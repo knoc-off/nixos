@@ -2,7 +2,7 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running `nixos-help`).
 
-{ config, pkgs, ... }:
+{ inputs, config, pkgs, ... }:
 
 {
   imports =
@@ -10,7 +10,8 @@
       # Include the results of the hardware scan.
       ./hardware/hardware-configuration.nix
       # move this to a flakes input
-      "${builtins.fetchTarball "https://github.com/nix-community/disko/archive/master.tar.gz"}/module.nix"
+      #"${builtins.fetchTarball "https://github.com/nix-community/disko/archive/master.tar.gz"}/module.nix"
+      inputs.disko.nixosModules.disko
 
       ./hardware/disks/btrfs-luks.nix
     ];

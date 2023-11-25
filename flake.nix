@@ -15,6 +15,10 @@
 
   inputs = {
 
+    inputs.disko.url = "github:nix-community/disko";
+    inputs.disko.inputs.nixpkgs.follows = "nixpkgs";
+
+
     unstable-packages.url = "github:nixos/nixpkgs/nixos-unstable";
     nixpkgs.url = "github:nixos/nixpkgs/nixos-23.05";
 
@@ -39,7 +43,7 @@
   };
 
   outputs =
-    inputs@{ self, nixpkgs, unstable-packages, home-manager, ... }:
+    inputs@{ self, nixpkgs, unstable-packages, home-manager, disko, ... }:
     let
       inherit (self) outputs;
       system = "x86_64-linux";
