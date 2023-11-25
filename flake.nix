@@ -15,8 +15,8 @@
 
   inputs = {
 
-    inputs.disko.url = "github:nix-community/disko";
-    inputs.disko.inputs.nixpkgs.follows = "nixpkgs";
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
 
 
     unstable-packages.url = "github:nixos/nixpkgs/nixos-unstable";
