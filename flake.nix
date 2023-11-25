@@ -50,7 +50,7 @@
       overlays = import ./overlays { inherit inputs; };
 
       nixosConfigurations = {
-        lapix = nixpkgs.lib.nixosSystem {
+        laptop = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           modules = [
             ./systems/laptop.nix

@@ -8,9 +8,11 @@
   imports =
     [
       # Include the results of the hardware scan.
-      ./hardware-configuration.nix
+      ./hardware/hardware-configuration.nix
+      # move this to a flakes input
       "${builtins.fetchTarball "https://github.com/nix-community/disko/archive/master.tar.gz"}/module.nix"
-      ./disks/btrfs-luks.nix
+
+      ./hardware/disks/btrfs-luks.nix
     ];
 
   # Use the systemd-boot EFI boot loader.
