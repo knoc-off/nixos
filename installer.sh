@@ -26,14 +26,19 @@ function download() {
     #
     # is it on github?
 
-    # read with default value
-    github="y"
     read -p "Is the repo on github? [y/n] " github
 
-
     read -p "Enter the username: " username
+
+    if [ -z "$username" ]; then
+        username="knoc-off";
+    fi
+
     read -p "Enter the repo name: " repo
-    #read -p "Enter the branch name: " branch
+
+    if [ -z "$repo" ]; then
+        repo="nixos-config";
+    fi
 
 
     if [ $github == "y" ]; then
