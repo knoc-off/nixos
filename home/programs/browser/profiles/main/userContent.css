@@ -1,0 +1,17 @@
+@-moz-document plain-text-document(), media-document(all) {
+  @media (prefers-color-scheme: dark) {
+    :root {
+      background-color: #${config.colorScheme.colors.base02} !important;
+    }
+    body:not([style*="background"], [class], [id]) {
+      background-color: transparent !important;
+    }
+  }
+}
+@-moz-document url("about:blank") {
+  @media (prefers-color-scheme: dark) {
+    :root {
+      background-color: #${config.colorScheme.colors.base02} !important;
+    }
+  }
+}

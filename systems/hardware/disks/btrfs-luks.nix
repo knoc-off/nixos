@@ -1,10 +1,10 @@
-
+#{ lib }:
 {
   disko.devices = {
     disk = {
       vdb = {
         type = "disk";
-        device = "/dev/sda";
+        device = "/dev/sda";#lib.mkDefault "/dev/sda";
         content = {
           type = "gpt";
           partitions = {

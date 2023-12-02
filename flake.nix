@@ -19,8 +19,9 @@
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
 
-    unstable-packages.url = "github:nixos/nixpkgs/nixos-unstable";
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-23.05";
+    #unstable-packages.url = "github:nixos/nixpkgs/nixos-unstable";
+    #nixpkgs.url = "github:nixos/nixpkgs/nixos-23.05";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
     # Firefox add-ons packaged for Nix
     firefox-addons = {
@@ -40,6 +41,9 @@
     # NixOS hardware-specific configurations
     hardware.url = "github:nixos/nixos-hardware";
 
+    # TPM
+    lanzaboote.url = "github:nix-community/lanzaboote";
+
   };
 
   outputs =
@@ -58,6 +62,8 @@
           specialArgs = { inherit inputs outputs; };
           modules = [
             ./systems/laptop.nix
+            disko.nixosModules.disko
+            #{ disko.devices.disk.vdb.device = "/dev/sda"; }
           ];
         };
         #desktop = nixpkgs.lib.nixosSystem {
@@ -71,7 +77,9 @@
       homeConfigurations = {
         "knoff/laptop" = home-manager.lib.homeManagerConfiguration {
           pkgs = nixpkgs.legacyPackages.x86_64-linux;
-          modules = [ ./home/knoff/lapix.nix ];
+          modules = [
+            ./home/knoff-laptop.nix
+          ];
           extraSpecialArgs = {
             inherit inputs;
             inherit outputs;
