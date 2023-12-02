@@ -55,7 +55,7 @@
     {
 
       # Your custom packages and modifications, exported as overlays
-      overlays = import ./overlays { inherit inputs; };
+      #overlays = import ./overlays { inherit inputs; };
 
       nixosConfigurations = {
         laptop = nixpkgs.lib.nixosSystem {
