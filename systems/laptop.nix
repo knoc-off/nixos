@@ -2,7 +2,7 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running `nixos-help`).
 
-{ inputs, config, pkgs, ... }:
+{ lib, inputs, config, pkgs, ... }:
 
 {
   imports =
@@ -11,14 +11,40 @@
       ./hardware/hardware-configuration.nix
       # move this to a flakes input
       #"${builtins.fetchTarball "https://github.com/nix-community/disko/archive/master.tar.gz"}/module.nix"
-      inputs.disko.nixosModules.disko
+      #inputs.lanzaboote.nixosModules.lanzaboote
+      #inputs.hardware
 
       ./hardware/disks/btrfs-luks.nix
     ];
 
   # Use the systemd-boot EFI boot loader.
+  # disable if using lanzaboote
   boot.loader.systemd-boot.enable = true;
+
   boot.loader.efi.canTouchEfiVariables = true;
+
+
+  # secureboot / lanzaboote
+  #
+  #  boot = {
+  #    bootspec.enable = true;
+  #    loader.systemd-boot.enable = lib.mkForce false;
+  #    lanzaboote = {
+  #      enable = true;
+  #      pkiBundle = "/etc/secureboot";
+  #    };
+  #  };
+
+
+  # enable setup mode
+  # 1) Select the "Security" tab.
+  # 2) Select the "Secure Boot" entry.
+  # 3) Set "Secure Boot" to enabled.
+  # 4) Select "Reset to Setup Mode".
+  # 5) Select "Clear All Secure Boot Keys".
+  # sudo nix run nixpkgs#sbctl enroll-keys -- --microsoft
+
+
 
   # networking.hostName = "nixos"; # Define your hostname.
   # Pick only one of the below networking options.
@@ -78,6 +104,9 @@
       tree
     ];
   };
+  users.users.root.openssh.authorizedKeys.keys = [
+      "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCzcqPB9VHe3vEaLRHEjtk39Y0cLIzl4MoInoMOIlHR3SmaNfaSYon64UGHydcTSoYusawKN+re+OPNHB/o04j7kW7Gfn3BDVzcwv2jADKmddC9fnhNz7YYC0S2aWMkvbXgzUmiQ3vC/g71xPYULKUBB0ZNKwV8DUjP/85Ft5I4CAfdcnss4410iVmWScLcmgZWHJgT0q0IAvdBQowMyJm5UIRINgZxOSOroEwgTFY74WNy/CKfx7/kDTte6OEgKwud99GhoA4o7up3GRXMPdFEut2af9iimIC7XyVRsTmQju1Jv1rf7KItRzAXGPYBNCz030Ak9bI1y8QwMYa1E/ZcnHXihdvAeEaJsUUPw9hmKOtNAtMnY42tRE4d+ihehZSKRhpXAUSoqdMvjCRNg2QjDvnv98GrAa7Mcbg7n5scCjuoczvaQ7cOAOGAYqLHLSBl9wqxUk9dZo0oTW/5NkHpslRNEy25biBqJukJAylLNXcB0YdnlTYDTcnyGtj9TIk= knoff" # content of authorized_keys file
+  ];
 
   # List packages installed in system profile. To search, run:
   # $ nix search wget
