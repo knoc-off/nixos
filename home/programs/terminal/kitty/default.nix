@@ -1,4 +1,14 @@
 { pkgs, config, theme, lib, ... }:
+let
+  isValidColor = thing:
+    if builtins.isString thing then
+      (builtins.match "^[0-9a-fA-F]{6}" thing) != null
+    else
+      false;
+
+
+  withHashtag = theme // (builtins.mapAttrs (_: value: if isValidColor value then "#" + value else value) theme);
+in
 {
   imports = [ ./tab_bar.nix ];
 
@@ -10,7 +20,7 @@
     };
     keybindings = {
       "ctrl+t" = "launch --cwd=current --type os-window";
-      "ctrl+l" =  "clear_terminal to_cursor active";
+      "ctrl+l" = "clear_terminal to_cursor active";
       #"ctrl+c" =  "copy_or_interrupt";
     };
     settings = {
@@ -19,68 +29,68 @@
       tab_title_template = " {index}: {f'{title[:6]}…{title[-6:]}' if title.rindex(title[-1]) + 1 > 13 else title.center(7)} ";
 
       window_padding_width = 0;
-      foreground = "#${theme.base06}";
-      background = "#${theme.base01}";
-      selection_background = "#${theme.base02}";
+      foreground = "${withHashtag.base06}";
+      background = "${withHashtag.base01}";
+      selection_background = "${withHashtag.base02}";
       selection_foreground = "none";
-      url_color = "#${theme.blue00}";
-      cursor = "#${theme.base06}";
+      url_color = "${withHashtag.blue00}";
+      cursor = "${withHashtag.base06}";
       #cursor_text_color = "none";
-      active_border_color = "#${theme.base03}";
-      inactive_border_color = "#${theme.base01}";
-      active_tab_background = "#${theme.base02}";
-      active_tab_foreground = "#${theme.base0D}";
-      inactive_tab_background = "#${theme.base01}";
-      inactive_tab_foreground = "#${theme.base05}";
-      tab_bar_background = "#${theme.base03}";
-      # Each of the theme below is paired with a light + dark varient
+      active_border_color = "${withHashtag.base03}";
+      inactive_border_color = "${withHashtag.base01}";
+      active_tab_background = "${withHashtag.base02}";
+      active_tab_foreground = "${withHashtag.base0D}";
+      inactive_tab_background = "${withHashtag.base01}";
+      inactive_tab_foreground = "${withHashtag.base05}";
+      tab_bar_background = "${withHashtag.base03}";
+      # Each of the withHashtag below is paired with a light + dark varient
       # might need to invert order.
       ## Black
-      color0 = "#${theme.base00}";
-      color8 = "#${theme.base01}";
+      color0 = "${withHashtag.base00}";
+      color8 = "${withHashtag.base01}";
 
       # Red
-      color1 = "#${theme.red00}";
-      color9 = "#${theme.red01}";
+      color1 = "${withHashtag.red00}";
+      color9 = "${withHashtag.red01}";
 
       # green
-      color2 = "#${theme.green00}";
-      color10 = "#${theme.green01}";
+      color2 = "${withHashtag.green00}";
+      color10 = "${withHashtag.green01}";
 
       # Yellow
-      color3 = "#${theme.yellow00}";
-      color11 = "#${theme.yellow01}";
+      color3 = "${withHashtag.yellow00}";
+      color11 = "${withHashtag.yellow01}";
 
       # Blue
-      color4 = "#${theme.blue00}";
-      color12 = "#${theme.blue01}";
+      color4 = "${withHashtag.blue00}";
+      color12 = "${withHashtag.blue01}";
 
       # Magenta
-      color5 = "#${theme.purple00}";
-      color13 = "#${theme.purple01}";
+      color5 = "${withHashtag.purple00}";
+      color13 = "${withHashtag.purple01}";
 
       # Cyan
-      color6 = "#${theme.cyan00}";
-      color14 = "#${theme.cyan01}";
+      color6 = "${withHashtag.cyan00}";
+      color14 = "${withHashtag.cyan01}";
 
       # White
-      color7 = "#${theme.white00}";
-      color15 = "#${theme.white01}";
+      color7 = "${withHashtag.white00}";
+      color15 = "${withHashtag.white01}";
 
-      mark1_foreground = "#${theme.base08}";
-      mark1_background = "#${theme.blue00}"; # light blue
-      mark2_foreground = "#${theme.base0A}";
-      mark2_background = "#${theme.orange00}"; # Beige
-      mark3_foreground = "#${theme.base0B}";
-      mark3_background = "#${theme.base0E}"; # Violet
+      mark1_foreground = "${withHashtag.base08}";
+      mark1_background = "${withHashtag.blue00}"; # light blue
+      mark2_foreground = "${withHashtag.base0A}";
+      mark2_background = "${withHashtag.orange00}"; # Beige
+      mark3_foreground = "${withHashtag.base0B}";
+      mark3_background = "${withHashtag.base0E}"; # Violet
 
       # IDK:
-      color16 = "#${theme.horriblepink}";
-      color17 = "#${theme.horriblepink}";
-      color18 = "#${theme.horriblepink}";
-      color19 = "#${theme.horriblepink}";
-      color20 = "#${theme.horriblepink}";
-      color21 = "#${theme.horriblepink}";
+      color16 = "${withHashtag.horriblepink}";
+      color17 = "${withHashtag.horriblepink}";
+      color18 = "${withHashtag.horriblepink}";
+      color19 = "${withHashtag.horriblepink}";
+      color20 = "${withHashtag.horriblepink}";
+      color21 = "${withHashtag.horriblepink}";
     };
   };
 }
