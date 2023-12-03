@@ -1,11 +1,12 @@
 #NixOS, home-manager, system configuration, package installation, program enablement, system options.
 { inputs, outputs, lib, config, pkgs, ... }: {
   imports = [
+    ./home/programs/editor/default.nix
     #./programs
     #./services
     #./desktop
     #./desktop/hyprland
-    ./enviroment.nix
+    #./enviroment.nix
   ];
 
   nixpkgs = {
@@ -29,22 +30,22 @@
   };
 
   # enable qt themes
-  qt = {
-    enable = true;
-    platformTheme = "gtk";
-    style = {
-      package = pkgs.adwaita-qt;
-    };
-  };
-
-  # enable gtk themes
-  gtk = {
-    enable = true;
-    theme = {
-      name = "Materia-dark";
-      package = pkgs.materia-theme;
-    };
-  };
+#  qt = {
+#    enable = true;
+#    platformTheme = "gtk";
+#    style = {
+#      package = pkgs.adwaita-qt;
+#    };
+#  };
+#
+#  # enable gtk themes
+#  gtk = {
+#    enable = true;
+#    theme = {
+#      name = "Materia-dark";
+#      package = pkgs.materia-theme;
+#    };
+#  };
 
   # Nicely reload system units when changing configs
   systemd.user.startServices = "sd-switch";
