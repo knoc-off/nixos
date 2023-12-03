@@ -23,7 +23,6 @@ in
 
   imports = [
     ./profiles/main
-    ./profiles/minimal
   ];
 
   programs.firefox = {

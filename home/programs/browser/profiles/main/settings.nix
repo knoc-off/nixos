@@ -1,114 +1,13 @@
 {
-  # I think its a bad idea to set this, but it could allow pre-configureations to work nicer
-  #"browser.uiCustomization.state"
+
+  # so the userchrome.css file is used
+  "toolkit.legacyUserProfileCustomizations.stylesheets" = true;
 
   # Make zoom more gradual
   "toolkit.zoomManager.zoomValues" =
     "0.30,0.32,0.34,0.36,0.38,0.40,0.42,0.44,0.46,0.48,0.50,0.52,0.54,0.56,0.58,0.60,0.62,0.64,0.66,0.68,0.70,0.72,0.74,0.76,0.78,0.80,0.82,0.84,0.86,0.88,0.90,0.92,0.94,0.96,0.98,1.0,1.02,1.04,1.06,1.08,1.10,1.12,1.14,1.16,1.18,1.20,1.22,1.24,1.26,1.28,1.30,1.32,1.34,1.36,1.38,1.40,1.42,1.44,1.46,1.48,1.50,1.52,1.54,1.56,1.58,1.60,1.62,1.64,1.66,1.68,1.70,1.72,1.74,1.76,1.78,1.80,1.82,1.84,1.86,1.88,1.90,1.92,1.94,1.96,1.98,2";
 
-  # Enable HTTPS-Only Mode
-  "dom.security.https_only_mode" = true;
-  "dom.security.https_only_mode_ever_enabled" = true;
 
-  # Privacy settings
-  "privacy.trackingprotection.pbmode.enabled" = true;
-  "privacy.usercontext.about_newtab_segregation.enabled" = true;
-  "security.ssl.disable_session_identifiers" = true;
-  "signon.autofillForms" = false;
-
-  "media.eme.enabled" = false;
-  "media.gmp-widevinecdm.enabled" = false;
-  "network.cookie.cookieBehavior" = 1;
-
-  "network.http.referer.trimmingPolicy" = 0;
-  "beacon.enabled" = false;
-  "browser.cache.offline.enable" = false;
-  "browser.disableResetPrompt" = true;
-  "browser.fixup.alternate.enabled" = false;
-  "browser.newtab.preload" = false;
-
-  "browser.newtabpage.activity-stream.disableSnippets" = true;
-  "browser.newtabpage.activity-stream.enabled" = false;
-  "browser.newtabpage.activity-stream.feeds.section.highlights" = false;
-  "browser.newtabpage.activity-stream.feeds.section.topstories" = false;
-  "browser.newtabpage.activity-stream.feeds.snippets" = false;
-  "browser.newtabpage.activity-stream.feeds.topsites" = false;
-  "browser.newtabpage.activity-stream.migrationExpired" = true;
-  "browser.newtabpage.activity-stream.prerender" = false;
-  "browser.newtabpage.activity-stream.showSearch" = false;
-  "browser.newtabpage.activity-stream.showTopSites" = false;
-
-  "browser.newtabpage.directory.source" = "";
-  "browser.newtabpage.directory.ping" = "";
-  "browser.newtabpage.enabled" = false;
-  "browser.newtabpage.enhanced" = false;
-  "browser.newtabpage.introShown" = true;
-
-  "browser.newtabpage.activity-stream.impressionId" = "";
-  "browser.selfsupport.url" = "";
-  "browser.send_pings" = false;
-  "browser.shell.checkDefaultBrowser" = false;
-  "browser.startup.homepage_override.mstone" = "ignore";
-  "datareporting.healthreport.service.enabled" = false;
-  "dom.battery.enabled" = false;
-  "dom.enable_performance" = false;
-  "dom.enable_resource_timing" = false;
-
-  "dom.webaudio.enabled" = false;
-  "extensions.getAddons.cache.enabled" = false;
-  "extensions.getAddons.showPane" = false;
-  "extensions.greasemonkey.stats.optedin" = false;
-  "extensions.greasemonkey.stats.url" = "";
-  "extensions.webservice.discoverURL" = "";
-  "geo.enabled" = false;
-  "media.navigator.enabled" = false;
-
-  "privacy.donottrackheader.enabled" = true;
-  "privacy.trackingprotection.enabled" = true;
-  "privacy.trackingprotection.socialtracking.enabled" = true;
-  "privacy.partition.network_state.ocsp_cache" = true;
-
-  ## New Tab
-  # Sponsors
-  "browser.newtabpage.activity-stream.showSponsored" = false;
-  "browser.newtabpage.activity-stream.showSponsoredTopSites" = false;
-  # pinned
-  "browser.newtabpage.activity-stream.improvesearch.topSiteSearchShortcuts.havePinned" =
-    "";
-  "browser.newtabpage.activity-stream.improvesearch.topSiteSearchShortcuts.searchEngines" =
-    "";
-  "browser.newtabpage.activity-stream.default.sites" = "";
-  "browser.newtabpage.blocked" = "";
-  "browser.search.hiddenOneOffs" = "Amazon.de,Bing,Google,Wikipedia (en)";
-
-  # Disable all sorts of telemetry
-  "browser.newtabpage.activity-stream.telemetry.structuredIngestion.endpoint" =
-    "";
-  "browser.newtabpage.activity-stream.feeds.telemetry" = false;
-  "browser.newtabpage.activity-stream.telemetry" = false;
-  "browser.ping-centre.telemetry" = false;
-  "devtools.onboarding.telemetry.logged" = false;
-  "toolkit.telemetry.unifiedIsOptIn" = false;
-  "toolkit.telemetry.archive.enabled" = false;
-  "toolkit.telemetry.bhrPing.enabled" = false;
-  "toolkit.telemetry.enabled" = false;
-  "toolkit.telemetry.rejected" = true;
-  "toolkit.telemetry.firstShutdownPing.enabled" = false;
-  "toolkit.telemetry.hybridContent.enabled" = false;
-  "toolkit.telemetry.newProfilePing.enabled" = false;
-  "toolkit.telemetry.reportingpolicy.firstRun" = false;
-  "toolkit.telemetry.shutdownPingSender.enabled" = false;
-  "toolkit.telemetry.unified" = false;
-  "toolkit.telemetry.updatePing.enabled" = false;
-  "toolkit.telemetry.server" = "";
-  "toolkit.telemetry.prompted" = 2;
-  "toolkit.telemetry.cachedClientID" = "";
-
-  # As well as Firefox 'experiments'
-  "experiments.activeExperiment" = false;
-  "experiments.enabled" = false;
-  "experiments.supported" = false;
-  "network.allow-experiments" = false;
 
   # Disable Pocket Integration
   "browser.newtabpage.activity-stream.section.highlights.includePocket" = false;
@@ -117,12 +16,6 @@
   "extensions.pocket.oAuthConsumerKey" = "";
   "extensions.pocket.showHome" = false;
   "extensions.pocket.site" = "";
-
-  ### More Privacy settings ###
-  "datareporting.sessions.current.clean" = true;
-  "datareporting.healthreport.uploadEnabled" = false;
-  "datareporting.policy.dataSubmissionEnabled" = false;
-  #"dom.push.userAgentID" = "";
 
   ## Fission
   "fission.autostart" = true;
@@ -134,8 +27,6 @@
   #"webgl.renderer-string-override" = " ";
   #"webgl.vendor-string-override" = " ";
 
-  ### Privacy /\
-
   #### Theme Settings ####
   ## personal
   "ui.key.menuAccessKeyFocuses" = false;
@@ -146,7 +37,6 @@
 
   ## Photon theme
   # Defaults
-  "toolkit.legacyUserProfileCustomizations.stylesheets" = true;
   "browser.proton.places-tooltip.enabled" = true;
   "svg.context-properties.content.enabled" = true;
   "layout.css.color-mix.enabled" = true;
@@ -241,10 +131,6 @@
   "userContent.page.proton_color" = true;
   "userContent.page.dark_mode" = true;
   "userContent.page.proton" = true;
-
-  # Useful Options
-  "browser.urlbar.suggest.calculator" = true;
-  "browser.urlbar.unitConversion.enabled" = true;
 
   # Smooth Scroll
   "general.autoScroll" = true; # Scroll with middle mouse click
