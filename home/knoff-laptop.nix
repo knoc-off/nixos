@@ -2,7 +2,7 @@
 { inputs, outputs, lib, config, pkgs, ... }: {
   imports = [
     ./programs/editor/default.nix
-    ./programs/terminal/shell
+    ./programs/terminal
     ./modules/sway
     #./programs
     #./services
