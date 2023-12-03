@@ -15,6 +15,11 @@
 
   inputs = {
 
+    # color scheme
+    themes.url = "github:RGBCube/ThemeNix";
+
+
+    # Disko - a declarative disk partitioning tool
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
@@ -32,9 +37,7 @@
     };
 
     # Hyprland
-    hyprland = {
-      url = "github:hyprwm/hyprland";
-    };
+    hyprland.url = "github:hyprwm/hyprland";
 
     # Home Manager (for managing user environments using Nix)
     home-manager.url = "github:nix-community/home-manager";
@@ -49,10 +52,13 @@
   };
 
   outputs =
-    inputs@{ self, nixpkgs, unstable-packages, home-manager, disko, ... }:
+    inputs@{ self, themes, nixpkgs, unstable-packages, home-manager, disko, ... }:
     let
       inherit (self) outputs;
       system = "x86_64-linux";
+
+      # theme
+      theme = themes.custom ./theme.nix;
     in
     {
 
@@ -75,20 +81,11 @@
                 inherit inputs;
                 inherit outputs;
                 inherit system;
-                #inherit nix-colors; # Shold substitute this
+                inherit theme;
               };
-
-              # Optionally, use home-manager.extraSpecialArgs to pass
-              # arguments to home.nix
             }
           ];
         };
-        #desktop = nixpkgs.lib.nixosSystem {
-        #  specialArgs = { inherit inputs outputs; };
-        #  modules = [
-        #    ./systems/desktop
-        #  ];
-        #};
       };
 
       homeConfigurations = {
@@ -101,7 +98,7 @@
             inherit inputs;
             inherit outputs;
             inherit system;
-            #inherit nix-colors; # Shold substitute this
+            inherit theme;
           };
         };
 

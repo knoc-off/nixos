@@ -2,12 +2,15 @@
 { inputs, outputs, lib, config, pkgs, ... }: {
   imports = [
     ./programs/editor/default.nix
+    ./programs/terminal/shell
     #./programs
     #./services
     #./desktop
     #./desktop/hyprland
     #./enviroment.nix
   ];
+
+  programs.home-manager.enable = true;
 
   nixpkgs = {
     overlays = [

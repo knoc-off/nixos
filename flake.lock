@@ -628,6 +628,7 @@
         "lanzaboote": "lanzaboote",
         "nixpkgs": "nixpkgs_3",
         "nixvim-flake": "nixvim-flake",
+        "themes": "themes",
         "unstable-packages": "unstable-packages"
       }
     },
@@ -728,6 +729,21 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
+        "type": "github"
+      }
+    },
+    "themes": {
+      "locked": {
+        "lastModified": 1701600988,
+        "narHash": "sha256-Y6F06KR4zkzxa1KwN3SfgZQ8KHhpgHpGD1CdbW2BuwE=",
+        "owner": "RGBCube",
+        "repo": "ThemeNix",
+        "rev": "e78e95f178afc6eadbb56b3547c9c9abd347240d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "RGBCube",
+        "repo": "ThemeNix",
         "type": "github"
       }
     },
