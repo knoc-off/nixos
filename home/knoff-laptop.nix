@@ -1,7 +1,7 @@
 #NixOS, home-manager, system configuration, package installation, program enablement, system options.
 { inputs, outputs, lib, config, pkgs, ... }: {
   imports = [
-    ./programs
+    #./programs
     #./services
     #./desktop
     #./desktop/hyprland
