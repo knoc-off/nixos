@@ -18,6 +18,8 @@
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
+    # my neovim config
+    nixvim-flake.url = "github:knoc-off/neovim-config";
 
     #unstable-packages.url = "github:nixos/nixpkgs/nixos-unstable";
     #nixpkgs.url = "github:nixos/nixpkgs/nixos-23.05";
@@ -66,9 +68,9 @@
             #{ disko.devices.disk.vdb.device = "/dev/sda"; }
             home-manager.nixosModules.home-manager
             {
-              home-manager.useGlobalPkgs = true;
+              home-manager.useGlobalPkgs = false;
               home-manager.useUserPackages = true;
-              home-manager.users.knoff = import ./home/knoff.nix;
+              home-manager.users.knoff = import ./home/knoff-laptop.nix;
               home-manager.extraSpecialArgs = {
                 inherit inputs;
                 inherit outputs;

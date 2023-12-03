@@ -2,29 +2,29 @@
 {
   imports = [
     # Terminal-related packages
-    ./terminal
-    ./ssh
+    #./terminal
+    #./ssh
 
     # Gaming-related packages
-    ./gaming
+    #./gaming
 
     # Editor-related packages
-    ./editor
+    #./editor
 
     # Browser-related packages
-    ./browser
+    #./browser
 
     # Virtualization-related packages
-    ./virtualization
+    #./virtualization
 
     # Media-related config
-    ./media
+    #./media
 
     # Manually set some dots
-    ./configs
+    #./configs
 
     # Filemanager-related packages
-    ./filemanager
+    #./filemanager
   ];
 
 
