@@ -60,8 +60,6 @@
       nixosConfigurations = {
         laptop = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
-          home-manager.url = "github:nix-community/home-manager/release-23.05";
-          home-manager.inputs.nixpkgs.follows = "nixpkgs";
           modules = [
             ./systems/laptop.nix
             disko.nixosModules.disko
