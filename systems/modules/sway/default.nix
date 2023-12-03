@@ -1,7 +1,7 @@
 { lib, pkgs, ... }:
 {
   imports = [
-    ./sway.nix
+    #./sway.nix
     #./greetd.nix
   ];
   programs.light.enable = true;

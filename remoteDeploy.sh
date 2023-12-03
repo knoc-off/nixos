@@ -72,9 +72,10 @@ function selectComputer() {
     echo $ip
 }
 
-# if argument is -y or --yes, then use the last options
+# if argument is not -y or --yes, then ask the user if he wants to use the last options
+yn="y"
+if [[ $1 != "-y" && $1 != "--yes" ]]; then
 
-if [[ ! $1 == "-y" || ! $1 == "--yes" ]]; then
     read -p "Do you want to use the last options? [Y/n] " yn
 fi
 
