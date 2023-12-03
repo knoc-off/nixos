@@ -4,7 +4,7 @@
     ./programs/editor/default.nix
     ./programs/terminal
     ./modules/sway
-    #./programs/browser
+    ./programs/browser
     #./programs
     #./services
     #./desktop
