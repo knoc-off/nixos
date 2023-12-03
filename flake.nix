@@ -58,7 +58,7 @@
       system = "x86_64-linux";
 
       # theme
-      theme = themes.custom ./theme.nix;
+      theme = themes.custom ( import ./theme.nix );
     in
     {
 

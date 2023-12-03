@@ -1,4 +1,4 @@
-{ lib, pkgs, config, ... }:
+{ lib, theme, pkgs, config, ... }:
 {
   home.packages = with pkgs; [
     chroma # Required for colorize...
@@ -19,7 +19,7 @@
 
     sessionVariables = {
       ZSH_COLORIZE_TOOL = "chroma";
-      ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE = "fg=#${config.colorScheme.colors.base05}";
+      ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE = "fg=#${theme.base05}"; # 05-07 for white
     };
 
 
