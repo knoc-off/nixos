@@ -89,7 +89,4 @@ in
     wrapperFeatures.gtk = true;
   };
 
-  xdg.configFile."sway/config".source = "./config";
-
-
 }
