@@ -1,7 +1,7 @@
 #NixOS, home-manager, system configuration, package installation, program enablement, system options.
 { inputs, outputs, lib, config, pkgs, ... }: {
   imports = [
-    ./home/programs/editor/default.nix
+    ./programs/editor/default.nix
     #./programs
     #./services
     #./desktop
