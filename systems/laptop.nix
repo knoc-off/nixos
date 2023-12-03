@@ -13,6 +13,7 @@
       #"${builtins.fetchTarball "https://github.com/nix-community/disko/archive/master.tar.gz"}/module.nix"
       #inputs.lanzaboote.nixosModules.lanzaboote
       #inputs.hardware
+      ./modules/sway
 
       ./hardware/disks/btrfs-luks.nix
     ];
