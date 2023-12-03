@@ -72,7 +72,12 @@ function selectComputer() {
     echo $ip
 }
 
-read -p "Do you want to use the last options? [Y/n] " yn
+# if argument is -y or --yes, then use the last options
+
+if [[ ! $1 == "-y" || ! $1 == "--yes" ]]; then
+    read -p "Do you want to use the last options? [Y/n] " yn
+fi
+
 if [[ $yn == "n" ]]; then
     # get the config
     selectConfig

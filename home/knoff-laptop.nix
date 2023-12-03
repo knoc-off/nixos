@@ -3,6 +3,7 @@
   imports = [
     ./programs/editor/default.nix
     ./programs/terminal/shell
+    ./modules/sway
     #./programs
     #./services
     #./desktop
