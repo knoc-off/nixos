@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, lib, pkgs, ... }:
 let
 
   fuzzel = "${pkgs.fuzzel}/bin/fuzzel";
@@ -11,7 +11,16 @@ in
 
   wayland.windowManager.sway = {
     enable = true;
+
+
     config = rec {
+      keybindings =
+        let
+          modifier = config.wayland.windowManager.sway.config.modifier;
+        in
+        lib.mkOptionDefault {
+          "${modifier}+space" = "exec ${fuzzel}";
+        };
       modifier = "Mod4";
       # Use kitty as default terminal
       terminal = "kitty";
@@ -36,8 +45,6 @@ in
       # give sway a little time to startup before starting kanshi.
       # exec sleep 5; systemctl --user start kanshi.service
 
-      # when press mod, run fuzzel
-      bindsym $mod+space exec ${fuzzel}
 
 
 
