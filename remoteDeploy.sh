@@ -74,10 +74,12 @@ function selectComputer() {
 
 # if argument is not -y or --yes, then ask the user if he wants to use the last options
 yn="y"
-if [[ $1 != "-y" && $1 != "--yes" ]]; then
 
+# check if the argument is not empty
+if [[ ! $# -gt 0 ]] || [[ $1 != "-y" && $1 != "--yes" ]]; then
     read -p "Do you want to use the last options? [Y/n] " yn
 fi
+
 
 if [[ $yn == "n" ]]; then
     # get the config

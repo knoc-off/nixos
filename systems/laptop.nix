@@ -18,6 +18,12 @@
       ./hardware/disks/btrfs-luks.nix
     ];
 
+  # Window manager
+  programs.hyprland = {
+    enable = true;
+    package = inputs.hyprland.packages.${pkgs.system}.hyprland;
+  };
+
   # Use the systemd-boot EFI boot loader.
   # disable if using lanzaboote
   boot.loader.systemd-boot.enable = true;
@@ -122,6 +128,7 @@
     git
     wget
     home-manager
+    libinput
   ];
 
   # Some programs need SUID wrappers, can be configured further or are
