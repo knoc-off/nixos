@@ -1,7 +1,4 @@
 { inputs, config, lib, pkgs, ... }:
-let
-
-in
 {
 
   programs.hyprland = {
@@ -9,12 +6,8 @@ in
     package = inputs.hyprland.packages.${pkgs.system}.hyprland;
   };
 
+  environment.sessionVariables.NIXOS_OZONE_WL = "1"; # electron apps use wayland
 
-
-  #wayland.windowManager.hyprland.settings = {
-  #  enable = true;
-  #  package = inputs.hyprland.packages.${pkgs.system}.hyprland;
-  #};
 
   nix.settings = {
     substituters = [ "https://hyprland.cachix.org" ];
