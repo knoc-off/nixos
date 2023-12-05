@@ -38,6 +38,9 @@
 
     # Hyprland
     hyprland.url = "github:hyprwm/hyprland";
+    hyprland-plugins.url = "github:hyprwm/hyprland-plugins";
+    hyprland-plugins.inputs.nixpkgs.follows = "nixpkgs";
+    #hyprland-plugins.inputs.hyprland.follows = "hyprland";
 
     # Home Manager (for managing user environments using Nix)
     home-manager.url = "github:nix-community/home-manager";
@@ -58,7 +61,7 @@
       system = "x86_64-linux";
 
       # theme
-      theme = themes.custom ( import ./theme.nix );
+      theme = themes.custom (import ./theme.nix);
     in
     {
 

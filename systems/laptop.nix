@@ -13,16 +13,13 @@
       #"${builtins.fetchTarball "https://github.com/nix-community/disko/archive/master.tar.gz"}/module.nix"
       #inputs.lanzaboote.nixosModules.lanzaboote
       #inputs.hardware
-      ./modules/sway
+      #./modules/sway
+      ./modules/nix.nix
+      ./modules/hyprland
 
       ./hardware/disks/btrfs-luks.nix
     ];
 
-  # Window manager
-  programs.hyprland = {
-    enable = true;
-    package = inputs.hyprland.packages.${pkgs.system}.hyprland;
-  };
 
   # Use the systemd-boot EFI boot loader.
   # disable if using lanzaboote
