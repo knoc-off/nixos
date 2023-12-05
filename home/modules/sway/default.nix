@@ -14,12 +14,49 @@ in
 
 
     config = rec {
+      gaps = {
+        inner = 10;
+        outer = 0;
+        smartGaps = true;
+        smartBorders = "on";
+      };
+
+      input = {
+        "type:touchpad" = {
+          accel_profile = "adaptive";
+          drag = "enabled";
+          drag_lock = "disabled";
+          dwt = "enabled";
+          left_handed = "disabled";
+          middle_emulation = "enabled";
+          pointer_accel = "0.3";
+          scroll_method = "two_finger";
+          scroll_factor = "0.5";
+          natural_scroll = "enabled";
+          tap = "enabled";
+        };
+
+        "type:keyboard" = {
+          xkb_layout = "us";
+          #xkb_variant = "dvorak";
+          #xkb_options = "compose:ralt";
+          xkb_options = "caps:escape";
+        };
+      };
+
+
       keybindings =
         let
-          modifier = config.wayland.windowManager.sway.config.modifier;
+          mod = config.wayland.windowManager.sway.config.modifier;
         in
         lib.mkOptionDefault {
-          "${modifier}+space" = "exec ${fuzzel}";
+          "${mod}+space" = "exec ${fuzzel}";
+
+
+
+
+
+          # Keybinds
         };
       modifier = "Mod4";
       # Use kitty as default terminal

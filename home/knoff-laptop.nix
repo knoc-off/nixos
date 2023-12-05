@@ -3,7 +3,8 @@
   imports = [
     ./programs/editor/default.nix
     ./programs/terminal
-    ./modules/sway
+    #./modules/sway
+    ./modules/hyprland
     ./programs/browser
     #./programs
     #./services
