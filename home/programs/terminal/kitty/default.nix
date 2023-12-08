@@ -85,12 +85,12 @@ in
       mark3_background = "${withHashtag.base0E}"; # Violet
 
       # IDK:
-      color16 = "${withHashtag.horriblepink}";
-      color17 = "${withHashtag.horriblepink}";
-      color18 = "${withHashtag.horriblepink}";
-      color19 = "${withHashtag.horriblepink}";
-      color20 = "${withHashtag.horriblepink}";
-      color21 = "${withHashtag.horriblepink}";
+      color16 = "${withHashtag.hp}";
+      color17 = "${withHashtag.hp}";
+      color18 = "${withHashtag.hp}";
+      color19 = "${withHashtag.hp}";
+      color20 = "${withHashtag.hp}";
+      color21 = "${withHashtag.hp}";
     };
   };
 }
