@@ -88,14 +88,22 @@ in
             }];
 
             icon = "${pkgs.nixos-icons}/share/icons/hicolor/scalable/apps/nix-snowflake.svg";
-            definedAliases = [ "@np" ];
+            definedAliases = [ "!p" ];
           };
 
           "NixOS Wiki" = {
             urls = [{ template = "https://nixos.wiki/index.php?search={searchTerms}"; }];
             iconUpdateURL = "https://nixos.wiki/favicon.png";
             updateInterval = 24 * 60 * 60 * 1000; # every day
-            definedAliases = [ "@nw" ];
+            icon = "${pkgs.nixos-icons}/share/icons/hicolor/scalable/apps/nix-snowflake.svg";
+            definedAliases = [ "!w" ];
+          };
+
+          "Home-Manager" = {
+            urls = [{ template = "https://mipmip.github.io/home-manager-option-search/?query={searchTerms}"; }];
+            updateInterval = 24 * 60 * 60 * 1000; # every day
+            icon = "${pkgs.nixos-icons}/share/icons/hicolor/scalable/apps/nix-snowflake.svg";
+            definedAliases = [ "!h" ];
           };
 
           "Bing".metaData.hidden = true;
@@ -119,9 +127,22 @@ in
           #sidebar-box{
             --uc-autohide-sidebar-delay: 100ms;
             --uc-autohide-transition-duration: 115ms;
-            --uc-sidebar-width: 40px;
+            --uc-sidebar-width: var(--sidebar-width);
+            --uc-sidebar-hover-width: 25vw;
+            background-color: #${theme.base02} !important;
           }
 
+          /* Some variables for quick configuration - play with numbers to find a perfect match for your setup */
+          :root {
+              --sidebar-width: 2vw;
+              --panel-width: 100vw; /* url bar width */
+              --panel-hide-offset: -30px;
+              --opacity-when-hidden: 0.0;
+          }
+
+          #sidebar-header {
+              display: none
+          }
 
           * {
             background-color: #${theme.hp} !important;
@@ -138,6 +159,7 @@ in
           #bookmarksPanel, #history-panel {
             background-color: #${theme.base01} !important;
           }
+
           #sidebar-header,#sidebar-search-container,#bookmarks-view-children,#historyTree {
             color: #${theme.base01} !important;
             background-color: #${theme.base01} !important;
@@ -145,13 +167,6 @@ in
             border-color:transparent !important;
           }
 
-          #sidebar-box{
-            --sidebar-transition-delay: 100ms;
-            --sidebar-width: 48px;
-            --sidebar-hover-width: calc(calc(calc(var(--sidebar-width) - 0.65em) * 10) + 0.65em);
-            --autohide-sidebar-delay: 100ms; /* Delay before hiding the sidebar */
-            --sidebar-background-color: #${theme.base02} !important;
-          }
 
           .sidebar-panel #search-box{
             background-color: #${theme.base03} !important;
@@ -257,13 +272,6 @@ in
           }
 
 
-          /* Some variables for quick configuration - play with numbers to find a perfect match for your setup */
-          :root {
-              --sidebar-width: 0vw;
-              --panel-width: 100vw;
-              --panel-hide-offset: -30px;
-              --opacity-when-hidden: 0.0;
-          }
 
 
           /* Auto-hide address bar */
@@ -282,8 +290,8 @@ in
 
           #navigator-toolbox,
           #navigator-toolbox > *{
-            /* Reduced width for panel in order to not overflow the screen on the right side */
-             width:  var(--panel-width);
+            /* calculate pannel width minus --uc-sidebar-width */
+             width: calc(var(--panel-width) - var(--sidebar-width));
           }
 
           /* if the cursor is at the top 30px of the screen, show the toolbar */
@@ -468,3 +476,152 @@ in
     };
   };
 }
+
+# Sideberry content
+#@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
+#/* This Source Code Form is subject to the terms of the Mozilla Public
+# * License, v. 2.0. If a copy of the MPL was not distributed with this
+# * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+#
+#/*
+# * This style will hide the tab bar. For MacOS Big Sur
+# *
+# * Contributor(s): Isaac-Newt, Ivan0xFF, millerdev, AMomchilov
+# */
+#
+# #titlebar {
+#  visibility: collapse;
+#}
+#
+#/* Position window controls */
+##TabsToolbar .titlebar-buttonbox-container {
+#  display: block;
+#  position: absolute;
+#  visibility: visible;
+#}
+#
+#/* Reposition the close/maximize/minimize buttons for the "normal" toolbar density  */
+#/* When the UI density is set to "normal", the `uidensity` attribute is undefined.  */
+#/* `window.document.documentElement.getAttribute("uidensity")` will be null.        */
+#:root:not([uidensity]) #TabsToolbar .titlebar-buttonbox-container {
+#  margin-left: 12px;
+#  margin-top: 12px;
+#}
+#
+#/* Reposition the close/maximize/minimize buttons for the "compact" toolbar density */
+#:root[uidensity="compact"] #TabsToolbar .titlebar-buttonbox-container {
+#  margin-left: 10px;
+#  margin-top: 9px;
+#}
+#
+##TabsToolbar .titlebar-buttonbox.titlebar-color {
+#  margin-left: 0px !important;
+#}
+#
+#/*
+# * Make room for window controls and a bit of extra space for window drag/move.
+# * Only apply this style when not in fullscreen mode.
+# */
+##main-window:not([inFullscreen]) #nav-bar {
+#  padding: 0px 0px 0px 70px !important;
+#}
+#
+#/*  Sideberry Dynamic sidebar   */
+#
+#/* Add the following to Sideberry settings/Styles Editor/Sidebar:
+#.Tab[data-pin="false"] .ctx {
+#  right: unset !important;
+#}
+#*/
+#
+##sidebar-box {
+#  background-color: #2B2A33;
+#  overflow: hidden;
+#  height: calc(100% + 6px);
+#  position: fixed;
+#  max-width: 26em !important;
+#  width: 100% !important;
+#  display: block;
+#  transition: 90ms;
+#}
+#
+##sidebar-box:hover {
+#  padding-bottom: 50px;
+#  position: absolute;
+#  z-index: 1;
+#}
+#
+##sidebar-header {
+#  background-color: #2B2A33;
+#}
+#
+##sidebar {
+#  width: calc(45px * 7) !important;
+#  max-width: 50vw !important;
+#  height: 100%;
+#}
+#
+##sidebar:hover {
+#  max-width: 100% !important;
+#}
+#
+##appcontent {
+#  margin-left: 45px;
+#}
+#
+#/* Page Actions Hide and Show on Hover */
+#
+#/* Hide Buttons and Reveal on Hover */
+#
+##page-action-buttons:not(:hover) .urlbar-page-action,
+##page-action-buttons:not(:hover) #star-button
+#{
+#  width: 0px !important;
+#  min-width: 0px !important;
+#  padding-left: 0px !important;
+#  padding-right: 10px !important;
+#  margin-right: -5px !important;
+#  transition: all 250ms ease-in-out;
+#}
+#
+##page-action-buttons:not(:hover) #userContext-indicator {
+#  margin-right : 45px !important;
+#  transition: all 250ms ease-in-out;
+#}
+#
+##page-action-buttons:hover .urlbar-page-action,
+##page-action-buttons:hover #star-button  {
+#  visibility: visible;
+#  min-width: unset !important;
+#}
+#
+##page-action-buttons:hover #userContext-indicator {
+#  margin-right : 0px !important;
+#}
+#
+#/* Create page actions hover "button" */
+##page-action-buttons::after {
+#  content: "•••";
+#  position: absolute;
+#  top: 0.7em;
+#  font-size: 0.7em;
+#  opacity: 0.5;
+#  right: 8px;
+#  transition: all 50ms ease-in-out;
+#}
+#
+#/* Hide the button on hover */
+##page-action-buttons:hover::after {
+#  display: none !important;
+#  width: 0px !important;
+#  margin-left: 0px !important;
+#  transition: all 50ms ease-in-out;
+#}
+#
+#/* Hide URLBar Buttons and Reveal on Hover Finished*/
+##urlbar,#searchbar {
+#  font-size: 13px !important;
+#	margin-top: 1px !important;
+#}
+
+
