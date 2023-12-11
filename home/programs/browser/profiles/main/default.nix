@@ -1,4 +1,4 @@
-{ theme, pkgs, config, inputs, lib, ... }:
+args@{ theme, pkgs, config, inputs, lib, ... }:
 let
   # unsigned int
   id = 0;
@@ -32,12 +32,10 @@ let
     rev = "67a9e9f9c96e6d007b4c57f1dd7eaceaee135178";
     sha256 = "sha256-uz6tqkjjTFMvY6IY70ke8dW5nst0AJoWJHObtzalQAc=";
   };
-
-
-
-
 in
 {
+
+
   home.file = {
     "firefox-csshacks" = {
       source = "${firefox-csshacks}";
@@ -132,7 +130,7 @@ in
             background-color: #${theme.base02} !important;
           }
 
-          /* Some variables for quick configuration - play with numbers to find a perfect match for your setup */
+          /* this is url bar options */
           :root {
               --sidebar-width: 2vw;
               --panel-width: 100vw; /* url bar width */
@@ -140,10 +138,12 @@ in
               --opacity-when-hidden: 0.0;
           }
 
+          /* this removes the sidebar header */
           #sidebar-header {
               display: none
           }
 
+          /* not sure. i think it removes the url bar */
           * {
             background-color: #${theme.hp} !important;
             -moz-appearance: none !important;
@@ -183,6 +183,8 @@ in
             background-repeat: no-repeat;
           }
 
+          /* what does this do. */
+          /*
           #browser {
             --sidebar-border-color: #${theme.base01} !important;
           }
@@ -193,6 +195,7 @@ in
           #sidebar-header::after{
             background-color: #${theme.base02} !important;
           }
+          */
 
           /* hides the native tabs */
           #TabsToolbar {
@@ -208,6 +211,7 @@ in
           }
 
           /* Color Configs */
+          /* should try to remove &/or debug */
           :root{
             -moz-border-radius: 1em;
             /* Popup panels */
