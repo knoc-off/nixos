@@ -38,7 +38,7 @@
     # Hyprland
     hyprland.url = "github:hyprwm/hyprland";
     hyprland-plugins.url = "github:hyprwm/hyprland-plugins";
-    #hyprland-plugins.inputs.hyprland.follows = "hyprland";
+    hyprland-plugins.inputs.hyprland.follows = "hyprland";
 
     # Home Manager (for managing user environments using Nix)
     home-manager.url = "github:nix-community/home-manager";
