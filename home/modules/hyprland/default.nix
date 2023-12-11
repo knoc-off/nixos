@@ -27,15 +27,29 @@ let
 
 
 
+  # hyprpaper config
+  # need to put the wallpaper into the nix-store.
   wallpaper = pkgs.writeText "wallpaper"
     ''
-      preload = /home/knoff/Nix-Config/home/knoff/desktop/thinknix-d.png
+      preload = ${./thinknix-d.png}
 
-      wallpaper = eDP-1,/home/knoff/Nix-Config/home/knoff/desktop/thinknix-d.png
+      wallpaper = eDP-1, ${./thinknix-d.png}
     '';
 in
 {
 
+  services.swayidle.enable = true;
+  services.swayidle = {
+    events = [
+      { event = "before-sleep"; command = "${pkgs.swaylock}/bin/swaylock -fF"; }
+      { event = "lock"; command = "lock"; }
+    ];
+    timeouts = [
+      { timeout = 60; command = "${pkgs.swaylock}/bin/swaylock -fF"; }
+      { timeout = 3600; command = "${pkgs.systemd}/bin/systemctl suspend"; }
+    ];
+
+  };
 
   home.packages = [ launcher debug-kitty pkgs.hyprpaper ];
   xdg.desktopEntries."org.gnome.Settings" = {
