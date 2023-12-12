@@ -1,4 +1,4 @@
-{ inputs, pkgs, theme, ... }:
+{ inputs, pkgs, theme, config, ... }:
 let
   # theres a few unchecked dependencies here.
   # like notify-send, etc. could link it like i do with fuzzle
@@ -6,7 +6,7 @@ let
   hyprland = inputs.hyprland.packages.${pkgs.system}.hyprland;
   plugins = inputs.hyprland-plugins.packages.${pkgs.system};
 
-  fuzzel = "${pkgs.fuzzel}/bin/fuzzel";
+  fuzzel = "${pkgs.fuzzel}/bin/fuzzel -b ${theme.base02}DD -t ${theme.base06}DD -m ${theme.base04}DD -C ${theme.base05}DD -s ${theme.base03}DD -S ${theme.base07}DD -M ${theme.base07}DD";
   notify-send = "${pkgs.libnotify}/bin/notify-send";
 
   debug-kitty = pkgs.writeShellScriptBin "debug-kitty" ''
@@ -24,6 +24,112 @@ let
     exec ${hyprland}/bin/Hyprland
   '';
 
+  swaylock = pkgs.writeShellScriptBin "swaylock" ''
+    #!/${pkgs.bash}/bin/bash
+
+    layout_bg_color="${theme.base00}"
+    layout_border_color="${theme.base02}"
+    layout_text_color="${theme.base05}"
+
+    # Verification
+    line_ver_color="${theme.green00}" # Inner & Outer Glow on Ring color
+    inside_ver_color="${theme.green02}"
+    ring_ver_color="${theme.green01}"
+    text_ver_color="${theme.white00}"
+
+    # Wrong
+    line_wrong_color="${theme.red00}"
+    inside_wrong_color="${theme.red02}"
+    ring_wrong_color="${theme.red01}"
+    text_wrong_color="${theme.white00}"
+
+    # Clear
+    line_clear_color="${theme.base00}"
+    inside_clear_color="${theme.base00}"
+    ring_clear_color="${theme.base00}"
+    text_clear_color="${theme.base00}"
+
+    # Main
+    ring_color="${theme.base00}"
+    key_hl_color="${theme.base00}" # Similar to :on-click, Color of the 1/6 or 1/8 of the ring hilighted per letter typed
+    text_color="${theme.base00}"
+
+    # Ring ?
+    line_color="${theme.base00}"
+    inside_color="${theme.base00}"
+    separator_color="${theme.base00}"
+
+    # Font
+    font="DejaVu Sans Book"
+    font_size="96"
+
+    # Ring Size & Thickness
+    indicator_radius="300"
+    indicator_thickness="10"
+
+    # Date & Time Format
+    date_format="%Y.%m.%d"
+    time_format="%H:%M:%S"
+
+    # Background Effects
+    effect_blur="5x5"
+    effect_pixelate="10"
+
+    exec swaylock \
+    --layout-bg-color $layout_bg_color \
+    --layout-border-color $layout_border_color \
+    --layout-text-color $layout_text_color \
+    \
+    --line-ver-color $line_ver_color \
+    --inside-ver-color $inside_ver_color \
+    --ring-ver-color $ring_ver_color \
+    --text-ver-color $text_ver_color \
+    \
+    --line-wrong-color $line_wrong_color \
+    --inside-wrong-color $inside_wrong_color \
+    --ring-wrong-color $ring_wrong_color \
+    --text-wrong-color $text_wrong_color \
+    \
+    --line-clear-color $line_clear_color \
+    --inside-clear-color $inside_clear_color \
+    --ring-clear-color $ring_clear_color \
+    --text-clear-color $text_clear_color \
+    \
+    --ring-color $ring_color \
+    --key-hl-color $key_hl_color \
+    --text-color $text_color \
+    \
+    --line-color $line_color \
+    --inside-color $inside_color \
+    --separator-color $separator_color \
+    \
+    --indicator \
+    --indicator-radius $indicator_radius \
+    --indicator-thickness $indicator_thickness \
+    \
+    --clock \
+    --datestr $date_format --timestr $time_format \
+    \
+    --screenshots \
+    --effect-custom /System/Config/Sway\ Lock\ Effects/Effects/twist-effect.c \
+    --effect-greyscale \
+    --effect-blur $effect_blur \
+    #--font $font \
+    #--font-size $font_size \
+    #--effect-compose $effect_compose \
+    #--effect-pixelate $effect_pixelate \
+    #--image "/System/Appearance/Backgrounds/Lock/Eye.jpg" \
+    #--effect-compose "50%x50%;center;/System/Appearance/Backgrounds/Lock/Eye.jpg" \
+    #--screenshots \
+    # --effect-vignette 0.5:0.25 \
+    # --effect-custom ~/twist-effect.c \
+    # --daemonize
+    # DejaVuSansMono Mono
+    # DejaVu Sans Book
+    # /System/Appearance/Backgrounds/Lock/StarCraft.png
+    # /System/Appearance/Backgrounds/Lock/Eye.jpg
+    # $(cat /System/Config/Sway/Variables/Backgrounds/Lock)
+  '';
 
 
 
@@ -41,15 +147,52 @@ in
   services.swayidle.enable = true;
   services.swayidle = {
     events = [
-      { event = "before-sleep"; command = "${pkgs.swaylock}/bin/swaylock -fF"; }
+      { event = "before-sleep"; command = "${config.programs.swaylock.package}/bin/swaylock --effect-blur 20x3 -S"; }
       { event = "lock"; command = "lock"; }
     ];
     timeouts = [
-      { timeout = 60; command = "${pkgs.swaylock}/bin/swaylock -fF"; }
+      { timeout = 60; command = "${config.programs.swaylock.package}/bin/swaylock --effect-blur 20x3 -S"; }
       { timeout = 3600; command = "${pkgs.systemd}/bin/systemctl suspend"; }
     ];
 
   };
+
+  programs.swaylock = {
+    package = pkgs.swaylock-effects;
+    settings = {
+      effect-blur = "20x3";
+
+      font = config.fontProfiles.regular.family;
+      font-size = 15;
+
+      line-uses-inside = true;
+      disable-caps-lock-text = true;
+      indicator-caps-lock = true;
+      indicator-radius = 40;
+      indicator-idle-visible = true;
+      indicator-y-position = 1000;
+
+      ring-color = "#${theme.base02}";
+      inside-wrong-color = "#${theme.base08}";
+      ring-wrong-color = "#${theme.base08}";
+      key-hl-color = "#${theme.base0B}";
+      bs-hl-color = "#${theme.base08}";
+      ring-ver-color = "#${theme.base09}";
+      inside-ver-color = "#${theme.base09}";
+      inside-color = "#${theme.base01}";
+      text-color = "#${theme.base07}";
+      text-clear-color = "#${theme.base01}";
+      text-ver-color = "#${theme.base01}";
+      text-wrong-color = "#${theme.base01}";
+      text-caps-lock-color = "#${theme.base07}";
+      inside-clear-color = "#${theme.base0C}";
+      ring-clear-color = "#${theme.base0C}";
+      inside-caps-lock-color = "#${theme.base09}";
+      ring-caps-lock-color = "#${theme.base02}";
+      separator-color = "#${theme.base02}";
+    };
+  };
+
 
   home.packages = [ launcher debug-kitty pkgs.hyprpaper ];
   xdg.desktopEntries."org.gnome.Settings" = {
@@ -260,8 +403,10 @@ in
           "${mainMod}, G, togglegroup, 0"
           ", page_down, changegroupactive, f"
           ", page_up, changegroupactive, b"
-          "${mainMod}, L, denywindowfromgroup, toggle"
-          "${mainMod}, L, lockactivegroup, toggle"
+          #"${mainMod}, L, denywindowfromgroup, toggle"
+          #"${mainMod}, L, lockactivegroup, toggle"
+          #${pkgs.swaylock}/bin/swaylock -fF
+          "${mainMod}, L, exec, ${config.programs.swaylock.package}/bin/swaylock --effect-blur \"20x3\" -S"
 
 
           (mvfocus "k" "u")

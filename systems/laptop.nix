@@ -21,6 +21,12 @@
     ];
 
 
+  # IDK if this does anything, TODO: check
+  environment.etc = {
+    "xdg/gtk-2.0".source = "${pkgs.theme-obsidian2}/share/themes/Materia-dark/gtk-2.0";
+    "xdg/gtk-3.0".source = "${pkgs.theme-obsidian2}/share/themes/Materia-dark/gtk-3.0";
+  };
+
   # Use the systemd-boot EFI boot loader.
   # disable if using lanzaboote
   boot.loader.systemd-boot.enable = true;
@@ -80,6 +86,16 @@
     dina-font
     proggyfonts
   ];
+
+  fonts = {
+    enableDefaultPackages = true;
+
+    fontconfig = {
+      defaultFonts = {
+        monospace = [ "FiraCode" ];
+      };
+    };
+  };
 
   # Enable the X11 windowing system.
   # services.xserver.enable = true;
