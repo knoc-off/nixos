@@ -24,7 +24,7 @@ let
     exec ${hyprland}/bin/Hyprland
   '';
 
-  swaylock = pkgs.writeShellScriptBin "swaylock" ''
+  swaylock-custom = pkgs.writeShellScriptBin "swaylock-custom" ''
     #!/${pkgs.bash}/bin/bash
 
     layout_bg_color="${theme.base00}"
@@ -50,21 +50,24 @@ let
     text_clear_color="${theme.base00}"
 
     # Main
-    ring_color="${theme.base00}"
-    key_hl_color="${theme.base00}" # Similar to :on-click, Color of the 1/6 or 1/8 of the ring hilighted per letter typed
-    text_color="${theme.base00}"
+    ring_color="${theme.base02}"
+    key_hl_color="${theme.base0B}" # Similar to :on-click, Color of the 1/6 or 1/8 of the ring hilighted per letter typed
+    text_color="${theme.base05}"
 
     # Ring ?
     line_color="${theme.base00}"
-    inside_color="${theme.base00}"
-    separator_color="${theme.base00}"
+    inside_color="${theme.base01}"
+    separator_color="${theme.base02}"
+
+    #font = config.fontProfiles.regular.family;
+    #indicator-caps-lock = true;
 
     # Font
     font="DejaVu Sans Book"
     font_size="96"
 
     # Ring Size & Thickness
-    indicator_radius="300"
+    indicator_radius="80"
     indicator_thickness="10"
 
     # Date & Time Format
@@ -75,7 +78,7 @@ let
     effect_blur="5x5"
     effect_pixelate="10"
 
-    exec swaylock \
+    exec ${config.programs.swaylock.package}/bin/swaylock \
     --layout-bg-color $layout_bg_color \
     --layout-border-color $layout_border_color \
     --layout-text-color $layout_text_color \
@@ -111,13 +114,17 @@ let
     --datestr $date_format --timestr $time_format \
     \
     --screenshots \
-    --effect-custom /System/Config/Sway\ Lock\ Effects/Effects/twist-effect.c \
     --effect-greyscale \
     --effect-blur $effect_blur \
+    #--effect-pixelate $effect_pixelate \
+
+
+
+
+    #--effect-custom /System/Config/Sway\ Lock\ Effects/Effects/twist-effect.c \
     #--font $font \
     #--font-size $font_size \
     #--effect-compose $effect_compose \
-    #--effect-pixelate $effect_pixelate \
     #--image "/System/Appearance/Backgrounds/Lock/Eye.jpg" \
     #--effect-compose "50%x50%;center;/System/Appearance/Backgrounds/Lock/Eye.jpg" \
     #--screenshots \
@@ -147,11 +154,11 @@ in
   services.swayidle.enable = true;
   services.swayidle = {
     events = [
-      { event = "before-sleep"; command = "${config.programs.swaylock.package}/bin/swaylock --effect-blur 20x3 -S"; }
+      { event = "before-sleep"; command = "${swaylock-custom}/bin/swaylock-custom"; }
       { event = "lock"; command = "lock"; }
     ];
     timeouts = [
-      { timeout = 60; command = "${config.programs.swaylock.package}/bin/swaylock --effect-blur 20x3 -S"; }
+      { timeout = 60; command = "${swaylock-custom}/bin/swaylock-custom"; }
       { timeout = 3600; command = "${pkgs.systemd}/bin/systemctl suspend"; }
     ];
 
@@ -159,38 +166,6 @@ in
 
   programs.swaylock = {
     package = pkgs.swaylock-effects;
-    settings = {
-      effect-blur = "20x3";
-
-      font = config.fontProfiles.regular.family;
-      font-size = 15;
-
-      line-uses-inside = true;
-      disable-caps-lock-text = true;
-      indicator-caps-lock = true;
-      indicator-radius = 40;
-      indicator-idle-visible = true;
-      indicator-y-position = 1000;
-
-      ring-color = "#${theme.base02}";
-      inside-wrong-color = "#${theme.base08}";
-      ring-wrong-color = "#${theme.base08}";
-      key-hl-color = "#${theme.base0B}";
-      bs-hl-color = "#${theme.base08}";
-      ring-ver-color = "#${theme.base09}";
-      inside-ver-color = "#${theme.base09}";
-      inside-color = "#${theme.base01}";
-      text-color = "#${theme.base07}";
-      text-clear-color = "#${theme.base01}";
-      text-ver-color = "#${theme.base01}";
-      text-wrong-color = "#${theme.base01}";
-      text-caps-lock-color = "#${theme.base07}";
-      inside-clear-color = "#${theme.base0C}";
-      ring-clear-color = "#${theme.base0C}";
-      inside-caps-lock-color = "#${theme.base09}";
-      ring-caps-lock-color = "#${theme.base02}";
-      separator-color = "#${theme.base02}";
-    };
   };
 
 
@@ -406,7 +381,8 @@ in
           #"${mainMod}, L, denywindowfromgroup, toggle"
           #"${mainMod}, L, lockactivegroup, toggle"
           #${pkgs.swaylock}/bin/swaylock -fF
-          "${mainMod}, L, exec, ${config.programs.swaylock.package}/bin/swaylock --effect-blur \"20x3\" -S"
+          #"${mainMod}, L, exec, ${config.programs.swaylock.package}/bin/swaylock --effect-blur \"20x3\" -S"
+          "${mainMod}, L, exec, ${swaylock-custom}/bin/swaylock-custom"
 
 
           (mvfocus "k" "u")
