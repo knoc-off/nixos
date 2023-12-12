@@ -132,7 +132,7 @@ in
 
           /* this is url bar options */
           :root {
-              --sidebar-width: 2vw;
+              --sidebar-width: 40px;
               --panel-width: 100vw; /* url bar width */
               --panel-hide-offset: -30px;
               --opacity-when-hidden: 0.0;

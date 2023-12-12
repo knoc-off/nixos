@@ -1,10 +1,10 @@
 {
   name = "dark";
   author = "knoff";
-  base00 = "151B25"; #151B25
-  base01 = "212D40"; #212D40
-  base02 = "313C51"; #313C51
-  base03 = "364156"; #364156
+  base00 = "131415"; #131415
+  base01 = "1a1c1d"; #1a1c1d
+  base02 = "242628"; #242628
+  base03 = "393b3c"; #393b3c
   base04 = "adb5bd"; #adb5bd
   base05 = "ced4da"; #ced4da
   base06 = "dee2e6"; #dee2e6
@@ -24,18 +24,18 @@
   # they are all unique colors, And distinct from each other.
   # they are also all bright colors, so they are easy to see.
   # follows roygbiv, and then some.
-  idk00 = "#FF0000";
-  idk01 = "#FF8000";
-  idk02 = "#FFFF00";
-  idk03 = "#80FF00";
-  idk04 = "#00FF00";
-  idk05 = "#00FF80";
-  idk06 = "#00FFFF";
-  idk07 = "#0080FF";
-  idk08 = "#0000FF";
-  idk09 = "#8000FF";
-  idk0A = "#FF00FF";
-  idk0B = "#FF0080";
+  idk00 = "FF0000"; #FF0000
+  idk01 = "FF8000"; #FF8000
+  idk02 = "FFFF00"; #FFFF00
+  idk03 = "80FF00"; #80FF00
+  idk04 = "00FF00"; #00FF00
+  idk05 = "00FF80"; #00FF80
+  idk06 = "00FFFF"; #00FFFF
+  idk07 = "0080FF"; #0080FF
+  idk08 = "0000FF"; #0000FF
+  idk09 = "8000FF"; #8000FF
+  idk0A = "FF00FF"; #FF00FF
+  idk0B = "FF0080"; #FF0080
 
   # These should all go from light to dark
 

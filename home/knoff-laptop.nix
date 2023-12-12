@@ -14,6 +14,7 @@
   ];
 
   programs.home-manager.enable = true;
+  fonts.fontconfig.enable = true;
 
   nixpkgs = {
     overlays = [
@@ -36,22 +37,22 @@
   };
 
   # enable qt themes
-#  qt = {
-#    enable = true;
-#    platformTheme = "gtk";
-#    style = {
-#      package = pkgs.adwaita-qt;
-#    };
-#  };
-#
-#  # enable gtk themes
-#  gtk = {
-#    enable = true;
-#    theme = {
-#      name = "Materia-dark";
-#      package = pkgs.materia-theme;
-#    };
-#  };
+  #  qt = {
+  #    enable = true;
+  #    platformTheme = "gtk";
+  #    style = {
+  #      package = pkgs.adwaita-qt;
+  #    };
+  #  };
+  #
+  #  # enable gtk themes
+  #  gtk = {
+  #    enable = true;
+  #    theme = {
+  #      name = "Materia-dark";
+  #      package = pkgs.materia-theme;
+  #    };
+  #  };
 
   # Nicely reload system units when changing configs
   systemd.user.startServices = "sd-switch";
