@@ -1,7 +1,6 @@
 { inputs, pkgs, ... }:
 {
 
-
   services.greetd.enable = true;
 
   # For greetd, we need a shell script into path, which lets us start qtile.service (after importing the environment of the login shell).
@@ -17,22 +16,30 @@
     hypr
   ''}";
 
+  # Backlight control
+  programs.light.enable = true;
 
-
+  # allow x compositor
   services.xserver = {
     displayManager.startx.enable = true;
   };
 
+  # hyprland.
   programs.hyprland = {
     enable = true;
     package = inputs.hyprland.packages.${pkgs.system}.hyprland;
     xwayland.enable = true;
   };
 
+  # portals
   xdg.portal = {
     enable = true;
     extraPortals = [ pkgs.xdg-desktop-portal-gnome ];
   };
+
+
+
+
 
   security = {
     polkit.enable = true;
@@ -52,10 +59,6 @@
     swaylock
     swayidle
   ];
-
-
-
-
 
   systemd = {
     user.services.polkit-gnome-authentication-agent-1 = {
@@ -86,5 +89,7 @@
       gnome-online-accounts.enable = true;
     };
   };
+
   environment.sessionVariables.NIXOS_OZONE_WL = "1"; # electron apps use wayland
+
 }

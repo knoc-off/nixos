@@ -63,7 +63,6 @@ in
         bitwarden
 
         # Appearance/functionality
-        new-tab-override
         sidebery
 
         smart-referer

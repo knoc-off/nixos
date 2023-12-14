@@ -4,7 +4,7 @@
     disk = {
       vdb = {
         type = "disk";
-        device = "/dev/sda";#lib.mkDefault "/dev/sda";
+        device = "/dev/nvme0n1";#lib.mkDefault "/dev/sda";
         content = {
           type = "gpt";
           partitions = {

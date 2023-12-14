@@ -11,7 +11,6 @@ let
 
   debug-kitty = pkgs.writeShellScriptBin "debug-kitty" ''
     #!/${pkgs.bash}/bin/bash
-
     exec ${pkgs.kitty}/bin/kitty --title NAN
   '';
 
@@ -45,13 +44,13 @@ let
 
     # Clear
     line_clear_color="${theme.base00}"
-    inside_clear_color="${theme.base00}"
-    ring_clear_color="${theme.base00}"
-    text_clear_color="${theme.base00}"
+    inside_clear_color="${theme.base03}"
+    ring_clear_color="${theme.yellow00}"
+    text_clear_color="${theme.white00}"
 
     # Main
     ring_color="${theme.base02}"
-    key_hl_color="${theme.base0B}" # Similar to :on-click, Color of the 1/6 or 1/8 of the ring hilighted per letter typed
+    key_hl_color="${theme.base0B}"
     text_color="${theme.base05}"
 
     # Ring ?
@@ -116,6 +115,8 @@ let
     --screenshots \
     --effect-greyscale \
     --effect-blur $effect_blur \
+    --daemonize
+
     #--effect-pixelate $effect_pixelate \
 
 
@@ -193,10 +194,10 @@ in
         "hyprpaper --config ${wallpaper}"
       ];
 
-      # idk
-      #monitor = [
-      #  "eDP-1, 1920x1080, 0x0, 1"
+      monitor = [
+        "eDP-1, highres, auto, 1.0"
       #  "HDMI-A-1, 2560x1440, 1920x0, 1"
+      ];
 
 
       general = {
@@ -378,21 +379,17 @@ in
           "${mainMod}, G, togglegroup, 0"
           ", page_down, changegroupactive, f"
           ", page_up, changegroupactive, b"
-          #"${mainMod}, L, denywindowfromgroup, toggle"
-          #"${mainMod}, L, lockactivegroup, toggle"
-          #${pkgs.swaylock}/bin/swaylock -fF
-          #"${mainMod}, L, exec, ${config.programs.swaylock.package}/bin/swaylock --effect-blur \"20x3\" -S"
-          "${mainMod}, L, exec, ${swaylock-custom}/bin/swaylock-custom"
+          "${mainMod}, W, exec, ${swaylock-custom}/bin/swaylock-custom"
 
 
-          (mvfocus "k" "u")
-          (mvfocus "j" "d")
-          (mvfocus "l" "r")
-          (mvfocus "h" "l")
-          (ws "left" "e-1")
-          (ws "right" "e+1")
-          (mvtows "left" "e-1")
-          (mvtows "right" "e+1")
+          (mvfocus "up" "u")
+          (mvfocus "down" "d")
+          (mvfocus "left" "l")
+          (mvfocus "right" "r")
+          #(ws "left" "e-1")
+          #(ws "right" "e+1")
+          #(mvtows "left" "e-1")
+          #(mvtows "right" "e+1")
           (resizeactive "k" "0 -20")
           (resizeactive "j" "0 20")
           (resizeactive "l" "20 0")
@@ -405,24 +402,24 @@ in
         ++ (map (i: ws (toString i) (toString i)) arr)
         ++ (map (i: mvtows (toString i) (toString i)) arr);
 
-      bindle = let e = "exec, ags -b hypr -r"; in
+      bindle =
         [
-          ",XF86MonBrightnessUp,   ${e} 'light -A 10'"
-          ",XF86MonBrightnessDown, ${e} 'light -U 10'"
-          ",XF86KbdBrightnessUp,   ${e} 'light -A 10'"
-          ",XF86KbdBrightnessDown, ${e} 'light -U 10'"
-          ",XF86AudioRaiseVolume,  ${e} 'wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+'"
-          ",XF86AudioLowerVolume,  ${e} 'wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-'"
+          ",XF86MonBrightnessUp,  exec,  light -A 10"
+          ",XF86MonBrightnessDown,exec,  light -U 10"
+          ",XF86KbdBrightnessUp,  exec,  light -A 10"
+          ",XF86KbdBrightnessDown,exec,  light -U 10"
+          ",XF86AudioRaiseVolume, exec,  wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"
+          ",XF86AudioLowerVolume, exec,  wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
         ];
 
-      bindl = let e = "exec, ags -b hypr -r"; in
+      bindl =
         [
-          ",XF86AudioPlay,    ${e} 'mpris?.playPause()'"
-          ",XF86AudioStop,    ${e} 'mpris?.stop()'"
-          ",XF86AudioPause,   ${e} 'mpris?.pause()'"
-          ",XF86AudioPrev,    ${e} 'mpris?.previous()'"
-          ",XF86AudioNext,    ${e} 'mpris?.next()'"
-          ",XF86AudioMicMute, ${e} 'audio.microphone.isMuted = !audio.microphone.isMuted'"
+          #",XF86AudioPlay,     'mpris?.playPause()'"
+          #",XF86AudioStop,     'mpris?.stop()'"
+          #",XF86AudioPause,    'mpris?.pause()'"
+          #",XF86AudioPrev,     'mpris?.previous()'"
+          #",XF86AudioNext,     'mpris?.next()'"
+          #",XF86AudioMicMute,  'audio.microphone.isMuted = !audio.microphone.isMuted'"
         ];
 
       bindm = [
