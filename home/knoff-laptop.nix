@@ -6,11 +6,12 @@
     #./modules/sway
     ./modules/hyprland
     ./programs/browser
+
+    ./enviroment.nix
     #./programs
     #./services
     #./desktop
     #./desktop/hyprland
-    #./enviroment.nix
   ];
 
   programs.home-manager.enable = true;
