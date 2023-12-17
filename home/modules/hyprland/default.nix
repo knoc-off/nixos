@@ -6,13 +6,10 @@ let
   hyprland = inputs.hyprland.packages.${pkgs.system}.hyprland;
   plugins = inputs.hyprland-plugins.packages.${pkgs.system};
 
+
+  wl-paste = "${pkgs.wl-clipboard}/bin/wl-paste";
   fuzzel = "${pkgs.fuzzel}/bin/fuzzel -b ${theme.base02}DD -t ${theme.base06}DD -m ${theme.base04}DD -C ${theme.base05}DD -s ${theme.base03}DD -S ${theme.base07}DD -M ${theme.base07}DD";
   notify-send = "${pkgs.libnotify}/bin/notify-send";
-
-  debug-kitty = pkgs.writeShellScriptBin "debug-kitty" ''
-    #!/${pkgs.bash}/bin/bash
-    exec ${pkgs.kitty}/bin/kitty --title NAN
-  '';
 
   launcher = pkgs.writeShellScriptBin "hypr" ''
     #!/${pkgs.bash}/bin/bash
@@ -23,50 +20,16 @@ let
     exec ${hyprland}/bin/Hyprland
   '';
 
+  # Had to result to this, as the home-manager module for swaylock seems to be broken.
   swaylock-custom = pkgs.writeShellScriptBin "swaylock-custom" ''
     #!/${pkgs.bash}/bin/bash
-
-    layout_bg_color="${theme.base00}"
-    layout_border_color="${theme.base02}"
-    layout_text_color="${theme.base05}"
-
-    # Verification
-    line_ver_color="${theme.green00}" # Inner & Outer Glow on Ring color
-    inside_ver_color="${theme.green02}"
-    ring_ver_color="${theme.green01}"
-    text_ver_color="${theme.white00}"
-
-    # Wrong
-    line_wrong_color="${theme.red00}"
-    inside_wrong_color="${theme.red02}"
-    ring_wrong_color="${theme.red01}"
-    text_wrong_color="${theme.white00}"
-
-    # Clear
-    line_clear_color="${theme.base00}"
-    inside_clear_color="${theme.base03}"
-    ring_clear_color="${theme.yellow00}"
-    text_clear_color="${theme.white00}"
-
-    # Main
-    ring_color="${theme.base02}"
-    key_hl_color="${theme.base0B}"
-    text_color="${theme.base05}"
-
-    # Ring ?
-    line_color="${theme.base00}"
-    inside_color="${theme.base01}"
-    separator_color="${theme.base02}"
-
-    #font = config.fontProfiles.regular.family;
-    #indicator-caps-lock = true;
 
     # Font
     font="DejaVu Sans Book"
     font_size="96"
 
     # Ring Size & Thickness
-    indicator_radius="80"
+    indicator_radius="120"
     indicator_thickness="10"
 
     # Date & Time Format
@@ -76,51 +39,58 @@ let
     # Background Effects
     effect_blur="5x5"
     effect_pixelate="10"
+    #font = config.fontProfiles.regular.family;
+    #indicator-caps-lock = true;
+
 
     exec ${config.programs.swaylock.package}/bin/swaylock \
-    --layout-bg-color $layout_bg_color \
-    --layout-border-color $layout_border_color \
-    --layout-text-color $layout_text_color \
+    --layout-bg-color "${theme.base00}" \
+    --layout-border-color "${theme.base02}" \
+    --layout-text-color "${theme.base05}" \
     \
-    --line-ver-color $line_ver_color \
-    --inside-ver-color $inside_ver_color \
-    --ring-ver-color $ring_ver_color \
-    --text-ver-color $text_ver_color \
+    --line-ver-color "${theme.green00}" \
+    --inside-ver-color "${theme.green02}" \
+    --ring-ver-color "${theme.green01}" \
+    --text-ver-color "${theme.white00}" \
     \
-    --line-wrong-color $line_wrong_color \
-    --inside-wrong-color $inside_wrong_color \
-    --ring-wrong-color $ring_wrong_color \
-    --text-wrong-color $text_wrong_color \
+    --line-wrong-color "${theme.red00}" \
+    --inside-wrong-color "${theme.red02}" \
+    --ring-wrong-color "${theme.red01}" \
+    --text-wrong-color "${theme.white00}" \
     \
-    --line-clear-color $line_clear_color \
-    --inside-clear-color $inside_clear_color \
-    --ring-clear-color $ring_clear_color \
-    --text-clear-color $text_clear_color \
+    --line-clear-color "${theme.base00}" \
+    --inside-clear-color "${theme.base03}" \
+    --ring-clear-color "${theme.yellow00}" \
+    --text-clear-color "${theme.white00}" \
     \
-    --ring-color $ring_color \
-    --key-hl-color $key_hl_color \
-    --text-color $text_color \
+    --ring-color "${theme.base02}" \
+    --key-hl-color "${theme.base0B}" \
+    --text-color "${theme.base05}" \
     \
-    --line-color $line_color \
-    --inside-color $inside_color \
-    --separator-color $separator_color \
+    --line-color "${theme.base00}" \
+    --inside-color "${theme.base01}" \
+    --separator-color "${theme.base02}" \
     \
     --indicator \
-    --indicator-radius $indicator_radius \
-    --indicator-thickness $indicator_thickness \
+    --indicator-radius "$indicator_radius" \
+    --indicator-thickness "$indicator_thickness" \
     \
     --clock \
-    --datestr $date_format --timestr $time_format \
+    --datestr "$date_format" --timestr "$time_format" \
     \
     --screenshots \
     --effect-greyscale \
-    --effect-blur $effect_blur \
+    --effect-pixelate "$effect_pixelate" \
+    --effect-blur "$effect_blur" \
     --daemonize
 
-    #--effect-pixelate $effect_pixelate \
+
+    # run as user to display notifications
 
 
 
+    #--fade-out 0.2 \
+    #--fade-in 0.2 \
 
     #--effect-custom /System/Config/Sway\ Lock\ Effects/Effects/twist-effect.c \
     #--font $font \
@@ -146,11 +116,14 @@ let
   wallpaper = pkgs.writeText "wallpaper"
     ''
       preload = ${./thinknix-d.png}
-
       wallpaper = eDP-1, ${./thinknix-d.png}
     '';
 in
 {
+
+  imports = [
+    ./dunst.nix
+  ];
 
   services.swayidle.enable = true;
   services.swayidle = {
@@ -159,7 +132,7 @@ in
       { event = "lock"; command = "lock"; }
     ];
     timeouts = [
-      { timeout = 60; command = "${swaylock-custom}/bin/swaylock-custom"; }
+      { timeout = 300; command = "${swaylock-custom}/bin/swaylock-custom"; }
       { timeout = 3600; command = "${pkgs.systemd}/bin/systemctl suspend"; }
     ];
 
@@ -170,7 +143,7 @@ in
   };
 
 
-  home.packages = [ launcher debug-kitty pkgs.hyprpaper ];
+  home.packages = [ launcher pkgs.hyprpaper ];
   xdg.desktopEntries."org.gnome.Settings" = {
     name = "Settings";
     comment = "Gnome Control Center";
@@ -196,7 +169,7 @@ in
 
       monitor = [
         "eDP-1, highres, auto, 1.0"
-      #  "HDMI-A-1, 2560x1440, 1920x0, 1"
+        #  "HDMI-A-1, 2560x1440, 1920x0, 1"
       ];
 
 
@@ -244,7 +217,7 @@ in
         enable_swallow = true; # TODO Config the regex
         # Any window started from kitty will be swallowed by the terminal
         swallow_regex = "kitty";
-        # the exception should be anything containing the word 'NAN'
+        # the exception should be anything containing the word 'NAN' or 'nvim'
         swallow_exception_regex = "NAN";
         background_color = "0xff${theme.base01}";
       };
@@ -260,7 +233,7 @@ in
         kb_options = "caps:super"; # caps as menu
         scroll_method = "2fg";
 
-
+        # key repeat settings
         repeat_rate = 50;
         repeat_delay = 300;
 
@@ -342,7 +315,7 @@ in
           #e = "exec, ags -b hypr";
           arr = [ 1 2 3 4 5 6 7 8 9 ];
           yt = pkgs.writeShellScriptBin "yt" ''
-            ${notify-send} "Opening video" "$(wl-paste)"
+            ${notify-send} "Opening video" "$(${wl-paste})"
             mpv "$(wl-paste)"
           '';
         in
@@ -368,7 +341,7 @@ in
 
           "${mainMod}, Tab, focuscurrentorlast"
           "${mainMod}, Delete, exit"
-          "${mainMod}, Q, killactive"
+          "${mainMod}, W, killactive"
           "${mainMod}, V, togglefloating"
           "${mainMod}, F, fullscreen"
           "${mainMod}, O, fakefullscreen"
@@ -379,8 +352,9 @@ in
           "${mainMod}, G, togglegroup, 0"
           ", page_down, changegroupactive, f"
           ", page_up, changegroupactive, b"
-          "${mainMod}, W, exec, ${swaylock-custom}/bin/swaylock-custom"
+          "${mainMod}, A, exec,  ${swaylock-custom}/bin/swaylock-custom"
 
+          # (${notify-send} \"Battery level: $(cat /sys/class/power_supply/BAT0/capacity)%\")
 
           (mvfocus "up" "u")
           (mvfocus "down" "d")
@@ -404,6 +378,8 @@ in
 
       bindle =
         [
+          # pkgs.light
+          # pkgs.wpctl
           ",XF86MonBrightnessUp,  exec,  light -A 10"
           ",XF86MonBrightnessDown,exec,  light -U 10"
           ",XF86KbdBrightnessUp,  exec,  light -A 10"
@@ -414,12 +390,7 @@ in
 
       bindl =
         [
-          #",XF86AudioPlay,     'mpris?.playPause()'"
-          #",XF86AudioStop,     'mpris?.stop()'"
-          #",XF86AudioPause,    'mpris?.pause()'"
-          #",XF86AudioPrev,     'mpris?.previous()'"
-          #",XF86AudioNext,     'mpris?.next()'"
-          #",XF86AudioMicMute,  'audio.microphone.isMuted = !audio.microphone.isMuted'"
+          ",XF86AudioMicMute, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
         ];
 
       bindm = [

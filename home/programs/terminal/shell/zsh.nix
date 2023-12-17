@@ -1,11 +1,14 @@
 { lib, theme, pkgs, config, ... }:
 {
+  # command line tools.
   home.packages = with pkgs; [
     chroma # Required for colorize...
     qrencode
     fd
     fzf
-    rg
+    ripgrep
+    pigz
+    pv
   ];
 
   programs.zsh = {
@@ -17,7 +20,7 @@
       docs = "$HOME/Documents";
       dl = "$HOME/Downloads";
     };
-
+    oh-my-zsh.enable = true;
 
     sessionVariables = {
       ZSH_COLORIZE_TOOL = "chroma";
@@ -35,6 +38,12 @@
     initExtra =
       builtins.readFile ./zshrc.sh +
       ''
+        # disable the awful vi mode
+        bindkey -e
+
+        compress() {
+            tar -cf - "$1" | pv -s $(du -sb "$1" | awk '{print $1}') | pigz -9 > "$2".tar.gz
+        }
 
         nixx () {
             nix shell nixpkgs#$1 --command $1 "$\{@:2}"

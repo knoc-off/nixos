@@ -9,10 +9,10 @@ function nx () {
     config_dir="/home/knoff/nixos" #$(realpath "~/nix-config")
     case $1 in
         rb)
-            sudo nixos-rebuild switch --flake $config_dir/#lapix
+            sudo nixos-rebuild switch --flake $config_dir/#laptop
             ;;
         rh)
-            home-manager switch --flake $config_dir/#knoff@lapix
+            home-manager switch --flake $config_dir/#knoff/laptop
             ;;
         rt)
             sudo nixos-rebuild test --flake $config_dir/#lapix
