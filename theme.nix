@@ -39,17 +39,13 @@
 
   # These should all go from light to dark
 
-  gray00 = "485265"; #485265
-  gray01 = "3A445A"; #3A445A
-  gray02 = "364156"; #364156
-  gray03 = "343F54"; #343F54
-  gray04 = "313C51"; #313C51
-  gray05 = "2C374B"; #2C374B
-  gray06 = "273246"; #273246
-  gray07 = "212D40"; #212D40
-  gray08 = "19212E"; #19212E
-  gray09 = "151B25"; #151B25
-  gray0A = "11151C"; #11151C
+  gray00 = "a3a4a5"; #a3a4a5
+  gray01 = "88898a"; #88898a
+  gray02 = "6e6f70"; #6e6f70
+  gray03 = "565758"; #565758
+  gray04 = "3e3f40"; #3e3f40
+  gray05 = "28292a"; #28292a
+  gray06 = "131415"; #131415
 
   white00 = "f8f9fa"; #f8f9fa
   white01 = "e9ecef"; #e9ecef
@@ -68,6 +64,12 @@
   #white10 = "#000000";
 
   # Red
+  #fe7272
+  #e95a58
+  #d44240
+  #bb2f2d
+  #9e211f
+  #821111
   red00 = "FF7F7F"; #FF7F7F
   red01 = "FF6E6E"; #FF6E6E
   red02 = "DD4F4F"; #DD4F4F

@@ -340,9 +340,15 @@ in
         }
 
         /* Color Configs */
-
+        /* not sure how i feel about this, because its hard to tell what is what */
+        /* and themes can have unintended effects. */
+        /* would be cool if with the theme.nix, if i could generate new colors from that */
+        /* how would that work? deriviation that generates it would make the most sense */
+        /* need to find a program that works like that. */
+        /* like theme.mkshades, or something, and then have one color with many shades. */
         :root {
-          --in-content-page-color: #${theme.idk00} !important;
+          /* this effects text color in firefox menus. */
+          --in-content-page-color: #${theme.white00} !important;
           --in-content-page-background: #${theme.base00} !important;
           --in-content-text-color: #${theme.white02} !important;
           --in-content-selected-text: #${theme.white01} !important;
@@ -393,11 +399,11 @@ in
           --grey-30: #${theme.white01} !important;
           --grey-60: #${theme.white02} !important;
           --grey-90: #${theme.white03} !important; /* text color */
-          --grey-90-a10: #${theme.idk01} !important;
-          --grey-90-a20: #${theme.idk02} !important;
-          --grey-90-a30: #${theme.idk02} !important;
-          --grey-90-a40: #${theme.white02} !important;
-          --grey-90-a50: #${theme.white02} !important;
+          --grey-90-a10: #${theme.white01} !important;
+          --grey-90-a20: #${theme.white02} !important;
+          --grey-90-a30: #${theme.white03} !important;
+          --grey-90-a40: #${theme.white04} !important;
+          --grey-90-a50: #${theme.white05} !important;
           --red-50: #${theme.red00} !important;
           --red-50-a30: #${theme.red01} !important;
           --red-60: #${theme.red02} !important;
@@ -412,7 +418,6 @@ in
         }
 
 
-        /* Color Configs */
         :root{
           -moz-border-radius: 1em;
 

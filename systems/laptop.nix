@@ -9,6 +9,7 @@
     [
       # Include the results of the hardware scan.
       ./hardware/hardware-configuration.nix
+      ./modules/audio
       # move this to a flakes input
       #"${builtins.fetchTarball "https://github.com/nix-community/disko/archive/master.tar.gz"}/module.nix"
       #inputs.lanzaboote.nixosModules.lanzaboote
@@ -147,6 +148,11 @@
     home-manager
     libinput
   ];
+
+  services.logind.extraConfig = ''
+    # don’t shutdown when power button is short-pressed
+    HandlePowerKey=hibernate
+  '';
 
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.

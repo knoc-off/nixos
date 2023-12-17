@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, ... }:
 {
   home = {
     sessionVariables = {
@@ -27,7 +27,7 @@
       # WLR_NO_HARDWARE_CURSORS = "1"; # if no cursor,uncomment this line
 
       # Java GUI settings
-      _JAVA_AWT_WM_NONREPARENTING = "1";
+      #_JAVA_AWT_WM_NONREPARENTING = "1";
 
       # Desktop environment settings
       XDG_CURRENT_DESKTOP = "Hyprland";
@@ -39,7 +39,6 @@
       XDG_CONFIG_HOME = "\${HOME}/.config";
       XDG_BIN_HOME = "\${HOME}/.local/bin";
       XDG_DATA_HOME = "\${HOME}/.local/share";
-
     };
   };
 }
