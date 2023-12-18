@@ -72,7 +72,10 @@
   # Select internationalisation properties.
   i18n.defaultLocale = "en_US.UTF-8";
   console = {
-    font = "Lat2-Terminus16";
+    #font = "Lat2-Terminus16";
+    packages = with pkgs; [ terminus_font ];
+    #font = "${pkgs.terminus_fonts}/share/consolefonts/ter-u28n.psf.gz";
+    font = "${pkgs.terminus_font}/share/consolefonts/ter-i22b.psf.gz";
     keyMap = lib.mkDefault "us";
     useXkbConfig = true; # use xkbOptions in tty.
   };
@@ -87,6 +90,7 @@
     mplus-outline-fonts.githubRelease
     dina-font
     proggyfonts
+    (nerdfonts.override { fonts = [ "FiraCode" ]; })
   ];
 
   fonts = {
@@ -94,7 +98,7 @@
 
     fontconfig = {
       defaultFonts = {
-        monospace = [ "FiraCode" ];
+        monospace = [ "FiraCode Nerd Font Mono" ];
       };
     };
   };

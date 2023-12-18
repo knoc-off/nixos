@@ -278,7 +278,8 @@ in
         # dont go to the next populated window. go to the next window
         workspace_swipe_distance = 300;
         workspace_swipe_fingers = 3;
-        workspace_swipe_numbered = true;
+        # this doesent skip empty workspaces
+        #workspace_swipe_numbered = true;
       };
 
 

@@ -64,18 +64,12 @@
   #white10 = "#000000";
 
   # Red
-  #fe7272
-  #e95a58
-  #d44240
-  #bb2f2d
-  #9e211f
-  #821111
-  red00 = "FF7F7F"; #FF7F7F
-  red01 = "FF6E6E"; #FF6E6E
-  red02 = "DD4F4F"; #DD4F4F
-  red03 = "B73F3F"; #B73F3F
-  red04 = "953131"; #953131
-  red05 = "732020"; #732020
+  red00 = "fe7272"; #fe7272
+  red01 = "e95a58"; #e95a58
+  red02 = "d44240"; #d44240
+  red03 = "bb2f2d"; #bb2f2d
+  red04 = "9e211f"; #9e211f
+  red05 = "821111"; #821111
 
   # Orange
   orange00 = "FF8C00"; #FF8C00
