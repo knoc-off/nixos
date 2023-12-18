@@ -31,6 +31,7 @@
     shellAliases = {
       remove = ''/usr/bin/env rm'';
       sshk = "kitty +kitten ssh";
+      mnt = "${pkgs.udisks}/bin/udisksctl mount -b";
     };
 
 
