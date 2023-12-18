@@ -18,10 +18,10 @@ function nx () {
             sudo nixos-rebuild test --flake $config_dir/#lapix
             ;;
         cr)
-            nix repl --extra-experimental-features repl-flake ~/Nix-Config#nixosConfigurations.lapix
+            nix repl --extra-experimental-features repl-flake $config_dir#nixosConfigurations.lapix
             ;;
         hr)
-            nix repl --extra-experimental-features repl-flake ~/Nix-Config#homeConfigurations."knoff@lapix"
+            nix repl --extra-experimental-features repl-flake $config_dir#homeConfigurations."knoff@lapix"
             ;;
         vm)
             sudo nixos-rebuild build-vm --flake $config_dir/#lapix
