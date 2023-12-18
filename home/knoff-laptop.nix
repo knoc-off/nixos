@@ -31,6 +31,7 @@
 
   };
 
+  #programs.bashmount.enable = true;
 
   home = {
     username = "knoff";
