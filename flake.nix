@@ -25,7 +25,6 @@
     # my neovim config
     nixvim-flake.url = "github:knoc-off/neovim-config";
 
-    #unstable-packages.url = "github:nixos/nixpkgs/nixos-unstable";
     #nixpkgs.url = "github:nixos/nixpkgs/nixos-23.05";
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
@@ -53,10 +52,11 @@
   };
 
   outputs =
-    inputs@{ self, themes, nixpkgs, unstable-packages, home-manager, disko, ... }:
+    inputs@{ self, themes, nixpkgs, home-manager, disko, ... }:
     let
       inherit (self) outputs;
       system = "x86_64-linux";
+      #pkgs = import nixpkgs { system = "x86_64-linux"; config.allowUnfree = true; };
 
       # theme
       theme = themes.custom (import ./theme.nix);
@@ -91,7 +91,7 @@
 
       homeConfigurations = {
         "knoff/laptop" = home-manager.lib.homeManagerConfiguration {
-          pkgs = nixpkgs.legacyPackages.x86_64-linux;
+
           modules = [
             ./home/knoff-laptop.nix
           ];

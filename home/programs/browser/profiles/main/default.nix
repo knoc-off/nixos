@@ -62,14 +62,26 @@ in
         ublock-origin
         bitwarden
 
-        # Appearance/functionality
+        # Appearance / functionality
         sidebery
-
-        smart-referer
         darkreader
-
         nighttab
+
+        # Privacy / Security
+        smart-referer
+        history-cleaner # deletes history older than <time>
+
+        # Quality of life
         translate-web-pages
+        export-cookies-txt # exports cookies to a txt file, used for curl, etc.
+
+        istilldontcareaboutcookies # deletes popups, not super needed with ublock.
+        cookie-autodelete # deletes cookies when tab is closed
+
+        #forget_me_not # deletes all website data
+
+
+        violentmonkey
       ];
 
 
@@ -81,17 +93,37 @@ in
               params = [
                 { name = "type"; value = "packages"; }
                 { name = "query"; value = "{searchTerms}"; }
+                { name = "channel"; value = "unstable"; }
+                { name = "size"; value = "150"; }
+              ];
+            }];
+            icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/package.svg";
+            definedAliases = [ "!p" ];
+          };
+          "Nix Options" = {
+            urls = [{
+              template = "https://search.nixos.org/options";
+              params = [
+                { name = "type"; value = "packages"; }
+                { name = "query"; value = "{searchTerms}"; }
+                { name = "channel"; value = "unstable"; }
+                { name = "size"; value = "150"; }
               ];
             }];
 
-            icon = "${pkgs.nixos-icons}/share/icons/hicolor/scalable/apps/nix-snowflake.svg";
-            definedAliases = [ "!p" ];
+            icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/cm_options.svg";
+            definedAliases = [ "!o" ];
           };
 
           "NixOS Wiki" = {
-            urls = [{ template = "https://nixos.wiki/index.php?search={searchTerms}"; }];
-            iconUpdateURL = "https://nixos.wiki/favicon.png";
-            updateInterval = 24 * 60 * 60 * 1000; # every day
+            urls = [{
+              template = "https://nixos.wiki/index.php";
+              params = [
+                { name = "search"; value = "{searchTerms}"; }
+              ];
+            }];
+            #iconUpdateURL = "https://nixos.wiki/favicon.png";
+            #updateInterval = 24 * 60 * 60 * 1000; # every day
             icon = "${pkgs.nixos-icons}/share/icons/hicolor/scalable/apps/nix-snowflake.svg";
             definedAliases = [ "!w" ];
           };
@@ -99,13 +131,13 @@ in
           "Home-Manager" = {
             urls = [{ template = "https://mipmip.github.io/home-manager-option-search/?query={searchTerms}"; }];
             updateInterval = 24 * 60 * 60 * 1000; # every day
-            icon = "${pkgs.nixos-icons}/share/icons/hicolor/scalable/apps/nix-snowflake.svg";
+            icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/twitter-home.svg";
             definedAliases = [ "!h" ];
           };
 
           "Bing".metaData.hidden = true;
           "Google".metaData.hidden = true;
-          "Amazon.se".metaData.hidden = true;
+          "Amazon.de".metaData.hidden = true;
           "Wikipidia (en)".metaData.hidden = true;
           "DuckDuckGo".metaData.hidden = false;
         };
