@@ -33,7 +33,7 @@ function nx () {
             cd "$file"
             ;;
             *)
-            file=$(fd . $config_dir -e nix -E .git -H | fzf --query "$@")
+            file=$(fd . $config_dir -e nix -E .git -H | fzf --query "$vars")
             if [[ $file == "" ]]; then return; fi
               nvim "$file"
         ;;

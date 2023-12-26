@@ -1,6 +1,6 @@
-# Edit this configuration file to define what should be installed on
-# your system.  Help is available in the configuration.nix(5) man page
-# and in the NixOS manual (accessible by running `nixos-help`).
+# im going to try to document as i go, with comments.
+# each setting that is not super obvious should have, what impact it has, and why.
+# for example enabling 32bit support for opengl, is needed for steam.
 
 { lib, inputs, config, pkgs, ... }:
 
@@ -32,9 +32,10 @@
   # Use the systemd-boot EFI boot loader.
   # disable if using lanzaboote
   boot.loader.systemd-boot.enable = true;
-
   boot.loader.efi.canTouchEfiVariables = true;
 
+  # this allows running flatpaks.
+  services.flatpak.enable = true;
 
   # secureboot / lanzaboote
   #
@@ -64,6 +65,7 @@
 
   # Set your time zone.
   time.timeZone = "Europe/Berlin";
+  nixpkgs.config.allowUnfree = true;
 
   # Configure network proxy if necessary
   # networking.proxy.default = "http://user:password@proxy:port/";
@@ -120,6 +122,12 @@
 
   # Enable CUPS to print documents.
   # services.printing.enable = true;
+
+
+  # needed for steam, and some other apps/games.
+  # steam benifits from launch param: -forcedesktopscaling 1.0%U
+  # NIXPKGS_ALLOW_UNFREE=1 nix run nixpkgs#steam --impure -- -forcedesktopscaling 1.0%U
+  hardware.opengl.driSupport32Bit = true; # For 32 bit applications
 
   # Enable sound.
   # sound.enable = true;
