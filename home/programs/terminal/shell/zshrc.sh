@@ -4,7 +4,8 @@
 # Should search for a matching word in apps
 function nx () {
     # create a variable that contians all arguments except the first one
-    vars=""#"${@:2}"
+    varsA="${@:1}"
+    varsB="${@:2}"
 
     config_dir="/home/knoff/nixos" #$(realpath "~/nix-config")
     case $1 in
@@ -28,12 +29,12 @@ function nx () {
         ;;
         cd)
           # find all directories in the config dir.
-            file=$(fd . $config_dir/ --type=d -E .git -H | fzf)
+            file=$(fd . $config_dir/ --type=d -E .git -H | fzf --query "$varsB")
             if [[ $file == "" ]]; then return; fi
             cd "$file"
-            ;;
+        ;;
             *)
-            file=$(fd . $config_dir -e nix -E .git -H | fzf --query "$vars")
+            file=$(fd . $config_dir -e nix -E .git -H | fzf --query "$varsA")
             if [[ $file == "" ]]; then return; fi
               nvim "$file"
         ;;
@@ -41,10 +42,9 @@ function nx () {
 }
 
 
-# I made this
 qr () {
   if [[ $1 == "--share" ]]; then
-    declare -f qr | qrencode -t UTF8;
+    declare -f qr | qrencode -l H -t UTF8;
     return
   fi
 
@@ -56,5 +56,7 @@ qr () {
 
   sanitized_input="$*"
 
-  echo "${sanitized_input}" | qrencode -t UTF8
+  echo "${sanitized_input}" | qrencode -l H -t UTF8
 }
+
+

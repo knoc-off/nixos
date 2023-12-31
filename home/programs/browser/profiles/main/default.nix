@@ -48,10 +48,24 @@ in
   };
 
 
+  home.packages = with pkgs; [
+    pkgs.tridactyl-native
+  ];
   #home.file."${profilePath}/chrome/sidebar-mods.css".text ;
   #home.file."${profilePath}/chrome/treestyletab-edge-mimicry.css".text ;
 
   programs.firefox = {
+
+    package = pkgs.firefox.override {
+      # See nixpkgs' firefox/wrapper.nix to check which options you can use
+      nativeMessagingHosts = [
+        # Gnome shell native connector
+        #pkgs.gnome-browser-connector
+        # Tridactyl native connector
+        pkgs.tridactyl-native
+      ];
+    };
+
     profiles.${profileName} = {
       isDefault = true;
       inherit id;
@@ -78,6 +92,7 @@ in
         istilldontcareaboutcookies # deletes popups, not super needed with ublock.
         cookie-autodelete # deletes cookies when tab is closed
 
+        tridactyl # best vim plugin
         #forget_me_not # deletes all website data
 
 
@@ -125,7 +140,40 @@ in
             #iconUpdateURL = "https://nixos.wiki/favicon.png";
             #updateInterval = 24 * 60 * 60 * 1000; # every day
             icon = "${pkgs.nixos-icons}/share/icons/hicolor/scalable/apps/nix-snowflake.svg";
-            definedAliases = [ "!w" ];
+            definedAliases = [ "!n" ];
+          };
+
+          "fmhy" = {
+            urls = [{
+              template = "https://duckduckgo.com/";
+              params = [
+                { name = "q"; value = "site%3Afmhy.net+{searchTerms}"; }
+              ];
+            }];
+            icon = "${pkgs.circle-flags}circle-flags/share/circle-flags-svg/other/pirate.svg";
+            definedAliases = [ "!f" ];
+          };
+          "StackOverflow" = {
+            urls = [{
+              template = "https://duckduckgo.com/";
+              params = [
+                { name = "q"; value = "site%3Astackoverflow.com+{searchTerms}"; }
+              ];
+            }];
+            icon = "${pkgs.super-tiny-icons}result/share/icons/SuperTinyIcons/svg/stackoverflow.svg";
+            definedAliases = [ "!s" ];
+          };
+          "Github" = {
+            urls = [{
+              template = "https://duckduckgo.com/";
+              params = [
+                { name = "q"; value = "site%3Agithub.com+-issues+-topic+-releases+{searchTerms}"; }
+              ];
+            }];
+            #iconUpdateURL = "https://nixos.wiki/favicon.png";
+            #updateInterval = 24 * 60 * 60 * 1000; # every day
+            icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/github.svg";
+            definedAliases = [ "!g" ];
           };
 
           "Home-Manager" = {
@@ -428,14 +476,14 @@ in
           --blue-70: #${theme.blue03} !important;
           --blue-80: #${theme.blue04} !important;
           --grey-20: #${theme.base01} !important; /* bg color 2 - ish*/
-          --grey-30: #${theme.white01} !important;
-          --grey-60: #${theme.white02} !important;
-          --grey-90: #${theme.white03} !important; /* text color */
-          --grey-90-a10: #${theme.white01} !important;
-          --grey-90-a20: #${theme.white02} !important;
-          --grey-90-a30: #${theme.white03} !important;
-          --grey-90-a40: #${theme.white04} !important;
-          --grey-90-a50: #${theme.white05} !important;
+          --grey-30: #${theme.gray01} !important; /* text highlight color? */
+          --grey-60: #${theme.gray03} !important;
+          --grey-90: #${theme.gray04} !important; /* background bar, inspect menu */
+          --grey-90-a10: #${theme.gray03} !important; /* drop shadow? */
+          --grey-90-a20: #${theme.gray04} !important;
+          --grey-90-a30: #${theme.gray05} !important;
+          --grey-90-a40: #${theme.gray06} !important;
+          --grey-90-a50: #${theme.gray06} !important;
           --red-50: #${theme.red00} !important;
           --red-50-a30: #${theme.red01} !important;
           --red-60: #${theme.red02} !important;

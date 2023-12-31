@@ -18,6 +18,13 @@
     themes.url = "github:RGBCube/ThemeNix";
 
 
+    # experimental, not sure if good idea.
+    #fprint = {
+    #  url = "github:ahbnr/nixos-06cb-009a-fingerprint-sensor";
+    #  inputs.nixpkgs.follows = "nixpkgs";
+    #};
+
+
     # Disko - a declarative disk partitioning tool
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
@@ -52,7 +59,7 @@
   };
 
   outputs =
-    inputs@{ self, themes, nixpkgs, home-manager, disko, ... }:
+    inputs@{ self,  themes, nixpkgs, home-manager, disko, ... }:
     let
       inherit (self) outputs;
       system = "x86_64-linux";

@@ -14,6 +14,7 @@
     #./desktop/hyprland
   ];
 
+
   programs.home-manager.enable = true;
   fonts.fontconfig.enable = true;
 
@@ -31,7 +32,11 @@
 
   };
 
-  #programs.bashmount.enable = true;
+
+  # ~ Battery
+  # Battery status, and notifications
+  services.batsignal.enable = true;
+
 
   home = {
     username = "knoff";
@@ -39,22 +44,22 @@
   };
 
   # enable qt themes
-  #  qt = {
-  #    enable = true;
-  #    platformTheme = "gtk";
-  #    style = {
-  #      package = pkgs.adwaita-qt;
-  #    };
-  #  };
-  #
-  #  # enable gtk themes
-  #  gtk = {
-  #    enable = true;
-  #    theme = {
-  #      name = "Materia-dark";
-  #      package = pkgs.materia-theme;
-  #    };
-  #  };
+  qt = {
+    enable = true;
+    platformTheme = "gtk";
+    style = {
+      package = pkgs.adwaita-qt;
+    };
+  };
+
+  # enable gtk themes
+  gtk = {
+    enable = true;
+    theme = {
+      name = "Materia-dark";
+      package = pkgs.materia-theme;
+    };
+  };
 
   # Nicely reload system units when changing configs
   systemd.user.startServices = "sd-switch";
@@ -63,3 +68,4 @@
   home.stateVersion = "23.05";
 
 }
+

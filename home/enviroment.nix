@@ -9,9 +9,9 @@
       # Browser
       BROWSER = "firefox";
 
-      GTK_THEME = "Adwaita:dark";
-      GTK2_RC_FILES = "${pkgs.theme-obsidian2}/share/themes/Obsidian-2/gtk-2.0/gtkrc";
-      QT_STYLE_OVERRIDE = "adwaita-dark";
+      #GTK_THEME = "Adwaita:dark";
+      #GTK2_RC_FILES = "${pkgs.theme-obsidian2}/share/themes/Obsidian-2/gtk-2.0/gtkrc";
+      #QT_STYLE_OVERRIDE = "adwaita-dark";
 
       # GUI toolkit settings
       QT_SCALE_FACTOR = "1";

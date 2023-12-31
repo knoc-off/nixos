@@ -50,7 +50,7 @@ in
       # might need to invert order.
       ## Black
       color0 = "${withHashtag.base00}";
-      color8 = "${withHashtag.base01}";
+      color8 = "${withHashtag.base04}";
 
       # Red
       color1 = "${withHashtag.red01}";
@@ -87,13 +87,8 @@ in
       mark3_foreground = "${withHashtag.idk04}";
       mark3_background = "${withHashtag.idk05}"; # Violet
 
-      # IDK:
-      color16 = "${withHashtag.hp}";
-      color17 = "${withHashtag.hp}";
-      color18 = "${withHashtag.hp}";
-      color19 = "${withHashtag.hp}";
-      color20 = "${withHashtag.hp}";
-      color21 = "${withHashtag.hp}";
+      # can change all the colors with the following format, xx is between 0..255
+      # colorXX = "${withHashtag.idk01}";
     };
   };
 }

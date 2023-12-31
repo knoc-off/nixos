@@ -116,8 +116,8 @@ let
   wallpaper = pkgs.writeText "wallpaper"
     ''
       preload = ${./thinknix-d.png}
-      wallpaper = preferred, ${./thinknix-d.png}
-    '';
+      wallpaper = eDP-1, ${./thinknix-d.png}
+    '';# eDP-1 used to be preferred
 in
 {
 
@@ -342,6 +342,10 @@ in
           ", print, layoutmsg, swapwithmaster master"
           # IDK what key this is.
           ", XF86Fn, layoutmsg, addmaster"
+
+
+          "${mainMod}, B, exec, ${notify-send} Battery \"$(cat /sys/class/power_supply/BAT0/status), $(cat /sys/class/power_supply/BAT0/capacity)\""
+
 
           "${mainMod}, Tab, focuscurrentorlast"
           "${mainMod}, Delete, exit"
