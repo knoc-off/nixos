@@ -1,47 +1,8 @@
 { inputs, pkgs, libs, config, ... }:
 {
-  imports = [
-    # Terminal-related packages
-    #./terminal
-    #./ssh
-
-    # Gaming-related packages
-    #./gaming
-
-    # Editor-related packages
-    #./editor
-
-    # Browser-related packages
-    #./browser
-
-    # Virtualization-related packages
-    #./virtualization
-
-    # Media-related config
-    #./media
-
-    # Manually set some dots
-    #./configs
-
-    # Filemanager-related packages
-    #./filemanager
-  ];
-
 
   # should move all of the following to their own files.
   home.packages = with pkgs; [
-    # Applications
-    trilium-desktop
-    element-desktop
-
-    # Command-line Utilities
-    tealdeer
-    fzf
-    fd
-    btop
-    bat
-    tiv # image viewer
-    ripgrep
 
     # Miscellaneous
     fuzzel

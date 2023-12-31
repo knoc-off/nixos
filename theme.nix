@@ -77,6 +77,10 @@
   orange02 = "E85400"; #E85400
   orange03 = "D9480F"; #D9480F
 
+  # Brown
+  brown00 = "A3685A"; #A3685A
+  brown01 = "854442"; #854442
+
   # Yellow
   yellow00 = "FFD900"; #ffd900
   yellow01 = "E6C000"; #E6C000
@@ -115,7 +119,4 @@
   # Purple
   purple00 = "B294BB"; #B294BB
   purple01 = "8F6C97"; #8F6C97
-  # Brown
-  brown00 = "A3685A"; #A3685A
-  brown01 = "854442"; #854442
 }
