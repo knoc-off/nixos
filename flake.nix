@@ -63,7 +63,7 @@
     let
       inherit (self) outputs;
       system = "x86_64-linux";
-      #pkgs = import nixpkgs { system = "x86_64-linux"; config.allowUnfree = true; };
+      pkgs = import nixpkgs { system = "x86_64-linux"; config.allowUnfree = true; };
 
       # theme
       theme = themes.custom (import ./theme.nix);
@@ -71,7 +71,7 @@
     {
 
       # Your custom packages and modifications, exported as overlays
-      #overlays = import ./overlays { inherit inputs; };
+      overlays = import ./overlays { inherit inputs; inherit pkgs; };
 
       nixosConfigurations = {
         laptop = nixpkgs.lib.nixosSystem {
@@ -97,6 +97,7 @@
       };
 
       homeConfigurations = {
+        inherit pkgs;
         "knoff/laptop" = home-manager.lib.homeManagerConfiguration {
 
           modules = [

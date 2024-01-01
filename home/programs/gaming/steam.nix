@@ -19,7 +19,7 @@ in
 {
   home.packages = with pkgs; [
     #steam-with-pkgs
-    steam
+    steam-scaling
     steam-tui
     steamcmd
     gamescope
