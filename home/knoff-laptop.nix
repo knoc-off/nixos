@@ -7,11 +7,14 @@
     ./modules/hyprland
     ./programs/browser
 
+
+    ./programs/gaming/steam.nix
     ./enviroment.nix
     #./programs
     #./services
     #./desktop
     #./desktop/hyprland
+    ./programs/virtualization/bottles.nix
   ];
 
 
@@ -19,12 +22,13 @@
   fonts.fontconfig.enable = true;
 
   nixpkgs = {
-    overlays = [
-      # Add overlays your own flake exports (from overlays and pkgs dir):
-      #outputs.overlays.additions
-      #outputs.overlays.modifications
-      #outputs.overlays.unstable-packages
-    ];
+    overlays = builtins.attrValues outputs.overlays;
+    #overlays = [
+    # Add overlays your own flake exports (from overlays and pkgs dir):
+    #outputs.overlays.additions
+    #outputs.overlays.modifications
+    #outputs.overlays.unstable-packages
+    #];
     config = {
       allowUnfree = true;
       allowUnfreePredicate = (pkg: true);

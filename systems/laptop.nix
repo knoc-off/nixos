@@ -2,7 +2,7 @@
 # each setting that is not super obvious should have, what impact it has, and why.
 # for example enabling 32bit support for opengl, is needed for steam.
 
-{ lib, inputs, config, pkgs, ... }:
+{ lib, inputs, config, pkgs, outputs, ... }:
 
 {
   imports =
@@ -28,6 +28,8 @@
     "xdg/gtk-2.0".source = "${pkgs.theme-obsidian2}/share/themes/Materia-dark/gtk-2.0";
     "xdg/gtk-3.0".source = "${pkgs.theme-obsidian2}/share/themes/Materia-dark/gtk-3.0";
   };
+
+
 
   # Use the systemd-boot EFI boot loader.
   # disable if using lanzaboote
@@ -110,6 +112,7 @@
   # Set your time zone.
   time.timeZone = "Europe/Berlin";
   nixpkgs.config.allowUnfree = true;
+  nixpkgs.overlays = builtins.attrValues outputs.overlays;
 
   # Configure network proxy if necessary
   # networking.proxy.default = "http://user:password@proxy:port/";
@@ -208,6 +211,9 @@
   services.logind.extraConfig = ''
     # don’t shutdown when power button is short-pressed
     HandlePowerKey=hibernate
+
+    [Service]
+    Environment=SYSTEMD_BYPASS_HIBERNATION_MEMORY_CHECK=1
   '';
 
   # Some programs need SUID wrappers, can be configured further or are
