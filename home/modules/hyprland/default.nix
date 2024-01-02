@@ -288,7 +288,7 @@ in
 
       windowrule =
         let
-          f = regex: "float, ^(${regex})$";
+          f = regex: "float, ${regex}";
         in
         [
           (f "org.gnome.Calculator")
@@ -303,6 +303,8 @@ in
           (f "xdg-desktop-portal-gnome")
           (f "transmission-gtk")
           (f "com.github.Aylur.ags")
+          (f "Extension: (Bitwarden - Free Password Manager) - Bitwarden — Mozilla Firefox")
+          (f "Steam - Browser")
           "workspace 7, title:Spotify"
         ];
 
