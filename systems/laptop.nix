@@ -7,20 +7,23 @@
 {
   imports =
     [
-      # Include the results of the hardware scan.
+      # hardware configs
       ./hardware/hardware-configuration.nix
+      ./hardware/disks/btrfs-luks.nix
+      inputs.hardware.nixosModules.lenovo-thinkpad-x1-6th-gen
+      #./hardware/fingerprint
+
+      # pipewire
       ./modules/audio
-      # move this to a flakes input
-      #"${builtins.fetchTarball "https://github.com/nix-community/disko/archive/master.tar.gz"}/module.nix"
-      #inputs.lanzaboote.nixosModules.lanzaboote
-      #inputs.hardware
-      #./modules/sway
+
+      # nix settings
       ./modules/nix.nix
+
+      # Desktop
       ./modules/hyprland
 
-      ./hardware/disks/btrfs-luks.nix
-      #./hardware/fingerprint
-      inputs.hardware.nixosModules.lenovo-thinkpad-x1-6th-gen
+      # Android emulation
+      ./modules/virtualization/waydroid.nix
     ];
 
   # IDK if this does anything, TODO: check
