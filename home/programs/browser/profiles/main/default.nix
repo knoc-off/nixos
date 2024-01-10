@@ -145,12 +145,12 @@ in
 
           "fmhy" = {
             urls = [{
-              template = "https://duckduckgo.com/";
+              template = "https://www.fmhy.tk/search";
               params = [
-                { name = "q"; value = "site%3Afmhy.net+{searchTerms}"; }
+                { name = "q"; value = "{searchTerms}"; }
               ];
             }];
-            icon = "${pkgs.circle-flags}circle-flags/share/circle-flags-svg/other/pirate.svg";
+            icon = "${pkgs.circle-flags}/share/circle-flags-svg/other/pirate.svg";
             definedAliases = [ "!f" ];
           };
           "StackOverflow" = {
@@ -160,7 +160,7 @@ in
                 { name = "q"; value = "site%3Astackoverflow.com+{searchTerms}"; }
               ];
             }];
-            icon = "${pkgs.super-tiny-icons}result/share/icons/SuperTinyIcons/svg/stackoverflow.svg";
+            icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/stackoverflow.svg";
             definedAliases = [ "!s" ];
           };
           "Github" = {

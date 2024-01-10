@@ -23,15 +23,17 @@
       ./modules/hyprland
 
       # Android emulation
-      ./modules/virtualization/waydroid.nix
+      #./modules/virtualisation/waydroid.nix
     ];
 
   # IDK if this does anything, TODO: check
+  # doesent seem to do much, cant remember why i added it.
   environment.etc = {
-    "xdg/gtk-2.0".source = "${pkgs.theme-obsidian2}/share/themes/Materia-dark/gtk-2.0";
-    "xdg/gtk-3.0".source = "${pkgs.theme-obsidian2}/share/themes/Materia-dark/gtk-3.0";
+    "xdg/gtk-2.0".source = "${pkgs.orchis-theme}/share/themes/Orchis-Grey-Dark/gtk-2.0";
+    "xdg/gtk-3.0".source = "${pkgs.orchis-theme}/share/themes/Orchis-Grey-Dark/gtk-3.0";
   };
 
+        services.ivpn.enable = true;
 
 
   # Use the systemd-boot EFI boot loader.

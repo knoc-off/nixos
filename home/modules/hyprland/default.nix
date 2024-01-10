@@ -37,7 +37,7 @@ let
     time_format="%H:%M:%S"
 
     # Background Effects
-    effect_blur="5x5"
+    effect_blur="50x5"
     effect_pixelate="10"
     #font = config.fontProfiles.regular.family;
     #indicator-caps-lock = true;
@@ -71,7 +71,6 @@ let
     --inside-color "${theme.base01}" \
     --separator-color "${theme.base02}" \
     \
-    --indicator \
     --indicator-radius "$indicator_radius" \
     --indicator-thickness "$indicator_thickness" \
     \
@@ -79,18 +78,18 @@ let
     --datestr "$date_format" --timestr "$time_format" \
     \
     --screenshots \
-    --effect-greyscale \
-    --effect-pixelate "$effect_pixelate" \
     --effect-blur "$effect_blur" \
+    --effect-pixelate "$effect_pixelate" \
+    --grace 5 \
+    --fade-in 0.5 \
     --daemonize
 
+    #--effect-greyscale \
 
     # run as user to display notifications
 
 
 
-    #--fade-out 0.2 \
-    #--fade-in 0.2 \
 
     #--effect-custom /System/Config/Sway\ Lock\ Effects/Effects/twist-effect.c \
     #--font $font \
@@ -162,8 +161,7 @@ in
 
     settings = {
       exec-once = [
-        "hyprctl setcursor Qogir 24"
-        "transmission-gtk"
+        #"hyprctl setcursor Qogir 24"
         "hyprpaper --config ${wallpaper}"
       ];
 
@@ -217,7 +215,7 @@ in
         disable_hyprland_logo = true;
         disable_splash_rendering = true;
         force_default_wallpaper = 0;
-        enable_swallow = true; # TODO Config the regex
+        enable_swallow = false;
         # Any window started from kitty will be swallowed by the terminal
         swallow_regex = "kitty";
         # the exception should be anything containing the word 'NAN' or 'nvim'
@@ -401,6 +399,7 @@ in
       bindl =
         [
           ",XF86AudioMicMute, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+          ",F1, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
         ];
 
       bindm = [

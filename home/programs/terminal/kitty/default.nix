@@ -30,6 +30,14 @@ in
       tab_bar_margin_height = "0.0 0.0";
       tab_title_template = " {index}: {f'{title[:6]}…{title[-6:]}' if title.rindex(title[-1]) + 1 > 13 else title.center(7)} ";
 
+      enable_audio_bell = "no";
+      visual_bell_duration = "0.0"; # annoying too
+      visual_bell_color = "${withHashtag.base01}"; #"none";
+
+      #window_resize_step_cells = 2;
+      #window_resize_step_lines = 2;
+
+
 
       window_padding_width = 0;
       foreground = "${withHashtag.base06}";
