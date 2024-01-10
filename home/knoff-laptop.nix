@@ -50,7 +50,7 @@
   # enable qt themes
   qt = {
     enable = true;
-    platformTheme = "gtk";
+    platformTheme = "gtk3";
     style = {
       package = pkgs.adwaita-qt;
     };
@@ -60,8 +60,12 @@
   gtk = {
     enable = true;
     theme = {
-      name = "Materia-dark";
-      package = pkgs.materia-theme;
+      name = "Orchis-Grey-Dark";
+      package = pkgs.orchis-theme;
+    };
+    cursorTheme = {
+      name = "Vanilla-DMZ";
+      package = pkgs.vanilla-dmz;
     };
   };
 
