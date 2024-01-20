@@ -20,9 +20,10 @@ in
     };
   };
 
-  environment.etc."greetd/environments".text = ''
-    sway
-    zsh
-    bash
-  '';
+    environment.etc."greetd/environments".text = ''
+      sway
+      ${if config.programs.zsh.enable then "zsh" else ""}
+      ${if config.programs.fish.enable then "fish" else ""}
+      bash
+    '';
 }

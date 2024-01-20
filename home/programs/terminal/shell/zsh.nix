@@ -1,16 +1,5 @@
 { lib, theme, pkgs, config, ... }:
 {
-  # command line tools.
-  home.packages = with pkgs; [
-    chroma # Required for colorize...
-    qrencode
-    fd
-    fzf
-    ripgrep
-    pigz
-    pv
-  ];
-
   programs.zsh = {
     enable = true;
     #enableAutosuggestions = true; # i dont like this too much. seems to mess with me more than help
@@ -47,7 +36,7 @@
         }
 
         nixx () {
-            nix shell nixpkgs#$1 --command $1 "$\{@:2}"
+            nix run nixpkgs#$1 -- "$\{@:2}"
         }
 
         chrome() {

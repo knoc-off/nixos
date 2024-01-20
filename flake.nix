@@ -59,7 +59,7 @@
   };
 
   outputs =
-    inputs@{ self,  themes, nixpkgs, home-manager, disko, ... }:
+    inputs@{ self, themes, nixpkgs, home-manager, disko, ... }:
     let
       inherit (self) outputs;
       system = "x86_64-linux";
@@ -79,7 +79,8 @@
           modules = [
             ./systems/laptop.nix
             disko.nixosModules.disko
-            #{ disko.devices.disk.vdb.device = "/dev/sda"; }
+            { disko.devices.disk.vdb.device = "/dev/nvme0n1"; }
+
             home-manager.nixosModules.home-manager
             {
               home-manager.useGlobalPkgs = false;
@@ -97,9 +98,8 @@
       };
 
       homeConfigurations = {
-        inherit pkgs;
         "knoff/laptop" = home-manager.lib.homeManagerConfiguration {
-
+          inherit pkgs;
           modules = [
             ./home/knoff-laptop.nix
           ];

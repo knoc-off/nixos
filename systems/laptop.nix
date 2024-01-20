@@ -9,17 +9,22 @@
     [
       # hardware configs
       ./hardware/hardware-configuration.nix
+
+      # Disko
       ./hardware/disks/btrfs-luks.nix
+      { disko.devices.disk.vdb.device = "/dev/nvme0n1"; } # this might not be needed
+
+      # hardware for my laptop
       inputs.hardware.nixosModules.lenovo-thinkpad-x1-6th-gen
       #./hardware/fingerprint
 
-      # pipewire
+      # pipewire / Audio
       ./modules/audio
 
-      # nix settings
+      # nix package settings
       ./modules/nix.nix
 
-      # Desktop
+      # Window manager
       ./modules/hyprland
 
       # Android emulation
@@ -33,7 +38,7 @@
     "xdg/gtk-3.0".source = "${pkgs.orchis-theme}/share/themes/Orchis-Grey-Dark/gtk-3.0";
   };
 
-        services.ivpn.enable = true;
+  services.ivpn.enable = true;
 
 
   # Use the systemd-boot EFI boot loader.
@@ -188,12 +193,19 @@
   # Enable touchpad support (enabled default in most desktopManager).
   services.xserver.libinput.enable = true;
 
-  programs.zsh.enable = true;
+  programs.zsh.enable = false;
+  programs.fish.enable = true;
 
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.knoff = {
     isNormalUser = true;
-    shell = lib.mkIf (config.programs.zsh.enable) pkgs.zsh;
+    #shell = lib.mkIf (config.programs.fish.enable) pkgs.fish
+    #   (lib.mkIf (config.programs.zsh.enable) pkgs.zsh pkgs.bash);
+
+    shell =
+      if config.programs.fish.enable then pkgs.fish
+      else if config.programs.zsh.enable then pkgs.zsh
+      else pkgs.bash;
     extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
     initialPassword = "password";
     openssh.authorizedKeys.keys = [

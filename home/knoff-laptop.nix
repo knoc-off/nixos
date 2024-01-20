@@ -5,7 +5,10 @@
     ./programs/terminal
     #./modules/sway
     ./modules/hyprland
+
     ./programs/browser
+
+    #./modules/firefox.nix
 
 
     ./programs/gaming/steam.nix
@@ -13,10 +16,20 @@
     #./programs
     #./services
     #./desktop
-    #./desktop/hyprland
     ./programs/virtualization/bottles.nix
+
+    ./modules/thunderbird.nix
   ];
 
+  #services.firefoxBrowser = {
+  #  enable = true;
+  #  profile = "knoff";
+  #};
+
+  services.emailManager = {
+    enable = true;
+    profile = "knoff";
+  };
 
   programs.home-manager.enable = true;
   fonts.fontconfig.enable = true;

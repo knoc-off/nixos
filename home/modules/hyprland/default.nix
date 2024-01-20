@@ -37,8 +37,8 @@ let
     time_format="%H:%M:%S"
 
     # Background Effects
-    effect_blur="50x5"
-    effect_pixelate="10"
+    effect_blur="$2" # 50x5
+    effect_pixelate="$3" # 10
     #font = config.fontProfiles.regular.family;
     #indicator-caps-lock = true;
 
@@ -80,7 +80,7 @@ let
     --screenshots \
     --effect-blur "$effect_blur" \
     --effect-pixelate "$effect_pixelate" \
-    --grace 5 \
+    --grace $1 \
     --fade-in 0.5 \
     --daemonize
 
@@ -127,11 +127,11 @@ in
   services.swayidle.enable = true;
   services.swayidle = {
     events = [
-      { event = "before-sleep"; command = "${swaylock-custom}/bin/swaylock-custom"; }
+      { event = "before-sleep"; command = "${swaylock-custom}/bin/swaylock-custom 0 50x6 10"; }
       { event = "lock"; command = "lock"; }
     ];
     timeouts = [
-      { timeout = 300; command = "${swaylock-custom}/bin/swaylock-custom"; }
+      { timeout = 300; command = "${swaylock-custom}/bin/swaylock-custom 5 50x6 10"; }
       { timeout = 3600; command = "${pkgs.systemd}/bin/systemctl suspend"; }
     ];
 
@@ -142,7 +142,7 @@ in
   };
 
 
-  home.packages = [ launcher pkgs.hyprpaper ];
+  home.packages = [ swaylock-custom launcher pkgs.hyprpaper ];
   xdg.desktopEntries."org.gnome.Settings" = {
     name = "Settings";
     comment = "Gnome Control Center";
@@ -360,7 +360,7 @@ in
           "${mainMod}, G, togglegroup, 0"
           ", page_down, changegroupactive, f"
           ", page_up, changegroupactive, b"
-          "${mainMod}, A, exec,  ${swaylock-custom}/bin/swaylock-custom"
+          "${mainMod}, A, exec,  ${swaylock-custom}/bin/swaylock-custom 0 120x6 10"
 
           # (${notify-send} \"Battery level: $(cat /sys/class/power_supply/BAT0/capacity)%\")
 
