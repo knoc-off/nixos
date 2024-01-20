@@ -1,0 +1,100 @@
+{ pkgs, lib, ... }:
+let
+  config_dir = "/home/knoff/nixos";
+  configName = "laptop";
+  homeConfigName = "knoff/laptop";
+in
+{
+  programs.fish = {
+    enable = true;
+    functions = {
+      __fish_command_not_found_handler = {
+        body = "__fish_default_command_not_found_handler $argv[1]";
+        onEvent = "fish_command_not_found";
+      };
+      #gitignore = "curl -sL https://www.gitignore.io/api/$argv";
+      nixx = "nix run nixpkgs#$argv[1] -- $argv[2..-1]";
+      compress = "tar -cf - \"$argv[1]\" | pv -s $(du -sb \"$argv[1]\" | awk '{print $1}') | pigz -9 > \"$argv[2]\".tar.gz";
+      #decompress = "pv \"$argv[1]\" | pigz -d | tar -xf -";
+      chrome = "nix shell nixpkgs#$argv[1] -- $argv[2..-1] &>/dev/null &";
+      nx =
+        ''
+          # fish function to run nix commands easily
+          # switch statemnt to handle different commands
+          switch $argv[1]
+            case rb
+              sudo nixos-rebuild switch --flake ${config_dir}#${configName}
+            case rh
+              home-manager switch --flake ${config_dir}#${configName}
+            case rt
+              sudo nixos-rebuild test --flake ${config_dir}#${configName}
+            case cr
+              nix repl --extra-experimental-features repl-flake ${config_dir}#nixosConfigurations."${configName}"
+            case hr
+              nix repl --extra-experimental-features repl-flake ${config_dir}#homeConfigurations."${homeConfigName}"
+            case vm
+              sudo nixos-rebuild build-vm --flake ${config_dir}#${configName}
+            case cd
+              set -l file $(fd . ${config_dir} --type=d -E .git -H | fzf --query "$argv[2..-1]")
+              if test -z "$file"
+                return
+              end
+              cd "$file"
+            case '*'
+              set -l file $(fd . ${config_dir} -e nix -E .git -H | fzf --query "$argv[1..-1]")
+              if test -z "$file"
+                return
+              end
+
+              nvim "$file"
+          end
+
+        '';
+
+      qr = ''
+        {
+          if [[ $argv[1] == "--share" ]]; then
+            declare -f qr | qrencode -l H -t UTF8;
+            return
+          fi
+
+          local S
+          if [[ "count $argv" == 0 ]]; then
+            IFS= read -r S
+            set -- "$S"
+          fi
+
+          sanitized_input="$argv"
+
+          echo "$sanitized_input" | qrencode -l H -t UTF8
+        }
+      '';
+
+      findLocalDevices = ''
+        local IPADDR="$(ifconfig | grep -A 1 'wlp2s0'  | tail -1 | grep -E '.[0-9]+\.[0-9]+\.[0-9]+\.' -o | tail -1)0"
+        local NETMASK=24
+        nix run nixpkgs#$argv[1] -- -sP "$IPADDR/$NETMASK"
+      '';
+
+
+
+    };
+    shellInit = ''
+      if test -f /etc/secrets/gpt/secret
+        set OPENAI_API_KEY $(cat /etc/secrets/gpt/secret)
+      end
+
+      function fish_prompt
+        set -l git_branch "{"(git branch 2>/dev/null | sed -n '/\* /s///p')"}"
+        echo -n (prompt_pwd)"$git_branch"' $ '
+      end
+
+      # If ssh is executed from kitty it will auto copy the term info.
+      # should move this to kitty config
+      #[ "$TERM" = "xterm-kitty" ] && alias ssh="kitty +kitten ssh"
+
+
+
+    '';
+  };
+}
