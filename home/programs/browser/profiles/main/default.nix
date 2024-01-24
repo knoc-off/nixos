@@ -197,6 +197,7 @@ in
       # @import "./edge-mimicry/edge-mimicry/sidebar-mods.css";
       userChrome =
         ''
+          /* this should be done decalratively, and i should package it. */
           @import "./firefox-csshacks/chrome/autohide_sidebar.css";
 
           /* override sidebar options */
@@ -228,6 +229,7 @@ in
             -moz-appearance: none !important;
           }
 
+          /* TODO: what does this do. */
           .tabbrowser-tabpanels {
               background-color: #${theme.base02} !important;
           }
@@ -235,10 +237,12 @@ in
               background-color: #${theme.base02} !important;
           }
 
+          /* TODO: what does this do. */
           #bookmarksPanel, #history-panel {
             background-color: #${theme.base01} !important;
           }
 
+          /* sets the color of the sidebar */
           #sidebar-header,#sidebar-search-container,#bookmarks-view-children,#historyTree {
             color: #${theme.base01} !important;
             background-color: #${theme.base01} !important;
@@ -247,11 +251,13 @@ in
           }
 
 
+          /* TODO: what does this do. */
           .sidebar-panel #search-box{
             background-color: #${theme.base03} !important;
             color: #${theme.base06} !important;
           }
 
+          /* TODO: what does this do. */
           #sidebar,
           #sidebar-header {
             background-color: #${theme.base02} !important;
@@ -262,7 +268,7 @@ in
             background-repeat: no-repeat;
           }
 
-          /* what does this do. */
+          /* TODO: what does this do. */
           /*
           #browser {
             --sidebar-border-color: #${theme.base01} !important;
@@ -277,11 +283,13 @@ in
           */
 
           /* hides the native tabs */
+          /* to be used together with sideberry. */
+          /* there is a way to auto collapse/ expand when sideberry is not displaying tabs*/
           #TabsToolbar {
             visibility: collapse;
           }
 
-          /* Hide window controls */
+          /* Hide window controls, minimise, close, etc. */
           .titlebar-buttonbox-container{
             display:none
           }
@@ -289,8 +297,9 @@ in
             display:none
           }
 
+
           /* Color Configs */
-          /* should try to remove &/or debug */
+          /* TODO: should try to remove &/or debug */
           :root{
             -moz-border-radius: 1em;
             /* Popup panels */
@@ -341,11 +350,14 @@ in
           /* line between nav-bar and tabs toolbar,
           also fallback color for border around selected tab */
           #navigator-toolbox{ --lwt-tabs-border-color: #${theme.base02} !important; }
+
           /* Line above tabs */
           #tabbrowser-tabs{ --lwt-tab-line-color: #${theme.base05} !important; }
+
           /* the header-area of sidebar needs this to work */
           #sidebar-box{ --sidebar-background-color: #${theme.base00} !important; }
 
+          /* remove flash of loading screen, TODO: (?), Implement Fade to white. */
           /* This changes the color of the loading page */
           #tabbrowser-tabpanels,
           #webextpanels-window,
@@ -371,12 +383,15 @@ in
             border: none !important;
           }
 
+          /* This makes the urlbar / address bar not reach the full width of the screen */
           #navigator-toolbox,
           #navigator-toolbox > *{
             /* calculate pannel width minus --uc-sidebar-width */
-             width: calc(var(--panel-width) - var(--sidebar-width));
+            width: calc(var(--panel-width) - var(--sidebar-width));
           }
 
+
+          /* TODO: Some unintended effects, when bookmarks toolbar is expanded*/
           /* if the cursor is at the top 30px of the screen, show the toolbar */
           /* and if the cursor is at the left half of the screen show the toolbar */
           #navigator-toolbox:not(:focus-within):not(:hover){
@@ -395,9 +410,10 @@ in
 
 
 
-          :root[tabsintitlebar] {
-            appearance: -moz-win-glass!important;
-          }
+          /* TODO: Document this or remove */
+          /* :root[tabsintitlebar] { */
+          /*  appearance: -moz-win-glass !important; */
+          /* } */
 
 
           -moz-border-radius: 1em;
@@ -412,6 +428,7 @@ in
           @media (prefers-color-scheme: dark) {
             :root {
               background-color: #${theme.base02} !important;
+              foreground-color: #${theme.base07} !important;
             }
             body:not([style*="background"], [class], [id]) {
               background-color: transparent !important;
@@ -424,8 +441,7 @@ in
         /* and themes can have unintended effects. */
         /* would be cool if with the theme.nix, if i could generate new colors from that */
         /* how would that work? deriviation that generates it would make the most sense */
-        /* need to find a program that works like that. */
-        /* like theme.mkshades, or something, and then have one color with many shades. */
+        /* like theme.mkshade, or something, and then have one color with many shades. */
         :root {
           /* this effects text color in firefox menus. */
           --in-content-page-color: #${theme.white00} !important;
@@ -550,6 +566,7 @@ in
           --lwt-sidebar-text-color: #${theme.base06} !important;
         }
 
+        /* remove flash */
         @-moz-document url("about:home"),url("about:blank"),url("about:newtab"),url("about:privatebrowsing"){
           body{background-color: #${theme.base02} !important }
         }
@@ -564,152 +581,3 @@ in
     };
   };
 }
-
-# Sideberry content
-#@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
-#/* This Source Code Form is subject to the terms of the Mozilla Public
-# * License, v. 2.0. If a copy of the MPL was not distributed with this
-# * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-#
-#/*
-# * This style will hide the tab bar. For MacOS Big Sur
-# *
-# * Contributor(s): Isaac-Newt, Ivan0xFF, millerdev, AMomchilov
-# */
-#
-# #titlebar {
-#  visibility: collapse;
-#}
-#
-#/* Position window controls */
-##TabsToolbar .titlebar-buttonbox-container {
-#  display: block;
-#  position: absolute;
-#  visibility: visible;
-#}
-#
-#/* Reposition the close/maximize/minimize buttons for the "normal" toolbar density  */
-#/* When the UI density is set to "normal", the `uidensity` attribute is undefined.  */
-#/* `window.document.documentElement.getAttribute("uidensity")` will be null.        */
-#:root:not([uidensity]) #TabsToolbar .titlebar-buttonbox-container {
-#  margin-left: 12px;
-#  margin-top: 12px;
-#}
-#
-#/* Reposition the close/maximize/minimize buttons for the "compact" toolbar density */
-#:root[uidensity="compact"] #TabsToolbar .titlebar-buttonbox-container {
-#  margin-left: 10px;
-#  margin-top: 9px;
-#}
-#
-##TabsToolbar .titlebar-buttonbox.titlebar-color {
-#  margin-left: 0px !important;
-#}
-#
-#/*
-# * Make room for window controls and a bit of extra space for window drag/move.
-# * Only apply this style when not in fullscreen mode.
-# */
-##main-window:not([inFullscreen]) #nav-bar {
-#  padding: 0px 0px 0px 70px !important;
-#}
-#
-#/*  Sideberry Dynamic sidebar   */
-#
-#/* Add the following to Sideberry settings/Styles Editor/Sidebar:
-#.Tab[data-pin="false"] .ctx {
-#  right: unset !important;
-#}
-#*/
-#
-##sidebar-box {
-#  background-color: #2B2A33;
-#  overflow: hidden;
-#  height: calc(100% + 6px);
-#  position: fixed;
-#  max-width: 26em !important;
-#  width: 100% !important;
-#  display: block;
-#  transition: 90ms;
-#}
-#
-##sidebar-box:hover {
-#  padding-bottom: 50px;
-#  position: absolute;
-#  z-index: 1;
-#}
-#
-##sidebar-header {
-#  background-color: #2B2A33;
-#}
-#
-##sidebar {
-#  width: calc(45px * 7) !important;
-#  max-width: 50vw !important;
-#  height: 100%;
-#}
-#
-##sidebar:hover {
-#  max-width: 100% !important;
-#}
-#
-##appcontent {
-#  margin-left: 45px;
-#}
-#
-#/* Page Actions Hide and Show on Hover */
-#
-#/* Hide Buttons and Reveal on Hover */
-#
-##page-action-buttons:not(:hover) .urlbar-page-action,
-##page-action-buttons:not(:hover) #star-button
-#{
-#  width: 0px !important;
-#  min-width: 0px !important;
-#  padding-left: 0px !important;
-#  padding-right: 10px !important;
-#  margin-right: -5px !important;
-#  transition: all 250ms ease-in-out;
-#}
-#
-##page-action-buttons:not(:hover) #userContext-indicator {
-#  margin-right : 45px !important;
-#  transition: all 250ms ease-in-out;
-#}
-#
-##page-action-buttons:hover .urlbar-page-action,
-##page-action-buttons:hover #star-button  {
-#  visibility: visible;
-#  min-width: unset !important;
-#}
-#
-##page-action-buttons:hover #userContext-indicator {
-#  margin-right : 0px !important;
-#}
-#
-#/* Create page actions hover "button" */
-##page-action-buttons::after {
-#  content: "•••";
-#  position: absolute;
-#  top: 0.7em;
-#  font-size: 0.7em;
-#  opacity: 0.5;
-#  right: 8px;
-#  transition: all 50ms ease-in-out;
-#}
-#
-#/* Hide the button on hover */
-##page-action-buttons:hover::after {
-#  display: none !important;
-#  width: 0px !important;
-#  margin-left: 0px !important;
-#  transition: all 50ms ease-in-out;
-#}
-#
-#/* Hide URLBar Buttons and Reveal on Hover Finished*/
-##urlbar,#searchbar {
-#  font-size: 13px !important;
-#	margin-top: 1px !important;
-#}
-
-

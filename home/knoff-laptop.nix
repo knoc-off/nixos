@@ -25,6 +25,10 @@
   #  enable = true;
   #  profile = "knoff";
   #};
+  programs.nix-index = {
+    enable = true;
+  };
+
 
   services.emailManager = {
     enable = true;

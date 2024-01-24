@@ -14,9 +14,40 @@ in
       };
       #gitignore = "curl -sL https://www.gitignore.io/api/$argv";
       nixx = "nix run nixpkgs#$argv[1] -- $argv[2..-1]";
-      compress = "tar -cf - \"$argv[1]\" | pv -s $(du -sb \"$argv[1]\" | awk '{print $1}') | pigz -9 > \"$argv[2]\".tar.gz";
+      compress = {
+        body = "tar -cf - \"$argv[1]\" | pv -s $(du -sb \"$argv[1]\" | awk '{print $1}') | pigz -9 > \"$argv[2]\".tar.gz";
+        description = "Compress a file or directory";
+      };
       #decompress = "pv \"$argv[1]\" | pigz -d | tar -xf -";
       chrome = "nix shell nixpkgs#$argv[1] -- $argv[2..-1] &>/dev/null &";
+
+      edit_command_buffer = {
+        description = ''Edit the command buffer in an external editor'';
+        body = ''
+          set -l f (mktemp)
+          if set -q f[1]
+              mv $f $f.fish
+              set f $f.fish
+          else
+              # We should never execute this block but better to be paranoid.
+              set f /tmp/fish.(echo %self).fish
+              touch $f
+          end
+
+          set -l p (commandline -C)
+          commandline -b > $f
+          if set -q EDITOR
+              eval $EDITOR $f
+          else
+              vim $f
+          end
+
+          commandline -r (cat $f)
+          commandline -C $p
+          command rm $f
+        '';
+      };
+
       nx =
         ''
           # fish function to run nix commands easily
@@ -25,7 +56,7 @@ in
             case rb
               sudo nixos-rebuild switch --flake ${config_dir}#${configName}
             case rh
-              home-manager switch --flake ${config_dir}#${configName}
+              home-manager switch --flake ${config_dir}#${homeConfigName}
             case rt
               sudo nixos-rebuild test --flake ${config_dir}#${configName}
             case cr
@@ -80,10 +111,6 @@ in
 
     };
     shellInit = ''
-      if test -f /etc/secrets/gpt/secret
-        set OPENAI_API_KEY $(cat /etc/secrets/gpt/secret)
-      end
-
       function fish_prompt
         set -l git_branch "{"(git branch 2>/dev/null | sed -n '/\* /s///p')"}"
         echo -n (prompt_pwd)"$git_branch"' $ '
@@ -94,6 +121,9 @@ in
       #[ "$TERM" = "xterm-kitty" ] && alias ssh="kitty +kitten ssh"
 
 
+      if test -f /etc/secrets/gpt/secret
+          export OPENAI_API_KEY=(cat /etc/secrets/gpt/secret)
+      end
 
     '';
   };

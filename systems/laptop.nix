@@ -12,7 +12,7 @@
 
       # Disko
       ./hardware/disks/btrfs-luks.nix
-      { disko.devices.disk.vdb.device = "/dev/nvme0n1"; } # this might not be needed
+      { disko.devices.disk.vdb.device = "/dev/nvme0n1"; } # this might not be needed But no issues so far.
 
       # hardware for my laptop
       inputs.hardware.nixosModules.lenovo-thinkpad-x1-6th-gen
@@ -38,7 +38,7 @@
     "xdg/gtk-3.0".source = "${pkgs.orchis-theme}/share/themes/Orchis-Grey-Dark/gtk-3.0";
   };
 
-  services.ivpn.enable = true;
+
 
 
   # Use the systemd-boot EFI boot loader.
@@ -242,6 +242,10 @@
   # };
 
   # List services that you want to enable:
+
+
+
+
 
   # Open ports in the firewall.
   networking.firewall.allowedTCPPorts = [ 22 ];
