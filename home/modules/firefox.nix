@@ -126,27 +126,40 @@ in
     };
 
 
-    # features:
-    # sidebar
-    sidebar-styles = mkOption {
-      type = types.bool;
-      default = true;
-      description =
-        ''
-          Enable sidebar styles
-        '';
+    visual = {
+      removeWhiteFlash = mkOption {
+        type = types.bool;
+        default = true;
+        description =
+          ''
+            removes the white flash when loading a page.
+          '';
+      };
+
+      # sidebar
+      sidebar-styles = mkOption {
+        type = types.bool;
+        default = true;
+        description =
+          ''
+            Enable sidebar styles
+          '';
+      };
+
+      # Remove this?
+      darken-everything = mkOption {
+        type = types.bool;
+        default = false;
+        description =
+          ''
+            Enable a dark theme, that may not be stable.
+            sites may break!
+          '';
+      };
+
     };
 
-    # dark theme unstable
-    darken-everything = mkOption {
-      type = types.bool;
-      default = false;
-      description =
-        ''
-          Enable a dark theme, that may not be stable.
-          sites may break!
-        '';
-    };
+
 
 
 
@@ -522,6 +535,24 @@ in
             -moz-border-radius: 1em;
 
           '';
+
+        /*
+        # this fades from black to white, would be perfect to remove the white flash
+          @-webkit-keyframes blackWhiteFade {
+            0% { background-color: black; }
+            100% { background-color: white; }
+          }
+
+          .blinkdiv {
+            height: 100px;
+            background-color: white;
+            -webkit-animation-name: blackWhiteFade;
+            -webkit-animation-iteration-count: 1;
+            -webkit-animation-duration: 10s;
+          }
+        */
+
+
         userContent = ''
           .tabbrowser-tabbox {
               background-color: #${theme.base02} !important;
@@ -531,6 +562,7 @@ in
             @media (prefers-color-scheme: dark) {
               :root {
                 background-color: #${theme.base02} !important;
+                foreground-color: #${theme.base07} !important;
               }
               body:not([style*="background"], [class], [id]) {
                 background-color: transparent !important;

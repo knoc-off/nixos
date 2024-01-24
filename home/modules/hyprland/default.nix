@@ -81,7 +81,7 @@ let
     --effect-blur "$effect_blur" \
     --effect-pixelate "$effect_pixelate" \
     --grace $1 \
-    --fade-in 0.5 \
+    --fade-in $4 \
     --daemonize
 
     #--effect-greyscale \
@@ -127,11 +127,11 @@ in
   services.swayidle.enable = true;
   services.swayidle = {
     events = [
-      { event = "before-sleep"; command = "${swaylock-custom}/bin/swaylock-custom 0 50x6 10"; }
+      { event = "before-sleep"; command = "${swaylock-custom}/bin/swaylock-custom 0 50x6 10 0"; }
       { event = "lock"; command = "lock"; }
     ];
     timeouts = [
-      { timeout = 300; command = "${swaylock-custom}/bin/swaylock-custom 5 50x6 10"; }
+      { timeout = 300; command = "${swaylock-custom}/bin/swaylock-custom 5 50x6 10 0.5"; }
       { timeout = 3600; command = "${pkgs.systemd}/bin/systemctl suspend"; }
     ];
 
@@ -360,7 +360,7 @@ in
           "${mainMod}, G, togglegroup, 0"
           ", page_down, changegroupactive, f"
           ", page_up, changegroupactive, b"
-          "${mainMod}, A, exec,  ${swaylock-custom}/bin/swaylock-custom 0 120x6 10"
+          "${mainMod}, A, exec,  ${swaylock-custom}/bin/swaylock-custom 0 120x6 10 0"
 
           # (${notify-send} \"Battery level: $(cat /sys/class/power_supply/BAT0/capacity)%\")
 
