@@ -175,7 +175,20 @@ in
             icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/github.svg";
             definedAliases = [ "!g" ];
           };
-
+          "kagi-summerize" = {
+            urls = [{
+              template = "https://kagi.com/summarizer/index.html";
+              params = [
+                { name = "target_language"; value = "english"; }
+                { name = "summary"; value = "takeaway"; }
+                { name = "url"; value = "{searchTerms}"; }
+              ];
+            }];
+            #iconUpdateURL = "https://nixos.wiki/favicon.png";
+            #updateInterval = 24 * 60 * 60 * 1000; # every day
+            icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/kaggle.svg";
+            definedAliases = [ "!k" ];
+          };
           "Home-Manager" = {
             urls = [{ template = "https://mipmip.github.io/home-manager-option-search/?query={searchTerms}"; }];
             updateInterval = 24 * 60 * 60 * 1000; # every day

@@ -12,10 +12,10 @@
 
       # Disko
       ./hardware/disks/btrfs-luks.nix
-      { disko.devices.disk.vdb.device = "/dev/nvme0n1"; } # this might not be needed But no issues so far.
+      #{ disko.devices.disk.vdb.device = "/dev/nvme0n1"; } # this might not be needed But no issues so far.
 
       # hardware for my laptop
-      inputs.hardware.nixosModules.lenovo-thinkpad-x1-6th-gen
+      inputs.hardware.nixosModules.framework-13-7040-amd
       #./hardware/fingerprint
 
       # pipewire / Audio
