@@ -5,6 +5,7 @@
     ./programs/terminal
     #./modules/sway
     ./modules/hyprland
+    ./modules/eww/default.nix
 
     ./programs/browser
 

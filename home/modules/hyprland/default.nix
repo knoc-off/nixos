@@ -122,7 +122,7 @@ in
 
   imports = [
     ./dunst.nix
-    #./eww.nix
+    ./eww.nix
   ];
 
   services.swayidle.enable = true;
