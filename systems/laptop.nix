@@ -12,11 +12,14 @@
 
       # Disko
       ./hardware/disks/btrfs-luks.nix
-      #{ disko.devices.disk.vdb.device = "/dev/nvme0n1"; } # this might not be needed But no issues so far.
 
       # hardware for my laptop
       inputs.hardware.nixosModules.framework-13-7040-amd
-      #./hardware/fingerprint
+      ./hardware/fingerprint
+
+      # Secure boot
+      inputs.lanzaboote.nixosModules.lanzaboote
+      # https://github.com/nix-community/lanzaboote/blob/master/docs/QUICK_START.md
 
       # pipewire / Audio
       ./modules/audio
@@ -38,45 +41,35 @@
     "xdg/gtk-3.0".source = "${pkgs.orchis-theme}/share/themes/Orchis-Grey-Dark/gtk-3.0";
   };
 
+  # TODO: check this
+  # Ensures lid-close leads to a sleep I actually expect, that doesn't drain my battery.
+  # "S3" here refers to Suspend-to-Ram of Intel's si0x documentation:
+  # https://www.intel.com/content/www/us/en/develop/documentation/vtune-help/top/reference/energy-analysis-metrics-reference/s0ix-states.html
+  # Lines below taken from https://github.com/NixOS/nixos-hardware/blob/488931efb69a50307fa0d71e23e78c8706909416/dell/xps/13-9370/default.nix
+  #
+  # Force S3 sleep mode. See README.wiki for details.
+  # boot.kernelParams = [ "mem_sleep_default=deep" ];
+
+  services.fwupd.enable = true;
 
 
 
   # Use the systemd-boot EFI boot loader.
   # disable if using lanzaboote
-  boot.loader.systemd-boot.enable = true;
+  boot.loader.systemd-boot.enable = lib.mkForce false;
   boot.loader.efi.canTouchEfiVariables = true;
+
+  boot.lanzaboote = {
+    enable = true;
+    pkiBundle = "/etc/secureboot";
+  };
+
+
+  networking.hostName = "framework"; # Define your hostname.
+  networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
 
   # this allows running flatpaks.
   services.flatpak.enable = true;
-  # ivpn
-  #services.ivpn.enable = true;
-
-  # secureboot / lanzaboote
-  #
-  #  boot = {
-  #    bootspec.enable = true;
-  #    loader.systemd-boot.enable = lib.mkForce false;
-  #    lanzaboote = {
-  #      enable = true;
-  #      pkiBundle = "/etc/secureboot";
-  #    };
-  #  };
-
-
-  # enable setup mode
-  # 1) Select the "Security" tab.
-  # 2) Select the "Secure Boot" entry.
-  # 3) Set "Secure Boot" to enabled.
-  # 4) Select "Reset to Setup Mode".
-  # 5) Select "Clear All Secure Boot Keys".
-  # sudo nix run nixpkgs#sbctl enroll-keys -- --microsoft
-
-
-
-  networking.hostName = "nixos"; # Define your hostname.
-  # Pick only one of the below networking options.
-  networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
-
 
   # enable power management, improves battery life.
   #powerManagement.powertop.enable = true;
@@ -89,11 +82,11 @@
     enable = true;
     settings = {
       battery = {
-        governor = "ondemand";
+        governor = "conservative";
         turbo = "auto";
       };
       charger = {
-        governor = "performance";
+        governor = "ondemand";
         turbo = "auto";
       };
     };
