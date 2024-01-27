@@ -114,14 +114,15 @@ let
   # need to put the wallpaper into the nix-store.
   wallpaper = pkgs.writeText "wallpaper"
     ''
-      preload = ${./thinknix-d.png}
-      wallpaper = eDP-1, ${./thinknix-d.png}
-    '';# eDP-1 used to be preferred
+      preload = ${./wallpaper-nixos.png}
+      wallpaper = eDP-1, ${./wallpaper-nixos.png}
+    '';
 in
 {
 
   imports = [
     ./dunst.nix
+    #./eww.nix
   ];
 
   services.swayidle.enable = true;
@@ -215,6 +216,7 @@ in
         disable_hyprland_logo = true;
         disable_splash_rendering = true;
         force_default_wallpaper = 0;
+        animate_manual_resizes = true;
         enable_swallow = false;
         # Any window started from kitty will be swallowed by the terminal
         swallow_regex = "kitty";
@@ -246,7 +248,7 @@ in
           scroll_factor = 0.5;
           middle_button_emulation = true;
           tap-and-drag = true;
-          drag_lock = true;
+          drag_lock = false;
 
           clickfinger_behavior = false;
           tap-to-click = true;
@@ -336,12 +338,12 @@ in
           #"SUPER, E, exec, wezterm -e lf"
 
           # youtube
-          "${mainMod}, print,  exec, ${yt}/bin/yt"
+          #"${mainMod}, print,  exec, ${yt}/bin/yt"
 
           ## Master-Layout binds
-          ", print, layoutmsg, swapwithmaster master"
+          "${mainMod}, Backslash, layoutmsg, swapwithmaster master"
           # IDK what key this is.
-          ", XF86Fn, layoutmsg, addmaster"
+          #", XF86Fn, layoutmsg, addmaster"
 
 
           "${mainMod}, B, exec, ${notify-send} Battery \"$(cat /sys/class/power_supply/BAT0/status), $(cat /sys/class/power_supply/BAT0/capacity)\""
@@ -392,14 +394,15 @@ in
           ",XF86MonBrightnessDown,exec,  light -U 10"
           ",XF86KbdBrightnessUp,  exec,  light -A 10"
           ",XF86KbdBrightnessDown,exec,  light -U 10"
-          ",XF86AudioRaiseVolume, exec,  wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"
-          ",XF86AudioLowerVolume, exec,  wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
+          ",XF86AudioRaiseVolume, exec,  wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%+"
+          ",XF86AudioLowerVolume, exec,  wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%-"
         ];
 
       bindl =
         [
-          ",XF86AudioMicMute, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
-          ",F1, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+
+          ",XF86AudioMute, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+          "SUPER, XF86AudioMute, exec, wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
         ];
 
       bindm = [

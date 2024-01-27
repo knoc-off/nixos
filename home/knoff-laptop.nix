@@ -21,14 +21,25 @@
     ./modules/thunderbird.nix
   ];
 
+  programs.git = {
+    enable = true;
+    userName = "knoff";
+    userEmail = "selby@niko.ink";
+  };
+
   #services.firefoxBrowser = {
   #  enable = true;
   #  profile = "knoff";
   #};
+
+  #nix.nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
   programs.nix-index = {
     enable = true;
   };
 
+  home.packages = with pkgs; [
+    prismlauncher
+  ];
 
   services.emailManager = {
     enable = true;

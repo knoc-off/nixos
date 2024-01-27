@@ -1,4 +1,4 @@
-{ inputs, pkgs, ... }:
+{ inputs, config, pkgs, ... }:
 {
 
   services.greetd.enable = true;
@@ -52,6 +52,7 @@
   ];
 
   security.pam.services.swaylock = { };
+  security.pam.services.swaylock.fprintAuth = config.services.fprintd.enable;
 
   # this should be enabled by default, with hyprland
   security = {

@@ -1,5 +1,9 @@
 { inputs, pkgs, ... }:
 {
+  # Prism launcher is better
+  #poly = inputs.polymc.overlay;
+
+
   modifications = final: prev: {
     #steam-scaling = prev.steamPackages.steam-fhsenv.overrideAttrs (old: rec {
       #pname = old.pname + "-scaling";

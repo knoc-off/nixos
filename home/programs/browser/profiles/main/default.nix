@@ -175,6 +175,16 @@ in
             icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/github.svg";
             definedAliases = [ "!g" ];
           };
+          "Annas-Archive" = {
+            urls = [{
+              template = "https://annas-archive.org/search";
+              params = [
+                { name = "q"; value = "{searchTerms}"; }
+              ];
+            }];
+            icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/bookmark.svg";
+            definedAliases = [ "!a" ];
+          };
           "kagi-summerize" = {
             urls = [{
               template = "https://kagi.com/summarizer/index.html";
@@ -189,12 +199,24 @@ in
             icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/kaggle.svg";
             definedAliases = [ "!k" ];
           };
+          "Kagi" = {
+            urls = [{
+              template = "https://kagi.com/search";
+              params = [
+                { name = "q"; value = "{searchTerms}"; }
+              ];
+            }];
+            updateInterval = 24 * 60 * 60 * 1000; # every day
+            icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/kaggle.svg";
+            definedAliases = [ ];
+          };
           "Home-Manager" = {
             urls = [{ template = "https://mipmip.github.io/home-manager-option-search/?query={searchTerms}"; }];
             updateInterval = 24 * 60 * 60 * 1000; # every day
             icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/twitter-home.svg";
             definedAliases = [ "!h" ];
           };
+
 
           "Bing".metaData.hidden = true;
           "Google".metaData.hidden = true;
@@ -203,7 +225,7 @@ in
           "DuckDuckGo".metaData.hidden = false;
         };
         force = true;
-        default = "duckduckgo";
+        default = "Kagi";
 
       };
 
