@@ -22,7 +22,7 @@
 
   programs.exa = {
     enable = true;
-  #  enableAliases = true;
+    #  enableAliases = true;
   };
 
   programs = {
@@ -38,6 +38,12 @@
     enable = true;
     userEmail = "nixos-git@knoc.one";
     userName = "knoff";
+
+    extraConfig = {
+      push = {
+        autoSetupRemote = "true";
+      };
+    };
   };
 
 

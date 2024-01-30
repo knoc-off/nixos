@@ -5,7 +5,7 @@
     ./programs/terminal
     #./modules/sway
     ./modules/hyprland
-    ./modules/eww/default.nix
+    ./modules/eww
 
     ./programs/browser
 
@@ -21,7 +21,7 @@
 
     ./modules/thunderbird.nix
   ];
-
+  disabledModules = ["programs/eww.nix"];
   programs.git = {
     enable = true;
     userName = "knoff";

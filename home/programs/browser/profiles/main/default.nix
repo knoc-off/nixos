@@ -204,6 +204,7 @@ in
               template = "https://kagi.com/search";
               params = [
                 { name = "q"; value = "{searchTerms}"; }
+                { name = "r"; value = "no_region"; }
               ];
             }];
             updateInterval = 24 * 60 * 60 * 1000; # every day
