@@ -54,6 +54,11 @@ in
           # switch statemnt to handle different commands
           switch $argv[1]
             case rb
+              if test -n "$(git -C ${config_dir} status --porcelain)"
+                echo "Error: You have modified files, first commit. or run nx rt, for temporary changes"
+                git -C ${config_dir} status --porcelain
+                return
+              end
               sudo nixos-rebuild switch --flake ${config_dir}#${configName}
             case rh
               home-manager switch --flake ${config_dir}#${homeConfigName}
@@ -65,6 +70,13 @@ in
               nix repl --extra-experimental-features repl-flake ${config_dir}#homeConfigurations."${homeConfigName}"
             case vm
               sudo nixos-rebuild build-vm --flake ${config_dir}#${configName}
+            case rg
+              set -l file $(rg "$argv[2..-1]" ${config_dir} -l. | fzf)
+              if test -z "$file"
+                return
+              end
+
+              nvim "$file"
             case cd
               set -l file $(fd . ${config_dir} --type=d -E .git -H | fzf --query "$argv[2..-1]")
               if test -z "$file"
