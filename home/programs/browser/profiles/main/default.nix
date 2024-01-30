@@ -194,9 +194,9 @@ in
                 { name = "url"; value = "{searchTerms}"; }
               ];
             }];
-            #iconUpdateURL = "https://nixos.wiki/favicon.png";
-            #updateInterval = 24 * 60 * 60 * 1000; # every day
-            icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/kaggle.svg";
+            iconUpdateURL = "https://kagi.com/favicon.ico";
+            updateInterval = 24 * 60 * 60 * 1000; # every day
+            #icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/kaggle.svg";
             definedAliases = [ "!k" ];
           };
           "Kagi" = {
@@ -204,11 +204,12 @@ in
               template = "https://kagi.com/search";
               params = [
                 { name = "q"; value = "{searchTerms}"; }
-                { name = "r"; value = "no_region"; }
+                #{ name = "r"; value = "no_region"; }
               ];
             }];
+            iconUpdateURL = "https://kagi.com/favicon.ico";
             updateInterval = 24 * 60 * 60 * 1000; # every day
-            icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/kaggle.svg";
+            #icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/kaggle.svg";
             definedAliases = [ ];
           };
           "Home-Manager" = {
