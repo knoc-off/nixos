@@ -233,7 +233,7 @@ in
         follow_mouse = 1;
         mouse_refocus = true;
 
-        kb_options = "caps:super"; # caps as menu
+        kb_options = "caps:super"; # caps as super
         scroll_method = "2fg";
 
         # key repeat settings

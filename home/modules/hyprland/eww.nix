@@ -2,9 +2,17 @@
 {
 
   programs.eww = {
+    enable = true;
+    config = {
+      bar.enable = true;
+      side = "top";
+
+    };
+
+
     package = pkgs.eww-wayland;
 
-    enable = true;
+
   #  configDir = ./eww;
   };
 

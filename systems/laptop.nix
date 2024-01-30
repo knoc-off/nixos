@@ -53,7 +53,6 @@
   services.fwupd.enable = true;
 
 
-
   # Use the systemd-boot EFI boot loader.
   # disable if using lanzaboote
   boot.loader.systemd-boot.enable = lib.mkForce false;

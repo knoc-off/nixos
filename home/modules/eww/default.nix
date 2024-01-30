@@ -1,21 +1,20 @@
 { config, lib, pkgs, ... }:
-
 with lib;
-
 let
+  pamixer = "${pkgs.pamixer}/bin/pamixer";
+  pactl = "${pkgs.pulseaudio}/bin/pactl";
 
   cfg = config.programs.eww;
-
 in
 {
-  meta.maintainers = [ hm.maintainers.mainrs ];
+  #meta.maintainers = [ hm.maintainers.mainrs ];
 
   options.programs.eww = {
     enable = mkEnableOption "eww";
 
 
     config = mkOption {
-      type = types.attrsOf types.any;
+      type = types.attrs;
       default = {
         bar = {
           enable = true;
@@ -53,30 +52,39 @@ in
 
     xdg.configFile =
       let
-        dir = "eww2";
+        dir = "eww";
+        scripts = "${dir}/scripts";
       in
       {
         "${dir}/eww.yuck" = {
-          text = ''
+          text =
+            ''
+              (defvar user_name "${config.home.username}")
+            ''
+            + (if cfg.config.bar.enable then ''(import ./bar.yuck)'' else '' '')
 
-          ''
-          #(if cfg.config.bar.enable then import ./bar.yuck else '' '')
+
           ;
         };
+
+        "${dir}/eww.scss" = {
+          text = ''
+          '';
+        };
+
         "${dir}/bar.yuck" = {
           enable = cfg.config.bar.enable;
           text = ''
-
+            (defwindow bar
+                :monitor 0
+                :exclusive true
+                :stacking "fg"
+                :namespace "eww_bar"
+                :geometry (geometry :width "100%"
+                                    :height "1%"
+                                    :anchor "top center")(hbar))
           '';
         };
-        "${dir}/eww.scss" = {
-          text = ''
-            @import "eww";
-
-            @include eww;
-          '';
-        };
-
       };
   };
 }
