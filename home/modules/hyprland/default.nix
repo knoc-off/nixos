@@ -24,23 +24,6 @@ let
   swaylock-custom = pkgs.writeShellScriptBin "swaylock-custom" ''
     #!/${pkgs.bash}/bin/bash
 
-    # Font
-    font="DejaVu Sans Book"
-    font_size="96"
-
-    # Ring Size & Thickness
-    indicator_radius="120"
-    indicator_thickness="10"
-
-    # Date & Time Format
-    date_format="%Y.%m.%d"
-    time_format="%H:%M:%S"
-
-    # Background Effects
-    effect_blur="$2" # 50x5
-    effect_pixelate="$3" # 10
-    #font = config.fontProfiles.regular.family;
-    #indicator-caps-lock = true;
 
 
     exec ${config.programs.swaylock.package}/bin/swaylock \
@@ -49,17 +32,17 @@ let
     --layout-text-color "${theme.base05}" \
     \
     --line-ver-color "${theme.green00}" \
-    --inside-ver-color "${theme.green02}" \
+    --inside-ver-color "${theme.base03}" \
     --ring-ver-color "${theme.green01}" \
     --text-ver-color "${theme.white00}" \
     \
     --line-wrong-color "${theme.red00}" \
-    --inside-wrong-color "${theme.red02}" \
+    --inside-wrong-color "${theme.base02}" \
     --ring-wrong-color "${theme.red01}" \
     --text-wrong-color "${theme.white00}" \
     \
     --line-clear-color "${theme.base00}" \
-    --inside-clear-color "${theme.base03}" \
+    --inside-clear-color "${theme.base02}" \
     --ring-clear-color "${theme.yellow00}" \
     --text-clear-color "${theme.white00}" \
     \
@@ -71,41 +54,19 @@ let
     --inside-color "${theme.base01}" \
     --separator-color "${theme.base02}" \
     \
-    --indicator-radius "$indicator_radius" \
-    --indicator-thickness "$indicator_thickness" \
+    --indicator-radius "130" \
+    --indicator-thickness "40" \
     \
     --clock \
-    --datestr "$date_format" --timestr "$time_format" \
+    --datestr "%Y.%m.%d" --timestr "%H:%M:%S" \
     \
     --screenshots \
-    --effect-blur "$effect_blur" \
-    --effect-pixelate "$effect_pixelate" \
+    --effect-blur "$2" \
+    --effect-pixelate "$3" \
     --grace $1 \
     --fade-in $4 \
+    --font-size 24 \
     --daemonize
-
-    #--effect-greyscale \
-
-    # run as user to display notifications
-
-
-
-
-    #--effect-custom /System/Config/Sway\ Lock\ Effects/Effects/twist-effect.c \
-    #--font $font \
-    #--font-size $font_size \
-    #--effect-compose $effect_compose \
-    #--image "/System/Appearance/Backgrounds/Lock/Eye.jpg" \
-    #--effect-compose "50%x50%;center;/System/Appearance/Backgrounds/Lock/Eye.jpg" \
-    #--screenshots \
-    # --effect-vignette 0.5:0.25 \
-    # --effect-custom ~/twist-effect.c \
-    # --daemonize
-    # DejaVuSansMono Mono
-    # DejaVu Sans Book
-    # /System/Appearance/Backgrounds/Lock/StarCraft.png
-    # /System/Appearance/Backgrounds/Lock/Eye.jpg
-    # $(cat /System/Config/Sway/Variables/Backgrounds/Lock)
   '';
 
 

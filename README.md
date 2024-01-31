@@ -16,10 +16,12 @@
 
 - my hyprland configuration.
     - not many novel ideas, but i think the implementation is quite clean.
+    - swaylock, set up so that its somewhat modular
     - many packages, are referenced declaratively. so no need to have them 'installed'
     - eww - very much a WIP, the goal is to make a module, that is much more declarative than existing modules, that just create a symlink to a folder.
 
 - laptop system.
     - uses secure boot.
+    - uses disko for declarative drive config.
     - need to clean thins up.
 
