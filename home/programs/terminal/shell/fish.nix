@@ -48,6 +48,16 @@ in
         '';
       };
 
+      nixcommit = ''
+        clear
+        git -C ~/nixos status --porcelain
+        # create a new temp file thats opend in the editor and then read the first line for the message, and the 3-.. is the body
+        read -P "commit message: " message
+
+        printf '{\n  system.nixos.label = "'"$message"'";\n}' > ~/nixos/systems/commit-message.nix
+        git commit -am "$message"
+      '';
+
       nx =
         ''
           # fish function to run nix commands easily

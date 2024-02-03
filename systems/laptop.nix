@@ -30,6 +30,10 @@
       # Window manager
       ./modules/hyprland
 
+      # run with the fish function nixcommit
+      # This is an 'auto generated' file that should add a message to the build versions in the boot menu
+      ./commit-message.nix
+
       # Android emulation
       #./modules/virtualisation/waydroid.nix
     ];
@@ -41,14 +45,7 @@
     "xdg/gtk-3.0".source = "${pkgs.orchis-theme}/share/themes/Orchis-Grey-Dark/gtk-3.0";
   };
 
-  # TODO: check this
-  # Ensures lid-close leads to a sleep I actually expect, that doesn't drain my battery.
-  # "S3" here refers to Suspend-to-Ram of Intel's si0x documentation:
-  # https://www.intel.com/content/www/us/en/develop/documentation/vtune-help/top/reference/energy-analysis-metrics-reference/s0ix-states.html
-  # Lines below taken from https://github.com/NixOS/nixos-hardware/blob/488931efb69a50307fa0d71e23e78c8706909416/dell/xps/13-9370/default.nix
-  #
-  # Force S3 sleep mode. See README.wiki for details.
-  # boot.kernelParams = [ "mem_sleep_default=deep" ];
+
 
   services.fwupd.enable = true;
 
@@ -166,7 +163,8 @@
 
 
   # Configure keymap in X11
-  services.xserver.layout = "us";
+  #services.xserver.layout = "us";
+  services.xserver.xkb.layout = "us";
   # services.xserver.xkbOptions = "eurosign:e,caps:escape";
 
   # Enable CUPS to print documents.
