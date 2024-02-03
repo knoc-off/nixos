@@ -95,13 +95,14 @@ in
         tridactyl # best vim plugin
         #forget_me_not # deletes all website data
 
-
+        kagi-search
         violentmonkey
       ];
 
 
       search = {
         engines = {
+          # -------------------- Nix Search --------------------
           "Nix Packages" = {
             urls = [{
               template = "https://search.nixos.org/packages";
@@ -129,7 +130,6 @@ in
             icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/cm_options.svg";
             definedAliases = [ "!o" ];
           };
-
           "NixOS Wiki" = {
             urls = [{
               template = "https://nixos.wiki/index.php";
@@ -142,17 +142,13 @@ in
             icon = "${pkgs.nixos-icons}/share/icons/hicolor/scalable/apps/nix-snowflake.svg";
             definedAliases = [ "!n" ];
           };
-
-          "fmhy" = {
-            urls = [{
-              template = "https://www.fmhy.tk/search";
-              params = [
-                { name = "q"; value = "{searchTerms}"; }
-              ];
-            }];
-            icon = "${pkgs.circle-flags}/share/circle-flags-svg/other/pirate.svg";
-            definedAliases = [ "!f" ];
+          "Home-Manager" = {
+            urls = [{ template = "https://mipmip.github.io/home-manager-option-search/?query={searchTerms}"; }];
+            updateInterval = 24 * 60 * 60 * 1000; # every day
+            icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/twitter-home.svg";
+            definedAliases = [ "!h" ];
           };
+          # -------------------- dev sites --------------------
           "StackOverflow" = {
             urls = [{
               template = "https://duckduckgo.com/";
@@ -170,10 +166,19 @@ in
                 { name = "q"; value = "site%3Agithub.com+-issues+-topic+-releases+{searchTerms}"; }
               ];
             }];
-            #iconUpdateURL = "https://nixos.wiki/favicon.png";
-            #updateInterval = 24 * 60 * 60 * 1000; # every day
             icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/github.svg";
             definedAliases = [ "!g" ];
+          };
+          # -------------------- free information --------------------
+          "fmhy" = {
+            urls = [{
+              template = "https://www.fmhy.tk/search";
+              params = [
+                { name = "q"; value = "{searchTerms}"; }
+              ];
+            }];
+            icon = "${pkgs.circle-flags}/share/circle-flags-svg/other/pirate.svg";
+            definedAliases = [ "!f" ];
           };
           "Annas-Archive" = {
             urls = [{
@@ -181,10 +186,13 @@ in
               params = [
                 { name = "q"; value = "{searchTerms}"; }
               ];
-            }];
-            icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/bookmark.svg";
+            }]; # https://annas-archive.org/favicon.ico
+            iconUpdateURL = "https://annas-archive.org/favicon.ico";
+            updateInterval = 24 * 60 * 60 * 1000; # every day
+            #icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/bookmark.svg";
             definedAliases = [ "!a" ];
           };
+          # -------------------- alternate search engines --------------------
           "kagi-summerize" = {
             urls = [{
               template = "https://kagi.com/summarizer/index.html";
@@ -212,12 +220,6 @@ in
             #icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/kaggle.svg";
             definedAliases = [ ];
           };
-          "Home-Manager" = {
-            urls = [{ template = "https://mipmip.github.io/home-manager-option-search/?query={searchTerms}"; }];
-            updateInterval = 24 * 60 * 60 * 1000; # every day
-            icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/twitter-home.svg";
-            definedAliases = [ "!h" ];
-          };
 
 
           "Bing".metaData.hidden = true;
@@ -236,14 +238,18 @@ in
         ''
           /* this should be done decalratively, and i should package it. */
           @import "./firefox-csshacks/chrome/autohide_sidebar.css";
+          /*@import "./firefox-csshacks/chrome/autohide_bookmarks_and_main_toolbars.css";*/
+
 
           /* override sidebar options */
           /* https://pastebin.com/KFHjwR4d */
           #sidebar-box{
             --uc-autohide-sidebar-delay: 100ms;
-            --uc-autohide-transition-duration: 115ms;
+            --uc-autohide-transition-duration: 215ms;
             --uc-sidebar-width: var(--sidebar-width);
             --uc-sidebar-hover-width: 25vw;
+            --uc-autohide-transition-type: ease-in-out;
+
             background-color: #${theme.base02} !important;
           }
 

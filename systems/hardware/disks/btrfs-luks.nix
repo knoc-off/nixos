@@ -4,7 +4,7 @@
     disk = {
       vdb = {
         type = "disk";
-        device = lib.mkDefault "/dev/nvme0n1";#lib.mkDefault "/dev/sda";
+        device = lib.mkDefault "/dev/nvme0n1"; #lib.mkDefault "/dev/sda";
         content = {
           type = "gpt";
           partitions = {
@@ -50,7 +50,7 @@
                     };
                     "/swap" = {
                       mountpoint = "/.swapvol";
-                      swap.swapfile.size = "16G";
+                      swap.swapfile.size = "32G";
                     };
                   };
                 };
