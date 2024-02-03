@@ -50,7 +50,10 @@ in
 
       nixcommit = ''
         clear
+        # color to red
+        set_color red
         git -C ${config_dir} status --porcelain
+        set_color normal
         # create a new temp file thats opend in the editor and then read the first line for the message, and the 3-.. is the body
         read -P "commit message: " message
 
