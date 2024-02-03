@@ -50,11 +50,11 @@ in
 
       nixcommit = ''
         clear
-        git -C ~/nixos status --porcelain
+        git -C ${config_dir} status --porcelain
         # create a new temp file thats opend in the editor and then read the first line for the message, and the 3-.. is the body
         read -P "commit message: " message
 
-        printf '{\n  system.nixos.label = "'"$message"'";\n}' > ~/nixos/systems/commit-message.nix
+        printf '{\n  system.nixos.label = "'"$message"'";\n}' > ${config_dir}/systems/commit-message.nix
         git commit -am "$message"
       '';
 
