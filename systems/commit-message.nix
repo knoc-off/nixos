@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "this_is_a_test_again";
+  system.nixos.label = "Updated flake fixed nixcommit";
 }
