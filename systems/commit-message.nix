@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "Updated flake fixed nixcommit";
+  system.nixos.label = "fixed_nixcommit_function";
 }
