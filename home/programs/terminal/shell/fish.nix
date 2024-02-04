@@ -71,10 +71,10 @@ in
           switch $argv[1]
             case rb
               if test (git status --porcelain | wc -l) -eq 1; and test (git status --porcelain | awk '{ print $2 }') = "systems/commit-message.nix"
-                  sudo nixos-rebuild switch --flake ${config_dir}#${configName}
+                sudo nixos-rebuild switch --flake ${config_dir}#${configName}
+                return
               end
               echo "Error: You have modified files, first commit. or run nx rt, for temporary changes"
-              return
             case rh
               home-manager switch --flake ${config_dir}#${homeConfigName}
             case rt

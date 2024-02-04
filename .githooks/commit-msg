@@ -1,0 +1,30 @@
+#/usr/bin/env bash
+# File to write commit message to
+TARGET_FILE=systems/commit-message.nix
+
+# Read the commit message from the argument
+# get the first line of the commit message
+first_line=$(head -n 1 $1)
+
+
+message=$(echo $first_line | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
+
+# ensure the commit message is 50 characters. If not, truncate it
+# if less than 50 characters, pad it with underscores on both sides equally
+if [ ${#message} -gt 50 ]; then
+    message=${message:0:50}
+fi
+
+if [ ${#message} -lt 50 ]; then
+    padding=$(( (50 - ${#message}) / 2 ))
+    message=$(printf "_%.0s" $(seq 1 $padding))$message$(printf "_%.0s" $(seq 1 $padding))
+    message=${message:0:50}
+fi
+
+# if its less than 50, add underscores to the end
+
+
+
+printf "{\n  system.nixos.label = \"$message\";\n}" > $TARGET_FILE
+
+exit 0
