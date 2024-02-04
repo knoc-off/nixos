@@ -1,5 +1,9 @@
 # My NixOS configuration.
 
+Run the command:
+`git config --local core.hooksPath .githooks/`
+To set each generation of nixos to have the same label as your git commit.
+This greatly improves the readability of the bootup generations, and allows more well informed rollbacks.
 
 
 # highlights:
