@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "nixcommit_features";
+  system.nixos.label = "__________________________________________________";
 }
