@@ -458,9 +458,6 @@ in
           /*  appearance: -moz-win-glass !important; */
           /* } */
 
-
-          -moz-border-radius: 1em;
-
         '';
       userContent = ''
         .tabbrowser-tabbox {
@@ -482,9 +479,7 @@ in
         /* Color Configs */
         /* not sure how i feel about this, because its hard to tell what is what */
         /* and themes can have unintended effects. */
-        /* would be cool if with the theme.nix, if i could generate new colors from that */
-        /* how would that work? deriviation that generates it would make the most sense */
-        /* like theme.mkshade, or something, and then have one color with many shades. */
+        /* need to document the effects.*/
         :root {
           /* this effects text color in firefox menus. */
           --in-content-page-color: #${theme.white00} !important;
@@ -554,12 +549,6 @@ in
           --card-outline-color: var(--grey-30);
           --card-shadow-hover: var(--card-shadow), 0 0 0 5px var(--card-outline-color);
           --card-shadow-focus: 0 0 0 2px var(--blue-50), 0 0 0 6px var(--blue-50-a30);
-        }
-
-
-        :root{
-          -moz-border-radius: 1em;
-
         }
 
         :root{
