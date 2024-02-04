@@ -70,12 +70,11 @@ in
           # switch statemnt to handle different commands
           switch $argv[1]
             case rb
-              if test -n "$(git -C ${config_dir} status --porcelain)"
-                echo "Error: You have modified files, first commit. or run nx rt, for temporary changes"
-                git -C ${config_dir} status --porcelain
-                return
+              if test (git status --porcelain | wc -l) -eq 1; and test (git status --porcelain | awk '{ print $2 }') = "systems/commit-message.nix"
+                  sudo nixos-rebuild switch --flake ${config_dir}#${configName}
               end
-              sudo nixos-rebuild switch --flake ${config_dir}#${configName}
+              echo "Error: You have modified files, first commit. or run nx rt, for temporary changes"
+              return
             case rh
               home-manager switch --flake ${config_dir}#${homeConfigName}
             case rt
