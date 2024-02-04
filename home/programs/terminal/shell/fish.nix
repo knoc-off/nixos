@@ -48,21 +48,21 @@ in
         '';
       };
 
-      nixcommit = ''
-        clear
-        # color to red
-        set_color red
-        git -C ${config_dir} status --porcelain
-        set_color normal
-        # create a new temp file thats opend in the editor and then read the first line for the message, and the 3-.. is the body
-        read -P "commit message: " message
-
-        set message (echo $message | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
-
-        printf '{\n  system.nixos.label = "'"$message"'";\n}' > ${config_dir}/systems/commit-message.nix
-        git commit -am "$message"
-
-      '';
+      #      nixcommit = ''
+      #        clear
+      #        # color to red
+      #        set_color red
+      #        git -C ${config_dir} status --porcelain
+      #        set_color normal
+      #        # create a new temp file thats opend in the editor and then read the first line for the message, and the 3-.. is the body
+      #        read -P "commit message: " message
+      #
+      #        set message (echo $message | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
+      #
+      #        printf '{\n  system.nixos.label = "'"$message"'";\n}' > ${config_dir}/systems/commit-message.nix
+      #        git commit -am "$message"
+      #
+      #      '';
 
       nx =
         ''

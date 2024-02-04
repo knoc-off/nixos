@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "__lets_see_if_this_works_for_the_commit_message__";
+  system.nixos.label = "___________________test_commit___________________";
 }
