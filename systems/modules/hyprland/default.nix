@@ -16,7 +16,7 @@
     hypr
   ''}";
 
-  # Backlight control
+  # Backlight control. TODO: link to the package instead of installing it?
   programs.light.enable = true;
 
   # allow x compositor
@@ -34,7 +34,10 @@
   # portals
   xdg.portal = {
     enable = true;
-    extraPortals = [ pkgs.xdg-desktop-portal-gnome ];
+    extraPortals = [
+      pkgs.xdg-desktop-portal-gnome
+      pkgs.xdg-desktop-portal-gtk
+    ];
   };
 
   environment.systemPackages = with pkgs; [
@@ -49,9 +52,13 @@
     gnome.gnome-software # for flatpak
     swaylock
     swayidle
+
+    # super useful
+    wl-clipboard
   ];
 
   security.pam.services.swaylock = { };
+  # I believe this is redundant, but I'm not sure
   security.pam.services.swaylock.fprintAuth = config.services.fprintd.enable;
 
   # this should be enabled by default, with hyprland
@@ -75,6 +82,7 @@
   #    };
   #  };
 
+  # TODO: Document this.
   services = {
     gvfs.enable = true;
     devmon.enable = true;

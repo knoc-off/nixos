@@ -47,6 +47,14 @@
 
 
 
+  # Attempt to fix the: GLib-GIO-ERROR**: No GSettings schemas are installed on the system
+  programs.dconf.enable = true;
+
+  #environment.systemPackages = [
+  #  pkgs.gnome.adwaita-icon-theme
+  #];
+
+
   services.fwupd.enable = true;
 
 
@@ -209,18 +217,19 @@
   # List packages installed in system profile. To search, run:
   # $ nix search wget
   environment.systemPackages = with pkgs; [
+    # TODO: see if this fixes issues
+    gnome.adwaita-icon-theme
+
+    # misc tools
     git
     wget
-    home-manager
+    home-manager # bootstrap
     libinput
   ];
 
   services.logind.extraConfig = ''
     # don’t shutdown when power button is short-pressed
-    HandlePowerKey=hibernate
-
-    [Service]
-    Environment=SYSTEMD_BYPASS_HIBERNATION_MEMORY_CHECK=1
+    HandlePowerKey=suspend
   '';
 
   # Some programs need SUID wrappers, can be configured further or are

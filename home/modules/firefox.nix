@@ -531,9 +531,6 @@ in
               appearance: -moz-win-glass!important;
             }
 
-
-            -moz-border-radius: 1em;
-
           '';
 
         /*
