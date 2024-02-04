@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "___________________test_commit___________________";
+  system.nixos.label = "__________________another_test.__________________";
 }
