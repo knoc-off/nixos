@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "revision_test_number_2_____________________c8ef755";
+  system.nixos.label = "removed_the_hash_it_references_the_previous_commit";
 }
