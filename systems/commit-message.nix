@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "system_label_commit_message_update________________";
+  system.nixos.label = "remove_hooks_should_work_now._____________________";
 }
