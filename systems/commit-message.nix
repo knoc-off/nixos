@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "testing_hash_at_the_end_of_message_________23c17ae";
+  system.nixos.label = "revision_test_number_2_____________________c8ef755";
 }
