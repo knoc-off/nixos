@@ -54,8 +54,8 @@ let
     --inside-color "${theme.base01}" \
     --separator-color "${theme.base02}" \
     \
-    --indicator-radius "130" \
-    --indicator-thickness "40" \
+    --indicator-radius "100" \
+    --indicator-thickness "1" \
     \
     --clock \
     --datestr "%Y.%m.%d" --timestr "%H:%M:%S" \

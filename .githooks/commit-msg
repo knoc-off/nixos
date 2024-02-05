@@ -27,4 +27,6 @@ fi
 
 printf "{\n  system.nixos.label = \"$message\";\n}" > $TARGET_FILE
 
+git add $TARGET_FILE
+
 exit 0
