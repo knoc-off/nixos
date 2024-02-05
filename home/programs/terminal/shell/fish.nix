@@ -48,21 +48,32 @@ in
         '';
       };
 
-      #      nixcommit = ''
-      #        clear
-      #        # color to red
-      #        set_color red
-      #        git -C ${config_dir} status --porcelain
-      #        set_color normal
-      #        # create a new temp file thats opend in the editor and then read the first line for the message, and the 3-.. is the body
-      #        read -P "commit message: " message
-      #
-      #        set message (echo $message | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
-      #
-      #        printf '{\n  system.nixos.label = "'"$message"'";\n}' > ${config_dir}/systems/commit-message.nix
-      #        git commit -am "$message"
-      #
-      #      '';
+      nixcommit = ''
+        GIT_EDITOR=false git commit
+        nvim -c 'set textwidth=80' ${config_dir}/.git/COMMIT_EDITMSG
+        set TARGET_FILE "${config_dir}/systems/commit-message.nix"
+        sed -i '/^#/d' ${config_dir}/.git/COMMIT_EDITMSG
+        if test -z "$(head -n 1 ${config_dir}/.git/COMMIT_EDITMSG)"
+            echo "is empty"
+            return
+        end
+        set first_line (head -n 1 ${config_dir}/.git/COMMIT_EDITMSG)
+        set message (echo $first_line | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
+        set git_rev (git rev-parse --short HEAD)
+        if test (string length -- $message) -lt 50
+            set message (string pad -w 50 -r --char=_ "$message")
+        end
+        set message (string sub --length 50 "$message")
+        printf "{\n  system.nixos.label = \"$message\";\n}" > $TARGET_FILE
+        git add $TARGET_FILE
+        git commit -a -F ${config_dir}/.git/COMMIT_EDITMSG
+
+        #set leng
+
+
+        # Could now add the revision too. but it wouldent be tracked
+        # but thats fine.
+      '';
 
       nx =
         ''

@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "testing_a_commit_now______________________________";
+  system.nixos.label = "Added_the_nixcommit_command_______________________";
 }
