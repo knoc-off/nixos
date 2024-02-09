@@ -47,6 +47,8 @@
 
 
 
+
+
   # Attempt to fix the: GLib-GIO-ERROR**: No GSettings schemas are installed on the system
   programs.dconf.enable = true;
 
