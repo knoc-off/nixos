@@ -49,7 +49,7 @@ in
       };
 
       nixcommit = ''
-        GIT_EDITOR=false git commit
+        GIT_EDITOR=false git -C ${config_dir} commit
         nvim -c 'set textwidth=80' ${config_dir}/.git/COMMIT_EDITMSG
         set TARGET_FILE "${config_dir}/systems/commit-message.nix"
         sed -i '/^#/d' ${config_dir}/.git/COMMIT_EDITMSG
@@ -65,8 +65,8 @@ in
         end
         set message (string sub --length 50 "$message")
         printf "{\n  system.nixos.label = \"$message\";\n}" > $TARGET_FILE
-        git add $TARGET_FILE
-        git commit -a -F ${config_dir}/.git/COMMIT_EDITMSG
+        git -C ${config_dir} add $TARGET_FILE
+        git -C ${config_dir} commit -a -F ${config_dir}/.git/COMMIT_EDITMSG
 
         #set leng
 

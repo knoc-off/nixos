@@ -55,6 +55,10 @@
 
     # super useful
     wl-clipboard
+
+    # lets see if xdg fixes things
+    xdg-utils
+
   ];
 
   security.pam.services.swaylock = { };

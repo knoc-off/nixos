@@ -28,6 +28,7 @@
     userEmail = "selby@niko.ink";
   };
 
+  # firefox module
   #services.firefoxBrowser = {
   #  enable = true;
   #  profile = "knoff";
@@ -38,9 +39,45 @@
     enable = true;
   };
 
+  # TODO: move this to someplace more logical
   home.packages = with pkgs; [
     prismlauncher
+
+    # move to desktop module?
+    gnome.gnome-disk-utility
+
+    # for xdg settings
+    gimp
+    mpv
   ];
+
+  # XDG settings
+  xdg.mimeApps = {
+    enable = true;
+    associations.added = {
+      #"application/pdf" = [ "org.gnome.Evince.desktop" ];
+      "video/mp4" = [ "mpv.desktop" ];
+      # gimp:
+      "image/bmp" = [ "org.gimp.GIMP.desktop" ];
+      "image/gif" = [ "org.gimp.GIMP.desktop" ];
+      "image/jpeg" = [ "org.gimp.GIMP.desktop" ];
+      "image/png" = [ "org.gimp.GIMP.desktop" ];
+      "image/svg+xml" = [ "org.gimp.GIMP.desktop" ];
+      "image/tiff" = [ "org.gimp.GIMP.desktop" ];
+
+    };
+    defaultApplications = {
+      #"application/pdf" = [ "org.gnome.Evince.desktop" ];
+      "video/mp4" = [ "mpv.desktop" ];
+      # gimp:
+      "image/bmp" = [ "org.gimp.GIMP.desktop" ];
+      "image/gif" = [ "org.gimp.GIMP.desktop" ];
+      "image/jpeg" = [ "org.gimp.GIMP.desktop" ];
+      "image/png" = [ "org.gimp.GIMP.desktop" ];
+      "image/svg+xml" = [ "org.gimp.GIMP.desktop" ];
+      "image/tiff" = [ "org.gimp.GIMP.desktop" ];
+    };
+  };
 
   services.emailManager = {
     enable = true;
