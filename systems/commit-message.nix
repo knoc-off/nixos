@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "fixed_up_some_things______________________________";
+  system.nixos.label = "fix_to_rb_command_________________________________";
 }
