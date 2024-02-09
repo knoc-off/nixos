@@ -81,14 +81,12 @@ in
           # switch statemnt to handle different commands
           switch $argv[1]
             case rb
-              if test "$(git status --porcelain | wc -l)" -eq 1 ||
-                 test "$(git status --porcelain | wc -l)" -eq 0 &&
-                 test "$(git status --porcelain | awk '{ print $2 }')" = "systems/commit-message.nix"; then
+              git -C ${config_dir} diff --quiet; set nochanges $status
+              if [ $nochanges -eq 0 ]; then
                 sudo nixos-rebuild switch --flake ${config_dir}#${configName}
-                return
-              fi
+              else
+                nixcommit
               end
-              echo "Error: You have modified files, first commit. or run nx rt, for temporary changes"
             case rh
               home-manager switch --flake ${config_dir}#${homeConfigName}
             case rt
