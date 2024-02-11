@@ -82,7 +82,7 @@ in
           switch $argv[1]
             case rb
               git -C ${config_dir} diff --quiet; set nochanges $status
-              if [ $nochanges -eq 0 ]; then
+              if [ $nochanges -eq 0 ];
                 sudo nixos-rebuild switch --flake ${config_dir}#${configName}
               else
                 nixcommit
@@ -141,9 +141,9 @@ in
       '';
 
       findLocalDevices = ''
-        local IPADDR="$(ifconfig | grep -A 1 'wlp2s0'  | tail -1 | grep -E '.[0-9]+\.[0-9]+\.[0-9]+\.' -o | tail -1)0"
-        local NETMASK=24
-        nix run nixpkgs#$argv[1] -- -sP "$IPADDR/$NETMASK"
+        set IPADDR "$(ifconfig | grep -A 1 'wlp2s0'  | tail -1 | grep -E '.[0-9]+\.[0-9]+\.[0-9]+\.' -o | tail -1)0"
+        set NETMASK 24
+        nix run nixpkgs#nmap -- -sP "$IPADDR/$NETMASK"
       '';
 
 
