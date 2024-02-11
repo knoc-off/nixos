@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "Finally_got_something_good_that_works_____________";
+  system.nixos.label = "Nixos_updated_all_inputs_and_neovim_changes.______";
 }
