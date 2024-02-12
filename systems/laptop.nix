@@ -38,13 +38,16 @@
       #./modules/virtualisation/waydroid.nix
     ];
 
+  hardware.framework.amd-7040.preventWakeOnAC = true;
+
+
+
   # IDK if this does anything, TODO: check
   # doesent seem to do much, cant remember why i added it.
   environment.etc = {
     "xdg/gtk-2.0".source = "${pkgs.orchis-theme}/share/themes/Orchis-Grey-Dark/gtk-2.0";
     "xdg/gtk-3.0".source = "${pkgs.orchis-theme}/share/themes/Orchis-Grey-Dark/gtk-3.0";
   };
-
 
   #boot.kernelPackages = pkgs.linuxPackages_latest;
 
@@ -78,19 +81,19 @@
   #services.power-profiles-daemon.enable = true;
   # thermal management. TODO: check if this is needed.
   #services.thermald.enable = true;
-  services.auto-cpufreq = {
-    enable = true;
-    settings = {
-      battery = {
-        governor = "conservative";
-        turbo = "auto";
-      };
-      charger = {
-        governor = "preformance";
-        turbo = "auto";
-      };
-    };
-  };
+  #  services.auto-cpufreq = {
+  #    enable = true;
+  #    settings = {
+  #      battery = {
+  #        governor = "conservative";
+  #        turbo = "auto";
+  #      };
+  #      charger = {
+  #        governor = "preformance";
+  #        turbo = "auto";
+  #      };
+  #    };
+  #  };
   #  services.tlp = {
   #    enable = true;
   #    settings = {
@@ -179,7 +182,8 @@
   # steam benifits from launch param: -forcedesktopscaling 1.0%U
   # NIXPKGS_ALLOW_UNFREE=1 nix run nixpkgs#steam --impure -- -forcedesktopscaling 1.0%U
   #hardware.opengl.driSupport32Bit = true;
-  #hardware.opengl.enable = true;
+  hardware.opengl.driSupport32Bit = true;
+  hardware.opengl.enable = true;
   hardware.pulseaudio.support32Bit = true;
 
 

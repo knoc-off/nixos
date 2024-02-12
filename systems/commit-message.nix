@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "changed_it_back._hyprland_dident_like_it__________";
+  system.nixos.label = "test_change_small_things__________________________";
 }
