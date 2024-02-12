@@ -49,7 +49,7 @@
     "xdg/gtk-3.0".source = "${pkgs.orchis-theme}/share/themes/Orchis-Grey-Dark/gtk-3.0";
   };
 
-  #boot.kernelPackages = pkgs.linuxPackages_latest;
+  boot.kernelPackages = pkgs.linuxPackages_latest;
 
 
   # Attempt to fix the: GLib-GIO-ERROR**: No GSettings schemas are installed on the system
