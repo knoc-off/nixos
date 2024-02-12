@@ -6,25 +6,14 @@ let
   hyprland = inputs.hyprland.packages.${pkgs.system}.hyprland;
   plugins = inputs.hyprland-plugins.packages.${pkgs.system};
 
-
-  wl-paste = "${pkgs.wl-clipboard}/bin/wl-paste";
+  #fuzzel = "${pkgs.fuzzel}/bin/fuzzel -b ${theme.base04}DD -t ${theme.base06}DD -m ${theme.base04}DD -C ${theme.base05}DD -s ${theme.base03}DD -S ${theme.base07}DD  -M ${theme.base07}DD";
   fuzzel = "${pkgs.fuzzel}/bin/fuzzel -b ${theme.base02}DD -t ${theme.base06}DD -m ${theme.base04}DD -C ${theme.base05}DD -s ${theme.base03}DD -S ${theme.base07}DD -M ${theme.base07}DD";
+
   notify-send = "${pkgs.libnotify}/bin/notify-send";
-
-  launcher = pkgs.writeShellScriptBin "hypr" ''
-    #!/${pkgs.bash}/bin/bash
-
-    export WLR_NO_HARDWARE_CURSORS=1
-    export _JAVA_AWT_WM_NONREPARENTING=1
-
-    exec ${hyprland}/bin/Hyprland
-  '';
 
   # Had to result to this, as the home-manager module for swaylock seems to be broken.
   swaylock-custom = pkgs.writeShellScriptBin "swaylock-custom" ''
     #!/${pkgs.bash}/bin/bash
-
-
 
     exec ${config.programs.swaylock.package}/bin/swaylock \
     --layout-bg-color "${theme.base00}" \
@@ -104,7 +93,7 @@ in
   };
 
 
-  home.packages = [ swaylock-custom launcher pkgs.hyprpaper ];
+  home.packages = [ swaylock-custom pkgs.hyprpaper ];
   xdg.desktopEntries."org.gnome.Settings" = {
     name = "Settings";
     comment = "Gnome Control Center";
@@ -123,7 +112,6 @@ in
 
     settings = {
       exec-once = [
-        #"hyprctl setcursor Qogir 24"
         "hyprpaper --config ${wallpaper}"
       ];
 
@@ -264,10 +252,42 @@ in
           (f "xdg-desktop-portal-gnome")
           (f "transmission-gtk")
           (f "com.github.Aylur.ags")
-          (f "Extension: (Bitwarden - Free Password Manager) - Bitwarden — Mozilla Firefox")
+          (f "^(Extension)(.*)$")
           (f "Steam - Browser")
           "workspace 7, title:Spotify"
         ];
+
+      windowrulev2 = [
+        #"float, class:(kitty), title:(.*)"
+        #"opacity 1, class:(kitty), title:(.*)"
+        "opacity 0.7, class:(firefox), title:(.*Bitwarden.*)"
+        "float, class:(firefox), title:(.*Bitwarden.*)"
+
+        #Window 30793f0 -> Extension: (Bitwarden - Free Password Manager) - Bitwarden — Mozilla Firefox:
+        #	mapped: 1
+        #	hidden: 0
+        #	at: 0,0
+        #	size: 2256,1504
+        #	workspace: 1 (1)
+        #	floating: 0
+        #	monitor: 0
+        #	class: firefox
+        #	title: Extension: (Bitwarden - Free Password Manager) - Bitwarden — Mozilla Firefox
+        #	initialClass: firefox
+        #	initialTitle: Mozilla Firefox
+        #	pid: 2428
+        #	xwayland: 0
+        #	pinned: 0
+        #	fullscreen: 1
+        #	fullscreenmode: 1
+        #	fakefullscreen: 0
+        #	grouped: 0
+        #	swallowing: 0
+        #	focusHistoryID: 0
+
+
+
+      ];
 
       bind =
         let
@@ -281,34 +301,15 @@ in
           mvtows = binding "${mainMod} SHIFT" "movetoworkspace";
           #e = "exec, ags -b hypr";
           arr = [ 1 2 3 4 5 6 7 8 9 ];
-          yt = pkgs.writeShellScriptBin "yt" ''
-            ${notify-send} "Opening video" "$(${wl-paste})"
-            mpv "$(wl-paste)"
-          '';
+
+          acpi = "${pkgs.acpi}/bin/acpi";
         in
         [
-          #"CTRL SHIFT, R,  ${e} quit; ags -b hypr"
-          #"SUPER, R,       ${e} -t applauncher"
-          #", XF86PowerOff, ${e} -t powermenu"
-          #"SUPER, Tab,     ${e} -t overview"
-          #", XF86Launch4,  ${e} -r 'recorder.start()'"
-          #",Print,         ${e} -r 'recorder.screenshot()'"
-          #"SHIFT,Print,    ${e} -r 'recorder.screenshot(true)'"
-          #"SUPER, Return, exec, xterm" # xterm is a symlink, not actually xterm
-          #"SUPER, W, exec, firefox"
-          #"SUPER, E, exec, wezterm -e lf"
-
-          # youtube
-          #"${mainMod}, print,  exec, ${yt}/bin/yt"
-
           ## Master-Layout binds
           "${mainMod}, Backslash, layoutmsg, swapwithmaster master"
-          # IDK what key this is.
           #", XF86Fn, layoutmsg, addmaster"
 
-
-          "${mainMod}, B, exec, ${notify-send} Battery \"$(cat /sys/class/power_supply/BAT0/status), $(cat /sys/class/power_supply/BAT0/capacity)\""
-
+          "${mainMod}, B, exec, ${notify-send} Battery \"$(${acpi} -b | awk '{print $3, $4}')\""
 
           "${mainMod}, Tab, focuscurrentorlast"
           "${mainMod}, Delete, exit"
@@ -323,18 +324,12 @@ in
           "${mainMod}, G, togglegroup, 0"
           ", page_down, changegroupactive, f"
           ", page_up, changegroupactive, b"
-          "${mainMod}, A, exec,  ${swaylock-custom}/bin/swaylock-custom 0 120x6 10 0"
-
-          # (${notify-send} \"Battery level: $(cat /sys/class/power_supply/BAT0/capacity)%\")
+          "${mainMod}, L, exec,  ${swaylock-custom}/bin/swaylock-custom 0 120x6 10 0"
 
           (mvfocus "up" "u")
           (mvfocus "down" "d")
           (mvfocus "left" "l")
           (mvfocus "right" "r")
-          #(ws "left" "e-1")
-          #(ws "right" "e+1")
-          #(mvtows "left" "e-1")
-          #(mvtows "right" "e+1")
           (resizeactive "k" "0 -20")
           (resizeactive "j" "0 20")
           (resizeactive "l" "20 0")
@@ -348,22 +343,27 @@ in
         ++ (map (i: mvtows (toString i) (toString i)) arr);
 
       bindle =
+        let
+          light = "${pkgs.light}/bin/light";
+          wpctl = "${pkgs.wireplumber}/bin/wpctl";
+        in
         [
-          # pkgs.light
-          # pkgs.wpctl
-          ",XF86MonBrightnessUp,  exec,  light -A 10"
-          ",XF86MonBrightnessDown,exec,  light -U 10"
-          ",XF86KbdBrightnessUp,  exec,  light -A 10"
-          ",XF86KbdBrightnessDown,exec,  light -U 10"
-          ",XF86AudioRaiseVolume, exec,  wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%+"
-          ",XF86AudioLowerVolume, exec,  wpctl set-volume @DEFAULT_AUDIO_SINK@ 1%-"
+          ",XF86MonBrightnessUp,  exec,  ${light} -A 2"
+          ",XF86MonBrightnessDown,exec,  ${light} -U 2"
+          ",XF86KbdBrightnessUp,  exec,  ${light} -A 2"
+          ",XF86KbdBrightnessDown,exec,  ${light} -U 2"
+          ",XF86AudioRaiseVolume, exec,  ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ 1%+"
+          ",XF86AudioLowerVolume, exec,  ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ 1%-"
         ];
 
       bindl =
+        let
+          wpctl = "${pkgs.wireplumber}/bin/wpctl";
+        in
         [
 
-          ",XF86AudioMute, exec, wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
-          "SUPER, XF86AudioMute, exec, wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
+          ",XF86AudioMute, exec, ${wpctl} set-mute @DEFAULT_AUDIO_SINK@ toggle"
+          "SUPER, XF86AudioMute, exec, ${wpctl} set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
         ];
 
       bindm = [
@@ -412,30 +412,24 @@ in
           "borderangle, 1, 8, default"
           "fade, 1, 10, default"
           "workspaces, 1, 3, default"
-
-          #"windows, 1, 5, myBezier"
-          #"windowsOut, 1, 7, default, popin 80%"
-          #"border, 1, 10, default"
-          #"fade, 1, 7, default"
-          #"workspaces, 1, 6, default"
         ];
       };
 
-      plugin = {
-        hyprbars = {
-          bar_color = "rgb(2a2a2a)";
-          bar_height = 28;
-          col_text = "rgba(ffffffdd)";
-          bar_text_size = 11;
-          bar_text_font = "Ubuntu Nerd Font";
-
-          buttons = {
-            button_size = 0;
-            "col.maximize" = "rgba(ffffff11)";
-            "col.close" = "rgba(ff111133)";
-          };
-        };
-      };
+      #      plugin = {
+      #        hyprbars = {
+      #          bar_color = "rgb(2a2a2a)";
+      #          bar_height = 28;
+      #          col_text = "rgba(ffffffdd)";
+      #          bar_text_size = 11;
+      #          bar_text_font = "Ubuntu Nerd Font";
+      #
+      #          buttons = {
+      #            button_size = 0;
+      #            "col.maximize" = "rgba(ffffff11)";
+      #            "col.close" = "rgba(ff111133)";
+      #          };
+      #        };
+      #      };
     };
   };
 }
