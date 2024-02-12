@@ -113,6 +113,10 @@ in
     settings = {
       exec-once = [
         "hyprpaper --config ${wallpaper}"
+        "firefox"
+        "kitty"
+        "hyprctl dispatch movetoworkspacesilent 1,firefox"
+        "hyprctl dispatch movetoworkspacesilent 2,kitty"
       ];
 
       monitor = [
