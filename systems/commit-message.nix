@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "new_kernal_trying_to_fix_gpu______________________";
+  system.nixos.label = "changed_it_back._hyprland_dident_like_it__________";
 }
