@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "up_kernel_version_________________________________";
+  system.nixos.label = "fix_greetd________________________________________";
 }
