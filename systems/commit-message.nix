@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "Nixos_updated_all_inputs_and_neovim_changes.______";
+  system.nixos.label = "testing_preformance_settings______________________";
 }

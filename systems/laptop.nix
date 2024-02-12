@@ -51,12 +51,6 @@
 
   # Attempt to fix the: GLib-GIO-ERROR**: No GSettings schemas are installed on the system
   programs.dconf.enable = true;
-
-  #environment.systemPackages = [
-  #  pkgs.gnome.adwaita-icon-theme
-  #];
-
-
   services.fwupd.enable = true;
 
 
@@ -92,7 +86,7 @@
         turbo = "auto";
       };
       charger = {
-        governor = "ondemand";
+        governor = "preformance";
         turbo = "auto";
       };
     };
@@ -184,7 +178,12 @@
   # needed for steam, and some other apps/games.
   # steam benifits from launch param: -forcedesktopscaling 1.0%U
   # NIXPKGS_ALLOW_UNFREE=1 nix run nixpkgs#steam --impure -- -forcedesktopscaling 1.0%U
-  hardware.opengl.driSupport32Bit = true; # For 32 bit applications
+  hardware.opengl.driSupport32Bit = true;
+  hardware.opengl.enable = true;
+  hardware.pulseaudio.support32Bit = true;
+
+
+
 
   # Enable sound.
   # sound.enable = true;
@@ -221,6 +220,8 @@
   environment.systemPackages = with pkgs; [
     # TODO: see if this fixes issues
     gnome.adwaita-icon-theme
+
+    vulkan-tools
 
     # misc tools
     git
