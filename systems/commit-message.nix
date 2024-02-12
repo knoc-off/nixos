@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "fix_greetd________________________________________";
+  system.nixos.label = "fixed_things______________________________________";
 }

@@ -4,17 +4,13 @@
   services.greetd.enable = true;
 
   # For greetd, we need a shell script into path, which lets us start qtile.service (after importing the environment of the login shell).
-  services.greetd.settings.default_session.command = "${pkgs.greetd.tuigreet}/bin/tuigreet --remember --cmd ${pkgs.writeScript "startqtile" ''
+  services.greetd.settings.default_session.command = "${pkgs.greetd.tuigreet}/bin/tuigreet --remember --cmd ${pkgs.writeScript "Hyprland_start" ''
     #! ${pkgs.bash}/bin/bash
 
-    # first import environment variables from the login manager
-    # export XDG_DATA_DIRS=/run/current-system/sw/share/gsettings-schemas:$XDG_DATA_DIRS
-    # systemctl --user unset-environment DISPLAY WAYLAND_DISPLAY
-
-    #zsh --login -c "systemctl --user import-environment XDG_DATA_DIRS PATH"
+    # Do stuff
 
     # Hyprland
-    ${pkgs.hyprland}/bin/hyprland
+    ${pkgs.hyprland}/bin/Hyprland
   ''}";
 
   # Backlight control. TODO: link to the package instead of installing it?
@@ -70,22 +66,6 @@
   security = {
     polkit.enable = true;
   };
-
-  #  systemd = {
-  #    user.services.polkit-gnome-authentication-agent-1 = {
-  #      description = "polkit-gnome-authentication-agent-1";
-  #      wantedBy = [ "graphical-session.target" ];
-  #      wants = [ "graphical-session.target" ];
-  #      after = [ "graphical-session.target" ];
-  #      serviceConfig = {
-  #        Type = "simple";
-  #        ExecStart = "${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1";
-  #        Restart = "on-failure";
-  #        RestartSec = 1;
-  #        TimeoutStopSec = 10;
-  #      };
-  #    };
-  #  };
 
   # TODO: Document this.
   services = {
