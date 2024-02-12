@@ -46,7 +46,7 @@
   };
 
 
-  boot.kernelPackages = pkgs.linuxPackages_latest;
+  #boot.kernelPackages = pkgs.linuxPackages_latest;
 
 
   # Attempt to fix the: GLib-GIO-ERROR**: No GSettings schemas are installed on the system
