@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "test_change_small_things__________________________";
+  system.nixos.label = "up_kernel_version_________________________________";
 }
