@@ -46,6 +46,8 @@
     # move to desktop module?
     gnome.gnome-disk-utility
 
+    wgnord
+
     # for xdg settings
     gimp
     mpv
