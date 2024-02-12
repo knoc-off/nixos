@@ -13,7 +13,8 @@
 
     #zsh --login -c "systemctl --user import-environment XDG_DATA_DIRS PATH"
 
-    hypr
+    # Hyprland
+    ${pkgs.hyprland}/bin/hyprland
   ''}";
 
   # Backlight control. TODO: link to the package instead of installing it?
