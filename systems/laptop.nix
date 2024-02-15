@@ -9,6 +9,7 @@
     [
       # hardware configs
       ./hardware/hardware-configuration.nix
+      ./hardware/bluetooth.nix
 
       # Disko
       ./hardware/disks/btrfs-luks.nix
@@ -80,20 +81,20 @@
   # power profiles.
   #services.power-profiles-daemon.enable = true;
   # thermal management. TODO: check if this is needed.
-  #services.thermald.enable = true;
-  #  services.auto-cpufreq = {
-  #    enable = true;
-  #    settings = {
-  #      battery = {
-  #        governor = "conservative";
-  #        turbo = "auto";
-  #      };
-  #      charger = {
-  #        governor = "preformance";
-  #        turbo = "auto";
-  #      };
-  #    };
-  #  };
+  services.thermald.enable = true;
+    services.auto-cpufreq = {
+      enable = true;
+      settings = {
+        battery = {
+          governor = "conservative";
+          turbo = "auto";
+        };
+        charger = {
+          governor = "preformance";
+          turbo = "auto";
+        };
+      };
+    };
   #  services.tlp = {
   #    enable = true;
   #    settings = {
