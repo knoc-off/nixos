@@ -242,6 +242,7 @@ in
       windowrule =
         let
           f = regex: "float, ${regex}";
+          w = regex: (number: "workspace ${builtins.toString number}, ${regex}");
         in
         [
           (f "org.gnome.Calculator")
@@ -256,40 +257,22 @@ in
           (f "xdg-desktop-portal-gnome")
           (f "transmission-gtk")
           (f "com.github.Aylur.ags")
-          (f "^(Extension)(.*)$")
-          (f "Steam - Browser")
-          "workspace 7, title:Spotify"
+          (w "Spotify" 7)
+          #"workspace 7, title:Spotify"
         ];
 
-      windowrulev2 = [
-        #"float, class:(kitty), title:(.*)"
-        #"opacity 1, class:(kitty), title:(.*)"
-        "opacity 0.7, class:(firefox), title:(.*Bitwarden.*)"
-        "float, class:(firefox), title:(.*Bitwarden.*)"
-
-        #Window 30793f0 -> Extension: (Bitwarden - Free Password Manager) - Bitwarden — Mozilla Firefox:
-        #	mapped: 1
-        #	hidden: 0
-        #	at: 0,0
-        #	size: 2256,1504
-        #	workspace: 1 (1)
-        #	floating: 0
-        #	monitor: 0
-        #	class: firefox
-        #	title: Extension: (Bitwarden - Free Password Manager) - Bitwarden — Mozilla Firefox
-        #	initialClass: firefox
-        #	initialTitle: Mozilla Firefox
-        #	pid: 2428
-        #	xwayland: 0
-        #	pinned: 0
-        #	fullscreen: 1
-        #	fullscreenmode: 1
-        #	fakefullscreen: 0
-        #	grouped: 0
-        #	swallowing: 0
-        #	focusHistoryID: 0
-
-
+      windowrulev2 =
+        let
+          float = class: (title: "float, class:(${class}), title:(${title})" );
+          #size = class: (title: (size: "float, class:(${class}), title:(${title})"));
+          idleinhibit = mode: (class: (title: "idleinhibit ${mode}, class:(${class}), title:(${title})"));
+        in
+      [
+        #"idleinhibit always, class:(kitty), title:(.*)"
+        #"idleinhibit focus, class:(firefox), title:(.*Youtube.*)"
+        (idleinhibit "focus" "firefox" ".*Youtube.*")
+        (float "steam" ".*Browser.*")
+        (float "steam" ".*Friends List.*")
 
       ];
 
