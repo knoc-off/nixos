@@ -114,9 +114,8 @@ in
       exec-once = [
         "hyprpaper --config ${wallpaper}"
         "firefox"
-        "kitty"
-        "hyprctl dispatch movetoworkspacesilent 1,firefox"
-        "hyprctl dispatch movetoworkspacesilent 2,kitty"
+        #"hyprctl dispatch movetoworkspacesilent 1,firefox"
+        #"hyprctl dispatch movetoworkspacesilent 2,kitty"
       ];
 
       monitor = [
@@ -266,13 +265,15 @@ in
           float = class: (title: "float, class:(${class}), title:(${title})" );
           #size = class: (title: (size: "float, class:(${class}), title:(${title})"));
           idleinhibit = mode: (class: (title: "idleinhibit ${mode}, class:(${class}), title:(${title})"));
+          window = class: (title: (number: "workspace ${builtins.toString number}, class:(${class}), title:(${title})"));
         in
       [
         #"idleinhibit always, class:(kitty), title:(.*)"
         #"idleinhibit focus, class:(firefox), title:(.*Youtube.*)"
-        (idleinhibit "focus" "firefox" ".*Youtube.*")
+        (idleinhibit "focus" "firefox" ".*YouTube.*")
         (float "steam" ".*Browser.*")
         (float "steam" ".*Friends List.*")
+        (window "thunderbird" ".*" 6)
 
       ];
 

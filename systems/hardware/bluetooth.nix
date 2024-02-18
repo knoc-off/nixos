@@ -1,3 +1,4 @@
+# https://nixos.wiki/wiki/Bluetooth
 { pkgs, ... }:
 {
   hardware.bluetooth.enable = true; # enables support for Bluetooth

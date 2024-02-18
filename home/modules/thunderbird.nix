@@ -28,7 +28,11 @@ in
         #name = lib.mkdefault "${cfg.profile}-profile";
 
         # user.js
-        settings = { };
+        settings = {
+
+          "mailnews.default_news_sort_order" = "2";
+          "mailnews.default_sort_order" = "2";
+        };
 
         # user js
         extraConfig = ''
