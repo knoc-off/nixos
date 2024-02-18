@@ -2,7 +2,8 @@
 { inputs, outputs, lib, config, pkgs, ... }: {
   imports = [
     ./programs/editor/default.nix
-    ./programs/terminal
+    ./programs/terminal # defautlt
+    ./programs/terminal/prompt.nix # starship
     #./modules/sway
     ./modules/hyprland
     ./modules/eww

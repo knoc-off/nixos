@@ -1,4 +1,4 @@
-{ pkgs, lib, ... }:
+{ config, pkgs, lib, ... }:
 let
   config_dir = "/home/knoff/nixos";
   configName = "laptop";
@@ -150,13 +150,9 @@ in
 
     };
     shellInit = ''
-      function fish_prompt
-        set -l git_branch " {"(git branch 2>/dev/null | sed -n '/\* /s///p')"}"
-        echo -n (set_color yellow)(prompt_pwd)(set_color normal)"$git_branch"' $ '
-      end
-      # If ssh is executed from kitty it will auto copy the term info.
-      # should move this to kitty config
-      #[ "$TERM" = "xterm-kitty" ] && alias ssh="kitty +kitten ssh"
+
+      # ssh with kitty, if using kitty
+      [ "$TERM" = "xterm-kitty" ] && alias ssh="kitty +kitten ssh"
 
 
       if test -f /etc/secrets/gpt/secret
@@ -164,5 +160,11 @@ in
       end
 
     '';
+
+      #function fish_prompt
+      #  set -l git_branch " {"(git branch 2>/dev/null | sed -n '/\* /s///p')"}"
+      #  echo -n (set_color yellow)(prompt_pwd)(set_color normal)"$git_branch"' $ '
+      #end
+
   };
 }

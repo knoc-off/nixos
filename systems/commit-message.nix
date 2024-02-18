@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "bluetooth_support_enabled_________________________";
+  system.nixos.label = "fixed_some_things_________________________________";
 }
