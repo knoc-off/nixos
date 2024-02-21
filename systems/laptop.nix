@@ -42,6 +42,8 @@
   hardware.framework.amd-7040.preventWakeOnAC = true;
 
 
+  programs.kdeconnect.enable = true;
+
 
   # IDK if this does anything, TODO: check
   # doesent seem to do much, cant remember why i added it.
