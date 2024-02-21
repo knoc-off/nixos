@@ -95,6 +95,14 @@
             }
           ];
         };
+
+       hetzner-cloud = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [
+            disko.nixosModules.disko
+            ./systems/hetzner-server.nix
+          ];
+        };
       };
 
       homeConfigurations = {
