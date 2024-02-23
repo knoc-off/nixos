@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "fixed_some_things_________________________________";
+  system.nixos.label = "up_the_version_might_be_a_mistake_________________";
 }

@@ -76,6 +76,7 @@
       nixosConfigurations = {
         laptop = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
+          system = "x86_64-linux";
           modules = [
             ./systems/laptop.nix
             disko.nixosModules.disko
@@ -97,9 +98,9 @@
         };
 
        hetzner-cloud = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
           system = "x86_64-linux";
           modules = [
-            disko.nixosModules.disko
             ./systems/hetzner-server.nix
           ];
         };
