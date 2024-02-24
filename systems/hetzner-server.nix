@@ -3,6 +3,9 @@
     (modulesPath + "/installer/scan/not-detected.nix")
     (modulesPath + "/profiles/qemu-guest.nix")
 
+    # Sops
+    inputs.sops-nix.nixosModules.sops
+
     # Disko
     inputs.disko.nixosModules.disko
     ./hardware/disks/simple-disk.nix
@@ -13,6 +16,18 @@
     # message at boot.
     ./commit-message.nix
   ];
+
+
+  sops.defaultSopsFile = ./secrets/hetzner/default.yaml;
+  # This will automatically import SSH keys as age keys
+  sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+  # This is using an age key that is expected to already be in the filesystem
+  sops.age.keyFile = "/var/lib/sops-nix/key.txt";
+  # This will generate a new key if the key specified above does not exist
+  sops.age.generateKey = true;
+  # This is the actual specification of the secrets.
+  sops.secrets.example-key = {};
+  sops.secrets."myservice/my_subdir/my_secret" = {};
 
   boot.loader.grub = {
     efiSupport = true;
