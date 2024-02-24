@@ -18,6 +18,7 @@
     themes.url = "github:RGBCube/ThemeNix";
 
 
+    sops-nix.url = "github:Mic92/sops-nix";
     # experimental, not sure if good idea.
     #fprint = {
     #  url = "github:ahbnr/nixos-06cb-009a-fingerprint-sensor";

@@ -84,6 +84,7 @@ in
         # Privacy / Security
         smart-referer
         history-cleaner # deletes history older than <time>
+        user-agent-string-switcher
 
         # Quality of life
         translate-web-pages
