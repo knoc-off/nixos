@@ -1,5 +1,9 @@
-{pkgs, config, libs, ...}:
 {
+  pkgs,
+  config,
+  libs,
+  ...
+}: {
   programs.ssh = {
     matchBlocks = {
       "nixprod" = {

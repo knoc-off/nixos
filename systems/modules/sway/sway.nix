@@ -1,6 +1,9 @@
-{ config, pkgs, lib, ... }:
-
-let
+{
+  config,
+  pkgs,
+  lib,
+  ...
+}: let
   # bash script to let dbus know about important env variables and
   # propagate them to relevent services run at the end of sway config
   # see
@@ -38,10 +41,7 @@ let
       gsettings set $gnome_schema gtk-theme 'Dracula'
     '';
   };
-
-
-in
-{
+in {
   environment.systemPackages = with pkgs; [
     alacritty # gpu accelerated terminal
     dbus-sway-environment
@@ -50,7 +50,7 @@ in
     xdg-utils # for opening default programs when clicking links
     glib # gsettings
     dracula-theme # gtk theme
-    gnome3.adwaita-icon-theme  # default gnome cursors
+    gnome3.adwaita-icon-theme # default gnome cursors
     swaylock
     swayidle
     grim # screenshot functionality
@@ -61,13 +61,11 @@ in
     wdisplays # tool to configure displays
   ];
 
-
   services.pipewire = {
     enable = true;
     alsa.enable = true;
     pulse.enable = true;
   };
-
 
   # xdg-desktop-portal works by exposing a series of D-Bus interfaces
   # known as portals under a well-known name
@@ -80,7 +78,7 @@ in
     enable = true;
     wlr.enable = true;
     # gtk portal needed to make gtk apps happy
-    extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
+    extraPortals = [pkgs.xdg-desktop-portal-gtk];
   };
 
   # enable sway window manager
@@ -88,5 +86,4 @@ in
     enable = true;
     wrapperFeatures.gtk = true;
   };
-
 }

@@ -1,5 +1,8 @@
-{ lib, pkgs, ... }:
 {
+  lib,
+  pkgs,
+  ...
+}: {
   imports = [
     #./sway.nix
     #./greetd.nix
@@ -8,11 +11,16 @@
   security.polkit.enable = true;
 
   # swaylock
-  security.pam.services.swaylock = { };
+  security.pam.services.swaylock = {};
 
   # preformace
   security.pam.loginLimits = [
-    { domain = "@users"; item = "rtprio"; type = "-"; value = 1; }
+    {
+      domain = "@users";
+      item = "rtprio";
+      type = "-";
+      value = 1;
+    }
   ];
 
   # kanshi systemd service

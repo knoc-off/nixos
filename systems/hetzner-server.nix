@@ -1,4 +1,11 @@
-{ modulesPath, inputs, config, lib, pkgs, ... }: {
+{
+  modulesPath,
+  inputs,
+  config,
+  lib,
+  pkgs,
+  ...
+}: {
   imports = [
     (modulesPath + "/installer/scan/not-detected.nix")
     (modulesPath + "/profiles/qemu-guest.nix")
@@ -15,19 +22,36 @@
 
     # message at boot.
     ./commit-message.nix
+
+    # services
+    ./services/nginx.nix
+
+    # nextcloud
+    ./services/nextcloud.nix
   ];
 
+  # Firewall
+  networking.firewall = {
+    enable = true;
+    allowedTCPPorts = [80 443];
+    #allowedUDPPortRanges = [
+    #  { from = 4000; to = 4007; }
+    #  { from = 8000; to = 8010; }
+    #];
+  };
 
   sops.defaultSopsFile = ./secrets/hetzner/default.yaml;
   # This will automatically import SSH keys as age keys
-  sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+  sops.age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
+
+  # Not needed ?
   # This is using an age key that is expected to already be in the filesystem
-  sops.age.keyFile = "/var/lib/sops-nix/key.txt";
+  #sops.age.keyFile = "/var/lib/sops-nix/key.txt";
   # This will generate a new key if the key specified above does not exist
-  sops.age.generateKey = true;
+  #sops.age.generateKey = true;
   # This is the actual specification of the secrets.
-  sops.secrets.example-key = {};
-  sops.secrets."myservice/my_subdir/my_secret" = {};
+  #sops.secrets.example-key = {};
+  #sops.secrets."myservice/my_subdir/my_secret" = {};
 
   boot.loader.grub = {
     efiSupport = true;

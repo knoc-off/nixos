@@ -1,5 +1,4 @@
-{ pkgs, ... }:
-{
+{pkgs, ...}: {
   home = {
     sessionVariables = {
       # Editor and shell
@@ -42,7 +41,6 @@
     };
   };
 }
-
 #env = GDK_BACKEND,wayland,x11
 #env = QT_QPA_PLATFORM,wayland;xcb
 #env = SDL_VIDEODRIVER,wayland
@@ -56,3 +54,4 @@
 #env = XCURSOR_THEME,Future-Cursors
 #env = XCURSOR_SIZE,24
 #env = QT_WAYLAND_DISABLE_WINDOWDECORATION,1
+

@@ -1,35 +1,40 @@
-{ pkgs, config, ... }:
 {
+  pkgs,
+  config,
+  ...
+}: {
+  #sops.secrets.example-key = {};
+  sops.secrets."services/nextcloud/admin-pass" = {};
+  sops.secrets."services/nextcloud/admin-pass".owner = config.users.users.nextcloud.name;
 
-  environment.etc."nextcloud-admin-pass".text = "test123";
   services.nextcloud = {
     enable = true;
     package = pkgs.nextcloud28;
     hostName = "nextcloud.niko.ink";
     https = true;
-    config.adminpassFile = "/etc/nextcloud-admin-pass";
-
+    config.adminpassFile = config.sops.secrets."services/nextcloud/admin-pass".path;
     configureRedis = true;
     maxUploadSize = "1G";
+
+    extraAppsEnable = true;
+    extraApps = {
+      inherit (config.services.nextcloud.package.packages.apps) contacts calendar tasks notes mail bookmarks music qownnotesapi deck phonetrack;
+    };
   };
 
+  sops.secrets."services/acme/namecheap-user" = {};
+  sops.secrets."services/acme/namecheap-key" = {};
 
-  extraAppsEnable = true;
-  extraApps = {
-    inherit (config.services.nextcloud.package.packages.apps) news contacts calendar tasks;
-
-    #memories = pkgs.fetchNextcloudApp {
-        #sha256 = "sha256-Xr1SRSmXo2r8yOGuoMyoXhD0oPVm/0/ISHlmNZpJYsg=";
-        #url = "https://github.com/pulsejet/memories/releases/download/v6.2.2/memories.tar.gz";
-        #license = "agpl3";
-    #};
-
+  security.acme.defaults.dnsProvider = "namecheap";
+  security.acme.defaults.email = "acme@niko.ink";
+  security.acme.defaults.credentialFiles = {
+    "NAMECHEAP_API_USER_FILE" = config.sops.secrets."services/acme/namecheap-user".path;
+    "NAMECHEAP_API_KEY_FILE" = config.sops.secrets."services/acme/namecheap-key".path;
   };
-
+  security.acme.acceptTerms = true;
 
   services.nginx.virtualHosts.${config.services.nextcloud.hostName} = {
     forceSSL = true;
     enableACME = true;
   };
-
 }

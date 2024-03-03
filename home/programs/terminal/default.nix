@@ -1,5 +1,11 @@
-{ inputs, pkgs, libs, theme, config, ... }:
 {
+  inputs,
+  pkgs,
+  libs,
+  theme,
+  config,
+  ...
+}: {
   imports = [
     ./kitty
     ./shell
@@ -20,7 +26,7 @@
   programs.eza = {
     enable = true;
     enableAliases = true;
-    extraOptions = [ "--group-directories-first" "--header" ];
+    extraOptions = ["--group-directories-first" "--header"];
     git = true;
     icons = true;
   };
@@ -51,7 +57,7 @@
 
   programs.ripgrep = {
     enable = true;
-    arguments = [ "--hidden" "--colors=line:style:bold" ];
+    arguments = ["--hidden" "--colors=line:style:bold"];
   };
 
   # better cat

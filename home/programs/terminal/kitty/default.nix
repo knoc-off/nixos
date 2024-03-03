@@ -1,14 +1,23 @@
-{ pkgs, config, theme, lib, ... }:
-let
-  isValidColor = thing:
-    if builtins.isString thing then
-      (builtins.match "^[0-9a-fA-F]{6}" thing) != null
-    else
-      false;
-  withHashtag = theme // (builtins.mapAttrs (_: value: if isValidColor value then "#" + value else value) theme);
-in
 {
-  imports = [ ./tab_bar.nix ];
+  pkgs,
+  config,
+  theme,
+  lib,
+  ...
+}: let
+  isValidColor = thing:
+    if builtins.isString thing
+    then (builtins.match "^[0-9a-fA-F]{6}" thing) != null
+    else false;
+  withHashtag =
+    theme
+    // (builtins.mapAttrs (_: value:
+      if isValidColor value
+      then "#" + value
+      else value)
+    theme);
+in {
+  imports = [./tab_bar.nix];
 
   programs.kitty = {
     enable = true;
@@ -36,8 +45,6 @@ in
 
       #window_resize_step_cells = 2;
       #window_resize_step_lines = 2;
-
-
 
       window_padding_width = 0;
       foreground = "${withHashtag.base06}";

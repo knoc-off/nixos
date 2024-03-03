@@ -1,17 +1,15 @@
-{ config, lib, pkgs, ... }:
-let
-
-  fuzzel = "${pkgs.fuzzel}/bin/fuzzel";
-
-in
 {
-
-
+  config,
+  lib,
+  pkgs,
+  ...
+}: let
+  fuzzel = "${pkgs.fuzzel}/bin/fuzzel";
+in {
   programs.swayr.enable = true;
 
   wayland.windowManager.sway = {
     enable = true;
-
 
     config = rec {
       gaps = {
@@ -44,17 +42,11 @@ in
         };
       };
 
-
-      keybindings =
-        let
-          mod = config.wayland.windowManager.sway.config.modifier;
-        in
+      keybindings = let
+        mod = config.wayland.windowManager.sway.config.modifier;
+      in
         lib.mkOptionDefault {
           "${mod}+space" = "exec ${fuzzel}";
-
-
-
-
 
           # Keybinds
         };
@@ -63,7 +55,7 @@ in
       terminal = "kitty";
       startup = [
         # Launch Firefox on start
-        { command = "firefox"; }
+        {command = "firefox";}
       ];
     };
     extraConfig = ''
@@ -87,5 +79,4 @@ in
 
     '';
   };
-
 }

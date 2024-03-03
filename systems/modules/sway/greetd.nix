@@ -1,5 +1,9 @@
-{ config, lib, pkgs, ... }:
-let
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}: let
   swayConfig = pkgs.writeText "greetd-sway-config" ''
     # `-l` activates layer-shell mode. Notice that `swaymsg exit` will run after gtkgreet.
     exec "${pkgs.greetd.gtkgreet}/bin/gtkgreet -l; swaymsg exit"
@@ -9,8 +13,7 @@ let
       -b 'Poweroff' 'systemctl poweroff' \
       -b 'Reboot' 'systemctl reboot'
   '';
-in
-{
+in {
   services.greetd = {
     enable = true;
     settings = {

@@ -1,5 +1,9 @@
-{ inputs, lib, pkgs, ... }:
 {
+  inputs,
+  lib,
+  pkgs,
+  ...
+}: {
   services.fprintd = {
     enable = true;
   };

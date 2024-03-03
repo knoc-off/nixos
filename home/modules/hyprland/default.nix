@@ -1,8 +1,12 @@
-{ inputs, pkgs, theme, config, ... }:
-let
+{
+  inputs,
+  pkgs,
+  theme,
+  config,
+  ...
+}: let
   # theres a few unchecked dependencies here.
   # like notify-send, etc. could link it like i do with fuzzle
-
   hyprland = inputs.hyprland.packages.${pkgs.system}.hyprland;
   plugins = inputs.hyprland-plugins.packages.${pkgs.system};
 
@@ -11,6 +15,38 @@ let
 
   notify-send = "${pkgs.libnotify}/bin/notify-send";
 
+  # pomo timer, should move to its own module
+  start-pomo = pkgs.writeShellScriptBin "start-pomo" ''
+    #!${pkgs.bash}/bin/bash
+
+    if ! pgrep -x "uair" > /dev/null; then
+      ${pkgs.uair}/bin/uair > /tmp/uair.log &
+    fi
+
+    sleep 0.1
+    ${pkgs.uair}/bin/uairctl jump $1
+    sleep 0.1
+    ${pkgs.uair}/bin/uairctl resume
+
+    # Ensure there is only one instance of start-pomo running
+    # Check if another instance of script is running
+    if pidof -o %PPID -x -- "$0" >/dev/null; then
+      printf >&2 '%s\n' "ERROR: Script $0 already running"
+      exit 1
+    fi
+
+    while true; do
+      sleep 0.1
+
+      ${notify-send} -t 60000 -h string:x-canonical-private-synchronous:pomodoro -h int:value:$(${pkgs.uair}/bin/uairctl fetch "{percent}") -u low "$(${pkgs.uair}/bin/uairctl fetch "{state} {time}")" #-i "$icon" "Brightness : $current%"
+
+      while [[ $(${pkgs.uair}/bin/uairctl fetch "{state}") = "⏸" ]]; do
+        sleep 0.1
+      done
+    done
+  '';
+
+  # move this to own module TODO
   # Had to result to this, as the home-manager module for swaylock seems to be broken.
   swaylock-custom = pkgs.writeShellScriptBin "swaylock-custom" ''
     #!/${pkgs.bash}/bin/bash
@@ -50,56 +86,88 @@ let
     --datestr "%Y.%m.%d" --timestr "%H:%M:%S" \
     \
     --screenshots \
+    --grace $1 \
     --effect-blur "$2" \
     --effect-pixelate "$3" \
-    --grace $1 \
     --fade-in $4 \
     --font-size 24 \
     --daemonize
   '';
 
-
-
   # hyprpaper config
   # need to put the wallpaper into the nix-store.
-  wallpaper = pkgs.writeText "wallpaper"
+  wallpaper =
+    pkgs.writeText "wallpaper"
     ''
       preload = ${./wallpaper-nixos.png}
       wallpaper = eDP-1, ${./wallpaper-nixos.png}
     '';
-in
-{
+in {
+  # Pomo timer, should move to its own module
+  home.file."uairtest" = {
+    target = ".config/uair/uair.toml";
+    source = pkgs.writers.writeTOML "uair.toml" {
+      defaults = {
+        format = "\r{percent}\n#{time}\n";
+      };
+      sessions = [
+        {
+          id = "work";
+          name = "Work";
+          duration = "25m";
+          command = "notify-send 'Work Done!'";
+        }
+        {
+          id = "rest";
+          name = "Rest";
+          duration = "5m";
+          command = "notify-send 'Rest Done!'";
+        }
+      ];
+    };
+  };
 
   imports = [
     ./dunst.nix
+    ./mako.nix
     ./eww.nix
   ];
 
   services.swayidle.enable = true;
   services.swayidle = {
     events = [
-      { event = "before-sleep"; command = "${swaylock-custom}/bin/swaylock-custom 0 50x6 10 0"; }
-      { event = "lock"; command = "lock"; }
+      {
+        event = "before-sleep";
+        command = "${swaylock-custom}/bin/swaylock-custom 0 50x6 10 0";
+      }
+      {
+        event = "lock";
+        command = "lock";
+      }
     ];
     timeouts = [
-      { timeout = 300; command = "${swaylock-custom}/bin/swaylock-custom 5 50x6 10 0.5"; }
-      { timeout = 600; command = "${pkgs.systemd}/bin/systemctl suspend"; }
+      {
+        timeout = 300;
+        command = "${swaylock-custom}/bin/swaylock-custom 5 50x6 10 0.5";
+      }
+      {
+        timeout = 600;
+        command = "${pkgs.systemd}/bin/systemctl suspend";
+      }
     ];
-
   };
 
   programs.swaylock = {
     package = pkgs.swaylock-effects;
   };
 
-
-  home.packages = [ swaylock-custom pkgs.hyprpaper ];
+  home.packages = [swaylock-custom pkgs.hyprpaper];
   xdg.desktopEntries."org.gnome.Settings" = {
     name = "Settings";
     comment = "Gnome Control Center";
     icon = "org.gnome.Settings";
     exec = "env XDG_CURRENT_DESKTOP=gnome ${pkgs.gnome.gnome-control-center}/bin/gnome-control-center";
-    categories = [ "X-Preferences" ];
+    categories = ["X-Preferences"];
     terminal = false;
   };
 
@@ -126,7 +194,6 @@ in
         #  "HDMI-A-1, 2560x1440, 1920x0, 1"
       ];
 
-
       general = {
         gaps_in = 2;
         gaps_out = 4;
@@ -139,7 +206,6 @@ in
         layout = "master";
         resize_on_border = true;
       };
-
 
       group = {
         insert_after_current = true;
@@ -162,7 +228,6 @@ in
         };
       };
 
-
       misc = {
         layers_hog_keyboard_focus = false;
         disable_hyprland_logo = true;
@@ -178,22 +243,31 @@ in
       };
 
       input = {
-
         kb_layout = "us";
+        #kb_options = "caps:super";
+        kb_file = "${./output.xkb}";
 
         # focus follows mouse
         follow_mouse = 1;
         mouse_refocus = true;
 
-        kb_options = "caps:super"; # caps as super
+        # Caps as super, and change repeat rate of the key 'a' to 5ms
+        #    kb_layout = us
+        #    kb_variant =
+        #    kb_model =
+        #    kb_options =
+        #    kb_rules =
+        #xkb_symbols "custom" {
+        #  key <KEY> { [ repeat ] };
+        #};
+
         scroll_method = "2fg";
 
         # key repeat settings
-        repeat_rate = 50;
-        repeat_delay = 300;
+        repeat_rate = 25;
+        repeat_delay = 200;
 
         touchpad = {
-
           disable_while_typing = false;
 
           natural_scroll = true;
@@ -225,7 +299,6 @@ in
         no_gaps_when_only = true;
       };
 
-
       gestures = {
         workspace_swipe = true;
         workspace_swipe_direction_lock = false;
@@ -237,61 +310,59 @@ in
         #workspace_swipe_numbered = true;
       };
 
+      windowrule = let
+        f = regex: "float, ${regex}";
+        w = regex: (number: "workspace ${builtins.toString number}, ${regex}");
+      in [
+        (f "org.gnome.Calculator")
+        (f "org.gnome.Nautilus")
+        (f "pavucontrol")
+        (f "nm-connection-editor")
+        (f "blueberry.py")
+        (f "org.gnome.Settings")
+        (f "org.gnome.design.Palette")
+        (f "Color Picker")
+        (f "xdg-desktop-portal")
+        (f "xdg-desktop-portal-gnome")
+        (f "transmission-gtk")
+        (f "com.github.Aylur.ags")
+        (w "Spotify" 7)
+        #"workspace 7, title:Spotify"
+      ];
 
-      windowrule =
-        let
-          f = regex: "float, ${regex}";
-          w = regex: (number: "workspace ${builtins.toString number}, ${regex}");
-        in
-        [
-          (f "org.gnome.Calculator")
-          (f "org.gnome.Nautilus")
-          (f "pavucontrol")
-          (f "nm-connection-editor")
-          (f "blueberry.py")
-          (f "org.gnome.Settings")
-          (f "org.gnome.design.Palette")
-          (f "Color Picker")
-          (f "xdg-desktop-portal")
-          (f "xdg-desktop-portal-gnome")
-          (f "transmission-gtk")
-          (f "com.github.Aylur.ags")
-          (w "Spotify" 7)
-          #"workspace 7, title:Spotify"
-        ];
-
-      windowrulev2 =
-        let
-          float = class: (title: "float, class:(${class}), title:(${title})" );
-          #size = class: (title: (size: "float, class:(${class}), title:(${title})"));
-          idleinhibit = mode: (class: (title: "idleinhibit ${mode}, class:(${class}), title:(${title})"));
-          window = class: (title: (number: "workspace ${builtins.toString number}, class:(${class}), title:(${title})"));
-        in
-      [
+      windowrulev2 = let
+        float = class: (title: "float, class:(${class}), title:(${title})");
+        pin = class: (title: "pin, class:(${class}), title:(${title})");
+        opacity = class: (title: (opacity: "opacity ${builtins.toString opacity}, class:(${class}), title:(${title})"));
+        #size = class: (title: (size: "float, class:(${class}), title:(${title})"));
+        idleinhibit = mode: (class: (title: "idleinhibit ${mode}, class:(${class}), title:(${title})"));
+        window = class: (title: (number: "workspace ${builtins.toString number}, class:(${class}), title:(${title})"));
+      in [
         #"idleinhibit always, class:(kitty), title:(.*)"
         #"idleinhibit focus, class:(firefox), title:(.*Youtube.*)"
         (idleinhibit "focus" "firefox" ".*YouTube.*")
         (float "steam" ".*Browser.*")
         (float "steam" ".*Friends List.*")
         (window "thunderbird" ".*" 6)
-
+        (float "yad" "uair")
+        (pin "yad" "uair")
+        (opacity "yad" "uair" 0.3)
       ];
 
-      bind =
-        let
-          mainMod = "SUPER";
+      bind = let
+        mainMod = "SUPER";
 
-          binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
-          mvfocus = binding "${mainMod}" "movefocus";
-          ws = binding "${mainMod}" "workspace";
-          resizeactive = binding "${mainMod} CTRL" "resizeactive";
-          mvactive = binding "${mainMod} ALT" "moveactive";
-          mvtows = binding "${mainMod} SHIFT" "movetoworkspace";
-          #e = "exec, ags -b hypr";
-          arr = [ 1 2 3 4 5 6 7 8 9 ];
+        binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
+        mvfocus = binding "${mainMod}" "movefocus";
+        ws = binding "${mainMod}" "workspace";
+        resizeactive = binding "${mainMod} CTRL" "resizeactive";
+        mvactive = binding "${mainMod} ALT" "moveactive";
+        mvtows = binding "${mainMod} SHIFT" "movetoworkspace";
+        #e = "exec, ags -b hypr";
+        arr = [1 2 3 4 5 6 7 8 9];
 
-          acpi = "${pkgs.acpi}/bin/acpi";
-        in
+        acpi = "${pkgs.acpi}/bin/acpi";
+      in
         [
           ## Master-Layout binds
           "${mainMod}, Backslash, layoutmsg, swapwithmaster master"
@@ -305,7 +376,7 @@ in
           "${mainMod}, V, togglefloating"
           "${mainMod}, F, fullscreen"
           "${mainMod}, O, fakefullscreen"
-          "${mainMod}, P, togglesplit"
+          #"${mainMod}, P, togglesplit"
           "${mainMod}, SPACE, exec, ${fuzzel}"
 
           # group
@@ -313,6 +384,12 @@ in
           ", page_down, changegroupactive, f"
           ", page_up, changegroupactive, b"
           "${mainMod}, L, exec,  ${swaylock-custom}/bin/swaylock-custom 0 120x6 10 0"
+
+          # pomo timer
+          "${mainMod}, period, exec, ${pkgs.uair}/bin/uairctl toggle"
+          "${mainMod}, comma, exec, ${start-pomo}/bin/start-pomo work"
+          #uair | yad --title "uair" --progress --no-buttons --css="* { font-size: 80px; }" & sleep 1 && uairctl resume
+          #''${mainMod}, P, exec,  ''
 
           (mvfocus "up" "u")
           (mvfocus "down" "d")
@@ -330,29 +407,66 @@ in
         ++ (map (i: ws (toString i) (toString i)) arr)
         ++ (map (i: mvtows (toString i) (toString i)) arr);
 
-      bindle =
-        let
-          light = "${pkgs.light}/bin/light";
-          wpctl = "${pkgs.wireplumber}/bin/wpctl";
-        in
-        [
-          ",XF86MonBrightnessUp,  exec,  ${light} -A 2"
-          ",XF86MonBrightnessDown,exec,  ${light} -U 2"
-          ",XF86KbdBrightnessUp,  exec,  ${light} -A 2"
-          ",XF86KbdBrightnessDown,exec,  ${light} -U 2"
-          ",XF86AudioRaiseVolume, exec,  ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ 1%+"
-          ",XF86AudioLowerVolume, exec,  ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ 1%-"
-        ];
+      bindle = let
+        light = "${pkgs.light}/bin/light";
+        wpctl = "${pkgs.wireplumber}/bin/wpctl";
 
-      bindl =
-        let
-          wpctl = "${pkgs.wireplumber}/bin/wpctl";
-        in
-        [
+        brightness = pkgs.writeShellScriptBin "brightness" ''
+          #!${pkgs.bash}/bin/bash
 
-          ",XF86AudioMute, exec, ${wpctl} set-mute @DEFAULT_AUDIO_SINK@ toggle"
-          "SUPER, XF86AudioMute, exec, ${wpctl} set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
-        ];
+          # would be cool to bas it on inertia
+          # value strts at 0.1 rounded up to 1, and multiplies by 1.1/2 every time, time is used to reset it down to 0 afterwords?
+
+          # jq
+          # {
+          #   "value": 0.1,
+          #   "time": {unix time}
+          # }
+
+          # if /tmp/brightness.json does not exist, create it
+          #if [[ ! -f /tmp/brightness.json ]]; then
+          #  jq '{ "value": 0.1, "time": $(date +%s) }' > /tmp/brightness.json
+          #fi
+
+          #data=$(jq -r '.value' /tmp/brightness.json)
+          # date -d '+5 seconds' +%s
+
+          # if time is more than 5 seconds, reset value to 0.1
+          # /tmp/brightness.json
+          #if [[ $(date +%s) -gt $(jq -r '.time' /tmp/brightness.json) ]]; then
+          #  jq '.value = 0.1 | .time = $(date +%s)' /tmp/brightness.json > /tmp/brightness.json
+          #fi
+
+
+          ${light} $@
+
+          ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:brightness -h int:value:$(${light}) "$(${light})%"
+        '';
+
+        volume = pkgs.writeShellScriptBin "volume" ''
+          #!${pkgs.bash}/bin/bash
+
+          ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ $1
+
+          ${pkgs.libcanberra-gtk3}/bin/canberra-gtk-play -i audio-volume-change -d "changeVolume"
+
+          ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:volume -h int:value:$(${pkgs.pamixer}/bin/pamixer --get-volume) -u low "$(${pkgs.pamixer}/bin/pamixer --get-volume-human)"
+        '';
+      in [
+        ",XF86MonBrightnessUp,  exec,  ${brightness}/bin/brightness -A 2"
+        ",XF86MonBrightnessDown,exec,  ${brightness}/bin/brightness -U 2"
+        ",XF86KbdBrightnessUp,  exec,  ${brightness}/bin/brightness -A 2"
+        ",XF86KbdBrightnessDown,exec,  ${brightness}/bin/brightness -U 2"
+        ",XF86AudioRaiseVolume, exec,  ${volume}/bin/volume 1%+"
+        ",XF86AudioLowerVolume, exec,  ${volume}/bin/volume 1%-"
+      ];
+
+      bindl = let
+        wpctl = "${pkgs.wireplumber}/bin/wpctl";
+      in [
+        ",XF86AudioMute, exec, ${wpctl} set-mute @DEFAULT_AUDIO_SINK@ toggle"
+        "SUPER, XF86AudioMute, exec, ${wpctl} set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
+      ];
 
       bindm = [
         "SUPER, mouse:273, resizewindow"
@@ -360,13 +474,11 @@ in
       ];
 
       decoration = {
-
         rounding = 10;
         inactive_opacity = 0.95;
         drop_shadow = false;
         shadow_range = 2;
         "col.shadow" = "0xff${theme.base01}";
-
 
         shadow_render_power = 2;
 

@@ -1,5 +1,12 @@
 #NixOS, home-manager, system configuration, package installation, program enablement, system options.
-{ inputs, outputs, lib, config, pkgs, ... }: {
+{
+  inputs,
+  outputs,
+  lib,
+  config,
+  pkgs,
+  ...
+}: {
   imports = [
     ./programs/editor/default.nix
     ./programs/terminal # defautlt
@@ -11,7 +18,6 @@
     ./programs/browser
 
     #./modules/firefox.nix
-
 
     ./programs/gaming/steam.nix
     ./enviroment.nix
@@ -59,26 +65,25 @@
     enable = true;
     associations.added = {
       #"application/pdf" = [ "org.gnome.Evince.desktop" ];
-      "video/mp4" = [ "mpv.desktop" ];
+      "video/mp4" = ["mpv.desktop"];
       # gimp:
-      "image/bmp" = [ "org.gimp.GIMP.desktop" ];
-      "image/gif" = [ "org.gimp.GIMP.desktop" ];
-      "image/jpeg" = [ "org.gimp.GIMP.desktop" ];
-      "image/png" = [ "org.gimp.GIMP.desktop" ];
-      "image/svg+xml" = [ "org.gimp.GIMP.desktop" ];
-      "image/tiff" = [ "org.gimp.GIMP.desktop" ];
-
+      "image/bmp" = ["org.gimp.GIMP.desktop"];
+      "image/gif" = ["org.gimp.GIMP.desktop"];
+      "image/jpeg" = ["org.gimp.GIMP.desktop"];
+      "image/png" = ["org.gimp.GIMP.desktop"];
+      "image/svg+xml" = ["org.gimp.GIMP.desktop"];
+      "image/tiff" = ["org.gimp.GIMP.desktop"];
     };
     defaultApplications = {
       #"application/pdf" = [ "org.gnome.Evince.desktop" ];
-      "video/mp4" = [ "mpv.desktop" ];
+      "video/mp4" = ["mpv.desktop"];
       # gimp:
-      "image/bmp" = [ "org.gimp.GIMP.desktop" ];
-      "image/gif" = [ "org.gimp.GIMP.desktop" ];
-      "image/jpeg" = [ "org.gimp.GIMP.desktop" ];
-      "image/png" = [ "org.gimp.GIMP.desktop" ];
-      "image/svg+xml" = [ "org.gimp.GIMP.desktop" ];
-      "image/tiff" = [ "org.gimp.GIMP.desktop" ];
+      "image/bmp" = ["org.gimp.GIMP.desktop"];
+      "image/gif" = ["org.gimp.GIMP.desktop"];
+      "image/jpeg" = ["org.gimp.GIMP.desktop"];
+      "image/png" = ["org.gimp.GIMP.desktop"];
+      "image/svg+xml" = ["org.gimp.GIMP.desktop"];
+      "image/tiff" = ["org.gimp.GIMP.desktop"];
     };
   };
 
@@ -100,16 +105,13 @@
     #];
     config = {
       allowUnfree = true;
-      allowUnfreePredicate = (pkg: true);
+      allowUnfreePredicate = pkg: true;
     };
-
   };
-
 
   # ~ Battery
   # Battery status, and notifications
   services.batsignal.enable = true;
-
 
   home = {
     username = "knoff";
@@ -143,6 +145,4 @@
 
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
   home.stateVersion = "23.05";
-
 }
-

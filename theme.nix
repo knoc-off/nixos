@@ -19,7 +19,7 @@
   base0F = "E6B673"; #E6B673
 
   hp = "#FF00FF";
-  # these colors are not used in the theme, but are used to find what colors
+  # these colors are not used in the theme, but are used to find what
   # change is made when you change a color in the theme.
   # they are all unique colors, And distinct from each other.
   # they are also all bright colors, so they are easy to see.
@@ -54,8 +54,6 @@
   white04 = "adb5bd"; #adb5bd
   white05 = "6c757d"; #6c757d
 
-
-
   #white01 = "#e6e6e6";
   #white03 = "#b3b3b3";
   #white05 = "#808080";
@@ -89,8 +87,6 @@
   yellow04 = "997800"; #997800
   yellow05 = "7F5F00"; #7F5F00
 
-
-
   # Green
   green00 = "B5BD68"; #B5BD68
   green01 = "768948"; #768948
@@ -114,7 +110,6 @@
   blue03 = "3E5C7E"; #3E5C7E
   blue04 = "2E4A71"; #2E4A71
   blue05 = "1E3867"; #1E3867
-
 
   # Purple
   purple00 = "B294BB"; #B294BB

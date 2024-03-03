@@ -1,5 +1,10 @@
-{ inputs, pkgs, libs, config, ... }:
 {
+  inputs,
+  pkgs,
+  libs,
+  config,
+  ...
+}: {
   # command line tools.
   home.packages = with pkgs; [
     chroma # Required for colorize...
@@ -11,8 +16,7 @@
     pv
   ];
   imports = [
-  #./zsh.nix
-  ./fish.nix
+    #./zsh.nix
+    ./fish.nix
   ];
-
 }

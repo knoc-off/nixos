@@ -1,20 +1,21 @@
-{ inputs, pkgs, libs, config, ... }:
 {
-
+  inputs,
+  pkgs,
+  libs,
+  config,
+  ...
+}: {
   # should move all of the following to their own files.
   home.packages = with pkgs; [
-
     # Miscellaneous
     fuzzel
 
     # File-Managers
     #xfce.thunar
     #pcmanfm
-
   ];
 
   programs.nix-index.enable = true;
-
 
   services.easyeffects = {
     enable = true;
@@ -45,7 +46,6 @@
       };
     };
   };
-
 
   programs.home-manager.enable = true;
 }

@@ -60,7 +60,8 @@ if [[ -f .remoteDeployOptions ]] && [[ ! $# -gt 0 ]] || [[ $1 != "-y" && $1 != "
     read -p "Do you want to use the last options? [Y/n] " yn
 fi
 
-if [[ $yn == "Y" || $yn == "y" ]]; then
+# if Y, y or blank, then restore the options
+if [[ $yn == "Y" || $yn == "y" || $yn == "" ]]; then
     # restore the options from the last run
     if [[ -f .remoteDeployOptions ]]; then
         options=$(cat .remoteDeployOptions)
