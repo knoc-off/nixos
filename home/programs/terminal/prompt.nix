@@ -1,5 +1,8 @@
-{ pkgs, lib, ... }:
 {
+  pkgs,
+  lib,
+  ...
+}: {
   programs.starship = {
     enable = true;
     settings = {
@@ -15,7 +18,5 @@
         error_symbol = "➜";
       };
     };
-
   };
-
 }

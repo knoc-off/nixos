@@ -1,5 +1,4 @@
 {
-
   description = "A decaratve nix config";
 
   nixConfig = {
@@ -13,10 +12,8 @@
   };
 
   inputs = {
-
     # color scheme
     themes.url = "github:RGBCube/ThemeNix";
-
 
     sops-nix.url = "github:Mic92/sops-nix";
     # experimental, not sure if good idea.
@@ -24,7 +21,6 @@
     #  url = "github:ahbnr/nixos-06cb-009a-fingerprint-sensor";
     #  inputs.nixpkgs.follows = "nixpkgs";
     #};
-
 
     # Disko - a declarative disk partitioning tool
     disko.url = "github:nix-community/disko";
@@ -56,72 +52,78 @@
 
     # TPM
     lanzaboote.url = "github:nix-community/lanzaboote";
-
   };
 
-  outputs =
-    inputs@{ self, themes, nixpkgs, home-manager, disko, ... }:
-    let
-      inherit (self) outputs;
+  outputs = inputs @ {
+    self,
+    themes,
+    nixpkgs,
+    home-manager,
+    disko,
+    ...
+  }: let
+    inherit (self) outputs;
+    system = "x86_64-linux";
+    pkgs = import nixpkgs {
       system = "x86_64-linux";
-      pkgs = import nixpkgs { system = "x86_64-linux"; config.allowUnfree = true; };
-
-      # theme
-      theme = themes.custom (import ./theme.nix);
-    in
-    {
-
-      # Your custom packages and modifications, exported as overlays
-      overlays = import ./overlays { inherit inputs; inherit pkgs; };
-
-      nixosConfigurations = {
-        laptop = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          system = "x86_64-linux";
-          modules = [
-            ./systems/laptop.nix
-            disko.nixosModules.disko
-            { disko.devices.disk.vdb.device = "/dev/nvme0n1"; }
-
-            home-manager.nixosModules.home-manager
-            {
-              home-manager.useGlobalPkgs = false;
-              home-manager.useUserPackages = true;
-              home-manager.users.knoff = import ./home/knoff-laptop.nix;
-              home-manager.extraSpecialArgs = {
-                inherit inputs;
-                inherit outputs;
-                inherit system;
-                inherit theme;
-              };
-            }
-          ];
-        };
-
-       hetzner-cloud = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          system = "x86_64-linux";
-          modules = [
-            ./systems/hetzner-server.nix
-          ];
-        };
-      };
-
-      homeConfigurations = {
-        "knoff/laptop" = home-manager.lib.homeManagerConfiguration {
-          inherit pkgs;
-          modules = [
-            ./home/knoff-laptop.nix
-          ];
-          extraSpecialArgs = {
-            inherit inputs;
-            inherit outputs;
-            inherit system;
-            inherit theme;
-          };
-        };
-
-      };
-
+      config.allowUnfree = true;
     };
+
+    # theme
+    theme = themes.custom (import ./theme.nix);
+  in {
+    # Your custom packages and modifications, exported as overlays
+    overlays = import ./overlays {
+      inherit inputs;
+      inherit pkgs;
+    };
+
+    nixosConfigurations = {
+      laptop = nixpkgs.lib.nixosSystem {
+        specialArgs = {inherit inputs outputs;};
+        system = "x86_64-linux";
+        modules = [
+          ./systems/laptop.nix
+          disko.nixosModules.disko
+          {disko.devices.disk.vdb.device = "/dev/nvme0n1";}
+
+          home-manager.nixosModules.home-manager
+          {
+            home-manager.useGlobalPkgs = false;
+            home-manager.useUserPackages = true;
+            home-manager.users.knoff = import ./home/knoff-laptop.nix;
+            home-manager.extraSpecialArgs = {
+              inherit inputs;
+              inherit outputs;
+              inherit system;
+              inherit theme;
+            };
+          }
+        ];
+      };
+
+      hetzner-cloud = nixpkgs.lib.nixosSystem {
+        specialArgs = {inherit inputs outputs;};
+        system = "x86_64-linux";
+        modules = [
+          ./systems/hetzner-server.nix
+        ];
+      };
+    };
+
+    homeConfigurations = {
+      "knoff/laptop" = home-manager.lib.homeManagerConfiguration {
+        inherit pkgs;
+        modules = [
+          ./home/knoff-laptop.nix
+        ];
+        extraSpecialArgs = {
+          inherit inputs;
+          inherit outputs;
+          inherit system;
+          inherit theme;
+        };
+      };
+    };
+  };
 }

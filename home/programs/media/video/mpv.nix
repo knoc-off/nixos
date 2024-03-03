@@ -1,4 +1,10 @@
-{ inputs, pkgs, libs, config, ... }: {
+{
+  inputs,
+  pkgs,
+  libs,
+  config,
+  ...
+}: {
   programs.mpv = {
     enable = true;
     bindings = {
@@ -15,8 +21,6 @@
     scripts = with pkgs.mpvScripts; [
       sponsorblock
       thumbnail
-
     ];
   };
-
 }

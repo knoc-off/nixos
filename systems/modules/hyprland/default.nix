@@ -1,6 +1,9 @@
-{ inputs, config, pkgs, ... }:
 {
-
+  inputs,
+  config,
+  pkgs,
+  ...
+}: {
   services.greetd.enable = true;
 
   # For greetd, we need a shell script into path, which lets us start qtile.service (after importing the environment of the login shell).
@@ -55,10 +58,9 @@
 
     # lets see if xdg fixes things
     xdg-utils
-
   ];
 
-  security.pam.services.swaylock = { };
+  security.pam.services.swaylock = {};
   # I believe this is redundant, but I'm not sure
   security.pam.services.swaylock.fprintAuth = config.services.fprintd.enable;
 
@@ -83,5 +85,4 @@
   };
 
   environment.sessionVariables.NIXOS_OZONE_WL = "1"; # electron apps use wayland
-
 }

@@ -1,5 +1,10 @@
-{ lib, theme, pkgs, config, ... }:
 {
+  lib,
+  theme,
+  pkgs,
+  config,
+  ...
+}: {
   programs.zsh = {
     enable = true;
     #enableAutosuggestions = true; # i dont like this too much. seems to mess with me more than help
@@ -16,18 +21,16 @@
       ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE = "fg=#${theme.base05}"; # 05-07 for white
     };
 
-
     shellAliases = {
       remove = ''/usr/bin/env rm'';
       sshk = "kitty +kitten ssh";
       mnt = "${pkgs.udisks}/bin/udisksctl mount -b";
     };
 
-
     # append text to end of read file
     initExtra =
-      builtins.readFile ./zshrc.sh +
-      ''
+      builtins.readFile ./zshrc.sh
+      + ''
         # disable the awful vi mode
         bindkey -e
 

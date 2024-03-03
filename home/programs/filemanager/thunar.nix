@@ -1,5 +1,4 @@
-{ pkgs, ... }:
-{
+{pkgs, ...}: {
   home.packages = with pkgs; [
     xfce.thunar
     xfce.thunar-archive-plugin
@@ -13,7 +12,4 @@
 
   # add other services that intigrate with thunar
   # to allow unziping and other file operations
-
-
-
 }

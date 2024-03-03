@@ -1,49 +1,50 @@
 # im going to try to document as i go, with comments.
 # each setting that is not super obvious should have, what impact it has, and why.
 # for example enabling 32bit support for opengl, is needed for steam.
-
-{ lib, inputs, config, pkgs, outputs, ... }:
-
 {
-  imports =
-    [
-      # hardware configs
-      ./hardware/hardware-configuration.nix
-      ./hardware/bluetooth.nix
+  lib,
+  inputs,
+  config,
+  pkgs,
+  outputs,
+  ...
+}: {
+  imports = [
+    # hardware configs
+    ./hardware/hardware-configuration.nix
+    ./hardware/bluetooth.nix
 
-      # Disko
-      ./hardware/disks/btrfs-luks.nix
+    # Disko
+    ./hardware/disks/btrfs-luks.nix
 
-      # hardware for my laptop
-      inputs.hardware.nixosModules.framework-13-7040-amd
-      ./hardware/fingerprint
+    # hardware for my laptop
+    inputs.hardware.nixosModules.framework-13-7040-amd
+    ./hardware/fingerprint
 
-      # Secure boot
-      inputs.lanzaboote.nixosModules.lanzaboote
-      # https://github.com/nix-community/lanzaboote/blob/master/docs/QUICK_START.md
+    # Secure boot
+    inputs.lanzaboote.nixosModules.lanzaboote
+    # https://github.com/nix-community/lanzaboote/blob/master/docs/QUICK_START.md
 
-      # pipewire / Audio
-      ./modules/audio
+    # pipewire / Audio
+    ./modules/audio
 
-      # nix package settings
-      ./modules/nix.nix
+    # nix package settings
+    ./modules/nix.nix
 
-      # Window manager
-      ./modules/hyprland
+    # Window manager
+    ./modules/hyprland
 
-      # run with the fish function nixcommit
-      # This is an 'auto generated' file that should add a message to the build versions in the boot menu
-      ./commit-message.nix
+    # run with the fish function nixcommit
+    # This is an 'auto generated' file that should add a message to the build versions in the boot menu
+    ./commit-message.nix
 
-      # Android emulation
-      #./modules/virtualisation/waydroid.nix
-    ];
+    # Android emulation
+    #./modules/virtualisation/waydroid.nix
+  ];
 
   hardware.framework.amd-7040.preventWakeOnAC = true;
 
-
   programs.kdeconnect.enable = true;
-
 
   # IDK if this does anything, TODO: check
   # doesent seem to do much, cant remember why i added it.
@@ -54,11 +55,9 @@
 
   boot.kernelPackages = pkgs.linuxPackages_latest;
 
-
   # Attempt to fix the: GLib-GIO-ERROR**: No GSettings schemas are installed on the system
   programs.dconf.enable = true;
   services.fwupd.enable = true;
-
 
   # Use the systemd-boot EFI boot loader.
   # disable if using lanzaboote
@@ -69,7 +68,6 @@
     enable = true;
     pkiBundle = "/etc/secureboot";
   };
-
 
   networking.hostName = "framework"; # Define your hostname.
   networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
@@ -84,19 +82,19 @@
   #services.power-profiles-daemon.enable = true;
   # thermal management. TODO: check if this is needed.
   services.thermald.enable = true;
-    services.auto-cpufreq = {
-      enable = true;
-      settings = {
-        battery = {
-          governor = "conservative";
-          turbo = "auto";
-        };
-        charger = {
-          governor = "preformance";
-          turbo = "auto";
-        };
+  services.auto-cpufreq = {
+    enable = true;
+    settings = {
+      battery = {
+        governor = "conservative";
+        turbo = "auto";
+      };
+      charger = {
+        governor = "preformance";
+        turbo = "auto";
       };
     };
+  };
   #  services.tlp = {
   #    enable = true;
   #    settings = {
@@ -131,7 +129,7 @@
   i18n.defaultLocale = "en_US.UTF-8";
   console = {
     #font = "Lat2-Terminus16";
-    packages = with pkgs; [ terminus_font ];
+    packages = with pkgs; [terminus_font];
     #font = "${pkgs.terminus_fonts}/share/consolefonts/ter-u28n.psf.gz";
     font = "${pkgs.terminus_font}/share/consolefonts/ter-i22b.psf.gz";
     keyMap = lib.mkDefault "us";
@@ -148,7 +146,7 @@
     mplus-outline-fonts.githubRelease
     dina-font
     proggyfonts
-    (nerdfonts.override { fonts = [ "FiraCode" ]; })
+    (nerdfonts.override {fonts = ["FiraCode"];})
   ];
 
   fonts = {
@@ -156,7 +154,7 @@
 
     fontconfig = {
       defaultFonts = {
-        monospace = [ "FiraCode Nerd Font Mono" ];
+        monospace = ["FiraCode Nerd Font Mono"];
       };
     };
   };
@@ -171,7 +169,6 @@
     settings.PermitRootLogin = "no";
   };
 
-
   # Configure keymap in X11
   #services.xserver.layout = "us";
   services.xserver.xkb.layout = "us";
@@ -180,7 +177,6 @@
   # Enable CUPS to print documents.
   # services.printing.enable = true;
 
-
   # needed for steam, and some other apps/games.
   # steam benifits from launch param: -forcedesktopscaling 1.0%U
   # NIXPKGS_ALLOW_UNFREE=1 nix run nixpkgs#steam --impure -- -forcedesktopscaling 1.0%U
@@ -188,9 +184,6 @@
   hardware.opengl.driSupport32Bit = true;
   hardware.opengl.enable = true;
   hardware.pulseaudio.support32Bit = true;
-
-
-
 
   # Enable sound.
   # sound.enable = true;
@@ -209,10 +202,12 @@
     #   (lib.mkIf (config.programs.zsh.enable) pkgs.zsh pkgs.bash);
 
     shell =
-      if config.programs.fish.enable then pkgs.fish
-      else if config.programs.zsh.enable then pkgs.zsh
+      if config.programs.fish.enable
+      then pkgs.fish
+      else if config.programs.zsh.enable
+      then pkgs.zsh
       else pkgs.bash;
-    extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
+    extraGroups = ["wheel" "networkmanager" "audio" "video"];
     initialPassword = "password";
     openssh.authorizedKeys.keys = [
     ];
@@ -250,13 +245,9 @@
 
   # List services that you want to enable:
 
-
-
-
-
   # Open ports in the firewall.
-  networking.firewall.allowedTCPPorts = [ 22 ];
-  networking.firewall.allowedUDPPorts = [ 22 ];
+  networking.firewall.allowedTCPPorts = [22 80 433 3000];
+  networking.firewall.allowedUDPPorts = [22 80 433 3000];
   # Or disable the firewall altogether.
   # networking.firewall.enable = false;
 
@@ -272,5 +263,4 @@
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
   system.stateVersion = "23.11"; # Did you read the comment?
-
 }

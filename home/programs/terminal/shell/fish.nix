@@ -1,4 +1,8 @@
-{ config, pkgs, lib, ... }:
+{ conf
+, pkgs
+, lib
+, ...
+}:
 let
   config_dir = "/home/knoff/nixos";
   configName = "laptop";
@@ -75,51 +79,50 @@ in
         # but thats fine.
       '';
 
-      nx =
-        ''
-          # fish function to run nix commands easily
-          # switch statemnt to handle different commands
-          switch $argv[1]
-            case rb
-              git -C ${config_dir} diff --quiet; set nochanges $status
-              if [ $nochanges -eq 0 ];
-                sudo nixos-rebuild switch --flake ${config_dir}#${configName}
-              else
-                nixcommit
-              end
-            case rh
-              home-manager switch --flake ${config_dir}#${homeConfigName}
-            case rt
-              sudo nixos-rebuild test --flake ${config_dir}#${configName}
-            case cr
-              nix repl --extra-experimental-features repl-flake ${config_dir}#nixosConfigurations."${configName}"
-            case hr
-              nix repl --extra-experimental-features repl-flake ${config_dir}#homeConfigurations."${homeConfigName}"
-            case vm
-              sudo nixos-rebuild build-vm --flake ${config_dir}#${configName}
-            case rg
-              set -l file $(rg "$argv[2..-1]" ${config_dir} -l. | fzf)
-              if test -z "$file"
-                return
-              end
+      nx = ''
+        # fish function to run nix commands easily
+        # switch statemnt to handle different commands
+        switch $argv[1]
+          case rb
+            git -C ${config_dir} diff --quiet; set nochanges $status
+            if [ $nochanges -eq 0 ];
+              sudo nixos-rebuild switch --flake ${config_dir}#${configName}
+            else
+              nixcommit
+            end
+          case rh
+            home-manager switch --flake ${config_dir}#${homeConfigName}
+          case rt
+            sudo nixos-rebuild test --flake ${config_dir}#${configName}
+          case cr
+            nix repl --extra-experimental-features repl-flake ${config_dir}#nixosConfigurations."${configName}"
+          case hr
+            nix repl --extra-experimental-features repl-flake ${config_dir}#homeConfigurations."${homeConfigName}"
+          case vm
+            sudo nixos-rebuild build-vm --flake ${config_dir}#${configName}
+          case rg
+            set -l file $(rg "$argv[2..-1]" ${config_dir} -l. | fzf)
+            if test -z "$file"
+              return
+            end
 
-              nvim "$file"
-            case cd
-              set -l file $(fd . ${config_dir} --type=d -E .git -H | fzf --query "$argv[2..-1]")
-              if test -z "$file"
-                return
-              end
-              cd "$file"
-            case '*'
-              set -l file $(fd . ${config_dir} -e nix -E .git -H | fzf --query "$argv[1..-1]")
-              if test -z "$file"
-                return
-              end
+            nvim "$file"
+          case cd
+            set -l file $(fd . ${config_dir} --type=d -E .git -H | fzf --query "$argv[2..-1]")
+            if test -z "$file"
+              return
+            end
+            cd "$file"
+          case '*'
+            set -l file $(fd . ${config_dir} -e nix -E .git -H | fzf --query "$argv[1..-1]")
+            if test -z "$file"
+              return
+            end
 
-              nvim "$file"
-          end
+            nvim "$file"
+        end
 
-        '';
+      '';
 
       qr = ''
         {
@@ -145,9 +148,6 @@ in
         set NETMASK 24
         nix run nixpkgs#nmap -- -sP "$IPADDR/$NETMASK"
       '';
-
-
-
     };
     shellInit = ''
 
@@ -159,12 +159,13 @@ in
           export OPENAI_API_KEY=(cat /etc/secrets/gpt/secret)
       end
 
+      bind --preset \cw backward-kill-word
+
     '';
 
-      #function fish_prompt
-      #  set -l git_branch " {"(git branch 2>/dev/null | sed -n '/\* /s///p')"}"
-      #  echo -n (set_color yellow)(prompt_pwd)(set_color normal)"$git_branch"' $ '
-      #end
-
+    #function fish_prompt
+    #  set -l git_branch " {"(git branch 2>/dev/null | sed -n '/\* /s///p')"}"
+    #  echo -n (set_color yellow)(prompt_pwd)(set_color normal)"$git_branch"' $ '
+    #end
   };
 }

@@ -1,7 +1,5 @@
-{ pkgs, ... }:
-{
+{pkgs, ...}: {
   virtualisation.waydroid.enable = true;
-
 
   # oneshot service to init waydroid:
   #systemd.services.waydroid-init = {
@@ -13,6 +11,4 @@
   #    ${pkgs.waydroid} init
   #  '';
   #};
-
 }
-

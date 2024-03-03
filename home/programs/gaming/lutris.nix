@@ -1,5 +1,9 @@
-{ inputs, pkgs, libs, ... }:
 {
+  inputs,
+  pkgs,
+  libs,
+  ...
+}: {
   home.packages = with pkgs; [
     lutris
   ];

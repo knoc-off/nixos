@@ -1,22 +1,20 @@
-{ config, pkgs, lib, ... }:
 {
-
+  config,
+  pkgs,
+  lib,
+  ...
+}: {
   programs.eww = {
     enable = true;
     config = {
       bar.enable = true;
       side = "top";
-
     };
-
 
     package = pkgs.eww-wayland;
 
-
-  #  configDir = ./eww;
+    #  configDir = ./eww;
   };
-
-
 
   #  home.file =
   #    let
@@ -39,7 +37,4 @@
   #      };
   #
   #    };
-
-
-
 }

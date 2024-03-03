@@ -1,5 +1,8 @@
-{ config, libs, ... }:
 {
+  config,
+  libs,
+  ...
+}: {
   imports = [
     ./video
     ./audio
