@@ -155,6 +155,7 @@ in
       [ "$TERM" = "xterm-kitty" ] && alias ssh="kitty +kitten ssh"
 
 
+      # Dont judge me, its useful
       if test -f /etc/secrets/gpt/secret
           export OPENAI_API_KEY=(cat /etc/secrets/gpt/secret)
       end

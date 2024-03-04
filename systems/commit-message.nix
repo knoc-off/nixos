@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "formatted_and_a_few_big_changes___________________";
+  system.nixos.label = "fixed_small_things________________________________";
 }
