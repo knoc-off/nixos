@@ -1,16 +1,15 @@
-{
-  inputs,
-  pkgs,
-  theme,
-  config,
-  ...
-}: let
+{ inputs
+, pkgs
+, theme
+, config
+, ...
+}:
+let
   # theres a few unchecked dependencies here.
   # like notify-send, etc. could link it like i do with fuzzle
   hyprland = inputs.hyprland.packages.${pkgs.system}.hyprland;
   plugins = inputs.hyprland-plugins.packages.${pkgs.system};
 
-  #fuzzel = "${pkgs.fuzzel}/bin/fuzzel -b ${theme.base04}DD -t ${theme.base06}DD -m ${theme.base04}DD -C ${theme.base05}DD -s ${theme.base03}DD -S ${theme.base07}DD  -M ${theme.base07}DD";
   fuzzel = "${pkgs.fuzzel}/bin/fuzzel -b ${theme.base02}DD -t ${theme.base06}DD -m ${theme.base04}DD -C ${theme.base05}DD -s ${theme.base03}DD -S ${theme.base07}DD -M ${theme.base07}DD";
 
   notify-send = "${pkgs.libnotify}/bin/notify-send";
@@ -98,11 +97,12 @@
   # need to put the wallpaper into the nix-store.
   wallpaper =
     pkgs.writeText "wallpaper"
-    ''
-      preload = ${./wallpaper-nixos.png}
-      wallpaper = eDP-1, ${./wallpaper-nixos.png}
-    '';
-in {
+      ''
+        preload = ${./wallpaper-nixos.png}
+        wallpaper = eDP-1, ${./wallpaper-nixos.png}
+      '';
+in
+{
   # Pomo timer, should move to its own module
   home.file."uairtest" = {
     target = ".config/uair/uair.toml";
@@ -161,13 +161,13 @@ in {
     package = pkgs.swaylock-effects;
   };
 
-  home.packages = [swaylock-custom pkgs.hyprpaper];
+  home.packages = [ swaylock-custom pkgs.hyprpaper ];
   xdg.desktopEntries."org.gnome.Settings" = {
     name = "Settings";
     comment = "Gnome Control Center";
     icon = "org.gnome.Settings";
     exec = "env XDG_CURRENT_DESKTOP=gnome ${pkgs.gnome.gnome-control-center}/bin/gnome-control-center";
-    categories = ["X-Preferences"];
+    categories = [ "X-Preferences" ];
     terminal = false;
   };
 
@@ -310,59 +310,64 @@ in {
         #workspace_swipe_numbered = true;
       };
 
-      windowrule = let
-        f = regex: "float, ${regex}";
-        w = regex: (number: "workspace ${builtins.toString number}, ${regex}");
-      in [
-        (f "org.gnome.Calculator")
-        (f "org.gnome.Nautilus")
-        (f "pavucontrol")
-        (f "nm-connection-editor")
-        (f "blueberry.py")
-        (f "org.gnome.Settings")
-        (f "org.gnome.design.Palette")
-        (f "Color Picker")
-        (f "xdg-desktop-portal")
-        (f "xdg-desktop-portal-gnome")
-        (f "transmission-gtk")
-        (f "com.github.Aylur.ags")
-        (w "Spotify" 7)
-        #"workspace 7, title:Spotify"
-      ];
+      windowrule =
+        let
+          f = regex: "float, ${regex}";
+          w = regex: (number: "workspace ${builtins.toString number}, ${regex}");
+        in
+        [
+          (f "org.gnome.Calculator")
+          (f "org.gnome.Nautilus")
+          (f "pavucontrol")
+          (f "nm-connection-editor")
+          (f "blueberry.py")
+          (f "org.gnome.Settings")
+          (f "org.gnome.design.Palette")
+          (f "Color Picker")
+          (f "xdg-desktop-portal")
+          (f "xdg-desktop-portal-gnome")
+          (f "transmission-gtk")
+          (f "com.github.Aylur.ags")
+          (w "Spotify" 7)
+          #"workspace 7, title:Spotify"
+        ];
 
-      windowrulev2 = let
-        float = class: (title: "float, class:(${class}), title:(${title})");
-        pin = class: (title: "pin, class:(${class}), title:(${title})");
-        opacity = class: (title: (opacity: "opacity ${builtins.toString opacity}, class:(${class}), title:(${title})"));
-        #size = class: (title: (size: "float, class:(${class}), title:(${title})"));
-        idleinhibit = mode: (class: (title: "idleinhibit ${mode}, class:(${class}), title:(${title})"));
-        window = class: (title: (number: "workspace ${builtins.toString number}, class:(${class}), title:(${title})"));
-      in [
-        #"idleinhibit always, class:(kitty), title:(.*)"
-        #"idleinhibit focus, class:(firefox), title:(.*Youtube.*)"
-        (idleinhibit "focus" "firefox" ".*YouTube.*")
-        (float "steam" ".*Browser.*")
-        (float "steam" ".*Friends List.*")
-        (window "thunderbird" ".*" 6)
-        (float "yad" "uair")
-        (pin "yad" "uair")
-        (opacity "yad" "uair" 0.3)
-      ];
+      windowrulev2 =
+        let
+          float = class: (title: "float, class:(${class}), title:(${title})");
+          pin = class: (title: "pin, class:(${class}), title:(${title})");
+          opacity = class: (title: (opacity: "opacity ${builtins.toString opacity}, class:(${class}), title:(${title})"));
+          #size = class: (title: (size: "float, class:(${class}), title:(${title})"));
+          idleinhibit = mode: (class: (title: "idleinhibit ${mode}, class:(${class}), title:(${title})"));
+          window = class: (title: (number: "workspace ${builtins.toString number}, class:(${class}), title:(${title})"));
+        in
+        [
+          #"idleinhibit always, class:(kitty), title:(.*)"
+          #"idleinhibit focus, class:(firefox), title:(.*Youtube.*)"
+          (idleinhibit "focus" "firefox" ".*YouTube.*")
+          (float "steam" ".*Browser.*")
+          (float "steam" ".*Friends List.*")
+          (window "thunderbird" ".*" 6)
+          (float "yad" "uair")
+          (pin "yad" "uair")
+          (opacity "yad" "uair" 0.3)
+        ];
 
-      bind = let
-        mainMod = "SUPER";
+      bind =
+        let
+          mainMod = "SUPER";
 
-        binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
-        mvfocus = binding "${mainMod}" "movefocus";
-        ws = binding "${mainMod}" "workspace";
-        resizeactive = binding "${mainMod} CTRL" "resizeactive";
-        mvactive = binding "${mainMod} ALT" "moveactive";
-        mvtows = binding "${mainMod} SHIFT" "movetoworkspace";
-        #e = "exec, ags -b hypr";
-        arr = [1 2 3 4 5 6 7 8 9];
+          binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
+          mvfocus = binding "${mainMod}" "movefocus";
+          ws = binding "${mainMod}" "workspace";
+          resizeactive = binding "${mainMod} CTRL" "resizeactive";
+          mvactive = binding "${mainMod} ALT" "moveactive";
+          mvtows = binding "${mainMod} SHIFT" "movetoworkspace";
+          #e = "exec, ags -b hypr";
+          arr = [ 1 2 3 4 5 6 7 8 9 ];
 
-        acpi = "${pkgs.acpi}/bin/acpi";
-      in
+          acpi = "${pkgs.acpi}/bin/acpi";
+        in
         [
           ## Master-Layout binds
           "${mainMod}, Backslash, layoutmsg, swapwithmaster master"
@@ -407,66 +412,70 @@ in {
         ++ (map (i: ws (toString i) (toString i)) arr)
         ++ (map (i: mvtows (toString i) (toString i)) arr);
 
-      bindle = let
-        light = "${pkgs.light}/bin/light";
-        wpctl = "${pkgs.wireplumber}/bin/wpctl";
+      bindle =
+        let
+          light = "${pkgs.light}/bin/light";
+          wpctl = "${pkgs.wireplumber}/bin/wpctl";
 
-        brightness = pkgs.writeShellScriptBin "brightness" ''
-          #!${pkgs.bash}/bin/bash
+          brightness = pkgs.writeShellScriptBin "brightness" ''
+            #!${pkgs.bash}/bin/bash
 
-          # would be cool to bas it on inertia
-          # value strts at 0.1 rounded up to 1, and multiplies by 1.1/2 every time, time is used to reset it down to 0 afterwords?
+            # would be cool to bas it on inertia
+            # value strts at 0.1 rounded up to 1, and multiplies by 1.1/2 every time, time is used to reset it down to 0 afterwords?
 
-          # jq
-          # {
-          #   "value": 0.1,
-          #   "time": {unix time}
-          # }
+            # jq
+            # {
+            #   "value": 0.1,
+            #   "time": {unix time}
+            # }
 
-          # if /tmp/brightness.json does not exist, create it
-          #if [[ ! -f /tmp/brightness.json ]]; then
-          #  jq '{ "value": 0.1, "time": $(date +%s) }' > /tmp/brightness.json
-          #fi
+            # if /tmp/brightness.json does not exist, create it
+            #if [[ ! -f /tmp/brightness.json ]]; then
+            #  jq '{ "value": 0.1, "time": $(date +%s) }' > /tmp/brightness.json
+            #fi
 
-          #data=$(jq -r '.value' /tmp/brightness.json)
-          # date -d '+5 seconds' +%s
+            #data=$(jq -r '.value' /tmp/brightness.json)
+            # date -d '+5 seconds' +%s
 
-          # if time is more than 5 seconds, reset value to 0.1
-          # /tmp/brightness.json
-          #if [[ $(date +%s) -gt $(jq -r '.time' /tmp/brightness.json) ]]; then
-          #  jq '.value = 0.1 | .time = $(date +%s)' /tmp/brightness.json > /tmp/brightness.json
-          #fi
+            # if time is more than 5 seconds, reset value to 0.1
+            # /tmp/brightness.json
+            #if [[ $(date +%s) -gt $(jq -r '.time' /tmp/brightness.json) ]]; then
+            #  jq '.value = 0.1 | .time = $(date +%s)' /tmp/brightness.json > /tmp/brightness.json
+            #fi
 
 
-          ${light} $@
+            ${light} $@
 
-          ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:brightness -h int:value:$(${light}) "$(${light})%"
-        '';
+            ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:brightness -h int:value:$(${light}) "$(${light})%"
+          '';
 
-        volume = pkgs.writeShellScriptBin "volume" ''
-          #!${pkgs.bash}/bin/bash
+          volume = pkgs.writeShellScriptBin "volume" ''
+            #!${pkgs.bash}/bin/bash
 
-          ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ $1
+            ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ $1
 
-          ${pkgs.libcanberra-gtk3}/bin/canberra-gtk-play -i audio-volume-change -d "changeVolume"
+            ${pkgs.libcanberra-gtk3}/bin/canberra-gtk-play -i audio-volume-change -d "changeVolume"
 
-          ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:volume -h int:value:$(${pkgs.pamixer}/bin/pamixer --get-volume) -u low "$(${pkgs.pamixer}/bin/pamixer --get-volume-human)"
-        '';
-      in [
-        ",XF86MonBrightnessUp,  exec,  ${brightness}/bin/brightness -A 2"
-        ",XF86MonBrightnessDown,exec,  ${brightness}/bin/brightness -U 2"
-        ",XF86KbdBrightnessUp,  exec,  ${brightness}/bin/brightness -A 2"
-        ",XF86KbdBrightnessDown,exec,  ${brightness}/bin/brightness -U 2"
-        ",XF86AudioRaiseVolume, exec,  ${volume}/bin/volume 1%+"
-        ",XF86AudioLowerVolume, exec,  ${volume}/bin/volume 1%-"
-      ];
+            ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:volume -h int:value:$(${pkgs.pamixer}/bin/pamixer --get-volume) -u low "$(${pkgs.pamixer}/bin/pamixer --get-volume-human)"
+          '';
+        in
+        [
+          ",XF86MonBrightnessUp,  exec,  ${brightness}/bin/brightness -A 2"
+          ",XF86MonBrightnessDown,exec,  ${brightness}/bin/brightness -U 2"
+          ",XF86KbdBrightnessUp,  exec,  ${brightness}/bin/brightness -A 2"
+          ",XF86KbdBrightnessDown,exec,  ${brightness}/bin/brightness -U 2"
+          ",XF86AudioRaiseVolume, exec,  ${volume}/bin/volume 1%+"
+          ",XF86AudioLowerVolume, exec,  ${volume}/bin/volume 1%-"
+        ];
 
-      bindl = let
-        wpctl = "${pkgs.wireplumber}/bin/wpctl";
-      in [
-        ",XF86AudioMute, exec, ${wpctl} set-mute @DEFAULT_AUDIO_SINK@ toggle"
-        "SUPER, XF86AudioMute, exec, ${wpctl} set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
-      ];
+      bindl =
+        let
+          wpctl = "${pkgs.wireplumber}/bin/wpctl";
+        in
+        [
+          ",XF86AudioMute, exec, ${wpctl} set-mute @DEFAULT_AUDIO_SINK@ toggle"
+          "SUPER, XF86AudioMute, exec, ${wpctl} set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
+        ];
 
       bindm = [
         "SUPER, mouse:273, resizewindow"

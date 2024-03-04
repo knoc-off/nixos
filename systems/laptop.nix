@@ -1,13 +1,12 @@
 # im going to try to document as i go, with comments.
 # each setting that is not super obvious should have, what impact it has, and why.
 # for example enabling 32bit support for opengl, is needed for steam.
-{
-  lib,
-  inputs,
-  config,
-  pkgs,
-  outputs,
-  ...
+{ lib
+, inputs
+, config
+, pkgs
+, outputs
+, ...
 }: {
   imports = [
     # hardware configs
@@ -41,6 +40,27 @@
     # Android emulation
     #./modules/virtualisation/waydroid.nix
   ];
+
+  programs.nix-ld = {
+    enable = true;
+    libraries = with pkgs; [
+    ];
+  };
+
+  # see if this works
+  system.autoUpgrade = {
+    enable = true;
+    flake = inputs.self.outPath;
+    flags = [
+      "--update-input"
+      "nixpkgs"
+      "-L"
+    ];
+    dates = [
+      "09:00"
+    ];
+    randomizedDelaySec = "45min";
+  };
 
   hardware.framework.amd-7040.preventWakeOnAC = true;
 
@@ -129,7 +149,7 @@
   i18n.defaultLocale = "en_US.UTF-8";
   console = {
     #font = "Lat2-Terminus16";
-    packages = with pkgs; [terminus_font];
+    packages = with pkgs; [ terminus_font ];
     #font = "${pkgs.terminus_fonts}/share/consolefonts/ter-u28n.psf.gz";
     font = "${pkgs.terminus_font}/share/consolefonts/ter-i22b.psf.gz";
     keyMap = lib.mkDefault "us";
@@ -146,7 +166,7 @@
     mplus-outline-fonts.githubRelease
     dina-font
     proggyfonts
-    (nerdfonts.override {fonts = ["FiraCode"];})
+    (nerdfonts.override { fonts = [ "FiraCode" ]; })
   ];
 
   fonts = {
@@ -154,7 +174,7 @@
 
     fontconfig = {
       defaultFonts = {
-        monospace = ["FiraCode Nerd Font Mono"];
+        monospace = [ "FiraCode Nerd Font Mono" ];
       };
     };
   };
@@ -207,7 +227,7 @@
       else if config.programs.zsh.enable
       then pkgs.zsh
       else pkgs.bash;
-    extraGroups = ["wheel" "networkmanager" "audio" "video"];
+    extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
     initialPassword = "password";
     openssh.authorizedKeys.keys = [
     ];
@@ -246,8 +266,8 @@
   # List services that you want to enable:
 
   # Open ports in the firewall.
-  networking.firewall.allowedTCPPorts = [22 80 433 3000];
-  networking.firewall.allowedUDPPorts = [22 80 433 3000];
+  networking.firewall.allowedTCPPorts = [ 22 80 433 3000 ];
+  networking.firewall.allowedUDPPorts = [ 22 80 433 3000 ];
   # Or disable the firewall altogether.
   # networking.firewall.enable = false;
 
