@@ -84,8 +84,9 @@ in
         # switch statemnt to handle different commands
         switch $argv[1]
           case rb
+            # if $argv[2] is -f then skip this check
             git -C ${config_dir} diff --quiet; set nochanges $status
-            if [ $nochanges -eq 0 ];
+            if [ $nochanges -eq 0 ]; or test "$argv[2]" = "-f"
               sudo nixos-rebuild switch --flake ${config_dir}#${configName}
             else
               nixcommit
