@@ -43,6 +43,10 @@
     hyprland-plugins.url = "github:hyprwm/hyprland-plugins";
     hyprland-plugins.inputs.hyprland.follows = "hyprland";
 
+    # Pyprland, python plugins for Hyprland
+    # pyprland.url = "github:hyprland-community/pyprland";
+    # https://github.com/hyprland-community/pyprland/blob/main/flake.nix
+
     # Home Manager (for managing user environments using Nix)
     home-manager.url = "github:nix-community/home-manager";
     home-manager.inputs.nixpkgs.follows = "nixpkgs";

@@ -48,19 +48,19 @@
   };
 
   # see if this works
-  system.autoUpgrade = {
-    enable = true;
-    flake = inputs.self.outPath;
-    flags = [
-      "--update-input"
-      "nixpkgs"
-      "-L"
-    ];
-    dates = [
-      "09:00"
-    ];
-    randomizedDelaySec = "45min";
-  };
+  #  system.autoUpgrade = {
+  #    enable = true;
+  #    flake = inputs.self.outPath;
+  #    flags = [
+  #      "--update-input"
+  #      "nixpkgs"
+  #      "-L"
+  #    ];
+  #    dates = [
+  #      "09:00"
+  #    ];
+  #    randomizedDelaySec = "45min";
+  #  };
 
   hardware.framework.amd-7040.preventWakeOnAC = true;
 

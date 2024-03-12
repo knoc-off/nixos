@@ -103,6 +103,69 @@ let
       '';
 in
 {
+
+  imports = [
+    ./dunst.nix
+    ./mako.nix
+    ./eww.nix
+
+  ];
+
+  # Pomo timer, should move to its own module
+  home.file."pyprland" = {
+    target = ".config/hypr/pyprland.toml";
+    source = pkgs.writers.writeTOML "pyprland.toml" {
+      pyprland = {
+        plugins = [
+          "scratchpads"
+          #"shift_monitors"
+          #"workspaces_follow_focus"
+        ];
+      };
+
+      scratchpads = {
+        stb = {
+          animation = "fromBottom";
+          command = "kitty --class kitty-stb sstb";
+          class = "kitty-stb";
+          lazy = true;
+          size = "75% 45%";
+        };
+
+        stb-logs = {
+          animation = "fromTop";
+          command = "kitty --class kitty-stb-logs stbLog";
+          class = "kitty-stb-logs";
+          lazy = true;
+          size = "75% 40%";
+        };
+
+        term = {
+          animation = "fromTop";
+          command = "kitty --class kitty-dropterm";
+          class = "kitty-dropterm";
+          size = "75% 60%";
+        };
+
+        file = {
+          animation = "fromBottom";
+          command = "nautilus";
+          class = "filemanager";
+          size = "75% 60%";
+        };
+
+        volume = {
+          animation = "fromRight";
+          command = "pavucontrol";
+          class = "pavucontrol";
+          lazy = true;
+          size = "40% 90%";
+          unfocus = "hide";
+
+        };
+      };
+    };
+  };
   # Pomo timer, should move to its own module
   home.file."uairtest" = {
     target = ".config/uair/uair.toml";
@@ -126,13 +189,6 @@ in
       ];
     };
   };
-
-  imports = [
-    ./dunst.nix
-    ./mako.nix
-    ./eww.nix
-  ];
-
   services.swayidle.enable = true;
   services.swayidle = {
     events = [
@@ -161,7 +217,11 @@ in
     package = pkgs.swaylock-effects;
   };
 
-  home.packages = [ swaylock-custom pkgs.hyprpaper ];
+  home.packages = [
+    swaylock-custom
+    pkgs.hyprpaper
+    pkgs.pyprland
+  ];
   xdg.desktopEntries."org.gnome.Settings" = {
     name = "Settings";
     comment = "Gnome Control Center";
@@ -180,8 +240,10 @@ in
 
     settings = {
       exec-once = [
+
         "hyprpaper --config ${wallpaper}"
         "firefox"
+        "pypr"
         #"hyprctl dispatch movetoworkspacesilent 1,firefox"
         #"hyprctl dispatch movetoworkspacesilent 2,kitty"
       ];
@@ -383,6 +445,11 @@ in
           "${mainMod}, O, fakefullscreen"
           #"${mainMod}, P, togglesplit"
           "${mainMod}, SPACE, exec, ${fuzzel}"
+
+
+          # Scratch workspaces
+          "${mainMod}, T, exec, pypr toggle term"
+          "${mainMod}, F, exec, pypr toggle file"
 
           # group
           "${mainMod}, G, togglegroup, 0"
