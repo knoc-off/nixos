@@ -441,11 +441,10 @@ in
           "${mainMod}, Delete, exit"
           "${mainMod}, W, killactive"
           "${mainMod}, V, togglefloating"
-          "${mainMod}, F, fullscreen"
+          "${mainMod}, equal, fullscreen"
           "${mainMod}, O, fakefullscreen"
           #"${mainMod}, P, togglesplit"
           "${mainMod}, SPACE, exec, ${fuzzel}"
-
 
           # Scratch workspaces
           "${mainMod}, T, exec, pypr toggle term"
