@@ -1,4 +1,4 @@
-args @ {
+{
   theme,
   pkgs,
   config,
