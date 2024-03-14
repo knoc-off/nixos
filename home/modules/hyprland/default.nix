@@ -125,14 +125,14 @@ in
       };
 
       scratchpads = {
-        firefox = {
-          animation = "fromBottom";
-          command = "firefox -p minimal";
-          class = "firefox-minimal";
-          unfocus = "hide";
-          size = "100% 100%";
-          margin = 0;
-        };
+        ##firefox = {
+          #animation = "fromBottom";
+          #command = "firefox -p minimal";
+          #class = "firefox-minimal";
+          #unfocus = "hide";
+          #size = "100% 100%";
+          #margin = 0;
+        #};
 
         stb-logs = {
           animation = "fromTop";
@@ -472,6 +472,7 @@ in
           # Scratch workspaces
           "${mainMod}, T, exec, pypr toggle term"
           "${mainMod}, F, exec, pypr toggle file"
+          #"${mainMod}, S, exec, pypr toggle firefox"
           "${mainMod} SHIFT, SPACE, exec, pypr expose"
 
           # group
