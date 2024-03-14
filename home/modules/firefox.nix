@@ -59,7 +59,7 @@ in {
         type = types.bool;
         default = true;
         description = ''
-          disable telemetry.
+          telemetry.
         '';
       };
 
@@ -68,7 +68,7 @@ in {
         type = types.bool;
         default = true;
         description = ''
-          disable crash reports.
+          crash reports.
         '';
       };
 
@@ -77,7 +77,7 @@ in {
         type = types.bool;
         default = true;
         description = ''
-          disable health reports.
+          health reports.
         '';
       };
 
@@ -86,7 +86,7 @@ in {
         type = types.bool;
         default = true;
         description = ''
-          disable experiments.
+          experiments.
         '';
       };
 
@@ -95,7 +95,7 @@ in {
         type = types.bool;
         default = true;
         description = ''
-          disable search suggestions, autocomplete.
+          search suggestions, autocomplete.
         '';
       };
 
@@ -104,7 +104,7 @@ in {
         type = types.bool;
         default = false;
         description = ''
-          disable pocket.
+          pocket.
         '';
       };
 

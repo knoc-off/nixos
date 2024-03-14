@@ -118,18 +118,20 @@ in
       pyprland = {
         plugins = [
           "scratchpads"
+          "expose"
           #"shift_monitors"
           #"workspaces_follow_focus"
         ];
       };
 
       scratchpads = {
-        stb = {
+        firefox = {
           animation = "fromBottom";
-          command = "kitty --class kitty-stb sstb";
-          class = "kitty-stb";
-          lazy = true;
-          size = "75% 45%";
+          command = "firefox -p minimal";
+          class = "firefox-minimal";
+          unfocus = "hide";
+          size = "100% 100%";
+          margin = 0;
         };
 
         stb-logs = {
@@ -144,6 +146,7 @@ in
           animation = "fromTop";
           command = "kitty --class kitty-dropterm";
           class = "kitty-dropterm";
+          unfocus = "hide";
           size = "75% 60%";
         };
 
@@ -152,6 +155,7 @@ in
           command = "nautilus";
           class = "filemanager";
           size = "75% 60%";
+          unfocus = "hide";
         };
 
         volume = {
@@ -242,7 +246,6 @@ in
       exec-once = [
 
         "hyprpaper --config ${wallpaper}"
-        "firefox"
         "pypr"
         #"hyprctl dispatch movetoworkspacesilent 1,firefox"
         #"hyprctl dispatch movetoworkspacesilent 2,kitty"
@@ -401,7 +404,7 @@ in
           opacity = class: (title: (opacity: "opacity ${builtins.toString opacity}, class:(${class}), title:(${title})"));
           #size = class: (title: (size: "float, class:(${class}), title:(${title})"));
           idleinhibit = mode: (class: (title: "idleinhibit ${mode}, class:(${class}), title:(${title})"));
-          window = class: (title: (number: "workspace ${builtins.toString number}, class:(${class}), title:(${title})"));
+          window = class: (title: (to: "workspace ${to}, class:(${class}), title:(${title})"));
         in
         [
           #"idleinhibit always, class:(kitty), title:(.*)"
@@ -409,15 +412,34 @@ in
           (idleinhibit "focus" "firefox" ".*YouTube.*")
           (float "steam" ".*Browser.*")
           (float "steam" ".*Friends List.*")
-          (window "thunderbird" ".*" 6)
-          (float "yad" "uair")
-          (pin "yad" "uair")
-          (opacity "yad" "uair" 0.3)
+          (window "thunderbird" ".*" "6")
+          #(window "firefox" ".*" "special:firefox")
         ];
 
       bind =
         let
           mainMod = "SUPER";
+
+          # Focus window($1) then focus last used window
+          scriptToggleFocus = pkgs.writeShellScriptBin "focus" ''
+            #!/usr/bin/env bash
+            tmp_var=$(hyprctl activewindow -j | jq ".address" -r)
+
+            if [ "$(cat /tmp/focuswindow_$1 | jq ".state")" == "" ] || [ $(cat /tmp/focuswindow_$1 | jq ".address") == "" ]; then
+              json_value=$(jq -n --arg tmp_var "$tmp_var" '{state: 0, address: $tmp_var}')
+              echo $json_value > /tmp/focuswindow_$1
+            fi
+
+            if [ "$(cat /tmp/focuswindow_$1 | jq ".state")" == "0" ]; then
+              hyprctl dispatch focuswindow $1
+              echo "$(jq '.state = 1' /tmp/focuswindow_$1)" > /tmp/focuswindow_$1
+              echo "$(jq --arg tmp_var "$tmp_var" '.address = $tmp_var' /tmp/focuswindow_$1)" > /tmp/focuswindow_$1
+            else
+              #hyprctl dispatch focuscurrentorlast
+              hyprctl dispatch focuswindow "address:$(cat /tmp/focuswindow_$1 | jq ".address" -r)"
+              echo "$(jq '.state = 0' /tmp/focuswindow_$1)" > /tmp/focuswindow_$1
+            fi
+          '';
 
           binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
           mvfocus = binding "${mainMod}" "movefocus";
@@ -445,10 +467,12 @@ in
           "${mainMod}, O, fakefullscreen"
           #"${mainMod}, P, togglesplit"
           "${mainMod}, SPACE, exec, ${fuzzel}"
+          "${mainMod}, A, exec, ${scriptToggleFocus}/bin/focus firefox"
 
           # Scratch workspaces
           "${mainMod}, T, exec, pypr toggle term"
           "${mainMod}, F, exec, pypr toggle file"
+          "${mainMod} SHIFT, SPACE, exec, pypr expose"
 
           # group
           "${mainMod}, G, togglegroup, 0"
@@ -461,6 +485,19 @@ in
           "${mainMod}, comma, exec, ${start-pomo}/bin/start-pomo work"
           #uair | yad --title "uair" --progress --no-buttons --css="* { font-size: 80px; }" & sleep 1 && uairctl resume
           #''${mainMod}, P, exec,  ''
+
+          # special workspaces
+          #"${mainMod} ALT, 1, movetoworkspace, special:firefox"
+          #"${mainMod}, A, togglespecialworkspace, firefox"
+          #"${mainMod} ALT, 2, movetoworkspace, special:2"
+          "${mainMod} ALT, 1, togglespecialworkspace, 1"
+          "${mainMod} ALT, 2, togglespecialworkspace, 2"
+          "${mainMod} ALT, 3, togglespecialworkspace, 3"
+          "${mainMod} ALT, 4, togglespecialworkspace, 4"
+
+
+
+
 
           (mvfocus "up" "u")
           (mvfocus "down" "d")
