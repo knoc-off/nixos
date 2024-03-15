@@ -121,8 +121,10 @@
   # enable qt themes
   qt = {
     enable = true;
-    platformTheme = "gtk3";
+    platformTheme = "gnome";
+
     style = {
+      name = "adwaita-dark";
       package = pkgs.adwaita-qt;
     };
   };
@@ -131,7 +133,7 @@
   gtk = {
     enable = true;
     theme = {
-      name = "Fluent";
+      name = "Fluent-Dark";
       package = pkgs.fluent-gtk-theme;
     };
     cursorTheme = {
