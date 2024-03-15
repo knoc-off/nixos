@@ -11,7 +11,7 @@
       side = "top";
     };
 
-    package = pkgs.eww-wayland;
+    #package = pkgs.eww-wayland;
 
     #  configDir = ./eww;
   };
@@ -23,8 +23,6 @@
   #    {
   #      "${dir}/eww.yuck" = {
   #        text = ''
-  #
-  #safasf asf
   #
   #      '';
   #      };

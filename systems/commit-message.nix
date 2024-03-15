@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "update_flake_inputs_______________________________";
+  system.nixos.label = "power_settings_reomoved_old_files.________________";
 }

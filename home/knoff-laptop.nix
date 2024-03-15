@@ -131,8 +131,8 @@
   gtk = {
     enable = true;
     theme = {
-      name = "Orchis-Grey-Dark";
-      package = pkgs.orchis-theme;
+      name = "Fluent";
+      package = pkgs.fluent-gtk-theme;
     };
     cursorTheme = {
       name = "Vanilla-DMZ";
