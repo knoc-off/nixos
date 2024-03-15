@@ -47,15 +47,13 @@
     ];
   };
 
-  hardware.framework.amd-7040.preventWakeOnAC = true;
-
-  programs.kdeconnect.enable = true;
+  #hardware.framework.amd-7040.preventWakeOnAC = true;
 
   # IDK if this does anything, TODO: check
   # doesent seem to do much, cant remember why i added it.
   environment.etc = {
-    "xdg/gtk-2.0".source = "${pkgs.orchis-theme}/share/themes/Orchis-Grey-Dark/gtk-2.0";
-    "xdg/gtk-3.0".source = "${pkgs.orchis-theme}/share/themes/Orchis-Grey-Dark/gtk-3.0";
+    "xdg/gtk-2.0".source = "${pkgs.fluent-gtk-theme}/share/themes/Fluent/gtk-2.0";
+    "xdg/gtk-3.0".source = "${pkgs.fluent-gtk-theme}/share/themes/Fluent/gtk-3.0";
   };
 
   boot.kernelPackages = pkgs.linuxPackages_latest;
@@ -84,43 +82,50 @@
   # powerManagement.powertop.enable = false;
 
   # power profiles.
-  services.power-profiles-daemon.enable = false;
   # thermal management. TODO: check if this is needed.
-  #  services.thermald.enable = true;
-  #  services.auto-cpufreq = {
-  #    enable = true;
-  #    settings = {
-  #      battery = {
-  #        governor = "conservative";
-  #        turbo = "auto";
-  #      };
-  #      charger = {
-  #        governor = "preformance";
-  #        turbo = "auto";
-  #      };
-  #    };
-  #  };
-
-  services.tlp = {
+  services.power-profiles-daemon.enable = true;
+  #services.cpupower-gui.enable = true;
+  powerManagement.enable = true;
+  powerManagement.powertop.enable = true;
+  services.auto-cpufreq = {
     enable = true;
     settings = {
-      CPU_SCALING_GOVERNOR_ON_AC = "performance";
-      CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
-
-      CPU_ENERGY_PERF_POLICY_ON_BAT = "power";
-      CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
-
-      CPU_MIN_PERF_ON_AC = 0;
-      CPU_MAX_PERF_ON_AC = 100;
-      CPU_MIN_PERF_ON_BAT = 0;
-      CPU_MAX_PERF_ON_BAT = 30;
-      #
-      #      #Optional helps save long term battery health
-      #      START_CHARGE_THRESH_BAT0 = 40; # 40 and bellow it starts to charge
-      #      STOP_CHARGE_THRESH_BAT0 = 80; # 80 and above it stops charging
-      #
+      battery = {
+        governor = "powersave";
+        turbo = "never";
+      };
+      charger = {
+        governor = "preformance";
+        turbo = "auto";
+      };
     };
   };
+
+
+  # ---------------- Power 2
+  #services.power-profiles-daemon.enable = false;
+  # services.tlp = {
+  #   enable = true;
+  #   settings = {
+  #     CPU_SCALING_GOVERNOR_ON_AC = "performance";
+  #     CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
+
+  #     CPU_ENERGY_PERF_POLICY_ON_BAT = "power";
+  #     CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
+
+  #     CPU_MIN_PERF_ON_AC = 0;
+  #     CPU_MAX_PERF_ON_AC = 100;
+  #     CPU_MIN_PERF_ON_BAT = 0;
+  #     CPU_MAX_PERF_ON_BAT = 30;
+  #     #
+  #     #      #Optional helps save long term battery health
+  #     #      START_CHARGE_THRESH_BAT0 = 40; # 40 and bellow it starts to charge
+  #     #      STOP_CHARGE_THRESH_BAT0 = 80; # 80 and above it stops charging
+  #     #
+  #   };
+  # };
+
+
 
   # Set your time zone.
   time.timeZone = "Europe/Berlin";
