@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "power_settings_reomoved_old_files.________________";
+  system.nixos.label = "theme_changes._hoping_to_make_things_more_consiste";
 }

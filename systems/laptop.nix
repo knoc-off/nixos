@@ -41,6 +41,17 @@
     #./modules/virtualisation/waydroid.nix
   ];
 
+  # Hardware GPU tests: TODO Remove
+
+  hardware.opengl.extraPackages = [
+    pkgs.rocm-opencl-icd
+    pkgs.rocmPackages.rocm-runtime
+  ];
+
+
+
+
+
   programs.nix-ld = {
     enable = true;
     libraries = with pkgs; [
@@ -51,10 +62,15 @@
 
   # IDK if this does anything, TODO: check
   # doesent seem to do much, cant remember why i added it.
-  environment.etc = {
-    "xdg/gtk-2.0".source = "${pkgs.fluent-gtk-theme}/share/themes/Fluent/gtk-2.0";
-    "xdg/gtk-3.0".source = "${pkgs.fluent-gtk-theme}/share/themes/Fluent/gtk-3.0";
-  };
+  environment.etc =
+    let
+      themeName = "Fluent-Dark";
+      themePkg = pkgs.fluent-gtk-theme;
+    in
+    {
+      "xdg/gtk-2.0".source = "${themePkg}/share/themes/${themeName}/gtk-2.0";
+      "xdg/gtk-3.0".source = "${themePkg}/share/themes/${themeName}/gtk-3.0";
+    };
 
   boot.kernelPackages = pkgs.linuxPackages_latest;
 
@@ -83,23 +99,25 @@
 
   # power profiles.
   # thermal management. TODO: check if this is needed.
-  services.power-profiles-daemon.enable = true;
+  #services.power-profiles-daemon.enable = true;
   #services.cpupower-gui.enable = true;
-  powerManagement.enable = true;
-  powerManagement.powertop.enable = true;
-  services.auto-cpufreq = {
-    enable = true;
-    settings = {
-      battery = {
-        governor = "powersave";
-        turbo = "never";
-      };
-      charger = {
-        governor = "preformance";
-        turbo = "auto";
-      };
-    };
-  };
+  #powerManagement.enable = true;
+  #powerManagement.powertop.enable = true;
+  #services.auto-cpufreq = {
+  #  enable = true;
+  #  settings = {
+  #    battery = {
+  #      governor = "powersave";
+  #      turbo = "never";
+  #     };
+  #     charger = {
+  #       governor = "preformance";
+  #       turbo = "auto";
+  #     };
+  #   };
+  # };
+
+
 
 
   # ---------------- Power 2
