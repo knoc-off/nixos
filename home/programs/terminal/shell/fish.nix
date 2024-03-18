@@ -126,7 +126,6 @@ in
       '';
 
       qr = ''
-        {
           if [[ $argv[1] == "--share" ]]; then
             declare -f qr | qrencode -l H -t UTF8;
             return
@@ -141,7 +140,6 @@ in
           sanitized_input="$argv"
 
           echo "$sanitized_input" | qrencode -l H -t UTF8
-        }
       '';
 
       findLocalDevices = ''
@@ -150,7 +148,7 @@ in
         nix run nixpkgs#nmap -- -sP "$IPADDR/$NETMASK"
       '';
     };
-    shellInit = ''
+    shellInitLast = ''
 
       # ssh with kitty, if using kitty
       [ "$TERM" = "xterm-kitty" ] && alias ssh="kitty +kitten ssh"
@@ -161,7 +159,12 @@ in
           export OPENAI_API_KEY=(cat /etc/secrets/gpt/secret)
       end
 
-      bind --preset \cw backward-kill-word
+      # This stupid magic function annoys me, of course it works
+      function fish_user_key_bindings
+        bind --preset \cw backward-kill-word
+        #bind \e\[1\;5C forward-word
+        #bind \e\[1\;5D backward-word
+      end
 
     '';
 

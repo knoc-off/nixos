@@ -55,6 +55,15 @@
   programs.nix-ld = {
     enable = true;
     libraries = with pkgs; [
+
+      # Dwarf Fortress
+      stdenv.cc.cc
+      SDL2
+      SDL2_image
+      ## DFHACK
+      libz
+
+
     ];
   };
 
@@ -70,6 +79,20 @@
     {
       "xdg/gtk-2.0".source = "${themePkg}/share/themes/${themeName}/gtk-2.0";
       "xdg/gtk-3.0".source = "${themePkg}/share/themes/${themeName}/gtk-3.0";
+
+
+      #"xdg/gtk-2.0/gtkrc".text = "gtk-application-prefer-dark-theme=1";
+      #"xdg/gtk-3.0/settings.ini".text = ''
+      #  [Settings]
+      #  gtk-application-prefer-dark-theme=1
+      #  gtk-error-bell=false
+      #'';
+      #"xdg/gtk-4.0/settings.ini".text = ''
+      #  [Settings]
+      #  gtk-application-prefer-dark-theme=1
+      #  gtk-error-bell=false
+      #'';
+
     };
 
   boot.kernelPackages = pkgs.linuxPackages_latest;

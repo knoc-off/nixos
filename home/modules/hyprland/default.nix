@@ -409,7 +409,8 @@ in
         [
           #"idleinhibit always, class:(kitty), title:(.*)"
           #"idleinhibit focus, class:(firefox), title:(.*Youtube.*)"
-          (idleinhibit "focus" "firefox" ".*YouTube.*")
+          #(idleinhibit "focus" "firefox" ".*YouTube.*")
+          (idleinhibit "focus" "firefox" ".*[Yy][Oo][Uu][Tt][Uu][Bb][Ee].*")
           (float "steam" ".*Browser.*")
           (float "steam" ".*Friends List.*")
           (window "thunderbird" ".*" "6")
@@ -423,12 +424,16 @@ in
           # Focus window($1) then focus last used window
           scriptToggleFocus = pkgs.writeShellScriptBin "focus" ''
             #!/usr/bin/env bash
-            tmp_var=$(hyprctl activewindow -j | jq ".address" -r)
+            activeWindow=$(hyprctl activewindow -j)
+
+
+            tmp_var=$($activeWindow | jq ".address" -r)
 
             if [ "$(cat /tmp/focuswindow_$1 | jq ".state")" == "" ] || [ $(cat /tmp/focuswindow_$1 | jq ".address") == "" ]; then
               json_value=$(jq -n --arg tmp_var "$tmp_var" '{state: 0, address: $tmp_var}')
               echo $json_value > /tmp/focuswindow_$1
             fi
+              #if [ "$(echo $activeWindow | jq ".class" -r)" == "firefox" ] ; then return; fi
 
             if [ "$(cat /tmp/focuswindow_$1 | jq ".state")" == "0" ]; then
               hyprctl dispatch focuswindow $1
