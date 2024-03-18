@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "theme_changes._hoping_to_make_things_more_consiste";
+  system.nixos.label = "small_changes_fixed_fish_and_fixed_hyprland_focus_";
 }

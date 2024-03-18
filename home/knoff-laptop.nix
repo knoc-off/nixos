@@ -20,6 +20,7 @@
     #./modules/firefox.nix
 
     ./programs/gaming/steam.nix
+    ./programs/gaming/lutris.nix
     ./enviroment.nix
     #./programs
     #./services
@@ -121,7 +122,7 @@
   # enable qt themes
   qt = {
     enable = true;
-    platformTheme = "gnome";
+    platformTheme = "gtk";
 
     style = {
       name = "adwaita-dark";
@@ -141,6 +142,7 @@
       package = pkgs.vanilla-dmz;
     };
   };
+
 
   # Nicely reload system units when changing configs
   systemd.user.startServices = "sd-switch";
