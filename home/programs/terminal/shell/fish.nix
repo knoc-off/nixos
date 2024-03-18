@@ -54,12 +54,14 @@ in
 
       nixcommit = ''
         GIT_EDITOR=false git -C ${config_dir} commit
+
+        git -C ${config_dir} diff --stat HEAD~ | sed 's/^/# /' >> ${config_dir}/.git/COMMIT_EDITMSG
         nvim -c 'set textwidth=80' ${config_dir}/.git/COMMIT_EDITMSG
         set TARGET_FILE "${config_dir}/systems/commit-message.nix"
         sed -i '/^#/d' ${config_dir}/.git/COMMIT_EDITMSG
         if test -z "$(head -n 1 ${config_dir}/.git/COMMIT_EDITMSG)"
-            echo "is empty"
-            return
+            echo "no data"
+            return 1
         end
         set first_line (head -n 1 ${config_dir}/.git/COMMIT_EDITMSG)
         set message (echo $first_line | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
@@ -75,6 +77,7 @@ in
         #set leng
 
 
+        return 0
         # Could now add the revision too. but it wouldent be tracked
         # but thats fine.
       '';
@@ -90,6 +93,9 @@ in
               sudo nixos-rebuild switch --flake ${config_dir}#${configName}
             else
               nixcommit
+              if [ "$status" = "0" ];
+                nx rb
+              end
             end
           case rh
             home-manager switch --flake ${config_dir}#${homeConfigName}

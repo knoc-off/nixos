@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "small_changes_fixed_fish_and_fixed_hyprland_focus_";
+  system.nixos.label = "changes_to_nx_function_and_fish.__________________";
 }
