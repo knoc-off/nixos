@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "changes_to_nx_function_and_fish.__________________";
+  system.nixos.label = "swapped_the_bash_focus_toggle_to_nushell__________";
 }

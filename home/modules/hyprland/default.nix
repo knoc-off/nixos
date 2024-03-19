@@ -419,33 +419,43 @@ in
 
       bind =
         let
-          mainMod = "SUPER";
 
           # Focus window($1) then focus last used window
-          scriptToggleFocus = pkgs.writeShellScriptBin "focus" ''
-            #!/usr/bin/env bash
-            activeWindow=$(hyprctl activewindow -j)
+          nu-focus = pkgs.writeTextFile {
+            name = "focus";
+            text = ''
+              #!${pkgs.nushell}/bin/nu
 
+              # explicit_type.nu
+              def main [title: string] {
+                let activeWindow = (hyprctl activewindow -j | from json)
+                let tmp_var = $activeWindow.address
 
-            tmp_var=$($activeWindow | jq ".address" -r)
+                let file_path = ("/tmp/focuswindow_" + $title)
+                let file_exists = ( $file_path | path exists )
 
-            if [ "$(cat /tmp/focuswindow_$1 | jq ".state")" == "" ] || [ $(cat /tmp/focuswindow_$1 | jq ".address") == "" ]; then
-              json_value=$(jq -n --arg tmp_var "$tmp_var" '{state: 0, address: $tmp_var}')
-              echo $json_value > /tmp/focuswindow_$1
-            fi
-              #if [ "$(echo $activeWindow | jq ".class" -r)" == "firefox" ] ; then return; fi
+                if ($file_exists == false) {
+                   let json_value = {state: 0, address: $tmp_var} | to json
+                   $json_value | save -f $file_path
+                }
 
-            if [ "$(cat /tmp/focuswindow_$1 | jq ".state")" == "0" ]; then
-              hyprctl dispatch focuswindow $1
-              echo "$(jq '.state = 1' /tmp/focuswindow_$1)" > /tmp/focuswindow_$1
-              echo "$(jq --arg tmp_var "$tmp_var" '.address = $tmp_var' /tmp/focuswindow_$1)" > /tmp/focuswindow_$1
-            else
-              #hyprctl dispatch focuscurrentorlast
-              hyprctl dispatch focuswindow "address:$(cat /tmp/focuswindow_$1 | jq ".address" -r)"
-              echo "$(jq '.state = 0' /tmp/focuswindow_$1)" > /tmp/focuswindow_$1
-            fi
-          '';
+                if (open $file_path | from json | get state) == 0 {
+                   if $activeWindow.class == $title { return }
+                   hyprctl dispatch focuswindow $title
+                   (open $file_path | from json | update state 1 | to json | save -f $file_path)
+                   (open $file_path | from json | update address $tmp_var | to json | save -f $file_path)
+                } else {
+                   let address = (open $file_path | from json | get address)
+                   hyprctl dispatch focuswindow ("address:" + $address)
+                   (open $file_path | from json | update state 0 | to json | save -f $file_path)
+                }
+              }
+            '';
+            executable = true;
+            destination = "/bin/focus";
+          };
 
+          mainMod = "SUPER";
           binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
           mvfocus = binding "${mainMod}" "movefocus";
           ws = binding "${mainMod}" "workspace";
@@ -472,7 +482,7 @@ in
           "${mainMod}, O, fakefullscreen"
           #"${mainMod}, P, togglesplit"
           "${mainMod}, SPACE, exec, ${fuzzel}"
-          "${mainMod}, A, exec, ${scriptToggleFocus}/bin/focus firefox"
+          "${mainMod}, A, exec, ${nu-focus}/bin/focus firefox"
 
           # Scratch workspaces
           "${mainMod}, T, exec, pypr toggle term"
