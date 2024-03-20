@@ -10,15 +10,16 @@
   additions = final: _prev: import ../pkgs {pkgs = final;};
 
   modifications = final: prev: {
-    #steam-scaling = prev.steamPackages.steam-fhsenv.overrideAttrs (old: rec {
-    #pname = old.pname + "-scaling";
-    #  extraArgs = old.extraArgs ++ [ "-forcedesktopscaling 1.0" ];
-    #postInstall =  ''
-    #sed -i 's/Exec=steam/Exec=steam -forcedesktopscaling 1.0/g' $out/share/applications/steam.desktop
-    #'';
-    #old.postInstall;
-    #+ ''sed -i 's/Exec=steam/Exec=steam -forcedesktopscaling 1.0%U/g' $out/share/applications/steam.desktop'';
-    #});
+
+    spotiblock = prev.spotify.overrideAttrs (old: rec {
+      postInstall = ''
+        ExecMe="env LD_PRELOAD=${prev.spotify-adblock}lib/libspotifyadblock.so spotify"
+
+        sed -i "s|^TryExec=.*|TryExec=$ExecMe %U|" $out/share/applications/spotify.desktop
+        sed -i "s|^Exec=.*|Exec=$ExecMe %U|" $out/share/applications/spotify.desktop
+      '';
+
+    });
 
     steam-scaling = prev.steamPackages.steam-fhsenv.override (old: rec {
       #pname = prev.steamPackages.steam-fhsenv.pname + "-scaling";
@@ -27,9 +28,6 @@
       #  sed -i 's/Exec=steam/Exec=steam -forcedesktopscaling 1.0/g' $out/share/applications/steam.desktop
       #'';
     });
-
-
-    #spotify-adblock = pkgs.callPackage ./spotify-adblock.nix;
 
     #pname = old.pname + "-scaling";
     #extraArgs = old.extraArgs ++ [ "-forcedesktopscaling 1.0" ];

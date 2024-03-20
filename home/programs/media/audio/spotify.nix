@@ -1,7 +1,8 @@
 {pkgs, ...}:
 {
   home.packages = with pkgs; [
-    spotify
+    spotiblock
+    #spotify-adblock
   ];
 
 
