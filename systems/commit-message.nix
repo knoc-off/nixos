@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "architecture_changes_added_spotify________________";
+  system.nixos.label = "tried_to_get_spotify-adblock_working._____________";
 }
