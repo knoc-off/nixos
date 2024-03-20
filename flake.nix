@@ -56,78 +56,92 @@
 
     # TPM
     lanzaboote.url = "github:nix-community/lanzaboote";
+
+
+    # experimental things:
+    #nuenv.url = "github:DeterminateSystems/nuenv";
+
   };
 
-  outputs = inputs @ {
-    self,
-    themes,
-    nixpkgs,
-    home-manager,
-    disko,
-    ...
-  }: let
-    inherit (self) outputs;
-    system = "x86_64-linux";
-    pkgs = import nixpkgs {
+  outputs =
+    inputs @ { self
+    , themes
+    , nixpkgs
+    , home-manager
+    , disko
+    , ...
+    }:
+    let
+      inherit (self) outputs;
+
+      # Supported systems for your flake packages, shell, etc.
+      systems = [
+        "aarch64-linux"
+        "i686-linux"
+        "x86_64-linux"
+        "aarch64-darwin"
+        "x86_64-darwin"
+      ];
+      # This is a function that generates an attribute by calling a function you
+      # pass to it, with each system as an argument
+      forAllSystems = nixpkgs.lib.genAttrs systems;
+
       system = "x86_64-linux";
-      config.allowUnfree = true;
-    };
+      #pkgs = import nixpkgs {
+      #  system = "x86_64-linux";
+      #  config.allowUnfree = true;
+      #};
 
-    # theme
-    theme = themes.custom (import ./theme.nix);
-  in {
-    # Your custom packages and modifications, exported as overlays
-    overlays = import ./overlays {
-      inherit inputs;
-      inherit pkgs;
-    };
+      # theme
+      theme = themes.custom (import ./theme.nix);
+    in
+    {
 
-    nixosConfigurations = {
-      laptop = nixpkgs.lib.nixosSystem {
-        specialArgs = {inherit inputs outputs;};
-        system = "x86_64-linux";
-        modules = [
-          ./systems/laptop.nix
-          disko.nixosModules.disko
-          {disko.devices.disk.vdb.device = "/dev/nvme0n1";}
+      # custom packages
+      packages = forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system});
 
-          home-manager.nixosModules.home-manager
-          {
-            home-manager.useGlobalPkgs = false;
-            home-manager.useUserPackages = true;
-            home-manager.users.knoff = import ./home/knoff-laptop.nix;
-            home-manager.extraSpecialArgs = {
-              inherit inputs;
-              inherit outputs;
-              inherit system;
-              inherit theme;
-            };
-          }
-        ];
+
+      # Your custom packages and modifications, exported as overlays
+      overlays = import ./overlays {
+        inherit inputs;
       };
 
-      hetzner-cloud = nixpkgs.lib.nixosSystem {
-        specialArgs = {inherit inputs outputs;};
-        system = "x86_64-linux";
-        modules = [
-          ./systems/hetzner-server.nix
-        ];
-      };
-    };
+      nixosConfigurations = {
+        laptop = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          system = "x86_64-linux";
+          modules = [
+            # main entry into the system
+            ./systems/laptop.nix
 
-    homeConfigurations = {
-      "knoff/laptop" = home-manager.lib.homeManagerConfiguration {
-        inherit pkgs;
-        modules = [
-          ./home/knoff-laptop.nix
-        ];
-        extraSpecialArgs = {
-          inherit inputs;
-          inherit outputs;
-          inherit system;
-          inherit theme;
+            # the disk im installing onto, should maybe move the actual path here too?
+            disko.nixosModules.disko
+            { disko.devices.disk.vdb.device = "/dev/nvme0n1"; }
+
+            # The Home-Manager Config
+            home-manager.nixosModules.home-manager
+            {
+              home-manager.useGlobalPkgs = false;
+              home-manager.useUserPackages = true;
+              home-manager.users.knoff = import ./home/knoff-laptop.nix;
+              home-manager.extraSpecialArgs = {
+                inherit inputs;
+                inherit outputs;
+                inherit system;
+                inherit theme;
+              };
+            }
+          ];
+        };
+
+        # hetzner-cloud server.
+        hetzner-cloud = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          system = "x86_64-linux";
+          modules = [
+            ./systems/hetzner-server.nix
+          ];
         };
       };
     };
-  };
 }

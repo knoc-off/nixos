@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "swapped_the_bash_focus_toggle_to_nushell__________";
+  system.nixos.label = "architecture_changes_added_spotify________________";
 }
