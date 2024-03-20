@@ -13,7 +13,7 @@
 
     spotiblock = prev.spotify.overrideAttrs (old: rec {
       postInstall = ''
-        ExecMe="env LD_PRELOAD=${prev.spotify-adblock}lib/libspotifyadblock.so spotify"
+        ExecMe="env LD_PRELOAD=${prev.spotify-adblock}/lib/libspotifyadblock.so spotify"
 
         sed -i "s|^TryExec=.*|TryExec=$ExecMe %U|" $out/share/applications/spotify.desktop
         sed -i "s|^Exec=.*|Exec=$ExecMe %U|" $out/share/applications/spotify.desktop
