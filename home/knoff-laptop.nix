@@ -15,7 +15,11 @@
     ./modules/hyprland
     ./modules/eww
 
-    ./programs/browser
+    # Firefox
+    ./programs/browser/firefox
+
+    # music
+    ./programs/media/audio/spotify.nix
 
     #./modules/firefox.nix
 

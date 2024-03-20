@@ -419,14 +419,12 @@ in
 
       bind =
         let
-
           # Focus window($1) then focus last used window
           nu-focus = pkgs.writeTextFile {
             name = "focus";
             text = ''
               #!${pkgs.nushell}/bin/nu
 
-              # explicit_type.nu
               def main [title: string] {
                 let activeWindow = (hyprctl activewindow -j | from json)
                 let tmp_var = $activeWindow.address
