@@ -9,6 +9,10 @@ pkgs.rustPackages.rustPlatform.buildRustPackage
 
   #nativeBuildInputs = [ pkg-config ];
 
+  postInstall = ''
+    cp ./config.toml $out/
+  '';
+
   src = pkgs.fetchFromGitHub {
     owner = "abba23";
     repo = "spotify-adblock";
