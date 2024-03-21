@@ -796,11 +796,11 @@
         "nixvim": "nixvim"
       },
       "locked": {
-        "lastModified": 1710532907,
-        "narHash": "sha256-fxx9XqHP2I+jMJPOR0dSLB/VEo/aXTV1wzOW8r329DQ=",
+        "lastModified": 1711015823,
+        "narHash": "sha256-LwvTQCKc6KPXL5ttIuAbDr79KVWqOsdqFzi08zcIHzI=",
         "owner": "knoc-off",
         "repo": "neovim-config",
-        "rev": "eefc63be427f7c0eabdc965d6373d41d0043820e",
+        "rev": "dded0547b6ea93df9ad7957f0aae960b39f74f59",
         "type": "github"
       },
       "original": {
