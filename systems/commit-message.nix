@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "flake_update______________________________________";
+  system.nixos.label = "another_update.___________________________________";
 }
