@@ -254,7 +254,8 @@ in
       monitor = [
         #"eDP-1, highres, auto, 1.0"
         #"preferred, highres, auto, 1.0"
-        ",highres, auto, 1"
+        #",highres, auto, 1"
+        ",preferred,auto,1"
 
         #  "HDMI-A-1, 2560x1440, 1920x0, 1"
       ];

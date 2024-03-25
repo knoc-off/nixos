@@ -95,6 +95,7 @@
       # theme
       theme = themes.custom (import ./theme.nix);
     in
+    rec
     {
 
       # custom packages
@@ -106,6 +107,8 @@
         inherit inputs;
       };
 
+      images.rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;
+
       nixosConfigurations = {
         laptop = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
@@ -113,6 +116,8 @@
           modules = [
             # main entry into the system
             ./systems/laptop.nix
+
+            { boot.binfmt.emulatedSystems = [ "aarch64-linux" ]; }
 
             # the disk im installing onto, should maybe move the actual path here too?
             disko.nixosModules.disko
@@ -142,6 +147,24 @@
             ./systems/hetzner-server.nix
           ];
         };
+
+        # raspberry pi 3A, testing this out, no idea. gotta look at how nixos-anywhere works
+        rpi3A = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          system = "aarch64-linux";
+          modules = [
+            "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-aarch64.nix"
+
+            ./systems/raspberry3A.nix
+            {
+              nixpkgs.config.allowUnsupportedSystem = true;
+              #nixpkgs.hostPlatform.system = "armv7l-linux";
+              nixpkgs.hostPlatform.system = "aarch64-linux";
+              #nixpkgs.buildPlatform.system = "x86_64-linux";
+            }
+          ];
+        };
       };
+
     };
 }
