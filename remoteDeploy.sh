@@ -17,7 +17,7 @@ function selectConfig() {
         i=$((i+1))
     done
 
-    read -p "Select the config: " num
+    read -rp "Select the config: " num
 
     # check if the input is valid
     if [[ ! $i =~ ^[0-9]+$ ]]; then
@@ -39,7 +39,7 @@ function selectConfig() {
 
 function selectComputer() {
     # ip address
-    read -p "Enter the ip address: " ip
+    read -rp "Enter the ip address: " ip
 
     # check if the ip address is valid
     if [[ ! $ip =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -57,7 +57,7 @@ yn="y"
 if [[ -f .remoteDeployOptions ]] && [[ ! $# -gt 0 ]] || [[ $1 != "-y" && $1 != "--yes" ]]; then
     # list contents of .remoteDeployOptions
     jq . .remoteDeployOptions
-    read -p "Do you want to use the last options? [Y/n] " yn
+    read -rp "Do you want to use the last options? [Y/n] " yn
 fi
 
 # if Y, y or blank, then restore the options

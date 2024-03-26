@@ -21,6 +21,8 @@
     # message at boot.
     ./commit-message.nix
 
+    ./services/octoprint.nix
+
   ];
 
   # Networking
@@ -64,6 +66,7 @@
   environment.systemPackages = map lib.lowPrio [
     pkgs.curl
     pkgs.gitMinimal
+    pkgs.libraspberrypi
   ];
 
   # TODO: Replace with hashed password, why not
