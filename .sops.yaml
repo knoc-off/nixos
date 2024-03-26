@@ -1,7 +1,7 @@
 keys:
   - &laptop age1xxs94a2jtv9ctes23rze0wgess0spqsapnpj8vrw46qx6kg98eeq20jfzt
   - &hetzner age1kedaufmt9rah4h65gvmml0vfxdjngqsteqqy79rvs4hqs0j9rfaq858cg0
-  #- &rpi3A ...
+  - &rpi3A age1x203sz3zrzjrj094j5dsyrpk4vj6zkp7jgvl6dvgk32nspyjqf9qkyacjt
 creation_rules:
   - path_regex: systems/secrets/hetzner/[^/]+\.(yaml|json|env|ini)$
     key_groups:
@@ -12,7 +12,7 @@ creation_rules:
     key_groups:
       - age:
         - *laptop
-        #- *rpi3A
+        - *rpi3A
   - path_regex: systems/secrets/laptop/[^/]+\.(yaml|json|env|ini)$
     key_groups:
       - age:
