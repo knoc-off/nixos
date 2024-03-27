@@ -17,11 +17,10 @@
     ./hardware/disks/btrfs-luks.nix
 
     # hardware for my laptop
-    inputs.hardware.nixosModules.framework-13-7040-amd
-    ./hardware/fingerprint
+    inputs.hardware.nixosModules.lenovo-thinkpad-x1-6th-gen
 
     # Secure boot
-    inputs.lanzaboote.nixosModules.lanzaboote
+    # inputs.lanzaboote.nixosModules.lanzaboote
     # https://github.com/nix-community/lanzaboote/blob/master/docs/QUICK_START.md
 
     # pipewire / Audio
@@ -48,10 +47,6 @@
     pkgs.rocmPackages.rocm-runtime
   ];
 
-
-
-
-
   programs.nix-ld = {
     enable = true;
     libraries = with pkgs; [
@@ -66,8 +61,6 @@
 
     ];
   };
-
-  #hardware.framework.amd-7040.preventWakeOnAC = true;
 
   # IDK if this does anything, TODO: check
   # doesent seem to do much, cant remember why i added it.
@@ -106,10 +99,10 @@
   boot.loader.systemd-boot.enable = lib.mkForce false;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  boot.lanzaboote = {
-    enable = true;
-    pkiBundle = "/etc/secureboot";
-  };
+  #boot.lanzaboote = {
+  #  enable = true;
+  #  pkiBundle = "/etc/secureboot";
+  #};
 
   networking.hostName = "framework"; # Define your hostname.
   networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
