@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "added_raspberry_pi_3A_config_and_cross_compile____";
+  system.nixos.label = "framework13_rename_add_laptop_config______________";
 }

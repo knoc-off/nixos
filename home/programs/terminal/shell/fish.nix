@@ -5,8 +5,8 @@
 }:
 let
   config_dir = "/home/knoff/nixos";
-  configName = "laptop";
-  homeConfigName = "knoff/laptop";
+  configName = "framework13";
+  #homeConfigName = "knoff/laptop";
 in
 {
   programs.fish = {
@@ -97,14 +97,10 @@ in
                 nx rb
               end
             end
-          case rh
-            home-manager switch --flake ${config_dir}#${homeConfigName}
           case rt
             sudo nixos-rebuild test --flake ${config_dir}#${configName}
           case cr
             nix repl --extra-experimental-features repl-flake ${config_dir}#nixosConfigurations."${configName}"
-          case hr
-            nix repl --extra-experimental-features repl-flake ${config_dir}#homeConfigurations."${homeConfigName}"
           case vm
             sudo nixos-rebuild build-vm --flake ${config_dir}#${configName}
           case rg

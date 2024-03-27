@@ -110,6 +110,38 @@
       images.rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;
 
       nixosConfigurations = {
+
+        # should rename to framework13 or something similar.
+        framework13 = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          system = "x86_64-linux";
+          modules = [
+            # main entry into the system
+            ./systems/framework13.nix
+
+            { boot.binfmt.emulatedSystems = [ "aarch64-linux" ]; }
+
+            # the disk im installing onto, should maybe move the actual path here too?
+            disko.nixosModules.disko
+            { disko.devices.disk.vdb.device = "/dev/nvme0n1"; }
+
+            # The Home-Manager Config
+            home-manager.nixosModules.home-manager
+            {
+              home-manager.useGlobalPkgs = false;
+              home-manager.useUserPackages = true;
+              home-manager.users.knoff = import ./home/knoff-laptop.nix;
+              home-manager.extraSpecialArgs = {
+                inherit inputs;
+                inherit outputs;
+                inherit system;
+                inherit theme;
+              };
+            }
+          ];
+        };
+
+        # should rename to framework13 or something similar.
         laptop = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           system = "x86_64-linux";
