@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "framework13_rename_add_laptop_config______________";
+  system.nixos.label = "small_changes_iso_sort_of_works.__________________";
 }

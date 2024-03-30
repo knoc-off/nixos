@@ -26,6 +26,12 @@
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
 
+    # Build ISO files for live booting, etc.
+    nixos-generators = {
+      url = "github:nix-community/nixos-generators";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # my neovim config
     nixvim-flake.url = "github:knoc-off/neovim-config";
 
@@ -69,6 +75,7 @@
     , nixpkgs
     , home-manager
     , disko
+    , nixos-generators
     , ...
     }:
     let
@@ -108,6 +115,8 @@
       };
 
       images.rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;
+      images.laptop = nixosConfigurations.laptop.config.system.build.isoImage;
+      #images.rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;
 
       nixosConfigurations = {
 
@@ -141,7 +150,7 @@
           ];
         };
 
-        # should rename to framework13 or something similar.
+
         laptop = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           system = "x86_64-linux";
