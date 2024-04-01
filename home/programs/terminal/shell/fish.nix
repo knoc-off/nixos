@@ -144,6 +144,9 @@ in
           echo "$sanitized_input" | qrencode -l H -t UTF8
       '';
 
+      bkg = ''
+        eval "$argv[0..-1] /dev/null 2>&1 & disown"
+      '';
       findLocalDevices = ''
         set IPADDR "$(ifconfig | grep -A 1 'wlp2s0'  | tail -1 | grep -E '.[0-9]+\.[0-9]+\.[0-9]+\.' -o | tail -1)0"
         set NETMASK 24

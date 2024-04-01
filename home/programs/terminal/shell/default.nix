@@ -18,5 +18,7 @@
   imports = [
     #./zsh.nix
     ./fish.nix
+    ./nushell.nix
+    ./scripts.nix
   ];
 }

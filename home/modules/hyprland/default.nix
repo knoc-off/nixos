@@ -394,6 +394,7 @@ in
           (f "xdg-desktop-portal-gnome")
           (f "transmission-gtk")
           (f "com.github.Aylur.ags")
+          (f ".gscreenshot-wrapped")
           (w "Spotify" 7)
           #"workspace 7, title:Spotify"
         ];
@@ -486,8 +487,10 @@ in
           # Scratch workspaces
           "${mainMod}, T, exec, pypr toggle term"
           "${mainMod}, F, exec, pypr toggle file"
-          #"${mainMod}, S, exec, pypr toggle firefox"
           "${mainMod} SHIFT, SPACE, exec, pypr expose"
+
+          # screenshot
+          "${mainMod}, S, exec, ${pkgs.gscreenshot}/bin/gscreenshot -sc"
 
           # group
           "${mainMod}, G, togglegroup, 0"
