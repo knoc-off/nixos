@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "small_changes_iso_sort_of_works.__________________";
+  system.nixos.label = "shell_changes_added_nu_script_____________________";
 }

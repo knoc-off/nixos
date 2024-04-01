@@ -16,11 +16,6 @@
     themes.url = "github:RGBCube/ThemeNix";
 
     sops-nix.url = "github:Mic92/sops-nix";
-    # experimental, not sure if good idea.
-    #fprint = {
-    #  url = "github:ahbnr/nixos-06cb-009a-fingerprint-sensor";
-    #  inputs.nixpkgs.follows = "nixpkgs";
-    #};
 
     # Disko - a declarative disk partitioning tool
     disko.url = "github:nix-community/disko";
@@ -48,10 +43,6 @@
     hyprland.url = "github:hyprwm/hyprland";
     hyprland-plugins.url = "github:hyprwm/hyprland-plugins";
     hyprland-plugins.inputs.hyprland.follows = "hyprland";
-
-    # Pyprland, python plugins for Hyprland
-    # pyprland.url = "github:hyprland-community/pyprland";
-    # https://github.com/hyprland-community/pyprland/blob/main/flake.nix
 
     # Home Manager (for managing user environments using Nix)
     home-manager.url = "github:nix-community/home-manager";
@@ -108,15 +99,15 @@
       # custom packages
       packages = forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system});
 
-
       # Your custom packages and modifications, exported as overlays
       overlays = import ./overlays {
         inherit inputs;
       };
 
       images.rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;
+
+      # This is problomatic, need to override disko or something.
       images.laptop = nixosConfigurations.laptop.config.system.build.isoImage;
-      #images.rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;
 
       nixosConfigurations = {
 

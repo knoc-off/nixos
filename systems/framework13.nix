@@ -244,9 +244,12 @@
   # Enable touchpad support (enabled default in most desktopManager).
   services.xserver.libinput.enable = true;
 
-  programs.zsh.enable = false;
-  programs.fish.enable = true;
-
+  # Shells
+  programs = {
+    zsh.enable = false;
+    fish.enable = true;
+    #nushell.enable = false; does not exist.
+  };
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.knoff = {
     isNormalUser = true;
@@ -255,9 +258,9 @@
 
     shell =
       if config.programs.fish.enable
-      then pkgs.fish
+        then pkgs.fish
       else if config.programs.zsh.enable
-      then pkgs.zsh
+        then pkgs.zsh
       else pkgs.bash;
     extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
     initialPassword = "password";
