@@ -52,80 +52,80 @@ in
         '';
       };
 
-      nixcommit = ''
-        GIT_EDITOR=false git -C ${config_dir} commit
+     # nixcommit = ''
+     #   GIT_EDITOR=false git -C ${config_dir} commit
 
-        git -C ${config_dir} diff --stat HEAD~ | sed 's/^/# /' >> ${config_dir}/.git/COMMIT_EDITMSG
-        nvim -c 'set textwidth=80' ${config_dir}/.git/COMMIT_EDITMSG
-        set TARGET_FILE "${config_dir}/systems/commit-message.nix"
-        sed -i '/^#/d' ${config_dir}/.git/COMMIT_EDITMSG
-        if test -z "$(head -n 1 ${config_dir}/.git/COMMIT_EDITMSG)"
-            echo "no data"
-            return 1
-        end
-        set first_line (head -n 1 ${config_dir}/.git/COMMIT_EDITMSG)
-        set message (echo $first_line | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
-        set git_rev (git rev-parse --short HEAD)
-        if test (string length -- $message) -lt 50
-            set message (string pad -w 50 -r --char=_ "$message")
-        end
-        set message (string sub --length 50 "$message")
-        printf "{\n  system.nixos.label = \"$message\";\n}" > $TARGET_FILE
-        git -C ${config_dir} add $TARGET_FILE
-        git -C ${config_dir} commit -a -F ${config_dir}/.git/COMMIT_EDITMSG
+     #   git -C ${config_dir} diff --stat HEAD~ | sed 's/^/# /' >> ${config_dir}/.git/COMMIT_EDITMSG
+     #   nvim -c 'set textwidth=80' ${config_dir}/.git/COMMIT_EDITMSG
+     #   set TARGET_FILE "${config_dir}/systems/commit-message.nix"
+     #   sed -i '/^#/d' ${config_dir}/.git/COMMIT_EDITMSG
+     #   if test -z "$(head -n 1 ${config_dir}/.git/COMMIT_EDITMSG)"
+     #       echo "no data"
+     #       return 1
+     #   end
+     #   set first_line (head -n 1 ${config_dir}/.git/COMMIT_EDITMSG)
+     #   set message (echo $first_line | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
+     #   set git_rev (git rev-parse --short HEAD)
+     #   if test (string length -- $message) -lt 50
+     #       set message (string pad -w 50 -r --char=_ "$message")
+     #   end
+     #   set message (string sub --length 50 "$message")
+     #   printf "{\n  system.nixos.label = \"$message\";\n}" > $TARGET_FILE
+     #   git -C ${config_dir} add $TARGET_FILE
+     #   git -C ${config_dir} commit -a -F ${config_dir}/.git/COMMIT_EDITMSG
 
-        #set leng
+     #   #set leng
 
 
-        return 0
-        # Could now add the revision too. but it wouldent be tracked
-        # but thats fine.
-      '';
+     #   return 0
+     #   # Could now add the revision too. but it wouldent be tracked
+     #   # but thats fine.
+     # '';
 
-      nx = ''
-        # fish function to run nix commands easily
-        # switch statemnt to handle different commands
-        switch $argv[1]
-          case rb
-            # if $argv[2] is -f then skip this check
-            git -C ${config_dir} diff --quiet; set nochanges $status
-            if [ $nochanges -eq 0 ]; or test "$argv[2]" = "-f"
-              sudo nixos-rebuild switch --flake ${config_dir}#${configName}
-            else
-              nixcommit
-              if [ "$status" = "0" ];
-                nx rb
-              end
-            end
-          case rt
-            sudo nixos-rebuild test --flake ${config_dir}#${configName}
-          case cr
-            nix repl --extra-experimental-features repl-flake ${config_dir}#nixosConfigurations."${configName}"
-          case vm
-            sudo nixos-rebuild build-vm --flake ${config_dir}#${configName}
-          case rg
-            set -l file $(rg "$argv[2..-1]" ${config_dir} -l. | fzf)
-            if test -z "$file"
-              return
-            end
+      #nx = ''
+      #  # fish function to run nix commands easily
+      #  # switch statemnt to handle different commands
+      #  switch $argv[1]
+      #    case rb
+      #      # if $argv[2] is -f then skip this check
+      #      git -C ${config_dir} diff --quiet
+      #      if [ $nochanges -eq 0 ]; or test "$argv[2]" = "-f"
+      #        sudo nixos-rebuild switch --flake ${config_dir}#${configName}
+      #      else
+      #        nixcommit
+      #        if [ "$status" = "0" ];
+      #          nx rb
+      #        end
+      #      end
+      #    case rt
+      #      sudo nixos-rebuild test --flake ${config_dir}#${configName}
+      #    case cr
+      #      nix repl --extra-experimental-features repl-flake ${config_dir}#nixosConfigurations."${configName}"
+      #    case vm
+      #      sudo nixos-rebuild build-vm --flake ${config_dir}#${configName}
+      #    case rg
+      #      set -l file $(rg "$argv[2..-1]" ${config_dir} -l. | fzf)
+      #      if test -z "$file"
+      #        return
+      #      end
 
-            nvim "$file"
-          case cd
-            set -l file $(fd . ${config_dir} --type=d -E .git -H | fzf --query "$argv[2..-1]")
-            if test -z "$file"
-              return
-            end
-            cd "$file"
-          case '*'
-            set -l file $(fd . ${config_dir} -e nix -E .git -H | fzf --query "$argv[1..-1]")
-            if test -z "$file"
-              return
-            end
+      #      nvim "$file"
+      #    case cd
+      #      set -l file $(fd . ${config_dir} --type=d -E .git -H | fzf --query "$argv[2..-1]")
+      #      if test -z "$file"
+      #        return
+      #      end
+      #      cd "$file"
+      #    case '*'
+      #      set -l file $(fd . ${config_dir} -e nix -E .git -H | fzf --query "$argv[1..-1]")
+      #      if test -z "$file"
+      #        return
+      #      end
 
-            nvim "$file"
-        end
+      #      nvim "$file"
+      #  end
 
-      '';
+      #'';
 
       qr = ''
           if [[ $argv[1] == "--share" ]]; then

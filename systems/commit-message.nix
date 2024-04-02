@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "shell_changes_added_nu_script_____________________";
+  system.nixos.label = "Ported_my_scripts_to_nushell_added_un-idle-er_____";
 }

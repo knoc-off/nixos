@@ -247,6 +247,7 @@ in
 
         "hyprpaper --config ${wallpaper}"
         "pypr"
+        "${pkgs.wayland-pipewire-idle-inhibit}/bin/wayland-pipewire-idle-inhibit"
         #"hyprctl dispatch movetoworkspacesilent 1,firefox"
         #"hyprctl dispatch movetoworkspacesilent 2,kitty"
       ];
@@ -412,7 +413,6 @@ in
           #"idleinhibit always, class:(kitty), title:(.*)"
           #"idleinhibit focus, class:(firefox), title:(.*Youtube.*)"
           #(idleinhibit "focus" "firefox" ".*YouTube.*")
-          (idleinhibit "focus" "firefox" ".*[Yy][Oo][Uu][Tt][Uu][Bb][Ee].*")
           (float "steam" ".*Browser.*")
           (float "steam" ".*Friends List.*")
           (window "thunderbird" ".*" "6")
