@@ -16,8 +16,6 @@ let
 
   # pomo timer, should move to its own module
   start-pomo = pkgs.writeShellScriptBin "start-pomo" ''
-    #!${pkgs.bash}/bin/bash
-
     if ! pgrep -x "uair" > /dev/null; then
       ${pkgs.uair}/bin/uair > /tmp/uair.log &
     fi
@@ -48,8 +46,6 @@ let
   # move this to own module TODO
   # Had to result to this, as the home-manager module for swaylock seems to be broken.
   swaylock-custom = pkgs.writeShellScriptBin "swaylock-custom" ''
-    #!/${pkgs.bash}/bin/bash
-
     exec ${config.programs.swaylock.package}/bin/swaylock \
     --layout-bg-color "${theme.base00}" \
     --layout-border-color "${theme.base02}" \
@@ -105,8 +101,9 @@ in
 {
 
   imports = [
-    ./dunst.nix
+    #./dunst.nix
     ./mako.nix
+    #./wired-notify.nix
     ./eww.nix
 
   ];
@@ -125,15 +122,6 @@ in
       };
 
       scratchpads = {
-        ##firefox = {
-          #animation = "fromBottom";
-          #command = "firefox -p minimal";
-          #class = "firefox-minimal";
-          #unfocus = "hide";
-          #size = "100% 100%";
-          #margin = 0;
-        #};
-
         stb-logs = {
           animation = "fromTop";
           command = "kitty --class kitty-stb-logs stbLog";
@@ -421,39 +409,48 @@ in
 
       bind =
         let
-          # Focus window($1) then focus last used window
-          nu-focus = pkgs.writeTextFile {
-            name = "focus";
-            text = ''
-              #!${pkgs.nushell}/bin/nu
-
-              def main [title: string] {
-                let activeWindow = (hyprctl activewindow -j | from json)
-                let tmp_var = $activeWindow.address
-
-                let file_path = ("/tmp/focuswindow_" + $title)
-                let file_exists = ( $file_path | path exists )
-
-                if ($file_exists == false) {
-                   let json_value = {state: 0, address: $tmp_var} | to json
-                   $json_value | save -f $file_path
-                }
-
-                if (open $file_path | from json | get state) == 0 {
-                   if $activeWindow.class == $title { return }
-                   hyprctl dispatch focuswindow $title
-                   (open $file_path | from json | update state 1 | to json | save -f $file_path)
-                   (open $file_path | from json | update address $tmp_var | to json | save -f $file_path)
-                } else {
-                   let address = (open $file_path | from json | get address)
-                   hyprctl dispatch focuswindow ("address:" + $address)
-                   (open $file_path | from json | update state 0 | to json | save -f $file_path)
-                }
+          moveRelativeTo = pkgs.writeNuScript "mv"
+          ''
+            def main [-w, num: int] {
+              let current_workspace = (hyprctl activeworkspace -j | from json | get id)
+              mut requested_workspace = $current_workspace + $num
+              if ($requested_workspace < 1 ) { $requested_workspace = 1 }
+              if ($requested_workspace > 9 ) { $requested_workspace = 9 }
+              if ($w) {
+                hyprctl dispatch movetoworkspace $requested_workspace
+              } else {
+                hyprctl dispatch workspace $requested_workspace
               }
-            '';
-            executable = true;
-            destination = "/bin/focus";
-          };
+            }
+          '';
+
+          nu-focus = pkgs.writeNuScript
+          "focus"
+          ''
+            def main [title: string] {
+              let activeWindow = (hyprctl activewindow -j | from json)
+              let tmp_var = $activeWindow.address
+
+              let file_path = ("/tmp/focuswindow_" + $title)
+              let file_exists = ( $file_path | path exists )
+
+              if ($file_exists == false) {
+                 let json_value = {state: 0, address: $tmp_var} | to json
+                 $json_value | save -f $file_path
+              }
+
+              if (open $file_path | from json | get state) == 0 {
+                 if $activeWindow.class == $title { return }
+                 hyprctl dispatch focuswindow $title
+                 (open $file_path | from json | update state 1 | to json | save -f $file_path)
+                 (open $file_path | from json | update address $tmp_var | to json | save -f $file_path)
+              } else {
+                 let address = (open $file_path | from json | get address)
+                 hyprctl dispatch focuswindow ("address:" + $address)
+                 (open $file_path | from json | update state 0 | to json | save -f $file_path)
+              }
+            }
+          '';
 
           mainMod = "SUPER";
           binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
@@ -463,7 +460,7 @@ in
           mvactive = binding "${mainMod} ALT" "moveactive";
           mvtows = binding "${mainMod} SHIFT" "movetoworkspace";
           #e = "exec, ags -b hypr";
-          arr = [ 1 2 3 4 5 6 7 8 9 ];
+          arr = [ 1 2 3 4 5 6 7 8 9 ]; # could reduce this to just 1 .. 9 probably
 
           acpi = "${pkgs.acpi}/bin/acpi";
         in
@@ -490,12 +487,17 @@ in
           "${mainMod} SHIFT, SPACE, exec, pypr expose"
 
           # screenshot
-          "${mainMod}, S, exec, ${pkgs.gscreenshot}/bin/gscreenshot -sc"
+          ", Print, exec, ${pkgs.gscreenshot}/bin/gscreenshot -sc"
+
+          # misc
+          ", page_down, exec, ${moveRelativeTo}/bin/mv -1 -w" # Up arrow
+          ", page_up, exec, ${moveRelativeTo}/bin/mv 1 -w"    # Down arrow
+          ", Home, exec, ${moveRelativeTo}/bin/mv -1" # home sits where my left arrow is
+          ", End, exec, ${moveRelativeTo}/bin/mv 1"   # end sits where my right arrow is
+
 
           # group
           "${mainMod}, G, togglegroup, 0"
-          ", page_down, changegroupactive, f"
-          ", page_up, changegroupactive, b"
           "${mainMod}, L, exec,  ${swaylock-custom}/bin/swaylock-custom 0 120x6 10 0"
 
           # pomo timer
@@ -537,56 +539,77 @@ in
         let
           light = "${pkgs.light}/bin/light";
           wpctl = "${pkgs.wireplumber}/bin/wpctl";
+          inertia = pkgs.writeNuScript "inertia"
+          ''
+            def reset_values [target: path, time: float, value: float] {
+                {
+                    "value": ($value),
+                    "time": ($time),
+                } | to json | save -f $target
+            }
 
-          brightness = pkgs.writeShellScriptBin "brightness" ''
-            #!${pkgs.bash}/bin/bash
+            def main [ name: string, incrementPerSecond: float, initalValue: float ] {
+                let datafile = ( "/tmp/inertia-" + $name ) | path expand
+                if ( not ( echo $datafile | path exists ) ) {
+                    reset_values $datafile 0 $initalValue
+                }
 
-            # would be cool to bas it on inertia
-            # value strts at 0.1 rounded up to 1, and multiplies by 1.1/2 every time, time is used to reset it down to 0 afterwords?
+                mut old = (open $datafile) | from json
 
-            # jq
-            # {
-            #   "value": 0.1,
-            #   "time": {unix time}
-            # }
+                let current_time = ${pkgs.ruby}/bin/ruby -e 'puts Time.now.to_f'
+                let current_time = $current_time | into float
+                let delta_time = (( $old.time | into float ) - ( $current_time | into float ) ) | math abs
 
-            # if /tmp/brightness.json does not exist, create it
-            #if [[ ! -f /tmp/brightness.json ]]; then
-            #  jq '{ "value": 0.1, "time": $(date +%s) }' > /tmp/brightness.json
-            #fi
+                if ( $delta_time > 0.5 ) {
+                    reset_values $datafile $current_time $initalValue
+                    return
+                }
 
-            #data=$(jq -r '.value' /tmp/brightness.json)
-            # date -d '+5 seconds' +%s
+                $old.value =  ( $old.value ) + ($delta_time * $incrementPerSecond)
+                echo $old.value
 
-            # if time is more than 5 seconds, reset value to 0.1
-            # /tmp/brightness.json
-            #if [[ $(date +%s) -gt $(jq -r '.time' /tmp/brightness.json) ]]; then
-            #  jq '.value = 0.1 | .time = $(date +%s)' /tmp/brightness.json > /tmp/brightness.json
-            #fi
-
-
-            ${light} $@
-
-            ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:brightness -h int:value:$(${light}) "$(${light})%"
+                reset_values $datafile $current_time $old.value
+            }
+          '';
+          brightness = pkgs.writeNuScript "brightness" ''
+            def main [-u] {
+                if ($u) {
+                  let value = ${inertia}/bin/inertia brightnessUP 5 0.1
+                  light -A $value
+                } else {
+                  let value = ${inertia}/bin/inertia brightnessDOWN 5 0.1
+                  light -U $value
+                }
+            }
+          '';
+          volumeScript = pkgs.writeNuScript "volume" ''
+            def main [-u] {
+                mut value = 0
+                if ($u) {
+                  $value = ( ${inertia}/bin/inertia volumeUP 0.5 0.5 )
+                  ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ (($value | into string) + "%+")
+                } else {
+                  $value = ( ${inertia}/bin/inertia volumeDOWN 0.5 0.5 )
+                  ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ (($value | into string) + "%-")
+                }
+                if ( ( $value | into float ) > 2 ) {
+                  ${pkgs.libcanberra-gtk3}/bin/canberra-gtk-play -i audio-volume-change -d "changeVolume"
+                }
+                ${volume}/bin/volume
+            }
           '';
 
           volume = pkgs.writeShellScriptBin "volume" ''
-            #!${pkgs.bash}/bin/bash
-
-            ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ $1
-
-            ${pkgs.libcanberra-gtk3}/bin/canberra-gtk-play -i audio-volume-change -d "changeVolume"
-
             ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:volume -h int:value:$(${pkgs.pamixer}/bin/pamixer --get-volume) -u low "$(${pkgs.pamixer}/bin/pamixer --get-volume-human)"
           '';
         in
         [
-          ",XF86MonBrightnessUp,  exec,  ${brightness}/bin/brightness -A 2"
-          ",XF86MonBrightnessDown,exec,  ${brightness}/bin/brightness -U 2"
-          ",XF86KbdBrightnessUp,  exec,  ${brightness}/bin/brightness -A 2"
-          ",XF86KbdBrightnessDown,exec,  ${brightness}/bin/brightness -U 2"
-          ",XF86AudioRaiseVolume, exec,  ${volume}/bin/volume 1%+"
-          ",XF86AudioLowerVolume, exec,  ${volume}/bin/volume 1%-"
+          ",XF86MonBrightnessUp,  exec,  ${brightness}/bin/brightness -u"
+          ",XF86MonBrightnessDown,exec,  ${brightness}/bin/brightness"
+          ",XF86KbdBrightnessUp,  exec,  ${brightness}/bin/brightness -u"
+          ",XF86KbdBrightnessDown,exec,  ${brightness}/bin/brightness"
+          ",XF86AudioRaiseVolume, exec,  ${volumeScript}/bin/volume -u"
+          ",XF86AudioLowerVolume, exec, ${volumeScript}/bin/volume"
         ];
 
       bindl =

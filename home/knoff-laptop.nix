@@ -9,7 +9,8 @@
 }: {
   imports = [
     ./programs/editor/default.nix
-    ./programs/terminal # defautlt
+    ./programs/terminal # default
+    ./programs/terminal/programs/pueue.nix
     ./programs/terminal/prompt.nix # starship
     #./modules/sway
     ./modules/hyprland
