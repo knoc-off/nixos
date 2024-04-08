@@ -3,25 +3,13 @@ let
   config_dir = "~/nixos";
   config_name = "framework13";
 
-  nu =
-  (name:
-    (script:
-      pkgs.writeTextFile rec {
-        inherit name;
-        text = ( "#!${pkgs.nushell}/bin/nu" + "\n" + script);
-
-        executable = true;
-        destination = "/bin/${name}";
-      }
-    )
-  );
 in
 {
 
-  home.packages = with pkgs; [
-    (nu "nx"
+  home.packages = [
+    (pkgs.writeNuScript "nx"
      ''
-      def main [ -f, ...x] {
+      def main --env [ -f, ...x] {
         enter ${config_dir}
         match ($x.0) {
           "rb" => {
@@ -66,7 +54,7 @@ in
       }
       ''
     )
-    (nu "nixcommit"
+    (pkgs.writeNuScript "nixcommit"
     ''
 
     def main [] {
@@ -107,7 +95,7 @@ in
       echo ("{\n  system.nixos.label = \"" + $message + "\";\n}") | save -f $message_path
       # Add and commit the changes
       git -C $config_dir add $message_path
-      git -C $config_dir commit --all --file=(($config_dir + "/.git/COMMIT_EDITMSG") | path expand)
+      git -C $config_dir commit --all --file (($config_dir + "/.git/COMMIT_EDITMSG") | path expand)
 
       exit 0
     }
