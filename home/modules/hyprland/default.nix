@@ -101,8 +101,8 @@ in
 {
 
   imports = [
-    #./dunst.nix
-    ./mako.nix
+    ./dunst.nix
+    #./mako.nix
     #./wired-notify.nix
     ./eww.nix
 
@@ -204,6 +204,7 @@ in
       }
     ];
   };
+
 
   programs.swaylock = {
     package = pkgs.swaylock-effects;
@@ -452,6 +453,16 @@ in
             }
           '';
 
+          screenshot-to-text = pkgs.writeNuScript "stt"
+          ''
+            def main [] {
+              ${pkgs.gscreenshot}/bin/gscreenshot -s -f /tmp/gscreenshot-image.png
+              ${pkgs.imagemagick}/bin/convert -colorspace gray -fill white  -resize 480%  -sharpen 0x1  /tmp/gscreenshot-image.png /tmp/gscreenshot-image-processed.jpg
+              ${pkgs.tesseract}/bin/tesseract /tmp/gscreenshot-image-processed.jpg /tmp/tesseract-output
+              cat /tmp/tesseract-output.txt | wl-copy
+            }
+          '';
+
           mainMod = "SUPER";
           binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
           mvfocus = binding "${mainMod}" "movefocus";
@@ -463,6 +474,10 @@ in
           arr = [ 1 2 3 4 5 6 7 8 9 ]; # could reduce this to just 1 .. 9 probably
 
           acpi = "${pkgs.acpi}/bin/acpi";
+
+
+
+
         in
         [
           ## Master-Layout binds
@@ -488,6 +503,7 @@ in
 
           # screenshot
           ", Print, exec, ${pkgs.gscreenshot}/bin/gscreenshot -sc"
+          "SHIFT, Print, exec, ${screenshot-to-text}/bin/stt"
 
           # misc
           ", page_down, exec, ${moveRelativeTo}/bin/mv -1 -w" # Up arrow
@@ -514,9 +530,6 @@ in
           "${mainMod} ALT, 2, togglespecialworkspace, 2"
           "${mainMod} ALT, 3, togglespecialworkspace, 3"
           "${mainMod} ALT, 4, togglespecialworkspace, 4"
-
-
-
 
 
           (mvfocus "up" "u")

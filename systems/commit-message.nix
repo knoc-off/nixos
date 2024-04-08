@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "Ported_my_scripts_to_nushell_added_un-idle-er_____";
+  system.nixos.label = "lots_of_small_changes._theming____________________";
 }
