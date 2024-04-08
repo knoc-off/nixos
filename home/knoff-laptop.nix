@@ -56,6 +56,10 @@
   home.packages = with pkgs; [
     prismlauncher
 
+    kdePackages.breeze-icons
+    kdePackages.grantleetheme
+    libsForQt5.grantleetheme
+
     # move to desktop module?
     gnome.gnome-disk-utility
 
@@ -127,11 +131,12 @@
   # enable qt themes
   qt = {
     enable = true;
-    platformTheme = "gtk";
+    #platformTheme = "qtct";
+    platformTheme = "gtk3";
 
     style = {
-      name = "adwaita-dark";
-      package = pkgs.adwaita-qt;
+      name = "gtk2";
+      package = pkgs.libsForQt5.qtstyleplugins;
     };
   };
 
