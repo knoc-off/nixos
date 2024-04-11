@@ -34,6 +34,15 @@
 
     ./modules/thunderbird.nix
   ];
+
+  #hyprland = {
+  #  enable = true;
+  #};
+
+
+
+
+
   disabledModules = ["programs/eww.nix"];
   programs.git = {
     enable = true;

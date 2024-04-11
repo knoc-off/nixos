@@ -109,6 +109,56 @@ in
   ];
 
   # Pomo timer, should move to its own module
+  home.file."pyprland" = {
+    target = ".config/hypr/pyprland.toml";
+    source = pkgs.writers.writeTOML "pyprland.toml" {
+      pyprland = {
+        plugins = [
+          "scratchpads"
+          "expose"
+          #"shift_monitors"
+          #"workspaces_follow_focus"
+        ];
+      };
+
+      scratchpads = {
+        stb-logs = {
+          animation = "fromTop";
+          command = "kitty --class kitty-stb-logs stbLog";
+          class = "kitty-stb-logs";
+          lazy = true;
+          size = "75% 40%";
+        };
+
+        term = {
+          animation = "fromTop";
+          command = "kitty --class kitty-dropterm";
+          class = "kitty-dropterm";
+          unfocus = "hide";
+          size = "75% 60%";
+        };
+
+        file = {
+          animation = "fromBottom";
+          command = "nautilus";
+          class = "filemanager";
+          size = "75% 60%";
+          unfocus = "hide";
+        };
+
+        volume = {
+          animation = "fromRight";
+          command = "pavucontrol";
+          class = "pavucontrol";
+          lazy = true;
+          size = "40% 90%";
+          unfocus = "hide";
+
+        };
+      };
+    };
+  };
+  # Pomo timer, should move to its own module
   home.file."uairtest" = {
     target = ".config/uair/uair.toml";
     source = pkgs.writers.writeTOML "uair.toml" {
@@ -163,6 +213,7 @@ in
   home.packages = [
     swaylock-custom
     pkgs.hyprpaper
+    pkgs.pyprland
   ];
   xdg.desktopEntries."org.gnome.Settings" = {
     name = "Settings";
