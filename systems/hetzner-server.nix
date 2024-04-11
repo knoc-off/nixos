@@ -27,9 +27,9 @@
     ./services/nginx.nix
 
     # nextcloud
-    ./services/nextcloud.nix
-    ./services/wordpress.nix
-    #./services/wordpress-oci.nix
+    # ./services/nextcloud.nix
+    # ./services/wordpress.nix
+    # ./services/wordpress-oci.nix
   ];
 
   # Firewall

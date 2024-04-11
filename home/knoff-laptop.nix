@@ -144,8 +144,8 @@
     platformTheme = "gtk3";
 
     style = {
-      name = "gtk2";
-      package = pkgs.libsForQt5.qtstyleplugins;
+      name = "adwaita-dark";
+      package = pkgs.adwaita-qt;
     };
   };
 

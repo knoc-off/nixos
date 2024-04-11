@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "lots_of_small_changes._theming____________________";
+  system.nixos.label = "added_hyprlandMod_trying_to_actually_modularize_my";
 }
