@@ -28,11 +28,13 @@
 
     # nextcloud
     ./services/nextcloud.nix
+    ./services/wordpress.nix
+    #./services/wordpress-oci.nix
   ];
 
   # Firewall
   networking.firewall = {
-    enable = true;
+    enable = false;
     allowedTCPPorts = [80 443];
     #allowedUDPPortRanges = [
     #  { from = 4000; to = 4007; }
