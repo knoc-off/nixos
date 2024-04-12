@@ -102,6 +102,7 @@ in
 
   imports = [
     ./dunst.nix
+    ./pyprland.nix
     #./mako.nix
     #./wired-notify.nix
     ./eww.nix
@@ -172,6 +173,51 @@ in
     categories = [ "X-Preferences" ];
     terminal = false;
   };
+
+
+
+  # ~~~~~~~~~
+
+  pyprland = {
+    enable = true;
+    extraPlugins = [
+      "expose"
+    ];
+    scratchpads = {
+      file = {
+        animation = "fromBottom";
+        command = "nautilus";
+        class = "filemanager";
+        size = "75% 60%";
+        unfocus = "hide";
+      };
+      volume = {
+        animation = "fromRight";
+        command = "pavucontrol";
+        class = "pavucontrol";
+        lazy = true;
+        size = "40% 90%";
+        unfocus = "hide";
+      };
+      stb-logs = {
+        animation = "fromTop";
+        command = "kitty --class kitty-stb-logs stbLog";
+        class = "kitty-stb-logs";
+        lazy = true;
+        size = "75% 40%";
+      };
+      term = {
+        animation = "fromTop";
+        command = "kitty --class kitty-dropterm";
+        class = "kitty-dropterm";
+        unfocus = "hide";
+        size = "75% 60%";
+      };
+    };
+  };
+
+  # ~~~~~~~~~
+
 
   wayland.windowManager.hyprland = {
     enable = true;

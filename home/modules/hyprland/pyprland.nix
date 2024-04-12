@@ -1,92 +1,82 @@
-{ pkgs, config, lib, ...}:
+{ pkgs, config, lib, ... }:
 let
-  cfg = config.hyprland.pyperland;
+  cfg = config.pyprland;
 in
 with lib;
 {
   options = {
-    hyprland.pyperland = {
-      enable = {
-        default = false;
-        type = with types; bool;
+    pyprland = {
+      enable = mkEnableOption "pyperland";
+
+      package = mkOption {
+        default = pkgs.pyprland;
+        type = types.package;
+        description = "The pyprland package to use";
       };
-      extraPlugins = {
+
+      extraPlugins = mkOption {
+        default = [];
         type = with types; listOf str;
-        description = ''
-          plugins to enable
-        '';
-
+        description = "Additional plugins to enable";
       };
 
-      plugins = {
-        scratchpads = {
-          enable = {
-            default = false;
-            type = with types; bool;
-            #scratchpads = {
-            #  default = {};
-              #type = with types; listOf;
-#
-            #};
+      config = mkOption {
+        default = {};
+        type = with types; attrsOf (oneOf [ str int bool ]);
+        description = "Additional pyprland configuration options";
+      };
+
+      scratchpads = mkOption {
+        default = {};
+        type = with types; attrsOf (submodule {
+          options = {
+            animation = mkOption {
+              type = str;
+              description = "Animation type for the scratchpad";
+            };
+            command = mkOption {
+              type = str;
+              description = "Command to execute for the scratchpad";
+            };
+            class = mkOption {
+              type = str;
+              description = "Window class for the scratchpad";
+            };
+            lazy = mkOption {
+              type = bool;
+              default = false;
+              description = "Whether to lazily spawn the scratchpad";
+            };
+            size = mkOption {
+              type = str;
+              description = "Size of the scratchpad window";
+            };
+            unfocus = mkOption {
+              type = str;
+              default = "hide";
+              description = "Behavior when the scratchpad loses focus";
+            };
           };
-        };
+        });
+        description = "Scratchpad configurations";
       };
     };
   };
 
-  config = {
+  config = mkIf cfg.enable {
     home.packages = [
-      pkgs.pyprland
+      cfg.package
     ];
 
     home.file."pyprland" = {
       target = ".config/hypr/pyprland.toml";
-      source = pkgs.writers.writeTOML "pyprland.toml" {
+      source = pkgs.writers.writeTOML "pyprland.toml" (recursiveUpdate {
         pyprland = {
-          plugins = [
-            "scratchpads"
-            "expose"
-            #"shift_monitors"
-            #"workspaces_follow_focus"
-          ];
+          plugins = cfg.extraPlugins ++ (optional (cfg.scratchpads != {}) "scratchpads");
         };
-
-        scratchpads = {
-          stb-logs = {
-            animation = "fromTop";
-            command = "kitty --class kitty-stb-logs stbLog";
-            class = "kitty-stb-logs";
-            lazy = true;
-            size = "75% 40%";
-          };
-
-          term = {
-            animation = "fromTop";
-            command = "kitty --class kitty-dropterm";
-            class = "kitty-dropterm";
-            unfocus = "hide";
-            size = "75% 60%";
-          };
-
-          file = {
-            animation = "fromBottom";
-            command = "nautilus";
-            class = "filemanager";
-            size = "75% 60%";
-            unfocus = "hide";
-          };
-
-          volume = {
-            animation = "fromRight";
-            command = "pavucontrol";
-            class = "pavucontrol";
-            lazy = true;
-            size = "40% 90%";
-            unfocus = "hide";
-
-          };
-        };
-      };
+      } (recursiveUpdate cfg.config {
+        scratchpads = mapAttrs (name: value: removeAttrs value ["_module"]) cfg.scratchpads;
+      }));
     };
   };
 }
