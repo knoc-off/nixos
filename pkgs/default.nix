@@ -5,6 +5,7 @@
    #example = pkgs.callPackage ./example { };
    # i think its pkgs.additions.spotify-adblock?
    spotify-adblock = pkgs.callPackage ./spotify-adblock {};
+   volumeLerp = pkgs.callPackage ./system-interface/volume-lerp-rust {};
 
 
 

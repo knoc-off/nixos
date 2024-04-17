@@ -53,10 +53,10 @@
     openFirewall = true;
     plugins = plugins: with plugins; [
       themeify
-      stlviewer
-      octoprint-prettygcode
+      #stlviewer
+      #octoprint-prettygcode
       BedLevelVisualizer
-      OctoPrint-FirmwareUpdater
+      #OctoPrint-FirmwareUpdater
     ];
 
     user = "octoprint";

@@ -180,7 +180,6 @@
           ];
         };
 
-        # raspberry pi 3A, testing this out, no idea. gotta look at how nixos-anywhere works
         rpi3A = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           system = "aarch64-linux";
