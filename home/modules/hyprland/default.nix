@@ -347,9 +347,15 @@ in
       };
       master = {
         # See https://wiki.hyprland.org/Configuring/Master-Layout/ for more
-        new_is_master = true;
+        orientation = "left";
+        always_center_master = true;
         new_on_top = true;
+        new_is_master = false;
         no_gaps_when_only = true;
+
+        #new
+        special_scale_factor = 0.5;
+        mfact = 0.65;
       };
 
       gestures = {
@@ -383,6 +389,7 @@ in
           (f "com.github.Aylur.ags")
           (f ".gscreenshot-wrapped")
           (w "Spotify" 7)
+          #"fakefullscreen, org.kde.falkon"
           #"workspace 7, title:Spotify"
         ];
 
@@ -391,6 +398,7 @@ in
           float = class: (title: "float, class:(${class}), title:(${title})");
           pin = class: (title: "pin, class:(${class}), title:(${title})");
           opacity = class: (title: (opacity: "opacity ${builtins.toString opacity}, class:(${class}), title:(${title})"));
+          fakeFullscreen = class: "fakefullscreen, class:(${class})";
           #size = class: (title: (size: "float, class:(${class}), title:(${title})"));
           idleinhibit = mode: (class: (title: "idleinhibit ${mode}, class:(${class}), title:(${title})"));
           window = class: (title: (to: "workspace ${to}, class:(${class}), title:(${title})"));
@@ -402,6 +410,7 @@ in
           (float "steam" ".*Browser.*")
           (float "steam" ".*Friends List.*")
           (window "thunderbird" ".*" "6")
+          (fakeFullscreen "org.kde.falkon")
           #(window "firefox" ".*" "special:firefox")
         ];
 
@@ -523,7 +532,7 @@ in
           #"${mainMod} ALT, 1, movetoworkspace, special:firefox"
           #"${mainMod}, A, togglespecialworkspace, firefox"
           #"${mainMod} ALT, 2, movetoworkspace, special:2"
-          "${mainMod} ALT, 1, togglespecialworkspace, 1"
+          "${mainMod} ALT, 1, exec, echo \"20\" > /tmp/volume_control_fifo" # ${pkgs.volume-lerp}/bin/volume-lerp"
           "${mainMod} ALT, 2, togglespecialworkspace, 2"
           "${mainMod} ALT, 3, togglespecialworkspace, 3"
           "${mainMod} ALT, 4, togglespecialworkspace, 4"
@@ -584,10 +593,10 @@ in
           brightness = pkgs.writeNuScript "brightness" ''
             def main [-u] {
                 if ($u) {
-                  let value = ${inertia}/bin/inertia brightnessUP 5 0.1
+                  let value = ${inertia}/bin/inertia brightnessUP 2 0.1
                   light -A $value
                 } else {
-                  let value = ${inertia}/bin/inertia brightnessDOWN 5 0.1
+                  let value = ${inertia}/bin/inertia brightnessDOWN 2 0.1
                   light -U $value
                 }
             }
@@ -608,6 +617,9 @@ in
                 ${volume}/bin/volume
             }
           '';
+          notify-bar = pkgs.writeShellScriptBin "notify-bar" ''
+            ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:volume -h int:value:$1 -u low "$@"
+          '';
 
           volume = pkgs.writeShellScriptBin "volume" ''
             ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:volume -h int:value:$(${pkgs.pamixer}/bin/pamixer --get-volume) -u low "$(${pkgs.pamixer}/bin/pamixer --get-volume-human)"
@@ -620,6 +632,7 @@ in
           ",XF86KbdBrightnessDown,exec,  ${brightness}/bin/brightness"
           ",XF86AudioRaiseVolume, exec,  ${volumeScript}/bin/volume -u"
           ",XF86AudioLowerVolume, exec, ${volumeScript}/bin/volume"
+
         ];
 
       bindl =
@@ -642,9 +655,7 @@ in
         drop_shadow = false;
         shadow_range = 2;
         "col.shadow" = "0xff${theme.base01}";
-
         shadow_render_power = 2;
-
         dim_inactive = false;
 
         blur = {
@@ -666,33 +677,20 @@ in
           "instant, 0, 9, 0, 9"
           "popBezier, 0.34, 1.16, 0.64, 1"
           "slowStart, 0.32, 0, 0.67, 0"
+          "fastSlow, 0.15, 0.67, 0.05, 1"
+          "slowFast,  0.15, 0, 0.05, 1"
         ];
         animation = [
-          "windows, 1, 3, default"
-          "windowsIn, 1, 2, default"
-          "windowsOut, 1, 1, instant"
+          "windows, 1, 1, slowFast"
+          "windowsIn, 1, 1, default"
+          "windowsOut, 0, 1, instant" # Disable
+          "fadeOut, 0"
           "border, 1, 10, default"
           "borderangle, 1, 8, default"
-          "fade, 1, 10, default"
+          "fade, 1, 1, default"
           "workspaces, 1, 3, default"
         ];
       };
-
-      #      plugin = {
-      #        hyprbars = {
-      #          bar_color = "rgb(2a2a2a)";
-      #          bar_height = 28;
-      #          col_text = "rgba(ffffffdd)";
-      #          bar_text_size = 11;
-      #          bar_text_font = "Ubuntu Nerd Font";
-      #
-      #          buttons = {
-      #            button_size = 0;
-      #            "col.maximize" = "rgba(ffffff11)";
-      #            "col.close" = "rgba(ff111133)";
-      #          };
-      #        };
-      #      };
     };
   };
 }

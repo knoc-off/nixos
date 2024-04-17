@@ -16,6 +16,16 @@
     }
   }
 
+  /* remove flash */
+  @-moz-document url("about:home"),url("about:blank"),url("about:newtab"),url("about:privatebrowsing"){
+    body{background-color: #${theme.base02} !important }
+  }
+
+  @-moz-document url("about:preferences#home"){
+    body{background-color: #${theme.base02} !important }
+  }
+
+  /* ~~~~~~~~~~~~~~~~~~~~~~~
   /* Color Configs */
   /* not sure how i feel about this, because its hard to tell what is what */
   /* and themes can have unintended effects. */
@@ -137,13 +147,6 @@
     --lwt-sidebar-background-color: #${theme.base02} !important;
     --lwt-sidebar-text-color: #${theme.base06} !important;
   }
+   ~~~~~~~~~~~~ */
 
-  /* remove flash */
-  @-moz-document url("about:home"),url("about:blank"),url("about:newtab"),url("about:privatebrowsing"){
-    body{background-color: #${theme.base02} !important }
-  }
-
-  @-moz-document url("about:preferences#home"){
-    body{background-color: #${theme.base02} !important }
-  }
 ''

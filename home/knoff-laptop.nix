@@ -33,6 +33,8 @@
     ./programs/virtualization/bottles.nix
 
     ./modules/thunderbird.nix
+
+    ./xdg-enviroment.nix
   ];
 
   #hyprland = {
@@ -63,48 +65,21 @@
 
   # TODO: move this to someplace more logical
   home.packages = with pkgs; [
+
+    obsidian
+
     prismlauncher
 
     kdePackages.breeze-icons
     kdePackages.grantleetheme
     libsForQt5.grantleetheme
-
-    # move to desktop module?
-    gnome.gnome-disk-utility
-
     wgnord
 
-    # for xdg settings
-    gimp
-    mpv
+
+    prusa-slicer
+
   ];
 
-  # XDG settings
-  xdg.mimeApps = {
-    enable = true;
-    associations.added = {
-      #"application/pdf" = [ "org.gnome.Evince.desktop" ];
-      "video/mp4" = ["mpv.desktop"];
-      # gimp:
-      "image/bmp" = ["org.gimp.GIMP.desktop"];
-      "image/gif" = ["org.gimp.GIMP.desktop"];
-      "image/jpeg" = ["org.gimp.GIMP.desktop"];
-      "image/png" = ["org.gimp.GIMP.desktop"];
-      "image/svg+xml" = ["org.gimp.GIMP.desktop"];
-      "image/tiff" = ["org.gimp.GIMP.desktop"];
-    };
-    defaultApplications = {
-      #"application/pdf" = [ "org.gnome.Evince.desktop" ];
-      "video/mp4" = ["mpv.desktop"];
-      # gimp:
-      "image/bmp" = ["org.gimp.GIMP.desktop"];
-      "image/gif" = ["org.gimp.GIMP.desktop"];
-      "image/jpeg" = ["org.gimp.GIMP.desktop"];
-      "image/png" = ["org.gimp.GIMP.desktop"];
-      "image/svg+xml" = ["org.gimp.GIMP.desktop"];
-      "image/tiff" = ["org.gimp.GIMP.desktop"];
-    };
-  };
 
   services.emailManager = {
     enable = true;
@@ -116,12 +91,6 @@
 
   nixpkgs = {
     overlays = builtins.attrValues outputs.overlays;
-    #overlays = [
-    # Add overlays your own flake exports (from overlays and pkgs dir):
-    #outputs.overlays.additions
-    #outputs.overlays.modifications
-    #outputs.overlays.unstable-packages
-    #];
     config = {
       allowUnfree = true;
       allowUnfreePredicate = pkg: true;
@@ -150,15 +119,51 @@
   };
 
   # enable gtk themes
-  gtk = {
+  gtk =
+  let
+    extra3-4Config = {
+      gtk-application-prefer-dark-theme=1;
+    };
+
+  in
+  {
     enable = true;
     theme = {
+      name = "Fluent-Dark";
+      package = pkgs.fluent-gtk-theme;
+    };
+    iconTheme = {
       name = "Fluent-Dark";
       package = pkgs.fluent-gtk-theme;
     };
     cursorTheme = {
       name = "Vanilla-DMZ";
       package = pkgs.vanilla-dmz;
+    };
+
+    gtk3.extraConfig = extra3-4Config;
+    gtk4.extraConfig = extra3-4Config;
+
+  };
+
+  dconf = {
+    enable = true;
+    settings = {
+      "org/gnome/desktop/interface" = {
+        color-scheme = "prefer-dark";
+        #gtk-theme = "Adwaita-dark";
+        #icon-theme = "Adwaita-dark";
+        #cursor-theme = "Adwaita-dark";
+      };
+      "org/gnome/shell/extensions/user-theme" = {
+        name = "Adwaita-dark";
+      };
+      "org/gnome/gedit/preferences/editor" = {
+        scheme = "oblivion";
+      };
+      "org/gnome/Terminal/Legacy/Settings" = {
+        theme-variant = "dark";
+      };
     };
   };
 
