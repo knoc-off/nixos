@@ -3,14 +3,6 @@
   config,
   ...
 }: {
-  #sops.secrets.example-key = {};
-  sops.secrets."services/nextcloud/admin-pass" = {};
-  sops.secrets."services/nextcloud/admin-pass".owner = config.users.users.nextcloud.name;
-
-  #services.nginx.virtualHosts.${config.services.nextcloud.hostName} = {
-  #  forceSSL = true;
-  #  enableACME = true;
-  #};
 
   services.nextcloud = {
     enable = true;

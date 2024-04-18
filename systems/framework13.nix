@@ -12,17 +12,22 @@
     # hardware configs
     ./hardware/hardware-configuration.nix
     ./hardware/bluetooth.nix
-
-    # Disko
-    ./hardware/disks/btrfs-luks.nix
-
-    # hardware for my laptop
-    inputs.hardware.nixosModules.framework-13-7040-amd
     ./hardware/fingerprint
 
     # Secure boot
     inputs.lanzaboote.nixosModules.lanzaboote
     # https://github.com/nix-community/lanzaboote/blob/master/docs/QUICK_START.md
+
+    # Sops
+    inputs.sops-nix.nixosModules.sops
+    {
+      sops.defaultSopsFile = ./secrets/framework13/default.yaml;
+      # This will automatically import SSH keys as age keys
+      sops.age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
+
+      sops.secrets."hashedpassword" = {};
+      sops.secrets."hashedpassword".owner = config.users.users.knoff.name;
+    }
 
     # pipewire / Audio
     ./modules/audio
@@ -41,36 +46,19 @@
     #./modules/virtualisation/waydroid.nix
   ];
 
-  # Hardware GPU tests: TODO Remove
-
-  hardware.opengl.extraPackages = [
-    pkgs.rocm-opencl-icd
-    pkgs.rocmPackages.rocm-runtime
-  ];
-
-
-
-
-
   programs.nix-ld = {
     enable = true;
     libraries = with pkgs; [
-
       # Dwarf Fortress
       stdenv.cc.cc
       SDL2
       SDL2_image
       ## DFHACK
       libz
-
-
     ];
   };
 
-  #hardware.framework.amd-7040.preventWakeOnAC = true;
-
-  # IDK if this does anything, TODO: check
-  # doesent seem to do much, cant remember why i added it.
+  #qt.style = "gtk2";
   environment.etc =
     let
       themeName = "Fluent-Dark";
@@ -103,7 +91,7 @@
 
   # Use the systemd-boot EFI boot loader.
   # disable if using lanzaboote
-  boot.loader.systemd-boot.enable = lib.mkForce false;
+  boot.loader.systemd-boot.enable = (if config.boot.lanzaboote.enable then lib.mkForce false else true);
   boot.loader.efi.canTouchEfiVariables = true;
 
   boot.lanzaboote = {
@@ -114,46 +102,18 @@
   networking.hostName = "framework"; # Define your hostname.
   networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
 
-  # this allows running flatpaks.
-  services.flatpak.enable = true;
+  # this allows running flatpaks. i never use this.
+  # services.flatpak.enable = true;
 
-  # enable power management, improves battery life.
-  # powerManagement.powertop.enable = false;
-
-  # power profiles.
-  # thermal management. TODO: check if this is needed.
-  #services.power-profiles-daemon.enable = true;
-  #services.cpupower-gui.enable = true;
-  #powerManagement.enable = true;
-  #powerManagement.powertop.enable = true;
-  #services.auto-cpufreq = {
-  #  enable = true;
-  #  settings = {
-  #    battery = {
-  #      governor = "powersave";
-  #      turbo = "never";
-  #     };
-  #     charger = {
-  #       governor = "preformance";
-  #       turbo = "auto";
-  #     };
-  #   };
-  # };
-
-
-
-
-  # ---------------- Power 2
+  # ---------------- Power
   #services.power-profiles-daemon.enable = false;
   # services.tlp = {
   #   enable = true;
   #   settings = {
   #     CPU_SCALING_GOVERNOR_ON_AC = "performance";
   #     CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
-
   #     CPU_ENERGY_PERF_POLICY_ON_BAT = "power";
   #     CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
-
   #     CPU_MIN_PERF_ON_AC = 0;
   #     CPU_MAX_PERF_ON_AC = 100;
   #     CPU_MIN_PERF_ON_BAT = 0;
@@ -166,10 +126,7 @@
   #   };
   # };
 
-
-
-  # Set your time zone.
-  time.timeZone = "Europe/Berlin";
+  # TODO: move to nix configs
   nixpkgs.config.allowUnfree = true;
   nixpkgs.overlays = builtins.attrValues outputs.overlays;
 
@@ -177,6 +134,8 @@
   # networking.proxy.default = "http://user:password@proxy:port/";
   # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
 
+  # Set your time zone.
+  time.timeZone = "Europe/Berlin";
   # Select internationalisation properties.
   i18n.defaultLocale = "en_US.UTF-8";
   console = {
@@ -211,8 +170,6 @@
     };
   };
 
-  # Enable the X11 windowing system.
-  # services.xserver.enable = true;
   services.openssh = {
     enable = true;
     # require public key authentication for better security
@@ -222,7 +179,6 @@
   };
 
   # Configure keymap in X11
-  #services.xserver.layout = "us";
   services.xserver.xkb.layout = "us";
   # services.xserver.xkbOptions = "eurosign:e,caps:escape";
 
@@ -230,25 +186,19 @@
   # services.printing.enable = true;
 
   # needed for steam, and some other apps/games.
-  # steam benifits from launch param: -forcedesktopscaling 1.0%U
-  # NIXPKGS_ALLOW_UNFREE=1 nix run nixpkgs#steam --impure -- -forcedesktopscaling 1.0%U
-  #hardware.opengl.driSupport32Bit = true;
   hardware.opengl.driSupport32Bit = true;
   hardware.opengl.enable = true;
   hardware.pulseaudio.support32Bit = true;
 
-  # Enable sound.
-  # sound.enable = true;
-  # hardware.pulseaudio.enable = true;
-
   # Enable touchpad support (enabled default in most desktopManager).
   services.xserver.libinput.enable = true;
 
+
+  # TODO: I could move my user to its own module, then import it to each system
   # Shells
   programs = {
     zsh.enable = false;
     fish.enable = true;
-    #nushell.enable = false; does not exist.
   };
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.knoff = {
@@ -263,7 +213,7 @@
         then pkgs.zsh
       else pkgs.bash;
     extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
-    initialPassword = "password";
+    hashedPasswordFile = config.sops.secrets."hashedpassword".path;
     openssh.authorizedKeys.keys = [
     ];
   };
@@ -271,9 +221,9 @@
   ];
 
   # List packages installed in system profile. To search, run:
-  # $ nix search wget
+  # $ nix search nixpkgs#wget
   environment.systemPackages = with pkgs; [
-    # TODO: see if this fixes issues
+    # TODO: see if this fixes issues. somewhat
     gnome.adwaita-icon-theme
 
     #vulkan-tools
@@ -285,37 +235,14 @@
     libinput
   ];
 
+  # don’t shutdown when power button is short-pressed
   services.logind.extraConfig = ''
-    # don’t shutdown when power button is short-pressed
     HandlePowerKey=suspend
   '';
 
-  # Some programs need SUID wrappers, can be configured further or are
-  # started in user sessions.
-  # programs.mtr.enable = true;
-  # programs.gnupg.agent = {
-  #   enable = true;
-  #   enableSSHSupport = true;
-  # };
+  # Open ports in the firewall. dont need any on this machine
+  #networking.firewall.allowedTCPPorts = [ 22 80 433 3000 ];
+  #networking.firewall.allowedUDPPorts = [ 22 80 433 3000 ];
 
-  # List services that you want to enable:
-
-  # Open ports in the firewall.
-  networking.firewall.allowedTCPPorts = [ 22 80 433 3000 ];
-  networking.firewall.allowedUDPPorts = [ 22 80 433 3000 ];
-  # Or disable the firewall altogether.
-  # networking.firewall.enable = false;
-
-  # Copy the NixOS configuration file and link it from the resulting system
-  # (/run/current-system/configuration.nix). This is useful in case you
-  # accidentally delete configuration.nix.
-  # system.copySystemConfiguration = true;
-
-  # This value determines the NixOS release from which the default
-  # settings for stateful data, like file locations and database versions
-  # on your system were taken. It's perfectly fine and recommended to leave
-  # this value at the release version of the first install of this system.
-  # Before changing this value read the documentation for this option
-  # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "23.11"; # Did you read the comment?
+  system.stateVersion = "23.11";
 }

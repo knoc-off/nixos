@@ -12,6 +12,14 @@
 
     # Sops
     inputs.sops-nix.nixosModules.sops
+    {
+      sops.defaultSopsFile = ./secrets/hetzner/default.yaml;
+      # This will automatically import SSH keys as age keys
+      sops.age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
+
+      sops.secrets."services/nextcloud/admin-pass" = {};
+      sops.secrets."services/nextcloud/admin-pass".owner = config.users.users.nextcloud.name;
+    }
 
     # Disko
     inputs.disko.nixosModules.disko
@@ -42,9 +50,6 @@
     #];
   };
 
-  sops.defaultSopsFile = ./secrets/hetzner/default.yaml;
-  # This will automatically import SSH keys as age keys
-  sops.age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
 
   # Not needed ?
   # This is using an age key that is expected to already be in the filesystem

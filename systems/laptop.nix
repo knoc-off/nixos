@@ -14,11 +14,7 @@
     ./hardware/hardware-configuration.nix
     ./hardware/bluetooth.nix
 
-    # Disko
-    ./hardware/disks/btrfs-luks.nix
 
-    # hardware for my laptop
-    inputs.hardware.nixosModules.lenovo-thinkpad-x1-6th-gen
 
     # Secure boot
     # inputs.lanzaboote.nixosModules.lanzaboote
