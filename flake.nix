@@ -110,7 +110,6 @@
       images.laptop = nixosConfigurations.laptop.config.system.build.isoImage;
 
       nixosConfigurations = {
-
         # should rename to framework13 or something similar.
         framework13 = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
@@ -119,43 +118,18 @@
             # main entry into the system
             ./systems/framework13.nix
 
-            { boot.binfmt.emulatedSystems = [ "aarch64-linux" ]; }
-
-            # the disk im installing onto, should maybe move the actual path here too?
-            disko.nixosModules.disko
-            { disko.devices.disk.vdb.device = "/dev/nvme0n1"; }
-
-            # The Home-Manager Config
-            home-manager.nixosModules.home-manager
-            {
-              home-manager.useGlobalPkgs = false;
-              home-manager.useUserPackages = true;
-              home-manager.users.knoff = import ./home/knoff-laptop.nix;
-              home-manager.extraSpecialArgs = {
-                inherit inputs;
-                inherit outputs;
-                inherit system;
-                inherit theme;
-              };
-            }
-          ];
-        };
-
-
-        laptop = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          system = "x86_64-linux";
-          modules = [
-            # main entry into the system
-            ./systems/laptop.nix
+            # hardware for my laptop
+            inputs.hardware.nixosModules.framework-13-7040-amd
 
             { boot.binfmt.emulatedSystems = [ "aarch64-linux" ]; }
 
-            # the disk im installing onto, should maybe move the actual path here too?
+            # Disko
             disko.nixosModules.disko
             { disko.devices.disk.vdb.device = "/dev/nvme0n1"; }
+            ./systems/hardware/disks/btrfs-luks.nix
 
-            # The Home-Manager Config
+
+            # Home-Manager Config
             home-manager.nixosModules.home-manager
             {
               home-manager.useGlobalPkgs = false;
@@ -186,6 +160,10 @@
           modules = [
             "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-aarch64.nix"
 
+            # the disk im installing onto, should maybe move the actual path here too?
+            disko.nixosModules.disko
+            { disko.devices.disk.vdb.device = "/dev/mmcblk0"; }
+
             ./systems/raspberry3A.nix
             {
               nixpkgs.config.allowUnsupportedSystem = true;
@@ -196,6 +174,5 @@
           ];
         };
       };
-
     };
 }
