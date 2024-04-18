@@ -14,9 +14,6 @@
     ./hardware/bluetooth.nix
     ./hardware/fingerprint
 
-    # Secure boot
-    inputs.lanzaboote.nixosModules.lanzaboote
-    # https://github.com/nix-community/lanzaboote/blob/master/docs/QUICK_START.md
 
     # Sops
     inputs.sops-nix.nixosModules.sops
@@ -94,10 +91,6 @@
   boot.loader.systemd-boot.enable = (if config.boot.lanzaboote.enable then lib.mkForce false else true);
   boot.loader.efi.canTouchEfiVariables = true;
 
-  boot.lanzaboote = {
-    enable = true;
-    pkiBundle = "/etc/secureboot";
-  };
 
   networking.hostName = "framework"; # Define your hostname.
   networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.

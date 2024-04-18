@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "some_experiments._updated_rpi3A___________________";
+  system.nixos.label = "something_is_broken_in_my_fish____________________";
 }

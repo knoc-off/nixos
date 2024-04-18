@@ -15,11 +15,13 @@
     # color scheme
     themes.url = "github:RGBCube/ThemeNix";
 
+    # secrets management
     sops-nix.url = "github:Mic92/sops-nix";
 
     # Disko - a declarative disk partitioning tool
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
+
 
     # Build ISO files for live booting, etc.
     nixos-generators = {
@@ -107,7 +109,7 @@
       images.rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;
 
       # This is problomatic, need to override disko or something.
-      images.laptop = nixosConfigurations.laptop.config.system.build.isoImage;
+      #images.laptop = nixosConfigurations.laptop.config.system.build.isoImage;
 
       nixosConfigurations = {
         # should rename to framework13 or something similar.
@@ -121,7 +123,18 @@
             # hardware for my laptop
             inputs.hardware.nixosModules.framework-13-7040-amd
 
+            # TODO: move to a more appropriate place
             { boot.binfmt.emulatedSystems = [ "aarch64-linux" ]; }
+
+            # Secure boot
+            # https://github.com/nix-community/lanzaboote/blob/master/docs/QUICK_START.md
+            inputs.lanzaboote.nixosModules.lanzaboote
+            {
+              boot.lanzaboote = {
+                enable = nixpkgs.lib.mkDefault true;
+                pkiBundle = "/etc/secureboot";
+              };
+            }
 
             # Disko
             disko.nixosModules.disko
@@ -158,11 +171,13 @@
           specialArgs = { inherit inputs outputs; };
           system = "aarch64-linux";
           modules = [
+            # for making an sd-card image. i mainly want to have a declarative swap partition
             "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-aarch64.nix"
 
             # the disk im installing onto, should maybe move the actual path here too?
-            disko.nixosModules.disko
-            { disko.devices.disk.vdb.device = "/dev/mmcblk0"; }
+            #disko.nixosModules.disko
+            #{ disko.devices.disk.vdb.device = "/dev/disk/by-label/NIXOS_SD"; }
+            #./systems/hardware/disks/simple-swap.nix
 
             ./systems/raspberry3A.nix
             {
