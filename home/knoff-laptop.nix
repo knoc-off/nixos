@@ -75,6 +75,7 @@
     libsForQt5.grantleetheme
     wgnord
 
+    telegram-desktop
 
     prusa-slicer
 

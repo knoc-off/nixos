@@ -12,6 +12,8 @@
     ./programs/btop.nix
   ];
 
+  programs.zoxide.enable = true;
+
   home.packages = with pkgs; [
     btop # htop but better
     tiv # terminal image viewer
