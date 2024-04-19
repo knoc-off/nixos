@@ -532,7 +532,7 @@ in
           #"${mainMod} ALT, 1, movetoworkspace, special:firefox"
           #"${mainMod}, A, togglespecialworkspace, firefox"
           #"${mainMod} ALT, 2, movetoworkspace, special:2"
-          "${mainMod} ALT, 1, exec, echo \"20\" > /tmp/volume_control_fifo" # ${pkgs.volume-lerp}/bin/volume-lerp"
+          #"${mainMod} ALT, 1, exec, echo \"20\" > /tmp/volume_control_fifo" # ${pkgs.volume-lerp}/bin/volume-lerp"
           "${mainMod} ALT, 2, togglespecialworkspace, 2"
           "${mainMod} ALT, 3, togglespecialworkspace, 3"
           "${mainMod} ALT, 4, togglespecialworkspace, 4"
@@ -605,10 +605,10 @@ in
             def main [-u] {
                 mut value = 0
                 if ($u) {
-                  $value = ( ${inertia}/bin/inertia volumeUP 0.5 0.5 )
+                  $value = ( ${inertia}/bin/inertia volumeUP 1 0.5 )
                   ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ (($value | into string) + "%+")
                 } else {
-                  $value = ( ${inertia}/bin/inertia volumeDOWN 0.5 0.5 )
+                  $value = ( ${inertia}/bin/inertia volumeDOWN 1 0.5 )
                   ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ (($value | into string) + "%-")
                 }
                 if ( ( $value | into float ) > 2 ) {
