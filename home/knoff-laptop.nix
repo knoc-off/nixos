@@ -110,8 +110,8 @@
   # enable qt themes
   qt = {
     enable = true;
-    #platformTheme = "qtct";
     platformTheme = "gtk3";
+    #platformTheme.name = "gtk3";
 
     style = {
       name = "adwaita-dark";

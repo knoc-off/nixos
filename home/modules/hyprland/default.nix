@@ -14,35 +14,6 @@ let
 
   notify-send = "${pkgs.libnotify}/bin/notify-send";
 
-  # pomo timer, should move to its own module
-  start-pomo = pkgs.writeShellScriptBin "start-pomo" ''
-    if ! pgrep -x "uair" > /dev/null; then
-      ${pkgs.uair}/bin/uair > /tmp/uair.log &
-    fi
-
-    sleep 0.1
-    ${pkgs.uair}/bin/uairctl jump $1
-    sleep 0.1
-    ${pkgs.uair}/bin/uairctl resume
-
-    # Ensure there is only one instance of start-pomo running
-    # Check if another instance of script is running
-    if pidof -o %PPID -x -- "$0" >/dev/null; then
-      printf >&2 '%s\n' "ERROR: Script $0 already running"
-      exit 1
-    fi
-
-    while true; do
-      sleep 0.1
-
-      ${notify-send} -t 60000 -h string:x-canonical-private-synchronous:pomodoro -h int:value:$(${pkgs.uair}/bin/uairctl fetch "{percent}") -u low "$(${pkgs.uair}/bin/uairctl fetch "{state} {time}")" #-i "$icon" "Brightness : $current%"
-
-      while [[ $(${pkgs.uair}/bin/uairctl fetch "{state}") = "⏸" ]]; do
-        sleep 0.1
-      done
-    done
-  '';
-
   # move this to own module TODO
   # Had to result to this, as the home-manager module for swaylock seems to be broken.
   swaylock-custom = pkgs.writeShellScriptBin "swaylock-custom" ''
@@ -226,7 +197,7 @@ in
     package = hyprland;
     systemd.enable = true;
     xwayland.enable = true;
-    # plugins = with plugins; [ hyprbars borderspp ];
+    plugins = with plugins; [ ];
 
     settings = {
       exec-once = [
@@ -248,12 +219,12 @@ in
       ];
 
       general = {
-        gaps_in = 2;
-        gaps_out = 4;
+        gaps_in = -1;
+        gaps_out = -2;
         border_size = 2;
-        "col.active_border" = "0xff${theme.base02}";
-        "col.inactive_border" = "0xff${theme.base01}";
-        "col.nogroup_border_active" = "0xff${theme.base02}";
+        "col.active_border" = "0xff${theme.green00}";
+        "col.inactive_border" = "0xff${theme.gray01}";
+        "col.nogroup_border_active" = "0x00${theme.base02}"; # transparent
         "col.nogroup_border" = "0x99${theme.base01}";
 
         layout = "master";
@@ -284,7 +255,9 @@ in
       misc = {
         layers_hog_keyboard_focus = false;
         disable_hyprland_logo = true;
-        disable_splash_rendering = true;
+        disable_splash_rendering = true; # the setting does nothing...
+        "col.splash" = "0x00000000";
+        new_window_takes_over_fullscreen = 2; # new window will un-fullscreen current.
         force_default_wallpaper = 0;
         animate_manual_resizes = true;
         enable_swallow = false;
@@ -521,10 +494,11 @@ in
           # group
           "${mainMod}, G, togglegroup, 0"
           "${mainMod}, L, exec,  ${swaylock-custom}/bin/swaylock-custom 0 120x6 10 0"
+          "${mainMod}, asciitilde, exec,  ${pkgs.kitty}/bin/kitty nx rt"
 
           # pomo timer
-          "${mainMod}, period, exec, ${pkgs.uair}/bin/uairctl toggle"
-          "${mainMod}, comma, exec, ${start-pomo}/bin/start-pomo work"
+          #"${mainMod}, period, exec, ${pkgs.uair}/bin/uairctl toggle"
+          #"${mainMod}, comma, exec, ${start-pomo}/bin/start-pomo work"
           #uair | yad --title "uair" --progress --no-buttons --css="* { font-size: 80px; }" & sleep 1 && uairctl resume
           #''${mainMod}, P, exec,  ''
 
@@ -558,7 +532,7 @@ in
         let
           light = "${pkgs.light}/bin/light";
           wpctl = "${pkgs.wireplumber}/bin/wpctl";
-          inertia = pkgs.writeNuScript "inertia"
+          inertia = "${pkgs.writeNuScript "inertia"
           ''
             def reset_values [target: path, time: float, value: float] {
                 {
@@ -567,63 +541,82 @@ in
                 } | to json | save -f $target
             }
 
-            def main [ name: string, incrementPerSecond: float, initalValue: float ] {
-                let datafile = ( "/tmp/inertia-" + $name ) | path expand
-                if ( not ( echo $datafile | path exists ) ) {
-                    reset_values $datafile 0 $initalValue
+            def main [
+                name: string = "default",
+                --increment (-i): float = 1.0,
+                --initialValue (-I): float = 1.0,
+                --speed (-s): float = 0.15
+            ] {
+                let datafile = ("/tmp/inertia-" + $name) | path expand
+                if not (echo $datafile | path exists) {
+                    reset_values $datafile 0 $initialValue
                 }
 
-                mut old = (open $datafile) | from json
+                let old = (open $datafile) | from json
 
                 let current_time = ${pkgs.ruby}/bin/ruby -e 'puts Time.now.to_f'
                 let current_time = $current_time | into float
-                let delta_time = (( $old.time | into float ) - ( $current_time | into float ) ) | math abs
+                let delta_time = (($old.time | into float) - ($current_time | into float)) | math abs
 
-                if ( $delta_time > 0.5 ) {
-                    reset_values $datafile $current_time $initalValue
-                    return
+                if $delta_time > $speed {
+                    reset_values $datafile $current_time $initialValue
+                    return $initialValue
                 }
 
-                $old.value =  ( $old.value ) + ($delta_time * $incrementPerSecond)
-                echo $old.value
-
-                reset_values $datafile $current_time $old.value
+                let new_value = ($old.value) + ($delta_time * $increment)
+                echo $new_value
+                reset_values $datafile $current_time $new_value
+                return $new_value
             }
-          '';
+          ''}/bin/inertia";
           brightness = pkgs.writeNuScript "brightness" ''
             def main [-u] {
-                if ($u) {
-                  let value = ${inertia}/bin/inertia brightnessUP 2 0.1
-                  light -A $value
+                let value = if ($u) {
+                  ${inertia} brightnessUP --increment 1 --initialValue 0.5 --speed 0.15
+
                 } else {
-                  let value = ${inertia}/bin/inertia brightnessDOWN 2 0.1
-                  light -U $value
+                  ${inertia} brightnessDOWN --increment 1 --initialValue 0.5 --speed 0.15
                 }
+                if ($u) {
+                  ${pkgs.light}/bin/light -A ($value)
+                } else {
+                  ${pkgs.light}/bin/light -U ($value)
+                }
+
+                ${notify-bar} brightnessbar (${pkgs.light}/bin/light) (${pkgs.light}/bin/light)
+                ${notify-msg} value $value
             }
           '';
           volumeScript = pkgs.writeNuScript "volume" ''
             def main [-u] {
-                mut value = 0
-                if ($u) {
-                  $value = ( ${inertia}/bin/inertia volumeUP 1 0.5 )
-                  ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ (($value | into string) + "%+")
-                } else {
-                  $value = ( ${inertia}/bin/inertia volumeDOWN 1 0.5 )
-                  ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ (($value | into string) + "%-")
-                }
-                if ( ( $value | into float ) > 2 ) {
-                  ${pkgs.libcanberra-gtk3}/bin/canberra-gtk-play -i audio-volume-change -d "changeVolume"
-                }
-                ${volume}/bin/volume
+              let value = if ($u) {
+                ${inertia} volumeUP -i 1 -I 0.5 -s 0.15
+              } else {
+                ${inertia} volumeDOWN -i 1 -I 0.5 -s 0.15
+              }
+
+              let percentage = if ($u) {
+                ($value | into string) + "%+"
+              } else {
+                ($value | into string) + "%-"
+              }
+
+              ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ $percentage
+
+              #if ($value | into float) > 2 {
+              #  ${pkgs.libcanberra-gtk3}/bin/canberra-gtk-play -i audio-volume-change -d "changeVolume"
+              #}
+
+              ${notify-bar} volbar (${pkgs.pamixer}/bin/pamixer --get-volume) (${pkgs.pamixer}/bin/pamixer --get-volume-human)
+              ${notify-msg} value $value
             }
           '';
-          notify-bar = pkgs.writeShellScriptBin "notify-bar" ''
-            ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:volume -h int:value:$1 -u low "$@"
-          '';
-
-          volume = pkgs.writeShellScriptBin "volume" ''
-            ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:volume -h int:value:$(${pkgs.pamixer}/bin/pamixer --get-volume) -u low "$(${pkgs.pamixer}/bin/pamixer --get-volume-human)"
-          '';
+          notify-msg = "${pkgs.writeShellScriptBin "notify-msg" ''
+            ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:$1 -u low "''${@:2}"
+          ''}/bin/notify-msg";
+          notify-bar = "${pkgs.writeShellScriptBin "notify-bar" ''
+            ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:$1 -h int:value:$2 -u low "''${@:3}"
+          ''}/bin/notify-bar";
         in
         [
           ",XF86MonBrightnessUp,  exec,  ${brightness}/bin/brightness -u"
@@ -650,16 +643,17 @@ in
       ];
 
       decoration = {
-        rounding = 10;
-        inactive_opacity = 0.95;
+        rounding = 3; # 10;
+        inactive_opacity = 1;
         drop_shadow = false;
-        shadow_range = 2;
+        shadow_range = 0;
         "col.shadow" = "0xff${theme.base01}";
         shadow_render_power = 2;
-        dim_inactive = false;
+        dim_inactive = true;
+        dim_strength = 0.20;
 
         blur = {
-          enabled = true;
+          enabled = false;
           size = 8;
           passes = 3;
           new_optimizations = "on";
