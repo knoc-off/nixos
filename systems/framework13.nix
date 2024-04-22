@@ -55,6 +55,12 @@
     ];
   };
 
+
+
+
+
+
+
   #qt.style = "gtk2";
   environment.etc =
     let
@@ -77,6 +83,14 @@
       #  gtk-application-prefer-dark-theme=1
       #  gtk-error-bell=false
       #'';
+
+
+      "current-system-packages".text =
+        let
+          packages = builtins.map (p: "${p.name}") config.environment.systemPackages;
+          sortedUnique = builtins.sort builtins.lessThan (lib.unique packages);
+          formatted = builtins.concatStringsSep "\n" sortedUnique;
+        in formatted;
 
     };
 
