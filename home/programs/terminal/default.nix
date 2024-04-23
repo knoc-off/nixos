@@ -1,7 +1,5 @@
 {
-  inputs,
   pkgs,
-  libs,
   theme,
   config,
   ...

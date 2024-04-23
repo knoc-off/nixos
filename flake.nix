@@ -68,7 +68,6 @@
     , nixpkgs
     , home-manager
     , disko
-    , nixos-generators
     , ...
     }:
     let

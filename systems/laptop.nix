@@ -2,7 +2,6 @@
 # each setting that is not super obvious should have, what impact it has, and why.
 # for example enabling 32bit support for opengl, is needed for steam.
 { lib
-, inputs
 , config
 , pkgs
 , outputs

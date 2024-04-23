@@ -22,8 +22,9 @@
       # This will automatically import SSH keys as age keys
       sops.age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
 
-      sops.secrets."hashedpassword" = {};
-      sops.secrets."hashedpassword".owner = config.users.users.knoff.name;
+      #sops.secrets."" = {};
+      #sops.secrets."hashedpassword" = {};
+      #sops.secrets."hashedpassword".owner = config.users.users.knoff.name;
     }
 
     # pipewire / Audio
@@ -220,7 +221,7 @@
         then pkgs.zsh
       else pkgs.bash;
     extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
-    hashedPasswordFile = config.sops.secrets."hashedpassword".path;
+    #hashedPasswordFile = config.sops.secrets."hashedpassword".path;
     openssh.authorizedKeys.keys = [
     ];
   };

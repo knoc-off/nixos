@@ -1,8 +1,6 @@
 {
-  lib,
   theme,
   pkgs,
-  config,
   ...
 }: {
   programs.zsh = {

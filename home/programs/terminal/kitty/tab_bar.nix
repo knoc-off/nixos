@@ -1,8 +1,4 @@
 {
-  pkgs,
-  config,
-  nix-color,
-  lib,
   ...
 }: {
   home.file.".config/kitty/tab_bar.py" = {

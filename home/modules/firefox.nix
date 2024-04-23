@@ -15,29 +15,14 @@ with lib; let
   profileName = "main";
 
   # Your firefox install path
-  firefoxPath = ".mozilla/firefox";
 
   # The location of your firefox config
-  profilePath = "${firefoxPath}/${profileName}";
 
   # Firefox Addons, may want to change this at some point
   addons = inputs.firefox-addons.packages.${pkgs.system};
 
   # can add these to a flake.
   # shold link these a directory back, so that it can be reused.
-  Edge-Mimicry = pkgs.fetchFromGitHub {
-    owner = "UnlimitedAvailableUsername";
-    repo = "Edge-Mimicry-Tree-Style-Tab-For-Firefox";
-    rev = "f9c59082c4803aace8c07fe9888b0216e9e680a7";
-    sha256 = "sha256-dEaWqwbui70kCzBeNjJIttKSSgi4rAncc8tGcpGvpl4=";
-  };
-
-  firefox-csshacks = pkgs.fetchFromGitHub {
-    owner = "MrOtherGuy";
-    repo = "firefox-csshacks";
-    rev = "67a9e9f9c96e6d007b4c57f1dd7eaceaee135178";
-    sha256 = "sha256-uz6tqkjjTFMvY6IY70ke8dW5nst0AJoWJHObtzalQAc=";
-  };
 
   cfg = config.services.firefoxBrowser;
 in {

@@ -1,13 +1,5 @@
-{ conf
-, pkgs
-, lib
-, ...
+{ ...
 }:
-let
-  config_dir = "/home/knoff/nixos";
-  configName = "framework13";
-  #homeConfigName = "knoff/laptop";
-in
 {
   programs.fish = {
     enable = true;

@@ -1,8 +1,5 @@
 {
-  inputs,
   pkgs,
-  libs,
-  config,
   ...
 }: {
   # command line tools.
