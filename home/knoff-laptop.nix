@@ -1,8 +1,6 @@
 #NixOS, home-manager, system configuration, package installation, program enablement, system options.
 {
-  inputs,
   outputs,
-  lib,
   config,
   pkgs,
   ...
@@ -44,7 +42,6 @@
 
 
 
-
   disabledModules = ["programs/eww.nix"];
   programs.git = {
     enable = true;
@@ -65,6 +62,8 @@
 
   # TODO: move this to someplace more logical
   home.packages = with pkgs; [
+
+    evince
 
     obsidian
 
@@ -94,7 +93,7 @@
     overlays = builtins.attrValues outputs.overlays;
     config = {
       allowUnfree = true;
-      allowUnfreePredicate = pkg: true;
+      allowUnfreePredicate = _pkg: true;
     };
   };
 
@@ -135,7 +134,7 @@
     };
     iconTheme = {
       name = "Fluent-Dark";
-      package = pkgs.fluent-gtk-theme;
+      package = pkgs.fluent-icon-theme;
     };
     cursorTheme = {
       name = "Vanilla-DMZ";

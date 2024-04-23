@@ -1,8 +1,5 @@
 {
-  pkgs,
-  config,
   theme,
-  lib,
   ...
 }: let
   isValidColor = thing:
@@ -49,7 +46,7 @@ in {
       window_padding_width = 0;
       foreground = "${withHashtag.base06}";
       background = "${withHashtag.base01}";
-      selection_background = "${withHashtag.base02}";
+      selection_background = "${withHashtag.base03}";
       selection_foreground = "none";
       url_color = "${withHashtag.blue00}";
       cursor = "${withHashtag.base06}";

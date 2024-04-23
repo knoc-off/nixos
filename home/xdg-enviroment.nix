@@ -1,4 +1,4 @@
-{pkgs, lib, ...}:
+{pkgs, ...}:
 {
   xdg.desktopEntries = {
     firefox-minimal = {

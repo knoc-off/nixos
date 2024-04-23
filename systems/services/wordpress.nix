@@ -1,4 +1,4 @@
-{ pkgs, ... }: let
+{ ... }: let
   domain = "niko.ink";
 in {
 

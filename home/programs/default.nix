@@ -1,8 +1,5 @@
 {
-  inputs,
   pkgs,
-  libs,
-  config,
   ...
 }: {
   # should move all of the following to their own files.

@@ -1,7 +1,4 @@
 {
-  inputs,
-  lib,
-  pkgs,
   ...
 }: {
   services.fprintd = {

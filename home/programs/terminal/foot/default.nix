@@ -1,23 +1,5 @@
-{ pkgs
-, config
-, theme
-, lib
-, ...
+{ ...
 }:
-let
-  isValidColor = thing:
-    if builtins.isString thing
-    then (builtins.match "^[0-9a-fA-F]{6}" thing) != null
-    else false;
-  withHashtag =
-    theme
-    // (builtins.mapAttrs
-      (_: value:
-        if isValidColor value
-        then "#" + value
-        else value)
-      theme);
-in
 {
 
   programs.foot = {

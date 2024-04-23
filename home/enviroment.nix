@@ -1,4 +1,4 @@
-{pkgs, ...}: {
+{ ...}: {
   home = {
     sessionVariables = {
       # Editor and shell

@@ -42,7 +42,6 @@
 
   environment.systemPackages = with pkgs; [
     gnome.adwaita-icon-theme
-    gnome.nautilus
     gnome.gnome-calendar
     gnome.gnome-boxes
     gnome.gnome-system-monitor
@@ -50,6 +49,11 @@
     gnome.gnome-weather
     gnome.gnome-calculator
     gnome.gnome-software # for flatpak
+
+    # File manager
+    cinnamon.nemo-with-extensions
+    xfce.thunar
+
     swaylock
     swayidle
 

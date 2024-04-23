@@ -1,7 +1,4 @@
 {
-  nix-colors,
-  pkgs,
-  lib,
   config,
   ...
 }: {

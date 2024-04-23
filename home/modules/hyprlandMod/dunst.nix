@@ -1,7 +1,5 @@
 {
-  pkgs,
   theme,
-  config,
   ...
 }: {
   services.dunst = {

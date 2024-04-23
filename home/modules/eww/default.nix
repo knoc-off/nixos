@@ -5,8 +5,6 @@
   ...
 }:
 with lib; let
-  pamixer = "${pkgs.pamixer}/bin/pamixer";
-  pactl = "${pkgs.pulseaudio}/bin/pactl";
 
   cfg = config.programs.eww;
 in {
@@ -53,7 +51,6 @@ in {
 
     xdg.configFile = let
       dir = "eww";
-      scripts = "${dir}/scripts";
     in {
       "${dir}/eww.yuck" = {
         text =

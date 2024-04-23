@@ -1,7 +1,4 @@
 {
-  pkgs,
-  config,
-  libs,
   ...
 }: {
   programs.ssh = {

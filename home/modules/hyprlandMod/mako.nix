@@ -1,7 +1,4 @@
 {
-  pkgs,
-  theme,
-  config,
   ...
 }: {
   services.mako = {

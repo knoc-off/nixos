@@ -1,5 +1,4 @@
 {
-  inputs,
   ...
 }: {
   # Prism launcher is better
@@ -9,9 +8,9 @@
   # Backlink
   additions = final: _prev: import ../pkgs {pkgs = final;};
 
-  modifications = final: prev: {
+  modifications = _final: prev: {
 
-    spotiblock = prev.spotify.overrideAttrs (old: rec {
+    spotiblock = prev.spotify.overrideAttrs (_old: rec {
       postInstall = ''
         ExecMe="env LD_PRELOAD=${prev.spotify-adblock}/lib/libspotifyadblock.so spotify"
 

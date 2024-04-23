@@ -2,6 +2,7 @@
 , pkgs
 , theme
 , config
+, lib
 , ...
 }:
 let
@@ -62,16 +63,17 @@ let
 
   # hyprpaper config
   # need to put the wallpaper into the nix-store.
-  wallpaper =
-    pkgs.writeText "wallpaper"
+  wallpaper = pkgs.writeText "wallpaper"
       ''
         preload = ${./wallpaper-nixos.png}
         wallpaper = eDP-1, ${./wallpaper-nixos.png}
+        splash = false
       '';
 in
 {
 
   imports = [
+    #./hyprSubmaps.nix
     ./dunst.nix
     ./pyprland.nix
     #./mako.nix
@@ -158,7 +160,7 @@ in
       scratchpads = {
         file = {
           animation = "fromBottom";
-          command = "nautilus";
+          command = "nemo";
           class = "filemanager";
           size = "75% 60%";
           unfocus = "hide";
@@ -192,7 +194,32 @@ in
   # ~~~~~~~~~
 
 
-  wayland.windowManager.hyprland = {
+  wayland.windowManager.hyprland = let
+          mainMod = "SUPER";
+  in {
+
+
+
+    #submaps = {
+    #  resize = {
+    #    keybinds = [
+    #      "binde = , right, resizeactive, 10 0"
+    #      "binde = , left, resizeactive, -10 0"
+    #      "binde = , up, resizeactive, 0 -10"
+    #      "binde = , down, resizeactive, 0 10"
+    #    ];
+    #  };
+    #  metameta = {
+    #    keybinds = [
+    #      "binde = , right, resizeactive, 10 0"
+    #      "binde = , left, resizeactive, -10 0"
+    #      "binde = , up, resizeactive, 0 -10"
+    #      "binde = , down, resizeactive, 0 10"
+    #    ];
+    #  };
+    #};
+
+
     enable = true;
     package = hyprland;
     systemd.enable = true;
@@ -369,11 +396,8 @@ in
       windowrulev2 =
         let
           float = class: (title: "float, class:(${class}), title:(${title})");
-          pin = class: (title: "pin, class:(${class}), title:(${title})");
-          opacity = class: (title: (opacity: "opacity ${builtins.toString opacity}, class:(${class}), title:(${title})"));
           fakeFullscreen = class: "fakefullscreen, class:(${class})";
           #size = class: (title: (size: "float, class:(${class}), title:(${title})"));
-          idleinhibit = mode: (class: (title: "idleinhibit ${mode}, class:(${class}), title:(${title})"));
           window = class: (title: (to: "workspace ${to}, class:(${class}), title:(${title})"));
         in
         [
@@ -442,7 +466,6 @@ in
             }
           '';
 
-          mainMod = "SUPER";
           binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
           mvfocus = binding "${mainMod}" "movefocus";
           ws = binding "${mainMod}" "workspace";
@@ -452,7 +475,7 @@ in
           #e = "exec, ags -b hypr";
           arr = [ 1 2 3 4 5 6 7 8 9 ]; # could reduce this to just 1 .. 9 probably
 
-          acpi = "${pkgs.acpi}/bin/acpi";
+          acpi = (lib.getExe pkgs.acpi);
 
 
 
@@ -474,6 +497,9 @@ in
           #"${mainMod}, P, togglesplit"
           "${mainMod}, SPACE, exec, ${fuzzel}"
           "${mainMod}, A, exec, ${nu-focus}/bin/focus firefox"
+
+          # "${mainMod}, ALT, submap, metameta"
+          # bind=ALT,R,submap,resize
 
           # Scratch workspaces
           "${mainMod}, T, exec, pypr toggle term"
@@ -685,6 +711,28 @@ in
           "workspaces, 1, 3, default"
         ];
       };
+
+
+
+    # Add a way to create submaps.
+    # submap consists of a name, binds, and an exit/reset
+    #    extraConfig = ''
+    #      # window resize
+    #      bind = $mod, S, submap, resize
+    #
+    #      submap = resize
+    #      binde = , right, resizeactive, 10 0
+    #      binde = , left, resizeactive, -10 0
+    #      binde = , up, resizeactive, 0 -10
+    #      binde = , down, resizeactive, 0 10
+    #      bind = , escape, submap, reset
+    #      submap = reset
+    #
+    #
+    #    '';
     };
+
+
+
   };
 }

@@ -1,4 +1,4 @@
-{ pkgs, lib, ... }:
+{ pkgs, ... }:
 let
   config_dir = "~/nixos";
   config_name = "framework13";

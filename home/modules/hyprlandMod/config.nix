@@ -392,10 +392,7 @@ in
       windowrulev2 =
         let
           float = class: (title: "float, class:(${class}), title:(${title})");
-          pin = class: (title: "pin, class:(${class}), title:(${title})");
-          opacity = class: (title: (opacity: "opacity ${builtins.toString opacity}, class:(${class}), title:(${title})"));
           #size = class: (title: (size: "float, class:(${class}), title:(${title})"));
-          idleinhibit = mode: (class: (title: "idleinhibit ${mode}, class:(${class}), title:(${title})"));
           window = class: (title: (to: "workspace ${to}, class:(${class}), title:(${title})"));
         in
         [
@@ -550,7 +547,6 @@ in
 
       bindle =
         let
-          light = "${pkgs.light}/bin/light";
           wpctl = "${pkgs.wireplumber}/bin/wpctl";
           inertia = pkgs.writeNuScript "inertia"
           ''
