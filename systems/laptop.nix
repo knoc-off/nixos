@@ -6,6 +6,7 @@
 , pkgs
 , outputs
 , modulesPath
+, inputs
 , ...
 }: {
   imports = [
@@ -14,6 +15,7 @@
     ./hardware/bluetooth.nix
 
 
+    inputs.lanzaboote.nixosModules.lanzaboote
 
     # Secure boot
     # inputs.lanzaboote.nixosModules.lanzaboote
