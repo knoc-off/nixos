@@ -22,18 +22,18 @@
 
   services.nginx.enable = true;
 
-#  services.nginx.virtualHosts."niko.ink" = {
-#    forceSSL = true;
-#    enableACME = true;
-#    locations."/" = {
-#      proxyPass = "http://127.0.0.1:3000";
-#      proxyWebsockets = true;
-#      extraConfig = ''
-#        proxy_set_header Upgrade $http_upgrade;
-#        proxy_set_header Connection "upgrade";
-#      '';
-#    };
-#  };
+  services.nginx.virtualHosts."niko.ink" = {
+    forceSSL = true;
+    enableACME = true;
+    locations."/" = {
+      proxyPass = "http://127.0.0.1:8080";
+      proxyWebsockets = true;
+      extraConfig = ''
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+      '';
+    };
+  };
 
 
 

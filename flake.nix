@@ -1,5 +1,59 @@
 {
-  description = "A decaratve nix config";
+  description = "A declarative Nix config";
+
+  inputs = {
+    # Nixpkgs
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+
+    # my custom website
+    mywebsite.url = "github:knoc-off/Actix-website";
+
+    # Home Manager
+    home-manager = {
+      url = "github:nix-community/home-manager";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Hardware-specific configurations
+    hardware.url = "github:nixos/nixos-hardware";
+
+    # Color scheme
+    themes.url = "github:RGBCube/ThemeNix";
+
+    # Disko - declarative disk partitioning
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Secure boot
+    lanzaboote.url = "github:nix-community/lanzaboote";
+
+    # NixOS generators
+    nixos-generators = {
+      url = "github:nix-community/nixos-generators";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Neovim config
+    nixvim-flake.url = "github:knoc-off/neovim-config";
+
+    # Firefox add-ons
+    firefox-addons = {
+      url = "gitlab:rycee/nur-expressions?dir=pkgs/firefox-addons";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    # Hyprland
+    hyprland.url = "github:hyprwm/hyprland";
+    hyprland-plugins = {
+      url = "github:hyprwm/hyprland-plugins";
+      inputs.hyprland.follows = "hyprland";
+    };
+
+    # Secrets management
+    sops-nix.url = "github:Mic92/sops-nix";
+  };
 
   nixConfig = {
     extra-substituters = [
@@ -11,69 +65,11 @@
     ];
   };
 
-  inputs = {
-    # color scheme
-    themes.url = "github:RGBCube/ThemeNix";
-
-    # secrets management
-    sops-nix.url = "github:Mic92/sops-nix";
-
-    # Disko - a declarative disk partitioning tool
-    disko.url = "github:nix-community/disko";
-    disko.inputs.nixpkgs.follows = "nixpkgs";
-
-
-    # Build ISO files for live booting, etc.
-    nixos-generators = {
-      url = "github:nix-community/nixos-generators";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    # my neovim config
-    nixvim-flake.url = "github:knoc-off/neovim-config";
-
-    #nixpkgs.url = "github:nixos/nixpkgs/nixos-23.05";
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-
-    # Firefox add-ons packaged for Nix
-    firefox-addons = {
-      url = "gitlab:rycee/nur-expressions?dir=pkgs/firefox-addons";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    # Hyprland
-    hyprland.url = "github:hyprwm/hyprland";
-    hyprland-plugins.url = "github:hyprwm/hyprland-plugins";
-    hyprland-plugins.inputs.hyprland.follows = "hyprland";
-
-    # Home Manager (for managing user environments using Nix)
-    home-manager.url = "github:nix-community/home-manager";
-    home-manager.inputs.nixpkgs.follows = "nixpkgs";
-
-    # NixOS hardware-specific configurations
-    hardware.url = "github:nixos/nixos-hardware";
-
-    # TPM
-    lanzaboote.url = "github:nix-community/lanzaboote";
-
-
-    # experimental things:
-    #nuenv.url = "github:DeterminateSystems/nuenv";
-
-  };
-
-  outputs =
-    inputs @ { self
-    , themes
-    , nixpkgs
-    , home-manager
-    , disko
-    , ...
-    }:
+  outputs = inputs @ { self, nixpkgs, home-manager, disko, ... }:
     let
       inherit (self) outputs;
+      theme = inputs.themes.custom (import ./theme.nix);
 
-      # Supported systems for your flake packages, shell, etc.
       systems = [
         "aarch64-linux"
         "i686-linux"
@@ -81,53 +77,27 @@
         "aarch64-darwin"
         "x86_64-darwin"
       ];
-      # This is a function that generates an attribute by calling a function you
-      # pass to it, with each system as an argument
+
       forAllSystems = nixpkgs.lib.genAttrs systems;
-
-      system = "x86_64-linux";
-      #pkgs = import nixpkgs {
-      #  system = "x86_64-linux";
-      #  config.allowUnfree = true;
-      #};
-
-      # theme
-      theme = themes.custom (import ./theme.nix);
     in
-    rec
-    {
-
-      # custom packages
+    rec {
       packages = forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system});
 
-      # Your custom packages and modifications, exported as overlays
-      overlays = import ./overlays {
-        inherit inputs;
+      overlays = import ./overlays { inherit inputs; };
+
+      images = {
+        rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;
       };
 
-      images.rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;
-
-      # This is problomatic, need to override disko or something.
-      #images.laptop = nixosConfigurations.laptop.config.system.build.isoImage;
-
       nixosConfigurations = {
-        # should rename to framework13 or something similar.
         framework13 = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           system = "x86_64-linux";
           modules = [
-            # main entry into the system
             ./systems/framework13.nix
-
-            # hardware for my laptop
             inputs.hardware.nixosModules.framework-13-7040-amd
-
-            # TODO: move to a more appropriate place
             { boot.binfmt.emulatedSystems = [ "aarch64-linux" ]; }
 
-            # Secure boot
-            # https://github.com/nix-community/lanzaboote/blob/master/docs/QUICK_START.md
-            inputs.lanzaboote.nixosModules.lanzaboote
             {
               boot.lanzaboote = {
                 enable = nixpkgs.lib.mkDefault true;
@@ -135,29 +105,22 @@
               };
             }
 
-            # Disko
             disko.nixosModules.disko
             { disko.devices.disk.vdb.device = "/dev/nvme0n1"; }
             ./systems/hardware/disks/btrfs-luks.nix
-
-
-            # Home-Manager Config
             home-manager.nixosModules.home-manager
             {
               home-manager.useGlobalPkgs = false;
               home-manager.useUserPackages = true;
               home-manager.users.knoff = import ./home/knoff-laptop.nix;
               home-manager.extraSpecialArgs = {
-                inherit inputs;
-                inherit outputs;
-                inherit system;
-                inherit theme;
+                inherit inputs outputs theme;
+                system = "x86_64-linux";
               };
             }
           ];
         };
 
-        # hetzner-cloud server.
         hetzner-cloud = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           system = "x86_64-linux";
@@ -170,23 +133,41 @@
           specialArgs = { inherit inputs outputs; };
           system = "aarch64-linux";
           modules = [
-            # for making an sd-card image. i mainly want to have a declarative swap partition
             "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-aarch64.nix"
-
-            # the disk im installing onto, should maybe move the actual path here too?
-            #disko.nixosModules.disko
-            #{ disko.devices.disk.vdb.device = "/dev/disk/by-label/NIXOS_SD"; }
-            #./systems/hardware/disks/simple-swap.nix
-
             ./systems/raspberry3A.nix
             {
               nixpkgs.config.allowUnsupportedSystem = true;
-              #nixpkgs.hostPlatform.system = "armv7l-linux";
               nixpkgs.hostPlatform.system = "aarch64-linux";
-              #nixpkgs.buildPlatform.system = "x86_64-linux";
             }
           ];
         };
+
+
+        laptop-iso = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          system = "x86_64-linux";
+          modules = [
+            "${nixpkgs}/nixos/modules/installer/cd-dvd/iso-image.nix"
+            ./systems/framework13.nix
+            {
+              # Define a minimal disk layout for the laptop ISO
+              boot.loader.grub.device = "/dev/sda";
+              fileSystems."/" = {
+                device = "/dev/sda1";
+                fsType = "ext4";
+              };
+            }
+           {
+             isoImage = {
+              isoName = "laptop-image.iso";
+              volumeID = "NIXOS_LIVE";
+              # Set the size of the ISO image (in megabytes)
+            };
+          }
+          ];
+        };
       };
+      images.laptop = nixosConfigurations.laptop-iso.config.system.build.isoImage;
     };
 }
+

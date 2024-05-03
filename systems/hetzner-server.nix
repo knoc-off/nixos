@@ -17,8 +17,11 @@
       # This will automatically import SSH keys as age keys
       sops.age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
 
-      sops.secrets."services/nextcloud/admin-pass" = {};
-      sops.secrets."services/nextcloud/admin-pass".owner = config.users.users.nextcloud.name;
+      sops.secrets = if config.services.nextcloud.enable then {
+        "services/nextcloud/admin-pass" = {
+          owner = config.users.users.nextcloud.name;
+        };
+      } else {};
     }
 
     # Disko
@@ -33,6 +36,7 @@
 
     # services
     ./services/nginx.nix
+    ./services/website.nix
 
     # nextcloud
     # ./services/nextcloud.nix
@@ -40,6 +44,7 @@
     # ./services/wordpress-oci.nix
   ];
 
+  networking.hostName = "oink";
   # Firewall
   networking.firewall = {
     enable = false;

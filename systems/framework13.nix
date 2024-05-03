@@ -14,6 +14,8 @@
     ./hardware/bluetooth.nix
     ./hardware/fingerprint
 
+    # lanzaboot
+    inputs.lanzaboote.nixosModules.lanzaboote
 
     # Sops
     inputs.sops-nix.nixosModules.sops
@@ -221,7 +223,7 @@
         then pkgs.zsh
       else pkgs.bash;
     extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
-    #hashedPasswordFile = config.sops.secrets."hashedpassword".path;
+    hashedPassword = "$y$j9T$jtFWvdQ6ghoncJ8srfdQn0$JN8OSftIfzHQmSpIZqeQyeK/Nrb8OQCbET5x2n82Yr9";
     openssh.authorizedKeys.keys = [
     ];
   };

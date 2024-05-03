@@ -63,10 +63,18 @@ let
 
   # hyprpaper config
   # need to put the wallpaper into the nix-store.
-  wallpaper = pkgs.writeText "wallpaper"
+  wallpaper =
+    let
+      wallpaper-img = pkgs.fetchurl {
+        url = "https://images.squarespace-cdn.com/content/v1/6554594506867677bdd68b03/a30ca789-db30-4413-8dc5-40726c893d7a/SCAV+new+intro+bg+02+copy.jpg";
+        sha256 = "sha256-oGjPyBq56rweu7/Lo9SJudF/vg7uL1X/qpus9fFkEmw="; # Replace with the actual SHA-256 hash
+      };
+    in
+
+  pkgs.writeText "wallpaper"
       ''
-        preload = ${./wallpaper-nixos.png}
-        wallpaper = eDP-1, ${./wallpaper-nixos.png}
+        preload = ${wallpaper-img}
+        wallpaper = eDP-1, ${wallpaper-img}
         splash = false
       '';
 in
@@ -195,7 +203,14 @@ in
 
 
   wayland.windowManager.hyprland = let
-          mainMod = "SUPER";
+
+    notify-msg = "${pkgs.writeShellScriptBin "notify-msg" ''
+      ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:$1 -u low "''${@:2}"
+    ''}/bin/notify-msg";
+    notify-bar = "${pkgs.writeShellScriptBin "notify-bar" ''
+      ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:$1 -h int:value:$2 -u low "''${@:3}"
+    ''}/bin/notify-bar";
+    mainMod = "SUPER";
   in {
 
 
@@ -634,15 +649,9 @@ in
               #}
 
               ${notify-bar} volbar (${pkgs.pamixer}/bin/pamixer --get-volume) (${pkgs.pamixer}/bin/pamixer --get-volume-human)
-              ${notify-msg} value $value
+              #${notify-msg} value $value
             }
           '';
-          notify-msg = "${pkgs.writeShellScriptBin "notify-msg" ''
-            ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:$1 -u low "''${@:2}"
-          ''}/bin/notify-msg";
-          notify-bar = "${pkgs.writeShellScriptBin "notify-bar" ''
-            ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:$1 -h int:value:$2 -u low "''${@:3}"
-          ''}/bin/notify-bar";
         in
         [
           ",XF86MonBrightnessUp,  exec,  ${brightness}/bin/brightness -u"
@@ -657,10 +666,14 @@ in
       bindl =
         let
           wpctl = "${pkgs.wireplumber}/bin/wpctl";
+          mute = "${pkgs.writeNuScript "mute" ''
+              ${wpctl} set-mute @DEFAULT_AUDIO_SINK@ toggle
+              ${notify-bar} volbar (${pkgs.pamixer}/bin/pamixer --get-volume) (${pkgs.pamixer}/bin/pamixer --get-volume-human)
+          ''}/bin/mute";
         in
         [
-          ",XF86AudioMute, exec, ${wpctl} set-mute @DEFAULT_AUDIO_SINK@ toggle"
-          "SUPER, XF86AudioMute, exec, ${wpctl} set-mute @DEFAULT_AUDIO_SOURCE@ toggle"
+          ",XF86AudioMute, exec, ${mute}"
+          "SUPER, XF86AudioMute, exec, ${mute}"
         ];
 
       bindm = [
