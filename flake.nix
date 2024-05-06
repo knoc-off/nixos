@@ -6,7 +6,8 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
     # my custom website
-    mywebsite.url = "github:knoc-off/Actix-website";
+    #mywebsite.url = "github:knoc-off/Actix-website";
+    mywebsite.url = "github:knoc-off/Website";
 
     # Home Manager
     home-manager = {

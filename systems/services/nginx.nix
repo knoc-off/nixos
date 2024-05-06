@@ -1,7 +1,15 @@
 {
   config,
+  inputs,
   ...
-}: {
+}:
+
+let
+  system = "x86_64-linux";
+  baseDir = "niko.ink";
+
+in {
+
   sops.secrets."services/acme/namecheap-user" = {};
   sops.secrets."services/acme/namecheap-key" = {};
 
@@ -25,17 +33,27 @@
   services.nginx.virtualHosts."niko.ink" = {
     forceSSL = true;
     enableACME = true;
-    locations."/" = {
-      proxyPass = "http://127.0.0.1:8080";
-      proxyWebsockets = true;
-      extraConfig = ''
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-      '';
+    locations = {
+      "/" = {
+        root = "${inputs.mywebsite.packages.${system}.portfolio}/lib";
+      };
     };
   };
 
-
+  # passing proxy, port
+#  services.nginx.virtualHosts."niko.ink" = {
+#    forceSSL = true;
+#    enableACME = true;
+#    locations."/" = {
+#      proxyPass = "http://127.0.0.1:8080";
+#      proxyWebsockets = true;
+#      extraConfig = ''
+#        proxy_set_header Upgrade $http_upgrade;
+#        proxy_set_header Connection "upgrade";
+#      '';
+#    };
+#  };
+#
 
 
 #  # Eileen Domain:
