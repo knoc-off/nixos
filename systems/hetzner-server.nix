@@ -36,7 +36,6 @@
 
     # services
     ./services/nginx.nix
-    ./services/website.nix
 
     # nextcloud
     # ./services/nextcloud.nix
