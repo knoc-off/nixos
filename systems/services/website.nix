@@ -1,8 +1,9 @@
-{ inputs, config, lib, ... }:
-{
+{ config, pkgs, inputs, ... }:
 
-  imports = [
-      inputs.mywebsite.nixosModules.actix-webserver
-  ];
+let
+  system = "x86_64-linux";
+  baseDir = "niko.ink";
 
+in {
 }
+
