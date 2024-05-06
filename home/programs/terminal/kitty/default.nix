@@ -26,6 +26,7 @@ in {
     keybindings = {
       "ctrl+t" = "launch --cwd=current --type os-window";
       "ctrl+l" = "clear_terminal to_cursor active";
+      "shift+enter" = "send_key alt+enter";
       #"ctrl+c" =  "copy_or_interrupt";
     };
     extraConfig = ''

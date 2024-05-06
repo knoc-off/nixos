@@ -624,8 +624,8 @@ in
                   ${pkgs.light}/bin/light -U ($value)
                 }
 
-                ${notify-bar} brightnessbar (${pkgs.light}/bin/light) (${pkgs.light}/bin/light)
-                ${notify-msg} value $value
+                ${notify-bar} brightnessbar (${pkgs.light}/bin/light) ((${pkgs.light}/bin/light) | into int | math round)
+                #${notify-msg} value $value
             }
           '';
           volumeScript = pkgs.writeNuScript "volume" ''

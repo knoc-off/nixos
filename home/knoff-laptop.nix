@@ -63,6 +63,8 @@
   # TODO: move this to someplace more logical
   home.packages = with pkgs; [
 
+    llm
+
     evince
 
     obsidian
