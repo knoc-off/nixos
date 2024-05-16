@@ -1,7 +1,0 @@
-{
-  ...
-}: {
-  services.mako = {
-    enable = true;
-  };
-}

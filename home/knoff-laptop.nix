@@ -12,7 +12,7 @@
     ./programs/terminal/prompt.nix # starship
     #./modules/sway
     ./modules/hyprland
-    ./modules/eww
+    #./modules/eww
 
     # Firefox
     ./programs/browser/firefox
@@ -35,27 +35,13 @@
     ./xdg-enviroment.nix
   ];
 
-  #hyprland = {
-  #  enable = true;
-  #};
-
-
-
-
-  disabledModules = ["programs/eww.nix"];
+  #disabledModules = ["programs/eww.nix"];
   programs.git = {
     enable = true;
     userName = "knoff";
     userEmail = "selby@niko.ink";
   };
 
-  # firefox module
-  #services.firefoxBrowser = {
-  #  enable = true;
-  #  profile = "knoff";
-  #};
-
-  #nix.nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
   programs.nix-index = {
     enable = true;
   };
@@ -111,7 +97,7 @@
   # enable qt themes
   qt = {
     enable = true;
-    platformTheme = "gtk3";
+    platformTheme.name = "gtk3";
     #platformTheme.name = "gtk3";
 
     style = {

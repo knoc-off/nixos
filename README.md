@@ -1,34 +1,72 @@
-# My NixOS configuration.
+## NixOS Configuration for Framework Laptop
 
-Run the command:
-`git config --local core.hooksPath .githooks/`
-To set each generation of nixos to have the same label as your git commit.
-This greatly improves the readability of the bootup generations, and allows more well informed rollbacks.
+This repository contains a NixOS configuration for a Framework laptop. It includes a variety of customizations and configurations for various programs and services, including:
 
-the main annoyance is that the the message, is offset from the commit. there must be a work around.
+* **Window Manager:** Hyprland
+* **Terminal:** Kitty
+* **Shell:** Fish, Nushell
+* **Editor:** Neovim
+* **Browser:** Firefox
+* **Audio:** Pipewire
+* **Power Management:** Light
+* **Secure Boot:** Lanzaboote
+* **Disk Partitioning:** Disko
+* **Docker:** Podman
+* **Bluetooth:** Blueman
+* **Custom Applications:** Steam, Lutris, Bottles, etc.
 
+### Custom Applications
+* **Steam Scaling Fix:** Passes a argument to force the scaling to be 1.0
+* **Abba23 spotify-adblock:** Ive packaged [abba23's](https://github.com/abba23/spotify-adblock) adblocker
+* **Spotify Adblock:** the official spotify package gets packaged and then i shim the launch arguments to LD_PRELOAD the adblocker
 
+### Structure
 
-# highlights:
-- my firefox config
-    - im going to try and turn this into a module, or similar.
-    - sets up theming, for auto-collapsing sidebar. installs extensions, like sideberry, ublock origin, bitwarden, etc.
-    - sets some user.js variables to minimize telemetry and to improve usability.
-    - sets up a bunch of custom search engines, letting you easily search github, stack overflow, nix pkgs/wiki/options/home-manager.
-    - sets dark mode options, removes white flash. sets custom colors. (WIP) still a bit ugly.
-- my neovim configuration.
-    - has migrated to its own repo/flake.
-        - lets you install it anywhere super easy
-    - using nixvim, still need to go through it and make it more usable.
+The configuration is organized into a series of Nix files, each responsible for a specific aspect of the system.
+The main configuration file is `configuration.nix`, which imports and combines all the other files.
 
-- my hyprland configuration.
-    - not many novel ideas, but i think the implementation is quite clean.
-    - swaylock, set up so that its somewhat modular
-    - many packages, are referenced declaratively. so no need to have them 'installed'
-    - eww - very much a WIP, the goal is to make a module, that is much more declarative than existing modules, that just create a symlink to a folder.
+I've tried to keep the number of 'back-links' (../xyz) to a minimal, because I feel that obscures the meaning of certain modules.
+so it should be more straightforward for an outsider to figure out how this works.
 
-- laptop system.
-    - uses secure boot.
-    - uses disko for declarative drive config.
-    - need to clean thins up.
+### Installation
 
+I dont recommend installing my exact configuration. just take what looks interesting, and adapt it to your own
+
+1. **Install NixOS:** Follow the instructions on the NixOS website to install NixOS.
+2. **Clone this repository:**
+   ```bash
+   git clone https://github.com/knoc-off/nixos-config.git
+   ```
+3. **Configure NixOS:**
+   * **Copy the configuration files:** Copy the contents of this repository to `/etc/nixos` on your NixOS system.
+   * **Edit `configuration.nix`:** Customize the configuration to your liking.
+4. **Rebuild the system:**
+   ```bash
+   sudo nixos-rebuild switch
+   ```
+
+### Usage
+
+This configuration includes a number of helpful scripts and functions:
+
+* **`nx`:** A Nushell script for running Nix commands easily.
+* **`nixcommit`:** A Nushell script for creating a commit message and updating the system label.
+* **`nixx`:** A Nushell script for running Nix packages in the background with Pueue.
+* **`qr`:** A Bash function for generating QR codes.
+* **`findLocalDevices`:** A Fish function for finding local devices on the network.
+* **`brightness`:** A Nushell script for adjusting screen brightness.
+* **`volume`:** A Nushell script for adjusting system volume.
+* **`mute`:** A Nushell script for muting/unmuting the system audio.
+
+### Customization
+
+* **Customize the theme:** Use a different color scheme or create your own.
+* **Configure services:** Enable or disable services based on your needs.
+
+### Contributing
+
+Contributions are welcome! Feel free to open an issue or submit a pull request.
+
+### License
+
+This configuration is licensed under the MIT License.
