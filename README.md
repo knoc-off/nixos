@@ -18,7 +18,14 @@ This repository contains a NixOS configuration for a Framework laptop. It includ
 ### Custom Applications
 * **Steam Scaling Fix:** Passes a argument to force the scaling to be 1.0
 * **Abba23 spotify-adblock:** Ive packaged [abba23's](https://github.com/abba23/spotify-adblock) adblocker
-* **Spotify Adblock:** the official spotify package gets packaged and then i shim the launch arguments to LD_PRELOAD the adblocker
+* **Spotify Adblock:** the official spotify package gets packaged and then I shim the launch arguments, in the .desktop file, to LD_PRELOAD the adblocker
+
+### Features
+* **Sops** for secrets management.
+* **Remote-Deploy/Install** Bash script to install/deploy systems.
+* **NuShell scripting** added a way to write nushell scripts the same way you write bash script in nix, nu is more reliable
+* **Commit messages in boot menu** (WIP) Adds the commit message into the boot menu label.
+
 
 ### Structure
 
