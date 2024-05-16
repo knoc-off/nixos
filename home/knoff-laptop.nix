@@ -49,7 +49,7 @@
   # TODO: move this to someplace more logical
   home.packages = with pkgs; [
 
-    llm
+    (llm.withPlugins([pkgs.llm-cmd]))
 
     evince
 

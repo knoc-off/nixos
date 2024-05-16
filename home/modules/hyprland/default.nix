@@ -83,9 +83,16 @@ in
           size = "75% 60%";
           unfocus = "hide";
         };
+        foxy = {
+          animation = "fromRight";
+          command = "firefox -p minimal --class firefox-minimal";
+          class = "firefox-minimal";
+          size = "55% 90%";
+          unfocus = "hide";
+        };
         volume = {
           animation = "fromRight";
-          command = "pavucontrol";
+          command = "${pkgs.pavucontrol}/bin/pavucontrol";
           class = "pavucontrol";
           lazy = true;
           size = "40% 90%";
@@ -100,7 +107,7 @@ in
         };
         term = {
           animation = "fromTop";
-          command = "kitty --config <(sed '/map ctrl+t new_os_window_with_cwd/d' /home/knoff/.config/kitty/kitty.conf)";
+          command = "kitty --class kitty-dropterm --config <(sed '/map ctrl+t new_os_window_with_cwd/d' /home/knoff/.config/kitty/kitty.conf)";
           class = "kitty-dropterm";
           unfocus = "hide";
           size = "75% 60%";

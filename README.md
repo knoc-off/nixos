@@ -1,4 +1,4 @@
-## NixOS Configuration for Framework Laptop
+## NixOS Configuration
 
 This repository contains a NixOS configuration for a Framework laptop. It includes a variety of customizations and configurations for various programs and services, including:
 
