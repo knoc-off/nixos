@@ -6,6 +6,8 @@
    # i think its pkgs.additions.spotify-adblock?
    spotify-adblock = pkgs.callPackage ./spotify-adblock {};
    volumeLerp = pkgs.callPackage ./system-interface/volume-lerp-rust {};
+   #llm-cmd = pkgs.callPackage ./llm-cmd.nix {};
+   llm-cmd = pkgs.python3Packages.callPackage ./llm-cmd.nix {};
 
 
     writeNuScript =

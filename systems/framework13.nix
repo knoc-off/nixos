@@ -201,7 +201,7 @@
   hardware.pulseaudio.support32Bit = true;
 
   # Enable touchpad support (enabled default in most desktopManager).
-  services.xserver.libinput.enable = true;
+  services.libinput.enable = true;
 
 
   # TODO: I could move my user to its own module, then import it to each system

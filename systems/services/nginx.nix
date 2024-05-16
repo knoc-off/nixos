@@ -41,29 +41,29 @@ in {
   };
 
   # passing proxy, port
-#  services.nginx.virtualHosts."niko.ink" = {
-#    forceSSL = true;
-#    enableACME = true;
-#    locations."/" = {
-#      proxyPass = "http://127.0.0.1:8080";
-#      proxyWebsockets = true;
-#      extraConfig = ''
-#        proxy_set_header Upgrade $http_upgrade;
-#        proxy_set_header Connection "upgrade";
-#      '';
-#    };
-#  };
-#
+  #  services.nginx.virtualHosts."niko.ink" = {
+  #    forceSSL = true;
+  #    enableACME = true;
+  #    locations."/" = {
+  #      proxyPass = "http://127.0.0.1:8080";
+  #      proxyWebsockets = true;
+  #      extraConfig = ''
+  #        proxy_set_header Upgrade $http_upgrade;
+  #        proxy_set_header Connection "upgrade";
+  #      '';
+  #    };
+  #  };
+  #
 
 
-#  # Eileen Domain:
-#  security.acme.certs."agedesign.org" = {
-#    # Supplying password files like this will make your credentials world-readable
-#    # in the Nix store. This is for demonstration purpose only, do not use this in production.
-#    credentialsFile = {
-#          "NAMECHEAP_API_USER_FILE" = config.sops.secrets."services/acme/namecheap-user2".path;
-#          "NAMECHEAP_API_KEY_FILE" = config.sops.secrets."services/acme/namecheap-key2".path;
-#    };
-#  };
+  #  # Eileen Domain:
+  #  security.acme.certs."agedesign.org" = {
+  #    # Supplying password files like this will make your credentials world-readable
+  #    # in the Nix store. This is for demonstration purpose only, do not use this in production.
+  #    credentialsFile = {
+  #          "NAMECHEAP_API_USER_FILE" = config.sops.secrets."services/acme/namecheap-user2".path;
+  #          "NAMECHEAP_API_KEY_FILE" = config.sops.secrets."services/acme/namecheap-key2".path;
+  #    };
+  #  };
 
 }

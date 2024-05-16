@@ -107,6 +107,8 @@
           # Scratch workspaces
           "${mainMod}, T, exec, pypr toggle term"
           "${mainMod}, F, exec, pypr toggle file"
+          "${mainMod}, S, exec, pypr toggle foxy"
+          "${mainMod}, Z, exec, pypr toggle volume"
           "${mainMod} SHIFT, SPACE, exec, pypr expose"
 
           # screenshot
