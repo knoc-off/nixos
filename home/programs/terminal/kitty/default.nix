@@ -24,7 +24,10 @@ in {
     };
     shellIntegration.enableZshIntegration = true;
     keybindings = {
-      "ctrl+t" = "launch --cwd=current --type os-window";
+      "ctrl+t" = "new_os_window_with_cwd";
+      "ctrl+shift+t" = "new_window_with_cwd";
+      #"alt+tab" = "next_window";
+      #"ctrl+tab" = "next_window";
       "ctrl+l" = "clear_terminal to_cursor active";
       "shift+enter" = "send_key alt+enter";
       #"ctrl+c" =  "copy_or_interrupt";
