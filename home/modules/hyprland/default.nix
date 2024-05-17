@@ -34,12 +34,8 @@ in
 {
 
   imports = [
-    #./hyprSubmaps.nix
     ./dunst.nix
     ./pyprland.nix
-    #./mako.nix
-    #./wired-notify.nix
-    #./eww.nix
 
     ./swayidle.nix
 
@@ -79,34 +75,28 @@ in
         file = {
           animation = "fromBottom";
           command = "nemo";
-          class = "filemanager";
+          class = "nemo";
           size = "75% 60%";
-          floating = true;
-          unfocus = "hide";
+          #unfocus = "hide";
         };
         foxy = {
           animation = "fromRight";
-          #command = "firefox -p minimal --class firefox-minimal";
           command = "firefox --no-remote -P minimal --name firefox-minimal https://duck.com";
           class = "firefox-minimal";
           size = "55% 90%";
-          floating = true;
-          unfocus = "hide";
         };
         volume = {
           animation = "fromRight";
           command = "${pkgs.pavucontrol}/bin/pavucontrol";
           class = "pavucontrol";
-          floating = true;
           lazy = true;
           size = "40% 90%";
-          unfocus = "hide";
+          #unfocus = "hide";
         };
         stb-logs = {
           animation = "fromTop";
           command = "kitty --class kitty-stb-logs stbLog";
           class = "kitty-stb-logs";
-          floating = true;
           lazy = true;
           size = "75% 40%";
         };
@@ -114,8 +104,7 @@ in
           animation = "fromTop";
           command = "kitty --class kitty-dropterm --config <(sed '/map ctrl+t new_os_window_with_cwd/d' /home/knoff/.config/kitty/kitty.conf)";
           class = "kitty-dropterm";
-          floating = true;
-          unfocus = "hide";
+          #unfocus = "hide";
           size = "75% 60%";
         };
       };
