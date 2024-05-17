@@ -76,7 +76,7 @@
     definedAliases = [ "!n" ];
   };
   "Home-Manager" = {
-    urls = [{ template = "https://mipmip.github.io/home-manager-option-search/?query={searchTerms}"; }];
+    urls = [{ template = "https://home-manager-options.extranix.com/?query={searchTerms}"; }];
     updateInterval = 24 * 60 * 60 * 1000; # every day
     icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/twitter-home.svg";
     definedAliases = [ "!h" ];
@@ -101,7 +101,7 @@
   "Github" = {
     urls = [
       {
-        template = "https://duckduckgo.com/";
+        template = "https://kagi.com/";
         params = [
           {
             name = "q";
