@@ -86,7 +86,8 @@ in
         };
         foxy = {
           animation = "fromRight";
-          command = "firefox -p minimal --class firefox-minimal";
+          #command = "firefox -p minimal --class firefox-minimal";
+          command = "firefox --no-remote -P minimal --name firefox-minimal https://duck.com";
           class = "firefox-minimal";
           size = "55% 90%";
           floating = true;
