@@ -68,7 +68,7 @@
   "userChrome.rounding.square_tab" = true;
 
   # Theme Default Settings
-  "layout.css.devPixelsPerPx" = "1.3"; # UI shrink
+  "layout.css.devPixelsPerPx" = "1.3"; # Scale of the ui
   "userChrome.compatibility.theme" = true;
   "userChrome.compatibility.os" = true;
   "userChrome.theme.built_in_contrast" = true;

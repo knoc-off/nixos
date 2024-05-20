@@ -1,15 +1,6 @@
 {pkgs, ...}:
 {
   xdg.desktopEntries = {
-    firefox-minimal = {
-      name = "Firefox-minimal";
-      genericName = "Web Browser";
-      exec = "firefox -p minimal %U";
-      icon = "${pkgs.firefox}/share/icons/hicolor/128x128/apps/firefox.png";
-      terminal = false;
-      categories = [ "Application" "Network" "WebBrowser" ];
-      mimeType = [ "text/html" "text/xml" ];
-    };
     kitty-neovim = {
       name = "Kitty Neovim";
       genericName = "Text Editor";
