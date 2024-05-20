@@ -329,6 +329,7 @@ in
           "border, 1, 10, default"
           "borderangle, 1, 8, default"
           "fade, 1, 1, default"
+          "fadeDim, 1, 1, slowFast"
           "workspaces, 1, 3, default"
         ];
       };

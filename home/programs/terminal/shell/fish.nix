@@ -16,6 +16,7 @@
       };
       #decompress = "pv \"$argv[1]\" | pigz -d | tar -xf -";
       chrome = "nix shell nixpkgs#$argv[1] -- $argv[2..-1] &>/dev/null &";
+      cdToFile = ''pushd "$(fd . --exclude .git --exclude .gitignore -t f | fzf | xargs dirname)"'';
 
       edit_command_buffer = {
         description = ''Edit the command buffer in an external editor'';
