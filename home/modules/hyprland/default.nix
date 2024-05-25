@@ -70,6 +70,7 @@ in
     extraPlugins = [
       "expose"
     ];
+
     settings = {
       scratchpads = {
         file = {
@@ -105,6 +106,8 @@ in
           command = "kitty --class kitty-dropterm --config <(sed '/map ctrl+t new_os_window_with_cwd/d' /home/knoff/.config/kitty/kitty.conf)";
           class = "kitty-dropterm";
           #unfocus = "hide";
+          #match_by =  "pid";
+          #hysteresis = 0;
           size = "75% 60%";
         };
       };

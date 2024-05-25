@@ -1,6 +1,7 @@
 #NixOS, home-manager, system configuration, package installation, program enablement, system options.
 {
   outputs,
+  inputs,
   config,
   pkgs,
   ...
@@ -50,6 +51,7 @@
   home.packages = with pkgs; [
 
     (llm.withPlugins([pkgs.llm-cmd]))
+    ttok
 
     evince
 
@@ -78,7 +80,14 @@
   fonts.fontconfig.enable = true;
 
   nixpkgs = {
-    overlays = builtins.attrValues outputs.overlays;
+    overlays =
+    [
+
+    ]
+    ++ builtins.attrValues inputs.solara.overlays
+    ++ builtins.attrValues outputs.overlays;
+
+
     config = {
       allowUnfree = true;
       allowUnfreePredicate = _pkg: true;

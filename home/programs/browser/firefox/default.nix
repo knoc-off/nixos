@@ -73,7 +73,7 @@
       userChrome = import ./userChrome/testing.nix { inherit theme pkgs; };
 
       # theme for the content firefox presents.
-      userContent = import ./userContent { inherit pkgs theme; };
+      userContent = import ./userContent/minimal.nix { inherit pkgs theme; };
 
       settings = import ./settings/minimal.nix { inherit theme; };
     };

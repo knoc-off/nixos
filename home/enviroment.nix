@@ -1,5 +1,10 @@
-{ ...}: {
+{ config, ...}: {
   home = {
+    file."nixos" = {
+      recursive = true;
+      source = config.lib.file.mkOutOfStoreSymlink "/etc/nixos/";
+    };
+
     sessionVariables = {
       # Editor and shell
       EDITOR = "nvim";

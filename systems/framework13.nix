@@ -46,6 +46,10 @@
     #./modules/virtualisation/waydroid.nix
   ];
 
+
+
+
+
   programs.nix-ld = {
     enable = true;
     libraries = with pkgs; [
@@ -229,6 +233,11 @@
   };
   users.users.root.openssh.authorizedKeys.keys = [
   ];
+
+  #systemd.user.tmpfiles.rules = [
+  #  "L /home/knoff/nixos - - - - /etc/nixos"
+  #];
+
 
   # List packages installed in system profile. To search, run:
   # $ nix search nixpkgs#wget

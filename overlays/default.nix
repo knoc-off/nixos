@@ -1,9 +1,23 @@
 {
+  inputs,
   ...
 }: {
 
   # Backlink
-  additions = final: _prev: import ../pkgs {pkgs = final;};
+  #additions = final: _prev: import ../pkgs {pkgs = final;};
+  # Adds my custom packages
+  additions = final: prev:
+    import ../pkgs {pkgs = final;};
+
+
+  #additions = final: prev:
+  #  let
+  #    solaraPackages = final.solara.packages.${final.system};
+  #    flakePlaygroundPackages = final.flakePlayground.packages.${final.system};
+  #  in
+  #  prev // solaraPackages // flakePlaygroundPackages;
+
+
 
   modifications = _final: prev: {
 
