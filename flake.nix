@@ -69,7 +69,7 @@
     ];
   };
 
-  outputs = inputs @ { self, nixpkgs, home-manager, disko, ... }:
+  outputs = inputs @ { self, solara, nixpkgs, home-manager, disko, ... }:
     let
       inherit (self) outputs;
       theme = inputs.themes.custom (import ./theme.nix);
@@ -95,7 +95,7 @@
 
       nixosConfigurations = {
         framework13 = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
+          specialArgs = { inherit inputs outputs; inherit (solara) nixosModules homeManagerModules; };
           system = "x86_64-linux";
           modules = [
             ./systems/framework13.nix
