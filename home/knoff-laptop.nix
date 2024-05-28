@@ -41,6 +41,12 @@
     enable = true;
     userName = "knoff";
     userEmail = "selby@niko.ink";
+
+    extraConfig = {
+      push = {
+        autoSetupRemote = "true";
+      };
+    };
   };
 
   programs.nix-index = {

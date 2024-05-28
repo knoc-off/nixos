@@ -3,7 +3,7 @@
   disko.devices = {
     disk = {
       vdb = {
-        device = lib.mkdefault "/dev/vdb";
+        device = lib.mkDefault "/dev/vdb";
         type = "disk";
         content = {
           type = "gpt";
@@ -18,7 +18,7 @@
               };
             };
             root = {
-              end = "-2G";
+              end = lib.mkDefault "-12G";
               content = {
                 type = "filesystem";
                 format = "ext4";

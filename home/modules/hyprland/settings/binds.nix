@@ -138,9 +138,13 @@
           #"${mainMod}, A, togglespecialworkspace, firefox"
           #"${mainMod} ALT, 2, movetoworkspace, special:2"
           #"${mainMod} ALT, 1, exec, echo \"20\" > /tmp/volume_control_fifo" # ${pkgs.volume-lerp}/bin/volume-lerp"
+          "${mainMod} ALT, 1, togglespecialworkspace, 1"
           "${mainMod} ALT, 2, togglespecialworkspace, 2"
           "${mainMod} ALT, 3, togglespecialworkspace, 3"
-          "${mainMod} ALT, 4, togglespecialworkspace, 4"
+
+          "${mainMod} ALT SHIFT, 1, movetoworkspace, special:1"
+          "${mainMod} ALT SHIFT, 2, movetoworkspace, special:2"
+          "${mainMod} ALT SHIFT, 3, movetoworkspace, special:3"
 
 
           (mvfocus "up" "u")
