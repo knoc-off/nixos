@@ -214,7 +214,9 @@
     zsh.enable = false;
     fish.enable = true;
   };
-  # Define a user account. Don't forget to set a password with ‘passwd’.
+
+
+  # should move this user to its own file, so i can import it where it makes sense
   users.users.knoff = {
     isNormalUser = true;
     #shell = lib.mkIf (config.programs.fish.enable) pkgs.fish

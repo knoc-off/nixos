@@ -1,6 +1,6 @@
 { pkgs, ... }:
 let
-  config_dir = "~/nixos"; # Should relocate to /etc? and symlink?
+  config_dir = "/etc/nixos"; # Should relocate to /etc? and symlink?
   config_name = "framework13";
 
 in
