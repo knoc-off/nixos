@@ -57,6 +57,9 @@
 
     # Secrets management
     sops-nix.url = "github:Mic92/sops-nix";
+
+    # Minecraft servers and packages
+    nix-minecraft.url = "github:Infinidoge/nix-minecraft";
   };
 
   nixConfig = {
@@ -121,6 +124,27 @@
                 inherit inputs outputs theme;
                 system = "x86_64-linux";
               };
+            }
+          ];
+        };
+
+        home-server = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          system = "x86_64-linux";
+          modules = [
+            ./systems/home-server.nix
+
+            # Disko
+            inputs.disko.nixosModules.disko
+            ./systems/hardware/disks/disk-module.nix
+            {
+              diskoCustom = {
+                bootType = "bios"; # or "bios"
+                swapSize = "8G";
+                diskDevice = "/dev/sda";
+                #ata-CT1000BX500SSD1_2115E59677B6
+              };
+              #disko.devices.disk.vdb.device = "/dev/disk/by-id/wwn-0x502b2a201d1c1b1a";
             }
           ];
         };

@@ -1,38 +1,28 @@
-{lib, ... }:
+# Example to create a bios compatible gpt partition
+{lib, ...}:
 {
   disko.devices = {
     disk = {
       vdb = {
-        device = lib.mkDefault "/dev/sda";
+        device = lib.mkDefault "/dev/vdb";
         type = "disk";
         content = {
-          type = "table";
-          format = "gpt";
-          partitions = [
-            {
-              name = "ESP";
-              start = "1M";
-              end = "500M";
-              bootable = true;
-              content = {
-                type = "filesystem";
-                format = "vfat";
-                mountpoint = "/boot";
-              };
-            }
-            {
-              name = "root";
-              start = "500M";
-              end = "100%";
-              part-type = "primary";
-              bootable = true;
+          type = "gpt";
+          partitions = {
+            boot = {
+              size = "1M";
+              type = "EF02"; # for grub MBR
+              priority = 1; # Needs to be first partition
+            };
+            root = {
+              size = "100%";
               content = {
                 type = "filesystem";
                 format = "ext4";
                 mountpoint = "/";
               };
-            }
-          ];
+            };
+          };
         };
       };
     };

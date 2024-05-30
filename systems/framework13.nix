@@ -49,6 +49,9 @@
 
 
 
+  # Fix wg-quick?
+  services.resolved.enable = true;
+
 
   programs.nix-ld = {
     enable = true;

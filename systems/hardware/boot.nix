@@ -28,7 +28,7 @@ in
     # Define an option to set the GRUB device for non-EFI systems
     bootloader.grubDevice = mkOption {
       type = types.str;
-      default = "/dev/sda";
+      default = "";
       description = "The device to install GRUB on for non-EFI systems.";
     };
   };
@@ -44,7 +44,7 @@ in
 
       boot.loader.grub.enable = (config.bootloader.type == "grub");
       boot.loader.grub.efiSupport = config.bootloader.efiSupport;
-      boot.loader.grub.device = if config.bootloader.efiSupport then "nodev" else config.bootloader.grubDevice;
+      #boot.loader.grub.device = if config.bootloader.efiSupport then "nodev" else config.bootloader.grubDevice;
       #boot.loader.grub.useOSProber = true; # Detect other operating systems
 
       boot.loader.systemd-boot.enable = (config.bootloader.type == "systemd-boot");
