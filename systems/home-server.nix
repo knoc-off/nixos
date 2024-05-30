@@ -7,77 +7,72 @@
   ...
 }: {
   imports = [
-
-    # Sops
-    #inputs.sops-nix.nixosModules.sops
-    #{
-    #  sops.defaultSopsFile = ./secrets/hetzner/default.yaml;
-    #  # This will automatically import SSH keys as age keys
-    #  sops.age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
-
-    #  sops.secrets = if config.services.nextcloud.enable then {
-    #    "services/nextcloud/admin-pass" = {
-    #      owner = config.users.users.nextcloud.name;
-    #    };
-    #  } else {};
-    #}
-
-
-    # nix package settings
     ./modules/nix.nix
 
+    inputs.sops-nix.nixosModules.sops {
+      sops.defaultSopsFile = ./secrets/homeserver/default.yaml;
+      sops.age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
+      sops.secrets."services/acme/namecheap-user" = {};
+      sops.secrets."services/acme/namecheap-key" = {};
+      sops.secrets."services/acme/namecheap-user-env" = {};
+      sops.secrets."services/acme/namecheap-key-env" = {};
+      sops.secrets."services/acme/envfile" = {};
+    }
 
-    # boot
-    ./hardware/boot.nix
+    inputs.nix-minecraft.nixosModules.minecraft-servers
 
-    # message at boot.
-    #./commit-message.nix
-
-    # services
-    #./services/nginx.nix
-
-    # nextcloud
-    # ./services/nextcloud.nix
-    # ./services/wordpress.nix
-    # ./services/wordpress-oci.nix
+    ./services/traefik.nix
   ];
 
+  nixpkgs.overlays = [ inputs.nix-minecraft.overlay ];
+  nixpkgs.config.allowUnfree = true;
 
-  bootloader = {
-    type = "grub"; # Set the desired bootloader type
-    efiSupport = false; # Disable EFI support
-    grubDevice = "/dev/sda"; # Set the correct GRUB device
+  services.minecraft-servers = {
+    eula = true;
+    enable = true;
+    servers.vanilla-fabric = {
+      enable = true;
+      package = pkgs.fabricServers.fabric-1_20_2.override { loaderVersion = "0.15.11"; };
+      serverProperties = {
+        server-port = 25500;
+        difficulty = 3;
+        motd = "NixOS Minecraft server 1";
+      };
+    };
+    servers.vani-fabric = {
+      enable = true;
+      package = pkgs.fabricServers.fabric-1_20_4.override { loaderVersion = "0.15.11"; };
+      serverProperties = {
+        server-port = 25501;
+        difficulty = 3;
+        motd = "NixOS Minecraft server 2";
+      };
+    };
+  };
+
+  boot.loader.grub = {
+    enable = true;
   };
 
   networking.hostName = "nserver";
-  # Firewall
   networking.firewall = {
-    enable = true;
-    allowedTCPPorts = [80 443];
-    allowedUDPPorts = [80 443];
-    #allowedUDPPortRanges = [
-    #  { from = 4000; to = 4007; }
-    #  { from = 8000; to = 8010; }
-    #];
+    enable = false;
+    allowedUDPPorts = [22 80 443];
+    allowedTCPPorts = [22 80 443];
   };
 
+  networking.interfaces."enp3s0" = {
+    useDHCP = false;
+    ipv4.addresses = [
+      {
+        address = "192.168.1.100";
+        prefixLength = 24;
+      }
+    ];
+  };
 
-  # Not needed ?
-  # This is using an age key that is expected to already be in the filesystem
-  #sops.age.keyFile = "/var/lib/sops-nix/key.txt";
-  # This will generate a new key if the key specified above does not exist
-  #sops.age.generateKey = true;
-  # This is the actual specification of the secrets.
-  #sops.secrets.example-key = {};
-  #sops.secrets."myservice/my_subdir/my_secret" = {};
-
-  # Use the systemd-boot EFI boot loader.
-  # disable if using lanzaboote
-  #boot.loader.systemd-boot.enable = true;
-  #boot.loader.efi.canTouchEfiVariables = true;
-
-
-
+  networking.defaultGateway = "192.168.1.254";
+  networking.nameservers = [ "8.8.8.8" "8.8.4.4" ];
 
   services.openssh.enable = true;
 

@@ -3,12 +3,12 @@
   inputs,
   ...
 }:
-
 let
   system = "x86_64-linux";
   baseDir = "niko.ink";
 
-in {
+in
+{
 
   sops.secrets."services/acme/namecheap-user" = {};
   sops.secrets."services/acme/namecheap-key" = {};
