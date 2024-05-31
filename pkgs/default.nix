@@ -9,6 +9,7 @@
    #llm-cmd = pkgs.callPackage ./llm-cmd.nix {};
    llm-cmd = pkgs.python3Packages.callPackage ./llm-cmd {};
    ttok = pkgs.python3Packages.callPackage ./ttok {};
+   gate = pkgs.callPackage ./gate {};
 
 
     writeNuScript =

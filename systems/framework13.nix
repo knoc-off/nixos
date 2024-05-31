@@ -51,6 +51,7 @@
 
   # Fix wg-quick?
   services.resolved.enable = true;
+  boot.initrd.systemd.dbus.enable = true;
 
 
   programs.nix-ld = {

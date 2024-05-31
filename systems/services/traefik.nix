@@ -7,7 +7,9 @@
 
     # Define secret credentials for Namecheap using the encrypted .env file
     environmentFiles = [
-      #"${config.sops.secrets."services/acme/envfile".path}"
+      # The sops file looks like:
+      #   namecheap-user-env: NAMECHEAP_API_USER=<user>
+      #   namecheap-key-env: NAMECHEAP_API_KEY=<key>
       "${config.sops.secrets."services/acme/namecheap-user-env".path}"
       "${config.sops.secrets."services/acme/namecheap-key-env".path}"
     ];
@@ -72,27 +74,12 @@
           };
         };
       };
-
-
-
-
       tcp = {
         routers = {
           minecraft = {
-            rule = "HostSNI(`one.kobbl.co`)";
+            rule = "HostSNI(`*`)";
             entryPoints = [ "minecraft" ];
             service = "minecraft";
-            tls = {
-              certResolver = "myresolver";
-              domains = [
-                { main = "*.kobbl.co"; sans = [ "kobbl.co" ]; }
-              ];
-            };
-          };
-          minecraftTwo = {
-            rule = "HostSNI(`two.kobbl.co`)";
-            entryPoints = [ "minecraft" ];
-            service = "minecraftTwo";
             tls = {
               certResolver = "myresolver";
               domains = [
@@ -109,23 +96,8 @@
               ];
             };
           };
-          minecraftTwo = {
-            loadBalancer = {
-              servers = [
-                { address = "127.0.0.1:25501"; }
-              ];
-            };
-          };
         };
       };
-
-
-
-
-
-
-
-
     };
   };
 
