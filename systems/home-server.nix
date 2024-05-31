@@ -5,7 +5,27 @@
   lib,
   pkgs,
   ...
-}: {
+}:
+
+let
+  settingsFormat = pkgs.formats.yaml {};
+
+  config = {
+    lite = {
+      enabled = true;
+      routes = [
+        { host = "abc.kobbl.co"; backend = "localhost:25500"; }
+        { host = "*.kobbl.co"; backend = "localhost:25501"; }
+        { host = [ "kobbl.co" "localhost" ]; backend = [ "localhost:25500" ]; }
+      ];
+    };
+  };
+
+  configFile = settingsFormat.generate "config.yaml" config;
+
+in
+
+{
   imports = [
     ./modules/nix.nix
 
@@ -21,8 +41,21 @@
 
     inputs.nix-minecraft.nixosModules.minecraft-servers
 
-    ./services/traefik.nix
+    #./services/traefik.nix
   ];
+
+
+
+  systemd.services.gateService = {
+    description = "Gate Service";
+    after = [ "network.target" "minecraft-server-vanilla.service" "minecraft-server-vanilla2.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      ExecStart = "${pkgs.gate}/bin/gate -c ${configFile}";
+      Restart = "always";
+      User = "root";
+    };
+  };
 
   nixpkgs.overlays = [ inputs.nix-minecraft.overlay ];
   nixpkgs.config.allowUnfree = true;
@@ -30,18 +63,20 @@
   services.minecraft-servers = {
     eula = true;
     enable = true;
-    servers.vanilla-fabric = {
+    servers.vanilla = {
       enable = true;
-      package = pkgs.fabricServers.fabric-1_20_2.override { loaderVersion = "0.15.11"; };
+      #package = pkgs.fabricServers.fabric-1_20_2.override { loaderVersion = "0.15.11"; };
+      package = pkgs.vanillaServers.vanilla-1_20_2;
       serverProperties = {
         server-port = 25500;
         difficulty = 3;
         motd = "NixOS Minecraft server 1";
       };
     };
-    servers.vani-fabric = {
+    servers.vanilla2 = {
       enable = true;
-      package = pkgs.fabricServers.fabric-1_20_4.override { loaderVersion = "0.15.11"; };
+      #package = pkgs.fabricServers.fabric-1_20_4.override { loaderVersion = "0.15.11"; };
+      package = pkgs.vanillaServers.vanilla-1_20_2;
       serverProperties = {
         server-port = 25501;
         difficulty = 3;
