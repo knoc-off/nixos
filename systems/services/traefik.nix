@@ -28,9 +28,6 @@
         websecure = {
           address = ":443";
         };
-        minecraft = {
-          address = ":25565";
-        };
       };
 
 
@@ -74,33 +71,6 @@
           };
         };
       };
-      tcp = {
-        routers = {
-          minecraft = {
-            rule = "HostSNI(`*`)";
-            entryPoints = [ "minecraft" ];
-            service = "minecraft";
-            tls = {
-              certResolver = "myresolver";
-              domains = [
-                { main = "*.kobbl.co"; sans = [ "kobbl.co" ]; }
-              ];
-            };
-          };
-        };
-        services = {
-          minecraft = {
-            loadBalancer = {
-              servers = [
-                { address = "127.0.0.1:25500"; }
-              ];
-            };
-          };
-        };
-      };
     };
   };
-
-  # Allow HTTP and Minecraft traffic in the firewall
-  networking.firewall.allowedTCPPorts = [ 80 25565 ];
 }

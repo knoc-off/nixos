@@ -43,6 +43,8 @@
     # ./services/wordpress-oci.nix
   ];
 
+  nix.settings.auto-optimise-store = true;
+
   networking.hostName = "oink";
   # Firewall
   networking.firewall = {

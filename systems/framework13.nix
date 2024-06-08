@@ -23,10 +23,6 @@
       sops.defaultSopsFile = ./secrets/framework13/default.yaml;
       # This will automatically import SSH keys as age keys
       sops.age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
-
-      #sops.secrets."" = {};
-      #sops.secrets."hashedpassword" = {};
-      #sops.secrets."hashedpassword".owner = config.users.users.knoff.name;
     }
 
     # pipewire / Audio
@@ -44,67 +40,73 @@
 
     # Android emulation
     #./modules/virtualisation/waydroid.nix
+    ./modules/gtk
   ];
 
-
-
+  # Yubikey
+  services.yubikey-agent.enable = true;
+  services.pcscd.enable = true;
+  services.udev.packages = [ pkgs.yubikey-personalization ];
+  programs.gnupg.agent = {
+    enable = true;
+    enableSSHSupport = true;
+  };
 
   # Fix wg-quick?
   services.resolved.enable = true;
   boot.initrd.systemd.dbus.enable = true;
 
-
+  # Lets you run binaries.
   programs.nix-ld = {
     enable = true;
     libraries = with pkgs; [
-      # Dwarf Fortress
       stdenv.cc.cc
       SDL2
       SDL2_image
-      ## DFHACK
       libz
     ];
   };
 
-
-
-
-
-
-
-  #qt.style = "gtk2";
-  environment.etc =
-    let
+  # Custom module, that combines settings and theme
+  services.gtkThemeSymlinks = {
+    enable = true;
+    gtk2 = {
       themeName = "Fluent-Dark";
-      themePkg = pkgs.fluent-gtk-theme;
-    in
-    {
-      "xdg/gtk-2.0".source = "${themePkg}/share/themes/${themeName}/gtk-2.0";
-      "xdg/gtk-3.0".source = "${themePkg}/share/themes/${themeName}/gtk-3.0";
-
-
-      #"xdg/gtk-2.0/gtkrc".text = "gtk-application-prefer-dark-theme=1";
-      #"xdg/gtk-3.0/settings.ini".text = ''
-      #  [Settings]
-      #  gtk-application-prefer-dark-theme=1
-      #  gtk-error-bell=false
-      #'';
-      #"xdg/gtk-4.0/settings.ini".text = ''
-      #  [Settings]
-      #  gtk-application-prefer-dark-theme=1
-      #  gtk-error-bell=false
-      #'';
-
-
-      "current-system-packages".text =
-        let
-          packages = builtins.map (p: "${p.name}") config.environment.systemPackages;
-          sortedUnique = builtins.sort builtins.lessThan (lib.unique packages);
-          formatted = builtins.concatStringsSep "\n" sortedUnique;
-        in formatted;
-
+      themePackage = pkgs.fluent-gtk-theme;
     };
+    gtk3 = {
+      themeName = "Fluent-Dark";
+      themePackage = pkgs.fluent-gtk-theme;
+    };
+    gtk4 = {
+      themeName = "Fluent-Dark";
+      themePackage = pkgs.fluent-gtk-theme;
+    };
+    symlinks = {
+      "gtk-2.0/gtkrc" = pkgs.writeText "gtkrc" "gtk-application-prefer-dark-theme=1";
+      "gtk-3.0/settings.ini" = pkgs.writeText "gtk3-settings.ini" ''
+        [Settings]
+        gtk-application-prefer-dark-theme=1
+        gtk-error-bell=false
+      '';
+      "gtk-4.0/settings.ini" = pkgs.writeText "gtk4-settings.ini" ''
+        [Settings]
+        gtk-application-prefer-dark-theme=1
+        gtk-error-bell=false
+      '';
+    };
+  };
 
+  # exports all packages to a file in /etc.
+  environment.etc."current-system-packages".text =
+    let
+      packages = builtins.map (p: "${p.name}") config.environment.systemPackages;
+      sortedUnique = builtins.sort builtins.lessThan (lib.unique packages);
+      formatted = builtins.concatStringsSep "\n" sortedUnique;
+    in formatted;
+
+
+  # Latest Kernel Version
   boot.kernelPackages = pkgs.linuxPackages_latest;
 
   # Attempt to fix the: GLib-GIO-ERROR**: No GSettings schemas are installed on the system
@@ -120,42 +122,17 @@
   networking.hostName = "framework"; # Define your hostname.
   networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
 
-  # this allows running flatpaks. i never use this.
-  # services.flatpak.enable = true;
-
-  # ---------------- Power
-  #services.power-profiles-daemon.enable = false;
-  # services.tlp = {
-  #   enable = true;
-  #   settings = {
-  #     CPU_SCALING_GOVERNOR_ON_AC = "performance";
-  #     CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
-  #     CPU_ENERGY_PERF_POLICY_ON_BAT = "power";
-  #     CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
-  #     CPU_MIN_PERF_ON_AC = 0;
-  #     CPU_MAX_PERF_ON_AC = 100;
-  #     CPU_MIN_PERF_ON_BAT = 0;
-  #     CPU_MAX_PERF_ON_BAT = 30;
-  #     #
-  #     #      #Optional helps save long term battery health
-  #     #      START_CHARGE_THRESH_BAT0 = 40; # 40 and bellow it starts to charge
-  #     #      STOP_CHARGE_THRESH_BAT0 = 80; # 80 and above it stops charging
-  #     #
-  #   };
-  # };
-
   # TODO: move to nix configs
   nixpkgs.config.allowUnfree = true;
   nixpkgs.overlays = builtins.attrValues outputs.overlays;
 
-  # Configure network proxy if necessary
-  # networking.proxy.default = "http://user:password@proxy:port/";
-  # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
-
   # Set your time zone.
   time.timeZone = "Europe/Berlin";
+
   # Select internationalisation properties.
   i18n.defaultLocale = "en_US.UTF-8";
+
+  # Console
   console = {
     #font = "Lat2-Terminus16";
     packages = with pkgs; [ terminus_font ];
@@ -165,6 +142,7 @@
     useXkbConfig = true; # use xkbOptions in tty.
   };
 
+  # fonts
   fonts.packages = with pkgs; [
     noto-fonts
     noto-fonts-cjk
@@ -188,9 +166,9 @@
     };
   };
 
+  # ssh
   services.openssh = {
     enable = true;
-    # require public key authentication for better security
     settings.PasswordAuthentication = false;
     settings.KbdInteractiveAuthentication = false;
     settings.PermitRootLogin = "no";
@@ -198,10 +176,22 @@
 
   # Configure keymap in X11
   services.xserver.xkb.layout = "us";
-  # services.xserver.xkbOptions = "eurosign:e,caps:escape";
 
-  # Enable CUPS to print documents.
-  # services.printing.enable = true;
+  # Enable the CUPS printing service
+  services.printing = {
+    enable = true;
+    drivers = with pkgs; [
+      hplip  # Example driver for HP printers
+      gutenprint  # Drivers for a wide range of printers
+      foo2zjs  # Drivers for ZJStream protocol printers (e.g., some HP LaserJets)
+    ];
+  };
+
+  # Optionally, enable Avahi for network printer discovery
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+  };
 
   # needed for steam, and some other apps/games.
   hardware.opengl.driSupport32Bit = true;
@@ -240,20 +230,9 @@
   users.users.root.openssh.authorizedKeys.keys = [
   ];
 
-  #systemd.user.tmpfiles.rules = [
-  #  "L /home/knoff/nixos - - - - /etc/nixos"
-  #];
-
-
-  # List packages installed in system profile. To search, run:
-  # $ nix search nixpkgs#wget
   environment.systemPackages = with pkgs; [
-    # TODO: see if this fixes issues. somewhat
     gnome.adwaita-icon-theme
-
-    #vulkan-tools
-
-    # misc tools
+    yubioath-flutter
     git
     wget
     home-manager # bootstrap
@@ -262,7 +241,7 @@
 
   # don’t shutdown when power button is short-pressed
   services.logind.extraConfig = ''
-    HandlePowerKey=suspend
+    HandlePowerKey=lock
   '';
 
   # Open ports in the firewall. dont need any on this machine

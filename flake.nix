@@ -94,6 +94,7 @@
 
       images = {
         rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;
+        rpi3B = nixosConfigurations.rpi3B.config.system.build.sdImage;
       };
 
       nixosConfigurations = {
@@ -139,7 +140,7 @@
             ./systems/hardware/disks/disk-module.nix
             {
               diskoCustom = {
-                bootType = "bios"; # or "bios"
+                bootType = "efi"; # or "bios"
                 swapSize = "8G";
                 diskDevice = "/dev/sda";
                 #ata-CT1000BX500SSD1_2115E59677B6
@@ -154,6 +155,19 @@
           system = "x86_64-linux";
           modules = [
             ./systems/hetzner-server.nix
+          ];
+        };
+
+        rpi3B = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          system = "aarch64-linux";
+          modules = [
+            "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-aarch64.nix"
+            ./systems/raspberry3B.nix
+            {
+              nixpkgs.config.allowUnsupportedSystem = true;
+              nixpkgs.hostPlatform.system = "aarch64-linux";
+            }
           ];
         };
 

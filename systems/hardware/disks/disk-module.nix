@@ -42,8 +42,11 @@ in
               } else {
                 size = "512M";
                 type = "EF00"; # for EFI
-                format = "vfat";
-                mountpoint = "/boot";
+                content = {
+                  type = "filesystem";
+                  format = "vfat";
+                  mountpoint = "/boot";
+                };
                 priority = 1; # Needs to be the first partition
               };
             in {
