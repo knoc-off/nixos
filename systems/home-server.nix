@@ -11,13 +11,24 @@ let
   settingsFormat = pkgs.formats.yaml {};
 
   config = {
-    lite = {
-      enabled = true;
-      routes = [
-        { host = "abc.kobbl.co"; backend = "localhost:25500"; }
-        { host = "*.kobbl.co"; backend = "localhost:25501"; }
-        { host = [ "kobbl.co" "localhost" ]; backend = [ "localhost:25500" ]; }
-      ];
+    config = {
+      lite = {
+        enabled = true;
+        routes = [
+          {
+            host = "abc.kobbl.co";
+            backend = "localhost:25500";
+          }
+          {
+            host = "*.kobbl.co";
+            backend = "localhost:25501";
+          }
+          {
+            host = [ "kobbl.co" "localhost" ];
+            backend = [ "localhost:25500" ];
+          }
+        ];
+      };
     };
   };
 
@@ -44,7 +55,7 @@ in
     #./services/traefik.nix
   ];
 
-
+  nix.settings.auto-optimise-store = true;
 
   systemd.services.gateService = {
     description = "Gate Service";
@@ -63,20 +74,40 @@ in
   services.minecraft-servers = {
     eula = true;
     enable = true;
-    servers.vanilla = {
+    servers.beez = {
       enable = true;
-      #package = pkgs.fabricServers.fabric-1_20_2.override { loaderVersion = "0.15.11"; };
-      package = pkgs.vanillaServers.vanilla-1_20_2;
+      #package = pkgs.fabricServers.fabric-1_20_4.override { loaderVersion = "0.15.11"; };
+      package = pkgs.vanillaServers.vanilla-1_20_6;
       serverProperties = {
         server-port = 25500;
         difficulty = 3;
-        motd = "NixOS Minecraft server 1";
+        motd = "Beez Server v0.1.0";
       };
+      symlinks = {
+        "ops.json" = pkgs.writeTextFile {
+          name = "ops.json";
+          text = ''
+            [
+              {
+                "uuid": "c9e17620-4cc1-4d83-a30a-ef320cc099e6",
+                "name": "knoc_off",
+                "level": 4,
+                "bypassesPlayerLimit": false
+              }
+            ]
+          '';
+        };
+        "server-icon.png" = ./server-icon.png;
+      };
+
+
     };
-    servers.vanilla2 = {
+    servers.CCC =
+
+    {
       enable = true;
-      #package = pkgs.fabricServers.fabric-1_20_4.override { loaderVersion = "0.15.11"; };
-      package = pkgs.vanillaServers.vanilla-1_20_2;
+      package = pkgs.fabricServers.fabric-1_20_1.override { loaderVersion = "0.15.11"; };
+      #package = pkgs.vanillaServers.vanilla-1_20_2;
       serverProperties = {
         server-port = 25501;
         difficulty = 3;
@@ -85,36 +116,55 @@ in
     };
   };
 
-  boot.loader.grub = {
-    enable = true;
+
+
+  services.logind = {
+    extraConfig = ''
+      HandleLidSwitch=ignore
+      HandleLidSwitchDocked=ignore
+    '';
   };
 
-  networking.hostName = "nserver";
-  networking.firewall = {
-    enable = false;
-    allowedUDPPorts = [22 80 443];
-    allowedTCPPorts = [22 80 443];
+  boot.loader.systemd-boot.enable = true;
+
+  boot.loader = {
+    efi = {
+      canTouchEfiVariables = true;
+    };
   };
 
-  networking.interfaces."enp3s0" = {
+  networking = {
+    hostName = "nikoserver";
+    firewall = {
+      enable = true;
+      allowedUDPPorts = [ 22 80 443 25565 ];
+      allowedTCPPorts = [ 22 80 443 25565 ];
+    };
+  };
+
+  # static ip
+  networking.interfaces."enp0s31f6" = {
     useDHCP = false;
     ipv4.addresses = [
       {
-        address = "192.168.1.100";
+        address = "192.168.1.102";
         prefixLength = 24;
       }
     ];
   };
 
-  networking.defaultGateway = "192.168.1.254";
+  networking.defaultGateway = "192.168.1.254"; # my router
   networking.nameservers = [ "8.8.8.8" "8.8.4.4" ];
-
-  services.openssh.enable = true;
 
   environment.systemPackages = map lib.lowPrio [
     pkgs.curl
     pkgs.gitMinimal
   ];
+
+  services.openssh = {
+    enable = true;
+    settings.PasswordAuthentication = false;
+  };
 
   users.users.root.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"

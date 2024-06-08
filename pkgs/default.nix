@@ -10,6 +10,9 @@
    llm-cmd = pkgs.python3Packages.callPackage ./llm-cmd {};
    ttok = pkgs.python3Packages.callPackage ./ttok {};
    gate = pkgs.callPackage ./gate {};
+   ascii-silhouettify = pkgs.callPackage ./ascii {};
+   mcscript = pkgs.callPackage ./mcscript {};
+
 
 
     writeNuScript =
