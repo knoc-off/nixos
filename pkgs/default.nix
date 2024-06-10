@@ -12,6 +12,7 @@
    gate = pkgs.callPackage ./gate {};
    ascii-silhouettify = pkgs.callPackage ./ascii {};
    mcscript = pkgs.callPackage ./mcscript {};
+   mcscript2 = pkgs.callPackage ./mcscript/tests.nix {};
 
 
 

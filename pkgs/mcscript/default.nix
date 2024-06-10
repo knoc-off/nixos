@@ -1,9 +1,9 @@
 { lib
-, buildNpmPackage
 , fetchFromGitHub
+, pkgs
 }:
 
-buildNpmPackage rec {
+pkgs.stdenv.mkDerivation rec {
   pname = "mcscript";
   version = "0.2.3";
 
@@ -14,15 +14,32 @@ buildNpmPackage rec {
     hash = "sha256-+eC+UtJhnBao5nsytRROW+s4K3E1hG+n8QJpkN8ZaH8=";
   };
 
-  npmDepsHash = "";
+  buildInputs = [
+    pkgs.nodejs
+    pkgs.nodePackages.npm
+  ];
 
-  # Use postPatch to ensure package-lock.json is copied after unpacking the source
-  postPatch = ''
-    echo "Copying package-lock.json to build directory"
-    cp ${./package-lock.json} ./package-lock.json
-    ls -l
+  installPhase = ''
+    # Create directories
+    mkdir -p $out/bin
+    mkdir -p $out/lib
+
+    # Copy source files
+    cp -r * $out
+
+    # Install npm dependencies
+    pushd $out
+    npm install
+    popd
+
+    # Create a wrapper script
+    cat > $out/bin/mcscript <<EOF
+#!/bin/sh
+exec ${pkgs.nodejs}/bin/npx mcscript "\$@"
+EOF
+
+    chmod +x $out/bin/mcscript
   '';
-
 
   meta = with lib; {
     description = "A programming language for Minecraft Vanilla";

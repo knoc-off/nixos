@@ -4,7 +4,7 @@
 }: {
   home.packages = with pkgs; [
     #steam-with-pkgs
-    steam-scaling
+    #steam
     steam-tui
     steamcmd
     gamescope
