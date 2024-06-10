@@ -57,16 +57,16 @@ in
 
   nix.settings.auto-optimise-store = true;
 
-  systemd.services.gateService = {
-    description = "Gate Service";
-    after = [ "network.target" "minecraft-server-vanilla.service" "minecraft-server-vanilla2.service" ];
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig = {
-      ExecStart = "${pkgs.gate}/bin/gate -c ${configFile}";
-      Restart = "always";
-      User = "root";
-    };
-  };
+  #systemd.services.gateService = {
+  #  description = "Gate Service";
+  #  after = [ "network.target" "minecraft-server-vanilla.service" "minecraft-server-vanilla2.service" ];
+  #  wantedBy = [ "multi-user.target" ];
+  #  serviceConfig = {
+  #    ExecStart = "${pkgs.gate}/bin/gate -c ${configFile}";
+  #    Restart = "always";
+  #    User = "root";
+  #  };
+  #};
 
   nixpkgs.overlays = [ inputs.nix-minecraft.overlay ];
   nixpkgs.config.allowUnfree = true;
@@ -79,9 +79,10 @@ in
       #package = pkgs.fabricServers.fabric-1_20_4.override { loaderVersion = "0.15.11"; };
       package = pkgs.vanillaServers.vanilla-1_20_6;
       serverProperties = {
-        server-port = 25500;
+        server-port = 25565;
         difficulty = 3;
         motd = "Beez Server v0.1.0";
+        spawn-protection = 0;
       };
       symlinks = {
         "ops.json" = pkgs.writeTextFile {
@@ -102,18 +103,17 @@ in
 
 
     };
-    servers.CCC =
-
-    {
-      enable = true;
-      package = pkgs.fabricServers.fabric-1_20_1.override { loaderVersion = "0.15.11"; };
-      #package = pkgs.vanillaServers.vanilla-1_20_2;
-      serverProperties = {
-        server-port = 25501;
-        difficulty = 3;
-        motd = "NixOS Minecraft server 2";
-      };
-    };
+    #servers.CCC =
+    #{
+    #  enable = true;
+    #  package = pkgs.fabricServers.fabric-1_20_1.override { loaderVersion = "0.15.11"; };
+    #  #package = pkgs.vanillaServers.vanilla-1_20_2;
+    #  serverProperties = {
+    #    server-port = 25501;
+    #    difficulty = 3;
+    #    motd = "NixOS Minecraft server 2";
+    #  };
+    #};
   };
 
 
@@ -136,7 +136,7 @@ in
   networking = {
     hostName = "nikoserver";
     firewall = {
-      enable = true;
+      enable = false;
       allowedUDPPorts = [ 22 80 443 25565 ];
       allowedTCPPorts = [ 22 80 443 25565 ];
     };
