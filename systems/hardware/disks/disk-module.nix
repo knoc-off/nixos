@@ -24,9 +24,22 @@ in
       default = "/dev/vdb";
       description = ''The disk device to configure.'';
     };
+
+    useSystemdBoot = mkOption {
+      type = types.bool;
+      default = false;
+      description = ''Whether to use systemd-boot instead of GRUB.'';
+    };
   };
 
   config = {
+    assertions = [
+      {
+        assertion = !(cfg.bootType == "bios" && cfg.useSystemdBoot);
+        message = "systemd-boot requires EFI support. Please set bootType to 'efi' or disable useSystemdBoot.";
+      }
+    ];
+
     disko.devices = {
       disk = {
         vdb = {
@@ -71,5 +84,19 @@ in
         };
       };
     };
+
+    # GRUB configuration
+    boot.loader.grub = mkIf (!cfg.useSystemdBoot) {
+      enable = true;
+      device = if cfg.bootType == "efi" then "nodev" else "";
+      efiSupport = cfg.bootType == "efi";
+      efiInstallAsRemovable = cfg.bootType == "efi";
+    };
+
+    # systemd-boot configuration
+    boot.loader.systemd-boot = mkIf cfg.useSystemdBoot {
+      enable = true;
+    };
+    boot.loader.efi.canTouchEfiVariables = mkIf cfg.useSystemdBoot true;
   };
 }

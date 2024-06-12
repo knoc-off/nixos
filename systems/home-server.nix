@@ -38,24 +38,29 @@ in
 
 {
   imports = [
+
+    (modulesPath + "/installer/scan/not-detected.nix")
+    (modulesPath + "/profiles/qemu-guest.nix")
+
+
     ./modules/nix.nix
 
-    inputs.sops-nix.nixosModules.sops {
-      sops.defaultSopsFile = ./secrets/homeserver/default.yaml;
-      sops.age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
-      sops.secrets."services/acme/namecheap-user" = {};
-      sops.secrets."services/acme/namecheap-key" = {};
-      sops.secrets."services/acme/namecheap-user-env" = {};
-      sops.secrets."services/acme/namecheap-key-env" = {};
-      sops.secrets."services/acme/envfile" = {};
-    }
+    #inputs.sops-nix.nixosModules.sops {
+    #  sops.defaultSopsFile = ./secrets/homeserver/default.yaml;
+    #  sops.age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
+    #  sops.secrets."services/acme/namecheap-user" = {};
+    #  sops.secrets."services/acme/namecheap-key" = {};
+    #  sops.secrets."services/acme/namecheap-user-env" = {};
+    #  sops.secrets."services/acme/namecheap-key-env" = {};
+    #  sops.secrets."services/acme/envfile" = {};
+    #}
 
     inputs.nix-minecraft.nixosModules.minecraft-servers
 
     #./services/traefik.nix
   ];
 
-  nix.settings.auto-optimise-store = true;
+  nix.settings.auto-optimise-store = false;
 
   #systemd.services.gateService = {
   #  description = "Gate Service";
@@ -70,14 +75,12 @@ in
 
   nixpkgs.overlays = [ inputs.nix-minecraft.overlay ];
   nixpkgs.config.allowUnfree = true;
-
   services.minecraft-servers = {
     eula = true;
     enable = true;
     servers.beez = {
       enable = true;
-      #package = pkgs.fabricServers.fabric-1_20_4.override { loaderVersion = "0.15.11"; };
-      package = pkgs.vanillaServers.vanilla-1_20_6;
+      package = pkgs.fabricServers.fabric-1_20_6.override { loaderVersion = "0.15.11"; };
       serverProperties = {
         server-port = 25565;
         difficulty = 3;
@@ -100,8 +103,6 @@ in
         };
         "server-icon.png" = ./server-icon.png;
       };
-
-
     };
     #servers.CCC =
     #{
@@ -125,16 +126,21 @@ in
     '';
   };
 
-  boot.loader.systemd-boot.enable = true;
 
-  boot.loader = {
-    efi = {
-      canTouchEfiVariables = true;
-    };
-  };
+  #boot.loader.grub = {
+  #  efiSupport = true;
+  #  efiInstallAsRemovable = true;
+  #};
+
+  #boot.loader.systemd-boot.enable = true;
+  #boot.loader = {
+  #  efi = {
+  #    canTouchEfiVariables = true;
+  #  };
+  #};
 
   networking = {
-    hostName = "nikoserver";
+    hostName = "nserv";
     firewall = {
       enable = false;
       allowedUDPPorts = [ 22 80 443 25565 ];
@@ -143,18 +149,21 @@ in
   };
 
   # static ip
-  networking.interfaces."enp0s31f6" = {
-    useDHCP = false;
-    ipv4.addresses = [
-      {
-        address = "192.168.1.102";
-        prefixLength = 24;
-      }
-    ];
-  };
+#  networking.interfaces."enp0s31f6" = {
+#    useDHCP = true;
+#    #ipv4.addresses = [
+#    #  {
+#    #    address = "192.168.1.102";
+#    #    prefixLength = 24;
+#    #  }
+#    #];
+#  };
 
-  networking.defaultGateway = "192.168.1.254"; # my router
-  networking.nameservers = [ "8.8.8.8" "8.8.4.4" ];
+  # Enable NetworkManager
+  #networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
+
+  #networking.defaultGateway = "192.168.1.254"; # my router
+  #networking.nameservers = [ "8.8.8.8" "8.8.4.4" ];
 
   environment.systemPackages = map lib.lowPrio [
     pkgs.curl

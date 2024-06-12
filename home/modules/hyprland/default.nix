@@ -188,8 +188,8 @@ in
 
       input = {
         kb_layout = "us";
-        #kb_options = "caps:super";
-        kb_file = "${./output.xkb}";
+        kb_options = "caps:super";
+        #kb_file = "${./output.xkb}";
 
         # focus follows mouse
         follow_mouse = 1;
