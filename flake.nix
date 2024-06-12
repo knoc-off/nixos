@@ -135,15 +135,17 @@
           modules = [
             ./systems/home-server.nix
 
+            #inputs.hardware.nixosModules.lenovo-thinkpad-x1-6th-gen
+
             # Disko
             inputs.disko.nixosModules.disko
+            #./systems/hardware/disks/simple-disk.nix
             ./systems/hardware/disks/disk-module.nix
             {
               diskoCustom = {
-                bootType = "efi"; # or "bios"
-                swapSize = "8G";
-                diskDevice = "/dev/sda";
-                #ata-CT1000BX500SSD1_2115E59677B6
+                bootType = "bios";   # Choose "bios" or "efi"
+                swapSize = "12G";    # Size of the swap partition
+                diskDevice = "/dev/sda";  # The disk device to configure
               };
               #disko.devices.disk.vdb.device = "/dev/disk/by-id/wwn-0x502b2a201d1c1b1a";
             }
