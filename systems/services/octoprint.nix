@@ -1,8 +1,5 @@
 { ...}:
 {
-
-
-
   nixpkgs.overlays = [(self: super: {
     octoprint = super.octoprint.override {
       packageOverrides = pyself: pysuper: {
@@ -46,13 +43,12 @@
     };
   })];
 
-
   services.octoprint = {
     enable = true;
     port = 8080;
     openFirewall = true;
     plugins = plugins: with plugins; [
-      themeify
+      #themeify
       #stlviewer
       #octoprint-prettygcode
       BedLevelVisualizer

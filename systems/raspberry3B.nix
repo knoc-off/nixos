@@ -31,7 +31,7 @@
   #  useDHCP = false;
   #  ipv4.addresses = [
   #    {
-  #      address = "192.168.1.104";
+  #      address = "192.168.1.155";
   #      prefixLength = 24;
   #    }
   #  ];
