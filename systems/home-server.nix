@@ -16,12 +16,8 @@ let
         enabled = true;
         routes = [
           {
-            host = "abc.kobbl.co";
-            backend = "localhost:25500";
-          }
-          {
             host = "*.kobbl.co";
-            backend = "localhost:25501";
+            backend = "localhost:25500";
           }
           {
             host = [ "kobbl.co" "localhost" ];
@@ -62,16 +58,16 @@ in
 
   nix.settings.auto-optimise-store = false;
 
-  #systemd.services.gateService = {
-  #  description = "Gate Service";
-  #  after = [ "network.target" "minecraft-server-vanilla.service" "minecraft-server-vanilla2.service" ];
-  #  wantedBy = [ "multi-user.target" ];
-  #  serviceConfig = {
-  #    ExecStart = "${pkgs.gate}/bin/gate -c ${configFile}";
-  #    Restart = "always";
-  #    User = "root";
-  #  };
-  #};
+  systemd.services.gateService = {
+    description = "Gate Service";
+    after = [ "network.target" "minecraft-server-vanilla.service" "minecraft-server-vanilla2.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      ExecStart = "${pkgs.gate}/bin/gate -c ${configFile}";
+      Restart = "always";
+      User = "root";
+    };
+  };
 
   nixpkgs.overlays = [ inputs.nix-minecraft.overlay ];
   nixpkgs.config.allowUnfree = true;
@@ -80,12 +76,14 @@ in
     enable = true;
     servers.beez = {
       enable = true;
-      package = pkgs.fabricServers.fabric-1_20_6.override { loaderVersion = "0.15.11"; };
+      package = pkgs.fabricServers.fabric-1_21.override { loaderVersion = "0.15.11"; };
       serverProperties = {
-        server-port = 25565;
+        server-port = 25500;
         difficulty = 3;
-        motd = "Beez Server v0.1.0";
+        motd = "\u00a7l \u00a77                       \ud83c\udfa3\u00a7r The \u00a7eBeez \u00a76\ud83d\udd25";
         spawn-protection = 0;
+        level-name = "world";
+        level-seed = 2786386421968123439;
       };
       symlinks = {
         "ops.json" = pkgs.writeTextFile {
@@ -96,7 +94,19 @@ in
                 "uuid": "c9e17620-4cc1-4d83-a30a-ef320cc099e6",
                 "name": "knoc_off",
                 "level": 4,
-                "bypassesPlayerLimit": false
+                "bypassesplayerlimit": true
+              },
+              {
+                "uuid": "c33fb94b-1e45-4bf2-b558-b363503c1e4e",
+                "name": "DBMarshmallow22",
+                "level": 4,
+                "bypassesplayerlimit": true
+              },
+              {
+                "uuid": "a09514fe-e2d6-42aa-98d8-243686e5b6f7",
+                "name": "Oddfan11",
+                "level": 4,
+                "bypassesplayerlimit": true
               }
             ]
           '';
@@ -104,15 +114,49 @@ in
         "server-icon.png" = ./server-icon.png;
       };
     };
-    #servers.CCC =
+    #servers.pre =
     #{
     #  enable = true;
-    #  package = pkgs.fabricServers.fabric-1_20_1.override { loaderVersion = "0.15.11"; };
-    #  #package = pkgs.vanillaServers.vanilla-1_20_2;
+    #  package = pkgs.fabricServers.fabric-1_21.override { loaderVersion = "0.15.11"; };
+    #  #package = pkgs.vanillaServers.vanilla-1_21;
+    #  symlinks = {
+    #    "ops.json" = pkgs.writeTextFile {
+    #      name = "ops.json";
+    #      text = ''
+    #        [
+    #          {
+    #            "uuid": "c9e17620-4cc1-4d83-a30a-ef320cc099e6",
+    #            "name": "knoc_off",
+    #            "level": 4,
+    #            "bypassesplayerlimit": true
+    #          },
+    #          {
+    #            "uuid": "c33fb94b-1e45-4bf2-b558-b363503c1e4e",
+    #            "name": "DBMarshmallow22",
+    #            "level": 4,
+    #            "bypassesplayerlimit": true
+    #          },
+    #          {
+    #            "uuid": "a09514fe-e2d6-42aa-98d8-243686e5b6f7",
+    #            "name": "Oddfan11",
+    #            "level": 4,
+    #            "bypassesplayerlimit": true
+    #          }
+
+    #        ]
+    #      '';
+    #    };
+    #    "server-icon.png" = ./server-icon.png;
+    #  };
     #  serverProperties = {
-    #    server-port = 25501;
+    #    server-port = 25500;
     #    difficulty = 3;
-    #    motd = "NixOS Minecraft server 2";
+    #    level-name = "world3";
+    #    motd = "beez pre 1.21 this world will be wiped 2";
+    #    "enable-rcon" = true;
+    #    "rcon.password" = "123";
+    #    "rcon.port" = 25575;
+
     #  };
     #};
   };

@@ -1,8 +1,7 @@
 { pkgs, lib, theme, config, ... }:
-let
-  mainMod = config.wayland.windowManager.hyprlandCustom.modkey;
-in
 {
+
+
   wayland.windowManager.hyprland = let
     fuzzel = "${pkgs.fuzzel}/bin/fuzzel -b ${theme.base02}DD -t ${theme.base06}DD -m ${theme.base04}DD -C ${theme.base05}DD -s ${theme.base03}DD -S ${theme.base07}DD -M ${theme.base07}DD";
     notify-send = "${pkgs.libnotify}/bin/notify-send";
@@ -12,6 +11,7 @@ in
     notify-bar = "${pkgs.writeShellScriptBin "notify-bar" ''
       ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:$1 -h int:value:$2 -u low "''${@:3}"
     ''}/bin/notify-bar";
+    mainMod = "SUPER";
   in {
     settings = {
       bind =
@@ -94,11 +94,11 @@ in
           "${mainMod}, Tab, focuscurrentorlast"
           "${mainMod}, Delete, exit"
           "${mainMod}, W, killactive"
-          #"${mainMod}, V, togglefloating"
+          "${mainMod}, V, togglefloating"
           "${mainMod}, equal, fullscreen"
           "${mainMod}, O, fakefullscreen"
           #"${mainMod}, P, togglesplit"
-          #"${mainMod}, SPACE, exec, ${fuzzel}"
+          "${mainMod}, SPACE, exec, ${fuzzel}"
           "${mainMod}, A, exec, ${nu-focus}/bin/focus firefox"
 
           # "${mainMod}, ALT, submap, metameta"
@@ -110,12 +110,6 @@ in
           "${mainMod}, S, exec, pypr toggle foxy"
           "${mainMod}, Z, exec, pypr toggle volume"
           "${mainMod} SHIFT, SPACE, exec, pypr expose"
-
-          # ROFI
-          "${mainMod}, SPACE, exec, rofi -show drun"
-          "${mainMod}, R, exec, rofi -show run"
-          "${mainMod}, V, exec, rofi -show clipboard"
-
 
           # screenshot
           ", Print, exec, ${pkgs.gscreenshot}/bin/gscreenshot -sc"

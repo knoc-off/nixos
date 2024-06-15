@@ -36,6 +36,15 @@
     ./xdg-enviroment.nix
   ];
 
+
+  wayland.windowManager.hyprlandCustom = {
+    enable = true;
+  };
+
+
+
+
+
   #disabledModules = ["programs/eww.nix"];
   programs.git = {
     enable = true;
