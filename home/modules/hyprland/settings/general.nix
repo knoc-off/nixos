@@ -180,6 +180,9 @@ in
           (float "steam" ".*Friends List.*")
           (window "thunderbird" ".*" "6")
           (fakeFullscreen "org.kde.falkon")
+
+          "noborder,class:(ulauncher),title:(.*)"
+
           #(window "firefox" ".*" "special:firefox")
         ];
 

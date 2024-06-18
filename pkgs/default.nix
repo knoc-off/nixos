@@ -11,8 +11,11 @@
    ttok = pkgs.python3Packages.callPackage ./ttok {};
    gate = pkgs.callPackage ./gate {};
    ascii-silhouettify = pkgs.callPackage ./ascii {};
-   mcscript = pkgs.callPackage ./mcscript {};
-   mcscript2 = pkgs.callPackage ./mcscript/tests.nix {};
+   #material-icons-ext = pkgs.callPackage ./material-icons-ext {};
+   material-icons-ext = (import ./svg-tools/icon-extractor {inherit pkgs;
+    iconsPackage = pkgs.material-design-icons;
+    fontPath = "share/fonts/truetype/materialdesignicons-webfont.ttf";
+   } );
 
 
 

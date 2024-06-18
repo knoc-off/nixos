@@ -118,12 +118,14 @@
             ./systems/hardware/disks/btrfs-luks.nix
             home-manager.nixosModules.home-manager
             {
-              home-manager.useGlobalPkgs = false;
-              home-manager.useUserPackages = true;
-              home-manager.users.knoff = import ./home/knoff-laptop.nix;
-              home-manager.extraSpecialArgs = {
-                inherit inputs outputs theme;
-                system = "x86_64-linux";
+              home-manager = {
+                useGlobalPkgs = false;
+                useUserPackages = true;
+                users.knoff = import ./home/knoff-laptop.nix;
+                extraSpecialArgs = {
+                  inherit inputs outputs theme;
+                  system = "x86_64-linux";
+                };
               };
             }
           ];

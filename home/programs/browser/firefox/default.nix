@@ -98,7 +98,19 @@
       categories = [ "Application" "Network" "WebBrowser" ];
       mimeType = [ "text/html" "text/xml" ];
     };
+    firefox-private = {
+      name = "firefox private";
+      genericName = "Web Browser";
+      exec = "firefox --private-window %U";
+      icon = "${pkgs.firefox}/share/icons/hicolor/128x128/apps/firefox.png";
+      terminal = false;
+      categories = [ "Application" "Network" "WebBrowser" ];
+      mimeType = [ "text/html" "text/xml" ];
+    };
   };
+
+
+
 
 
 

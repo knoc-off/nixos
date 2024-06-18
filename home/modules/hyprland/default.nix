@@ -49,7 +49,7 @@ in
 
     programs.rofi = {
       enable = true;
-      package = pkgs.rofi;
+      package = pkgs.rofi-wayland;
       font = "Droid Sans 9";
       location = "center";
       xoffset = 0;
