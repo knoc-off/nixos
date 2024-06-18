@@ -80,10 +80,15 @@ in
       serverProperties = {
         server-port = 25500;
         difficulty = 3;
-        motd = "\u00a7l \u00a77                       \ud83c\udfa3\u00a7r The \u00a7eBeez \u00a76\ud83d\udd25";
+        motd = "The Beez";
         spawn-protection = 0;
         level-name = "world";
         level-seed = 2786386421968123439;
+
+        # Rcon
+        enable-rcon = true;
+        "rcon.password" = "123";
+        "rcon.port" = 25575;
       };
       symlinks = {
         "ops.json" = pkgs.writeTextFile {

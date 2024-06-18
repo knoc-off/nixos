@@ -4,7 +4,7 @@ let
 in
 {
   wayland.windowManager.hyprland = let
-    fuzzel = "${pkgs.fuzzel}/bin/fuzzel -b ${theme.base02}DD -t ${theme.base06}DD -m ${theme.base04}DD -C ${theme.base05}DD -s ${theme.base03}DD -S ${theme.base07}DD -M ${theme.base07}DD";
+    #fuzzel = "${pkgs.fuzzel}/bin/fuzzel -b ${theme.base02}DD -t ${theme.base06}DD -m ${theme.base04}DD -C ${theme.base05}DD -s ${theme.base03}DD -S ${theme.base07}DD -M ${theme.base07}DD";
     notify-send = "${pkgs.libnotify}/bin/notify-send";
     notify-msg = "${pkgs.writeShellScriptBin "notify-msg" ''
       ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:$1 -u low "''${@:2}"
@@ -111,10 +111,8 @@ in
           "${mainMod}, Z, exec, pypr toggle volume"
           "${mainMod} SHIFT, SPACE, exec, pypr expose"
 
-          # ROFI
-          "${mainMod}, SPACE, exec, rofi -show drun"
-          "${mainMod}, R, exec, rofi -show run"
-          "${mainMod}, V, exec, rofi -show clipboard"
+          # launcher
+          "${mainMod}, SPACE, exec, ${pkgs.ulauncher}/bin/ulauncher"
 
 
           # screenshot
