@@ -49,11 +49,9 @@
     };
 
     # Hyprland
-    hyprland.url = "github:hyprwm/hyprland";
-    hyprland-plugins = {
-      url = "github:hyprwm/hyprland-plugins";
-      inputs.hyprland.follows = "hyprland";
-    };
+    #hyprland.url = "github:hyprwm/hyprland";
+    hyprland.url = "git+https://github.com/hyprwm/Hyprland?submodules=1";
+
 
     # Secrets management
     sops-nix.url = "github:Mic92/sops-nix";
@@ -130,6 +128,47 @@
             }
           ];
         };
+
+        nuci5 = nixpkgs.lib.nixosSystem {
+          specialArgs = { inherit inputs outputs; };
+          system = "x86_64-linux";
+          modules = [
+
+            ./systems/nuci5.nix
+
+            inputs.hardware.nixosModules.common-cpu-intel
+
+            disko.nixosModules.disko
+            ./systems/hardware/disks/disk-module.nix
+            {
+              diskoCustom = {
+                bootType = "efi";   # Choose "bios" or "efi"
+                swapSize = "12G";    # Size of the swap partition
+                diskDevice = "/dev/sda";  # The disk device to configure
+              };
+              #disko.devices.disk.vdb.device = "/dev/disk/by-id/wwn-0x502b2a201d1c1b1a";
+            }
+
+            #./systems/hardware/disks/btrfs-luks.nix
+
+            home-manager.nixosModules.home-manager
+            {
+              home-manager = {
+                useGlobalPkgs = false;
+                useUserPackages = true;
+                users.knoff = import ./home/knoff-laptop.nix;
+                extraSpecialArgs = {
+                  inherit inputs outputs theme;
+                  system = "x86_64-linux";
+                };
+              };
+            }
+          ];
+        };
+
+
+
+
 
         home-server = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };

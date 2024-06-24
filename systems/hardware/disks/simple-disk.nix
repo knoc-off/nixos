@@ -1,5 +1,3 @@
-# https://github.com/nix-community/nixos-anywhere-examples/blob/main/disk-config.nix
-# Example to create a bios compatible gpt partition
 {lib, ...}: {
   disko.devices = {
     disk.disk1 = {

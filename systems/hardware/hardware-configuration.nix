@@ -7,6 +7,7 @@
   modulesPath,
   ...
 }: {
+  # what does this do?
   imports = [
     (modulesPath + "/installer/scan/not-detected.nix")
   ];
@@ -25,5 +26,4 @@
   # networking.interfaces.wlp4s0.useDHCP = lib.mkDefault true;
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-  hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 }

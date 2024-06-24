@@ -56,7 +56,7 @@ in
     #./services/traefik.nix
   ];
 
-  nix.settings.auto-optimise-store = false;
+  nix.settings.auto-optimise-store = true;
 
   systemd.services.gateService = {
     description = "Gate Service";
@@ -88,7 +88,7 @@ in
         # Rcon
         enable-rcon = true;
         "rcon.password" = "123";
-        "rcon.port" = 25575;
+        "rcon.port" = 25570;
       };
       symlinks = {
         "ops.json" = pkgs.writeTextFile {

@@ -11,6 +11,7 @@ in
     ./pyprland.nix
     ./swayidle.nix
     ./settings/binds.nix
+    inputs.hyprland.homeManagerModules.default
   ];
 
   options.wayland.windowManager.hyprlandCustom = {

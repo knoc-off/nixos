@@ -12,9 +12,9 @@
    gate = pkgs.callPackage ./gate {};
    ascii-silhouettify = pkgs.callPackage ./ascii {};
    #material-icons-ext = pkgs.callPackage ./material-icons-ext {};
+
    material-icons-ext = (import ./svg-tools/icon-extractor {inherit pkgs;
-    iconsPackage = pkgs.material-design-icons;
-    fontPath = "share/fonts/truetype/materialdesignicons-webfont.ttf";
+    fontPath = "${pkgs.material-design-icons}/share/fonts/truetype/materialdesignicons-webfont.ttf";
    } );
 
 

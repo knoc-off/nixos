@@ -1,6 +1,21 @@
 {pkgs, ...}:
 {
 
+    #spotiblock = prev.spotify.overrideAttrs (_old: rec {
+    #  postInstall = ''
+    #    ExecMe="env LD_PRELOAD=${prev.spotify-adblock}/lib/libspotifyadblock.so spotify"
+    #    sed -i "s|^TryExec=.*|TryExec=$ExecMe %U|" $out/share/applications/spotify.desktop
+    #    sed -i "s|^Exec=.*|Exec=$ExecMe %U|" $out/share/applications/spotify.desktop
+    #  '';
+    #});
+  xdg.desktopEntries."spotify-adblock" = {
+    name = "Spotify (Adblock)";
+    comment = "Spotify with Adblock";
+    icon = "spotify";
+    exec = "env LD_PRELOAD=${pkgs.spotify-adblock}/lib/libspotifyadblock.so ${pkgs.spotify}/bin/spotify";
+    categories = [ "Audio" "Music" "Player" ];
+    terminal = false;
+  };
 
   # gnome settings app
   xdg.desktopEntries."org.gnome.Settings" = {

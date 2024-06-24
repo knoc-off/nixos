@@ -59,6 +59,9 @@ in
                   type = "filesystem";
                   format = "vfat";
                   mountpoint = "/boot";
+                  mountOptions = [
+                    "defaults"
+                  ];
                 };
                 priority = 1; # Needs to be the first partition
               };
@@ -90,7 +93,6 @@ in
       enable = true;
       device = if cfg.bootType == "efi" then "nodev" else "";
       efiSupport = cfg.bootType == "efi";
-      efiInstallAsRemovable = cfg.bootType == "efi";
     };
 
     # systemd-boot configuration
