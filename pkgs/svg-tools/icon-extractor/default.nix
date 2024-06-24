@@ -1,11 +1,10 @@
-{ pkgs ? import <nixpkgs> {}, iconsPackage, fontPath }:
+{ pkgs ? import <nixpkgs> {}, fontPath }:
 
 pkgs.stdenv.mkDerivation {
   name = "extract-icons-svg";
   src = null;
 
   buildInputs = [
-    iconsPackage
     pkgs.fontforge
   ];
 
@@ -16,7 +15,7 @@ pkgs.stdenv.mkDerivation {
     mkdir -p svg_files
     fontforge -lang=py -c '
 import os, fontforge
-font = fontforge.open("${iconsPackage}/${fontPath}")
+font = fontforge.open("${fontPath}")
 os.makedirs("svg_files", exist_ok=True)
 [glyph.export(f"svg_files/{glyph.glyphname}.svg") for glyph in font.glyphs() if glyph.glyphname]'
   '';

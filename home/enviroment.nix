@@ -1,8 +1,15 @@
 { config, ...}: {
   home = {
-    file."nixos" = {
-      recursive = true;
-      source = config.lib.file.mkOutOfStoreSymlink "/etc/nixos/";
+    file = {
+      mnt = {
+        recursive = true;
+        source = config.lib.file.mkOutOfStoreSymlink "/run/media/${config.home.username}";
+      };
+
+      nixos = {
+        recursive = true;
+        source = config.lib.file.mkOutOfStoreSymlink "/etc/nixos/";
+      };
     };
 
     sessionVariables = {
