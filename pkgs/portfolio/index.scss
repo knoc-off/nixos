@@ -1,0 +1,331 @@
+// Define colors and fonts
+$primary-color: #3498db;
+$secondary-color: #2c3e50;
+$background-color: #ecf0f1;
+$text-color: #333;
+$font-stack: 'Helvetica Neue', Arial, sans-serif;
+
+// General body styling
+body {
+    margin: 0px;
+    font-family: $font-stack;
+    background-color: $background-color;
+    color: $text-color;
+    line-height: 1.6;
+}
+
+// Navigation styling
+nav {
+    background: $secondary-color;
+    padding: 1em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .logo-links-container {
+        display: flex;
+        align-items: center;
+
+        a {
+            display: flex;
+            align-items: center;
+            margin-right: 0.1rem;
+            padding: 0px;
+            transition: transform 0.2s;
+                width: 3rem;
+
+            img {
+                border-radius: 50%;
+            }
+
+            &:hover {
+                transform: scale(1.1);
+            }
+        }
+    }
+
+    a {
+        color: white;
+        margin: 0 15px;
+        text-decoration: none;
+        font-weight: bold;
+
+        &:hover {
+            color: $primary-color;
+        }
+    }
+}
+
+// Main content area
+main {
+    padding: 20px;
+    min-width: 300px;
+
+    section {
+        background: white;
+        padding: 20px;
+        margin: 20px auto;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+}
+
+
+
+// Projects list specific styles
+.projects-list {
+    //display: flex;
+    //flex-wrap: wrap;
+    //flex-direction: column;
+    display: grid;
+    //grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* Adjust the minmax value to control the minimum width of the grid items */
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+
+    //grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+
+    a {
+        text-decoration: none;
+        color: inherit;
+        //height: 100%;
+
+        &:hover .project-item {
+            background-color: #e9e9e9;
+        }
+    }
+
+    .project-item {
+        //max-width: 200px;
+        border: 1px solid #ccc;
+        padding: 20px;
+        border-radius: 8px;
+        background-color: #fff;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        transition: background-color 0.3s;
+
+        .header {
+            display: flex;
+            align-items: center;
+
+            img {
+                width: 50px;
+                height: 50px;
+                margin-right: 15px;
+                border-radius: 50%;
+            }
+
+            .title {
+                h2 {
+                    margin: 0;
+                }
+            }
+        }
+
+        .markdown-view {
+            padding-top: 10px;
+
+            .markdown-content {
+                p {
+                    margin: 5px 0;
+                    padding-top: 0px;
+                    margin-top: 0px;
+                }
+            }
+        }
+    }
+}
+
+
+
+
+
+
+// about me section
+.about-container {
+    display: flex;
+    max-width: 50rem;
+    align-items: flex-start; /* Align items at the start of the flex container */
+    .markdown-content {
+        p {
+            padding-top: 0px;
+            margin-top: 0px;
+        }
+
+        min-width: 200px;
+
+    }
+}
+
+.about-image {
+    width: 200px; /* or any other dimensions */
+    height: auto; /* maintain aspect ratio */
+    margin-right: 40px; /* space between the image and the Markdown content */
+    margin-bottom: 20px; /* space between the image and the Markdown content */
+    border-radius: 8px;
+    //box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+
+
+
+
+// Styles for aspect ratio 3/4 (height greater than width)
+@media (max-aspect-ratio: 3/4) {
+    nav a {
+        margin: 0 10px; // Reduce margin for smaller screens
+    }
+
+    main {
+        padding: 10px;
+    }
+
+    .projects-list {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); // Smaller columns on mobile
+    }
+
+    .project-item {
+        padding: 10px; // Reduced padding on mobile
+    }
+
+    .about-container {
+        flex-direction: column; // Stack items vertically
+        align-items: center; // Center items horizontally
+        text-align: center; // Center text
+
+        .about-image {
+            margin-right: 0; // Remove right margin
+            margin-bottom: 20px; // Keep bottom margin
+        }
+
+        .markdown-content {
+            min-width: 0; // Allow content to take full width
+        }
+    }
+}
+
+
+// Footer styling
+footer {
+    text-align: center;
+    padding: 1em 0;
+    background: $secondary-color;
+    color: white;
+}
+
+// Animations
+@keyframes blinkWarning {
+    0% { color: red; }
+    100% { color: white; }
+}
+
+.blinkWarning {
+    animation: blinkWarning 1s linear infinite;
+}
+
+
+
+// Resume
+.resume-container {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f5f5f5;
+}
+
+.resume-grid {
+    width: 210mm;
+    height: 297mm;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: 1fr 3fr;
+    font-size: 12px;
+}
+
+.quadrant {
+    padding: 20px;
+    overflow: auto;
+}
+
+.top-left {
+    background-color: #ebeef1;
+}
+
+.top-right {
+    background-color: #99abba;
+}
+
+.bottom-left {
+    background-color: #ffffff;
+    grid-row: 2 / 4;
+}
+
+.bottom-right {
+    background-color: #d6dde4;
+}
+
+h1 { font-size: 24px; }
+h2 { font-size: 20px; }
+h3 { font-size: 16px; }
+p, ul, li { font-size: 12px; }
+
+/* Print styles */
+@media print {
+    @page {
+        size: A4;
+        margin: 0;
+    }
+
+    html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+    }
+
+    .resume-container {
+        width: 100%;
+        height: 100%;
+        display: block;
+        page-break-inside: avoid;
+    }
+
+    .resume-grid {
+        width: 100%;
+        height: 100%;
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        grid-template-rows: 1fr 3fr;
+    }
+
+    .quadrant {
+        padding: 20px;
+        overflow: visible;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+    }
+
+    .top-left {
+        background-color: #ebeef1 !important;
+    }
+
+    .top-right {
+        background-color: #99abba !important;
+    }
+
+    .bottom-left {
+        background-color: #ffffff !important;
+    }
+
+    .bottom-right {
+        background-color: #d6dde4 !important;
+    }
+
+    /* Adjust font sizes for print */
+    h1 { font-size: 20pt; }
+    h2 { font-size: 16pt; }
+    h3 { font-size: 12pt; }
+    p, ul, li { font-size: 8pt; }
+}
