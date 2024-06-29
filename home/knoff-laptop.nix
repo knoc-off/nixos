@@ -68,6 +68,9 @@
     (llm.withPlugins([pkgs.llm-cmd]))
     ttok
 
+    skypeforlinux # -- skype phone
+    audio-recorder
+
     evince
 
     obsidian

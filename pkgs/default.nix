@@ -9,9 +9,19 @@
    #llm-cmd = pkgs.callPackage ./llm-cmd.nix {};
    llm-cmd = pkgs.python3Packages.callPackage ./llm-cmd {};
    ttok = pkgs.python3Packages.callPackage ./ttok {};
+   poe = pkgs.python3Packages.callPackage ./poe-llm-api {};
    gate = pkgs.callPackage ./gate {};
    ascii-silhouettify = pkgs.callPackage ./ascii {};
    #material-icons-ext = pkgs.callPackage ./material-icons-ext {};
+
+
+    website = {
+      portfolio = pkgs.callPackage ./portfolio { };
+
+    };
+
+
+
 
    material-icons-ext = (import ./svg-tools/icon-extractor {inherit pkgs;
     fontPath = "${pkgs.material-design-icons}/share/fonts/truetype/materialdesignicons-webfont.ttf";
