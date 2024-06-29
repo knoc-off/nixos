@@ -5,6 +5,9 @@
     # Nixpkgs
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
+    # Rust overlay
+    rust-overlay.url = "github:oxalica/rust-overlay";
+
     # my custom website
     mywebsite.url = "github:knoc-off/Website";
 
@@ -70,7 +73,7 @@
     ];
   };
 
-  outputs = inputs @ { self, solara, nixpkgs, home-manager, disko, ... }:
+  outputs = inputs @ { self, nixpkgs, home-manager, disko, ... }:
     let
       inherit (self) outputs;
       theme = inputs.themes.custom (import ./theme.nix);
@@ -86,9 +89,23 @@
       forAllSystems = nixpkgs.lib.genAttrs systems;
     in
     rec {
-      packages = forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system});
+      #packages = forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system});
+
+      packages = forAllSystems (system:
+        import ./pkgs {
+          inherit inputs;
+          pkgs = nixpkgs.legacyPackages.${system};
+        }
+      );
 
       overlays = import ./overlays { inherit inputs; };
+
+      devShells = forAllSystems (system:
+        import ./devshells {
+          inherit inputs;
+          pkgs = nixpkgs.legacyPackages.${system};
+        }
+      );
 
       images = {
         rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;
@@ -97,7 +114,7 @@
 
       nixosConfigurations = {
         framework13 = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; inherit (solara) nixosModules homeManagerModules; };
+          specialArgs = { inherit inputs outputs; };
           system = "x86_64-linux";
           modules = [
             ./systems/framework13.nix
