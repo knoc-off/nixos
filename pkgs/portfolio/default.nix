@@ -34,16 +34,16 @@ rustPlatform.buildRustPackage rec {
   ]);
 
 
-  #buildPhase = ''
-  #  runHook preBuild
-  #  mkdir -p $TMPDIR/output
+  buildPhase = ''
+    runHook preBuild
+    mkdir -p $TMPDIR/output
 
-  #  ln -s ${pkgs.super-tiny-icons}/ icons
-  #  ln -s ${pkgs.font-awesome}/share/fonts/opentype/ font-awesome
+    ln -s ${pkgs.super-tiny-icons}/ icons
+    ln -s ${pkgs.font-awesome}/share/fonts/opentype/ font-awesome
 
-  #  trunk build --release --offline --dist $TMPDIR/output --public-url /
-  #  runHook postBuild
-  #'';
+    trunk build --release --offline --dist $TMPDIR/output --public-url /
+    runHook postBuild
+  '';
 
   #installPhase = ''
   #  runHook preInstall
