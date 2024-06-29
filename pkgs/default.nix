@@ -1,6 +1,6 @@
 # Custom packages, that can be defined similarly to ones from nixpkgs
 # You can build them using 'nix build .#example'
-{ pkgs, ... }: {
+{ pkgs, inputs, ... }: {
 
    #example = pkgs.callPackage ./example { };
    # i think its pkgs.additions.spotify-adblock?
@@ -16,7 +16,7 @@
 
 
     website = {
-      portfolio = pkgs.callPackage ./portfolio { };
+      portfolio = pkgs.callPackage ./portfolio { rust-overlay = inputs.rust-overlay; };
 
     };
 
