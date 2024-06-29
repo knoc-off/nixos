@@ -13,6 +13,7 @@
     };
 
     sessionVariables = {
+
       # Editor and shell
       EDITOR = "nvim";
       TERMINAL = "kitty";
