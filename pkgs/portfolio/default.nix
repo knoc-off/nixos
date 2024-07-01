@@ -46,9 +46,9 @@ rustPlatform.buildRustPackage rec {
     mkdir -p $TMPDIR/output
 
     ln -s ${pkgs.super-tiny-icons}/ icons
-    #ln -s ${pkgs.font-awesome}/share/fonts/opentype/ font-awesome
+    ln -s ${pkgs.font-awesome}/share/fonts/opentype/ font-awesome
 
-    trunk build --release --offline --dist $TMPDIR/output --public-url /
+    TRUNK_SKIP_VERSION_CHECK=true trunk build --release --offline --dist $TMPDIR/output --public-url /
     #trunk build --release --offline --public-url /
     #RUST_BACKTRACE=full trunk build --release --offline --public-url /
     runHook postBuild
@@ -57,7 +57,7 @@ rustPlatform.buildRustPackage rec {
   installPhase = ''
     runHook preInstall
     mkdir -p $out/lib
-    #cp -r $TMPDIR/output/* $out/lib/
+    cp -r $TMPDIR/output/* $out/lib/
     runHook postInstall
   '';
 }
