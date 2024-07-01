@@ -7,7 +7,11 @@
   #additions = final: _prev: import ../pkgs {pkgs = final;};
   # Adds my custom packages
   additions = final: prev:
-    import ../pkgs {pkgs = final;};
+    import ../pkgs {
+      inherit inputs;
+
+      pkgs = final;
+    };
 
 
   #additions = final: prev:
@@ -32,6 +36,14 @@
     steam-scaling = prev.steamPackages.steam-fhsenv.override (old: rec {
       extraArgs = (old.extraArgs or "") + " -forcedesktopscaling 1.0 ";
     });
+
+
+    unstable-packages = final: _prev: {
+      unstable = import inputs.nixpkgs-unstable {
+        system = final.system;
+        config.allowUnfree = true;
+      };
+    };
 
   };
 
