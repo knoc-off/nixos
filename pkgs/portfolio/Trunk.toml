@@ -2,8 +2,6 @@
 dist = "dist"
 public_url = "/"
 
-[watch]
-watch = ["src"]
 
 [serve]
 address = "127.0.0.1"

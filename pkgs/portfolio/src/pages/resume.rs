@@ -1,199 +1,27 @@
 use yew::prelude::*;
-use crate::components::markdown::MarkdownViewer;
+use crate::components::resume::*;
 use crate::components::social_links::LogoLinkProps;
-use crate::components::social_links::LogoLink;
 
-#[derive(Clone, PartialEq)]
-pub struct ResumeData {
-    name: String,
-    title: String,
-    contact: ContactInfo,
-    summary: String,
-    experience: Vec<Experience>,
-    skills: Vec<String>,
-    education: Vec<Education>,
-    languages: Vec<Language>,
-    interests: String,
+#[function_component(Resume)]
+pub fn about() -> Html {
+    let resume_data = create_resume_data();
+    html! { <ResumeComponent data={resume_data} /> }
 }
 
-#[derive(Clone, PartialEq)]
-pub struct ContactInfo {
-    email: String,
-    phone: String,
-    location: String,
-    linkedin: String,
-    github: String,
-    social_links: Vec<LogoLinkProps>,
-}
 
-#[derive(Clone, PartialEq)]
-pub struct Experience {
-    company: String,
-    position: String,
-    location: String,
-    date_range: String,
-    responsibilities: Vec<String>,
-}
 
-#[derive(Clone, PartialEq)]
-pub struct Education {
-    institution: String,
-    location: String,
-    degree: String,
-    date: String,
-    details: Vec<String>,
-}
-
-#[derive(Clone, PartialEq)]
-pub struct Language {
-    name: String,
-    level: String,
-}
-
-pub struct Resume {
-    data: ResumeData,
-}
-
-#[derive(Properties, PartialEq)]
-pub struct ResumeProps {
-    pub data: ResumeData,
-}
-
-impl Component for Resume {
-    type Message = ();
-    type Properties = ResumeProps;
-
-    fn create(ctx: &Context<Self>) -> Self {
-        Resume {
-            data: ctx.props().data.clone(),
-        }
-    }
-
-    fn view(&self, _ctx: &Context<Self>) -> Html {
-        html! {
-            <>
-            <style>
-                {"@media print { @page { size: A4; margin: 0; } }"}
-                {"
-                    .contact-info {
-                        display: flex;
-                        justify-content: space-around;
-                        align-items: center;
-                    }
-
-                    .contact-item {
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        transition: transform 0.3s;
-                    }
-
-                    .contact-item:hover {
-                        transform: scale(1.1);
-                    }
-
-                    .contact-item img {
-                        width: 20px;
-                        height: 20px;
-                    }
-                "}
-            </style>
-            <div class="resume-container">
-                <div class="resume-grid">
-                    <div class="quadrant top-left">
-                        <h1>{ &self.data.name }</h1>
-                        <h2>{ &self.data.title }</h2>
-                        <div class="contact-info">
-                            { self.data.contact.social_links.iter().map(|link| html! {
-                                <LogoLink
-                                    link={link.link.clone()}
-                                    img_src={link.img_src.clone()}
-                                    alt_text={link.alt_text.clone()}
-                                    width={link.width.clone()}
-                                    height={link.height.clone()}
-                                    additional_style={link.additional_style.clone()}
-                                />
-                            }).collect::<Html>() }
-                        </div>
-                    </div>
-                    <div class="quadrant top-right">
-                        <MarkdownViewer markdown={format!(r#"
-## PROFESSIONAL SUMMARY
-
-{}
-                        "#,
-                        self.data.summary
-                        )} />
-                    </div>
-                    <div class="quadrant bottom-left">
-                        <MarkdownViewer markdown={format!(r#"
-## EXPERIENCE
-
-{}
-
-## SKILLS
-
-{}
-                        "#,
-                        self.data.experience.iter().map(|exp| format!(
-                            "### {} - {}\n*{} • {}*\n\n{}\n",
-                            exp.company,
-                            exp.position,
-                            exp.location,
-                            exp.date_range,
-                            exp.responsibilities.iter().map(|r| format!("- {}", r)).collect::<Vec<_>>().join("\n")
-                        )).collect::<Vec<_>>().join("\n"),
-                        self.data.skills.iter().map(|s| format!("- {}", s)).collect::<Vec<_>>().join("\n")
-                        )} />
-                    </div>
-                    <div class="quadrant bottom-right">
-                        <MarkdownViewer markdown={format!(r#"
-## EDUCATION
-
-{}
-
-## LANGUAGES
-
-{}
-
-## INTERESTS
-
-{}
-                        "#,
-                        self.data.education.iter().map(|edu| format!(
-                            "### {}\n*{} • {}*\n{}\n{}",
-                            edu.institution,
-                            edu.location,
-                            edu.date,
-                            edu.degree,
-                            edu.details.iter().map(|d| format!("- {}", d)).collect::<Vec<_>>().join("\n")
-                        )).collect::<Vec<_>>().join("\n\n"),
-                        self.data.languages.iter().map(|lang| format!("- {}: {}", lang.name, lang.level)).collect::<Vec<_>>().join("\n"),
-                        self.data.interests
-                        )} />
-                    </div>
-                </div>
-            </div>
-            </>
-        }
-    }
-}
-
-pub fn create_fake_resume_data() -> ResumeData {
+pub fn create_resume_data() -> ResumeData {
     ResumeData {
-        name: "John Doe".to_string(),
-        title: "Software Engineer".to_string(),
+        name: "NICHOLAS SELBY".to_string(),
+        title: "SOFTWARE DEVELOPER".to_string(),
         contact: ContactInfo {
-            email: "john.doe@example.com".to_string(),
-            phone: "555-1234".to_string(),
-            location: "New York, NY".to_string(),
-            linkedin: "https://www.linkedin.com/in/johndoe".to_string(),
-            github: "https://github.com/johndoe".to_string(),
-
-
-
-
+            email: "selby@niko.ink".to_string(),
+            phone: "+49 176 56615691".to_string(),
+            location: "Berlin, Berlin 13465".to_string(),
+            linkedin: "".to_string(), // Not provided in the data
+            github: "".to_string(), // Not provided in the data
             social_links: vec![
+
                 LogoLinkProps {
                     link: "https://www.linkedin.com/in/johndoe".to_string(),
                     img_src: "/icons/share/icons/SuperTinyIcons/svg/linkedin.svg".to_string(),
@@ -210,51 +38,79 @@ pub fn create_fake_resume_data() -> ResumeData {
                     height: Some("30px".to_string()),
                     additional_style: None,
                 },
+
+
+
             ],
-
-
-
-
-
         },
-        summary: "Experienced software engineer with a passion for developing innovative programs that expedite the efficiency and effectiveness of organizational success.".to_string(),
+        summary: "Versatile Junior Software Developer with a track record of resolving technical issues and enhancing collaboration at Olymp Consulting. Demonstrated expertise in Python Programming. Achieved significant improvements in development processes through innovative technology integration. Skilled in both back-end development and fostering productive relationships. Seeking to utilize excellent communication, interpersonal, and organizational skills to complete tasks. Reliable with a good work ethic and the ability to quickly adapt to new tasks and environments.".to_string(),
+        photo_path: "static/Niko.jpeg".to_string(), // No photo path provided in the data
         experience: vec![
             Experience {
-                company: "TechCorp".to_string(),
-                position: "Senior Developer".to_string(),
-                location: "New York, NY".to_string(),
-                date_range: "Jan 2020 - Present".to_string(),
+                company: "Olymp Consulting".to_string(),
+                position: "Junior Software Developer".to_string(),
+                location: "Berlin, Berlin".to_string(),
+                date_range: "10/2022 - 06/2023".to_string(),
                 responsibilities: vec![
-                    "Lead a team of 10 developers in creating a new e-commerce platform.".to_string(),
-                    "Implemented a microservices architecture using Docker and Kubernetes.".to_string(),
+                    "Troubleshot, debugged, and resolved technical issues with existing software applications.".to_string(),
+                    "Wrote comprehensive documentation for all developed programs or applications.".to_string(),
+                    "Set up servers that hosted internal services to increase collaboration.".to_string(),
+                    "Researched and proposed new technologies or tools that could improve development processes.".to_string(),
+                    "Performed system integration testing to ensure compatibility between components.".to_string(),
+                    "Participated in technical discussions and meetings, providing valuable insights and solutions.".to_string(),
                 ],
             },
             Experience {
-                company: "Web Solutions".to_string(),
-                position: "Software Developer".to_string(),
-                location: "San Francisco, CA".to_string(),
-                date_range: "Jun 2015 - Dec 2019".to_string(),
+                company: "Motive School of Movement".to_string(),
+                position: "Gymnastics Coach".to_string(),
+                location: "Greenville, SC".to_string(),
+                date_range: "03/2020 - 05/2021".to_string(),
                 responsibilities: vec![
-                    "Developed front-end and back-end features for client projects.".to_string(),
-                    "Collaborated with designers to improve user experience.".to_string(),
+                    "Cultivated relationships with other coaches and staff members within the organization.".to_string(),
+                    "Demonstrated ability to teach and motivate students of all ages and skill levels in gymnastics.".to_string(),
+                    "Provided technical instruction on proper technique for tumbling, vaulting, bars, beam, floor exercises and trampoline.".to_string(),
                 ],
             },
         ],
         skills: vec![
-            "Rust".to_string(),
-            "JavaScript".to_string(),
-            "Docker".to_string(),
-            "Kubernetes".to_string(),
+            "Python Programming".to_string(),
+            "Software Documentation".to_string(),
+            "Version control".to_string(),
+            "Web development".to_string(),
+            "UI and UX design".to_string(),
+            "CI/CD".to_string(),
+            "Docker containers".to_string(),
+            "Linux operating systems".to_string(),
+            "HTML and CSS".to_string(),
+            "Cloud computing".to_string(),
+            "Back-end development".to_string(),
+            "Data structures".to_string(),
         ],
         education: vec![
             Education {
-                institution: "State University".to_string(),
-                location: "Los Angeles, CA".to_string(),
-                degree: "Bachelor of Science in Computer Science".to_string(),
-                date: "Class of 2015".to_string(),
+                institution: "Wade Hampton High School".to_string(),
+                location: "Greenville SC".to_string(),
+                degree: "High School Diploma".to_string(),
+                date: "08/2021".to_string(),
                 details: vec![
-                    "Dean's List".to_string(),
-                    "Graduated with Honors".to_string(),
+                    "Relevant Coursework: Computer Science using Java, AP Computer Science".to_string(),
+                    "Extracurricular Activities: German Club".to_string(),
+                ],
+            },
+            Education {
+                institution: "Fine Arts Center".to_string(),
+                location: "Greenville SC".to_string(),
+                degree: "Graduation Certificate".to_string(),
+                date: "06/2021".to_string(),
+                details: vec![],
+            },
+            Education {
+                institution: "T.U. Berlin".to_string(),
+                location: "Berlin".to_string(),
+                degree: "Gasthörerschaft".to_string(),
+                date: "".to_string(),
+                details: vec![
+                    "Relevant Coursework: IT Fundamentals".to_string(),
                 ],
             },
         ],
@@ -264,10 +120,10 @@ pub fn create_fake_resume_data() -> ResumeData {
                 level: "Native".to_string(),
             },
             Language {
-                name: "Spanish".to_string(),
+                name: "German".to_string(),
                 level: "Fluent".to_string(),
             },
         ],
-        interests: "Open source contribution, hiking, photography".to_string(),
+        interests: "Technology, including 3D printing, Arduino, programming, and game development, as well as hobbies like board games, drawing, and cooking.".to_string(),
     }
 }

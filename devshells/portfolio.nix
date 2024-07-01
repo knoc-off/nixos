@@ -29,6 +29,11 @@ pkgs.mkShell {
     dart-sass
     wasm-bindgen-cli
   ];
+
+  env = {
+    TRUNK_SKIP_VERSION_CHECK = "true";
+  };
+
   shellHook = ''
       #cd nix/pkgs/portfolio
       clear
