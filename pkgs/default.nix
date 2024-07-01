@@ -15,9 +15,13 @@
    #material-icons-ext = pkgs.callPackage ./material-icons-ext {};
 
 
-    website = {
-      portfolio = pkgs.callPackage ./portfolio { rust-overlay = inputs.rust-overlay; };
-
+    website =
+    let
+      #rust-overlay = inputs.rust-overlay;
+      rustPkgs = pkgs.extend (import inputs.rust-overlay);
+    in
+    {
+      portfolio = rustPkgs.callPackage ./portfolio { };
     };
 
 

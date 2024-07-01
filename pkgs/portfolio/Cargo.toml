@@ -18,8 +18,8 @@ wasm-bindgen = "0.2.92"
 #console_error_panic_hook = { version = "0.1.7", optional = true }
 #noise = "0.9.0"
 #web-sys = { version = "=0.3.65", features = ["CanvasRenderingContext2d", "ImageData"] }
-web-sys = { version = "=0.3.65", features = ["Document", "Element", "HtmlCanvasElement", "CanvasRenderingContext2d", "Window"] }
-js-sys = "=0.3.65"
+web-sys = { version = "0.3.65", features = ["Document", "Element", "HtmlCanvasElement", "CanvasRenderingContext2d", "Window"] }
+js-sys = "0.3.65"
 yew = { version = "0.21.0", features = ["csr"] }
 gloo = "0.11.0"
 reqwasm = "0.5.0"
