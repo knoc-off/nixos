@@ -14,10 +14,6 @@
     # my custom website
     mywebsite.url = "github:knoc-off/Website";
 
-    # Solara, my custom flake. pkgs, modules, etc.
-    solara.url = "github:knoc-off/solara";
-    solara.inputs.nixpkgs.follows = "nixpkgs";
-
     # Home Manager
     home-manager = {
       url = "github:nix-community/home-manager/release-24.05";
