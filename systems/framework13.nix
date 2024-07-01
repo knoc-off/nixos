@@ -200,9 +200,9 @@
   };
 
   # needed for steam, and some other apps/games.
-  hardware.opengl.driSupport32Bit = true;
-  hardware.opengl.enable = true;
-  hardware.pulseaudio.support32Bit = true;
+  #hardware.opengl.driSupport32Bit = true;
+  #hardware.opengl.enable = true;
+  #hardware.pulseaudio.support32Bit = true;
 
   # Enable touchpad support (enabled default in most desktopManager).
   services.libinput.enable = true;

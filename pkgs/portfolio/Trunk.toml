@@ -1,0 +1,15 @@
+[build]
+dist = "dist"
+public_url = "/"
+
+[watch]
+watch = ["src"]
+
+[serve]
+address = "127.0.0.1"
+port = 8080
+
+[tools]
+# Disable the update check
+trunk_version_check = false
+sass = "1.77.4"
