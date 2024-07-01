@@ -62,7 +62,7 @@ main {
     min-width: 300px;
 
     section {
-        background: white;
+        background: #FCFCFC;
         padding: 20px;
         margin: 20px auto;
         border-radius: 8px;
@@ -225,52 +225,6 @@ footer {
 
 
 
-// Resume
-.resume-container {
-    width: 100vw;
-    height: 100vh;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background-color: #f5f5f5;
-}
-
-.resume-grid {
-    width: 210mm;
-    height: 297mm;
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    grid-template-rows: 1fr 3fr;
-    font-size: 12px;
-}
-
-.quadrant {
-    padding: 20px;
-    overflow: auto;
-}
-
-.top-left {
-    background-color: #ebeef1;
-}
-
-.top-right {
-    background-color: #99abba;
-}
-
-.bottom-left {
-    background-color: #ffffff;
-    grid-row: 2 / 4;
-}
-
-.bottom-right {
-    background-color: #d6dde4;
-}
-
-h1 { font-size: 24px; }
-h2 { font-size: 20px; }
-h3 { font-size: 16px; }
-p, ul, li { font-size: 12px; }
-
 /* Print styles */
 @media print {
     @page {
@@ -328,4 +282,197 @@ p, ul, li { font-size: 12px; }
     h2 { font-size: 16pt; }
     h3 { font-size: 12pt; }
     p, ul, li { font-size: 8pt; }
+}
+
+
+
+
+
+// Resume
+.resume-container {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f5f5f5;
+}
+
+.resume-grid {
+    width: 210mm;
+    height: 297mm;
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    grid-template-rows: 1fr 3fr;
+    font-size: 0.75rem; // 12px equivalent
+    overflow: hidden; // Prevent scrollbars
+}
+
+.quadrant {
+    padding: 1.25em; // 20px equivalent, scales with font size
+    // Remove overflow: auto;
+}
+
+.top-left {
+    background-color: #ebeef1;
+}
+
+.top-right {
+    background-color: #99abba;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    position: relative; // Add this to position the pseudo-element
+}
+
+.top-right img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+    position: relative; // Add this to position the image above the shadow
+    z-index: 1; // Ensure the image is above the shadow
+    box-shadow: 5px 5px 0 #6b7d8f; // Add a sharp shadow
+}
+
+
+
+
+
+// For sections that might have a lot of content
+.bottom-left, .bottom-right {
+    max-height: 100%;
+}
+
+
+.bottom-left {
+    background-color: #ffffff;
+    grid-row: 2 / 4;
+}
+
+.bottom-right {
+    background-color: #d6dde4;
+}
+
+
+.skills-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.skill-item {
+    background-color: #ebeef1;
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 0.9em;
+}
+
+
+h1 {
+    margin-top: 0px;
+    font-size: 2.75rem;
+    margin-bottom: 0px;
+}
+h2 {
+    font-size: 1.5rem;
+    margin-bottom: 0px;
+    margin-top: 0px;
+    padding-top: 0px;
+    //padding-bottom: 5px;
+}
+h3 {
+     font-size: 1rem;
+     margin-bottom: 10px;
+     margin-top: 0px;
+}
+p, ul, li {
+    font-size: 1rem;
+    line-height: 1.4;
+}
+
+// Add some spacing and styling to lists
+ul {
+    padding-left: 20px;
+    margin-bottom: 15px;
+}
+
+
+
+.contact-info {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.contact-icon {
+    width: 24px;
+    height: 24px;
+    margin-right: 15px; /* Increased space between icon and text */
+}
+
+
+.contact-data {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.social-links {
+    display: flex;
+    flex-direction: row;
+    gap: 10px;
+    justify-content: flex-start;
+}
+
+
+
+
+.logo-link {
+    display: inline-block;
+    padding: 5px 10px;  /* Add padding to either side */
+    background-color: transparent;  /* Ensures the background doesn't interfere with the shadow */
+}
+
+.logo-link img {
+    display: block;  /* This ensures the image respects the padding */
+    //transition: transform 0.1s ease-in-out, box-shadow 0.1s ease-in-out;
+    box-shadow: 3px 3px 0 #6b7d8f;  /* Sharp, solid color shadow */
+    border-radius: 0%;  /* Keeps the circular shape if the image is circular */
+}
+
+.logo-link img:hover {
+    //transform: translate(-2px, -2px);  /* Slight lift effect */
+    box-shadow: 5px 5px 0 #6b7d8f;  /* Increased shadow on hover */
+}
+
+
+
+// Add some hover effects to links
+a {
+    color: #007bff;
+    text-decoration: none;
+    transition: color 0.3s ease;
+
+    &:hover {
+        color: #0056b3;
+        text-decoration: underline;
+    }
+}
+
+// Add a print media query to ensure proper printing
+@media print {
+    .resume-container {
+        width: 210mm;
+        height: 297mm;
+        margin: 0;
+        padding: 0;
+    }
+
+    .resume-grid {
+        box-shadow: none;
+    }
 }

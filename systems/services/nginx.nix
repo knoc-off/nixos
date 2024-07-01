@@ -1,4 +1,5 @@
 {
+  pkgs,
   config,
   inputs,
   ...
@@ -35,7 +36,7 @@ in
     enableACME = true;
     locations = {
       "/" = {
-        root = "${inputs.mywebsite.packages.${system}.portfolio}/lib";
+        root = "${pkgs.website.portfolio}/lib";
       };
     };
   };

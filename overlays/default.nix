@@ -16,10 +16,8 @@
 
   #additions = final: prev:
   #  let
-  #    solaraPackages = final.solara.packages.${final.system};
   #    flakePlaygroundPackages = final.flakePlayground.packages.${final.system};
   #  in
-  #  prev // solaraPackages // flakePlaygroundPackages;
 
 
 

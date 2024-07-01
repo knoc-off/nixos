@@ -102,7 +102,6 @@
     [
 
     ]
-    ++ builtins.attrValues inputs.solara.overlays
     ++ builtins.attrValues outputs.overlays;
 
 
