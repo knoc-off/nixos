@@ -9,17 +9,17 @@ pub fn navbar() -> Html {
             <div style="display: flex; align-items: center;">
                 <LogoLink
                     link={"https://www.linkedin.com/in/niko-selby/".to_string()}
-                    img_src={"/icons/share/icons/SuperTinyIcons/svg/linkedin.svg".to_string()}
+                    img_src={"/static/icons/tiny/linkedin.svg".to_string()}
                     alt_text={"LinkedIn".to_string()}
                 />
                 <LogoLink
                     link={"https://github.com/knoc-off".to_string()}
-                    img_src={"/icons/share/icons/SuperTinyIcons/svg/github.svg".to_string()}
+                    img_src={"/static/icons/tiny/github.svg".to_string()}
                     alt_text={"GitHub".to_string()}
                 />
                 <LogoLink
-                    link={"/static/cv.pdf".to_string()}
-                    img_src={"/icons/share/icons/SuperTinyIcons/svg/pdf.svg".to_string()}
+                    link={"/static/Nicholas_Selby_CV.pdf".to_string()}
+                    img_src={"/static/icons/tiny/pdf.svg".to_string()}
                     alt_text={"CV".to_string()}
                 />
             </div>

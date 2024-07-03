@@ -17,22 +17,20 @@ pub fn create_resume_data() -> ResumeData {
         contact: ContactInfo {
             email: "selby@niko.ink".to_string(),
             phone: "+49 176 56615691".to_string(),
-            location: "Berlin, Berlin 13465".to_string(),
-            linkedin: "".to_string(), // Not provided in the data
-            github: "".to_string(), // Not provided in the data
+            location: "Berlin 13465".to_string(),
             social_links: vec![
 
                 LogoLinkProps {
-                    link: "https://www.linkedin.com/in/johndoe".to_string(),
-                    img_src: "/icons/share/icons/SuperTinyIcons/svg/linkedin.svg".to_string(),
+                    link: "https://www.linkedin.com/in/niko-selby/".to_string(),
+                    img_src: "/static/icons/tiny/linkedin.svg".to_string(),
                     alt_text: "LinkedIn".to_string(),
                     width: Some("30px".to_string()),
                     height: Some("30px".to_string()),
                     additional_style: None,
                 },
                 LogoLinkProps {
-                    link: "https://github.com/johndoe".to_string(),
-                    img_src: "/icons/share/icons/SuperTinyIcons/svg/github.svg".to_string(),
+                    link: "https://github.com/knoc-off".to_string(),
+                    img_src: "/static/icons/tiny/github.svg".to_string(),
                     alt_text: "GitHub".to_string(),
                     width: Some("30px".to_string()),
                     height: Some("30px".to_string()),
@@ -44,7 +42,7 @@ pub fn create_resume_data() -> ResumeData {
             ],
         },
         summary: "Versatile Junior Software Developer with a track record of resolving technical issues and enhancing collaboration at Olymp Consulting. Demonstrated expertise in Python Programming. Achieved significant improvements in development processes through innovative technology integration. Skilled in both back-end development and fostering productive relationships. Seeking to utilize excellent communication, interpersonal, and organizational skills to complete tasks. Reliable with a good work ethic and the ability to quickly adapt to new tasks and environments.".to_string(),
-        photo_path: "static/Niko.jpeg".to_string(), // No photo path provided in the data
+        photo_path: "static/Niko.jpeg".to_string(),
         experience: vec![
             Experience {
                 company: "Olymp Consulting".to_string(),
@@ -52,12 +50,12 @@ pub fn create_resume_data() -> ResumeData {
                 location: "Berlin, Berlin".to_string(),
                 date_range: "10/2022 - 06/2023".to_string(),
                 responsibilities: vec![
-                    "Troubleshot, debugged, and resolved technical issues with existing software applications.".to_string(),
-                    "Wrote comprehensive documentation for all developed programs or applications.".to_string(),
-                    "Set up servers that hosted internal services to increase collaboration.".to_string(),
-                    "Researched and proposed new technologies or tools that could improve development processes.".to_string(),
-                    "Performed system integration testing to ensure compatibility between components.".to_string(),
-                    "Participated in technical discussions and meetings, providing valuable insights and solutions.".to_string(),
+                    "Debugged and resolved issues with existing software.".to_string(),
+                    "Documented developed programs.".to_string(),
+                    "Configured servers and setup internal services to enhance collaboration.".to_string(),
+                    "Researched and proposed technologies to improve workflows.".to_string(),
+                    "Integrated systems for component compatibility.".to_string(),
+                    "Contributed insights and solutions in technical meetings.".to_string(),
                 ],
             },
             Experience {
@@ -66,9 +64,9 @@ pub fn create_resume_data() -> ResumeData {
                 location: "Greenville, SC".to_string(),
                 date_range: "03/2020 - 05/2021".to_string(),
                 responsibilities: vec![
-                    "Cultivated relationships with other coaches and staff members within the organization.".to_string(),
-                    "Demonstrated ability to teach and motivate students of all ages and skill levels in gymnastics.".to_string(),
-                    "Provided technical instruction on proper technique for tumbling, vaulting, bars, beam, floor exercises and trampoline.".to_string(),
+                    "Taught gymnastics skills effectively.".to_string(),
+                    "Instructed tumbling, vaulting, bars, beam, floor, and trampoline.".to_string(),
+                    "Communicated effectively with students, parents, and staff.".to_string(),
                 ],
             },
         ],
@@ -118,12 +116,14 @@ pub fn create_resume_data() -> ResumeData {
             Language {
                 name: "English".to_string(),
                 level: "Native".to_string(),
+                icon: "flags/us.svg".to_string(),
             },
             Language {
                 name: "German".to_string(),
                 level: "Fluent".to_string(),
+                icon: "flags/de.svg".to_string(),
             },
         ],
-        interests: "Technology, including 3D printing, Arduino, programming, and game development, as well as hobbies like board games, drawing, and cooking.".to_string(),
+        interests: "3D printing, Arduino, game development, sketching, board games, cooking.".to_string(),
     }
 }

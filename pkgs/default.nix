@@ -24,14 +24,9 @@
       portfolio = rustPkgs.callPackage ./portfolio { };
     };
 
-
-
-
    material-icons-ext = (import ./svg-tools/icon-extractor {inherit pkgs;
-    fontPath = "${pkgs.material-design-icons}/share/fonts/truetype/materialdesignicons-webfont.ttf";
+    fontPath = "${pkgs.material-icons}/share/fonts/opentype/MaterialIconsRound-Regular.otf";
    } );
-
-
 
     writeNuScript =
       (name:

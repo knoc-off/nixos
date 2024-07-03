@@ -1,6 +1,7 @@
 {
   modulesPath,
   inputs,
+  outputs,
   config,
   lib,
   pkgs,
@@ -43,6 +44,7 @@
     # ./services/wordpress-oci.nix
   ];
 
+  nixpkgs.overlays = builtins.attrValues outputs.overlays;
   nix.settings.auto-optimise-store = true;
 
   networking.hostName = "oink";

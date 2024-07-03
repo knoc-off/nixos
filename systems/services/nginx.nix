@@ -37,6 +37,7 @@ in
     locations = {
       "/" = {
         root = "${pkgs.website.portfolio}/lib";
+        tryFiles = "$uri $uri/ /index.html";
       };
     };
   };

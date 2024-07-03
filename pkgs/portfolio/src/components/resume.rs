@@ -25,8 +25,6 @@ pub struct ContactInfo {
     pub email: String,
     pub phone: String,
     pub location: String,
-    pub linkedin: String,
-    pub github: String,
     pub social_links: Vec<LogoLinkProps>,
 }
 
@@ -52,6 +50,7 @@ pub struct Education {
 pub struct Language {
     pub name: String,
     pub level: String,
+    pub icon: String,
 }
 
 // Make ResumeComponent public
@@ -106,18 +105,27 @@ impl Component for ResumeComponent {
                         <h2>{ &self.data.title }</h2>
                         <div class="contact-info">
                             <div class="contact-data">
+
                                 <div class="contact-item">
-                                    <img class="contact-icon" src="/icons/email.svg" alt="Email" />
-                                    <span>{ &self.data.contact.email }</span>
+                                    <a href={format!("mailto:{}", &self.data.contact.email)}>
+                                        <span class="contact-icon fa-icon">{ '\u{E158}' }</span>
+                                        <span>{ &self.data.contact.email }</span>
+                                    </a>
                                 </div>
                                 <div class="contact-item">
-                                    <img class="contact-icon" src="/icons/phone.svg" alt="Phone" />
-                                    <span>{ &self.data.contact.phone }</span>
+                                    <a href={format!("tel:{}", &self.data.contact.phone)}>
+                                        <span class="contact-icon fa-icon">{ '\u{E0CD}' }</span>
+                                        <span>{ &self.data.contact.phone }</span>
+                                    </a>
                                 </div>
                                 <div class="contact-item">
-                                    <img class="contact-icon" src="/icons/location.svg" alt="Location" />
-                                    <span>{ &self.data.contact.location }</span>
+                                    <a href={format!("https://www.google.com/maps/search/?api=1&query={}", &self.data.contact.location)} target="_blank">
+                                        <span class="contact-icon fa-icon">{ '\u{E0C8}' }</span>
+                                        <span>{ &self.data.contact.location }</span>
+                                    </a>
                                 </div>
+
+
                             </div>
                             <div class="social-links">
                                 { self.data.contact.social_links.iter().map(|link| html! {
@@ -160,17 +168,10 @@ impl Component for ResumeComponent {
                             }).collect::<Html>() }
                         </div>
                     </div>
+
                     <div class="quadrant bottom-right">
                         <MarkdownViewer markdown={format!(r#"
 ## EDUCATION
-
-{}
-
-## LANGUAGES
-
-{}
-
-## INTERESTS
 
 {}
                         "#,
@@ -181,11 +182,26 @@ impl Component for ResumeComponent {
                             edu.date,
                             edu.degree,
                             edu.details.iter().map(|d| format!("- {}", d)).collect::<Vec<_>>().join("\n")
-                        )).collect::<Vec<_>>().join("\n\n"),
-                        self.data.languages.iter().map(|lang| format!("- {}: {}", lang.name, lang.level)).collect::<Vec<_>>().join("\n"),
-                        self.data.interests
+                        )).collect::<Vec<_>>().join("\n\n")
                         )} />
+
+                        <h2>{"LANGUAGES"}</h2>
+                        <div class="languages-list">
+                            { self.data.languages.iter().map(|lang| html! {
+                                <div class="language-item">
+                                    <img src={lang.icon.clone()} alt={format!("{} icon", lang.name)} class="language-icon" />
+                                    <span>{format!("{}: {}", lang.name, lang.level)}</span>
+                                </div>
+                            }).collect::<Html>() }
+                        </div>
+
+                        <h2>{"INTERESTS"}</h2>
+                        <p>{ &self.data.interests }</p>
                     </div>
+
+
+
+
                 </div>
             </div>
             </>

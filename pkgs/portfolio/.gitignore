@@ -1,6 +1,5 @@
-target
+/target
 result
-icons
-dist
-
-font-awesome
+/dist
+/static/icons
+/static/fonts
