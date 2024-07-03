@@ -45,8 +45,13 @@ rustPlatform.buildRustPackage rec {
     runHook preBuild
     mkdir -p $TMPDIR/output
 
-    ln -s ${pkgs.super-tiny-icons}/ icons
-    ln -s ${pkgs.font-awesome}/share/fonts/opentype/ font-awesome
+    # There should be a better way to do this.
+    mkdir static/icons/flags -p
+    cp -r ${pkgs.circle-flags}/share/circle-flags-svg/* static/icons/flags
+    mkdir static/fonts/material -p
+    cp -r ${pkgs.material-icons}/share/fonts/opentype/* static/fonts/material
+    mkdir static/icons/tiny -p
+    cp -r ${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/* static/icons/tiny
 
     TRUNK_SKIP_VERSION_CHECK=true trunk build --release --offline --dist $TMPDIR/output --public-url /
     #trunk build --release --offline --public-url /

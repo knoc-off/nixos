@@ -7,7 +7,7 @@ pub fn main_content() -> Html {
     let projects = vec![
         Project {
             name: "My Website".to_string(),
-            image_url: "/icons/share/icons/SuperTinyIcons/svg/webassembly.svg".to_string(),
+            image_url: "/static/icons/tiny/webassembly.svg".to_string(),
             summary_md: "
 Website leveraging the Yew framework, which compiles to wasm. I aim to grow this project into something more substantial.
 
@@ -16,7 +16,7 @@ Website leveraging the Yew framework, which compiles to wasm. I aim to grow this
         },
         Project {
             name: "Discord-GPT".to_string(),
-            image_url: "/icons/share/icons/SuperTinyIcons/svg/discord.svg".to_string(),
+            image_url: "/static/icons/tiny/discord.svg".to_string(),
             summary_md: "
 Discord bot using ChatGPT to enable sentiment-based conversations within Discord channels. Built when chatGPT hype was at its peak
 ".to_string(),
@@ -24,7 +24,7 @@ Discord bot using ChatGPT to enable sentiment-based conversations within Discord
         },
         Project {
             name: "My Nixos Configs".to_string(),
-            image_url: "/icons/share/icons/SuperTinyIcons/svg/nixos.svg".to_string(),
+            image_url: "/static/icons/tiny/nixos.svg".to_string(),
             summary_md: "
 My nixos configs, this defines all of my systems.
 server management, custom pc, raspberry pi, etc.
@@ -33,7 +33,7 @@ server management, custom pc, raspberry pi, etc.
         },
         Project {
             name: "My Neovim Configs".to_string(),
-            image_url: "/icons/share/icons/SuperTinyIcons/svg/vim.svg".to_string(),
+            image_url: "/static/icons/tiny/vim.svg".to_string(),
             summary_md: "
 This nix-flake exports a carbon copy of the editor i use daily. this makes it extremely portable.
 

@@ -28,10 +28,10 @@ pub fn logo_link(props: &LogoLinkProps) -> Html {
             <style>
                 {"
                 .logo-link img {
-                    transition: transform 0.1s ease-in-out;
+                    transition: transform 0s linear;
                 }
                 .logo-link img:hover {
-                    transform: scale(1.1);
+                    transform: translate(-2px, -2px);
                 }
                 "}
             </style>

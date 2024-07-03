@@ -37,14 +37,18 @@ pkgs.mkShell {
   shellHook = ''
       #cd nix/pkgs/portfolio
       clear
-      echo "remove 'icons' and create new symbolic links? proceed? (y/n)"
+      echo "create new symbolic links? (y/n)"
       read confirmation
 
       if [ "$confirmation" = "y" ]; then
-          #cd nix/pkgs/portfolio
-          rm icons
-          ln -s ${pkgs.super-tiny-icons}/ icons
-          ln -s ${pkgs.font-awesome}/share/fonts/opentype/ font-awesome
+
+        mkdir static/icons/flags -p
+        cp -r ${pkgs.circle-flags}/share/circle-flags-svg/* static/icons/flags
+        mkdir static/fonts/material -p
+        cp -r ${pkgs.material-icons}/share/fonts/opentype/* static/fonts/material
+        mkdir static/icons/tiny -p
+        cp -r ${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/* static/icons/tiny
+
       fi
     '';
   RUST_BACKTRACE = 1;
