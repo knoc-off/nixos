@@ -47,15 +47,12 @@ pub fn create_resume_data() -> ResumeData {
             Experience {
                 company: "Olymp Consulting".to_string(),
                 position: "Junior Software Developer".to_string(),
-                location: "Berlin, Berlin".to_string(),
+                location: "Berlin".to_string(),
                 date_range: "10/2022 - 06/2023".to_string(),
                 responsibilities: vec![
-                    "Debugged and resolved issues with existing software.".to_string(),
-                    "Documented developed programs.".to_string(),
-                    "Configured servers and setup internal services to enhance collaboration.".to_string(),
-                    "Researched and proposed technologies to improve workflows.".to_string(),
-                    "Integrated systems for component compatibility.".to_string(),
-                    "Contributed insights and solutions in technical meetings.".to_string(),
+                    "Configured servers using nixos.".to_string(),
+                    "Setup internal services, nextcloud filesharing.".to_string(),
+                    "Configured security protocols with Authelia".to_string(),
                 ],
             },
             Experience {
@@ -64,9 +61,6 @@ pub fn create_resume_data() -> ResumeData {
                 location: "Greenville, SC".to_string(),
                 date_range: "03/2020 - 05/2021".to_string(),
                 responsibilities: vec![
-                    "Taught gymnastics skills effectively.".to_string(),
-                    "Instructed tumbling, vaulting, bars, beam, floor, and trampoline.".to_string(),
-                    "Communicated effectively with students, parents, and staff.".to_string(),
                 ],
             },
         ],
@@ -91,8 +85,8 @@ pub fn create_resume_data() -> ResumeData {
                 degree: "High School Diploma".to_string(),
                 date: "08/2021".to_string(),
                 details: vec![
-                    "Relevant Coursework: Computer Science using Java, AP Computer Science".to_string(),
-                    "Extracurricular Activities: German Club".to_string(),
+                    //"Relevant Coursework: Computer Science using Java, AP Computer Science".to_string(),
+                    //"Extracurricular Activities: German Club".to_string(),
                 ],
             },
             Education {
@@ -106,7 +100,7 @@ pub fn create_resume_data() -> ResumeData {
                 institution: "T.U. Berlin".to_string(),
                 location: "Berlin".to_string(),
                 degree: "Gasthörerschaft".to_string(),
-                date: "".to_string(),
+                date: "wintersemester 2023".to_string(),
                 details: vec![
                     "Relevant Coursework: IT Fundamentals".to_string(),
                 ],
@@ -116,12 +110,12 @@ pub fn create_resume_data() -> ResumeData {
             Language {
                 name: "English".to_string(),
                 level: "Native".to_string(),
-                icon: "flags/us.svg".to_string(),
+                icon: "static/icons/flags/us.svg".to_string(),
             },
             Language {
                 name: "German".to_string(),
                 level: "Fluent".to_string(),
-                icon: "flags/de.svg".to_string(),
+                icon: "static/icons/flags/de.svg".to_string(),
             },
         ],
         interests: "3D printing, Arduino, game development, sketching, board games, cooking.".to_string(),

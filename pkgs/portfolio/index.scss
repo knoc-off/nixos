@@ -205,42 +205,76 @@ footer {
     color: white;
 }
 
-// Animations
-@keyframes blinkWarning {
-    0% { color: red; }
-    100% { color: white; }
-}
 
-.blinkWarning {
-    animation: blinkWarning 1s linear infinite;
-}
 
-// Resume Styles
-.resume-container {
-  --a4-ratio: 1.4142857143; // A4 aspect ratio (297mm / 210mm)
+
+
+
+
+
+
+
+// Variables
+:root {
+  --h1-color: #1a2a3a;
+  --h2-color: #2c3e50;
+  --h3-color: #34495e;
+  --body-color: #4a4a4a;
+  --a4-ratio: 1.4142857143;
   --container-width: min(calc(100vh / var(--a4-ratio)), 100vw);
   --container-height: min(calc(var(--container-width) * var(--a4-ratio)), 100vh);
-
-  // Font sizes
   --base-font-size: calc(var(--container-height) / 80);
-  --h1-size: calc(var(--base-font-size) * 3);
-  --h2-size: calc(var(--base-font-size) * 1.75);
-  --h3-size: calc(var(--base-font-size) * 1.4);
-  --body-size: calc(var(--base-font-size) * 1.2);
-  --small-size: calc(var(--base-font-size) * 0.9);
+  --h1-size: calc(var(--base-font-size) * 2.5);
+  --h2-size: calc(var(--base-font-size) * 2);
+  --h3-size: calc(var(--base-font-size) * 1.5);
+  --body-size: var(--base-font-size);
+  --small-size: calc(var(--base-font-size) * 0.875);
   --icon-size: calc(var(--base-font-size) * 1.5);
+}
 
+// Base styles
+.resume {
   width: var(--container-width);
   height: var(--container-height);
   margin: auto;
   position: absolute;
-  top: 0; right: 0; bottom: 0; left: 0;
+  inset: 0;
   background-color: #f5f5f5;
   overflow: hidden;
   font-size: var(--base-font-size);
+
+  h1, h2, h3, p, ul, li {
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  h1 {
+    font-size: var(--h1-size);
+    color: var(--h1-color);
+    font-weight: 700;
+  }
+
+  h2 {
+    font-size: var(--h2-size);
+    color: var(--h2-color);
+    font-weight: 600;
+  }
+
+  h3 {
+    font-size: var(--h3-size);
+    color: var(--h3-color);
+    font-weight: 500;
+  }
+
+  p, ul, li {
+    font-size: var(--body-size);
+    color: var(--body-color);
+    font-weight: 400;
+  }
 }
 
-.resume-grid {
+// Grid layout
+.grid {
   width: 100%;
   height: 100%;
   display: grid;
@@ -249,154 +283,151 @@ footer {
   overflow: hidden;
 }
 
-.quadrant {
-  padding: 1.68%;
+.header {
+  background-color: #ebeef1;
+  padding: 1.5em;
   overflow: hidden;
 }
 
-.top-left { background-color: #ebeef1; }
-
-.top-right {
+.photo {
   background-color: #99abba;
+  padding: 0;
   display: flex;
   justify-content: center;
   align-items: center;
-  overflow: hidden;
-  position: relative;
 
   img {
-    width: calc(100% - 1em);
-    height: calc(100% - 1em);
+    width: 100%;
+    height: 100%;
     object-fit: cover;
     object-position: center;
-    position: relative;
-    z-index: 1;
-    box-shadow: 0.5em 0.5em 0 #6b7d8f;
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+}
 
-    &:hover {
-      transform: translate(-0.25em, -0.25em);
-      box-shadow: 0.75em 0.75em 0 #6b7d8f;
-    }
+.main {
+  background-color: #ffffff;
+  grid-row: 2 / 4;
+  padding: 1.5em;
+  overflow-y: auto;
+
+  section {
+    margin-bottom: 3em;
+  }
+
+  div {
+    margin-bottom: 1em;
+  }
+
+  p {
+    margin: 0;
+  }
+}
+
+.sidebar {
+  background-color: #d6dde4;
+  padding: 1.5em;
+  overflow-y: auto;
+  flex-direction: column;
+
+  section {
+    margin-bottom: 1.5em;
+  }
+
+  h2 {
+    margin-bottom: 0.2em;
+  }
+
+  div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5em;
+  }
+
+  // Language items
+  div > div {
+    display: flex;
+    flex-direction: row; // Added to ensure the icon and text are inline
+    align-items: center;
+    gap: 0.5em;
+    margin-top: 0.5em;
+  }
+
+  img {
+    width: 1.25em;
+    height: 1.25em;
+    object-fit: contain;
+  }
+
+  span {
+    font-size: var(--body-size);
   }
 }
 
 
-.bottom-left {
-  background-color: #ffffff;
-  grid-row: 2 / 4;
-}
-.bottom-right { background-color: #d6dde4; }
-
-.skills-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.67%;
-  margin-top: 1%;
+// Interests section
+.sidebar section:nth-child(2) {
+  margin-top: 6em;
 }
 
-.skill-item {
-  background-color: #ebeef1;
-  padding: 0.2em 0.4em;
-  border-radius: 0.2em;
-  font-size: var(--small-size);
-}
 
-.contact-icon.fa-icon {
-  font-family: 'Font Awesome 6 Free';
-  font-weight: 900;
-  font-size: var(--icon-size);
-  display: inline-block;
-  width: 1.5em;
-  height: 1.5em;
-  text-align: center;
-  margin-right: 0.5em;
-}
-
-.contact-info {
+// Contact info
+.contact {
   display: flex;
   flex-direction: column;
   gap: 1%;
   margin-top: 1.35%;
-}
 
-.contact-icon {
-  width: 1.5em;
-  height: 1.5em;
-  margin-right: 0.5em;
-}
-
-.contact-data {
-  display: flex;
-  flex-direction: column;
-  gap: 0.67%;
-}
-
-
-.contact-item {
-    a {
-        text-decoration: none;
-        color: inherit;
-
-        &:hover {
-            text-decoration: none;
-        }
-    }
-
-    .contact-icon {
-        transition: color 0.3s;
-
-        &:hover {
-            color: #007bff; // Change this to your desired hover color
-        }
-    }
-}
-
-
-.social-links {
-  display: flex;
-  flex-direction: row;
-  gap: 0.67%;
-  justify-content: flex-start;
-}
-
-
-
-.logo-link {
-  display: inline-block;
-  padding: 0.2em 0.4em;
-  background-color: transparent;
-
-  img {
-    display: block;
-    box-shadow: 0.25em 0.25em 0 #6b7d8f;
-    border-radius: 0%;
-    width: 1.5em;
-    height: 1.5em;
-    transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+  a {
+    text-decoration: none;
+    color: inherit;
+    display: flex;
+    align-items: center;
 
     &:hover {
-      transform: translate(-0.125em, -0.125em);
-      box-shadow: 0.375em 0.375em 0 #6b7d8f;
+      text-decoration: none;
+    }
+  }
+
+  .icon {
+    font-family: 'Font Awesome 6 Free';
+    font-weight: 900;
+    font-size: var(--icon-size);
+    width: 1.5em;
+    height: 1.5em;
+    text-align: center;
+    margin-right: 0.5em;
+    transition: color 0.3s;
+
+    &:hover {
+      color: #007bff;
     }
   }
 }
 
-.language-icon {
-  margin-right: 10px;
-  width: 1.25em;
-  height: 1.25em;
+// Social links
+.social {
+  display: flex;
+  gap: 0.67%;
+  justify-content: flex-start;
 }
 
-// Typography for resume
-.resume-container {
-  h1 { font-size: var(--h1-size); margin: 0 0 0.2em 0; }
-  h2 { font-size: var(--h2-size); margin: 0 0 0.3em 0; }
-  h3 { font-size: var(--h3-size); margin: 0 0 0.2em 0; }
-  p, ul, li { font-size: var(--body-size); line-height: 1.4; margin-bottom: 0.5em; }
+// Skills
+.skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.67%;
+  margin-top: 1%;
+
+  span {
+    background-color: #ebeef1;
+    padding: 0.2em 0.4em;
+    margin: 0.3em;
+    border-radius: 0.2em;
+    font-size: var(--small-size);
+  }
 }
 
-// Print Styles
+// Print styles
 @media print {
   @page {
     size: auto;
@@ -410,67 +441,30 @@ footer {
     height: 100%;
   }
 
-  .resume-container {
+  .resume {
     width: 100%;
     height: 100%;
     margin: 0;
     padding: 0;
-    position: relative;
-
-    // Print font sizes
-    --base-font-size: 3.5mm;
-    --h1-size: 12mm;
-    --h2-size: 6mm;
-    --h3-size: 4.5mm;
-    --body-size: 4.5mm;
-    --small-size: 3mm;
-    --icon-size: 4mm;
   }
 
-  .resume-grid {
-    width: 100%;
-    height: 100%;
-    display: grid;
-    grid-template-columns: 70% 30%;
-    grid-template-rows: 25% 75%;
-  }
-
-  .quadrant {
-    padding: 3mm;
-    overflow: hidden;
+  .header, .photo, .main, .sidebar {
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
-  // Ensure background colors print
-  .top-left { background-color: #ebeef1 !important; }
-  .top-right { background-color: #99abba !important; }
-  .bottom-left { background-color: #ffffff !important; }
-  .bottom-right { background-color: #d6dde4 !important; }
+  .header { background-color: #ebeef1 !important; }
+  .photo { background-color: #99abba !important; }
+  .main { background-color: #ffffff !important; }
+  .sidebar { background-color: #d6dde4 !important; }
 
-
-
-  .top-right img {
-    box-shadow: 2mm 2mm 0 #6b7d8f !important;
+  .social img {
+    box-shadow: 1px 1px 0 #6b7d8f !important;
   }
 
-  .logo-link img {
-    box-shadow: 1mm 1mm 0 #6b7d8f !important;
-  }
-
-  .language-icon {
-      margin-right: 10px;
-      width: 20px;
-      height: 20px;
-  }
-
-
-  // Adjust typography for print
-  h1 { font-size: var(--h1-size); margin-bottom: 2mm; }
-  h2 { font-size: var(--h2-size); margin-bottom: 1.5mm; }
-  h3 { font-size: var(--h3-size); margin-bottom: 1mm; }
-  p, ul, li { font-size: var(--body-size); line-height: 1.3; margin-bottom: 1mm; }
-
-  // Hide any elements not meant for print
   .no-print { display: none !important; }
+
+  .main section, .sidebar section {
+    page-break-inside: avoid;
+  }
 }
