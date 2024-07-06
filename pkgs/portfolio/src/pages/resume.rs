@@ -124,7 +124,7 @@ pub fn create_resume_data() -> ResumeData {
                 icon_path: String::from("static/icons/tiny/nixos.svg"),
                 name: String::from("Nix Configurations"),
                 url: String::from("https://github.com/knoc-off/nixos"),
-                description: String::from("My nixos files. My operating system, many programs ive developed/packaged"),
+                description: String::from("My nixos files. My operating system and many programs ive developed/packaged"),
                 languages: vec![
                     LanguageUsage { language: String::from("Nix"),     color: String::from("#7e7eff"), percentage: 77.43 },
                     LanguageUsage { language: String::from("Rust"),    color: String::from("#dea584"), percentage: 10.80 },
