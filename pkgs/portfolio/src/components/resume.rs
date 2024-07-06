@@ -203,6 +203,7 @@ impl Component for ResumeComponent {
                                         </h3>
                                     </div>
                                     <p class="resume-project-description">{&project.description}</p>
+
                                     <div class="resume-project-languages">
                                         {for project.languages.iter().map(|lang| html! {
                                             <div class="resume-project-language" style={format!("width: {}%; min-width: 4%; background-color: {};", lang.percentage, lang.color)}>
@@ -212,6 +213,7 @@ impl Component for ResumeComponent {
                                             </div>
                                         })}
                                     </div>
+
                                 </div>
                             })}
                         </section>

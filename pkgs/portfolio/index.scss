@@ -465,17 +465,16 @@ footer {
 .resume-project-languages {
     display: flex;
     margin-top: 0em;
-    height: 0.625em;
+    height: 0.3rem;
     position: relative;
 
     margin-right: 0.1em;
     margin-left: 0.1em;
 
+    font-size: 0.2em;
+
     .resume-project-language {
-        margin-right: 0;
-        margin-left: 0;
-        padding-left: 0;
-        padding-right: 0;
+
 
         position: relative;
         height: 100%;
@@ -484,11 +483,12 @@ footer {
 
         &:hover {
             width: 100% !important;
-            height: 1.875em !important;
+            height: 1.5rem !important;
             z-index: 10;
             transition: all 0.3s cubic-bezier(0.25, 0.1, 0.5, 1);
 
             .resume-project-language-text {
+                font-size: 0.8rem !important;
                 visibility: visible;
                 opacity: 1;
             }
@@ -518,6 +518,8 @@ footer {
 
 
 .social img {
+    width: 2em !important;
+    height: 2em !important;
     box-shadow: 0.3em 0.3em 0 #6b7d8f !important;
 }
 
@@ -541,16 +543,16 @@ footer {
 
 
   // this might not be good?
-  body:before {
-    content: '';
-    display: block;
-    position: absolute;
-    top: 0;
-    right: 0;
-    left: 0;
-    z-index: -1;
-    border-bottom: 1000px solid #eee;
- }
+  //  body:before {
+  //    content: '';
+  //    display: block;
+  //    position: absolute;
+  //    top: 0;
+  //    right: 0;
+  //    left: 0;
+  //    z-index: -1;
+  //    border-bottom: 1000px solid #eee;
+  // }
 
 
 
