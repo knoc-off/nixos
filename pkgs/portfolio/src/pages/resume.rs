@@ -58,14 +58,13 @@ pub fn create_resume_data() -> ResumeData {
             Experience {
                 company: "Motive School of Movement".to_string(),
                 position: "Gymnastics Coach".to_string(),
-                location: "Greenville, SC".to_string(),
+                location: "South Carolina".to_string(),
                 date_range: "03/2020 - 05/2021".to_string(),
                 responsibilities: vec![
                 ],
             },
         ],
         skills: vec![
-            "Python Programming".to_string(),
             "Software Documentation".to_string(),
             "Version control".to_string(),
             "Web development".to_string(),
@@ -77,11 +76,12 @@ pub fn create_resume_data() -> ResumeData {
             "Cloud computing".to_string(),
             "Back-end development".to_string(),
             "Data structures".to_string(),
+            "Nix Configurations".to_string(),
         ],
         education: vec![
             Education {
                 institution: "Wade Hampton High School".to_string(),
-                location: "Greenville SC".to_string(),
+                location: "South Carolina".to_string(),
                 degree: "High School Diploma".to_string(),
                 date: "08/2021".to_string(),
                 details: vec![
@@ -91,7 +91,7 @@ pub fn create_resume_data() -> ResumeData {
             },
             Education {
                 institution: "Fine Arts Center".to_string(),
-                location: "Greenville SC".to_string(),
+                location: "South Carolina".to_string(),
                 degree: "Graduation Certificate".to_string(),
                 date: "06/2021".to_string(),
                 details: vec![],
@@ -119,5 +119,37 @@ pub fn create_resume_data() -> ResumeData {
             },
         ],
         interests: "3D printing, Arduino, game development, sketching, board games, cooking.".to_string(),
+        projects: vec![
+            Project {
+                icon_path: String::from("static/icons/tiny/nixos.svg"),
+                name: String::from("Nix Configurations"),
+                url: String::from("https://github.com/knoc-off/nixos"),
+                description: String::from("My nixos files. My operating system, many programs ive developed/packaged"),
+                languages: vec![
+                    LanguageUsage { language: String::from("Nix"),     color: String::from("#7e7eff"), percentage: 77.43 },
+                    LanguageUsage { language: String::from("Rust"),    color: String::from("#dea584"), percentage: 10.80 },
+                    LanguageUsage { language: String::from("Sass"),    color: String::from("#a53b70"), percentage: 5.51 },
+                    LanguageUsage { language: String::from("Shell"),   color: String::from("#89e051"), percentage: 2.08 },
+                    LanguageUsage { language: String::from("YAML"),    color: String::from("#cb171e"), percentage: 2.00 },
+                    LanguageUsage { language: String::from("other"),  color: String::from("#aaaaaa"), percentage: 3.00 },
+                ],
+            },
+            Project {
+                icon_path: String::from("static/icons/tiny/webassembly.svg"),
+                name: String::from("Yew Website"),
+                url: String::from("https://github.com/knoc-off/nixos/tree/main/pkgs/portfolio"),
+                description: String::from("This website! Compiled to WASM, programed in Rust"),
+                languages: vec![
+                    LanguageUsage { language: String::from("Rust"),    color: String::from("#dea584"), percentage: 59.73 },
+                    LanguageUsage { language: String::from("Sass"),    color: String::from("#a53b70"), percentage: 34.48 },
+                    LanguageUsage { language: String::from("Nix"),     color: String::from("#7e7eff"), percentage: 2.54 },
+                    LanguageUsage { language: String::from("TOML"),    color: String::from("#9c4221"), percentage: 2.46 },
+                    LanguageUsage { language: String::from("HTML"),    color: String::from("#e34c26"), percentage: 0.79 },
+                ],
+            },
+
+
+
+        ],
     }
 }

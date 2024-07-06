@@ -34,23 +34,29 @@ pkgs.mkShell {
     TRUNK_SKIP_VERSION_CHECK = "true";
   };
 
+
   shellHook = ''
-      #cd nix/pkgs/portfolio
-      clear
-      echo "create new symbolic links? (y/n)"
-      read confirmation
+    #cd nix/pkgs/portfolio
+    clear
+    echo "create new symbolic links? (y/n)"
+    read confirmation
 
-      if [ "$confirmation" = "y" ]; then
+    if [ "$confirmation" = "y" ]; then
+      mkdir -p static/icons/flags
+      mkdir -p static/fonts/material
+      mkdir -p static/icons/tiny
 
-        mkdir static/icons/flags -p
-        cp -r ${pkgs.circle-flags}/share/circle-flags-svg/* static/icons/flags
-        mkdir static/fonts/material -p
-        cp -r ${pkgs.material-icons}/share/fonts/opentype/* static/fonts/material
-        mkdir static/icons/tiny -p
-        cp -r ${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/* static/icons/tiny
+      cp -rf ${pkgs.circle-flags}/share/circle-flags-svg/* static/icons/flags/
+      cp -rf ${pkgs.material-icons}/share/fonts/opentype/* static/fonts/material/
+      cp -rf ${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/* static/icons/tiny/
 
-      fi
-    '';
+      chmod -R a+rw static/icons/flags
+      chmod -R a+rw static/fonts/material
+      chmod -R a+rw static/icons/tiny
+    fi
+  '';
+
+
   RUST_BACKTRACE = 1;
 }
 

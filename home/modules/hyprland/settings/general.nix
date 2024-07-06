@@ -122,7 +122,7 @@ in
         orientation = "left";
         always_center_master = true;
         new_on_top = true;
-        new_is_master = false;
+        #new_is_master = false;
         no_gaps_when_only = true;
 
         #new

@@ -211,7 +211,7 @@ footer {
 
 
 
-
+// Resume
 
 
 // Variables
@@ -330,7 +330,7 @@ footer {
   flex-direction: column;
 
   section {
-    margin-bottom: 1.5em;
+    margin-bottom: 5em;
   }
 
   h2 {
@@ -361,12 +361,6 @@ footer {
   span {
     font-size: var(--body-size);
   }
-}
-
-
-// Interests section
-.sidebar section:nth-child(2) {
-  margin-top: 6em;
 }
 
 
@@ -407,8 +401,9 @@ footer {
 // Social links
 .social {
   display: flex;
-  gap: 0.67%;
+  gap: 1em;
   justify-content: flex-start;
+  margin-top: 1em;
 }
 
 // Skills
@@ -427,6 +422,106 @@ footer {
   }
 }
 
+
+// Projects / langs
+.resume-project {
+    margin-bottom: 1.25em;
+
+    .resume-project-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.625em;
+
+        .resume-project-icon {
+            width: 2.5em;
+            height: 2.5em;
+            margin-right: 0.625em;
+            border-radius: 50%;
+        }
+
+        .resume-project-name {
+            font-size: 1.125em;
+            font-weight: bold;
+            margin-bottom: 0;
+
+            a {
+                text-decoration: none;
+                color: inherit;
+                &:hover {
+                    text-decoration: underline;
+                }
+            }
+        }
+    }
+
+    .resume-project-description {
+        margin-bottom: 0em;
+    }
+
+}
+
+
+
+.resume-project-languages {
+    display: flex;
+    margin-top: 0em;
+    height: 0.625em;
+    position: relative;
+
+    margin-right: 0.1em;
+    margin-left: 0.1em;
+
+    .resume-project-language {
+        margin-right: 0;
+        margin-left: 0;
+        padding-left: 0;
+        padding-right: 0;
+
+        position: relative;
+        height: 100%;
+        transition: all 0.9s cubic-bezier(0.25, 0.1, 0.25, 1);
+        overflow: hidden;
+
+        &:hover {
+            width: 100% !important;
+            height: 1.875em !important;
+            z-index: 10;
+            transition: all 0.3s cubic-bezier(0.25, 0.1, 0.5, 1);
+
+            .resume-project-language-text {
+                visibility: visible;
+                opacity: 1;
+            }
+        }
+
+        .resume-project-language-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: bold;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: auto !important;
+            text-align: center;
+            visibility: hidden;
+            opacity: 0;
+            transition: visibility 0s, opacity 0.3s;
+            font-size: 0.75em;
+            padding: 0 0.5em;
+        }
+    }
+
+}
+
+
+.social img {
+    box-shadow: 0.3em 0.3em 0 #6b7d8f !important;
+}
+
+
 // Print styles
 @media print {
   @page {
@@ -435,17 +530,39 @@ footer {
   }
 
   html, body {
+
+
+
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
   }
 
+
+  // this might not be good?
+  body:before {
+    content: '';
+    display: block;
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    z-index: -1;
+    border-bottom: 1000px solid #eee;
+ }
+
+
+
   .resume {
-    width: 100%;
-    height: 100%;
     margin: 0;
     padding: 0;
+    width: 100%;  // Use full viewport width
+    height: 100%; // Use full viewport height
+  }
+  :root {
+    --base-font-size: calc(var(--container-height) / 70);
+
   }
 
   .header, .photo, .main, .sidebar {
@@ -459,7 +576,7 @@ footer {
   .sidebar { background-color: #d6dde4 !important; }
 
   .social img {
-    box-shadow: 1px 1px 0 #6b7d8f !important;
+    box-shadow: 1mm 1mm 0 #6b7d8f !important;
   }
 
   .no-print { display: none !important; }
