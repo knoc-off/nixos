@@ -2,12 +2,42 @@ use yew::prelude::*;
 use crate::components::resume::*;
 use crate::components::social_links::LogoLinkProps;
 
-#[function_component(Resume)]
-pub fn about() -> Html {
-    let resume_data = create_resume_data();
-    html! { <ResumeComponent data={resume_data} /> }
-}
 
+
+#[function_component(Resume)]
+pub fn resume() -> Html {
+    let resume_data = create_resume_data();
+    html! {
+        <div class="resume">
+            <div class="grid">
+                <Header
+                    name={resume_data.name.clone()}
+                    title={resume_data.title.clone()}
+                    contact_info={resume_data.contact.clone()}
+                />
+
+                <div class="photo">
+                    <img src={resume_data.photo_path.clone()} alt="Profile Photo" />
+                </div>
+
+                <div class="main">
+                    <ExperienceSection experiences={resume_data.experience.clone()} />
+                    <EducationSection education={resume_data.education.clone()} />
+                    <SkillsSection skills={resume_data.skills.clone()} />
+                </div>
+
+                <div class="sidebar">
+                    <LanguagesSection languages={resume_data.languages.clone()} />
+                    <ProjectsSection projects={resume_data.projects.clone()} />
+                    <section>
+                        <h2>{"INTERESTS"}</h2>
+                        <p>{ &resume_data.interests }</p>
+                    </section>
+                </div>
+            </div>
+        </div>
+    }
+}
 
 
 pub fn create_resume_data() -> ResumeData {
