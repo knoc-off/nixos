@@ -4,6 +4,8 @@ use crate::components::main_content::MainContent;
 #[function_component(Home)]
 pub fn home() -> Html {
     html! {
-        <MainContent />
+        <div class="home">
+            <MainContent />
+        </div>
     }
 }
