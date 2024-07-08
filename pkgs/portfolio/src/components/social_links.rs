@@ -25,16 +25,6 @@ pub fn logo_link(props: &LogoLinkProps) -> Html {
 
     html! {
         <>
-            <style>
-                {"
-                .logo-link img {
-                    transition: transform 0s linear;
-                }
-                .logo-link img:hover {
-                    transform: translate(-2px, -2px);
-                }
-                "}
-            </style>
             <a href={props.link.clone()} target="_blank" class="logo-link">
                 <img src={props.img_src.clone()} alt={props.alt_text.clone()} style={style} />
             </a>

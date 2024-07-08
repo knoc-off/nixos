@@ -1,38 +1,54 @@
 use yew::prelude::*;
 use crate::components::resume::*;
 use crate::components::social_links::LogoLinkProps;
+use wasm_bindgen::prelude::*;
 
-
+// Add this function to call window.print()
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = window)]
+    fn print();
+}
 
 #[function_component(Resume)]
 pub fn resume() -> Html {
     let resume_data = create_resume_data();
+
+    // Create a callback for the print button
+    let onclick = Callback::from(|_| {
+        print();
+    });
+
     html! {
-        <div class="resume">
-            <div class="grid">
-                <Header
-                    name={resume_data.name.clone()}
-                    title={resume_data.title.clone()}
-                    contact_info={resume_data.contact.clone()}
-                />
+        <div>
+            <button class="print-button no-print" {onclick}>{"Print Resume"}</button>
+            <div class="resume">
+                // Add the print button
+                <div class="grid">
+                    <Header
+                        name={resume_data.name.clone()}
+                        title={resume_data.title.clone()}
+                        contact_info={resume_data.contact.clone()}
+                    />
 
-                <div class="photo">
-                    <img src={resume_data.photo_path.clone()} alt="Profile Photo" />
-                </div>
+                    <div class="photo">
+                        <img src={resume_data.photo_path.clone()} alt="Profile Photo" />
+                    </div>
 
-                <div class="main">
-                    <ExperienceSection experiences={resume_data.experience.clone()} />
-                    <EducationSection education={resume_data.education.clone()} />
-                    <SkillsSection skills={resume_data.skills.clone()} />
-                </div>
+                    <div class="main">
+                        <ExperienceSection experiences={resume_data.experience.clone()} />
+                        <EducationSection education={resume_data.education.clone()} />
+                        <SkillsSection skills={resume_data.skills.clone()} />
+                    </div>
 
-                <div class="sidebar">
-                    <LanguagesSection languages={resume_data.languages.clone()} />
-                    <ProjectsSection projects={resume_data.projects.clone()} />
-                    <section>
-                        <h2>{"INTERESTS"}</h2>
-                        <p>{ &resume_data.interests }</p>
-                    </section>
+                    <div class="sidebar">
+                        <LanguagesSection languages={resume_data.languages.clone()} />
+                        <ProjectsSection projects={resume_data.projects.clone()} />
+                        <section>
+                            <h2>{"INTERESTS"}</h2>
+                            <p>{ &resume_data.interests }</p>
+                        </section>
+                    </div>
                 </div>
             </div>
         </div>
