@@ -8,8 +8,8 @@ $font-stack: 'Helvetica Neue', Arial, sans-serif;
 
 // Base Color Palette
 $color-primary:    #1a2a3a;
-$color-secondary:  #4CAF50;
-$color-tertiary:   #ef8354;
+$color-secondary:  #3B1C1A;
+$color-tertiary:   #4CAF50;
 
 $color-accent-1:   #007bff;
 $color-accent-2:   #6b7d8f;
@@ -88,7 +88,7 @@ body, html {
                 top: 20px;
                 right: 0;
                 padding: 10px 20px;
-                background-color: $color-secondary;
+                background-color: color.adjust($color-secondary, $lightness: 40%, $saturation: 0%);
                 color: white;
                 border: none;
                 border-top-left-radius: 20px;
