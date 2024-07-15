@@ -12,6 +12,10 @@
     ./plugins/compleations.nix
     ./plugins/productivity/telescope.nix
 
+
+    # Theme
+    ./themes
+
   ];
 
   viAlias = true;

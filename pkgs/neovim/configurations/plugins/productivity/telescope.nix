@@ -16,7 +16,7 @@
         "<C-f>" = "live_grep";
       };
 
-      defaults = {
+      settings.defaults = {
         file_ignore_patterns = [
           "^.git/"
           "^.mypy_cache/"
