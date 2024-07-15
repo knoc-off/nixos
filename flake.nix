@@ -20,6 +20,9 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    nixvim.url = "github:nix-community/nixvim";
+    nixneovimplugins.url = "github:NixNeovim/nixpkgs-vim-extra-plugins";
+
     # Hardware-specific configurations
     hardware.url = "github:nixos/nixos-hardware";
 
@@ -42,7 +45,10 @@
     };
 
     # Neovim config
-    nixvim-flake.url = "github:knoc-off/neovim-config";
+    neovim = {
+      url = "github:knoc-off/neovim-config";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
 
     # Firefox add-ons
     firefox-addons = {
@@ -92,7 +98,7 @@
 
       packages = forAllSystems (system:
         import ./pkgs {
-          inherit inputs;
+          inherit inputs system;
           pkgs = nixpkgs.legacyPackages.${system};
         }
       );
@@ -181,10 +187,6 @@
             }
           ];
         };
-
-
-
-
 
         home-server = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };

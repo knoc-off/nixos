@@ -87,7 +87,7 @@ pub fn create_resume_data() -> ResumeData {
 
             ],
         },
-        summary: "Versatile Junior Software Developer with a track record of resolving technical issues and enhancing collaboration at Olymp Consulting. Demonstrated expertise in Python Programming. Achieved significant improvements in development processes through innovative technology integration. Skilled in both back-end development and fostering productive relationships. Seeking to utilize excellent communication, interpersonal, and organizational skills to complete tasks. Reliable with a good work ethic and the ability to quickly adapt to new tasks and environments.".to_string(),
+        summary: "Junior software developer with experience in server configuration, web development, and system security. Proficient in Rust, Nix, and various web technologies. Skilled in Docker, CI/CD, and Linux systems. Demonstrated ability to set up and maintain internal services. Fluent in English and German.".to_string(),
         photo_path: "static/Niko.jpeg".to_string(),
         experience: vec![
             Experience {
@@ -126,6 +126,15 @@ pub fn create_resume_data() -> ResumeData {
         ],
         education: vec![
             Education {
+                institution: "T.U. Berlin".to_string(),
+                location: "Berlin".to_string(),
+                degree: "Gasthörerschaft".to_string(),
+                date: "Wintersemester 2023".to_string(),
+                details: vec![
+                    "Relevant Coursework: IT Fundamentals".to_string(),
+                ],
+            },
+            Education {
                 institution: "Wade Hampton High School".to_string(),
                 location: "South Carolina".to_string(),
                 degree: "High School Diploma".to_string(),
@@ -141,15 +150,6 @@ pub fn create_resume_data() -> ResumeData {
                 degree: "Graduation Certificate".to_string(),
                 date: "06/2021".to_string(),
                 details: vec![],
-            },
-            Education {
-                institution: "T.U. Berlin".to_string(),
-                location: "Berlin".to_string(),
-                degree: "Gasthörerschaft".to_string(),
-                date: "wintersemester 2023".to_string(),
-                details: vec![
-                    "Relevant Coursework: IT Fundamentals".to_string(),
-                ],
             },
         ],
         languages: vec![

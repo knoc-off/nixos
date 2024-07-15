@@ -75,8 +75,9 @@ in
     eula = true;
     enable = true;
     servers.beez = {
+      jvmOpts = "-Xmx4G -Xms4G";
       enable = true;
-      package = pkgs.fabricServers.fabric-1_21.override { loaderVersion = "0.15.11"; };
+      #package = pkgs.fabricServers.fabric-1_21.override { loaderVersion = "0.15.11"; };
       serverProperties = {
         server-port = 25500;
         difficulty = 3;
