@@ -7,5 +7,5 @@
     #inputs.nixvim.homeManagerModules.nixvim
     #./neovim
   ];
-  home.packages = [inputs.nixvim-flake.packages.${system}.default];
+  home.packages = [inputs.neovim.packages.${system}.default];
 }
