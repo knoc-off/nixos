@@ -93,32 +93,13 @@
       #packages = forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system});
 
       packages = forAllSystems (system:
-        let
+        import ./pkgs {
+          inherit inputs;
           pkgs = nixpkgs.legacyPackages.${system};
-          nixvim = inputs.nixvim.legacyPackages.${system};
-          
-          customPkgs = import inputs.nixpkgs-unstable {
-            inherit system;
-            config = {
-              allowUnfree = true;
-            };
-            overlays = [
-              inputs.nixneovimplugins.overlays.default
-            ];
-          };
+        });
 
-          basePackages = import ./pkgs {
-            inherit inputs;
-            pkgs = nixpkgs.legacyPackages.${system};
-          };
-        in
-        basePackages // {
-          neovim-nix = nixvim.makeNixvimWithModule {
-            pkgs = customPkgs;
-            module = import ./pkgs/neovim/configurations;
-          };
-        }
-      );
+
+
 
       overlays = import ./overlays { inherit inputs; };
 
