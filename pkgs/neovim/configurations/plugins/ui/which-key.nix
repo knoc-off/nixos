@@ -3,10 +3,13 @@
     enable = true;
     registrations = {
       "<leader>b" = "Buffer";
-      "<leader>f" = "Find";
-      "<leader>w" = "Window";
+      "<leader>f" = "File";
       "<leader>g" = "Git";
       "<leader>l" = "LSP";
+      "<leader>s" = "Search";
+      "<leader>t" = "Tab";
+      "<leader>u" = "UI";
+      "<leader>w" = "Window";
     };
     plugins = {
       marks = true;
@@ -25,9 +28,7 @@
         g = true;
       };
     };
-    operators = {
-      gc = "Comments";
-    };
+    operators = { gc = "Comments"; };
     keyLabels = {
       "<space>" = "SPC";
       "<cr>" = "RET";
@@ -76,21 +77,14 @@
     showHelp = true;
     showKeys = true;
     triggers = "auto";
-    triggersNoWait = [
-      "`"
-      "'"
-      "g`"
-      "g'"
-      "<c-r>"
-      "z="
-    ];
+    triggersNoWait = [ "`" "'" "g`" "g'" "<c-r>" "z=" ];
     triggersBlackList = {
-      i = ["j" "k"];
-      v = ["j" "k"];
+      i = [ "j" "k" ];
+      v = [ "j" "k" ];
     };
     disable = {
-      buftypes = [];
-      filetypes = [];
+      buftypes = [ ];
+      filetypes = [ ];
     };
   };
 }

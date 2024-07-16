@@ -1,9 +1,5 @@
-{
-  helpers,
-  lib,
-  ...
-}: {
-  config.plugins.telescope = {
+{ helpers, lib, ... }: {
+  plugins.telescope = {
     enable = true;
 
     keymaps = {
@@ -30,6 +26,18 @@
         "%.ipynb"
       ];
       set_env.COLORTERM = "truecolor";
+    };
+  };
+  plugins.which-key = {
+    enable = true;
+    registrations = {
+      "<leader>s" = "Search";
+      "<leader>sf" = "Search Find files";
+      "<leader>sF" = "Find files Hidden Also";
+      "<leader>sr" = "Search Recent files";
+      "<leader>sk" = "Search Keymaps";
+      "<leader>ss" = "Search Telescope";
+      "<leader>sg" = "Search Live Grep";
     };
   };
 }

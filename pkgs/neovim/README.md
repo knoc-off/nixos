@@ -1,27 +1,38 @@
-## Nixvim Configuration
-This repository contains my Nixvim configurations.
+# Neovim Configuration
 
-### Features/Plugins
+This repository contains a Neovim configuration using the Nix package manager and the nixvim framework.
 
-- **Modular Structure:**  The configuration is organized into modules.
-- **Plugin Management:**  Leverages Nix's package management capabilities install and manage plugins.
-- **Comprehensive Settings:**  keymappings, autocommands, and highlights.
-- **LSP Support:**  Language Server Protocol (LSP) support for intelligent code completion, diagnostics, and more.
-- **LuaSnip Integration:**  Incorporates LuaSnip for powerful and flexible snippet management.
-- **TabNine Integration:**  TabNine for AI-powered code completion.
+## Features
 
-### Installation
-You can include this repo as an input flake, and then use its output neovim package
+- Language Server Protocol (LSP) support
+- Autocompletion
+- Syntax highlighting with Treesitter
+- Telescope for fuzzy finding
+- Custom keymappings
+- OneDark color scheme
+- Various productivity plugins
 
-### Customization
+## Structure
 
-The configuration is designed for easy customization. You can modify the settings in the `configurations` directory to suit your preferences.
+- `configurations/`: Main configuration directory
+  - `default.nix`: Entry point for the configuration
+  - `plugins/`: Plugin-specific configurations
+  - `settings/`: General Neovim settings
+  - `themes/`: Color scheme configuration
 
-For example, to change the `mapleader` key:
+## Key Plugins
 
-1. Open `configurations/settings/keymappings.nix`.
-2. Modify the `mapleader` value to your desired key.
+- LSP
+- Telescope
+- Treesitter
+- Which-key
+- Bufferline
+- Completion (cmp)
 
-### Contributing
+## Usage
 
-Contributions are welcome! If you have any suggestions, bug reports, or feature requests, please open an issue or submit a pull request.
+can be run with the command:
+
+`# nix run github:knoc-off/nixos/#neovim-nix.default`
+
+nix is required.
