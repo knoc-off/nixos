@@ -16,7 +16,6 @@
   ## WebRender
   "gfx.webrender.all" = true;
 
-
   #### Theme Settings ####
   ## personal
   "ui.key.menuAccessKeyFocuses" = false;
@@ -25,9 +24,7 @@
   "browser.tabs.insertAfterCurrent" = true;
   "browser.tabs.inTitlebar" = "2";
 
-
   "layout.css.devPixelsPerPx" = "1.3";
-
 
   # Smooth Scroll
   "general.autoScroll" = false; # Scroll with middle mouse click
@@ -72,6 +69,4 @@
   "mousewheel.transaction.timeout" = 1500;
   "toolkit.scrollbox.horizontalScrollDistance" = 4;
   "toolkit.scrollbox.verticalScrollDistance" = 3;
-
-
 }

@@ -1,6 +1,9 @@
-{ config, lib, pkgs, ... }:
-
 {
+  config,
+  lib,
+  pkgs,
+  ...
+}: {
   # Enable the Traefik service
   services.traefik = {
     enable = true;
@@ -16,7 +19,6 @@
 
     # Define static configuration options
     staticConfigOptions = {
-
       global = {
         checkNewVersion = false;
         sendAnonymousUsage = false;
@@ -29,8 +31,6 @@
           address = ":443";
         };
       };
-
-
 
       certificatesResolvers = {
         myresolver = {
@@ -48,13 +48,11 @@
 
     # Define dynamic configuration options
     dynamicConfigOptions = {
-
-
       http = {
         routers = {
           example = {
             rule = "Host(`kobbl.co`)";
-            entryPoints = [ "websecure" ];  # Use websecure for HTTPS
+            entryPoints = ["websecure"]; # Use websecure for HTTPS
             service = "example";
             tls = {
               certResolver = "myresolver";
@@ -65,7 +63,7 @@
           example = {
             loadBalancer = {
               servers = [
-                { url = "http://127.0.0.1:8080"; }
+                {url = "http://127.0.0.1:8080";}
               ];
             };
           };

@@ -1,8 +1,8 @@
-{ lib
-, buildNpmPackage
-, fetchFromGitHub
+{
+  lib,
+  buildNpmPackage,
+  fetchFromGitHub,
 }:
-
 buildNpmPackage rec {
   pname = "ascii-silhouettify";
   version = "unstable-2024-06-07";
@@ -20,7 +20,7 @@ buildNpmPackage rec {
     description = "A tool to convert images into ASCII art silhouettes";
     homepage = "https://github.com/meatfighter/ascii-silhouettify";
     license = licenses.gpl3Only;
-    maintainers = with maintainers; [ ];
+    maintainers = with maintainers; [];
     platforms = platforms.all;
   };
 }

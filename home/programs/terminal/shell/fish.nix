@@ -1,6 +1,4 @@
-{ ...
-}:
-{
+{...}: {
   programs.fish = {
     enable = true;
     functions = {
@@ -45,35 +43,34 @@
         '';
       };
 
-     # nixcommit = ''
-     #   GIT_EDITOR=false git -C ${config_dir} commit
+      # nixcommit = ''
+      #   GIT_EDITOR=false git -C ${config_dir} commit
 
-     #   git -C ${config_dir} diff --stat HEAD~ | sed 's/^/# /' >> ${config_dir}/.git/COMMIT_EDITMSG
-     #   nvim -c 'set textwidth=80' ${config_dir}/.git/COMMIT_EDITMSG
-     #   set TARGET_FILE "${config_dir}/systems/commit-message.nix"
-     #   sed -i '/^#/d' ${config_dir}/.git/COMMIT_EDITMSG
-     #   if test -z "$(head -n 1 ${config_dir}/.git/COMMIT_EDITMSG)"
-     #       echo "no data"
-     #       return 1
-     #   end
-     #   set first_line (head -n 1 ${config_dir}/.git/COMMIT_EDITMSG)
-     #   set message (echo $first_line | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
-     #   set git_rev (git rev-parse --short HEAD)
-     #   if test (string length -- $message) -lt 50
-     #       set message (string pad -w 50 -r --char=_ "$message")
-     #   end
-     #   set message (string sub --length 50 "$message")
-     #   printf "{\n  system.nixos.label = \"$message\";\n}" > $TARGET_FILE
-     #   git -C ${config_dir} add $TARGET_FILE
-     #   git -C ${config_dir} commit -a -F ${config_dir}/.git/COMMIT_EDITMSG
+      #   git -C ${config_dir} diff --stat HEAD~ | sed 's/^/# /' >> ${config_dir}/.git/COMMIT_EDITMSG
+      #   nvim -c 'set textwidth=80' ${config_dir}/.git/COMMIT_EDITMSG
+      #   set TARGET_FILE "${config_dir}/systems/commit-message.nix"
+      #   sed -i '/^#/d' ${config_dir}/.git/COMMIT_EDITMSG
+      #   if test -z "$(head -n 1 ${config_dir}/.git/COMMIT_EDITMSG)"
+      #       echo "no data"
+      #       return 1
+      #   end
+      #   set first_line (head -n 1 ${config_dir}/.git/COMMIT_EDITMSG)
+      #   set message (echo $first_line | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
+      #   set git_rev (git rev-parse --short HEAD)
+      #   if test (string length -- $message) -lt 50
+      #       set message (string pad -w 50 -r --char=_ "$message")
+      #   end
+      #   set message (string sub --length 50 "$message")
+      #   printf "{\n  system.nixos.label = \"$message\";\n}" > $TARGET_FILE
+      #   git -C ${config_dir} add $TARGET_FILE
+      #   git -C ${config_dir} commit -a -F ${config_dir}/.git/COMMIT_EDITMSG
 
-     #   #set leng
+      #   #set leng
 
-
-     #   return 0
-     #   # Could now add the revision too. but it wouldent be tracked
-     #   # but thats fine.
-     # '';
+      #   return 0
+      #   # Could now add the revision too. but it wouldent be tracked
+      #   # but thats fine.
+      # '';
 
       #nx = ''
       #  # fish function to run nix commands easily
@@ -121,20 +118,20 @@
       #'';
 
       qr = ''
-          if [[ $argv[1] == "--share" ]]; then
-            declare -f qr | qrencode -l H -t UTF8;
-            return
-          fi
+        if [[ $argv[1] == "--share" ]]; then
+          declare -f qr | qrencode -l H -t UTF8;
+          return
+        fi
 
-          local S
-          if [[ "count $argv" == 0 ]]; then
-            IFS= read -r S
-            set -- "$S"
-          fi
+        local S
+        if [[ "count $argv" == 0 ]]; then
+          IFS= read -r S
+          set -- "$S"
+        fi
 
-          sanitized_input="$argv"
+        sanitized_input="$argv"
 
-          echo "$sanitized_input" | qrencode -l H -t UTF8
+        echo "$sanitized_input" | qrencode -l H -t UTF8
       '';
 
       bkg = ''

@@ -1,7 +1,4 @@
-{
-  config,
-  ...
-}: {
+{config, ...}: {
   home.file."custom/configs/trillium.css".text = ''
       :root {
 

@@ -1,5 +1,4 @@
-{pkgs, ...}:
-{
+{pkgs, ...}: {
   # this project spans a few different files. namely
   # nixos/pkgs/spotify-adblock/default.nix
   # nixos/overlays/default.nix
@@ -11,8 +10,7 @@
   # installs the needed files for the adblocker.
   home.file.".config/spotify-adblock/config.toml" = {
     enable = true;
-    source  = "${pkgs.spotify-adblock}/config.toml";
+    source = "${pkgs.spotify-adblock}/config.toml";
     target = ".config/spotify-adblock/config.toml";
   };
-
 }

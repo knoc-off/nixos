@@ -1,8 +1,8 @@
-{ lib
-, python3
-, fetchFromGitHub
+{
+  lib,
+  python3,
+  fetchFromGitHub,
 }:
-
 python3.pkgs.buildPythonApplication rec {
   pname = "ttok";
   version = "0.3";
@@ -18,21 +18,20 @@ python3.pkgs.buildPythonApplication rec {
   nativeBuildInputs = [
     python3.pkgs.setuptools
     python3.pkgs.wheel
-
   ];
 
-    propagatedBuildInputs = [
+  propagatedBuildInputs = [
     python3.pkgs.click
     python3.pkgs.tiktoken
   ];
 
-  pythonImportsCheck = [ "ttok" ];
+  pythonImportsCheck = ["ttok"];
 
   meta = with lib; {
     description = "Count and truncate text based on tokens";
     homepage = "https://github.com/simonw/ttok";
     license = licenses.asl20;
-    maintainers = with maintainers; [ ];
+    maintainers = with maintainers; [];
     mainProgram = "ttok";
   };
 }

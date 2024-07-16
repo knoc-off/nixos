@@ -1,11 +1,10 @@
-{ lib, ... }:
-{
+{lib, ...}: {
   plugins = {
     cmp = {
       enable = true;
       settings = {
         sources = [
-          { name = "luasnip"; }
+          {name = "luasnip";}
         ];
         preselect = "cmp.PreselectMode.None";
         snippet.expand = "function(args) require('luasnip').lsp_expand(args.body) end";

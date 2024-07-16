@@ -1,6 +1,4 @@
-{
-  ...
-}: {
+{...}: {
   home.file.".config/kitty/tab_bar.py" = {
     text = ''
       # pyright: reportMissingImports=false

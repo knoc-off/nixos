@@ -98,9 +98,6 @@
           pkgs = nixpkgs.legacyPackages.${system};
         });
 
-
-
-
       overlays = import ./overlays { inherit inputs; };
 
       devShells = forAllSystems (system:
@@ -152,7 +149,6 @@
           specialArgs = { inherit inputs outputs; };
           system = "x86_64-linux";
           modules = [
-
             ./systems/nuci5.nix
 
             inputs.hardware.nixosModules.common-cpu-intel

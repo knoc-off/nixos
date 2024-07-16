@@ -1,13 +1,14 @@
-{ theme, pkgs }:
-let
+{
+  theme,
+  pkgs,
+}: let
   firefox-csshacks = pkgs.fetchFromGitHub {
     owner = "MrOtherGuy";
     repo = "firefox-csshacks";
     rev = "31cb27a5d8e11a4f35499ea9d75cc9939399d915";
     sha256 = "sha256-ALLqHSEk4oC0/KsALYmQyXg4GtxYiOy4bquLjC+dhng=";
   };
-in
-''
+in ''
   /* Import necessary CSS hacks */
   @import "${firefox-csshacks}/chrome/autohide_sidebar.css";
   @import "${firefox-csshacks}/chrome/autohide_toolbox.css";
@@ -157,5 +158,3 @@ in
     --tooltip-color: #${theme.base06} !important;
   }
 ''
-
-

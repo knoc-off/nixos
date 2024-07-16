@@ -1,5 +1,8 @@
-{ lib, helpers, ... }:
 {
+  lib,
+  helpers,
+  ...
+}: {
   plugins.bufferline = {
     enable = true;
     diagnostics = "nvim_lsp";
@@ -38,7 +41,8 @@
   };
 
   keymaps = let
-    normal = lib.mapAttrsToList
+    normal =
+      lib.mapAttrsToList
       (key: action: {
         mode = "n";
         inherit action key;
@@ -60,6 +64,6 @@
       };
   in
     helpers.keymaps.mkKeymaps
-      { options.silent = true; }
-      normal;
+    {options.silent = true;}
+    normal;
 }

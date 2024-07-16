@@ -3,14 +3,10 @@
   config,
   inputs,
   ...
-}:
-let
+}: let
   system = "x86_64-linux";
   baseDir = "niko.ink";
-
-in
-{
-
+in {
   sops.secrets."services/acme/namecheap-user" = {};
   sops.secrets."services/acme/namecheap-key" = {};
 
@@ -27,7 +23,6 @@ in
       acceptTerms = true;
     };
   };
-
 
   services.nginx.enable = true;
 
@@ -57,7 +52,6 @@ in
   #  };
   #
 
-
   #  # Eileen Domain:
   #  security.acme.certs."agedesign.org" = {
   #    # Supplying password files like this will make your credentials world-readable
@@ -67,5 +61,4 @@ in
   #          "NAMECHEAP_API_KEY_FILE" = config.sops.secrets."services/acme/namecheap-key2".path;
   #    };
   #  };
-
 }

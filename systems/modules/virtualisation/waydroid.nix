@@ -1,4 +1,4 @@
-{ ...}: {
+{...}: {
   virtualisation.waydroid.enable = true;
 
   # oneshot service to init waydroid:

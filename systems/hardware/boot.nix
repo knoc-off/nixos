@@ -1,12 +1,13 @@
-{ lib, config, inputs, ... }:
-
-with lib;
-
-let
-  # Define the available bootloader types
-  bootloaderTypes = [ "grub" "systemd-boot" "lanzaboote" ];
-in
 {
+  lib,
+  config,
+  inputs,
+  ...
+}:
+with lib; let
+  # Define the available bootloader types
+  bootloaderTypes = ["grub" "systemd-boot" "lanzaboote"];
+in {
   imports = [
     inputs.lanzaboote.nixosModules.lanzaboote
   ];
@@ -42,15 +43,15 @@ in
       boot.loader.efi.canTouchEfiVariables = config.bootloader.efiSupport;
       #boot.loader.efi.efiSysMountPoint = "/boot/efi";
 
-      boot.loader.grub.enable = (config.bootloader.type == "grub");
+      boot.loader.grub.enable = config.bootloader.type == "grub";
       boot.loader.grub.efiSupport = config.bootloader.efiSupport;
       #boot.loader.grub.device = if config.bootloader.efiSupport then "nodev" else config.bootloader.grubDevice;
       #boot.loader.grub.useOSProber = true; # Detect other operating systems
 
-      boot.loader.systemd-boot.enable = (config.bootloader.type == "systemd-boot");
+      boot.loader.systemd-boot.enable = config.bootloader.type == "systemd-boot";
       boot.loader.systemd-boot.editor = true; # Allow editing of boot entries at boot time
 
-      boot.lanzaboote.enable = (config.bootloader.type == "lanzaboote");
+      boot.lanzaboote.enable = config.bootloader.type == "lanzaboote";
     }
   ];
 }

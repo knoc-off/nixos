@@ -1,6 +1,9 @@
-{ pkgs, config, theme, ... }:
-let
-
+{
+  pkgs,
+  config,
+  theme,
+  ...
+}: let
   swaylock-custom = pkgs.writeShellScriptBin "swaylock-custom" ''
     exec ${config.programs.swaylock.package}/bin/swaylock \
     --layout-bg-color "${theme.base00}" \
@@ -44,9 +47,7 @@ let
     --font-size 24 \
     --daemonize
   '';
-
-in
-{
+in {
   services.swayidle.enable = true;
 
   home.packages = [

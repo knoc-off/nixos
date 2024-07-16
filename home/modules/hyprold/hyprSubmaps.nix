@@ -1,11 +1,12 @@
-{ config, lib, ... }:
-
-with lib;
-
-let
+{
+  config,
+  lib,
+  ...
+}:
+with lib; let
   cfg = config.wayland.windowManager.hyprland;
 
-  submapModule = { name, ... }: {
+  submapModule = {name, ...}: {
     options = {
       name = mkOption {
         type = types.str;
@@ -21,13 +22,14 @@ let
     };
   };
 
-  submapsConfig = concatStringsSep "\n" (mapAttrsToList (name: submap:
-    ''
-      submap = ${name}
-      ${concatStringsSep "\n" submap.keybinds}
-      bind = , escape, submap, reset
-    ''
-  ) cfg.submaps);
+  submapsConfig = concatStringsSep "\n" (mapAttrsToList (
+      name: submap: ''
+        submap = ${name}
+        ${concatStringsSep "\n" submap.keybinds}
+        bind = , escape, submap, reset
+      ''
+    )
+    cfg.submaps);
 in {
   options.wayland.windowManager.hyprland = {
     submaps = mkOption {
@@ -41,4 +43,3 @@ in {
     wayland.windowManager.hyprland.extraConfig = mkAfter submapsConfig;
   };
 }
-

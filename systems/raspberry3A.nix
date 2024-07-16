@@ -5,7 +5,6 @@
   ...
 }: {
   imports = [
-
     # Sops
     inputs.sops-nix.nixosModules.sops
     {
@@ -23,15 +22,15 @@
     ./commit-message.nix
 
     ./services/octoprint.nix
-
   ];
 
   # swap:
-  swapDevices = [ {
-    device = "/var/lib/swapfile";
-    size = 2*1024; # 2 GB
-  } ];
-
+  swapDevices = [
+    {
+      device = "/var/lib/swapfile";
+      size = 2 * 1024; # 2 GB
+    }
+  ];
 
   # Networking
   networking.hostName = "rpi3A"; # Define your hostname.
@@ -75,4 +74,3 @@
 
   system.stateVersion = "23.11";
 }
-

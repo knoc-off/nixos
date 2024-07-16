@@ -1,13 +1,10 @@
-{ ... }: let
+{...}: let
   domain = "niko.ink";
 in {
-
-
   imports = [
     #./wordpress-oci.nix
     ./docker-compose.nix
   ];
-
 
   services.nginx.virtualHosts.${domain} = {
     forceSSL = true;
@@ -22,28 +19,21 @@ in {
     };
   };
 
-
   #virtualisation.docker.enable = true;
 
-
-#  services.phpfpm.pools."wordpress-${domain}".phpOptions = ''
-#    upload_max_filesize=1G
-#    post_max_size=1G
-#  '';
-#
-#  services.wordpress = {
-#    webserver = "nginx";
-#    sites.${domain} = {
-#    };
-#  };
-#
-#  services.nginx.virtualHosts.${domain} = {
-#    forceSSL = true;
-#    enableACME = true;
-#  };
-
-
-
-
-
+  #  services.phpfpm.pools."wordpress-${domain}".phpOptions = ''
+  #    upload_max_filesize=1G
+  #    post_max_size=1G
+  #  '';
+  #
+  #  services.wordpress = {
+  #    webserver = "nginx";
+  #    sites.${domain} = {
+  #    };
+  #  };
+  #
+  #  services.nginx.virtualHosts.${domain} = {
+  #    forceSSL = true;
+  #    enableACME = true;
+  #  };
 }

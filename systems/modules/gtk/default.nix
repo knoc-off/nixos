@@ -1,11 +1,12 @@
-{ config, lib, pkgs, ... }:
-
-with lib;
-
-let
-  cfg = config.services.gtkThemeSymlinks;
-in
 {
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+with lib; let
+  cfg = config.services.gtkThemeSymlinks;
+in {
   options.services.gtkThemeSymlinks = {
     enable = mkOption {
       type = types.bool;
@@ -78,7 +79,7 @@ in
         name = "gtk-theme-symlinks";
         src = cfg.gtk2.themePackage.src;
 
-        buildInputs = [ pkgs.glib ];
+        buildInputs = [pkgs.glib];
 
         installPhase = ''
           mkdir -p $out/share/themes/${cfg.gtk2.themeName}/gtk-2.0
@@ -91,14 +92,15 @@ in
 
           # Create symlinks
           ${concatStringsSep "\n" (mapAttrsToList (file: target: ''
-            ln -sf ${target} $out/share/themes/${cfg.gtk2.themeName}/${file}
-          '') cfg.symlinks)}
+              ln -sf ${target} $out/share/themes/${cfg.gtk2.themeName}/${file}
+            '')
+            cfg.symlinks)}
         '';
 
         meta = with lib; {
           description = "GTK theme with symlinked files";
           license = licenses.mit; # Change to the actual license of the theme
-          maintainers = [ maintainers.yourself ];
+          maintainers = [maintainers.yourself];
           platforms = platforms.linux;
         };
       })

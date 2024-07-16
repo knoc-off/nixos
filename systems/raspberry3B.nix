@@ -5,7 +5,6 @@
   ...
 }: {
   imports = [
-
     # Sops
     #inputs.sops-nix.nixosModules.sops
     #{
@@ -23,7 +22,6 @@
     ./commit-message.nix
 
     ./services/octoprint.nix
-
   ];
 
   # static ip
@@ -38,17 +36,17 @@
   #};
 
   # swap:
-  swapDevices = [ {
-    device = "/var/lib/swapfile";
-    size = 2*1024; # 2 GB
-  } ];
-
+  swapDevices = [
+    {
+      device = "/var/lib/swapfile";
+      size = 2 * 1024; # 2 GB
+    }
+  ];
 
   # Networking
   networking.hostName = "rpi3B"; # Define your hostname.
   networking.networkmanager.enable = true;
   #networking.wireless.enable = true;
-
 
   # Firewall
   networking.firewall = {
@@ -83,4 +81,3 @@
 
   system.stateVersion = "23.11";
 }
-

@@ -1,7 +1,4 @@
-{
-  inputs,
-  ...
-}: {
+{inputs, ...}: {
   nix = {
     #nix.nixPath = [ "/etc/nix/path" ];
     #environment.etc."nix/path/nixpkgs".source = inputs.nixpkgs;

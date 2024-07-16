@@ -1,5 +1,4 @@
-{ pkgs ? import <nixpkgs> {} }:
-
+{pkgs ? import <nixpkgs> {}}:
 pkgs.python3Packages.buildPythonApplication {
   pname = "volumeLerp";
   version = "0.1.0";
@@ -11,19 +10,20 @@ pkgs.python3Packages.buildPythonApplication {
   ];
 
   postFixup = ''
-    wrapProgram $out/bin/volumeLerp --prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.alsaUtils ]}
+    wrapProgram $out/bin/volumeLerp --prefix PATH : ${pkgs.lib.makeBinPath [pkgs.alsaUtils]}
   '';
 
   makeWrapperArgs = [
-    "--set" "PYTHONPATH" "$out/${pkgs.python3.sitePackages}:$PYTHONPATH"
+    "--set"
+    "PYTHONPATH"
+    "$out/${pkgs.python3.sitePackages}:$PYTHONPATH"
   ];
 
   meta = with pkgs.lib; {
     description = "A script to smoothly change the volume using linear interpolation";
     homepage = "https://example.com";
     license = licenses.mit;
-    maintainers = with maintainers; [ your-name ];
+    maintainers = with maintainers; [your-name];
     platforms = platforms.unix;
   };
 }
-

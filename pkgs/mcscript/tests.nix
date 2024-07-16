@@ -1,8 +1,9 @@
-{ lib
-, buildNpmPackage
-, fetchFromGitHub
-, pkgs ? import <nixpkgs> {} }:
-
+{
+  lib,
+  buildNpmPackage,
+  fetchFromGitHub,
+  pkgs ? import <nixpkgs> {},
+}:
 pkgs.stdenv.mkDerivation rec {
   pname = "mcscript";
   version = "0.2.3";

@@ -1,7 +1,4 @@
-{
-  theme,
-  ...
-}: let
+{theme, ...}: let
   isValidColor = thing:
     if builtins.isString thing
     then (builtins.match "^[0-9a-fA-F]{6}" thing) != null

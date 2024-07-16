@@ -1,7 +1,5 @@
 {
-
   imports = [
-
     # settings
     ./settings/highlights.nix
     ./settings/options.nix
@@ -16,11 +14,8 @@
     ## lsp
     ./plugins/ls
 
-
-
     # Theme
     ./themes
-
   ];
 
   viAlias = true;
@@ -29,4 +24,3 @@
   # plugin manager, that loads plugin with lua code
   luaLoader.enable = true;
 }
-

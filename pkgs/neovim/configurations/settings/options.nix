@@ -1,5 +1,5 @@
 {
-config = {
+  config = {
     globals = {
       # Disable useless providers
       loaded_ruby_provider = 0; # Ruby
@@ -60,5 +60,5 @@ config = {
       # Folding
       foldlevel = 99; # Folds with a level higher than this number will be closed
     };
-};
+  };
 }

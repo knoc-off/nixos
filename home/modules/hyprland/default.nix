@@ -1,11 +1,14 @@
 # The goal of this module is to setup a decent base.
-{ config, lib, theme, pkgs, inputs, ... }:
-
-let
-  cfg = config.wayland.windowManager.hyprlandCustom;
-in
-
 {
+  config,
+  lib,
+  theme,
+  pkgs,
+  inputs,
+  ...
+}: let
+  cfg = config.wayland.windowManager.hyprlandCustom;
+in {
   imports = [
     ./dunst.nix
     ./pyprland.nix
@@ -39,12 +42,10 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-
-
     services.cliphist = {
       enable = true;
       allowImages = true;
-      extraOptions = [ "--history-size=1000" ];
+      extraOptions = ["--history-size=1000"];
       systemdTarget = "hyprland-session.target";
     };
 
@@ -67,7 +68,6 @@ in
       #theme = "~/path/to/your/rofi/theme.rasi";
     };
 
-
     # lockscreen
     programs.swaylock = {
       package = pkgs.swaylock-effects;
@@ -88,7 +88,7 @@ in
 
       settings = lib.mkMerge [
         cfg.settings
-        (import ./settings/general.nix { inherit config inputs theme lib pkgs; })
+        (import ./settings/general.nix {inherit config inputs theme lib pkgs;})
       ];
     };
 
