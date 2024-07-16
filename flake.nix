@@ -60,7 +60,6 @@
     #hyprland.url = "github:hyprwm/hyprland";
     hyprland.url = "git+https://github.com/hyprwm/Hyprland?submodules=1";
 
-
     # Secrets management
     sops-nix.url = "github:Mic92/sops-nix";
 
@@ -69,16 +68,14 @@
   };
 
   nixConfig = {
-    extra-substituters = [
-      "https://nix-community.cachix.org"
-    ];
+    extra-substituters = [ "https://nix-community.cachix.org" ];
     extra-trusted-public-keys = [
       "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
       "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc="
     ];
   };
 
-  outputs = inputs @ { self, nixpkgs, home-manager, disko, ... }:
+  outputs = inputs@{ self, nixpkgs, home-manager, disko, ... }:
     let
       inherit (self) outputs;
       theme = inputs.themes.custom (import ./theme.nix);
@@ -92,14 +89,34 @@
       ];
 
       forAllSystems = nixpkgs.lib.genAttrs systems;
-    in
-    rec {
+    in rec {
       #packages = forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system});
 
       packages = forAllSystems (system:
-        import ./pkgs {
-          inherit inputs system;
+        let
           pkgs = nixpkgs.legacyPackages.${system};
+          nixvim = inputs.nixvim.legacyPackages.${system};
+          
+          customPkgs = import inputs.nixpkgs-unstable {
+            inherit system;
+            config = {
+              allowUnfree = true;
+            };
+            overlays = [
+              inputs.nixneovimplugins.overlays.default
+            ];
+          };
+
+          basePackages = import ./pkgs {
+            inherit inputs;
+            pkgs = nixpkgs.legacyPackages.${system};
+          };
+        in
+        basePackages // {
+          neovim-nix = nixvim.makeNixvimWithModule {
+            pkgs = customPkgs;
+            module = import ./pkgs/neovim/configurations;
+          };
         }
       );
 
@@ -109,8 +126,7 @@
         import ./devshells {
           inherit inputs;
           pkgs = nixpkgs.legacyPackages.${system};
-        }
-      );
+        });
 
       images = {
         rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;
@@ -164,9 +180,9 @@
             ./systems/hardware/disks/disk-module.nix
             {
               diskoCustom = {
-                bootType = "efi";   # Choose "bios" or "efi"
-                swapSize = "12G";    # Size of the swap partition
-                diskDevice = "/dev/sda";  # The disk device to configure
+                bootType = "efi"; # Choose "bios" or "efi"
+                swapSize = "12G"; # Size of the swap partition
+                diskDevice = "/dev/sda"; # The disk device to configure
               };
               #disko.devices.disk.vdb.device = "/dev/disk/by-id/wwn-0x502b2a201d1c1b1a";
             }
@@ -202,9 +218,9 @@
             ./systems/hardware/disks/disk-module.nix
             {
               diskoCustom = {
-                bootType = "bios";   # Choose "bios" or "efi"
-                swapSize = "12G";    # Size of the swap partition
-                diskDevice = "/dev/sda";  # The disk device to configure
+                bootType = "bios"; # Choose "bios" or "efi"
+                swapSize = "12G"; # Size of the swap partition
+                diskDevice = "/dev/sda"; # The disk device to configure
               };
               #disko.devices.disk.vdb.device = "/dev/disk/by-id/wwn-0x502b2a201d1c1b1a";
             }
@@ -214,9 +230,7 @@
         hetzner-cloud = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           system = "x86_64-linux";
-          modules = [
-            ./systems/hetzner-server.nix
-          ];
+          modules = [ ./systems/hetzner-server.nix ];
         };
 
         rpi3B = nixpkgs.lib.nixosSystem {
@@ -245,7 +259,6 @@
           ];
         };
 
-
         laptop-iso = nixpkgs.lib.nixosSystem {
           specialArgs = { inherit inputs outputs; };
           system = "x86_64-linux";
@@ -260,17 +273,17 @@
                 fsType = "ext4";
               };
             }
-           {
-             isoImage = {
-              isoName = "laptop-image.iso";
-              volumeID = "NIXOS_LIVE";
-              # Set the size of the ISO image (in megabytes)
-            };
-          }
+            {
+              isoImage = {
+                isoName = "laptop-image.iso";
+                volumeID = "NIXOS_LIVE";
+                # Set the size of the ISO image (in megabytes)
+              };
+            }
           ];
         };
       };
-      images.laptop = nixosConfigurations.laptop-iso.config.system.build.isoImage;
+      images.laptop =
+        nixosConfigurations.laptop-iso.config.system.build.isoImage;
     };
 }
-
