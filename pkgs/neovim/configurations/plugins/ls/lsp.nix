@@ -1,4 +1,4 @@
-{pkgs, ...}: {
+{ pkgs, ... }: {
   plugins = {
     lsp = {
       enable = true;
@@ -49,5 +49,15 @@
         };
       };
     };
+  };
+
+  plugins.which-key.registrations = {
+    "<leader>lf" = "Format file";
+    "<leader>li" = "LspInfo";
+    "<leader>lo" = "Outline";
+    "<leader>lw" = "Workspace Diagnostics";
+    "<leader>ld" = "Line Diagnostics";
+    "<leader>la" = "Code Action";
+    "<leader>ll" = "Toggle Ghost Text";
   };
 }
