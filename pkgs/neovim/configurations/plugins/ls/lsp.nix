@@ -52,6 +52,7 @@
   };
 
   plugins.which-key.registrations = {
+    "<leader>l" = "LSP";
     "<leader>lf" = "Format file";
     "<leader>li" = "LspInfo";
     "<leader>lo" = "Outline";

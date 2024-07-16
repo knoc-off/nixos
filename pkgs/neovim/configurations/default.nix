@@ -11,6 +11,8 @@
     ./plugins/productivity/telescope.nix
     ./plugins/ui/bufferline.nix
     ./plugins/ui/which-key.nix
+    ./plugins/ui/precognition.nix
+    ./plugins/productivity/vim-ai.nix
     ## lsp
     ./plugins/ls
 

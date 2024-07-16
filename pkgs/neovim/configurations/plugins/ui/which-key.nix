@@ -1,16 +1,6 @@
 {
   plugins.which-key = {
     enable = true;
-    registrations = {
-      "<leader>b" = "Buffer";
-      "<leader>f" = "File";
-      "<leader>g" = "Git";
-      "<leader>l" = "LSP";
-      "<leader>s" = "Search";
-      "<leader>t" = "Tab";
-      "<leader>u" = "UI";
-      "<leader>w" = "Window";
-    };
     plugins = {
       marks = true;
       registers = true;
@@ -87,4 +77,5 @@
       filetypes = [ ];
     };
   };
+
 }
