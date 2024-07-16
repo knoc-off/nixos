@@ -1,37 +1,12 @@
-{ pkgs, inputs, system, ... }: {
+{ pkgs, inputs, ... }: {
 
-   spotify-adblock = pkgs.callPackage ./spotify-adblock {};
-   llm-cmd = pkgs.python3Packages.callPackage ./llm-cmd {};
-   ttok = pkgs.python3Packages.callPackage ./ttok {};
-   poe = pkgs.python3Packages.callPackage ./poe-llm-api {};
-   gate = pkgs.callPackage ./gate {};
-   ascii-silhouettify = pkgs.callPackage ./ascii {};
+  spotify-adblock = pkgs.callPackage ./spotify-adblock {};
+  llm-cmd = pkgs.python3Packages.callPackage ./llm-cmd {};
+  ttok = pkgs.python3Packages.callPackage ./ttok {};
+  poe = pkgs.python3Packages.callPackage ./poe-llm-api {};
+  gate = pkgs.callPackage ./gate {};
+  ascii-silhouettify = pkgs.callPackage ./ascii {};
 
-  neovim =
-  let
-    nixvim = inputs.nixvim.legacyPackages.${system};
-
-
-    customPkgs = import inputs.nixpkgs-unstable {
-      inherit system;
-      config = {
-        allowUnfree = true;
-      };
-      overlays = [
-        #(import inputs.nixneovimplugins.overlays.default)
-      ];
-    };
-
-  in
-  {
-    default =
-      nixvim.makeNixvimWithModule {
-        pkgs = customPkgs;
-        #pkgs = unstablePkgs;
-        #inherit pkgs;
-        module = import ./neovim/configurations;
-      };
-  };
 
    website =
    let
