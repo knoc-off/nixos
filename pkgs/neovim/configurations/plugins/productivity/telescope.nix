@@ -2,6 +2,8 @@
   plugins.telescope = {
     enable = true;
 
+    extensions.undo.enable = true;
+
     keymaps = {
       # Find files using Telescope command-line sugar.
       "<leader>ff" = "find_files";
@@ -9,6 +11,7 @@
       "<leader>b" = "buffers";
       "<leader>fh" = "help_tags";
       "<leader>fd" = "diagnostics";
+      "<leader>fu" = "undo"; # Added undo keymap
 
       # FZF like bindings
       "<C-p>" = "git_files";
@@ -27,17 +30,40 @@
       ];
       set_env.COLORTERM = "truecolor";
     };
+
+    extensions.undo = {
+      settings = {
+        use_delta = true;
+        side_by_side = true;
+        entry_format = "state #$ID, $STAT, $TIME";
+        time_format = "%Y-%m-%d %H:%M:%S";
+        mappings = {
+          i = {
+            "<cr>" = "require('telescope-undo.actions').yank_additions";
+            "<s-cr>" = "require('telescope-undo.actions').yank_deletions";
+            "<c-cr>" = "require('telescope-undo.actions').restore";
+          };
+          n = {
+            "y" = "require('telescope-undo.actions').yank_additions";
+            "Y" = "require('telescope-undo.actions').yank_deletions";
+            "u" = "require('telescope-undo.actions').restore";
+          };
+        };
+      };
+    };
   };
+
   plugins.which-key = {
     enable = true;
     registrations = {
-      "<leader>s" = "Search";
-      "<leader>sf" = "Search Find files";
-      "<leader>sF" = "Find files Hidden Also";
-      "<leader>sr" = "Search Recent files";
-      "<leader>sk" = "Search Keymaps";
-      "<leader>ss" = "Search Telescope";
-      "<leader>sg" = "Search Live Grep";
+      "<leader>f" = "Telescope";
+      "<leader>ff" = "Search Find files";
+      "<leader>fF" = "Find files Hidden Also";
+      "<leader>fr" = "Search Recent files";
+      "<leader>fk" = "Search Keymaps";
+      "<leader>fs" = "Search Telescope";
+      "<leader>fg" = "Search Live Grep";
+      "<leader>fu" = "Undo History"; # Added undo registration
     };
   };
 }

@@ -52,8 +52,6 @@
       # M = Alt key
       "<M-k>" = ":move-2<CR>";
       "<M-j>" = ":move+<CR>";
-
-      "<leader>rp" = ":!remi push<CR>";
     };
 
     visual = lib.mapAttrsToList (key: action: {
@@ -81,12 +79,8 @@
   plugins.which-key = {
     enable = true;
     registrations = {
-      "<leader>" = "+leader";
-      "<leader>f" = "Format";
       "<leader>w" = "Format and Save";
       "<leader>h" = "Window Left";
-      "<leader>l" = "Window Right";
-      "<leader>rp" = "Remi Push";
 
       # For the arrow key resizing
       "<C-Up>" = "Resize Up";
@@ -103,8 +97,6 @@
       "v<" = "Indent Left";
       "v<TAB>" = "Indent Right";
       "v<S-TAB>" = "Indent Left";
-      "vK" = "Move Selection Up";
-      "vJ" = "Move Selection Down";
     };
   };
 
