@@ -1,4 +1,4 @@
-{ inputs, ... }: {
+{inputs, ...}: {
   additions = final: prev:
     import ../pkgs {
       inherit inputs;
@@ -6,7 +6,6 @@
     };
 
   modifications = _final: prev: {
-
     spotiblock = prev.spotify.overrideAttrs (_old: {
       postInstall = ''
         ExecMe="env LD_PRELOAD=${prev.spotify-adblock}/lib/libspotifyadblock.so spotify"

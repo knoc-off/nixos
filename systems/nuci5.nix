@@ -1,12 +1,13 @@
 # im going to try to document as i go, with comments.
 # each setting that is not super obvious should have, what impact it has, and why.
 # for example enabling 32bit support for opengl, is needed for steam.
-{ lib
-, inputs
-, config
-, pkgs
-, outputs
-, ...
+{
+  lib,
+  inputs,
+  config,
+  pkgs,
+  outputs,
+  ...
 }: {
   imports = [
     # hardware configs
@@ -42,7 +43,6 @@
     ./modules/gtk
   ];
 
-
   services.flatpak.enable = true;
 
   programs.steam.enable = true;
@@ -51,7 +51,7 @@
   # Yubikey
   services.yubikey-agent.enable = true;
   services.pcscd.enable = true;
-  services.udev.packages = [ pkgs.yubikey-personalization ];
+  services.udev.packages = [pkgs.yubikey-personalization];
   programs.gnupg.agent = {
     enable = true;
     enableSSHSupport = true;
@@ -103,13 +103,12 @@
   };
 
   # exports all packages to a file in /etc.
-  environment.etc."current-system-packages".text =
-    let
-      packages = builtins.map (p: "${p.name}") config.environment.systemPackages;
-      sortedUnique = builtins.sort builtins.lessThan (lib.unique packages);
-      formatted = builtins.concatStringsSep "\n" sortedUnique;
-    in formatted;
-
+  environment.etc."current-system-packages".text = let
+    packages = builtins.map (p: "${p.name}") config.environment.systemPackages;
+    sortedUnique = builtins.sort builtins.lessThan (lib.unique packages);
+    formatted = builtins.concatStringsSep "\n" sortedUnique;
+  in
+    formatted;
 
   # Latest Kernel Version
   boot.kernelPackages = pkgs.linuxPackages_latest;
@@ -117,7 +116,6 @@
   # Attempt to fix the: GLib-GIO-ERROR**: No GSettings schemas are installed on the system
   programs.dconf.enable = true;
   services.fwupd.enable = true;
-
 
   networking.hostName = "framework"; # Define your hostname.
   networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
@@ -135,7 +133,7 @@
   # Console
   console = {
     #font = "Lat2-Terminus16";
-    packages = with pkgs; [ terminus_font ];
+    packages = with pkgs; [terminus_font];
     #font = "${pkgs.terminus_fonts}/share/consolefonts/ter-u28n.psf.gz";
     font = "${pkgs.terminus_font}/share/consolefonts/ter-i22b.psf.gz";
     keyMap = lib.mkDefault "us";
@@ -153,7 +151,7 @@
     mplus-outline-fonts.githubRelease
     dina-font
     proggyfonts
-    (nerdfonts.override { fonts = [ "FiraCode" ]; })
+    (nerdfonts.override {fonts = ["FiraCode"];})
   ];
 
   fonts = {
@@ -161,7 +159,7 @@
 
     fontconfig = {
       defaultFonts = {
-        monospace = [ "FiraCode Nerd Font Mono" ];
+        monospace = ["FiraCode Nerd Font Mono"];
       };
     };
   };
@@ -181,9 +179,9 @@
   services.printing = {
     enable = true;
     drivers = with pkgs; [
-      hplip  # Example driver for HP printers
-      gutenprint  # Drivers for a wide range of printers
-      foo2zjs  # Drivers for ZJStream protocol printers (e.g., some HP LaserJets)
+      hplip # Example driver for HP printers
+      gutenprint # Drivers for a wide range of printers
+      foo2zjs # Drivers for ZJStream protocol printers (e.g., some HP LaserJets)
     ];
   };
 
@@ -201,14 +199,12 @@
   # Enable touchpad support (enabled default in most desktopManager).
   services.libinput.enable = true;
 
-
   # TODO: I could move my user to its own module, then import it to each system
   # Shells
   programs = {
     zsh.enable = false;
     fish.enable = true;
   };
-
 
   # should move this user to its own file, so i can import it where it makes sense
   users.users.knoff = {
@@ -218,11 +214,11 @@
 
     shell =
       if config.programs.fish.enable
-        then pkgs.fish
+      then pkgs.fish
       else if config.programs.zsh.enable
-        then pkgs.zsh
+      then pkgs.zsh
       else pkgs.bash;
-    extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
+    extraGroups = ["wheel" "networkmanager" "audio" "video"];
     hashedPassword = "$y$j9T$jtFWvdQ6ghoncJ8srfdQn0$JN8OSftIfzHQmSpIZqeQyeK/Nrb8OQCbET5x2n82Yr9";
     openssh.authorizedKeys.keys = [
     ];

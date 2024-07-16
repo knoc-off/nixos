@@ -1,4 +1,4 @@
-{ pkgs, ... }: {
+{pkgs, ...}: {
   plugins = {
     treesitter = {
       enable = true;
@@ -31,7 +31,7 @@
         };
       };
     };
-    treesitter-textobjects = { enable = true; };
+    treesitter-textobjects = {enable = true;};
     mini.enable = true;
     indent-blankline = {
       enable = true;
@@ -50,12 +50,12 @@
             "''"
           ];
         };
-        indent = { char = "│"; };
+        indent = {char = "│";};
       };
     };
   };
 
-  extraPlugins = with pkgs.vimPlugins; [ nvim-treesitter-textsubjects ];
+  extraPlugins = with pkgs.vimPlugins; [nvim-treesitter-textsubjects];
   extraConfigLua = ''
     require('mini.indentscope').setup({
       symbol = "│",

@@ -7,5 +7,4 @@ pkgs.rustPackages.rustPlatform.buildRustPackage
   cargoHash = "sha256-T8ihF8VBa2dfDYz71oeHgZPf8C6r3O9adqkvStzpylw=";
 
   src = ./.;
-
 }

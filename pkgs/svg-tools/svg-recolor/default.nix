@@ -1,11 +1,10 @@
-{ pkgs ? import <nixpkgs> {} }:
-
+{pkgs ? import <nixpkgs> {}}:
 pkgs.stdenv.mkDerivation rec {
   name = "modify-svg-color";
   version = "1.0";
   src = null;
 
-  buildInputs = [ pkgs.python3 pkgs.python3Packages.lxml ];
+  buildInputs = [pkgs.python3 pkgs.python3Packages.lxml];
 
   script = ''
     import sys
@@ -39,7 +38,7 @@ pkgs.stdenv.mkDerivation rec {
   meta = with pkgs.lib; {
     description = "A script to modify the fill color of an SVG file";
     license = licenses.mit;
-    maintainers = [ maintainers.yourself ];
+    maintainers = [maintainers.yourself];
     platforms = platforms.all;
   };
 }

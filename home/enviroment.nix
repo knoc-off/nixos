@@ -1,4 +1,4 @@
-{ config, ...}: {
+{config, ...}: {
   home = {
     file = {
       mnt = {
@@ -13,7 +13,6 @@
     };
 
     sessionVariables = {
-
       # Editor and shell
       EDITOR = "nvim";
       TERMINAL = "kitty";

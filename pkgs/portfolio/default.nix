@@ -1,4 +1,8 @@
-{ pkgs, rustPlatform, lib }:
+{
+  pkgs,
+  rustPlatform,
+  lib,
+}:
 rustPlatform.buildRustPackage rec {
   pname = "portfolio";
   version = "0.1.0";
@@ -7,8 +11,8 @@ rustPlatform.buildRustPackage rec {
 
   nativeBuildInputs = with pkgs; [
     (rust-bin.stable."1.76.0".default.override {
-      extensions = [ "rust-src" ];
-      targets = [ "wasm32-unknown-unknown" ];
+      extensions = ["rust-src"];
+      targets = ["wasm32-unknown-unknown"];
     })
     pkg-config
     trunk
@@ -30,16 +34,17 @@ rustPlatform.buildRustPackage rec {
     wasm-bindgen-cli
   ];
 
-  buildInputs = [
-    pkgs.openssl.dev
-    pkgs.pkg-config
-    pkgs.zlib.dev
-  ] ++ lib.optionals pkgs.stdenv.isDarwin (with pkgs.darwin.apple_sdk.frameworks; [
-    libiconv
-    CoreServices
-    SystemConfiguration
-  ]);
-
+  buildInputs =
+    [
+      pkgs.openssl.dev
+      pkgs.pkg-config
+      pkgs.zlib.dev
+    ]
+    ++ lib.optionals pkgs.stdenv.isDarwin (with pkgs.darwin.apple_sdk.frameworks; [
+      libiconv
+      CoreServices
+      SystemConfiguration
+    ]);
 
   buildPhase = ''
     runHook preBuild

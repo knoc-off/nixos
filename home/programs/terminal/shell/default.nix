@@ -1,7 +1,4 @@
-{
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   # command line tools.
   home.packages = with pkgs; [
     chroma # Required for colorize...

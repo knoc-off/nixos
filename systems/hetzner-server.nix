@@ -18,11 +18,14 @@
       # This will automatically import SSH keys as age keys
       sops.age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
 
-      sops.secrets = if config.services.nextcloud.enable then {
-        "services/nextcloud/admin-pass" = {
-          owner = config.users.users.nextcloud.name;
-        };
-      } else {};
+      sops.secrets =
+        if config.services.nextcloud.enable
+        then {
+          "services/nextcloud/admin-pass" = {
+            owner = config.users.users.nextcloud.name;
+          };
+        }
+        else {};
     }
 
     # Disko
@@ -57,7 +60,6 @@
     #  { from = 8000; to = 8010; }
     #];
   };
-
 
   # Not needed ?
   # This is using an age key that is expected to already be in the filesystem

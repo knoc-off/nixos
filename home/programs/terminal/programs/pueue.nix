@@ -25,7 +25,6 @@
         #status_datetime_format: "%Y-%m-%d\n%H:%M:%S"
       };
       daemon = {
-
         #default_parallel_tasks: 1
         #pause_group_on_failure: false
         #pause_all_on_failure: false

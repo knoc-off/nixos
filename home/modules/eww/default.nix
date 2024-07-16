@@ -5,7 +5,6 @@
   ...
 }:
 with lib; let
-
   cfg = config.programs.eww;
 in {
   #meta.maintainers = [ hm.maintainers.mainrs ];

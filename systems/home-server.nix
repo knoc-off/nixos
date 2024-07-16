@@ -5,9 +5,7 @@
   lib,
   pkgs,
   ...
-}:
-
-let
+}: let
   settingsFormat = pkgs.formats.yaml {};
 
   config = {
@@ -20,8 +18,8 @@ let
             backend = "localhost:25500";
           }
           {
-            host = [ "kobbl.co" "localhost" ];
-            backend = [ "localhost:25500" ];
+            host = ["kobbl.co" "localhost"];
+            backend = ["localhost:25500"];
           }
         ];
       };
@@ -29,15 +27,10 @@ let
   };
 
   configFile = settingsFormat.generate "config.yaml" config;
-
-in
-
-{
+in {
   imports = [
-
     (modulesPath + "/installer/scan/not-detected.nix")
     (modulesPath + "/profiles/qemu-guest.nix")
-
 
     ./modules/nix.nix
 
@@ -60,8 +53,8 @@ in
 
   systemd.services.gateService = {
     description = "Gate Service";
-    after = [ "network.target" "minecraft-server-vanilla.service" "minecraft-server-vanilla2.service" ];
-    wantedBy = [ "multi-user.target" ];
+    after = ["network.target" "minecraft-server-vanilla.service" "minecraft-server-vanilla2.service"];
+    wantedBy = ["multi-user.target"];
     serviceConfig = {
       ExecStart = "${pkgs.gate}/bin/gate -c ${configFile}";
       Restart = "always";
@@ -69,7 +62,7 @@ in
     };
   };
 
-  nixpkgs.overlays = [ inputs.nix-minecraft.overlay ];
+  nixpkgs.overlays = [inputs.nix-minecraft.overlay];
   nixpkgs.config.allowUnfree = true;
   services.minecraft-servers = {
     eula = true;
@@ -167,15 +160,12 @@ in
     #};
   };
 
-
-
   services.logind = {
     extraConfig = ''
       HandleLidSwitch=ignore
       HandleLidSwitchDocked=ignore
     '';
   };
-
 
   #boot.loader.grub = {
   #  efiSupport = true;
@@ -193,21 +183,21 @@ in
     hostName = "nserv";
     firewall = {
       enable = false;
-      allowedUDPPorts = [ 22 80 443 25565 ];
-      allowedTCPPorts = [ 22 80 443 25565 ];
+      allowedUDPPorts = [22 80 443 25565];
+      allowedTCPPorts = [22 80 443 25565];
     };
   };
 
   # static ip
-#  networking.interfaces."enp0s31f6" = {
-#    useDHCP = true;
-#    #ipv4.addresses = [
-#    #  {
-#    #    address = "192.168.1.102";
-#    #    prefixLength = 24;
-#    #  }
-#    #];
-#  };
+  #  networking.interfaces."enp0s31f6" = {
+  #    useDHCP = true;
+  #    #ipv4.addresses = [
+  #    #  {
+  #    #    address = "192.168.1.102";
+  #    #    prefixLength = 24;
+  #    #  }
+  #    #];
+  #  };
 
   # Enable NetworkManager
   #networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.

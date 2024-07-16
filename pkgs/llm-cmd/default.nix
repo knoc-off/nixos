@@ -1,11 +1,11 @@
-{ lib
-, buildPythonPackage
-, fetchFromGitHub
-, setuptools
-, wheel
-, pytest
+{
+  lib,
+  buildPythonPackage,
+  fetchFromGitHub,
+  setuptools,
+  wheel,
+  pytest,
 }:
-
 buildPythonPackage rec {
   pname = "llm-cmd";
   version = "0.1a0";
@@ -39,6 +39,6 @@ buildPythonPackage rec {
     description = "Use LLM to generate and execute commands in your shell";
     homepage = "https://github.com/simonw/llm-cmd";
     license = licenses.asl20;
-    maintainers = with maintainers; [ ];
+    maintainers = with maintainers; [];
   };
 }

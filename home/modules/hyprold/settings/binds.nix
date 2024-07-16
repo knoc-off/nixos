@@ -1,7 +1,10 @@
-{ pkgs, lib, theme, config, ... }:
 {
-
-
+  pkgs,
+  lib,
+  theme,
+  config,
+  ...
+}: {
   wayland.windowManager.hyprland = let
     fuzzel = "${pkgs.fuzzel}/bin/fuzzel -b ${theme.base02}DD -t ${theme.base06}DD -m ${theme.base04}DD -C ${theme.base05}DD -s ${theme.base03}DD -S ${theme.base07}DD -M ${theme.base07}DD";
     notify-send = "${pkgs.libnotify}/bin/notify-send";
@@ -14,9 +17,9 @@
     mainMod = "SUPER";
   in {
     settings = {
-      bind =
-        let
-          moveRelativeTo = pkgs.writeNuScript "mv"
+      bind = let
+        moveRelativeTo =
+          pkgs.writeNuScript "mv"
           ''
             def main [-w, num: int] {
               let current_workspace = (hyprctl activeworkspace -j | from json | get id)
@@ -31,7 +34,8 @@
             }
           '';
 
-          nu-focus = pkgs.writeNuScript
+        nu-focus =
+          pkgs.writeNuScript
           "focus"
           ''
             def main [title: string] {
@@ -59,7 +63,8 @@
             }
           '';
 
-          screenshot-to-text = pkgs.writeNuScript "stt"
+        screenshot-to-text =
+          pkgs.writeNuScript "stt"
           ''
             def main [] {
               ${pkgs.gscreenshot}/bin/gscreenshot -s -f /tmp/gscreenshot-image.png
@@ -69,21 +74,17 @@
             }
           '';
 
-          binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
-          mvfocus = binding "${mainMod}" "movefocus";
-          ws = binding "${mainMod}" "workspace";
-          resizeactive = binding "${mainMod} CTRL" "resizeactive";
-          mvactive = binding "${mainMod} ALT" "moveactive";
-          mvtows = binding "${mainMod} SHIFT" "movetoworkspace";
-          #e = "exec, ags -b hypr";
-          arr = [ 1 2 3 4 5 6 7 8 9 ]; # could reduce this to just 1 .. 9 probably
+        binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
+        mvfocus = binding "${mainMod}" "movefocus";
+        ws = binding "${mainMod}" "workspace";
+        resizeactive = binding "${mainMod} CTRL" "resizeactive";
+        mvactive = binding "${mainMod} ALT" "moveactive";
+        mvtows = binding "${mainMod} SHIFT" "movetoworkspace";
+        #e = "exec, ags -b hypr";
+        arr = [1 2 3 4 5 6 7 8 9]; # could reduce this to just 1 .. 9 probably
 
-          acpi = (lib.getExe pkgs.acpi);
-
-
-
-
-        in
+        acpi = lib.getExe pkgs.acpi;
+      in
         [
           ## Master-Layout binds
           "${mainMod}, Backslash, layoutmsg, swapwithmaster master"
@@ -117,10 +118,9 @@
 
           # misc
           ", page_down, exec, ${moveRelativeTo}/bin/mv -1 -w" # Up arrow
-          ", page_up, exec, ${moveRelativeTo}/bin/mv 1 -w"    # Down arrow
+          ", page_up, exec, ${moveRelativeTo}/bin/mv 1 -w" # Down arrow
           ", Home, exec, ${moveRelativeTo}/bin/mv -1" # home sits where my left arrow is
-          ", End, exec, ${moveRelativeTo}/bin/mv 1"   # end sits where my right arrow is
-
+          ", End, exec, ${moveRelativeTo}/bin/mv 1" # end sits where my right arrow is
 
           # group
           "${mainMod}, G, togglegroup, 0"
@@ -146,7 +146,6 @@
           "${mainMod} ALT SHIFT, 2, movetoworkspace, special:2"
           "${mainMod} ALT SHIFT, 3, movetoworkspace, special:3"
 
-
           (mvfocus "up" "u")
           (mvfocus "down" "d")
           (mvfocus "left" "l")
@@ -163,11 +162,10 @@
         ++ (map (i: ws (toString i) (toString i)) arr)
         ++ (map (i: mvtows (toString i) (toString i)) arr);
 
-      bindle =
-        let
-          light = "${pkgs.light}/bin/light";
-          wpctl = "${pkgs.wireplumber}/bin/wpctl";
-          inertia = "${pkgs.writeNuScript "inertia"
+      bindle = let
+        light = "${pkgs.light}/bin/light";
+        wpctl = "${pkgs.wireplumber}/bin/wpctl";
+        inertia = "${pkgs.writeNuScript "inertia"
           ''
             def reset_values [target: path, time: float, value: float] {
                 {
@@ -204,71 +202,67 @@
                 return $new_value
             }
           ''}/bin/inertia";
-          brightness = pkgs.writeNuScript "brightness" ''
-            def main [-u] {
-                let value = if ($u) {
-                  ${inertia} brightnessUP --increment 1 --initialValue 0.5 --speed 0.15
-
-                } else {
-                  ${inertia} brightnessDOWN --increment 1 --initialValue 0.5 --speed 0.15
-                }
-                if ($u) {
-                  ${pkgs.light}/bin/light -A ($value)
-                } else {
-                  ${pkgs.light}/bin/light -U ($value)
-                }
-
-                ${notify-bar} brightnessbar (${pkgs.light}/bin/light) ((${pkgs.light}/bin/light) | into int | math round)
-                #${notify-msg} value $value
-            }
-          '';
-          volumeScript = pkgs.writeNuScript "volume" ''
-            def main [-u] {
+        brightness = pkgs.writeNuScript "brightness" ''
+          def main [-u] {
               let value = if ($u) {
-                ${inertia} volumeUP -i 1 -I 0.5 -s 0.15
+                ${inertia} brightnessUP --increment 1 --initialValue 0.5 --speed 0.15
+
               } else {
-                ${inertia} volumeDOWN -i 1 -I 0.5 -s 0.15
+                ${inertia} brightnessDOWN --increment 1 --initialValue 0.5 --speed 0.15
+              }
+              if ($u) {
+                ${pkgs.light}/bin/light -A ($value)
+              } else {
+                ${pkgs.light}/bin/light -U ($value)
               }
 
-              let percentage = if ($u) {
-                ($value | into string) + "%+"
-              } else {
-                ($value | into string) + "%-"
-              }
-
-              ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ $percentage
-
-              #if ($value | into float) > 2 {
-              #  ${pkgs.libcanberra-gtk3}/bin/canberra-gtk-play -i audio-volume-change -d "changeVolume"
-              #}
-
-              ${notify-bar} volbar (${pkgs.pamixer}/bin/pamixer --get-volume) (${pkgs.pamixer}/bin/pamixer --get-volume-human)
+              ${notify-bar} brightnessbar (${pkgs.light}/bin/light) ((${pkgs.light}/bin/light) | into int | math round)
               #${notify-msg} value $value
+          }
+        '';
+        volumeScript = pkgs.writeNuScript "volume" ''
+          def main [-u] {
+            let value = if ($u) {
+              ${inertia} volumeUP -i 1 -I 0.5 -s 0.15
+            } else {
+              ${inertia} volumeDOWN -i 1 -I 0.5 -s 0.15
             }
-          '';
-        in
-        [
-          ",XF86MonBrightnessUp,  exec,  ${brightness}/bin/brightness -u"
-          ",XF86MonBrightnessDown,exec,  ${brightness}/bin/brightness"
-          ",XF86KbdBrightnessUp,  exec,  ${brightness}/bin/brightness -u"
-          ",XF86KbdBrightnessDown,exec,  ${brightness}/bin/brightness"
-          ",XF86AudioRaiseVolume, exec,  ${volumeScript}/bin/volume -u"
-          ",XF86AudioLowerVolume, exec, ${volumeScript}/bin/volume"
 
-        ];
+            let percentage = if ($u) {
+              ($value | into string) + "%+"
+            } else {
+              ($value | into string) + "%-"
+            }
 
-      bindl =
-        let
-          wpctl = "${pkgs.wireplumber}/bin/wpctl";
-          mute = "${pkgs.writeNuScript "mute" ''
-              ${wpctl} set-mute @DEFAULT_AUDIO_SINK@ toggle
-              ${notify-bar} volbar (${pkgs.pamixer}/bin/pamixer --get-volume) (${pkgs.pamixer}/bin/pamixer --get-volume-human)
-          ''}/bin/mute";
-        in
-        [
-          ",XF86AudioMute, exec, ${mute}"
-          "SUPER, XF86AudioMute, exec, ${mute}"
-        ];
+            ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ $percentage
+
+            #if ($value | into float) > 2 {
+            #  ${pkgs.libcanberra-gtk3}/bin/canberra-gtk-play -i audio-volume-change -d "changeVolume"
+            #}
+
+            ${notify-bar} volbar (${pkgs.pamixer}/bin/pamixer --get-volume) (${pkgs.pamixer}/bin/pamixer --get-volume-human)
+            #${notify-msg} value $value
+          }
+        '';
+      in [
+        ",XF86MonBrightnessUp,  exec,  ${brightness}/bin/brightness -u"
+        ",XF86MonBrightnessDown,exec,  ${brightness}/bin/brightness"
+        ",XF86KbdBrightnessUp,  exec,  ${brightness}/bin/brightness -u"
+        ",XF86KbdBrightnessDown,exec,  ${brightness}/bin/brightness"
+        ",XF86AudioRaiseVolume, exec,  ${volumeScript}/bin/volume -u"
+        ",XF86AudioLowerVolume, exec, ${volumeScript}/bin/volume"
+      ];
+
+      bindl = let
+        wpctl = "${pkgs.wireplumber}/bin/wpctl";
+        mute = "${pkgs.writeNuScript "mute" ''
+          ${wpctl} set-mute @DEFAULT_AUDIO_SINK@ toggle
+          ${notify-bar} volbar (${pkgs.pamixer}/bin/pamixer --get-volume) (${pkgs.pamixer}/bin/pamixer --get-volume-human)
+        ''}/bin/mute";
+      in [
+        ",XF86AudioMute, exec, ${mute}"
+        "SUPER, XF86AudioMute, exec, ${mute}"
+      ];
 
       bindm = [
         "SUPER, mouse:273, resizewindow"

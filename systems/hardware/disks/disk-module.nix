@@ -1,14 +1,15 @@
-{ lib, config, pkgs, ... }:
-
-with lib;
-
-let
-  cfg = config.diskoCustom;
-in
 {
+  lib,
+  config,
+  pkgs,
+  ...
+}:
+with lib; let
+  cfg = config.diskoCustom;
+in {
   options.diskoCustom = {
     bootType = mkOption {
-      type = types.enum [ "bios" "efi" ];
+      type = types.enum ["bios" "efi"];
       default = "bios";
       description = ''Type of boot partition. Can be "bios" or "efi".'';
     };
@@ -48,23 +49,26 @@ in
           content = {
             type = "gpt";
             partitions = let
-              bootPartition = if cfg.bootType == "bios" then {
-                size = "1M";
-                type = "EF02"; # for grub MBR
-                priority = 1; # Needs to be the first partition
-              } else {
-                size = "512M";
-                type = "EF00"; # for EFI
-                content = {
-                  type = "filesystem";
-                  format = "vfat";
-                  mountpoint = "/boot";
-                  mountOptions = [
-                    "defaults"
-                  ];
+              bootPartition =
+                if cfg.bootType == "bios"
+                then {
+                  size = "1M";
+                  type = "EF02"; # for grub MBR
+                  priority = 1; # Needs to be the first partition
+                }
+                else {
+                  size = "512M";
+                  type = "EF00"; # for EFI
+                  content = {
+                    type = "filesystem";
+                    format = "vfat";
+                    mountpoint = "/boot";
+                    mountOptions = [
+                      "defaults"
+                    ];
+                  };
+                  priority = 1; # Needs to be the first partition
                 };
-                priority = 1; # Needs to be the first partition
-              };
             in {
               boot = bootPartition;
               root = {
@@ -91,7 +95,10 @@ in
     # GRUB configuration
     boot.loader.grub = mkIf (!cfg.useSystemdBoot) {
       enable = true;
-      device = if cfg.bootType == "efi" then "nodev" else "";
+      device =
+        if cfg.bootType == "efi"
+        then "nodev"
+        else "";
       efiSupport = cfg.bootType == "efi";
     };
 

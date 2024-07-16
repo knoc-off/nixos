@@ -1,4 +1,8 @@
-{ pkgs, lib, ... }: {
+{
+  pkgs,
+  lib,
+  ...
+}: {
   colorschemes.onedark = {
     enable = true;
     settings = {
@@ -14,16 +18,16 @@
       };
 
       highlights = {
-        TelescopeMatching = { fg = "$orange"; };
+        TelescopeMatching = {fg = "$orange";};
         TelescopeSelection = {
           fg = "$fg";
           bg = "$bg1";
           bold = true;
         };
-        TelescopePromptPrefix = { bg = "$bg1"; };
-        TelescopePromptNormal = { bg = "$bg1"; };
-        TelescopeResultsNormal = { bg = "$bg1"; };
-        TelescopePreviewNormal = { bg = "$bg1"; };
+        TelescopePromptPrefix = {bg = "$bg1";};
+        TelescopePromptNormal = {bg = "$bg1";};
+        TelescopeResultsNormal = {bg = "$bg1";};
+        TelescopePreviewNormal = {bg = "$bg1";};
         TelescopePromptBorder = {
           fg = "$bg1";
           bg = "$bg1";
@@ -40,7 +44,7 @@
           fg = "$bg0";
           bg = "$purple";
         };
-        TelescopeResultsTitle = { fg = "$bg0"; };
+        TelescopeResultsTitle = {fg = "$bg0";};
         TelescopePreviewTitle = {
           fg = "$bg0";
           bg = "$green";
@@ -49,7 +53,7 @@
           fg = "$bg0";
           bg = "$red";
         };
-        PMenu = { bg = "NONE"; };
+        PMenu = {bg = "NONE";};
       };
     };
   };

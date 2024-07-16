@@ -36,14 +36,9 @@
     ./xdg-enviroment.nix
   ];
 
-
   wayland.windowManager.hyprlandCustom = {
     enable = true;
   };
-
-
-
-
 
   #disabledModules = ["programs/eww.nix"];
   programs.git = {
@@ -64,8 +59,7 @@
 
   # TODO: move this to someplace more logical
   home.packages = with pkgs; [
-
-    (llm.withPlugins([pkgs.llm-cmd]))
+    (llm.withPlugins [pkgs.llm-cmd])
     ttok
 
     skypeforlinux # -- skype phone
@@ -85,9 +79,7 @@
     telegram-desktop
 
     prusa-slicer
-
   ];
-
 
   services.emailManager = {
     enable = true;
@@ -99,11 +91,9 @@
 
   nixpkgs = {
     overlays =
-    [
-
-    ]
-    ++ builtins.attrValues outputs.overlays;
-
+      [
+      ]
+      ++ builtins.attrValues outputs.overlays;
 
     config = {
       allowUnfree = true;
@@ -133,14 +123,11 @@
   };
 
   # enable gtk themes
-  gtk =
-  let
+  gtk = let
     extra3-4Config = {
-      gtk-application-prefer-dark-theme=1;
+      gtk-application-prefer-dark-theme = 1;
     };
-
-  in
-  {
+  in {
     enable = true;
     theme = {
       name = "Fluent-Dark";
@@ -157,7 +144,6 @@
 
     gtk3.extraConfig = extra3-4Config;
     gtk4.extraConfig = extra3-4Config;
-
   };
 
   dconf = {
@@ -180,7 +166,6 @@
       };
     };
   };
-
 
   # Nicely reload system units when changing configs
   systemd.user.startServices = "sd-switch";

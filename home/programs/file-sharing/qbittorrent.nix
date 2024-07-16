@@ -1,8 +1,5 @@
 #NixOS, package installation, qBittorrent, torrenting application.
-{
-  pkgs,
-  ...
-}: {
+{pkgs, ...}: {
   home.packages = with pkgs; [
     qbittorent
   ];

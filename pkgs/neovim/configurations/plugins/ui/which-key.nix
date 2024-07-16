@@ -46,13 +46,29 @@
     window = {
       border = "single";
       position = "bottom";
-      margin = { top = 1; right = 0; bottom = 1; left = 0; };
-      padding = { top = 1; right = 2; bottom = 1; left = 2; };
+      margin = {
+        top = 1;
+        right = 0;
+        bottom = 1;
+        left = 0;
+      };
+      padding = {
+        top = 1;
+        right = 2;
+        bottom = 1;
+        left = 2;
+      };
       winblend = 0;
     };
     layout = {
-      height = { min = 4; max = 25; };
-      width = { min = 20; max = 50; };
+      height = {
+        min = 4;
+        max = 25;
+      };
+      width = {
+        min = 20;
+        max = 50;
+      };
       spacing = 3;
       align = "left";
     };
@@ -69,8 +85,8 @@
       "z="
     ];
     triggersBlackList = {
-      i = [ "j" "k" ];
-      v = [ "j" "k" ];
+      i = ["j" "k"];
+      v = ["j" "k"];
     };
     disable = {
       buftypes = [];

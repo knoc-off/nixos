@@ -1,16 +1,15 @@
 # im going to try to document as i go, with comments.
 # each setting that is not super obvious should have, what impact it has, and why.
 # for example enabling 32bit support for opengl, is needed for steam.
-{ lib
-, inputs
-, config
-, pkgs
-, outputs
-, ...
+{
+  lib,
+  inputs,
+  config,
+  pkgs,
+  outputs,
+  ...
 }: {
   imports = [
-
-
     inputs.hardware.nixosModules.common-cpu-amd
     inputs.hardware.nixosModules.common-gpu-amd
     inputs.hardware.nixosModules.common-pc-ssd
@@ -46,40 +45,34 @@
   programs.nix-ld = {
     enable = true;
     libraries = with pkgs; [
-
       # Dwarf Fortress
       stdenv.cc.cc
       SDL2
       SDL2_image
       ## DFHACK
       libz
-
     ];
   };
 
-  environment.etc =
-    let
-      themeName = "Fluent-Dark";
-      themePkg = pkgs.fluent-gtk-theme;
-    in
-    {
-      "xdg/gtk-2.0".source = "${themePkg}/share/themes/${themeName}/gtk-2.0";
-      "xdg/gtk-3.0".source = "${themePkg}/share/themes/${themeName}/gtk-3.0";
+  environment.etc = let
+    themeName = "Fluent-Dark";
+    themePkg = pkgs.fluent-gtk-theme;
+  in {
+    "xdg/gtk-2.0".source = "${themePkg}/share/themes/${themeName}/gtk-2.0";
+    "xdg/gtk-3.0".source = "${themePkg}/share/themes/${themeName}/gtk-3.0";
 
-
-      #"xdg/gtk-2.0/gtkrc".text = "gtk-application-prefer-dark-theme=1";
-      #"xdg/gtk-3.0/settings.ini".text = ''
-      #  [Settings]
-      #  gtk-application-prefer-dark-theme=1
-      #  gtk-error-bell=false
-      #'';
-      #"xdg/gtk-4.0/settings.ini".text = ''
-      #  [Settings]
-      #  gtk-application-prefer-dark-theme=1
-      #  gtk-error-bell=false
-      #'';
-
-    };
+    #"xdg/gtk-2.0/gtkrc".text = "gtk-application-prefer-dark-theme=1";
+    #"xdg/gtk-3.0/settings.ini".text = ''
+    #  [Settings]
+    #  gtk-application-prefer-dark-theme=1
+    #  gtk-error-bell=false
+    #'';
+    #"xdg/gtk-4.0/settings.ini".text = ''
+    #  [Settings]
+    #  gtk-application-prefer-dark-theme=1
+    #  gtk-error-bell=false
+    #'';
+  };
 
   # Use the latest linux kernel
   boot.kernelPackages = pkgs.linuxPackages_latest;
@@ -90,7 +83,10 @@
 
   # Use the systemd-boot EFI boot loader.
   # disable if using lanzaboote
-  boot.loader.systemd-boot.enable = (if config.boot.lanzaboote.enable then lib.mkForce false else true);
+  boot.loader.systemd-boot.enable =
+    if config.boot.lanzaboote.enable
+    then lib.mkForce false
+    else true;
 
   boot.loader.efi.canTouchEfiVariables = true;
   boot.lanzaboote = {
@@ -113,7 +109,7 @@
   i18n.defaultLocale = "en_US.UTF-8";
   console = {
     #font = "Lat2-Terminus16";
-    packages = with pkgs; [ terminus_font ];
+    packages = with pkgs; [terminus_font];
     #font = "${pkgs.terminus_fonts}/share/consolefonts/ter-u28n.psf.gz";
     font = "${pkgs.terminus_font}/share/consolefonts/ter-i22b.psf.gz";
     keyMap = lib.mkDefault "us";
@@ -130,7 +126,7 @@
     mplus-outline-fonts.githubRelease
     dina-font
     proggyfonts
-    (nerdfonts.override { fonts = [ "FiraCode" ]; })
+    (nerdfonts.override {fonts = ["FiraCode"];})
   ];
 
   fonts = {
@@ -138,7 +134,7 @@
 
     fontconfig = {
       defaultFonts = {
-        monospace = [ "FiraCode Nerd Font Mono" ];
+        monospace = ["FiraCode Nerd Font Mono"];
       };
     };
   };
@@ -172,11 +168,11 @@
     isNormalUser = true;
     shell =
       if config.programs.fish.enable
-        then pkgs.fish
+      then pkgs.fish
       else if config.programs.zsh.enable
-        then pkgs.zsh
+      then pkgs.zsh
       else pkgs.bash;
-    extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
+    extraGroups = ["wheel" "networkmanager" "audio" "video"];
     initialPassword = "password";
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink" # laptop
@@ -204,8 +200,8 @@
   '';
 
   # Open ports in the firewall.
-  networking.firewall.allowedTCPPorts = [ 22 80 433 3000 ];
-  networking.firewall.allowedUDPPorts = [ 22 80 433 3000 ];
+  networking.firewall.allowedTCPPorts = [22 80 433 3000];
+  networking.firewall.allowedUDPPorts = [22 80 433 3000];
 
   system.stateVersion = "23.11";
 }

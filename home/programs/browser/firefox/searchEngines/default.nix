@@ -1,5 +1,4 @@
-{ pkgs }:
-{
+{pkgs}: {
   # -------------------- Nix Search --------------------
   "Nix Packages" = {
     urls = [
@@ -26,7 +25,7 @@
       }
     ];
     icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/package.svg";
-    definedAliases = [ "!p" ];
+    definedAliases = ["!p"];
   };
   # -------------------- Nix Options --------------------
   "Nix Options" = {
@@ -55,7 +54,7 @@
     ];
 
     icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/cm_options.svg";
-    definedAliases = [ "!o" ];
+    definedAliases = ["!o"];
   };
   # -------------------- Nixos Wiki --------------------
   "NixOS Wiki" = {
@@ -73,13 +72,13 @@
     #iconUpdateURL = "https://nixos.wiki/favicon.png";
     #updateInterval = 24 * 60 * 60 * 1000; # every day
     icon = "${pkgs.nixos-icons}/share/icons/hicolor/scalable/apps/nix-snowflake.svg";
-    definedAliases = [ "!n" ];
+    definedAliases = ["!n"];
   };
   "Home-Manager" = {
-    urls = [{ template = "https://home-manager-options.extranix.com/?query={searchTerms}"; }];
+    urls = [{template = "https://home-manager-options.extranix.com/?query={searchTerms}";}];
     updateInterval = 24 * 60 * 60 * 1000; # every day
     icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/twitter-home.svg";
-    definedAliases = [ "!h" ];
+    definedAliases = ["!h"];
   };
   # -------------------- dev sites --------------------
   "StackOverflow" = {
@@ -95,7 +94,7 @@
       }
     ];
     icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/stackoverflow.svg";
-    definedAliases = [ "!s" ];
+    definedAliases = ["!s"];
   };
   # -------------------- Github --------------------
   "Github" = {
@@ -111,7 +110,7 @@
       }
     ];
     icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/github.svg";
-    definedAliases = [ "!g" ];
+    definedAliases = ["!g"];
   };
   # -------------------- free information --------------------
   "fmhy" = {
@@ -127,7 +126,7 @@
       }
     ];
     icon = "${pkgs.circle-flags}/share/circle-flags-svg/other/pirate.svg";
-    definedAliases = [ "!f" ];
+    definedAliases = ["!f"];
   };
   # -------------------- Annas-Archive --------------------
   "Annas-Archive" = {
@@ -145,7 +144,7 @@
     iconUpdateURL = "https://annas-archive.org/favicon.ico";
     updateInterval = 24 * 60 * 60 * 1000; # every day
     #icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/bookmark.svg";
-    definedAliases = [ "!a" ];
+    definedAliases = ["!a"];
   };
   # -------------------- alternate search engines --------------------
   "Kagi-discuss" = {
@@ -171,7 +170,7 @@
     iconUpdateURL = "https://kagi.com/favicon.ico";
     updateInterval = 24 * 60 * 60 * 1000; # every day
     #icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/kaggle.svg";
-    definedAliases = [ "!k" ];
+    definedAliases = ["!k"];
   };
   # -------------------- Kagi Search --------------------
   "Kagi" = {
@@ -190,7 +189,7 @@
     iconUpdateURL = "https://kagi.com/favicon.ico";
     updateInterval = 24 * 60 * 60 * 1000; # every day
     #icon = "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/kaggle.svg";
-    definedAliases = [ ];
+    definedAliases = [];
   };
 
   # -------------------- Disable Defaults --------------------
