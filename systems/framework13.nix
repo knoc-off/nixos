@@ -197,7 +197,7 @@
   # Shells
   programs = {
     zsh.enable = true;
-    #fish.enable = true;
+    fish.enable = true;
   };
 
   # should move this user to its own file, so i can import it where it makes sense
@@ -206,10 +206,10 @@
     #shell = lib.mkIf (config.programs.fish.enable) pkgs.fish
     #   (lib.mkIf (config.programs.zsh.enable) pkgs.zsh pkgs.bash);
 
-    shell = if config.programs.fish.enable then
-      pkgs.fish
-    else if config.programs.zsh.enable then
+    shell = if config.programs.zsh.enable then
       pkgs.zsh
+    else if config.programs.fish.enable then
+      pkgs.fish
     else
       pkgs.bash;
     extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
