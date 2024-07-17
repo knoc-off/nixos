@@ -1,14 +1,7 @@
 # im going to try to document as i go, with comments.
 # each setting that is not super obvious should have, what impact it has, and why.
 # for example enabling 32bit support for opengl, is needed for steam.
-{
-  lib,
-  inputs,
-  config,
-  pkgs,
-  outputs,
-  ...
-}: {
+{ lib, inputs, config, pkgs, outputs, ... }: {
   imports = [
     # hardware configs
     ./hardware/hardware-configuration.nix
@@ -23,7 +16,7 @@
     {
       sops.defaultSopsFile = ./secrets/framework13/default.yaml;
       # This will automatically import SSH keys as age keys
-      sops.age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
+      sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
     }
 
     # pipewire / Audio
@@ -52,7 +45,7 @@
   # Yubikey
   services.yubikey-agent.enable = true;
   services.pcscd.enable = true;
-  services.udev.packages = [pkgs.yubikey-personalization];
+  services.udev.packages = [ pkgs.yubikey-personalization ];
   programs.gnupg.agent = {
     enable = true;
     enableSSHSupport = true;
@@ -65,12 +58,7 @@
   # Lets you run binaries.
   programs.nix-ld = {
     enable = true;
-    libraries = with pkgs; [
-      stdenv.cc.cc
-      SDL2
-      SDL2_image
-      libz
-    ];
+    libraries = with pkgs; [ stdenv.cc.cc SDL2 SDL2_image libz ];
   };
 
   # Custom module, that combines settings and theme
@@ -89,7 +77,8 @@
       themePackage = pkgs.fluent-gtk-theme;
     };
     symlinks = {
-      "gtk-2.0/gtkrc" = pkgs.writeText "gtkrc" "gtk-application-prefer-dark-theme=1";
+      "gtk-2.0/gtkrc" =
+        pkgs.writeText "gtkrc" "gtk-application-prefer-dark-theme=1";
       "gtk-3.0/settings.ini" = pkgs.writeText "gtk3-settings.ini" ''
         [Settings]
         gtk-application-prefer-dark-theme=1
@@ -108,8 +97,7 @@
     packages = builtins.map (p: "${p.name}") config.environment.systemPackages;
     sortedUnique = builtins.sort builtins.lessThan (lib.unique packages);
     formatted = builtins.concatStringsSep "\n" sortedUnique;
-  in
-    formatted;
+  in formatted;
 
   # Latest Kernel Version
   boot.kernelPackages = pkgs.linuxPackages_latest;
@@ -121,13 +109,12 @@
   # Use the systemd-boot EFI boot loader.
   # disable if using lanzaboote
   boot.loader.systemd-boot.enable =
-    if config.boot.lanzaboote.enable
-    then lib.mkForce false
-    else true;
+    if config.boot.lanzaboote.enable then lib.mkForce false else true;
   boot.loader.efi.canTouchEfiVariables = true;
 
   networking.hostName = "framework"; # Define your hostname.
-  networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
+  networking.networkmanager.enable =
+    true; # Easiest to use and most distros use this by default.
 
   # TODO: move to nix configs
   nixpkgs.config.allowUnfree = true;
@@ -142,7 +129,7 @@
   # Console
   console = {
     #font = "Lat2-Terminus16";
-    packages = with pkgs; [terminus_font];
+    packages = with pkgs; [ terminus_font ];
     #font = "${pkgs.terminus_fonts}/share/consolefonts/ter-u28n.psf.gz";
     font = "${pkgs.terminus_font}/share/consolefonts/ter-i22b.psf.gz";
     keyMap = lib.mkDefault "us";
@@ -160,16 +147,14 @@
     mplus-outline-fonts.githubRelease
     dina-font
     proggyfonts
-    (nerdfonts.override {fonts = ["FiraCode"];})
+    (nerdfonts.override { fonts = [ "FiraCode" ]; })
   ];
 
   fonts = {
     enableDefaultPackages = true;
 
     fontconfig = {
-      defaultFonts = {
-        monospace = ["FiraCode Nerd Font Mono"];
-      };
+      defaultFonts = { monospace = [ "FiraCode Nerd Font Mono" ]; };
     };
   };
 
@@ -211,8 +196,8 @@
   # TODO: I could move my user to its own module, then import it to each system
   # Shells
   programs = {
-    zsh.enable = false;
-    fish.enable = true;
+    zsh.enable = true;
+    #fish.enable = true;
   };
 
   # should move this user to its own file, so i can import it where it makes sense
@@ -221,19 +206,18 @@
     #shell = lib.mkIf (config.programs.fish.enable) pkgs.fish
     #   (lib.mkIf (config.programs.zsh.enable) pkgs.zsh pkgs.bash);
 
-    shell =
-      if config.programs.fish.enable
-      then pkgs.fish
-      else if config.programs.zsh.enable
-      then pkgs.zsh
-      else pkgs.bash;
-    extraGroups = ["wheel" "networkmanager" "audio" "video"];
-    hashedPassword = "$y$j9T$jtFWvdQ6ghoncJ8srfdQn0$JN8OSftIfzHQmSpIZqeQyeK/Nrb8OQCbET5x2n82Yr9";
-    openssh.authorizedKeys.keys = [
-    ];
+    shell = if config.programs.fish.enable then
+      pkgs.fish
+    else if config.programs.zsh.enable then
+      pkgs.zsh
+    else
+      pkgs.bash;
+    extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
+    hashedPassword =
+      "$y$j9T$jtFWvdQ6ghoncJ8srfdQn0$JN8OSftIfzHQmSpIZqeQyeK/Nrb8OQCbET5x2n82Yr9";
+    openssh.authorizedKeys.keys = [ ];
   };
-  users.users.root.openssh.authorizedKeys.keys = [
-  ];
+  users.users.root.openssh.authorizedKeys.keys = [ ];
 
   environment.systemPackages = with pkgs; [
     gnome.adwaita-icon-theme
