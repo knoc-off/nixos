@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "Git_commits_now_are_auto_included_in_the_OS7";
+  system.nixos.label = "Update_README.md34";
 }
