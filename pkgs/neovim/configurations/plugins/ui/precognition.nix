@@ -7,6 +7,7 @@
     require('precognition').setup({
       -- Add your configuration options here
       -- For example:
+      startVisible = false,
       delay = 100,  -- delay in milliseconds
       ignored_filetypes = {},  -- filetypes to ignore
     })
@@ -16,17 +17,17 @@
   keymaps = [
     {
       mode = "n";
-      key = "<leader>pe";
-      action = ":PrecognitionEnable<CR>";
+      key = "<leader>pt";
+      action = ":Precognition toggle<CR>";
       options = {
         silent = true;
-        desc = "Enable Precognition";
+        desc = "Toggle Precognition";
       };
     }
     {
       mode = "n";
-      key = "<leader>pd";
-      action = ":PrecognitionDisable<CR>";
+      key = "<leader>pp";
+      action = ":Precognition peek<CR>";
       options = {
         silent = true;
         desc = "Disable Precognition";
@@ -37,7 +38,7 @@
   # Optional: Add which-key registrations
   plugins.which-key.registrations = {
     "<leader>p" = "Precognition";
-    "<leader>pe" = "Enable Precognition";
-    "<leader>pd" = "Disable Precognition";
+    "<leader>pp" = "Peek";
+    "<leader>pt" = "Toggle";
   };
 }
