@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+# File to write commit message to
+TARGET_FILE=systems/commit-message.nix
+
+# Get the latest commit message
+commit_msg=$(git log -1 --pretty=%B)
+
+# Process the commit message (first line only)
+first_line=$(echo "$commit_msg" | head -n 1)
+message=$(echo "$first_line" | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
+
+# Ensure the message is exactly 50 characters, padding on the right side only
+if [ ${#message} -gt 50 ]; then
+    message=${message:0:50}
+else
+    message="${message}$(printf '%s' $((50-${#message})) | tr ' ' '_')"
+fi
+
+# Write the message to the target file
+printf "{\n  system.nixos.label = \"%s\";\n}" "$message" > $TARGET_FILE
+
+# Check if there are changes to commit
+if [[ -n $(git status -s "$TARGET_FILE") ]]; then
+    # Stage the changes to the target file
+    git add "$TARGET_FILE"
+
+    # Amend the current commit to include the changes to the target file
+    git commit --amend --no-edit
+fi
+
+exit 0
