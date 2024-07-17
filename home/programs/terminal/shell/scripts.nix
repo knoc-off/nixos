@@ -4,143 +4,128 @@ let
   config_name = "framework13";
 in {
   home.packages = [
-    (pkgs.writeNuScript "nx" ''
-      def main --env [ -f, ...x] {
-        match ($x.0) {
-          "rb" => {
-              enter ${config_dir}
-              # if dirty > commit. unless forced then continue
+    (pkgs.writeShellScriptBin "nx" ''
+      #!/usr/bin/env bash
+      set -e
 
-              if ( (git status --porcelain) != "" and $f == false) {
-                  echo "git is dirty"
-                  nixcommit
-                  if ($env.LAST_EXIT_CODE == 1 ) { return }
-              }
-              dexit
+      force_flag=false
+      args=("$@")
 
-              echo "force rebuild"
-              sudo nixos-rebuild switch --flake (("${config_dir}" | path expand) + "#" + "${config_name}")
+      # Check if -f flag is present
+      for arg in "$@"; do
+        if [[ $arg == "-f" ]]; then
+          force_flag=true
+          break
+        fi
+      done
 
-          },
-          "rt" => {
-              sudo nixos-rebuild test --flake (("${config_dir}" | path expand) + "#" + "${config_name}")
-          },
-          "cr" => {
-            nix repl --extra-experimental-features repl-flake (("${config_dir}" | path expand) + "#nixosConfigurations." + "${config_name}" )
-          },
-           "vm" => {
-              sudo nixos-rebuild build-vm --flake (("${config_dir}" | path expand) + "#" + "${config_name}")
-          },
-          "cd" => {
-              let file = (fd . ("${config_dir}" | path expand) --type=d -E .git -H | fzf --query ( $x | range 1..-1 | str join " "))
-              if not ( echo $file | path exists) { return }
-              echo $file
+      # Remove -f from args if present
+      args=(''${args[@]/-f/})
 
-              cd $file
+      case "''${args[0]}" in
+        "rb")
+          cd "${config_dir}"
 
-          }
-          _ => {
-              let file = (fd . ("${config_dir}" | path expand) -e nix -E .git -H | fzf --query ( $x | range 0..-1 | str join " "))
-              if ( echo $file | path exists) {
-                  echo $file
-                  nvim $file
-              }
-          },
-        }
-      }
+          if [[ $(git status --porcelain) != "" && $force_flag == false ]]; then
+            echo "git is dirty"
+            exit 1
+          fi
+
+          echo "force rebuild"
+          sudo nixos-rebuild switch --flake "${config_dir}#${config_name}"
+          ;;
+        "rt")
+          sudo nixos-rebuild test --flake "${config_dir}#${config_name}"
+          ;;
+        "cr")
+          nix repl --extra-experimental-features repl-flake "${config_dir}#nixosConfigurations.${config_name}"
+          ;;
+        "vm")
+          sudo nixos-rebuild build-vm --flake "${config_dir}#${config_name}"
+          ;;
+        "cd")
+          query="''${args[@]:1}"
+          file=$(fd . "${config_dir}" --type=d -E .git -H | fzf --query "$query")
+          if [[ -d $file ]]; then
+            echo "$file"
+            cd "$file"
+          fi
+          ;;
+        *)
+          query="''${args[@]}"
+          file=$(fd . "${config_dir}" -e nix -E .git -H | fzf --query "$query")
+          if [[ -f $file ]]; then
+            echo "$file"
+            nvim "$file"
+          fi
+          ;;
+      esac
     '')
-    (pkgs.writeNuScript "nixcommit" ''
-      def main [] {
 
-        let config_dir = ("${config_dir}" | path expand)
-
-        # Initial commit without an editor
-        try {
-          mut GIT_EDITOR = false
-          git -C $config_dir commit
-          #GIT_EDITOR = $previous_GIT_EDITOR
-        }
-
-        # Edit the commit message with nvim, setting textwidth to 80
-        nvim -c 'set textwidth=80' (($config_dir + "/.git/COMMIT_EDITMSG") | path expand)
-
-        let first_line = (open (($config_dir + "/.git/COMMIT_EDITMSG") | path expand ) | lines | first 1).0
-
-        # Check if the first line of COMMIT_EDITMSG is empty
-        if ( $first_line == "") {
-          echo "empty data"
-          exit 1
-        }
-
-
-        let message = (echo $first_line | str trim | str replace -a " " "_" | str replace -ra '[^a-zA-Z0-9:_\.-]' "")
-
-        # Truncate or pad message to exactly 50 characters
-        let message = ($message | str substring 0..50)
-
-        let message = ($message | fill -a left -c '_' -w 50)
-        #'1234' | fill -a left -c '0' -w 10
-
-        echo $message
-
-        let message_path =  ( $config_dir + "/systems/commit-message.nix"  | path expand )
-
-        echo ("{\n  system.nixos.label = \"" + $message + "\";\n}") | save -f $message_path
-        # Add and commit the changes
-        git -C $config_dir add $message_path
-        git -C $config_dir commit --all --file (($config_dir + "/.git/COMMIT_EDITMSG") | path expand)
-
-        exit 0
-      }
-    '')
     (pkgs.writeNuScript "nixx" ''
-      # i should really just add everything to a list and then combine with " "
-      def main [--sudo, --bg, package: string, ...args] {
-        mut command = [];
+      def main [
+        --sudo (-s): bool,  # Run the command with sudo
+        --bg (-b): bool,    # Run the command in the background
+        package: string,    # The Nix package to run
+        ...args: string     # Additional arguments for the command
+      ] {
+        mut command = []
 
-        if ($sudo and $bg) {
-          # sudo and pueue is not made for this, im just gonna do it.
-          echo "place fingerprint"
+        if $sudo and $bg {
+          echo "Warning: Using sudo with background tasks may require manual authentication"
         }
 
-        if ($bg) {
-          $command = ($command | append "pueue add -p")
+        if $bg {
+          $command = ($command | append ["pueue", "add"])
         }
 
-        # Allow unfree
-        $command = ($command | append "NIXPKGS_ALLOW_UNFREE=1")
+        $command = ($command | append [
+          "env",
+          "NIXPKGS_ALLOW_UNFREE=1",
+          "nix",
+          "shell",
+          "--impure",
+          $"nixpkgs#($package)",
+          "--command"
+        ])
 
-        # Shell or run?
-        $command = ($command | append "nix shell")
+        if $sudo {
+          $command = ($command | append "sudo")
+        }
 
-        # impure
-        $command = ($command | append "--impure")
+        $command = ($command | append $package)
+        $command = ($command | append $args)
 
-        # Package
-        $command = ($command | append ( "nixpkgs#" + $package + " " ))
+        let command_str = ($command | str join " ")
 
-        # command
-
-
-        if ($sudo) {
-          $command = ($command | append ("--command sudo"))
+        if $bg {
+          let task_id = (^$nu.current-exe -c $command_str | parse "{id}")
+          pueue follow $task_id
         } else {
-          $command = ($command | append ("--command"))
+          ^$nu.current-exe -c $command_str
         }
-
-        $command = ( $command | append $package )
-
-        # extra
-        $command = ( $command | append $args )
-
-        #echo $command
-        let strCommand = ($command | str join " ")
-        let variable = nu -c $strCommand
-        if ( $bg ) {
-          pueue follow $variable
-        }
-
       }
     '')
+
+    (pkgs.writeShellScriptBin "commit-msg" ''
+      git diff HEAD | llm "from the text extract only important changes to craft a concise and simple git commit message, formatted like this:
+      <Title of the git commit>
+
+      <body, Details of the commit>"
+    '')
+
+    (pkgs.writeShellScriptBin "compress" ''
+      tar -cf - "$1" | pv -s $(du -sb "$1" | awk '{print $1}') | pigz -9 > "$2".tar.gz
+    '')
+    (pkgs.writeShellScriptBin "chrome" ''
+      nix shell nixpkgs#ungoogled-chromium --command chromium $1 &>/dev/null &
+    '')
+    (pkgs.writeShellScriptBin "connect" ''
+      echo "nmcli device wifi rescan"
+      nmcli device wifi rescan
+      echo "nmcli device wifi connect $@"
+      nmcli device wifi connect $@
+    '')
+
   ];
 }
