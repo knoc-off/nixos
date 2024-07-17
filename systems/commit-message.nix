@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "Update_README.md34";
+  system.nixos.label = "LICENSE43";
 }
