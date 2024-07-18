@@ -1,9 +1,6 @@
-{
-  pkgs,
-  inputs,
-  ...
-}: {
+{ pkgs, inputs, ... }: {
   website = {
-    portfolio = pkgs.callPackage ./portfolio.nix {rust-overlay = inputs.rust-overlay;};
+    portfolio =
+      pkgs.callPackage ./portfolio.nix { inherit (inputs) rust-overlay; };
   };
 }

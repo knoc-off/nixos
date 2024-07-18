@@ -34,7 +34,7 @@
       };
     };
 
-    lsp-format.enable = true;
+    lsp-format.enable = false;
 
     none-ls = {
       enable = true;

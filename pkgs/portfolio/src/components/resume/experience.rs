@@ -21,8 +21,10 @@ pub fn experience_section(props: &ExperienceProps) -> Html {
             <h2>{"EXPERIENCE"}</h2>
             {for props.experiences.iter().map(|exp| html!(
                 <div>
-                    <h3>{&exp.position}</h3>
-                    <p>{format!(" - {}", &exp.company) }</p>
+                    <div class="title-with-detail">
+                        <h3>{&exp.position}</h3>
+                        <p>{format!(" - {}", &exp.company) }</p>
+                    </div>
                     <p>{&exp.location} {" • "} {&exp.date_range}</p>
                     <ul>
                         {for exp.responsibilities.iter().map(|r| html!(
