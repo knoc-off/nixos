@@ -26,9 +26,6 @@
     # Hardware-specific configurations
     hardware.url = "github:nixos/nixos-hardware";
 
-    # Color scheme
-    themes.url = "github:RGBCube/ThemeNix";
-
     # Disko - declarative disk partitioning
     disko = {
       url = "github:nix-community/disko";
@@ -78,7 +75,7 @@
   outputs = inputs@{ self, nixpkgs, home-manager, disko, ... }:
     let
       inherit (self) outputs;
-      theme = inputs.themes.custom (import ./theme.nix);
+      theme = import ./theme.nix;
 
       systems = [
         "aarch64-linux"

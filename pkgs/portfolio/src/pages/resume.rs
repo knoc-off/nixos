@@ -1,7 +1,7 @@
-use yew::prelude::*;
 use crate::components::resume::*;
 use crate::components::social_links::LogoLinkProps;
 use wasm_bindgen::prelude::*;
+use yew::prelude::*;
 
 // Add this function to call window.print()
 #[wasm_bindgen]
@@ -38,15 +38,19 @@ pub fn resume() -> Html {
                     <div class="main">
                         <ExperienceSection experiences={resume_data.experience.clone()} />
                         <EducationSection education={resume_data.education.clone()} />
-                        <SkillsSection skills={resume_data.skills.clone()} />
+                        <ProjectsSection projects={resume_data.projects.clone()} />
                     </div>
 
                     <div class="sidebar">
                         <LanguagesSection languages={resume_data.languages.clone()} />
-                        <ProjectsSection projects={resume_data.projects.clone()} />
+                        <SkillsSection skills={resume_data.skills.clone()} />
                         <section>
                             <h2>{"INTERESTS"}</h2>
-                            <p>{ &resume_data.interests }</p>
+                            <div class="skills">
+                                { resume_data.interests.iter().map(|skill| html! {
+                                    <span>{ skill }</span>
+                                }).collect::<Html>() }
+                            </div>
                         </section>
                     </div>
                 </div>
@@ -55,11 +59,10 @@ pub fn resume() -> Html {
     }
 }
 
-
 pub fn create_resume_data() -> ResumeData {
     ResumeData {
         name: "NICHOLAS SELBY".to_string(),
-        title: "SOFTWARE DEVELOPER".to_string(),
+        title: "SERVER ADMIN".to_string(),
         contact: ContactInfo {
             email: "selby@niko.ink".to_string(),
             phone: "+49 176 56615691".to_string(),
@@ -101,41 +104,44 @@ pub fn create_resume_data() -> ResumeData {
                     "Configured security protocols with Authelia".to_string(),
                 ],
             },
-            Experience {
-                company: "Motive School of Movement".to_string(),
-                position: "Gymnastics Coach".to_string(),
-                location: "South Carolina".to_string(),
-                date_range: "03/2020 - 05/2021".to_string(),
-                responsibilities: vec![
-                ],
-            },
+            //Experience {
+            //    company: "Motive School of Movement".to_string(),
+            //    position: "Gymnastics Coach".to_string(),
+            //    location: "South Carolina".to_string(),
+            //    date_range: "03/2020 - 05/2021".to_string(),
+            //    responsibilities: vec![
+            //    ],
+            //},
         ],
-        skills: vec![
-            "Software Documentation".to_string(),
-            "Version control".to_string(),
-            "Web development".to_string(),
-            "UI and UX design".to_string(),
+        skills: vec![ // TODO sort by importance
+            "Linux".to_string(),
+            "UI/UX".to_string(),
+            "Server Admin".to_string(),
+            "Nix Configs".to_string(),
+            "NixOS".to_string(),
+            "Docker".to_string(),
+            "Podman".to_string(),
             "CI/CD".to_string(),
-            "Docker containers".to_string(),
-            "Linux operating systems".to_string(),
-            "HTML and CSS".to_string(),
-            "Cloud computing".to_string(),
-            "Back-end development".to_string(),
-            "Data structures".to_string(),
-            "Nix Configurations".to_string(),
+            "HTML/CSS".to_string(),
+            "Rust".to_string(),
+            "Java".to_string(),
+            "Bash".to_string(),
+            "Json".to_string(),
+            "Version Control".to_string(),
         ],
         education: vec![
             Education {
                 institution: "T.U. Berlin".to_string(),
+                extra: "Gasthörerschaft".to_string(),
                 location: "Berlin".to_string(),
                 degree: "Gasthörerschaft".to_string(),
                 date: "Wintersemester 2023".to_string(),
                 details: vec![
-                    "Relevant Coursework: IT Fundamentals".to_string(),
                 ],
             },
             Education {
                 institution: "Wade Hampton High School".to_string(),
+                extra: "".to_string(),
                 location: "South Carolina".to_string(),
                 degree: "High School Diploma".to_string(),
                 date: "08/2021".to_string(),
@@ -144,13 +150,14 @@ pub fn create_resume_data() -> ResumeData {
                     //"Extracurricular Activities: German Club".to_string(),
                 ],
             },
-            Education {
-                institution: "Fine Arts Center".to_string(),
-                location: "South Carolina".to_string(),
-                degree: "Graduation Certificate".to_string(),
-                date: "06/2021".to_string(),
-                details: vec![],
-            },
+            //Education {
+            //    institution: "Fine Arts Center".to_string(),
+            //    extra: "".to_string(),
+            //    location: "South Carolina".to_string(),
+            //    degree: "Graduation Certificate".to_string(),
+            //    date: "06/2021".to_string(),
+            //    details: vec![],
+            //},
         ],
         languages: vec![
             Language {
@@ -164,27 +171,63 @@ pub fn create_resume_data() -> ResumeData {
                 icon: "static/icons/flags/de.svg".to_string(),
             },
         ],
-        interests: "3D printing, Arduino, game development, sketching, board games, cooking.".to_string(),
+        interests: vec![
+            "3D printing".to_string(),
+            "Arduino".to_string(),
+            "game development".to_string(),
+            "sketching".to_string(),
+            "board games".to_string(),
+            "cooking".to_string(),
+        ],
+
         projects: vec![
             Project {
                 icon_path: String::from("static/icons/tiny/nixos.svg"),
                 name: String::from("Nix Configurations"),
                 url: String::from("https://github.com/knoc-off/nixos"),
-                description: String::from("My nixos files. My operating system and many programs ive developed/packaged"),
+                description: String::from(""),
+                bullets: vec![
+                    "Lorem ipsum dolor sit amet ut labore et".to_string(),
+                    "Consectetur adipiscing elit dolore magna".to_string(),
+                    "Sed do eiusmod tempor incididunt aliqua".to_string()
+                ],
                 languages: vec![
                     LanguageUsage { language: String::from("Nix"),     color: String::from("#7e7eff"), percentage: 77.43 },
                     LanguageUsage { language: String::from("Rust"),    color: String::from("#dea584"), percentage: 10.80 },
                     LanguageUsage { language: String::from("Sass"),    color: String::from("#a53b70"), percentage: 5.51 },
                     LanguageUsage { language: String::from("Shell"),   color: String::from("#89e051"), percentage: 2.08 },
                     LanguageUsage { language: String::from("YAML"),    color: String::from("#cb171e"), percentage: 2.00 },
-                    LanguageUsage { language: String::from("other"),  color: String::from("#aaaaaa"), percentage: 3.00 },
+                    LanguageUsage { language: String::from("other"),   color: String::from("#aaaaaa"), percentage: 3.00 },
                 ],
             },
             Project {
                 icon_path: String::from("static/icons/tiny/webassembly.svg"),
                 name: String::from("Yew Website"),
                 url: String::from("https://github.com/knoc-off/nixos/tree/main/pkgs/portfolio"),
-                description: String::from("This website! Compiled to WASM, programed in Rust"),
+                description: String::from(""),
+                bullets: vec![
+                    "Lorem ipsum dolor sit amet ut labore et adipiscing elit".to_string(),
+                    "Consectetur adipiscing elit dolore magna adipiscing ".to_string(),
+                    "Sed do eiusmod tempor incididunt aliqua elit".to_string()
+                ],
+                languages: vec![
+                    LanguageUsage { language: String::from("Rust"),    color: String::from("#dea584"), percentage: 59.73 },
+                    LanguageUsage { language: String::from("Sass"),    color: String::from("#a53b70"), percentage: 34.48 },
+                    LanguageUsage { language: String::from("Nix"),     color: String::from("#7e7eff"), percentage: 2.54 },
+                    LanguageUsage { language: String::from("TOML"),    color: String::from("#9c4221"), percentage: 2.46 },
+                    LanguageUsage { language: String::from("HTML"),    color: String::from("#e34c26"), percentage: 0.79 },
+                ],
+            },
+            Project {
+                icon_path: String::from("static/icons/tiny/webassembly.svg"),
+                name: String::from("Yew Website"),
+                url: String::from("https://github.com/knoc-off/nixos/tree/main/pkgs/portfolio"),
+                description: String::from(""),
+                bullets: vec![
+                    "Lorem ipsum dolor sit amet ut labore et adipiscing elit".to_string(),
+                    "Consectetur adipiscing elit dolore magna adipiscing ".to_string(),
+                    "Sed do eiusmod tempor incididunt aliqua elit".to_string()
+                ],
                 languages: vec![
                     LanguageUsage { language: String::from("Rust"),    color: String::from("#dea584"), percentage: 59.73 },
                     LanguageUsage { language: String::from("Sass"),    color: String::from("#a53b70"), percentage: 34.48 },

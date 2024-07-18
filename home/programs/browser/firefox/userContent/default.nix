@@ -1,4 +1,4 @@
-{theme}: ''
+{ theme }: ''
   .tabbrowser-tabbox {
       background-color: #${theme.base02} !important;
   }

@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "Enable_fish_shell_in_framework13.nix14";
+  system.nixos.label = "Update_theme_a_bit._and_resume20";
 }

@@ -17,9 +17,9 @@ pub fn languages_section(props: &LanguagesProps) -> Html {
     html! {
         <section>
             <h2>{"LANGUAGES"}</h2>
-            <div>
+            <div class="spoken-language-section">
                 { props.languages.iter().map(|lang| html! {
-                    <div>
+                    <div class="spoken-language">
                         <img src={lang.icon.clone()} alt={format!("{} icon", lang.name)} />
                         <span>{format!("{}: {}", lang.name, lang.level)}</span>
                     </div>

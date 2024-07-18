@@ -25,6 +25,6 @@ pub struct ResumeData {
     pub skills: Vec<String>,
     pub education: Vec<Education>,
     pub languages: Vec<Language>,
-    pub interests: String,
+    pub interests: Vec<String>,
     pub projects: Vec<Project>,
 }

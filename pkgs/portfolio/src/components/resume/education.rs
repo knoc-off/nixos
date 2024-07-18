@@ -3,6 +3,7 @@ use yew::prelude::*;
 #[derive(Clone, PartialEq)]
 pub struct Education {
     pub institution: String,
+    pub extra: String,
     pub location: String,
     pub degree: String,
     pub date: String,
@@ -21,7 +22,10 @@ pub fn education_section(props: &EducationProps) -> Html {
             <h2>{"EDUCATION"}</h2>
             {for props.education.iter().map(|edu| html!(
                 <div>
-                    <h3>{&edu.institution}</h3>
+                    <div class="title-with-detail">
+                        <h3>{&edu.institution}</h3>
+                        <p>{format!(" - {}", &edu.degree) }</p>
+                    </div>
                     <p>{&edu.location} {" • "} {&edu.date}</p>
                     <ul>
                         {for edu.details.iter().map(|d| html!(
