@@ -681,7 +681,8 @@ html {
       align-items: center;
       margin-top: 0.5em;
 
-      border-radius: 5em;
+      //border-radius: 5em;
+      //background-color: $color-surface-dark !important;
 
       .resume-project-language {
         position: relative;
@@ -689,6 +690,7 @@ html {
         transition: all 1.0s cubic-bezier(0.25, 0.1, 0.25, 1);
         overflow: hidden;
         margin-right: 0.2em;
+        //padding-right: 0.2em;
         margin-bottom: 0;
         border-radius: 0.15em;
 

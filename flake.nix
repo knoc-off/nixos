@@ -3,8 +3,6 @@
 
   inputs = {
     # Nixpkgs
-    #nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
-
     nixpkgs.url = "github:nixos/nixpkgs/nixos-24.05";
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
@@ -72,7 +70,7 @@
     ];
   };
 
-  outputs = inputs@{ self, nixpkgs, home-manager, disko, ... }:
+  outputs = inputs@{ self, nixpkgs, home-manager, ... }:
     let
       inherit (self) outputs;
       theme = import ./theme.nix;
@@ -124,7 +122,7 @@
               };
             }
 
-            disko.nixosModules.disko
+            inputs.disko.nixosModules.disko
             { disko.devices.disk.vdb.device = "/dev/nvme0n1"; }
             ./systems/hardware/disks/btrfs-luks.nix
             home-manager.nixosModules.home-manager
@@ -150,7 +148,7 @@
 
             inputs.hardware.nixosModules.common-cpu-intel
 
-            disko.nixosModules.disko
+            inputs.disko.nixosModules.disko
             ./systems/hardware/disks/disk-module.nix
             {
               diskoCustom = {

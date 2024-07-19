@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "Update_theme_a_bit._and_resume20";
+  system.nixos.label = "Fix_styling_portfolio29";
 }
