@@ -214,6 +214,8 @@ html {
     min-width: 300px;
     background-color: $color-surface;
 
+
+
     section {
       background: $color-surface;
       padding: 20px;
@@ -428,6 +430,7 @@ html {
   }
 
   .header {
+    overflow: hidden; // Hides overflow
     background-color: $color-surface-light;
     padding: 1.5em;
     overflow: hidden;
@@ -448,10 +451,10 @@ html {
   }
 
   .main {
+    overflow: hidden; // Hides overflow
     background-color: $color-surface;
     grid-row: 2 / 4;
     padding: 1.5em;
-    overflow-y: auto;
 
     section {
       margin-bottom: 3em;
@@ -469,7 +472,7 @@ html {
   .sidebar {
     background-color: $color-surface-dark;
     padding: 1.5em;
-    overflow-y: auto;
+    overflow: hidden; // Hides overflow
     flex-direction: column;
 
     section {
@@ -550,7 +553,7 @@ html {
     display: flex;
     flex-direction: row; // Explicitly set row direction
     flex-wrap: wrap;
-    gap: 0.5em;
+    gap: 1em;
     margin-top: 1em;
     width: 100%; // Ensure full width
 
@@ -561,7 +564,7 @@ html {
       padding: 0.2em 0.4em;
       border-radius: 0.2em;
       font-size: var(--small-size);
-      margin: 0;
+      margin: 0.2em;
       white-space: nowrap; // Prevent wrapping within spans
     }
   }
@@ -591,7 +594,7 @@ html {
     display: flex;
     align-items: center; // Vertically center items
     gap: 0.5em; // Space between icon and text
-    margin-bottom: 0.5em; // Space between language entries
+    margin-bottom: 1em; // Space between language entries
 
     img {
       width: 1.25em;
@@ -649,6 +652,7 @@ html {
         margin-left: var(--content-margin-left);
         .resume-project-bullets {
           padding-left: 1em; // Decrease padding on the left of the bullet list
+          padding-bottom: 1em;
 
         };
       }
@@ -672,9 +676,8 @@ html {
 
     .resume-project-languages {
       display: flex;
-      height: 0.5em;
+      height: 0.3rem ;
       position: relative;
-      margin-right: 0.5em;
       width: 60%;
 
       flex-direction: row;
@@ -690,17 +693,17 @@ html {
         transition: all 1.0s cubic-bezier(0.25, 0.1, 0.25, 1);
         overflow: hidden;
         margin-right: 0.2em;
-        //padding-right: 0.2em;
         margin-bottom: 0;
         border-radius: 0.15em;
 
         &:hover {
           width: 100% !important;
-          height: 1em !important;
+          height: 1rem !important;
           transition: all 0.3s cubic-bezier(0.25, 0.1, 0.5, 1);
 
           .resume-project-language-text {
             visibility: visible;
+            color: $color-base;
             opacity: 1;
           }
         }
@@ -717,12 +720,11 @@ html {
           text-overflow: ellipsis;
           width: auto !important;
           text-align: center;
-          visibility: hidden;
+          visibility: visible;
           opacity: 0;
           transition:
-            visibility 0s,
+            visibility 0.3s,
             opacity 0.3s;
-          font-size: 0.75em;
           padding: 0 0.5em;
         }
       }
@@ -765,38 +767,55 @@ html {
     padding: 0;
     width: 100%;
     height: 100%;
-  }
 
-  .header,
-  .photo,
-  .main,
-  .sidebar {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
 
-  .header {
-    background-color: $color-surface-light !important;
-  }
 
-  .main {
-    background-color: $color-surface !important;
-  }
 
-  .sidebar {
-    background-color: $color-surface-dark !important;
-  }
+    .resume-project-languages {
+      width: 35% !important;
+      height: 0.75mm !important;
 
-  .social img {
-    box-shadow: 1mm 1mm 0 $color-shadow !important;
+      .resume-project-language {
+        margin-right: 1% !important;
+        border-radius: 1em !important;
+      }
+    }
+
+
+
+    .header,
+    .photo,
+    .main,
+    .sidebar {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .header {
+      background-color: $color-surface-light !important;
+    }
+
+    .main {
+      background-color: $color-surface !important;
+    }
+
+    .sidebar {
+      background-color: $color-surface-dark !important;
+    }
+
+    .social img {
+      box-shadow: 1mm 1mm 0 $color-shadow !important;
+    }
+
+
+    .main section,
+    .sidebar section {
+      page-break-inside: avoid;
+    }
+
   }
 
   .no-print {
     display: none !important;
-  }
-
-  .main section,
-  .sidebar section {
-    page-break-inside: avoid;
   }
 }

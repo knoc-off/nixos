@@ -99,9 +99,9 @@ pub fn create_resume_data() -> ResumeData {
                 location: "Berlin".to_string(),
                 date_range: "10/2022 - 06/2023".to_string(),
                 responsibilities: vec![
-                    "Configured servers using nixos.".to_string(),
-                    "Setup internal services, nextcloud filesharing.".to_string(),
-                    "Configured security protocols with Authelia".to_string(),
+                    "Configured and managed servers using NixOS.".to_string(),
+                    "Establish internal services, such as Autheliea.".to_string(),
+                    "Proposed workflow changes and implemented them.".to_string(),
                 ],
             },
             //Experience {
@@ -114,20 +114,24 @@ pub fn create_resume_data() -> ResumeData {
             //},
         ],
         skills: vec![ // TODO sort by importance
-            "Linux".to_string(),
-            "UI/UX".to_string(),
-            "Server Admin".to_string(),
-            "Nix Configs".to_string(),
-            "NixOS".to_string(),
-            "Docker".to_string(),
-            "Podman".to_string(),
-            "CI/CD".to_string(),
-            "HTML/CSS".to_string(),
-            "Rust".to_string(),
-            "Java".to_string(),
-            "Bash".to_string(),
-            "Json".to_string(),
-            "Version Control".to_string(),
+            "Linux".to_string(), // !!
+            "Server Admin".to_string(), // !!
+            "NixOS".to_string(), // !!
+            "Nix Configs".to_string(), // !!
+            "Docker".to_string(), // !!
+            "Podman".to_string(), // !!
+            "CI/CD".to_string(), // !!
+            "Rust".to_string(), // !!
+            "UI/UX".to_string(), // !!
+            "HTML/CSS".to_string(), // !!
+            "JavaScript".to_string(), // !!
+            "Java".to_string(), // !!
+            "Bash".to_string(), // !!
+            "Json".to_string(), // !!
+            "Python".to_string(), // !!
+            "Version Control".to_string(), // !!
+            "Project Management".to_string(), // !!
+            "Time Management".to_string(), // !!
         ],
         education: vec![
             Education {
@@ -150,14 +154,14 @@ pub fn create_resume_data() -> ResumeData {
                     //"Extracurricular Activities: German Club".to_string(),
                 ],
             },
-            //Education {
-            //    institution: "Fine Arts Center".to_string(),
-            //    extra: "".to_string(),
-            //    location: "South Carolina".to_string(),
-            //    degree: "Graduation Certificate".to_string(),
-            //    date: "06/2021".to_string(),
-            //    details: vec![],
-            //},
+            Education {
+                institution: "Fine Arts Center".to_string(),
+                extra: "".to_string(),
+                location: "South Carolina".to_string(),
+                degree: "Graduation Certificate".to_string(),
+                date: "06/2021".to_string(),
+                details: vec![],
+            },
         ],
         languages: vec![
             Language {
@@ -187,9 +191,9 @@ pub fn create_resume_data() -> ResumeData {
                 url: String::from("https://github.com/knoc-off/nixos"),
                 description: String::from(""),
                 bullets: vec![
-                    "Lorem ipsum dolor sit amet ut labore et".to_string(),
-                    "Consectetur adipiscing elit dolore magna".to_string(),
-                    "Sed do eiusmod tempor incididunt aliqua".to_string()
+                    "Configures multiple systems via a single, version-controlled repository.".to_string(),
+                    "Utilizes Disko for declarative disk partitioning".to_string(),
+                    "Manages secrets using sops-nix for encrypted configuration".to_string(),
                 ],
                 languages: vec![
                     LanguageUsage { language: String::from("Nix"),     color: String::from("#7e7eff"), percentage: 77.43 },
@@ -206,9 +210,9 @@ pub fn create_resume_data() -> ResumeData {
                 url: String::from("https://github.com/knoc-off/nixos/tree/main/pkgs/portfolio"),
                 description: String::from(""),
                 bullets: vec![
-                    "Lorem ipsum dolor sit amet ut labore et adipiscing elit".to_string(),
-                    "Consectetur adipiscing elit dolore magna adipiscing ".to_string(),
-                    "Sed do eiusmod tempor incididunt aliqua elit".to_string()
+                    "Uses Yew for Rust-based WebAssembly front-end development.".to_string(),
+                    "Modular structure with components that can be reused".to_string(),
+                    "Utilizes Trunk for Rust and WebAssembly build/bundling.".to_string(),
                 ],
                 languages: vec![
                     LanguageUsage { language: String::from("Rust"),    color: String::from("#dea584"), percentage: 59.73 },
@@ -218,24 +222,24 @@ pub fn create_resume_data() -> ResumeData {
                     LanguageUsage { language: String::from("HTML"),    color: String::from("#e34c26"), percentage: 0.79 },
                 ],
             },
-            Project {
-                icon_path: String::from("static/icons/tiny/webassembly.svg"),
-                name: String::from("Yew Website"),
-                url: String::from("https://github.com/knoc-off/nixos/tree/main/pkgs/portfolio"),
-                description: String::from(""),
-                bullets: vec![
-                    "Lorem ipsum dolor sit amet ut labore et adipiscing elit".to_string(),
-                    "Consectetur adipiscing elit dolore magna adipiscing ".to_string(),
-                    "Sed do eiusmod tempor incididunt aliqua elit".to_string()
-                ],
-                languages: vec![
-                    LanguageUsage { language: String::from("Rust"),    color: String::from("#dea584"), percentage: 59.73 },
-                    LanguageUsage { language: String::from("Sass"),    color: String::from("#a53b70"), percentage: 34.48 },
-                    LanguageUsage { language: String::from("Nix"),     color: String::from("#7e7eff"), percentage: 2.54 },
-                    LanguageUsage { language: String::from("TOML"),    color: String::from("#9c4221"), percentage: 2.46 },
-                    LanguageUsage { language: String::from("HTML"),    color: String::from("#e34c26"), percentage: 0.79 },
-                ],
-            },
+            //Project {
+            //    icon_path: String::from("static/icons/tiny/webassembly.svg"),
+            //    name: String::from("Yew Website"),
+            //    url: String::from("https://github.com/knoc-off/nixos/tree/main/pkgs/portfolio"),
+            //    description: String::from(""),
+            //    bullets: vec![
+            //        "Lorem ipsum dolor sit amet ut labore et adipiscing elit".to_string(),
+            //        "Consectetur adipiscing elit dolore magna adipiscing ".to_string(),
+            //        "Sed do eiusmod tempor incididunt aliqua elit".to_string()
+            //    ],
+            //    languages: vec![
+            //        LanguageUsage { language: String::from("Rust"),    color: String::from("#dea584"), percentage: 59.73 },
+            //        LanguageUsage { language: String::from("Sass"),    color: String::from("#a53b70"), percentage: 34.48 },
+            //        LanguageUsage { language: String::from("Nix"),     color: String::from("#7e7eff"), percentage: 2.54 },
+            //        LanguageUsage { language: String::from("TOML"),    color: String::from("#9c4221"), percentage: 2.46 },
+            //        LanguageUsage { language: String::from("HTML"),    color: String::from("#e34c26"), percentage: 0.79 },
+            //    ],
+            //},
 
 
 
