@@ -15,13 +15,13 @@ pub fn resume() -> Html {
     let resume_data = create_resume_data();
 
     // Create a callback for the print button
-    let onclick = Callback::from(|_| {
+    let print_resume = Callback::from(|_| {
         print();
     });
 
     html! {
         <div>
-            <button class="print-button no-print" {onclick}>{"Print Resume"}</button>
+            <button class="print-button no-print" onclick={print_resume}>{"Print Resume"}</button>
             <div class="resume">
                 // Add the print button
                 <div class="grid">
@@ -101,7 +101,8 @@ pub fn create_resume_data() -> ResumeData {
                 responsibilities: vec![
                     "Configured and managed servers using NixOS.".to_string(),
                     "Establish internal services, such as Autheliea.".to_string(),
-                    "Proposed workflow changes and implemented them.".to_string(),
+                    //"Proposed workflow changes and implemented them.".to_string(),
+                    "implemented my proposed workflow changes".to_string(),
                 ],
             },
             //Experience {
@@ -113,25 +114,22 @@ pub fn create_resume_data() -> ResumeData {
             //    ],
             //},
         ],
-        skills: vec![ // TODO sort by importance
-            "Linux".to_string(), // !!
-            "Server Admin".to_string(), // !!
-            "NixOS".to_string(), // !!
-            "Nix Configs".to_string(), // !!
-            "Docker".to_string(), // !!
-            "Podman".to_string(), // !!
-            "CI/CD".to_string(), // !!
-            "Rust".to_string(), // !!
-            "UI/UX".to_string(), // !!
-            "HTML/CSS".to_string(), // !!
-            "JavaScript".to_string(), // !!
-            "Java".to_string(), // !!
-            "Bash".to_string(), // !!
-            "Json".to_string(), // !!
-            "Python".to_string(), // !!
-            "Version Control".to_string(), // !!
-            "Project Management".to_string(), // !!
-            "Time Management".to_string(), // !!
+        skills: vec![
+            "Linux".to_string(),
+            "NixOS".to_string(),
+            "Docker".to_string(),
+            "Podman".to_string(),
+            "CI/CD".to_string(),
+            "Rust".to_string(),
+            "UI/UX".to_string(),
+            "HTML/CSS".to_string(),
+            "JavaScript".to_string(),
+            "Java".to_string(),
+            "Bash".to_string(),
+            "Json".to_string(),
+            "Python".to_string(),
+            "Git".to_string(),
+            "Project Management".to_string(),
         ],
         education: vec![
             Education {
@@ -192,16 +190,17 @@ pub fn create_resume_data() -> ResumeData {
                 description: String::from(""),
                 bullets: vec![
                     "Configures multiple systems via a single, version-controlled repository.".to_string(),
-                    "Utilizes Disko for declarative disk partitioning".to_string(),
+                    "Set up OCI containers for services like WordPress".to_string(),
+                    //"Utilizes Disko for declarative disk partitioning".to_string(),
                     "Manages secrets using sops-nix for encrypted configuration".to_string(),
                 ],
                 languages: vec![
-                    LanguageUsage { language: String::from("Nix"),     color: String::from("#7e7eff"), percentage: 77.43 },
-                    LanguageUsage { language: String::from("Rust"),    color: String::from("#dea584"), percentage: 10.80 },
-                    LanguageUsage { language: String::from("Sass"),    color: String::from("#a53b70"), percentage: 5.51 },
-                    LanguageUsage { language: String::from("Shell"),   color: String::from("#89e051"), percentage: 2.08 },
+                    LanguageUsage { language: String::from("Nix"),     color: String::from("#7e7eff"), percentage: 77.0 },
+                    LanguageUsage { language: String::from("Rust"),    color: String::from("#dea584"), percentage: 10.0 },
+                    LanguageUsage { language: String::from("Sass"),    color: String::from("#a53b70"), percentage: 5.0 },
+                    LanguageUsage { language: String::from("Shell"),   color: String::from("#89e051"), percentage: 2.0 },
                     LanguageUsage { language: String::from("YAML"),    color: String::from("#cb171e"), percentage: 2.00 },
-                    LanguageUsage { language: String::from("other"),   color: String::from("#aaaaaa"), percentage: 3.00 },
+                    LanguageUsage { language: String::from("other"),   color: String::from("#aaaaaa"), percentage: 4.00 },
                 ],
             },
             Project {
@@ -210,39 +209,18 @@ pub fn create_resume_data() -> ResumeData {
                 url: String::from("https://github.com/knoc-off/nixos/tree/main/pkgs/portfolio"),
                 description: String::from(""),
                 bullets: vec![
-                    "Uses Yew for Rust-based WebAssembly front-end development.".to_string(),
-                    "Modular structure with components that can be reused".to_string(),
+                    "Uses Yew for WebAssembly and front-end development.".to_string(),
+                    "built around reusable components, bundling logic and presentation".to_string(),
                     "Utilizes Trunk for Rust and WebAssembly build/bundling.".to_string(),
                 ],
                 languages: vec![
-                    LanguageUsage { language: String::from("Rust"),    color: String::from("#dea584"), percentage: 59.73 },
-                    LanguageUsage { language: String::from("Sass"),    color: String::from("#a53b70"), percentage: 34.48 },
-                    LanguageUsage { language: String::from("Nix"),     color: String::from("#7e7eff"), percentage: 2.54 },
-                    LanguageUsage { language: String::from("TOML"),    color: String::from("#9c4221"), percentage: 2.46 },
-                    LanguageUsage { language: String::from("HTML"),    color: String::from("#e34c26"), percentage: 0.79 },
+                    LanguageUsage { language: String::from("Rust"),    color: String::from("#dea584"), percentage: 60.0 },
+                    LanguageUsage { language: String::from("Sass"),    color: String::from("#a53b70"), percentage: 34.0 },
+                    LanguageUsage { language: String::from("Nix"),     color: String::from("#7e7eff"), percentage: 3.00 },
+                    LanguageUsage { language: String::from("TOML"),    color: String::from("#9c4221"), percentage: 2.00 },
+                    LanguageUsage { language: String::from("HTML"),    color: String::from("#e34c26"), percentage: 1.00 },
                 ],
             },
-            //Project {
-            //    icon_path: String::from("static/icons/tiny/webassembly.svg"),
-            //    name: String::from("Yew Website"),
-            //    url: String::from("https://github.com/knoc-off/nixos/tree/main/pkgs/portfolio"),
-            //    description: String::from(""),
-            //    bullets: vec![
-            //        "Lorem ipsum dolor sit amet ut labore et adipiscing elit".to_string(),
-            //        "Consectetur adipiscing elit dolore magna adipiscing ".to_string(),
-            //        "Sed do eiusmod tempor incididunt aliqua elit".to_string()
-            //    ],
-            //    languages: vec![
-            //        LanguageUsage { language: String::from("Rust"),    color: String::from("#dea584"), percentage: 59.73 },
-            //        LanguageUsage { language: String::from("Sass"),    color: String::from("#a53b70"), percentage: 34.48 },
-            //        LanguageUsage { language: String::from("Nix"),     color: String::from("#7e7eff"), percentage: 2.54 },
-            //        LanguageUsage { language: String::from("TOML"),    color: String::from("#9c4221"), percentage: 2.46 },
-            //        LanguageUsage { language: String::from("HTML"),    color: String::from("#e34c26"), percentage: 0.79 },
-            //    ],
-            //},
-
-
-
         ],
     }
 }
