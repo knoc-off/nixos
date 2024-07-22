@@ -457,7 +457,7 @@ html {
     padding: 1.5em;
 
     section {
-      margin-bottom: 3em;
+      margin-bottom: 3em; // Space between sections
     }
 
     div {
@@ -476,7 +476,7 @@ html {
     flex-direction: column;
 
     section {
-      margin-bottom: 5em;
+      margin-bottom: 3em;
     }
 
     h2 {
@@ -594,7 +594,7 @@ html {
     display: flex;
     align-items: center; // Vertically center items
     gap: 0.5em; // Space between icon and text
-    margin-bottom: 1em; // Space between language entries
+    margin-bottom: 1.5em; // Space between language entries
 
     img {
       width: 1.25em;
@@ -629,6 +629,7 @@ html {
         width: var(--icon-container-width);
         margin-right: 0.625em;
         position: absolute;
+        height: 90%;
         top: 0;
         bottom: 0;
         left: 0;
@@ -772,7 +773,7 @@ html {
 
 
     .resume-project-languages {
-      width: 35% !important;
+      //width: 35% !important;
       height: 0.75mm !important;
 
       .resume-project-language {
