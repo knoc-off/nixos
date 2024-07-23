@@ -10,11 +10,11 @@ commit_msg=$(git log -1 --pretty=%B)
 first_line=$(echo "$commit_msg" | head -n 1)
 message=$(echo "$first_line" | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
 
-# Ensure the message is exactly 50 characters, padding on the right side only
 if [ ${#message} -gt 50 ]; then
     message=${message:0:50}
 else
-    message="${message}$(printf '%s' $((50-${#message})) | tr ' ' '_')"
+    padding=$(printf '%*s' $((50-${#message})) | tr ' ' '_')
+    message="${message}${padding}"
 fi
 
 # Write the message to the target file
