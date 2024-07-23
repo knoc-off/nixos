@@ -8,3 +8,4 @@ pub mod navbar;
 pub mod projects;
 pub mod resume;
 pub mod social_links;
+pub mod interaction;

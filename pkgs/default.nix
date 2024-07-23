@@ -28,7 +28,10 @@
   website = let
     #rust-overlay = inputs.rust-overlay;
     rustPkgs = pkgs.extend (import inputs.rust-overlay);
-  in {portfolio = rustPkgs.callPackage ./portfolio {};};
+  in {
+    actix-backend = rustPkgs.callPackage ./website/actix-backend {};
+    portfolio = rustPkgs.callPackage ./website/portfolio {};
+  };
 
   # This lets me use font glyphs as SVG's for places that dont accept SVG.
   material-icons-ext = import ./svg-tools/icon-extractor {
