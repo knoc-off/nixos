@@ -3,7 +3,6 @@ use yew::prelude::*;
 #[derive(Clone, PartialEq)]
 pub struct Education {
     pub institution: String,
-    pub extra: String,
     pub location: String,
     pub degree: String,
     pub date: String,

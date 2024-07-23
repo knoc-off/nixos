@@ -30,6 +30,9 @@ pulldown-cmark = "0.10.3"
 gloo-timers = "0.3.0"
 yew-router = "0.18.0"
 palette = "0.7.6"
+gloo-net = "0.6.0"
+serde = "1.0.204"
+wasm-bindgen-futures = "0.4.42"
 
 
 

@@ -134,7 +134,6 @@ pub fn create_resume_data() -> ResumeData {
         education: vec![
             Education {
                 institution: "T.U. Berlin".to_string(),
-                extra: "Gasthörerschaft".to_string(),
                 location: "Berlin".to_string(),
                 degree: "Gasthörerschaft".to_string(),
                 date: "Wintersemester 2023".to_string(),
@@ -143,7 +142,6 @@ pub fn create_resume_data() -> ResumeData {
             },
             Education {
                 institution: "Wade Hampton High School".to_string(),
-                extra: "".to_string(),
                 location: "South Carolina".to_string(),
                 degree: "High School Diploma".to_string(),
                 date: "08/2021".to_string(),
@@ -154,7 +152,6 @@ pub fn create_resume_data() -> ResumeData {
             },
             Education {
                 institution: "Fine Arts Center".to_string(),
-                extra: "".to_string(),
                 location: "South Carolina".to_string(),
                 degree: "Graduation Certificate".to_string(),
                 date: "06/2021".to_string(),
