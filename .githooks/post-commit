@@ -13,7 +13,7 @@ message=$(echo "$first_line" | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/
 if [ ${#message} -gt 50 ]; then
     message=${message:0:50}
 else
-    padding=$(printf '%*s' $((50-${#message})) | tr ' ' '_')
+    padding=$(printf '%s' $((50-${#message})) | tr ' ' '_')
     message="${message}${padding}"
 fi
 

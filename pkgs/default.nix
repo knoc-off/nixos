@@ -25,6 +25,8 @@
     };
   };
 
+  marlin = pkgs.callPackage ./marlin {};
+
   website = let
     #rust-overlay = inputs.rust-overlay;
     rustPkgs = pkgs.extend (import inputs.rust-overlay);
