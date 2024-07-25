@@ -26,7 +26,7 @@ pub fn navbar() -> Html {
 
             <div style="display: flex; justify-content: center;">
                 <LinkItem color={"#ffffff"} text={"Home".to_string()} href={"/".to_string()} />
-                <LinkItem color={"#ffffff"} text={"About".to_string()} href={"/about".to_string()} />
+                //<LinkItem color={"#ffffff"} text={"About".to_string()} href={"/about".to_string()} />
                 <LinkItem color={"#ffffff"} text={"Resume".to_string()} href={"/resume".to_string()} />
                 // Add additional navigation links here
             </div>

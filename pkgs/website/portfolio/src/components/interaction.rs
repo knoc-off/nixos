@@ -35,7 +35,7 @@ pub fn fruit_selector() -> Html {
 
             let result = result.clone();
             spawn_local(async move {
-                let response = Request::post("/api/process")
+                let response = Request::post("http://127.0.0.1:8081/api/process")  // Updated URL
                     .json(&form_data)
                     .unwrap()
                     .send()
@@ -48,7 +48,6 @@ pub fn fruit_selector() -> Html {
             });
         })
     };
-
     let onnameinput = {
         let name = name.clone();
         Callback::from(move |e: InputEvent| {

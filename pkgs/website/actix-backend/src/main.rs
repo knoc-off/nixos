@@ -1,31 +1,38 @@
-use actix_files as fs;
-use actix_web::{web, App, HttpServer, Result};
-use actix_files::NamedFile;
-use std::env;
-use std::path::PathBuf;
-use lazy_static::lazy_static;
+use actix_web::{web, App, HttpResponse, HttpServer, Responder};
+use serde::{Deserialize, Serialize};
 
-lazy_static! {
-    static ref STATIC_DIR: PathBuf = {
-        let exe_path = env::current_exe().unwrap();
-        let exe_dir = exe_path.parent().unwrap();
-        exe_dir.join("static")
-    };
+#[derive(Deserialize)]
+struct FormData {
+    name: String,
+    fruits: Vec<String>,
 }
 
-async fn index() -> Result<NamedFile> {
-    Ok(NamedFile::open(STATIC_DIR.join("index.html"))?)
+#[derive(Serialize)]
+struct BackendResponse {
+    message: String,
+}
+
+async fn process(form: web::Json<FormData>) -> impl Responder {
+    let fruits_str = if form.fruits.is_empty() {
+        "no fruits".to_string()
+    } else {
+        form.fruits.join(", ")
+    };
+
+    let message = format!(
+        "Hello, {}! You selected the following fruits: {}.",
+        form.name, fruits_str
+    );
+
+    HttpResponse::Ok().json(BackendResponse { message })
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
-        App::new()
-            .route("/", web::get().to(index))
-            .service(fs::Files::new("/", STATIC_DIR.clone()).show_files_listing())
+        App::new().service(web::resource("/api/process").route(web::post().to(process)))
     })
     .bind("127.0.0.1:8081")?
     .run()
     .await
 }
-
