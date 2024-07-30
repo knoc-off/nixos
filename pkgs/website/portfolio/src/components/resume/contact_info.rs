@@ -1,12 +1,14 @@
 use yew::prelude::*;
-use crate::components::social_links::{LogoLink, LogoLinkProps};
+use crate::components::link_item::ImageLinkItem;
+
+use crate::data::link::ImageLinkData;
 
 #[derive(Clone, PartialEq)]
 pub struct ContactInfo {
     pub email: String,
     pub phone: String,
     pub location: String,
-    pub social_links: Vec<LogoLinkProps>,
+    pub social_links: Vec<ImageLinkData>,
 }
 
 #[derive(Properties, PartialEq)]
@@ -34,13 +36,9 @@ pub fn contact_info(props: &ContactInfoProps) -> Html {
             </div>
             <div class="social">
                 { props.info.social_links.iter().map(|link| html! {
-                    <LogoLink
-                        link={link.link.clone()}
+                    <ImageLinkItem
+                        data={link.data.clone()}
                         img_src={link.img_src.clone()}
-                        alt_text={link.alt_text.clone()}
-                        width={link.width.clone()}
-                        height={link.height.clone()}
-                        additional_style={link.additional_style.clone()}
                     />
                 }).collect::<Html>() }
             </div>

@@ -11,7 +11,7 @@ $color-tertiary: #4caf50;
 $color-accent-1: #007bff;
 $color-accent-2: #6b7d8f;
 
-// Semantic Colors (derived from base palette)
+// Semantic Colors
 $color-success: color.adjust($color-primary,
     $hue: 120deg,
     $saturation: 50%,
@@ -92,6 +92,23 @@ html {
   color: $color-text-body;
   line-height: 1.6;
 }
+
+
+.navbar {
+  div {
+    display: flex;
+    align-items: center;
+
+  }
+}
+
+.image-link {
+  height: 3em;
+  width: 3em;
+  .link-text {
+    visibility: hidden;
+  }
+};
 
 .print-button {
   position: absolute;
@@ -346,7 +363,6 @@ html {
 }
 
 // Resume
-// Resume Page Variables and Styles
 .resume {
   --h1-color: #{$color-text-primary};
   --h2-color: #{$color-text-secondary};
@@ -371,12 +387,14 @@ html {
   --small-size: calc(var(--base-font-size) * 0.875);
   --icon-size: calc(var(--base-font-size) * 1.5);
 
-  border: 1px solid $color-primary;
+  box-shadow: 0 0 10px $color-primary;
+
 
   // Base styles
   width: var(--container-width);
-  height: var(--container-height);
+  height: calc(var(--container-height) - 2em);
   margin: auto;
+  margin-top: 1em;
   position: absolute;
   inset: 0;
   background-color: $background-color;
@@ -391,6 +409,11 @@ html {
   li {
     margin: 0;
     line-height: 1.4;
+  }
+
+  ul {
+    padding-left: 2em;
+
   }
 
   h1 {
@@ -430,10 +453,27 @@ html {
   }
 
   .header {
-    overflow: hidden; // Hides overflow
+    overflow: hidden;
     background-color: $color-surface-light;
     padding: 1.5em;
     overflow: hidden;
+    text-align: left; //TODO: could fiddle with this a bit.
+    line-height: 1.3;
+
+    .name {
+      font-size: 2.5em;
+      span {
+        font-weight: 700;
+        margin-right: 0.5em;
+      }
+    }
+
+    .title {
+      font-weight: 300;
+    }
+
+
+
   }
 
   .photo {
@@ -451,13 +491,13 @@ html {
   }
 
   .main {
-    overflow: hidden; // Hides overflow
+    overflow: hidden;
     background-color: $color-surface;
     grid-row: 2 / 4;
     padding: 1.5em;
 
     section {
-      margin-bottom: 3em; // Space between sections
+      margin-bottom: 3em;
     }
 
     div {
@@ -472,7 +512,7 @@ html {
   .sidebar {
     background-color: $color-surface-dark;
     padding: 1.5em;
-    overflow: hidden; // Hides overflow
+    overflow: hidden;
     flex-direction: column;
 
     section {
@@ -502,6 +542,7 @@ html {
 
   // Contact info
   .contact {
+
     display: flex;
     flex-direction: column;
     gap: 1%;
@@ -515,6 +556,21 @@ html {
 
       &:hover {
         text-decoration: none;
+      }
+    }
+
+
+    // Social links
+    .social {
+      display: flex;
+      gap: 1em;
+      justify-content: flex-start;
+      margin-top: 1em;
+
+      img {
+        width: 2em !important;
+        height: 2em !important;
+        box-shadow: 0.3em 0.3em 0 $color-shadow !important;
       }
     }
 
@@ -534,88 +590,73 @@ html {
     }
   }
 
-  // Social links
-  .social {
-    display: flex;
-    gap: 1em;
-    justify-content: flex-start;
-    margin-top: 1em;
-
-    img {
-      width: 2em !important;
-      height: 2em !important;
-      box-shadow: 0.3em 0.3em 0 $color-shadow !important;
-    }
-  }
 
     // Skills
   .skills {
     display: flex;
-    flex-direction: row; // Explicitly set row direction
+    flex-direction: row;
     flex-wrap: wrap;
     gap: 1em;
     margin-top: 1em;
-    width: 100%; // Ensure full width
+    width: 100%;
 
     span {
       display: inline-block;
-      flex: 0 1 auto; // Don't grow, can shrink, auto basis
+      flex: 0 1 auto;
       background-color: $color-shadow;
       padding: 0.2em 0.4em;
       border-radius: 0.2em;
       font-size: var(--small-size);
       margin: 0.2em;
-      white-space: nowrap; // Prevent wrapping within spans
+      white-space: nowrap;
     }
   }
 
   .title-with-detail {
     display: flex;
-    align-items: baseline; // Aligns text baselines
-    flex-wrap: wrap; // Allows wrapping if the container is too narrow
-    gap: 0.5em; // Space between h3 and p
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 0.5em;
     margin-bottom: 0 !important;
 
     h3, p {
-      margin: 0; // Removes default margins
+      margin: 0;
     }
 
     h3 {
-      font-weight: bold; // Ensures the title stands out
+      font-weight: bold;
     }
 
     p {
-      color: $color-text-secondary; // Adjust this variable to your color scheme
-      font-style: italic; // Optional: makes the extra info stand out
+      color: $color-text-secondary;
+      font-style: italic;
     }
   }
 
   .spoken-language {
     display: flex;
-    align-items: center; // Vertically center items
-    gap: 0.5em; // Space between icon and text
-    margin-bottom: 1.5em; // Space between language entries
+    align-items: center;
+    gap: 0.5em;
+    margin-bottom: 1.5em;
 
     img {
       width: 1.25em;
       height: 1.25em;
       object-fit: contain;
-      flex-shrink: 0; // Prevents the icon from shrinking
+      flex-shrink: 0;
     }
 
     span {
       font-size: var(--body-size);
-      flex-grow: 1; // Allows text to take up remaining space
-      // If you want to ensure the text doesn't wrap:
+      flex-grow: 1;
       white-space: nowrap;
     }
   }
 
 
-    // Projects / langs
   .resume-project {
-    --icon-size: 3em; // Default icon size, can be overridden
-    --icon-container-width: calc(var(--icon-size) * 1.25); // Make container slightly larger than the icon
+    --icon-size: 3em;
+    --icon-container-width: calc(var(--icon-size) * 1.25);
     --content-margin-left: calc(var(--icon-container-width) + 0.625em);
 
     margin-bottom: 1.25em;
@@ -636,7 +677,7 @@ html {
         display: flex;
         justify-content: center;
         align-items: flex-start;
-        padding-top: calc(var(--icon-size) * 0.125); // Proportional top padding
+        padding-top: calc(var(--icon-size) * 0.125);
         border-radius: 1em;
         background-color: $color-surface-light;
       }
@@ -645,14 +686,14 @@ html {
         width: var(--icon-size);
         height: var(--icon-size);
         border-radius: 0.5em;
-        object-fit: cover; // Ensure the image covers the area without distortion
+        object-fit: cover;
       }
 
       .resume-project-content {
         flex-grow: 1;
         margin-left: var(--content-margin-left);
         .resume-project-bullets {
-          padding-left: 1em; // Decrease padding on the left of the bullet list
+          padding-left: 1em;
           padding-bottom: 1em;
 
         };
@@ -677,7 +718,7 @@ html {
 
     .resume-project-languages {
       display: flex;
-      height: 0.3rem ;
+      height: 0.65em ;
       position: relative;
       width: 60%;
 
@@ -699,7 +740,7 @@ html {
 
         &:hover {
           width: 100% !important;
-          height: 1rem !important;
+          height: 1.75em !important;
           transition: all 0.3s cubic-bezier(0.25, 0.1, 0.5, 1);
 
           .resume-project-language-text {
@@ -738,6 +779,205 @@ html {
 
 
 }
+
+
+
+.cover-letter-page {
+  // Variables
+  --a4-ratio: 1.4142857143;
+  --container-width: min(calc(100vh / var(--a4-ratio)), 100vw);
+  --container-height: min(calc(var(--container-width) * var(--a4-ratio)), 100vh);
+  --base-font-size: calc(var(--container-height) / 60);
+
+  // Colors
+  --h1-color: #{$color-text-primary};
+  --h2-color: #{$color-text-secondary};
+  --h3-color: #{$color-text-tertiary};
+  --body-color: #{$color-text-body};
+  --background-color: #{$background-color};
+  --main-bg-color: #{$color-surface};
+  --shadow-color: #{$color-shadow};
+
+  // Font sizes
+  --h1-size: calc(var(--base-font-size) * 2);
+  --h2-size: calc(var(--base-font-size) * 1.5);
+  --h3-size: calc(var(--base-font-size) * 1.25);
+  --body-size: var(--base-font-size);
+  --icon-size: calc(var(--base-font-size) * 1.2);
+
+  // Reset
+  h1, h2, h3, p, ul, li {
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  ul {
+    padding-left: 2em;
+  }
+
+  // Base styles
+  width: var(--container-width);
+  height: calc(var(--container-height) - 6em);
+  margin: 1em auto;
+  padding: 0em;
+  position: relative;
+  background-color: $background-color;
+  overflow: hidden;
+  font-size: var(--base-font-size);
+  box-shadow: 0 0 10px var(--shadow-color);
+
+  // Typography
+  h1 { font-size: var(--h1-size); color: var(--h1-color); font-weight: 700; }
+  h2 { font-size: var(--h2-size); color: var(--h2-color); font-weight: 600; }
+  h3 { font-size: var(--h3-size); color: var(--h3-color); font-weight: 500; }
+  p, ul, li { font-size: var(--body-size); color: var(--body-color); font-weight: 400; }
+
+  .cover-letter {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+
+  .letter-body {
+    padding: 2em;
+
+  }
+
+  .recipient {
+    padding-left: 2em;
+    //foreground-color: $color-text-tertiary;
+    p {
+      color: rgba($color-text-tertiary, 0.50); // make the text slightly transparent.
+    }
+  }
+
+  .header {
+    padding: 1em;
+    background: $color-surface-light;
+    margin-bottom: 2em;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+
+    .name-title {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .title {
+      font-size: 1.5rem;
+      margin-top: 0.5em;
+      font-weight: normal;
+    }
+
+    .name {
+      line-height: 1.2;
+      display: flex;
+      flex-direction: column;
+      font-size: 3.0rem;
+      span {
+        font-weight: 700;
+      }
+    }
+
+    .contact {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      text-align: right;
+
+      a {
+        text-decoration: none;
+        color: inherit;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+      }
+
+      .social {
+        display: none; //TODO maybe display the icons?
+        //display: flex;
+        justify-content: flex-end;
+        margin-top: 0.5em;
+        gap: 0.5em;
+        margin-right: 0.5em;
+
+        a.image-link {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+        }
+
+        img {
+          width: 2em;
+          height: 2em;
+          box-shadow: 0.3em 0.3em 0 $color-shadow;
+        }
+
+        .link-text {
+          display: none;
+        }
+      }
+
+      .icon {
+        font-family: "Font Awesome 6 Free";
+        font-weight: 900;
+        font-size: var(--icon-size);
+        width: 1.5em;
+        height: 1.5em;
+        text-align: center;
+        margin-left: 0.5em;
+        order: 1;
+        transition: color 0.3s;
+
+        &:hover {
+          color: $color-interactive-hover;
+        }
+      }
+    }
+  }
+
+
+  .letter-body {
+    flex-grow: 1;
+
+    .greeting {
+      font-size: var(--h2-size);
+      color: var(--h2-color);
+      margin-bottom: 1em;
+    }
+
+    p {
+      margin-bottom: 1em;
+      line-height: 1.6;
+    }
+
+    .closing {
+      margin-top: 2em;
+    }
+
+    .signature {
+      height: 3em;
+      margin-top: 1em;
+    }
+  }
+
+  @media print {
+    box-shadow: none;
+    padding: 0;
+
+    .header, .recipient, .letter-body {
+      page-break-inside: avoid;
+    }
+  }
+}
+
+
+
+
+
 
 
 @page {

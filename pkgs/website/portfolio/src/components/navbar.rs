@@ -1,34 +1,30 @@
-use crate::components::link_item::LinkItem;
-use crate::components::social_links::LogoLink;
+use crate::components::link_item::{LinkItem, ImageLinkItem};
 use yew::prelude::*;
+
+use crate::data::link::LinkData;
 
 #[function_component(Navbar)]
 pub fn navbar() -> Html {
     html! {
-        <nav>
-            <div style="display: flex; align-items: center;">
-                <LogoLink
-                    link={"https://www.linkedin.com/in/niko-selby/".to_string()}
+        <nav class="navbar">
+            <div>
+                <ImageLinkItem
+                    data={LinkData { link: "https://www.linkedin.com/in/niko-selby/".to_string(), alt_text: "linkedin".to_string() }}
                     img_src={"/static/icons/tiny/linkedin.svg".to_string()}
-                    alt_text={"LinkedIn".to_string()}
                 />
-                <LogoLink
-                    link={"https://github.com/knoc-off".to_string()}
+                <ImageLinkItem
+                    data={LinkData { link: "https://github.com/knoc-off".to_string(), alt_text: "github".to_string() }}
                     img_src={"/static/icons/tiny/github.svg".to_string()}
-                    alt_text={"GitHub".to_string()}
                 />
-                <LogoLink
-                    link={"/static/Nicholas_Selby_CV.pdf".to_string()}
+                <ImageLinkItem
+                    data={LinkData { link: "/resume".to_string(), alt_text: "CV".to_string() }}
                     img_src={"/static/icons/tiny/pdf.svg".to_string()}
-                    alt_text={"CV".to_string()}
                 />
             </div>
 
             <div style="display: flex; justify-content: center;">
-                <LinkItem color={"#ffffff"} text={"Home".to_string()} href={"/".to_string()} />
-                //<LinkItem color={"#ffffff"} text={"About".to_string()} href={"/about".to_string()} />
-                <LinkItem color={"#ffffff"} text={"Resume".to_string()} href={"/resume".to_string()} />
-                // Add additional navigation links here
+                <LinkItem link={"/resume".to_string()} alt_text={"resume".to_string()} />
+                <LinkItem link={"/home".to_string()} alt_text={"home".to_string()}  />
             </div>
         </nav>
     }

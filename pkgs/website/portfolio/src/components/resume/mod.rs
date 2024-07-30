@@ -14,9 +14,11 @@ pub use languages::*;
 pub use projects::*;
 pub use skills::*;
 
+use crate::data::name::Name;
+
 #[derive(Clone, PartialEq)]
 pub struct ResumeData {
-    pub name: String,
+    pub name: Name,
     pub title: String,
     pub contact: ContactInfo,
     pub summary: String,

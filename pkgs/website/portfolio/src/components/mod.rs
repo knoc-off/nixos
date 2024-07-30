@@ -7,5 +7,7 @@ pub mod markdown;
 pub mod navbar;
 pub mod projects;
 pub mod resume;
-pub mod social_links;
+
+pub mod cover_letter;
+
 pub mod interaction;
