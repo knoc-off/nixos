@@ -44,6 +44,7 @@
     #gedit
     f3d
 
+    #(gimp-with-plugins.override { plugins = with gimpPlugins; [ resynthesizer ]; })
     gimp
     mpv
     feh
