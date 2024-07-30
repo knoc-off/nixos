@@ -1,7 +1,10 @@
 use crate::components::resume::*;
-use crate::components::social_links::LogoLinkProps;
 use wasm_bindgen::prelude::*;
 use yew::prelude::*;
+
+use crate::data::name::Name;
+use crate::data::link::*;
+//use crate::components::link_item::ImageLinkItem;
 
 // Add this function to call window.print()
 #[wasm_bindgen]
@@ -61,7 +64,11 @@ pub fn resume() -> Html {
 
 pub fn create_resume_data() -> ResumeData {
     ResumeData {
-        name: "NICHOLAS SELBY".to_string(),
+        name: Name {
+            first: "Nicholas".to_string(),
+            last: "Selby".to_string(),
+            middle: Some("".to_string()),
+        },
         title: "SERVER ADMIN".to_string(),
         contact: ContactInfo {
             email: "selby@niko.ink".to_string(),
@@ -69,21 +76,19 @@ pub fn create_resume_data() -> ResumeData {
             location: "Berlin 13465".to_string(),
             social_links: vec![
 
-                LogoLinkProps {
-                    link: "https://www.linkedin.com/in/niko-selby/".to_string(),
+                ImageLinkData {
+                    data: LinkData {
+                        link: "https://www.linkedin.com/in/niko-selby/".to_string(),
+                        alt_text: "LinkedIn".to_string(),
+                    },
                     img_src: "/static/icons/tiny/linkedin.svg".to_string(),
-                    alt_text: "LinkedIn".to_string(),
-                    width: Some("30px".to_string()),
-                    height: Some("30px".to_string()),
-                    additional_style: None,
                 },
-                LogoLinkProps {
-                    link: "https://github.com/knoc-off".to_string(),
+                ImageLinkData {
+                    data: LinkData {
+                        link: "https://github.com/knoc-off".to_string(),
+                        alt_text: "GitHub".to_string(),
+                    },
                     img_src: "/static/icons/tiny/github.svg".to_string(),
-                    alt_text: "GitHub".to_string(),
-                    width: Some("30px".to_string()),
-                    height: Some("30px".to_string()),
-                    additional_style: None,
                 },
 
 
