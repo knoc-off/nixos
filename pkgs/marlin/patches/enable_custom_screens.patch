@@ -1,0 +1,17 @@
+diff --git a/Marlin/Configuration.h b/Marlin/Configuration.h
+index 9642852..d9d30c3 100644
+--- a/Marlin/Configuration.h
++++ b/Marlin/Configuration.h
+@@ -79,10 +79,10 @@
+ #define SHOW_BOOTSCREEN
+ 
+ // Show the bitmap in Marlin/_Bootscreen.h on startup.
+-//#define SHOW_CUSTOM_BOOTSCREEN
++#define SHOW_CUSTOM_BOOTSCREEN
+ 
+ // Show the bitmap in Marlin/_Statusscreen.h on the status screen.
+-//#define CUSTOM_STATUS_SCREEN_IMAGE
++#define CUSTOM_STATUS_SCREEN_IMAGE
+ 
+ // @section machine
+ 
