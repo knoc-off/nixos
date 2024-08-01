@@ -41,6 +41,9 @@
     # services
     ./services/nginx.nix
 
+    # mail
+    ./services/imapfilter.nix
+
     # nextcloud
     # ./services/nextcloud.nix
     # ./services/wordpress.nix
