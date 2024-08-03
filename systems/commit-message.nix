@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "removed_config_and_instead_have_patches11";
+  system.nixos.label = "Add_window_rule_for_FreeCAD_Formula_editor_with_st";
 }

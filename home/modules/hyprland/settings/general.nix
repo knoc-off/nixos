@@ -178,6 +178,9 @@ in {
     (fakeFullscreen "org.kde.falkon")
 
     "noborder,class:(ulauncher),title:(.*)"
+    "stayfocused, class:^(FreeCAD)$, title:^(Formula editor)$"
+
+    # windowrulev2 = stayfocused, class:^(pinentry-) # fix pinentry losing focus
 
     #(window "firefox" ".*" "special:firefox")
   ];
