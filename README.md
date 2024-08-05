@@ -4,30 +4,30 @@ This repository contains my personal NixOS configuration for various systems, in
 
 ## Key Features
 
-• Uses Hyprland as the window manager, configured with custom keybindings and animations
-• Implements secure boot using Lanzaboote
-• Utilizes Disko for declarative disk partitioning
-• Manages secrets using sops-nix for encrypted configuration
-• Configures Pipewire for audio handling
-• Sets up a custom Neovim configuration using nixvim
-• Implements a custom Firefox configuration with specific add-ons and themes
-• Configures Steam with a scaling fix
-• Uses home-manager for user-specific configurations
-• Implements a custom GTK theme using a NixOS module
-• Sets up OCI containers for services like WordPress
-• Configures Nginx as a reverse proxy with automatic HTTPS using ACME
-• Implements a custom resume builder using Yew and Rust
-• Uses nix-minecraft for Minecraft server setup
-• Configures multiple systems including a desktop, laptop, and Raspberry Pi
-• Implements fingerprint authentication
-• Sets up Yubikey support
-• Uses podman for container management
-• Configures Traefik as a reverse proxy with automatic HTTPS
-• Implements a custom volume interpolation script for smooth volume changes
-• Sets up Octoprint for 3D printer management with custom plugins
-• Uses compose2nix to convert Docker Compose files to Nix configurations
-• Implements a custom portfolio website using Yew and Rust
-• Configures multiple programming languages and development environments
+- Uses Hyprland as the window manager, configured with custom keybindings and animations
+- Implements secure boot using Lanzaboote
+- Utilizes Disko for declarative disk partitioning
+- Manages secrets using sops-nix for encrypted configuration
+- Configures Pipewire for audio handling
+- Sets up a custom Neovim configuration using nixvim
+- Implements a custom Firefox configuration with specific add-ons and themes
+- Configures Steam with a scaling fix
+- Uses home-manager for user-specific configurations
+- Implements a custom GTK theme using a NixOS module
+- Sets up OCI containers for services like WordPress
+- Configures Nginx as a reverse proxy with automatic HTTPS using ACME
+- Implements a custom resume builder using Yew and Rust
+- Uses nix-minecraft for Minecraft server setup
+- Configures multiple systems including a desktop, laptop, and Raspberry Pi
+- Implements fingerprint authentication
+- Sets up Yubikey support
+- Uses podman for container management
+- Configures Traefik as a reverse proxy with automatic HTTPS
+- Implements a custom volume interpolation script for smooth volume changes
+- Sets up Octoprint for 3D printer management with custom plugins
+- Uses compose2nix to convert Docker Compose files to Nix configurations
+- Implements a custom portfolio website using Yew and Rust
+- Configures multiple programming languages and development environments
 
 ## Highlights
 
