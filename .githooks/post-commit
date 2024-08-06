@@ -1,31 +1,56 @@
 #!/usr/bin/env bash
 
-# File to write commit message to
-TARGET_FILE=systems/commit-message.nix
+# Directory containing the Nix files
+SYSTEMS_DIR="systems"
+# Directory to store commit messages
+COMMIT_MSG_DIR="${SYSTEMS_DIR}/commit-messages"
 
-# Get the latest commit message
-commit_msg=$(git log -1 --pretty=%B)
+# Create the commit messages directory if it doesn't exist
+mkdir -p "$COMMIT_MSG_DIR"
 
-# Process the commit message (first line only)
-first_line=$(echo "$commit_msg" | head -n 1)
-message=$(echo "$first_line" | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
+# Function to process commit message
+process_commit_msg() {
+    local commit_msg="$1"
+    local first_line=$(echo "$commit_msg" | head -n 1)
+    local message=$(echo "$first_line" | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
 
-if [ ${#message} -gt 50 ]; then
-    message=${message:0:50}
-else
-    padding=$(printf '%s' $((50-${#message})) | tr ' ' '_')
-    message="${message}${padding}"
-fi
+    if [ ${#message} -gt 50 ]; then
+        message=${message:0:50}
+    else
+        padding=$(printf '%s' $((50-${#message})) | tr ' ' '_')
+        message="${message}${padding}"
+    fi
 
-# Write the message to the target file
-printf "{\n  system.nixos.label = \"%s\";\n}" "$message" > $TARGET_FILE
+    echo "$message"
+}
 
-# Check if there are changes to commit
-if [[ -n $(git status -s "$TARGET_FILE") ]]; then
-    # Stage the changes to the target file
-    git add "$TARGET_FILE"
+# Process each Nix file
+for nix_file in ${SYSTEMS_DIR}/*.nix; do
+    # Skip if no files match the pattern
+    [[ -e "$nix_file" ]] || continue
 
-    # Amend the current commit to include the changes to the target file
+    # Get the latest commit message for this file
+    commit_msg=$(git log -1 --pretty=%B -- "$nix_file")
+
+    # Process the commit message
+    processed_msg=$(process_commit_msg "$commit_msg")
+
+    # Create a new file name for the commit message
+    filename=$(basename "$nix_file")
+    commit_msg_file="${COMMIT_MSG_DIR}/${filename%.*}-commit-message.nix"
+
+    # Write the message to the target file
+    printf "{\n  system.nixos.label = \"%s\";\n}" "$processed_msg" > "$commit_msg_file"
+
+    # Check if there are changes to commit
+    if [[ -n $(git status -s "$commit_msg_file") ]]; then
+        # Stage the changes to the target file
+        git add "$commit_msg_file"
+    fi
+done
+
+# Amend the current commit to include all changes
+if [[ -n $(git status -s) ]]; then
     git commit --amend --no-edit
 fi
 
