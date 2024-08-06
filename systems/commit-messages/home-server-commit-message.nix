@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "formatting________________________________________";
+  system.nixos.label = "added_the_commit_message_to_home-server___________";
 }
