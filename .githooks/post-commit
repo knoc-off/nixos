@@ -15,10 +15,9 @@ process_commit_msg() {
     local message=$(echo "$first_line" | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
 
     if [ ${#message} -gt 50 ]; then
-        message=${message:0:50}
+        message="${message:0:50}"
     else
-        padding=$(printf '%s' $((50-${#message})) | tr ' ' '_')
-        message="${message}${padding}"
+        message="${message}$(printf '%*s' $((50-${#message})) | tr ' ' '_')"
     fi
 
     echo "$message"

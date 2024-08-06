@@ -36,7 +36,7 @@
 
     # run with the fish function nixcommit
     # This is an 'auto generated' file that should add a message to the build versions in the boot menu
-    ./commit-message.nix
+    ./commit-messages/desktop-commit-message.nix
 
     # Android emulation
     #./modules/virtualisation/waydroid.nix

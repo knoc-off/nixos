@@ -36,7 +36,7 @@
     ./modules/nix.nix
 
     # message at boot.
-    ./commit-message.nix
+    ./commit-messages/hetzner-server-commit-message.nix
 
     # services
     ./services/nginx.nix

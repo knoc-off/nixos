@@ -19,7 +19,7 @@
     ./modules/nix.nix
 
     # message at boot.
-    ./commit-message.nix
+    ./commit-messages/raspberry3B-commit-message.nix
 
     ./services/octoprint.nix
   ];
