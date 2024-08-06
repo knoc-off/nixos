@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "formatting40";
+  system.nixos.label = "formatting________________________________________";
 }
