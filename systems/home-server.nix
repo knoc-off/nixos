@@ -44,6 +44,8 @@ in {
     #  sops.secrets."services/acme/envfile" = {};
     #}
 
+    ./commit-messages/home-server-commit-message.nix
+
     inputs.nix-minecraft.nixosModules.minecraft-servers
 
     #./services/traefik.nix
