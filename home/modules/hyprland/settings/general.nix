@@ -174,7 +174,7 @@ in {
     #(idleinhibit "focus" "firefox" ".*YouTube.*")
     (float "steam" ".*Browser.*")
     (float "steam" ".*Friends List.*")
-    (window "thunderbird" ".*" "6")
+    #(window "thunderbird" ".*" "6")
     (fakeFullscreen "org.kde.falkon")
 
     "noborder,class:(ulauncher),title:(.*)"
