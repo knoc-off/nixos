@@ -160,19 +160,6 @@
             }
 
             #./systems/hardware/disks/btrfs-luks.nix
-
-            home-manager.nixosModules.home-manager
-            {
-              home-manager = {
-                useGlobalPkgs = false;
-                useUserPackages = true;
-                users.knoff = import ./home/knoff-laptop.nix;
-                extraSpecialArgs = {
-                  inherit inputs outputs theme;
-                  system = "x86_64-linux";
-                };
-              };
-            }
           ];
         };
 
@@ -235,23 +222,21 @@
           specialArgs = { inherit inputs outputs; };
           system = "x86_64-linux";
           modules = [
-            "${nixpkgs}/nixos/modules/installer/cd-dvd/iso-image.nix"
             ./systems/framework13.nix
+            ./systems/modules/live-iso.nix
+            home-manager.nixosModules.home-manager
             {
-              # Define a minimal disk layout for the laptop ISO
-              boot.loader.grub.device = "/dev/sda";
-              fileSystems."/" = {
-                device = "/dev/sda1";
-                fsType = "ext4";
+              home-manager = {
+                useGlobalPkgs = false;
+                useUserPackages = true;
+                users.knoff = import ./home/knoff-laptop.nix;
+                extraSpecialArgs = {
+                  inherit inputs outputs theme;
+                  system = "x86_64-linux";
+                };
               };
             }
-            {
-              isoImage = {
-                isoName = "laptop-image.iso";
-                volumeID = "NIXOS_LIVE";
-                # Set the size of the ISO image (in megabytes)
-              };
-            }
+
           ];
         };
       };
