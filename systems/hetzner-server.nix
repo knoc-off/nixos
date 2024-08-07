@@ -42,7 +42,10 @@
     ./services/nginx.nix
 
     # mail
-    ./services/imapfilter.nix
+    ./services/imapfilter
+
+    # Matrix
+    ./services/matrix/dendrite.nix
 
     # nextcloud
     # ./services/nextcloud.nix

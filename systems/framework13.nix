@@ -99,7 +99,7 @@
       settings = {
         PasswordAuthentication = false;
         KbdInteractiveAuthentication = false;
-        PermitRootLogin = "no";
+        PermitRootLogin = lib.mkDefault "no";
       };
     };
 
@@ -143,7 +143,7 @@
   };
 
   boot = {
-    kernelPackages = pkgs.linuxPackages_latest;
+    kernelPackages = lib.mkDefault pkgs.linuxPackages_latest;
     initrd.systemd.dbus.enable = true;
     loader = {
       systemd-boot.enable = if config.boot.lanzaboote.enable then lib.mkForce false else true;
@@ -153,7 +153,7 @@
 
   networking = {
     hostName = "framework";
-    networkmanager.enable = true;
+    #networkmanager.enable = true;
   };
 
   nixpkgs = {
@@ -192,12 +192,12 @@
   };
 
   users.users.knoff = {
+    initialPassword = "password";
     isNormalUser = true;
     shell = if config.programs.zsh.enable then pkgs.zsh
             else if config.programs.fish.enable then pkgs.fish
             else pkgs.bash;
     extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
-    hashedPassword = "$y$j9T$jtFWvdQ6ghoncJ8srfdQn0$JN8OSftIfzHQmSpIZqeQyeK/Nrb8OQCbET5x2n82Yr9";
     openssh.authorizedKeys.keys = [ ];
   };
 
