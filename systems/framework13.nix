@@ -153,7 +153,7 @@
 
   networking = {
     hostName = "framework";
-    #networkmanager.enable = true;
+    networkmanager.enable = lib.mkDefault true;
   };
 
   nixpkgs = {
