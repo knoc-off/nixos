@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "added_Live-ISO_and_matrix_home-server_____________";
+  system.nixos.label = "fixed_zsh_issue_added_imapfilter_stuff____________";
 }

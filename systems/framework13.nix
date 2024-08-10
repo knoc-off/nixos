@@ -191,6 +191,7 @@
     };
   };
 
+  programs.zsh.enable = true;
   users.users.knoff = {
     initialPassword = "password";
     isNormalUser = true;
