@@ -45,7 +45,10 @@
     ./services/imapfilter
 
     # Matrix
-    ./services/matrix/dendrite.nix
+    #./services/matrix/dendrite.nix
+
+    # Syncthing
+    ./services/syncthing.nix
 
     # nextcloud
     # ./services/nextcloud.nix
