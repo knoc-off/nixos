@@ -107,7 +107,7 @@ in {
           # bind=ALT,R,submap,resize
 
           # Scratch workspaces
-          "${mainMod}, T, exec, pypr toggle term"
+          "${mainMod}, T, exec, togglespecialworkspace" # can include name,
           "${mainMod}, F, exec, pypr toggle file"
           "${mainMod}, S, exec, pypr toggle foxy"
           "${mainMod}, Z, exec, pypr toggle volume"

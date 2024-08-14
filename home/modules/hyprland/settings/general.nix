@@ -19,8 +19,9 @@
 in {
   exec-once = [
     "hyprpaper --config ${wallpaper}"
-    "pypr"
+    #"pypr"
     "${pkgs.wayland-pipewire-idle-inhibit}/bin/wayland-pipewire-idle-inhibit"
+    "[workspace special silent] kitty --class kitty-dropterm --config <(sed '/map ctrl+t new_os_window_with_cwd/d' /home/knoff/.config/kitty/kitty.conf)"
   ];
 
   monitor = [
@@ -208,6 +209,7 @@ in {
 
   animations = {
     enabled = true;
+
     bezier = [
       #"myBezier, 0.05, 0.9, 0.1, 1.05"
       "myBezier, 0.00, 1, 0, 9"
@@ -227,6 +229,7 @@ in {
       "fade, 1, 1, default"
       "fadeDim, 1, 1, slowFast"
       "workspaces, 1, 3, default"
+      "specialWorkspace, 1, 4, default, slidevert"
     ];
   };
 }

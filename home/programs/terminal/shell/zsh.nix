@@ -32,8 +32,8 @@
       fi
 
       # Beginning search with arrow keys
-      bindkey "^[OA" up-line-or-beginning-search
-      bindkey "^[OB" down-line-or-beginning-search
+      #bindkey "^[OA" up-line-or-beginning-search
+      #bindkey "^[OB" down-line-or-beginning-search
 
       bindkey "^[[1;5C" forward-word   # Ctrl+Right
       bindkey "^[[1;5D" backward-word  # Ctrl+Left
