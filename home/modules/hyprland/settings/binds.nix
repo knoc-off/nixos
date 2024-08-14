@@ -91,7 +91,7 @@ in {
           "${mainMod}, Backslash, layoutmsg, swapwithmaster master"
           #", XF86Fn, layoutmsg, addmaster"
 
-          "${mainMod}, B, exec, ${notify-send} Battery \"$(${acpi} -b | awk '{print $3, $4}')\""
+          "${mainMod}, B, exec, ${notify-send} \"$(${acpi} -b | awk '{print $3, $4}')\""
 
           "${mainMod}, Tab, focuscurrentorlast"
           "${mainMod}, Delete, exit"
@@ -220,7 +220,7 @@ in {
                 ${pkgs.light}/bin/light -U ($value)
               }
 
-              ${notify-bar} brightnessbar (${pkgs.light}/bin/light) ((${pkgs.light}/bin/light) | into int | math round)
+              #${notify-bar} brightnessbar (${pkgs.light}/bin/light) ((${pkgs.light}/bin/light) | into int | math round)
               #${notify-msg} value $value
           }
         '';
@@ -244,7 +244,7 @@ in {
             #  ${pkgs.libcanberra-gtk3}/bin/canberra-gtk-play -i audio-volume-change -d "changeVolume"
             #}
 
-            ${notify-bar} volbar (${pkgs.pamixer}/bin/pamixer --get-volume) (${pkgs.pamixer}/bin/pamixer --get-volume-human)
+            #${notify-bar} volbar (${pkgs.pamixer}/bin/pamixer --get-volume) (${pkgs.pamixer}/bin/pamixer --get-volume-human)
             #${notify-msg} value $value
           }
         '';

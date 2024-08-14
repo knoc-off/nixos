@@ -1,5 +1,9 @@
 {inputs, ...}: {
   nix = {
+    registry = {
+      nixpkgs.flake = inputs.nixpkgs;
+      nixos-hardware.flake = inputs.hardware;
+    };
     #nix.nixPath = [ "/etc/nix/path" ];
     #environment.etc."nix/path/nixpkgs".source = inputs.nixpkgs;
     nixPath = ["nixpkgs=${inputs.nixpkgs}"];
@@ -10,4 +14,5 @@
       trusted-users = ["@wheel"];
     };
   };
+
 }

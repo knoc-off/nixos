@@ -1,16 +1,5 @@
-{
-  pkgs,
-  theme,
-  config,
-  ...
-}: {
-  imports = [
-    ./kitty
-    ./shell
-    ./programs/btop.nix
-  ];
-
-  programs.zoxide.enable = true;
+{ pkgs, theme, ... }: {
+  imports = [ ./kitty ./shell ./programs/btop.nix ];
 
   home.packages = with pkgs; [
     btop # htop but better
@@ -19,53 +8,54 @@
     fd # better find
   ];
 
-  programs.feh = {
-    enable = true;
-  };
+  programs = {
 
-  programs.eza = {
-    enable = true;
-    extraOptions = ["--group-directories-first" "--header"];
-    git = true;
-    icons = true;
-  };
+    zoxide.enable = true;
 
-  programs.tealdeer = {
-    enable = true;
-    settings = {
-      display = {
-        compact = false;
-        use_pager = true;
-      };
-      updates = {
-        auto_update = true;
+    feh = { enable = true; };
+
+    eza = {
+      enable = true;
+      extraOptions = [ "--group-directories-first" "--header" ];
+      git = true;
+      icons = true;
+    };
+
+    tealdeer = {
+      enable = true;
+      settings = {
+        display = {
+          compact = false;
+          use_pager = true;
+        };
+        updates = { auto_update = true; };
       };
     };
-  };
 
-  programs.fzf = {
-    enable = true;
+    fzf = {
+      enable = true;
 
-    colors = {
-      bg = "#${theme.base01}";
-      "bg+" = "#${theme.base01}";
-      fg = "#${theme.base06}";
-      "fg+" = "#${theme.base06}";
+      colors = {
+        bg = "#${theme.base01}";
+        "bg+" = "#${theme.base01}";
+        fg = "#${theme.base06}";
+        "fg+" = "#${theme.base06}";
+      };
     };
-  };
 
-  programs.ripgrep = {
-    enable = true;
-    arguments = ["--hidden" "--colors=line:style:bold"];
-  };
+    ripgrep = {
+      enable = true;
+      arguments = [ "--hidden" "--colors=line:style:bold" ];
+    };
 
-  # better cat
-  programs.bat = {
-    enable = true;
-    config = {
-      #map-syntax = [ "*.jenkinsfile:Groovy" "*.props:Java Properties" ];
-      pager = "less -FR";
-      theme = "TwoDark";
+    # better cat
+    bat = {
+      enable = true;
+      config = {
+        #map-syntax = [ "*.jenkinsfile:Groovy" "*.props:Java Properties" ];
+        pager = "less -FR";
+        theme = "TwoDark";
+      };
     };
   };
 }
