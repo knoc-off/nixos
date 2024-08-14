@@ -107,7 +107,8 @@ in {
           # bind=ALT,R,submap,resize
 
           # Scratch workspaces
-          "${mainMod}, T, exec, togglespecialworkspace" # can include name,
+          #"${mainMod}, T, exec, togglespecialworkspace " # can include name,
+          "${mainMod}, T, exec, pypr toggle term"
           "${mainMod}, F, exec, pypr toggle file"
           "${mainMod}, S, exec, pypr toggle foxy"
           "${mainMod}, Z, exec, pypr toggle volume"
@@ -142,13 +143,13 @@ in {
           #"${mainMod}, A, togglespecialworkspace, firefox"
           #"${mainMod} ALT, 2, movetoworkspace, special:2"
           #"${mainMod} ALT, 1, exec, echo \"20\" > /tmp/volume_control_fifo" # ${pkgs.volume-lerp}/bin/volume-lerp"
-          "${mainMod} ALT, 1, togglespecialworkspace, 1"
-          "${mainMod} ALT, 2, togglespecialworkspace, 2"
-          "${mainMod} ALT, 3, togglespecialworkspace, 3"
+          #"${mainMod} ALT, 1, togglespecialworkspace, 1"
+          #"${mainMod} ALT, 2, togglespecialworkspace, 2"
+          #"${mainMod} ALT, 3, togglespecialworkspace, 3"
 
-          "${mainMod} ALT SHIFT, 1, movetoworkspace, special:1"
-          "${mainMod} ALT SHIFT, 2, movetoworkspace, special:2"
-          "${mainMod} ALT SHIFT, 3, movetoworkspace, special:3"
+          #"${mainMod} ALT SHIFT, 1, movetoworkspace, special:1"
+          #"${mainMod} ALT SHIFT, 2, movetoworkspace, special:2"
+          #"${mainMod} ALT SHIFT, 3, movetoworkspace, special:3"
 
           (mvfocus "up" "u")
           (mvfocus "down" "d")
