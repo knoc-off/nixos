@@ -13,6 +13,7 @@
     ./programs/terminal/prompt.nix # starship
     #./modules/sway
     ./modules/hyprland
+    ./modules/ags
     #./modules/eww
 
     # Firefox
@@ -35,6 +36,8 @@
 
     ./xdg-enviroment.nix
   ];
+
+  services.playerctld.enable = true;
 
   wayland.windowManager.hyprlandCustom = {
     enable = true;

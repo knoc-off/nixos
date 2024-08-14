@@ -55,6 +55,9 @@
     #hyprland.url = "github:hyprwm/hyprland";
     hyprland.url = "git+https://github.com/hyprwm/Hyprland?submodules=1";
 
+    # add ags / Widgets, etc.
+    ags.url = "github:Aylur/ags";
+
     # Secrets management
     sops-nix.url = "github:Mic92/sops-nix";
 

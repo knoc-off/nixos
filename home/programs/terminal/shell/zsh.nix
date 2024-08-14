@@ -1,24 +1,17 @@
 { theme, pkgs, ... }: {
   programs.zsh = {
     enable = true;
-    dotDir = ".config/zsh";
-
-    oh-my-zsh = {
-      enable = true;
-      plugins = [ "git" "docker" "sudo" "command-not-found" ];
-      theme = "robbyrussell";
-    };
 
     sessionVariables = {
       ZSH_COLORIZE_TOOL = "chroma";
       ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE = "fg=#${theme.gray00}";
+      MANPAGER = "sh -c 'col -bx | bat -l man -p'";
     };
 
     initExtra = builtins.readFile ./zshrc.sh + ''
       # disable the awful vi mode
       bindkey -e
 
-      # just a simple function to connect to wifi
       if [ -f /etc/secrets/gpt/secret ]; then
         export OPENAI_API_KEY=$(cat /etc/secrets/gpt/secret)
       fi
@@ -31,6 +24,19 @@
 
       zstyle ':completion:*:*:nix:*' completer _complete _ignored
       zstyle ':completion:*:*:nix:*' matcher-list 'm:{[:lower:][:upper:]}={[:upper:][:lower:]}' 'r:|[._-]=* r:|=*'
+
+      # Set up fzf key bindings and fuzzy completion
+      if [ -n "${pkgs.fzf}/share/fzf" ]; then
+        source "${pkgs.fzf}/share/fzf/key-bindings.zsh"
+        source "${pkgs.fzf}/share/fzf/completion.zsh"
+      fi
+
+      # Beginning search with arrow keys
+      bindkey "^[OA" up-line-or-beginning-search
+      bindkey "^[OB" down-line-or-beginning-search
+
+      bindkey "^[[1;5C" forward-word   # Ctrl+Right
+      bindkey "^[[1;5D" backward-word  # Ctrl+Left
 
     '';
 
@@ -61,16 +67,7 @@
         src = pkgs.fetchFromGitHub {
           owner = "chisui";
           repo = "zsh-nix-shell";
-          rev = "v0.5.0";
-          sha256 = "sha256-qSobM4PRXjfsvoXY6ENqJGI9NEAaFFzlij6MPeTfT0o=";
-        };
-      }
-      {
-        name = "zsh-completions";
-        src = pkgs.fetchFromGitHub {
-          owner = "zsh-users";
-          repo = "zsh-completions";
-          rev = "0.34.0";
+          rev = "v0.8.0";
           sha256 = "sha256-qSobM4PRXjfsvoXY6ENqJGI9NEAaFFzlij6MPeTfT0o=";
         };
       }
