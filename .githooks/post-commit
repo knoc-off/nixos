@@ -11,13 +11,14 @@ mkdir -p "$COMMIT_MSG_DIR"
 # Function to process commit message
 process_commit_msg() {
     local commit_msg="$1"
+    local pad_amount="$2"
     local first_line=$(echo "$commit_msg" | head -n 1)
     local message=$(echo "$first_line" | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
 
-    if [ ${#message} -gt 50 ]; then
-        message="${message:0:50}"
+    if [ ${#message} -gt "$pad_amount" ]; then
+        message="${message:0:$pad_amount}"
     else
-        message="${message}$(printf '%*s' $((50-${#message})) | tr ' ' '_')"
+        message="${message}$(printf '%*s' $(($pad_amount-${#message})) | tr ' ' '_')"
     fi
 
     echo "$message"
@@ -31,15 +32,28 @@ for nix_file in ${SYSTEMS_DIR}/*.nix; do
     # Get the latest commit message for this file
     commit_msg=$(git log -1 --pretty=%B -- "$nix_file")
 
-    # Process the commit message
-    processed_msg=$(process_commit_msg "$commit_msg")
+    # Get the global commit message
+    global_msg=$(git log -1 --pretty=%B)
+
+    # Calculate pad amount for the file-specific message
+    global_msg_length=${#global_msg}
+    file_msg_pad_amount=$((100 - global_msg_length))
+
+    # Process the file-specific commit message
+    processed_file_msg=$(process_commit_msg "$commit_msg" "$file_msg_pad_amount")
+
+    # Process the global commit message
+    processed_global_msg=$(process_commit_msg "$global_msg" "$global_msg_length")
+
+    # Combine the processed messages
+    combined_msg="${processed_file_msg}${processed_global_msg}"
 
     # Create a new file name for the commit message
     filename=$(basename "$nix_file")
     commit_msg_file="${COMMIT_MSG_DIR}/${filename%.*}-commit-message.nix"
 
-    # Write the message to the target file
-    printf "{\n  system.nixos.label = \"%s\";\n}" "$processed_msg" > "$commit_msg_file"
+    # Write the combined message to the target file
+    printf "{\n  system.nixos.label = \"%s\";\n}" "$combined_msg" > "$commit_msg_file"
 
     # Check if there are changes to commit
     if [[ -n $(git status -s "$commit_msg_file") ]]; then
