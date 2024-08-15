@@ -20,17 +20,38 @@ in {
     settings = {
       bind = let
 
-        hdrop = pkgs.writeShellScriptBin "hdrop" (builtins.readFile (builtins.fetchurl {
-          url = "https://raw.githubusercontent.com/hyprwm/contrib/main/hdrop/hdrop";
-          sha256 = "1a4rxj7kcfq3ac7vn6dkijqld04j9zvfgma6c5j07s98z35yzd0v";
-        }));
 
-        # Helper function to create hdrop commands
-        mkHdrop = { command, class ? null, size ? null, position ? null }: let
-          classArg = if class != null then "-c ${class}" else "";
-          sizeArgs = if size != null then "-w ${toString size.width} -h ${toString size.height}" else "";
-          positionArg = if position != null then "-p ${position}" else "";
-        in "${hdrop}/bin/hdrop -f ${classArg} ${sizeArgs} ${positionArg} ${command}";
+        mkHdrop = {
+          command,              # The command to run (required)
+          background ? false,   # Launch in background if not running
+          class ? null,         # Set the window class name
+          floating ? true,      # Spawn as a floating window
+          gap ? null,           # Gap from screen edge in pixels
+          size ? null,          # Window size as { width = int; height = int; }
+          insensitive ? false,  # Case-insensitive class name matching
+          position ? null,      # Window position: "top", "bottom", "left", or "right"
+          verbose ? false,      # Show detailed notifications
+          version ? false       # Print version information
+        }: let
+          boolToFlag = name: value: if value then "-${name}" else "";
+          nullableArg = name: value: if value != null then "-${name} ${toString value}" else "";
+          hdrop = pkgs.writeShellScriptBin "hdrop" (builtins.readFile (builtins.fetchurl {
+            url = "https://raw.githubusercontent.com/hyprwm/contrib/main/hdrop/hdrop";
+            sha256 = "1a4rxj7kcfq3ac7vn6dkijqld04j9zvfgma6c5j07s98z35yzd0v";
+          }));
+
+          args = lib.concatStringsSep " " (lib.filter (x: x != "") [
+            (boolToFlag "b" background)
+            (nullableArg "c" class)
+            (boolToFlag "f" floating)
+            (nullableArg "g" gap)
+            (if size != null then "-w ${toString size.width} -h ${toString size.height}" else "")
+            (boolToFlag "i" insensitive)
+            (nullableArg "p" position)
+            (boolToFlag "v" verbose)
+            (boolToFlag "V" version)
+          ]);
+        in "${hdrop}/bin/hdrop ${args} ${command}";
 
 
         moveRelativeTo =
@@ -100,26 +121,32 @@ in {
           #"${mainMod} SHIFT, SPACE, exec, pypr expose"
           "${mainMod}, T, exec, ${mkHdrop {
             command = "kitty --class kitty-dropterm";
+            background = true;
             class = "kitty-dropterm";
             size = { width = 75; height = 60; };
+            gap = 5;
             position = "top";
           }}"
           "${mainMod}, F, exec, ${mkHdrop {
             command = "nemo";
             class = "nemo";
             size = { width = 75; height = 60; };
+            gap = 5;
             position = "bottom";
           }}"
           "${mainMod}, S, exec, ${mkHdrop {
-            command = "firefox --no-remote -P minimal --name firefox-minimal https://duck.com";
+            command = "firefox --no-remote -P minimal --name firefox-minimal https://poe.com";
+            background = true;
             class = "firefox-minimal";
             size = { width = 55; height = 90; };
+            gap = 5;
             position = "right";
           }}"
           "${mainMod}, Z, exec, ${mkHdrop {
             command = "${pkgs.pavucontrol}/bin/pavucontrol";
             class = "pavucontrol";
             size = { width = 40; height = 90; };
+            gap = 5;
             position = "right";
           }}"
 
