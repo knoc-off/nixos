@@ -19,8 +19,6 @@ in {
   in {
     settings = {
       bind = let
-
-
         mkHdrop = {
           command,              # The command to run (required)
           background ? false,   # Launch in background if not running
@@ -134,7 +132,7 @@ in {
             gap = 5;
             position = "bottom";
           }}"
-          "${mainMod}, S, exec, ${mkHdrop {
+          "${mainMod}, A, exec, ${mkHdrop {
             command = "firefox --no-remote -P minimal --name firefox-minimal https://poe.com";
             background = true;
             class = "firefox-minimal";
