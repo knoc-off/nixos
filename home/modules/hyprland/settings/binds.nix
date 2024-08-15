@@ -19,6 +19,20 @@ in {
   in {
     settings = {
       bind = let
+
+        hdrop = pkgs.writeShellScriptBin "hdrop" (builtins.readFile (builtins.fetchurl {
+          url = "https://raw.githubusercontent.com/hyprwm/contrib/main/hdrop/hdrop";
+          sha256 = "1a4rxj7kcfq3ac7vn6dkijqld04j9zvfgma6c5j07s98z35yzd0v";
+        }));
+
+        # Helper function to create hdrop commands
+        mkHdrop = { command, class ? null, size ? null, position ? null }: let
+          classArg = if class != null then "-c ${class}" else "";
+          sizeArgs = if size != null then "-w ${toString size.width} -h ${toString size.height}" else "";
+          positionArg = if position != null then "-p ${position}" else "";
+        in "${hdrop}/bin/hdrop -f ${classArg} ${sizeArgs} ${positionArg} ${command}";
+
+
         moveRelativeTo =
           pkgs.writeNuScript "mv"
           ''
@@ -35,34 +49,6 @@ in {
             }
           '';
 
-        nu-focus =
-          pkgs.writeNuScript
-          "focus"
-          ''
-            def main [title: string] {
-              let activeWindow = (hyprctl activewindow -j | from json)
-              let tmp_var = $activeWindow.address
-
-              let file_path = ("/tmp/focuswindow_" + $title)
-              let file_exists = ( $file_path | path exists )
-
-              if ($file_exists == false) {
-                 let json_value = {state: 0, address: $tmp_var} | to json
-                 $json_value | save -f $file_path
-              }
-
-              if (open $file_path | from json | get state) == 0 {
-                 if $activeWindow.class == $title { return }
-                 hyprctl dispatch focuswindow $title
-                 (open $file_path | from json | update state 1 | to json | save -f $file_path)
-                 (open $file_path | from json | update address $tmp_var | to json | save -f $file_path)
-              } else {
-                 let address = (open $file_path | from json | get address)
-                 hyprctl dispatch focuswindow ("address:" + $address)
-                 (open $file_path | from json | update state 0 | to json | save -f $file_path)
-              }
-            }
-          '';
 
         screenshot-to-text =
           pkgs.writeNuScript "stt"
@@ -101,18 +87,43 @@ in {
           "${mainMod}, O, fakefullscreen"
           #"${mainMod}, P, togglesplit"
           #"${mainMod}, SPACE, exec, ${fuzzel}"
-          "${mainMod}, A, exec, ${nu-focus}/bin/focus firefox"
 
           # "${mainMod}, ALT, submap, metameta"
           # bind=ALT,R,submap,resize
 
           # Scratch workspaces
           #"${mainMod}, T, exec, togglespecialworkspace " # can include name,
-          "${mainMod}, T, exec, pypr toggle term"
-          "${mainMod}, F, exec, pypr toggle file"
-          "${mainMod}, S, exec, pypr toggle foxy"
-          "${mainMod}, Z, exec, pypr toggle volume"
-          "${mainMod} SHIFT, SPACE, exec, pypr expose"
+          #"${mainMod}, T, exec, pypr toggle term"
+          #"${mainMod}, F, exec, pypr toggle file"
+          #"${mainMod}, S, exec, pypr toggle foxy"
+          #"${mainMod}, Z, exec, pypr toggle volume"
+          #"${mainMod} SHIFT, SPACE, exec, pypr expose"
+          "${mainMod}, T, exec, ${mkHdrop {
+            command = "kitty --class kitty-dropterm";
+            class = "kitty-dropterm";
+            size = { width = 75; height = 60; };
+            position = "top";
+          }}"
+          "${mainMod}, F, exec, ${mkHdrop {
+            command = "nemo";
+            class = "nemo";
+            size = { width = 75; height = 60; };
+            position = "bottom";
+          }}"
+          "${mainMod}, S, exec, ${mkHdrop {
+            command = "firefox --no-remote -P minimal --name firefox-minimal https://duck.com";
+            class = "firefox-minimal";
+            size = { width = 55; height = 90; };
+            position = "right";
+          }}"
+          "${mainMod}, Z, exec, ${mkHdrop {
+            command = "${pkgs.pavucontrol}/bin/pavucontrol";
+            class = "pavucontrol";
+            size = { width = 40; height = 90; };
+            position = "right";
+          }}"
+
+
 
           # launcher
           "${mainMod}, SPACE, exec, ${pkgs.ulauncher}/bin/ulauncher"
@@ -131,6 +142,10 @@ in {
           "${mainMod}, G, togglegroup, 0"
           "${mainMod}, L, exec, swaylock-custom 0 120x6 10 0"
           "${mainMod}, asciitilde, exec,  ${pkgs.kitty}/bin/kitty nx rt"
+
+          # playerctl, music control
+          ", XF86AudioNext, exec, ${pkgs.playerctl}/bin/playerctl next"
+          ", XF86AudioPrev, exec, ${pkgs.playerctl}/bin/playerctl previous"
 
           # pomo timer
           #"${mainMod}, period, exec, ${pkgs.uair}/bin/uairctl toggle"
