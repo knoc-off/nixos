@@ -101,22 +101,10 @@ in {
           "${mainMod}, Tab, focuscurrentorlast"
           "${mainMod}, Delete, exit"
           "${mainMod}, W, killactive"
-          #"${mainMod}, V, togglefloating"
+          "${mainMod}, V, togglefloating"
           "${mainMod}, equal, fullscreen"
           "${mainMod}, O, fakefullscreen"
-          #"${mainMod}, P, togglesplit"
-          #"${mainMod}, SPACE, exec, ${fuzzel}"
 
-          # "${mainMod}, ALT, submap, metameta"
-          # bind=ALT,R,submap,resize
-
-          # Scratch workspaces
-          #"${mainMod}, T, exec, togglespecialworkspace " # can include name,
-          #"${mainMod}, T, exec, pypr toggle term"
-          #"${mainMod}, F, exec, pypr toggle file"
-          #"${mainMod}, S, exec, pypr toggle foxy"
-          #"${mainMod}, Z, exec, pypr toggle volume"
-          #"${mainMod} SHIFT, SPACE, exec, pypr expose"
           "${mainMod}, T, exec, ${mkHdrop {
             command = "kitty --class kitty-dropterm";
             background = true;
@@ -171,25 +159,9 @@ in {
           # playerctl, music control
           ", XF86AudioNext, exec, ${pkgs.playerctl}/bin/playerctl next"
           ", XF86AudioPrev, exec, ${pkgs.playerctl}/bin/playerctl previous"
+          ", XF86AudioPlay, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
+          ", XF86AudioPause, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
 
-          # pomo timer
-          #"${mainMod}, period, exec, ${pkgs.uair}/bin/uairctl toggle"
-          #"${mainMod}, comma, exec, ${start-pomo}/bin/start-pomo work"
-          #uair | yad --title "uair" --progress --no-buttons --css="* { font-size: 80px; }" & sleep 1 && uairctl resume
-          #''${mainMod}, P, exec,  ''
-
-          # special workspaces
-          #"${mainMod} ALT, 1, movetoworkspace, special:firefox"
-          #"${mainMod}, A, togglespecialworkspace, firefox"
-          #"${mainMod} ALT, 2, movetoworkspace, special:2"
-          #"${mainMod} ALT, 1, exec, echo \"20\" > /tmp/volume_control_fifo" # ${pkgs.volume-lerp}/bin/volume-lerp"
-          #"${mainMod} ALT, 1, togglespecialworkspace, 1"
-          #"${mainMod} ALT, 2, togglespecialworkspace, 2"
-          #"${mainMod} ALT, 3, togglespecialworkspace, 3"
-
-          #"${mainMod} ALT SHIFT, 1, movetoworkspace, special:1"
-          #"${mainMod} ALT SHIFT, 2, movetoworkspace, special:2"
-          #"${mainMod} ALT SHIFT, 3, movetoworkspace, special:3"
 
           (mvfocus "up" "u")
           (mvfocus "down" "d")
