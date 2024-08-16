@@ -1,6 +1,10 @@
 { lib, inputs, config, pkgs, outputs, ... }:
+let
+  muteScript = pkgs.writeShellScript "mute-speakers" ''
+    ${pkgs.pulseaudio}/bin/pactl set-sink-mute alsa_output.pci-0000_c1_00.6.analog-stereo 1
+  '';
 
-{
+in {
   imports = [
     # Hardware configs
     ./hardware/hardware-configuration.nix
@@ -78,7 +82,8 @@
         themePackage = pkgs.fluent-gtk-theme;
       };
       symlinks = {
-        "gtk-2.0/gtkrc" = pkgs.writeText "gtkrc" "gtk-application-prefer-dark-theme=1";
+        "gtk-2.0/gtkrc" =
+          pkgs.writeText "gtkrc" "gtk-application-prefer-dark-theme=1";
         "gtk-3.0/settings.ini" = pkgs.writeText "gtk3-settings.ini" ''
           [Settings]
           gtk-application-prefer-dark-theme=1
@@ -107,11 +112,7 @@
 
     printing = {
       enable = true;
-      drivers = with pkgs; [
-        hplip
-        gutenprint
-        foo2zjs
-      ];
+      drivers = with pkgs; [ hplip gutenprint foo2zjs ];
     };
 
     avahi = {
@@ -136,7 +137,8 @@
       libinput
     ];
     etc."current-system-packages".text = let
-      packages = builtins.map (p: "${p.name}") config.environment.systemPackages;
+      packages =
+        builtins.map (p: "${p.name}") config.environment.systemPackages;
       sortedUnique = builtins.sort builtins.lessThan (lib.unique packages);
       formatted = builtins.concatStringsSep "\n" sortedUnique;
     in formatted;
@@ -146,7 +148,8 @@
     kernelPackages = lib.mkDefault pkgs.linuxPackages_latest;
     initrd.systemd.dbus.enable = true;
     loader = {
-      systemd-boot.enable = if config.boot.lanzaboote.enable then lib.mkForce false else true;
+      systemd-boot.enable =
+        if config.boot.lanzaboote.enable then lib.mkForce false else true;
       efi.canTouchEfiVariables = true;
     };
   };
@@ -186,18 +189,19 @@
       proggyfonts
       (nerdfonts.override { fonts = [ "FiraCode" ]; })
     ];
-    fontconfig.defaultFonts = {
-      monospace = [ "FiraCode Nerd Font Mono" ];
-    };
+    fontconfig.defaultFonts = { monospace = [ "FiraCode Nerd Font Mono" ]; };
   };
 
   programs.zsh.enable = true;
   users.users.knoff = {
     initialPassword = "password";
     isNormalUser = true;
-    shell = if config.programs.zsh.enable then pkgs.zsh
-            else if config.programs.fish.enable then pkgs.fish
-            else pkgs.bash;
+    shell = if config.programs.zsh.enable then
+      pkgs.zsh
+    else if config.programs.fish.enable then
+      pkgs.fish
+    else
+      pkgs.bash;
     extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
     openssh.authorizedKeys.keys = [ ];
   };
