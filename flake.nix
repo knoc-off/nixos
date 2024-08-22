@@ -6,6 +6,9 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-24.05";
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
+    # nix cli
+    nixos-cli.url = "github:water-sucks/nixos";
+
     # Rust overlay
     rust-overlay.url = "github:oxalica/rust-overlay";
 
@@ -115,6 +118,15 @@
           system = "x86_64-linux";
           modules = [
             ./systems/framework13.nix
+
+            #inputs.nixos-cli.nixosModules.nixos-cli
+            #{
+            #  # Enable the nixos-cli service
+            #  services.nixos-cli = {
+            #    enable = true;
+            #  };
+            #}
+
             inputs.hardware.nixosModules.framework-13-7040-amd
             { boot.binfmt.emulatedSystems = [ "aarch64-linux" ]; }
 

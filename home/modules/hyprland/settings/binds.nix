@@ -107,7 +107,6 @@ in {
 
           "${mainMod}, T, exec, ${mkHdrop {
             command = "kitty --class kitty-dropterm";
-            background = true;
             class = "kitty-dropterm";
             size = { width = 75; height = 60; };
             gap = 5;
@@ -122,7 +121,6 @@ in {
           }}"
           "${mainMod}, A, exec, ${mkHdrop {
             command = "firefox --no-remote -P minimal --name firefox-minimal https://poe.com";
-            background = true;
             class = "firefox-minimal";
             size = { width = 55; height = 90; };
             gap = 5;
@@ -154,7 +152,7 @@ in {
           # group
           "${mainMod}, G, togglegroup, 0"
           "${mainMod}, L, exec, swaylock-custom 0 120x6 10 0"
-          "${mainMod}, asciitilde, exec,  ${pkgs.kitty}/bin/kitty nx rt"
+          #"${mainMod}, asciitilde, exec,  ${pkgs.kitty}/bin/kitty nx rt"
 
           # playerctl, music control
           ", XF86AudioNext, exec, ${pkgs.playerctl}/bin/playerctl next"
@@ -180,7 +178,6 @@ in {
         ++ (map (i: mvtows (toString i) (toString i)) arr);
 
       bindle = let
-        light = "${pkgs.light}/bin/light";
         wpctl = "${pkgs.wireplumber}/bin/wpctl";
         inertia = "${pkgs.writeNuScript "inertia"
           ''

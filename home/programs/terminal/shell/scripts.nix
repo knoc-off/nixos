@@ -107,7 +107,7 @@ in {
       }
     '')
 
-    (pkgs.writeShellScriptBin "commit-msg" ''
+    (pkgs.writeShellScriptBin "gen-git-msg" ''
       git diff HEAD | llm "from the text extract only important changes to craft a concise and simple git commit message, formatted like this:
       <Title of the git commit>
 

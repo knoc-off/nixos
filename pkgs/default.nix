@@ -41,6 +41,38 @@
     fontPath = "${pkgs.material-icons}/share/fonts/opentype/MaterialIconsRound-Regular.otf";
   };
 
+  writeRustScript = name: script:
+    pkgs.stdenv.mkDerivation {
+      inherit name;
+      buildInputs = [ pkgs.rustc pkgs.cargo pkgs.openssl pkgs.pkg-config ];
+      src = pkgs.writeTextFile {
+        name = "Cargo.toml";
+        text = ''
+          [package]
+          name = "${name}"
+          version = "0.1.0"
+          edition = "2021"
+
+          [dependencies]
+          clap = "3.1.6"
+          anyhow = "1.0"
+          fd-find = "8.3.0"
+          skim = "0.9.4"
+        '';
+      };
+      buildPhase = ''
+        mkdir src
+        cat > src/main.rs << EOF
+        ${script}
+        EOF
+        cargo build --release
+      '';
+      installPhase = ''
+        mkdir -p $out/bin
+        cp target/release/${name} $out/bin/${name}
+      '';
+    };
+
   writeNuScript = name: (script:
     pkgs.writeTextFile rec {
       inherit name;
