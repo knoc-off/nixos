@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "big_restructure______________________________________________________________________big_restructure";
+  system.nixos.label = "removed_steam__________________________________________________________________________removed_steam";
 }

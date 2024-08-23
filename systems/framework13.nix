@@ -1,5 +1,4 @@
-{ lib, inputs, config, pkgs, self, ... }:
-{
+{ lib, inputs, config, pkgs, self, ... }: {
   imports = [
     self.nixosModules.x86_64-linux.knoff
 
@@ -22,7 +21,6 @@
         pkiBundle = "/etc/secureboot";
       };
     }
-
 
     inputs.disko.nixosModules.disko
     { disko.devices.disk.vdb.device = "/dev/nvme0n1"; }
@@ -63,7 +61,7 @@
 
   programs = {
     steam = {
-      enable = true;
+      enable = false;
       package = pkgs.steam-scaling;
     };
     gnupg.agent = {
