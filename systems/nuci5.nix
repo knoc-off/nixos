@@ -1,6 +1,3 @@
-# im going to try to document as i go, with comments.
-# each setting that is not super obvious should have, what impact it has, and why.
-# for example enabling 32bit support for opengl, is needed for steam.
 {
   lib,
   inputs,
@@ -14,6 +11,19 @@
     ./hardware/hardware-configuration.nix
     ./hardware/bluetooth.nix
     ./hardware/fingerprint
+
+    inputs.hardware.nixosModules.common-cpu-intel
+
+    inputs.disko.nixosModules.disko
+    ./hardware/disks/disk-module.nix
+    {
+      diskoCustom = {
+        bootType = "efi"; # Choose "bios" or "efi"
+        swapSize = "12G"; # Size of the swap partition
+        diskDevice = "/dev/sda"; # The disk device to configure
+      };
+      #disko.devices.disk.vdb.device = "/dev/disk/by-id/wwn-0x502b2a201d1c1b1a";
+    }
 
     # lanzaboot
 

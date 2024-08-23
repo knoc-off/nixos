@@ -1,4 +1,4 @@
-{pkgs, ...}: {
+{pkgs, self, ...}: {
   #spotiblock = prev.spotify.overrideAttrs (_old: rec {
   #  postInstall = ''
   #    ExecMe="env LD_PRELOAD=${prev.spotify-adblock}/lib/libspotifyadblock.so spotify"
@@ -10,7 +10,7 @@
     name = "Spotify (Adblock)";
     comment = "Spotify with Adblock";
     icon = "spotify";
-    exec = "env LD_PRELOAD=${pkgs.spotify-adblock}/lib/libspotifyadblock.so ${pkgs.spotify}/bin/spotify";
+    exec = "env LD_PRELOAD=${self.packages.${pkgs.system}.spotify-adblock}/lib/libspotifyadblock.so ${pkgs.spotify}/bin/spotify";
     categories = ["Audio" "Music" "Player"];
     terminal = false;
   };

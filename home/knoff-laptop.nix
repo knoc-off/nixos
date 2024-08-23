@@ -1,8 +1,7 @@
 #NixOS, home-manager, system configuration, package installation, program enablement, system options.
 {
   outputs,
-  inputs,
-  config,
+  self,
   pkgs,
   ...
 }: {
@@ -62,8 +61,8 @@
 
   # TODO: move this to someplace more logical
   home.packages = with pkgs; [
-    (llm.withPlugins [pkgs.llm-cmd])
-    ttok
+    (llm.withPlugins [self.packages.${pkgs.system}.llm-cmd])
+    (self.packages.${pkgs.system}.ttok)
 
     skypeforlinux # -- skype phone
     audio-recorder

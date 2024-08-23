@@ -78,7 +78,7 @@
 
   outputs = inputs@{ self, nixpkgs, home-manager, ... }:
     let
-      inherit (self) outputs;
+
       theme = import ./theme.nix;
 
       systems = [
@@ -90,12 +90,55 @@
       ];
 
       forAllSystems = nixpkgs.lib.genAttrs systems;
+
+      inherit (self) outputs;
+
+      lib = nixpkgs.lib.extend (final: prev: home-manager.lib);
+
+      inherit (lib) nixosSystem genAttrs hasPrefix listToAttrs;
+
+      mkHost = hostname: username: system: {
+        name = hostname;
+        value = nixosSystem {
+          specialArgs = {
+            inherit self # this does the same as outputs
+              inputs outputs # this does the same as self
+              hostname username lib
+
+              theme # remove this.
+            ;
+            selfPkgs = self.packages.${system};
+          };
+          modules = [
+            {
+              nixpkgs.hostPlatform = system;
+              nixpkgs.buildPlatform = "x86_64-linux";
+            }
+            ./systems/${hostname}.nix
+          ];
+        };
+      };
+      pkgs = import nixpkgs {
+        system = "x86_64-linux";
+        config.allowUnfree = true;
+      };
+
     in rec {
       #packages = forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system});
 
       packages = forAllSystems (system:
         import ./pkgs {
           inherit inputs;
+          #pkgs = nixpkgs.legacyPackages.${system};
+          pkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
+          }; # should make this the default
+        });
+
+      nixosModules = forAllSystems (system:
+        import ./modules/nixos {
+          inherit inputs outputs self theme;
           pkgs = nixpkgs.legacyPackages.${system};
         });
 
@@ -110,152 +153,11 @@
       images = {
         rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;
         rpi3B = nixosConfigurations.rpi3B.config.system.build.sdImage;
+        laptop = nixosConfigurations.laptop-iso.config.system.build.isoImage;
       };
 
-      nixosConfigurations = {
-        framework13 = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          system = "x86_64-linux";
-          modules = [
-            ./systems/framework13.nix
+      nixosConfigurations =
+        listToAttrs [ (mkHost "framework13" "knoff" "x86_64-linux") ];
 
-            #inputs.nixos-cli.nixosModules.nixos-cli
-            #{
-            #  # Enable the nixos-cli service
-            #  services.nixos-cli = {
-            #    enable = true;
-            #  };
-            #}
-
-            inputs.hardware.nixosModules.framework-13-7040-amd
-            { boot.binfmt.emulatedSystems = [ "aarch64-linux" ]; }
-
-            {
-              boot.lanzaboote = {
-                enable = nixpkgs.lib.mkDefault true;
-                pkiBundle = "/etc/secureboot";
-              };
-            }
-
-            inputs.disko.nixosModules.disko
-            { disko.devices.disk.vdb.device = "/dev/nvme0n1"; }
-            ./systems/hardware/disks/btrfs-luks.nix
-            home-manager.nixosModules.home-manager
-            {
-              home-manager = {
-                useGlobalPkgs = false;
-                useUserPackages = true;
-                users.knoff = import ./home/knoff-laptop.nix;
-                extraSpecialArgs = {
-                  inherit inputs outputs theme;
-                  system = "x86_64-linux";
-                };
-              };
-            }
-          ];
-        };
-
-        nuci5 = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          system = "x86_64-linux";
-          modules = [
-            ./systems/nuci5.nix
-
-            inputs.hardware.nixosModules.common-cpu-intel
-
-            inputs.disko.nixosModules.disko
-            ./systems/hardware/disks/disk-module.nix
-            {
-              diskoCustom = {
-                bootType = "efi"; # Choose "bios" or "efi"
-                swapSize = "12G"; # Size of the swap partition
-                diskDevice = "/dev/sda"; # The disk device to configure
-              };
-              #disko.devices.disk.vdb.device = "/dev/disk/by-id/wwn-0x502b2a201d1c1b1a";
-            }
-
-            #./systems/hardware/disks/btrfs-luks.nix
-          ];
-        };
-
-        home-server = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          system = "x86_64-linux";
-          modules = [
-            ./systems/home-server.nix
-
-            #inputs.hardware.nixosModules.lenovo-thinkpad-x1-6th-gen
-
-            # Disko
-            inputs.disko.nixosModules.disko
-            #./systems/hardware/disks/simple-disk.nix
-            ./systems/hardware/disks/disk-module.nix
-            {
-              diskoCustom = {
-                bootType = "bios"; # Choose "bios" or "efi"
-                swapSize = "12G"; # Size of the swap partition
-                diskDevice = "/dev/sda"; # The disk device to configure
-              };
-              #disko.devices.disk.vdb.device = "/dev/disk/by-id/wwn-0x502b2a201d1c1b1a";
-            }
-          ];
-        };
-
-        hetzner-cloud = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          system = "x86_64-linux";
-          modules = [ ./systems/hetzner-server.nix ];
-        };
-
-        rpi3B = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          system = "aarch64-linux";
-          modules = [
-            "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-aarch64.nix"
-            ./systems/raspberry3B.nix
-            {
-              nixpkgs.config.allowUnsupportedSystem = true;
-              nixpkgs.hostPlatform.system = "aarch64-linux";
-            }
-          ];
-        };
-
-        rpi3A = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          system = "aarch64-linux";
-          modules = [
-            "${nixpkgs}/nixos/modules/installer/sd-card/sd-image-aarch64.nix"
-            ./systems/raspberry3A.nix
-            {
-              nixpkgs.config.allowUnsupportedSystem = true;
-              nixpkgs.hostPlatform.system = "aarch64-linux";
-            }
-          ];
-        };
-
-        laptop-iso = nixpkgs.lib.nixosSystem {
-          specialArgs = { inherit inputs outputs; };
-          system = "x86_64-linux";
-          modules = [
-            ./systems/framework13.nix
-            ./systems/modules/live-iso.nix
-            home-manager.nixosModules.home-manager
-            {
-              home-manager = {
-                useGlobalPkgs = false;
-                useUserPackages = true;
-                users.knoff = import ./home/knoff-laptop.nix;
-                extraSpecialArgs = {
-                  inherit inputs outputs theme;
-                  system = "x86_64-linux";
-                };
-              };
-            }
-
-          ];
-        };
-      };
-      images.laptop =
-        nixosConfigurations.laptop-iso.config.system.build.isoImage;
     };
 }

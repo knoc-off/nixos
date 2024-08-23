@@ -1,11 +1,33 @@
-{ lib, inputs, config, pkgs, outputs, ... }:
-let
-  muteScript = pkgs.writeShellScript "mute-speakers" ''
-    ${pkgs.pulseaudio}/bin/pactl set-sink-mute alsa_output.pci-0000_c1_00.6.analog-stereo 1
-  '';
-
-in {
+{ lib, inputs, config, pkgs, self, ... }:
+{
   imports = [
+    self.nixosModules.x86_64-linux.knoff
+
+    #self.nixosModules."${pkgs.system}".knoff
+    #inputs.nixos-cli.nixosModules.nixos-cli
+    #{
+    #  # Enable the nixos-cli service
+    #  services.nixos-cli = {
+    #    enable = true;
+    #  };
+    #}
+
+    inputs.hardware.nixosModules.framework-13-7040-amd
+
+    { boot.binfmt.emulatedSystems = [ "aarch64-linux" ]; }
+
+    {
+      boot.lanzaboote = {
+        enable = lib.mkDefault true;
+        pkiBundle = "/etc/secureboot";
+      };
+    }
+
+
+    inputs.disko.nixosModules.disko
+    { disko.devices.disk.vdb.device = "/dev/nvme0n1"; }
+    ./hardware/disks/btrfs-luks.nix
+
     # Hardware configs
     ./hardware/hardware-configuration.nix
     ./hardware/bluetooth.nix
@@ -133,7 +155,6 @@ in {
       yubioath-flutter
       git
       wget
-      home-manager
       libinput
     ];
     etc."current-system-packages".text = let
@@ -161,7 +182,7 @@ in {
 
   nixpkgs = {
     config.allowUnfree = true;
-    overlays = builtins.attrValues outputs.overlays;
+    overlays = builtins.attrValues self.outputs.overlays;
   };
 
   time.timeZone = "Europe/Berlin";

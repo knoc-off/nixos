@@ -2,8 +2,18 @@
   pkgs,
   inputs,
   ...
-}: {
+}: rec {
   spotify-adblock = pkgs.callPackage ./spotify-adblock {};
+
+  spotiblock = pkgs.spotify.overrideAttrs (_old: {
+    postInstall = ''
+      ExecMe="env LD_PRELOAD=${spotify-adblock}/lib/libspotifyadblock.so spotify"
+      sed -i "s|^TryExec=.*|TryExec=$ExecMe %U|" $out/share/applications/spotify.desktop
+      sed -i "s|^Exec=.*|Exec=$ExecMe %U|" $out/share/applications/spotify.desktop
+    '';
+  });
+
+
   llm-cmd = pkgs.python3Packages.callPackage ./llm-cmd {};
   ttok = pkgs.python3Packages.callPackage ./ttok {};
   poe = pkgs.python3Packages.callPackage ./poe-llm-api {};
