@@ -55,9 +55,6 @@
 
   services.flatpak.enable = true;
 
-  programs.steam.enable = true;
-  programs.steam.package = pkgs.steam-scaling;
-
   # Yubikey
   services.yubikey-agent.enable = true;
   services.pcscd.enable = true;
