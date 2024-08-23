@@ -1,10 +1,10 @@
-{pkgs, ...}: {
+{pkgs, self, ...}: {
   imports = [
     #inputs.nixvim.homeManagerModules.nixvim
     #./neovim
   ];
   #home.packages = [inputs.neovim.packages.${system}.default];
   home.packages = [
-    pkgs.neovim-nix.default
+    self.packages.${pkgs.system}.neovim-nix.default
   ];
 }

@@ -1,10 +1,16 @@
 {
   pkgs,
   lib,
-  theme,
+  self,
   config,
   ...
 }: let
+
+  #writeNuScript = self.packages.${pkgs.system}.writeNuScript;
+  inherit (self.packages.${pkgs.system}) writeNuScript;
+
+
+
   mainMod = config.wayland.windowManager.hyprlandCustom.modkey;
 in {
   wayland.windowManager.hyprland = let
@@ -53,7 +59,7 @@ in {
 
 
         moveRelativeTo =
-          pkgs.writeNuScript "mv"
+          writeNuScript "mv"
           ''
             def main [-w, num: int] {
               let current_workspace = (hyprctl activeworkspace -j | from json | get id)
@@ -70,7 +76,7 @@ in {
 
 
         screenshot-to-text =
-          pkgs.writeNuScript "stt"
+          writeNuScript "stt"
           ''
             def main [] {
               ${pkgs.gscreenshot}/bin/gscreenshot -s -f /tmp/gscreenshot-image.png
@@ -179,7 +185,7 @@ in {
 
       bindle = let
         wpctl = "${pkgs.wireplumber}/bin/wpctl";
-        inertia = "${pkgs.writeNuScript "inertia"
+        inertia = "${writeNuScript "inertia"
           ''
             def reset_values [target: path, time: float, value: float] {
                 {
@@ -216,7 +222,7 @@ in {
                 return $new_value
             }
           ''}/bin/inertia";
-        brightness = pkgs.writeNuScript "brightness" ''
+        brightness = writeNuScript "brightness" ''
           def main [-u] {
               let value = if ($u) {
                 ${inertia} brightnessUP --increment 1 --initialValue 0.5 --speed 0.15
@@ -234,7 +240,7 @@ in {
               #${notify-msg} value $value
           }
         '';
-        volumeScript = pkgs.writeNuScript "volume" ''
+        volumeScript = writeNuScript "volume" ''
           def main [-u] {
             let value = if ($u) {
               ${inertia} volumeUP -i 1 -I 0.5 -s 0.15
@@ -269,7 +275,7 @@ in {
 
       bindl = let
         wpctl = "${pkgs.wireplumber}/bin/wpctl";
-        mute = "${pkgs.writeNuScript "mute" ''
+        mute = "${writeNuScript "mute" ''
           ${wpctl} set-mute @DEFAULT_AUDIO_SINK@ toggle
           ${notify-bar} volbar (${pkgs.pamixer}/bin/pamixer --get-volume) (${pkgs.pamixer}/bin/pamixer --get-volume-human)
         ''}/bin/mute";

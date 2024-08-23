@@ -1,7 +1,8 @@
-{ pkgs, ... }:
+{ pkgs, self, ... }:
 let
   config_dir = "/etc/nixos"; # Should relocate to /etc? and symlink?
   config_name = "framework13";
+  inherit (self.packages.${pkgs.system}) writeNuScript;
 in {
   home.packages = [
     (pkgs.writeShellScriptBin "nx" ''
@@ -62,7 +63,7 @@ in {
       esac
     '')
 
-    (pkgs.writeNuScript "nixx" ''
+    (writeNuScript "nixx" ''
       def main [
         --sudo (-s): bool,  # Run the command with sudo
         --bg (-b): bool,    # Run the command in the background

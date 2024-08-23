@@ -32,6 +32,22 @@ in {
     (modulesPath + "/installer/scan/not-detected.nix")
     (modulesPath + "/profiles/qemu-guest.nix")
 
+
+    # Disko
+    inputs.disko.nixosModules.disko
+    #./systems/hardware/disks/simple-disk.nix
+    ./hardware/disks/disk-module.nix
+    {
+      diskoCustom = {
+        bootType = "bios"; # Choose "bios" or "efi"
+        swapSize = "12G"; # Size of the swap partition
+        diskDevice = "/dev/sda"; # The disk device to configure
+      };
+      #disko.devices.disk.vdb.device = "/dev/disk/by-id/wwn-0x502b2a201d1c1b1a";
+    }
+
+
+
     ./modules/nix.nix
 
     #inputs.sops-nix.nixosModules.sops {

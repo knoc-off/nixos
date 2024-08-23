@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "added_the_commit_message_to_home-server_____________________________bugfix:_scripts_hyprland_binds._";
+  system.nixos.label = "big_restructure______________________________________________________________________big_restructure";
 }
