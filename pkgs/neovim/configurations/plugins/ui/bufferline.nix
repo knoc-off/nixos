@@ -3,7 +3,7 @@
     enable = true;
     diagnostics = "nvim_lsp";
     truncateNames = true;
-    offsets = [
+    settings.options.offsets = [
       {
         filetype = "undotree";
         text = "Undotree";

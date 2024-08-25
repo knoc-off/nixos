@@ -77,7 +77,6 @@
   in helpers.keymaps.mkKeymaps { options.silent = true; } (normal ++ visual);
 
   plugins.which-key = {
-    enable = true;
     registrations = {
       "<leader>w" = "Format and Save";
       "<leader>h" = "Window Left";
