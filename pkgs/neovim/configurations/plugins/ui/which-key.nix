@@ -2,7 +2,6 @@
   plugins.which-key = {
     enable = true;
     plugins = {
-      marks = true;
       registers = true;
       spelling = {
         enabled = true;

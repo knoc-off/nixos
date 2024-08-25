@@ -10,7 +10,7 @@
     ./plugins/compleations.nix
     ./plugins/productivity/telescope.nix
     ./plugins/ui/bufferline.nix
-    ./plugins/ui/which-key.nix
+    #./plugins/ui/which-key.nix
     ./plugins/ui/precognition.nix
     ./plugins/productivity/vim-ai.nix
     ./plugins/ui/colorizer.nix

@@ -54,7 +54,6 @@
   };
 
   plugins.which-key = {
-    enable = true;
     registrations = {
       "<leader>f" = "Telescope";
       "<leader>ff" = "Search Find files";

@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "removed_steam__________________________________________________________________________removed_steam";
+  system.nixos.label = "removed_steam________________________________________________________________________fprintd_enabled";
 }
