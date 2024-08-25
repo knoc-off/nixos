@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "removed_steam________________________________________________________________________fprintd_enabled";
+  system.nixos.label = "removed_steam___________________________________________________________kernelParams_autosuspend_off";
 }
