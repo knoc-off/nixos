@@ -59,6 +59,8 @@
     ./modules/gtk
   ];
 
+  boot.kernelParams = [ "usbcore.autosuspend=-1" ];
+
   programs = {
     steam = {
       enable = false;
