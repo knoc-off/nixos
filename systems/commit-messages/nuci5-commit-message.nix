@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "removed_steam___________________________________________________________kernelParams_autosuspend_off";
+  system.nixos.label = "removed_steam_____________________________________________________doc:_added_fingerprint_explanation";
 }

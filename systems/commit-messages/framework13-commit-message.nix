@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "kernelParams_autosuspend_off____________________________________________kernelParams_autosuspend_off";
+  system.nixos.label = "doc:_added_fingerprint_explanation________________________________doc:_added_fingerprint_explanation";
 }
