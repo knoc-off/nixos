@@ -59,6 +59,7 @@
     ./modules/gtk
   ];
 
+  # fingerpritn scanner does not work without this, suddenly.
   boot.kernelParams = [ "usbcore.autosuspend=-1" ];
 
   programs = {

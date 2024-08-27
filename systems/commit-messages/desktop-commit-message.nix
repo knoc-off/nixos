@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "fixed_the_way_the_commit-message_is_formatted___________________________kernelParams_autosuspend_off";
+  system.nixos.label = "fixed_the_way_the_commit-message_is_formatted_____________________doc:_added_fingerprint_explanation";
 }

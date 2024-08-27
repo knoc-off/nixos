@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "big_restructure_________________________________________________________kernelParams_autosuspend_off";
+  system.nixos.label = "big_restructure___________________________________________________doc:_added_fingerprint_explanation";
 }
