@@ -1,6 +1,6 @@
-{ lib, inputs, config, pkgs, self, ... }: {
+{ lib, inputs, config, pkgs, self, system, ... }: {
   imports = [
-    self.nixosModules.x86_64-linux.knoff
+    self.nixosModules.knoff
 
     #self.nixosModules."${pkgs.system}".knoff
     #inputs.nixos-cli.nixosModules.nixos-cli
@@ -49,6 +49,7 @@
     ./modules/nix.nix
 
     # Window manager
+    #self.modules.
     ./modules/hyprland
 
     # This is an 'auto generated' file that should add a message to the build versions in the boot menu
