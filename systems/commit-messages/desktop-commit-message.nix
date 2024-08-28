@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "fixed_the_way_the_commit-message_is_formatted_____________________doc:_added_fingerprint_explanation";
+  system.nixos.label = "fixed_the_way_the_commit-message_is_formatted___________________bugfix:_fixed_the_module_declaration";
 }

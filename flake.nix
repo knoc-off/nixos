@@ -105,6 +105,7 @@
               inputs outputs # this does the same as self
               hostname username lib
 
+              system
               theme # remove this.
             ;
             selfPkgs = self.packages.${system};
@@ -118,14 +119,8 @@
           ];
         };
       };
-      pkgs = import nixpkgs {
-        system = "x86_64-linux";
-        config.allowUnfree = true;
-      };
 
     in rec {
-      #packages = forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system});
-
       packages = forAllSystems (system:
         import ./pkgs {
           inherit inputs;
@@ -136,11 +131,9 @@
           }; # should make this the default
         });
 
-      nixosModules = forAllSystems (system:
-        import ./modules/nixos {
-          inherit inputs outputs self theme;
-          pkgs = nixpkgs.legacyPackages.${system};
-        });
+      nixosModules =  {
+          knoff = import ./modules/nixos/knoff.nix;
+        };
 
       overlays = import ./overlays { inherit inputs; };
 

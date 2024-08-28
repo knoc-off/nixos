@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "doc:_added_fingerprint_explanation________________________________doc:_added_fingerprint_explanation";
+  system.nixos.label = "bugfix:_fixed_the_module_declaration____________________________bugfix:_fixed_the_module_declaration";
 }
