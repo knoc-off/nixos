@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "big_restructure_________________________________________________bugfix:_fixed_the_module_declaration";
+  system.nixos.label = "fix:_spotify-adblock_working_________________________________________________________________________________________________________________________________________";
 }

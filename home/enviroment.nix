@@ -1,4 +1,4 @@
-{config, ...}: {
+{config, pkgs, ...}: {
   home = {
     file = {
       mnt = {
@@ -11,6 +11,12 @@
         source = config.lib.file.mkOutOfStoreSymlink "/etc/nixos/";
       };
     };
+
+
+    packages = [
+        pkgs.libsForQt5.qt5.qtwayland # QT_QPA_PLATFORM
+
+    ];
 
     sessionVariables = {
       # Editor and shell
@@ -26,7 +32,7 @@
 
       # GUI toolkit settings
       QT_SCALE_FACTOR = "1";
-      QT_QPA_PLATFORM = "wayland";
+      QT_QPA_PLATFORM = "wayland"; # needs   libsForQt5.qt5.qtwayland
       QT_WAYLAND_DISABLE_WINDOWDECORATION = "1";
       QT_AUTO_SCREEN_SCALE_FACTOR = "1";
       CLUTTER_BACKEND = "wayland";

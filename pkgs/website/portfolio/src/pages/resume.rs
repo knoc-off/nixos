@@ -217,7 +217,7 @@ pub fn create_resume_data() -> ResumeData {
                 ],
                 languages: vec![
                     LanguageUsage { language: String::from("Rust"),    color: String::from("#dea584"), percentage: 60.0 },
-                    LanguageUsage { language: String::from("Sass"),    color: String::from("#a53b70"), percentage: 34.0 },
+                    LanguageUsage { language: String::from("Scss"),    color: String::from("#a53b70"), percentage: 34.0 },
                     LanguageUsage { language: String::from("Nix"),     color: String::from("#7e7eff"), percentage: 3.00 },
                     LanguageUsage { language: String::from("TOML"),    color: String::from("#9c4221"), percentage: 2.00 },
                     LanguageUsage { language: String::from("HTML"),    color: String::from("#e34c26"), percentage: 1.00 },

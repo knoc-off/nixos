@@ -41,7 +41,7 @@ in {
           nullableArg = name: value: if value != null then "-${name} ${toString value}" else "";
           hdrop = pkgs.writeShellScriptBin "hdrop" (builtins.readFile (builtins.fetchurl {
             url = "https://raw.githubusercontent.com/hyprwm/contrib/main/hdrop/hdrop";
-            sha256 = "1a4rxj7kcfq3ac7vn6dkijqld04j9zvfgma6c5j07s98z35yzd0v";
+            sha256 = "06bcqqy139xsiyff490sfmz2p7di55naky8n642c7rzcmq36brf2";
           }));
 
           args = lib.concatStringsSep " " (lib.filter (x: x != "") [

@@ -7,8 +7,14 @@ let
 
     cargoHash = "sha256-HpOxoHe7jbmgU2Im0JKSGISmj4im6fwFIuyJTueLmM0=";
 
+    postPatch = ''
+      substituteInPlace src/lib.rs \
+        --replace 'PathBuf::from("config.toml"),' 'PathBuf::from("'"$out"'/etc/spotify-adblock/config.toml"),'
+    '';
+
     postInstall = ''
-      cp ./config.toml $out/
+      mkdir -p $out/etc/spotify-adblock
+      cp ./config.toml $out/etc/spotify-adblock/
     '';
 
     src = pkgs.fetchFromGitHub {
