@@ -30,10 +30,10 @@ for nix_file in ${SYSTEMS_DIR}/*.nix; do
     [[ -e "$nix_file" ]] || continue
 
     # Get the latest commit message for this file
-    commit_msg=$(git log -1 --pretty=%B -- "$nix_file")
+    commit_msg=$(git log -1 --pretty=%s -- "$nix_file")
 
     # Get the global commit message
-    global_msg=$(git log -1 --pretty=%B)
+    global_msg=$(git log -1 --pretty=%s)
 
     # Calculate pad amount for the file-specific message
     global_msg_length=${#global_msg}
