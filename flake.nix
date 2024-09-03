@@ -131,9 +131,10 @@
           }; # should make this the default
         });
 
-      nixosModules =  {
-          knoff = import ./modules/nixos/knoff.nix;
-        };
+      nixosModules =  import ./modules/nixos/default.nix;
+        #{
+      #  knoff = import ./modules/nixos/knoff.nix;
+        # };
 
       overlays = import ./overlays { inherit inputs; };
 

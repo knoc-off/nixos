@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "removed_steam___________________________________________________bugfix:_fixed_the_module_declaration";
+  system.nixos.label = "fix:_spotify-adblock_working_________________________________________________________________________________________________________________________________________";
 }

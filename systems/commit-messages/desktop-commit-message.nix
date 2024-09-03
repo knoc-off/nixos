@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "fixed_the_way_the_commit-message_is_formatted___________________bugfix:_fixed_the_module_declaration";
+  system.nixos.label = "fix:_spotify-adblock_working_________________________________________________________________________________________________________________________________________";
 }

@@ -2,7 +2,6 @@
   imports = [
     self.nixosModules.knoff
 
-    #self.nixosModules."${pkgs.system}".knoff
     #inputs.nixos-cli.nixosModules.nixos-cli
     #{
     #  # Enable the nixos-cli service
@@ -49,8 +48,8 @@
     ./modules/nix.nix
 
     # Window manager
-    #self.modules.
-    ./modules/hyprland
+    self.nixosModules.windowManager.hyprland
+    #./modules/hyprland
 
     # This is an 'auto generated' file that should add a message to the build versions in the boot menu
     ./commit-messages/framework13-commit-message.nix
@@ -62,6 +61,10 @@
 
   # fingerpritn scanner does not work without this, suddenly.
   boot.kernelParams = [ "usbcore.autosuspend=-1" ];
+
+
+  # Wireshark, why not.
+  programs.wireshark.enable = true;
 
   programs = {
     steam = {
