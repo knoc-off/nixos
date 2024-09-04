@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "removed_steam___________________________________________________feat:_firefox_settings_more_modular_";
+  system.nixos.label = "removed_steam_________________________________________________________feat:_firefox_is_more_modular.";
 }

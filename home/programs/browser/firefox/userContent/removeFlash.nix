@@ -1,4 +1,5 @@
-{ theme }: ''
+{ theme }:
+''
   .tabbrowser-tabbox {
       background-color: #${theme.base02} !important;
   }
@@ -23,6 +24,4 @@
   @-moz-document url("about:preferences#home"){
     body{background-color: #${theme.base02} !important }
   }
-
-
 ''

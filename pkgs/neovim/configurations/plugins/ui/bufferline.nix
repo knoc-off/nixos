@@ -1,39 +1,41 @@
 { lib, helpers, ... }: {
   plugins.bufferline = {
     enable = true;
-    diagnostics = "nvim_lsp";
-    truncateNames = true;
-    settings.options.offsets = [
-      {
-        filetype = "undotree";
-        text = "Undotree";
-        highlight = "PanelHeading";
-        padding = 1;
-      }
-      {
-        filetype = "neo-tree";
-        text = "Explorer";
-        highlight = "PanelHeading";
-        padding = 1;
-      }
-      {
-        filetype = "NvimTree";
-        text = "Explorer";
-        highlight = "PanelHeading";
-        padding = 1;
-      }
-      {
-        filetype = "DiffviewFiles";
-        text = "Diff View";
-        highlight = "PanelHeading";
-        padding = 1;
-      }
-      {
-        filetype = "flutterToolsOutline";
-        text = "Flutter Outline";
-        highlight = "PanelHeading";
-      }
-    ];
+    settings.options = {
+      truncateNames = true;
+      diagnostics = "nvim_lsp";
+      offsets = [
+        {
+          filetype = "undotree";
+          text = "Undotree";
+          highlight = "PanelHeading";
+          padding = 1;
+        }
+        {
+          filetype = "neo-tree";
+          text = "Explorer";
+          highlight = "PanelHeading";
+          padding = 1;
+        }
+        {
+          filetype = "NvimTree";
+          text = "Explorer";
+          highlight = "PanelHeading";
+          padding = 1;
+        }
+        {
+          filetype = "DiffviewFiles";
+          text = "Diff View";
+          highlight = "PanelHeading";
+          padding = 1;
+        }
+        {
+          filetype = "flutterToolsOutline";
+          text = "Flutter Outline";
+          highlight = "PanelHeading";
+        }
+      ];
+    };
   };
 
   plugins.which-key.registrations = {
