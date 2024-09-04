@@ -10,7 +10,7 @@
     name = "Spotify (Adblock)";
     comment = "Spotify with Adblock";
     icon = "spotify";
-    exec = "env LD_PRELOAD=${self.packages.${pkgs.system}.spotify-adblock}/lib/libspotifyadblock.so ${pkgs.spotify}/bin/spotify";
+    exec = "${self.packages.${pkgs.system}.spotify-adblock}/bin/spotify";
     categories = ["Audio" "Music" "Player"];
     terminal = false;
   };
