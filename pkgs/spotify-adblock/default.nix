@@ -24,11 +24,31 @@ let
       hash = "sha256-UzpHAHpQx2MlmBNKm2turjeVmgp5zXKWm3nZbEo0mYE=";
     };
   };
+
+  spotifyWrapper = pkgs.writeShellScriptBin "spotify" ''
+    LD_PRELOAD="${spotify-adblock}/lib/libspotifyadblock.so" ${pkgs.spotify}/bin/spotify "$@"
+  '';
+
 in
 pkgs.spotify.overrideAttrs (_old: {
+
   postInstall = ''
-    ExecMe="env LD_PRELOAD=${spotify-adblock}/lib/libspotifyadblock.so spotify"
-    sed -i "s|^TryExec=.*|TryExec=$ExecMe %U|" $out/share/applications/spotify.desktop
-    sed -i "s|^Exec=.*|Exec=$ExecMe %U|" $out/share/applications/spotify.desktop
+    # Update .desktop files
+    for f in $out/share/applications/spotify.desktop $out/share/spotify/spotify.desktop; do
+      if [ -f "$f" ]; then
+        substituteInPlace "$f" \
+          --replace "Exec=spotify" "Exec=${spotifyWrapper}/bin/spotify" \
+          --replace "TryExec=spotify" "TryExec=${spotifyWrapper}/bin/spotify"
+      fi
+    done
   '';
+
+    #postInstall = ''
+    #  ExecMe="env LD_PRELOAD=${spotify-adblock}/lib/libspotifyadblock.so spotify"
+    #  sed -i "s|^TryExec=.*|TryExec=$ExecMe %U|" $out/share/applications/spotify.desktop
+    #  sed -i "s|^Exec=.*|Exec=$ExecMe %U|" $out/share/applications/spotify.desktop
+
+    #  sed -i "s|^TryExec=.*|TryExec=$ExecMe %U|" $out/share/spotify/spotify.desktop
+    #  sed -i "s|^Exec=.*|Exec=$ExecMe %U|" $out/share/spotify/spotify.desktop
+    #'';
 })

@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "big_restructure_________________________________________fix:_the_post-commit_message_being_the_body_";
+  system.nixos.label = "big_restructure_________________________________________________________________fix:_spotify_adblock";
 }
