@@ -31,24 +31,9 @@ let
 
 in
 pkgs.spotify.overrideAttrs (_old: {
-
   postInstall = ''
-    # Update .desktop files
-    for f in $out/share/applications/spotify.desktop $out/share/spotify/spotify.desktop; do
-      if [ -f "$f" ]; then
-        substituteInPlace "$f" \
-          --replace "Exec=spotify" "Exec=${spotifyWrapper}/bin/spotify" \
-          --replace "TryExec=spotify" "TryExec=${spotifyWrapper}/bin/spotify"
-      fi
-    done
+    ${_old.postInstall or ""}
+    rm $out/bin/spotify
+    ln -sf ${spotifyWrapper}/bin/spotify $out/bin/spotify
   '';
-
-    #postInstall = ''
-    #  ExecMe="env LD_PRELOAD=${spotify-adblock}/lib/libspotifyadblock.so spotify"
-    #  sed -i "s|^TryExec=.*|TryExec=$ExecMe %U|" $out/share/applications/spotify.desktop
-    #  sed -i "s|^Exec=.*|Exec=$ExecMe %U|" $out/share/applications/spotify.desktop
-
-    #  sed -i "s|^TryExec=.*|TryExec=$ExecMe %U|" $out/share/spotify/spotify.desktop
-    #  sed -i "s|^Exec=.*|Exec=$ExecMe %U|" $out/share/spotify/spotify.desktop
-    #'';
 })
