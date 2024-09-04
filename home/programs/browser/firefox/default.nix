@@ -7,6 +7,8 @@
 }:
 let
   mkFirefoxSettings = import ./settings/mkFirefoxSettings.nix { inherit lib theme; };
+  mkUserChrome = import ./mkUserChrome.nix { inherit pkgs theme; };
+  mkUserContent = import ./mkUserContent.nix { inherit pkgs theme; };
 in
 
 {
@@ -29,10 +31,22 @@ in
       };
 
       # theme for the firefox ui
-      userChrome = import ./userChrome {inherit theme pkgs;};
+      #userChrome = import ./userChrome {inherit theme pkgs;};
+      userChrome = mkUserChrome {
+        enableSidebarCustomization = true;
+        enableTabsCustomization = true;
+        enableColorScheme = true;
+        enableAutohideFeatures = true;
+        extraStyles = ''
+          /* Any additional custom styles */
+        '';
+      };
 
       # theme for the content firefox presents.
-      userContent = import ./userContent {inherit theme;};
+      userContent = mkUserContent {
+        removeFlash = true;
+
+      };
 
       # settings for firefox. telemetry, scrolling, etc.
       #settings = import ./settings;
@@ -61,11 +75,20 @@ in
         order = ["Annas-Archive" "NixOS Wiki" "Nix Packages" "Nix Options" "Home-Manager" "StackOverflow" "Github" "fmhy"];
       };
 
-      # theme for the firefox ui
-      userChrome = import ./userChrome {inherit theme pkgs;};
+      userChrome = mkUserChrome {
+        enableSidebarCustomization = true;
+        enableTabsCustomization = true;
+        enableColorScheme = true;
+        enableAutohideFeatures = true;
+        extraStyles = ''
+          /* Any additional custom styles */
+        '';
+      };
 
       # theme for the content firefox presents.
-      userContent = import ./userContent {inherit theme;};
+      userContent = mkUserContent {
+        removeFlash = true;
+      };
 
       # settings for firefox. telemetry, scrolling, etc.
       #settings = import ./settings;
