@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "big_restructure______________________________________________Attempt_to_get_cross_compilation_to_avr";
+  system.nixos.label = "big_restructure__________________________________________________________feat:_compiles_in_the_shell";
 }

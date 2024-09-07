@@ -31,7 +31,7 @@ in rec {
     actix-backend = rustPkgs.callPackage ./website/actix-backend { };
     portfolio = rustPkgs.callPackage ./website/portfolio { };
   };
-  embeddedRust = rustPkgs.callPackage ./embeddedRust { };
+  embeddedRust = rustPkgs.callPackage ./embedded-rust { };
 
   # This lets me use font glyphs as SVG's for places that dont accept SVG.
   material-icons-ext = import ./svg-tools/icon-extractor {

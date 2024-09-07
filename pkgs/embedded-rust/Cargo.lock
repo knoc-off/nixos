@@ -5,7 +5,7 @@ version = 3
 [[package]]
 name = "arduino-hal"
 version = "0.1.0"
-source = "git+https://github.com/Rahix/avr-hal?branch=main#8097b3299876990498ba09e0d643f02759e2e1d7"
+source = "git+https://github.com/rahix/avr-hal?rev=3e362624547462928a219c40f9ea8e3a64f21e5f#3e362624547462928a219c40f9ea8e3a64f21e5f"
 dependencies = [
  "atmega-hal",
  "avr-device",
@@ -17,19 +17,9 @@ dependencies = [
 ]
 
 [[package]]
-name = "arduino-rust"
-version = "0.1.0"
-dependencies = [
- "arduino-hal",
- "embedded-hal 1.0.0",
- "nb 1.1.0",
- "panic-halt",
-]
-
-[[package]]
 name = "atmega-hal"
 version = "0.1.0"
-source = "git+https://github.com/Rahix/avr-hal?branch=main#8097b3299876990498ba09e0d643f02759e2e1d7"
+source = "git+https://github.com/rahix/avr-hal?rev=3e362624547462928a219c40f9ea8e3a64f21e5f#3e362624547462928a219c40f9ea8e3a64f21e5f"
 dependencies = [
  "avr-device",
  "avr-hal-generic",
@@ -61,7 +51,7 @@ dependencies = [
 [[package]]
 name = "avr-hal-generic"
 version = "0.1.0"
-source = "git+https://github.com/Rahix/avr-hal?branch=main#8097b3299876990498ba09e0d643f02759e2e1d7"
+source = "git+https://github.com/rahix/avr-hal?rev=3e362624547462928a219c40f9ea8e3a64f21e5f#3e362624547462928a219c40f9ea8e3a64f21e5f"
 dependencies = [
  "avr-device",
  "cfg-if 0.1.10",
@@ -127,6 +117,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "embedded-rust"
+version = "0.1.0"
+dependencies = [
+ "arduino-hal",
+ "embedded-hal 0.2.7",
+ "nb 0.1.3",
+ "panic-halt",
+ "proc-macro2",
+ "ufmt",
+]
+
+[[package]]
 name = "embedded-storage"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -161,18 +163,18 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.86"
+version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e719e8df665df0d1c8fbfd238015744736151d4445ec0836b8e628aae103b77"
+checksum = "e835ff2298f5721608eb1a980ecaee1aef2c132bf95ecc026a11b7bf3c01c02e"
 dependencies = [
  "unicode-ident",
 ]
 
 [[package]]
 name = "quote"
-version = "1.0.37"
+version = "1.0.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b5b9d34b8991d19d98081b46eacdd8eb58c6f2b201139f7c5f643cc155a633af"
+checksum = "0fa76aaf39101c457836aec0ce2316dbdc3ab723cdda1c6bd4e6ad4208acaca7"
 dependencies = [
  "proc-macro2",
 ]

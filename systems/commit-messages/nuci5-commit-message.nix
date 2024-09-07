@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "removed_steam________________________________________________Attempt_to_get_cross_compilation_to_avr";
+  system.nixos.label = "removed_steam____________________________________________________________feat:_compiles_in_the_shell";
 }
