@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "fix:_spotify-adblock_working__________________________________________feat:_firefox_is_more_modular.";
+  system.nixos.label = "fix:_spotify-adblock_working_________________________________Attempt_to_get_cross_compilation_to_avr";
 }

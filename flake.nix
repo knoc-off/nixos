@@ -105,8 +105,7 @@
               inputs outputs # this does the same as self
               hostname username lib
 
-              system
-              theme # remove this.
+              system theme # remove this.
             ;
             selfPkgs = self.packages.${system};
           };
@@ -131,10 +130,10 @@
           }; # should make this the default
         });
 
-      nixosModules =  import ./modules/nixos/default.nix;
-        #{
+      nixosModules = import ./modules/nixos/default.nix;
+      #{
       #  knoff = import ./modules/nixos/knoff.nix;
-        # };
+      # };
 
       overlays = import ./overlays { inherit inputs; };
 
@@ -150,8 +149,10 @@
         laptop = nixosConfigurations.laptop-iso.config.system.build.isoImage;
       };
 
-      nixosConfigurations =
-        listToAttrs [ (mkHost "framework13" "knoff" "x86_64-linux") ];
+      nixosConfigurations = listToAttrs [
+        (mkHost "framework13" "knoff" "x86_64-linux")
+        (mkHost "hetzner" "knoff" "x86_64-linux")
+      ];
 
     };
 }
