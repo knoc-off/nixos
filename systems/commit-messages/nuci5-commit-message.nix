@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "removed_steam_________________________________________________________feat:_firefox_is_more_modular.";
+  system.nixos.label = "removed_steam________________________________________________Attempt_to_get_cross_compilation_to_avr";
 }

@@ -2,6 +2,7 @@
   pkgs,
   config,
   inputs,
+  self,
   ...
 }: let
   system = "x86_64-linux";
@@ -31,7 +32,7 @@ in {
     enableACME = true;
     locations = {
       "/" = {
-        root = "${pkgs.website.portfolio}/lib";
+        root = "${self.packages.${pkgs.system}.website.portfolio}/lib";
         tryFiles = "$uri $uri/ /index.html";
       };
     };
