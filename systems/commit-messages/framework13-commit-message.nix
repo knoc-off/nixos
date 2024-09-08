@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "fix:_spotify-adblock_working__________________________________________embedded-rust_nix_build_error_";
+  system.nixos.label = "added_dialout_group._added_c_cross________________________________added_dialout_group._added_c_cross";
 }

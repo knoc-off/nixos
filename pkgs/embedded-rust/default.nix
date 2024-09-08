@@ -6,10 +6,15 @@ let
   avrGcc = pkgs.pkgsCross.avr.buildPackages.gcc;
 
   # Use a nightly Rust toolchain with AVR support
-  rustToolchain = rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
+  rustToolchain = rust-bin.selectLatestNightlyWith (toolchain: toolchain.minimal.override {
     extensions = [ "rust-src" ];
-    targets = [ "avr-unknown-gnu-atmega328" ];
+    #targets = [ "avr-unknown-gnu-atmega328" ];
   });
+
+  toolchain = (
+      pkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml
+  );
+
 in
 
 rustPlatform.buildRustPackage rec {
