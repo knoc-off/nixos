@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "fix:_spotify-adblock_working_____________________________________________feat:_compiles_in_the_shell";
+  system.nixos.label = "fix:_spotify-adblock_working__________________________________________embedded-rust_nix_build_error_";
 }
