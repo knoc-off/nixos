@@ -39,3 +39,6 @@ codegen-units = 1
 debug = true
 lto = true
 opt-level = "s"
+
+[dev-dependencies]
+compiler_builtins = "0.1.125"

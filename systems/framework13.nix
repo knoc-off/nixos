@@ -228,7 +228,7 @@
       pkgs.fish
     else
       pkgs.bash;
-    extraGroups = [ "wheel" "networkmanager" "audio" "video" ];
+    extraGroups = [ "wheel" "networkmanager" "audio" "video" "dialout" ];
     openssh.authorizedKeys.keys = [ ];
   };
 

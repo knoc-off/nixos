@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "big_restructure_______________________________________________________embedded-rust_nix_build_error_";
+  system.nixos.label = "big_restructure___________________________________________________added_dialout_group._added_c_cross";
 }
