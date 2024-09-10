@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "big_restructure___________________________________Add_ATtiny85_development_environment_for_Digispark";
+  system.nixos.label = "big_restructure____________________________________________________________________git_ignore_added.";
 }

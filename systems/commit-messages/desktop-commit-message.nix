@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "fixed_the_way_the_commit-message_is_formatted_____Add_ATtiny85_development_environment_for_Digispark";
+  system.nixos.label = "fixed_the_way_the_commit-message_is_formatted______________________________________git_ignore_added.";
 }
