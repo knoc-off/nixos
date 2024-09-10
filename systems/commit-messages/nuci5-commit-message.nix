@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "removed_steam_____________________________________________________added_dialout_group._added_c_cross";
+  system.nixos.label = "removed_steam______________________________________________________working_c_embedded_arduino_coding";
 }

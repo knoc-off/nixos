@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "big_restructure___________________________________________________added_dialout_group._added_c_cross";
+  system.nixos.label = "big_restructure____________________________________________________working_c_embedded_arduino_coding";
 }
