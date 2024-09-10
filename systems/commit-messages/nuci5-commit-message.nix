@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "removed_steam______________________________________________________working_c_embedded_arduino_coding";
+  system.nixos.label = "removed_steam_____________________________________Add_ATtiny85_development_environment_for_Digispark";
 }

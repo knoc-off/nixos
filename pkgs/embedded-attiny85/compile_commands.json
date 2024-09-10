@@ -1,0 +1,7 @@
+[
+  {
+    "directory": "/etc/nixos/pkgs/embedded-attiny85",
+    "command": "/nix/store/bwzq5byrzj0xscxl47f9aicsbbffr6j6-avr-gcc-wrapper-13.2.0/bin/avr-g++ -c -g -Os -w -std=gnu++11 -fpermissive -fno-exceptions -ffunction-sections -fdata-sections -fno-threadsafe-statics -Wno-error=narrowing -mmcu=attiny85 -DF_CPU=16500000L main.cpp -o main.o",
+    "file": "main.cpp"
+  }
+]

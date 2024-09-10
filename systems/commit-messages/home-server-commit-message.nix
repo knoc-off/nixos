@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "big_restructure____________________________________________________working_c_embedded_arduino_coding";
+  system.nixos.label = "big_restructure___________________________________Add_ATtiny85_development_environment_for_Digispark";
 }
