@@ -13,10 +13,18 @@
     };
 
 
-    packages = [
-        pkgs.libsForQt5.qt5.qtwayland # QT_QPA_PLATFORM
-
+    packages = with pkgs; [
+      libsForQt5.qt5.qtwayland
+      adwaita-qt
+      fluent-gtk-theme
+      fluent-icon-theme
+      vanilla-dmz
+      gsettings-desktop-schemas  # Add this missing package
     ];
+
+
+
+
 
     sessionVariables = {
       # Editor and shell
@@ -56,8 +64,70 @@
       XDG_CONFIG_HOME = "\${HOME}/.config";
       XDG_BIN_HOME = "\${HOME}/.local/bin";
       XDG_DATA_HOME = "\${HOME}/.local/share";
+      #XDG_DATA_DIRS = "$XDG_DATA_DIRS:/usr/share:/usr/local/share";
     };
   };
+
+  # enable qt themes
+  qt = {
+    enable = true;
+    platformTheme.name = "gtk3";
+
+    style = {
+      name = "adwaita-dark";
+      package = pkgs.adwaita-qt;
+    };
+  };
+
+  # enable gtk themes
+  gtk = let
+    extra3-4Config = {
+      gtk-application-prefer-dark-theme = 1;
+    };
+  in {
+    enable = true;
+    theme = {
+      name = "Fluent-Dark";
+      package = pkgs.fluent-gtk-theme;
+    };
+    iconTheme = {
+      name = "Fluent-Dark";
+      package = pkgs.fluent-icon-theme;
+    };
+    cursorTheme = {
+      name = "Vanilla-DMZ";
+      package = pkgs.vanilla-dmz;
+    };
+
+    gtk3.extraConfig = extra3-4Config;
+    gtk4.extraConfig = extra3-4Config;
+  };
+
+  dconf = {
+    enable = true;
+    settings = {
+      "org/gnome/desktop/interface" = {
+        color-scheme = "prefer-dark";
+        gtk-theme = "Fluent-Dark";
+        icon-theme = "Fluent-Dark";
+        cursor-theme = "Vanilla-DMZ";
+        #gtk-theme = "Adwaita-dark";
+        #icon-theme = "Adwaita-dark";
+        #cursor-theme = "Adwaita-dark";
+      };
+      "org/gnome/shell/extensions/user-theme" = {
+        name = "Adwaita-dark";
+      };
+      "org/gnome/gedit/preferences/editor" = {
+        scheme = "oblivion";
+      };
+      "org/gnome/Terminal/Legacy/Settings" = {
+        theme-variant = "dark";
+      };
+    };
+  };
+
+
 }
 #env = GDK_BACKEND,wayland,x11
 #env = QT_QPA_PLATFORM,wayland;xcb

@@ -1,12 +1,21 @@
 { pkgs, inputs, ... }:
-let rustPkgs = pkgs.extend (import inputs.rust-overlay);
+let
+
+  rustPkgs = pkgs.extend (import inputs.rust-overlay);
+
+  inherit (inputs.poetry2nix.lib.mkPoetry2Nix { inherit pkgs; }) mkPoetryApplication;
+
 in rec {
   spotify-adblock = pkgs.callPackage ./spotify-adblock { };
   pam-fprint-grosshack = pkgs.callPackage ./grosshack { };
   pam-wrapper = pkgs.callPackage ./pam-wrapper { };
   llm-cmd = pkgs.python3Packages.callPackage ./llm-cmd { };
   ttok = pkgs.python3Packages.callPackage ./ttok { };
-  poe = pkgs.python3Packages.callPackage ./poe-llm-api { };
+
+  marker = pkgs.python3Packages.callPackage ./marker {};
+
+
+  texify = pkgs.callPackage ./texify { };
   gate = pkgs.callPackage ./gate { };
   ascii-silhouettify = pkgs.callPackage ./ascii { };
 
@@ -71,6 +80,55 @@ in rec {
         cp target/release/${name} $out/bin/${name}
       '';
     };
+
+  fdroid = let
+    droidifyApk = pkgs.fetchurl {
+      url = "https://github.com/Droid-ify/client/releases/download/v0.6.3/app-release.apk";
+      sha256 = "sha256-InJOIXMuGdjNcdZQrcKDPJfSQTLFLjQ1QZhUjZppukQ=";
+    };
+
+    droidifyEmulator = pkgs.androidenv.emulateApp {
+      name = "Droidify";
+      package = pkgs.androidenv.androidPkgs_9_0.androidsdk;
+      platformVersion = "28";
+      abiVersion = "x86";
+      systemImageType = "google_apis_playstore";
+      app = droidifyApk;
+    };
+
+    droidifyWrapper = pkgs.stdenv.mkDerivation {
+      name = "droidify-wrapper";
+      buildInputs = [ pkgs.makeWrapper ];
+
+      unpackPhase = "true";
+
+      installPhase = ''
+        mkdir -p $out/bin $out/share/applications
+
+        # Create a wrapper script
+        makeWrapper ${droidifyEmulator}/bin/run-test-emulator $out/bin/run-droidify
+
+        # Create a .desktop file
+        cat > $out/share/applications/droidify.desktop << EOF
+        [Desktop Entry]
+        Type=Application
+        Name=Droid-ify
+        Exec=$out/bin/run-droidify
+        Icon=${pkgs.fetchurl {
+          url = "https://raw.githubusercontent.com/Droid-ify/client/master/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png";
+          sha256 = "sha256-r3hKlaMSnnNelZ67NMzuBWbieKcB2CcriTh7TSD+PK0=";
+        }}
+        Categories=Application;
+        EOF
+      '';
+    };
+  in
+    droidifyWrapper;
+
+
+
+
+
 
   writeNuScript = name:
     (script:
