@@ -69,7 +69,9 @@
 
     evince
 
-    obsidian
+    obsidian # notes
+
+    koodo-reader # books
 
     prismlauncher
 
@@ -112,62 +114,6 @@
     homeDirectory = "/home/knoff";
   };
 
-  # enable qt themes
-  qt = {
-    enable = true;
-    platformTheme.name = "gtk3";
-    #platformTheme.name = "gtk3";
-
-    style = {
-      name = "adwaita-dark";
-      package = pkgs.adwaita-qt;
-    };
-  };
-
-  # enable gtk themes
-  gtk = let
-    extra3-4Config = {
-      gtk-application-prefer-dark-theme = 1;
-    };
-  in {
-    enable = true;
-    theme = {
-      name = "Fluent-Dark";
-      package = pkgs.fluent-gtk-theme;
-    };
-    iconTheme = {
-      name = "Fluent-Dark";
-      package = pkgs.fluent-icon-theme;
-    };
-    cursorTheme = {
-      name = "Vanilla-DMZ";
-      package = pkgs.vanilla-dmz;
-    };
-
-    gtk3.extraConfig = extra3-4Config;
-    gtk4.extraConfig = extra3-4Config;
-  };
-
-  dconf = {
-    enable = true;
-    settings = {
-      "org/gnome/desktop/interface" = {
-        color-scheme = "prefer-dark";
-        #gtk-theme = "Adwaita-dark";
-        #icon-theme = "Adwaita-dark";
-        #cursor-theme = "Adwaita-dark";
-      };
-      "org/gnome/shell/extensions/user-theme" = {
-        name = "Adwaita-dark";
-      };
-      "org/gnome/gedit/preferences/editor" = {
-        scheme = "oblivion";
-      };
-      "org/gnome/Terminal/Legacy/Settings" = {
-        theme-variant = "dark";
-      };
-    };
-  };
 
   # Nicely reload system units when changing configs
   systemd.user.startServices = "sd-switch";

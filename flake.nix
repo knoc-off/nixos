@@ -64,6 +64,12 @@
     # Secrets management
     sops-nix.url = "github:Mic92/sops-nix";
 
+    # poetry2nix
+    poetry2nix = {
+      url = "github:nix-community/poetry2nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Minecraft servers and packages
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
   };
