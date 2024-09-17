@@ -19,7 +19,8 @@
       fluent-gtk-theme
       fluent-icon-theme
       vanilla-dmz
-      gsettings-desktop-schemas  # Add this missing package
+      gsettings-desktop-schemas
+      gnome.gnome-settings-daemon
     ];
 
 
@@ -44,6 +45,7 @@
       QT_WAYLAND_DISABLE_WINDOWDECORATION = "1";
       QT_AUTO_SCREEN_SCALE_FACTOR = "1";
       CLUTTER_BACKEND = "wayland";
+
 
       # Video and graphics
       MOZ_ENABLE_WAYLAND = "1";

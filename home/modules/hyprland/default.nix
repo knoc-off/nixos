@@ -11,7 +11,7 @@
 in {
   imports = [
     # AGS is my notifier
-    # ./dunst.nix
+    ./dunst.nix
     #./pyprland.nix
     ./swayidle.nix
     ./settings/binds.nix
@@ -32,7 +32,12 @@ in {
     };
     plugins = lib.mkOption {
       type = lib.types.listOf lib.types.package;
-      default = with inputs.hyprland-plugins.packages.${pkgs.system}; [];
+      default = with inputs.hyprland-plugins.packages.${pkgs.system};
+        [
+          #hyprexpo
+
+
+        ];
       description = "Hyprland plugins to use.";
     };
     settings = lib.mkOption {

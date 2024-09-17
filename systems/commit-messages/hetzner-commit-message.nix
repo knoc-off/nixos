@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "big_restructure____________________________________________________________________________gitignore";
+  system.nixos.label = "big_restructure_________________________________________________________________streamlined_firefox.";
 }

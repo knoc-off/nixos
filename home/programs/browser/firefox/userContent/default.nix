@@ -15,14 +15,6 @@
     }
   }
 
-  /* remove flash */
-  @-moz-document url("about:home"),url("about:blank"),url("about:newtab"),url("about:privatebrowsing"){
-    body{background-color: #${theme.base02} !important }
-  }
-
-  @-moz-document url("about:preferences#home"){
-    body{background-color: #${theme.base02} !important }
-  }
 
 
 ''

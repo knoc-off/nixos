@@ -1,0 +1,40 @@
+diff --git a/chrome/autohide_toolbox.css b/chrome/autohide_toolbox.css
+index 6b65f4a..4f303a8 100644
+--- a/chrome/autohide_toolbox.css
++++ b/chrome/autohide_toolbox.css
+@@ -9,6 +9,7 @@ See the above repository for updates as well as full license text. */
+ :root{
+   --uc-autohide-toolbox-delay: 200ms; /* Wait 0.1s before hiding toolbars */
+   --uc-toolbox-rotation: 82deg;  /* This may need to be lower on mac - like 75 or so */
++  --uc-toolbox-trigger-area: 50px; /* Area from top of the window that triggers toolbox */
+ }
+ 
+ :root[sizemode="maximized"]{
+@@ -36,8 +37,19 @@ See the above repository for updates as well as full license text. */
+   pointer-events: none;
+ }
+ 
++#navigator-toolbox::before {
++  content: '';
++  position: fixed;
++  top: 0;
++  left: 0;
++  right: 0;
++  height: var(--uc-toolbox-trigger-area);
++  z-index: 2;
++}
++
+ #navigator-toolbox:hover,
+-#navigator-toolbox:focus-within{
++#navigator-toolbox:focus-within,
++#navigator-toolbox::before:hover + #navigator-toolbox {
+   transition-delay: 33ms !important;
+   transform: rotateX(0);
+   opacity: 1;
+@@ -80,4 +92,4 @@ See the above repository for updates as well as full license text. */
+ /*
+ #navigator-toolbox{ flex-direction: column; display: flex; }
+ #titlebar{ order: 2 }
+-*/
+\ No newline at end of file
++*/
