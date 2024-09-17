@@ -1,15 +1,16 @@
-{
-  lib,
-  buildPythonPackage,
-  fetchFromGitHub,
-  setuptools,
-  wheel,
-  pytest,
+{ lib
+, buildPythonPackage
+, fetchFromGitHub
+, setuptools
+, wheel
+, pytest
+, mkShell
+, shell ? false
 }:
-buildPythonPackage rec {
+
+let
   pname = "llm-cmd";
   version = "0.1a0";
-  pyproject = true;
 
   src = fetchFromGitHub {
     owner = "simonw";
@@ -26,14 +27,11 @@ buildPythonPackage rec {
   propagatedBuildInputs = [
   ];
 
-  passthru.optional-dependencies = {
+  optional-dependencies = {
     test = [
       pytest
     ];
   };
-
-  #pythonImportsCheck = [ "llm_cmd" ];
-  dontCheckRuntimeDeps = true;
 
   meta = with lib; {
     description = "Use LLM to generate and execute commands in your shell";
@@ -41,4 +39,26 @@ buildPythonPackage rec {
     license = licenses.asl20;
     maintainers = with maintainers; [];
   };
-}
+
+  package = buildPythonPackage {
+    inherit pname version src nativeBuildInputs propagatedBuildInputs meta;
+    pyproject = true;
+
+    passthru.optional-dependencies = optional-dependencies;
+
+    #pythonImportsCheck = [ "llm_cmd" ];
+    dontCheckRuntimeDeps = true;
+  };
+
+in
+if shell then
+  mkShell {
+    name = "${pname}-dev-shell";
+    packages = nativeBuildInputs ++ propagatedBuildInputs ++ optional-dependencies.test;
+
+    shellHook = ''
+      echo "Entering ${pname} development shell"
+    '';
+  }
+else
+  package

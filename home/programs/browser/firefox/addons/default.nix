@@ -5,6 +5,9 @@
   addons = inputs.firefox-addons.packages.${pkgs.system};
 in
   with addons; [
+
+    bypass-paywalls-clean
+
     # Privacy and Security
     ublock-origin # best ad blocker
     bitwarden # need this.

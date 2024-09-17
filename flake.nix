@@ -57,6 +57,10 @@
     # Hyprland
     #hyprland.url = "github:hyprwm/hyprland";
     hyprland.url = "git+https://github.com/hyprwm/Hyprland?submodules=1";
+    hyprland-plugins = {
+      url = "github:hyprwm/hyprland-plugins";
+      inputs.hyprland.follows = "hyprland";
+    };
 
     # add ags / Widgets, etc.
     ags.url = "github:Aylur/ags";
@@ -72,6 +76,15 @@
 
     # Minecraft servers and packages
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
+
+    # Non-Flake Inputs:
+
+    firefox-csshacks = {
+      url = "github:MrOtherGuy/firefox-csshacks";
+      flake = false;
+    };
+
+
   };
 
   nixConfig = {
@@ -125,29 +138,25 @@
         };
       };
 
-    in rec {
-      packages = forAllSystems (system:
-        import ./pkgs {
-          inherit inputs;
-          #pkgs = nixpkgs.legacyPackages.${system};
+      mkPkgShell = system: shell:
+        let
           pkgs = import nixpkgs {
             inherit system;
             config.allowUnfree = true;
-          }; # should make this the default
-        });
+          };
+        in
+        import ./pkgs {
+          inherit inputs self system pkgs shell;
+        };
+
+    in rec {
+      packages = forAllSystems (system: mkPkgShell system false);
+      devShells = forAllSystems (system: mkPkgShell system true);
 
       nixosModules = import ./modules/nixos/default.nix;
-      #{
-      #  knoff = import ./modules/nixos/knoff.nix;
-      # };
 
       overlays = import ./overlays { inherit inputs; };
 
-      devShells = forAllSystems (system:
-        import ./devshells {
-          inherit inputs;
-          pkgs = nixpkgs.legacyPackages.${system};
-        });
 
       images = {
         rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;

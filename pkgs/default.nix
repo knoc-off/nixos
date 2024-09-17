@@ -1,29 +1,47 @@
-{ pkgs, inputs, ... }:
-let
+{ pkgs, inputs, system, self, shell ? false }:
 
+let
   rustPkgs = pkgs.extend (import inputs.rust-overlay);
 
-  inherit (inputs.poetry2nix.lib.mkPoetry2Nix { inherit pkgs; }) mkPoetryApplication;
+  mkPkgOrShell = { path, args ? { }, callPackage ? pkgs.callPackage }:
+    if shell then
+      import path ({ inherit pkgs shell; } // args)
+    else
+      callPackage path ({ inherit shell; } // args);
+
+  #wrapper = path: args: callPackage: importWithArgs { inherit path args callPackage;};
 
 in rec {
+  #test = importWithArgs ./test { };
+  test = mkPkgOrShell {
+    path = ./test;
+    inherit (pkgs.python3Packages) callPackage;
+  };
+
   spotify-adblock = pkgs.callPackage ./spotify-adblock { };
   pam-fprint-grosshack = pkgs.callPackage ./grosshack { };
   pam-wrapper = pkgs.callPackage ./pam-wrapper { };
-  llm-cmd = pkgs.python3Packages.callPackage ./llm-cmd { };
+
+  llm-cmd = mkPkgOrShell {
+    path = ./llm-cmd;
+    inherit (pkgs.python3Packages) callPackage;
+  };
+
+  # pkgs.python3Packages.callPackage ./llm-cmd { };
+
   ttok = pkgs.python3Packages.callPackage ./ttok { };
 
-  marker = pkgs.python3Packages.callPackage ./marker {};
-
+  marker = pkgs.python3Packages.callPackage ./marker { };
 
   texify = pkgs.callPackage ./texify { };
   gate = pkgs.callPackage ./gate { };
   ascii-silhouettify = pkgs.callPackage ./ascii { };
 
   neovim-nix = let
-    nixvim = inputs.nixvim.legacyPackages.${pkgs.system};
+    nixvim = inputs.nixvim.legacyPackages.${system};
 
     customPkgs = import inputs.nixpkgs-unstable {
-      inherit (pkgs) system;
+      inherit system;
       config = { allowUnfree = true; };
       overlays = [ inputs.nixneovimplugins.overlays.default ];
     };
@@ -42,7 +60,18 @@ in rec {
   };
   embeddedRust = rustPkgs.callPackage ./embedded-rust { };
 
-  # This lets me use font glyphs as SVG's for places that dont accept SVG.
+  bevy-test = mkPkgOrShell {
+    path = ./bevy/test;
+    args = {
+      rust-toolchain = rustPkgs.rust-bin.selectLatestNightlyWith (toolchain:
+        toolchain.default.override {
+          extensions = [ "rust-src" ];
+          targets = [ "wasm32-unknown-unknown" ];
+        });
+    };
+    inherit (rustPkgs) callPackage;
+  };
+
   material-icons-ext = import ./svg-tools/icon-extractor {
     inherit pkgs;
     fontPath =
@@ -83,7 +112,8 @@ in rec {
 
   fdroid = let
     droidifyApk = pkgs.fetchurl {
-      url = "https://github.com/Droid-ify/client/releases/download/v0.6.3/app-release.apk";
+      url =
+        "https://github.com/Droid-ify/client/releases/download/v0.6.3/app-release.apk";
       sha256 = "sha256-InJOIXMuGdjNcdZQrcKDPJfSQTLFLjQ1QZhUjZppukQ=";
     };
 
@@ -114,21 +144,18 @@ in rec {
         Type=Application
         Name=Droid-ify
         Exec=$out/bin/run-droidify
-        Icon=${pkgs.fetchurl {
-          url = "https://raw.githubusercontent.com/Droid-ify/client/master/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png";
-          sha256 = "sha256-r3hKlaMSnnNelZ67NMzuBWbieKcB2CcriTh7TSD+PK0=";
-        }}
+        Icon=${
+          pkgs.fetchurl {
+            url =
+              "https://raw.githubusercontent.com/Droid-ify/client/master/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png";
+            sha256 = "sha256-r3hKlaMSnnNelZ67NMzuBWbieKcB2CcriTh7TSD+PK0=";
+          }
+        }
         Categories=Application;
         EOF
       '';
     };
-  in
-    droidifyWrapper;
-
-
-
-
-
+  in droidifyWrapper;
 
   writeNuScript = name:
     (script:
@@ -140,3 +167,6 @@ in rec {
         destination = "/bin/${name}";
       });
 }
+
+#packages
+#builtins.mapAttrs mkPkgOrShell packages

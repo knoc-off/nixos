@@ -1,29 +1,38 @@
-{ pkgs, theme }:
+{ pkgs, theme, firefox-csshacks }:
 
 { enableSidebarCustomization ? false
-, enableTabsCustomization ? false
+, hideTabs ? false
 , enableColorScheme ? false
-, enableAutohideFeatures ? false
+, autohideToolbox ? false
+, autohideSidebar ? false
 , extraStyles ? ""
 }:
 
 let
-  firefox-csshacks = pkgs.fetchFromGitHub {
-    owner = "MrOtherGuy";
-    repo = "firefox-csshacks";
-    rev = "31cb27a5d8e11a4f35499ea9d75cc9939399d915";
-    sha256 = "sha256-ALLqHSEk4oC0/KsALYmQyXg4GtxYiOy4bquLjC+dhng=";
-  };
 
-  sidebarCustomization = import ./userChrome/sidebar.nix { inherit theme; };
+
+  sidebarCustomization = import ./userChrome/sidebar.nix { inherit theme firefox-csshacks; };
   tabsCustomization = import ./userChrome/tabs.nix;
   colorScheme = import ./userChrome/colors.nix { inherit theme; };
-  autohideFeatures = import ./userChrome/autohide.nix { inherit firefox-csshacks; };
 
 in ''
-  ${if enableAutohideFeatures then autohideFeatures else ""}
+
+
+  ${if autohideToolbox then ''@import "${firefox-csshacks}/chrome/autohide_toolbox.css";'' else ""}
+  ${if autohideSidebar then ''@import "${firefox-csshacks}/chrome/autohide_sidebar.css";'' else ""}
   ${if enableSidebarCustomization then sidebarCustomization else ""}
-  ${if enableTabsCustomization then tabsCustomization else ""}
+  ${if hideTabs then ''
+      /* Hide native tabs (useful with Sidebery extension) */
+      #TabsToolbar {
+        visibility: collapse;
+      }
+
+      /* Hide window controls (minimize, close, etc.) */
+      .titlebar-buttonbox-container,
+      .titlebar-spacer[type="post-tabs"] {
+        display: none;
+      }
+    '' else ""}
   ${if enableColorScheme then colorScheme else ""}
   ${extraStyles}
 ''
