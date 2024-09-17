@@ -52,7 +52,7 @@ in {
       userChrome = mkUserChrome {
         enableSidebarCustomization = true;
         hideTabs = true;
-        enableColorScheme = true;
+        enableColorScheme = false;
         autohideToolbox = true;
         autohideSidebar = true;
         extraStyles = ''
@@ -102,7 +102,7 @@ in {
       userChrome = mkUserChrome {
         enableSidebarCustomization = true;
         hideTabs = true;
-        enableColorScheme = true;
+        enableColorScheme = false;
         autohideToolbox = true;
         autohideSidebar = true;
         extraStyles = ''

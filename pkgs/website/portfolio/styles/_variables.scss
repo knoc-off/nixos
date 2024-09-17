@@ -1,0 +1,57 @@
+@use "sass:color";
+
+// Font
+$font-stack: "Helvetica Neue", Arial, sans-serif;
+
+// Base Color Palette
+$color-primary: #1a2a3a;
+$color-secondary: #3b1c1a;
+$color-tertiary: #4caf50;
+
+$color-accent-1: #007bff;
+$color-accent-2: #6b7d8f;
+
+// Semantic Colors
+$color-success: color.adjust($color-primary, $hue: 120deg, $saturation: 50%, $lightness: 20%);
+$color-info: color.adjust($color-accent-1, $lightness: -10%);
+$color-warning: color.adjust($color-accent-2, $hue: 45deg, $saturation: 100%, $lightness: 50%);
+$color-danger: color.adjust($color-primary, $hue: -60deg, $saturation: 70%, $lightness: 20%);
+
+// Neutral Colors
+$color-white: #ffffff;
+$color-black: #000000;
+
+// Neutral shades (derived from $color-primary)
+$neutral-100: color.adjust($color-primary, $lightness: 77%, $saturation: -10%);
+$neutral-200: color.adjust($color-primary, $lightness: 70%, $saturation: -10%);
+$neutral-300: color.adjust($color-primary, $lightness: 60%, $saturation: -10%);
+$neutral-400: color.adjust($color-primary, $lightness: 50%, $saturation: -10%);
+$neutral-500: color.adjust($color-primary, $lightness: 40%, $saturation: -10%);
+$neutral-600: color.adjust($color-primary, $lightness: 30%, $saturation: -10%);
+$neutral-700: color.adjust($color-primary, $lightness: 20%, $saturation: -10%);
+$neutral-800: color.adjust($color-primary, $lightness: 10%, $saturation: -10%);
+$neutral-900: color.adjust($color-primary, $lightness: 05%, $saturation: -10%);
+
+// Derived Colors
+$color-base: $color-white;
+$background-color: color.adjust($color-primary, $lightness: 80%, $saturation: -100%);
+$color-surface-light: $neutral-100;
+$color-surface: $color-white;
+$color-surface-dark: $neutral-200;
+$color-text-primary: $color-primary;
+$color-text-secondary: color.adjust($color-primary, $lightness: 10%, $saturation: -5%);
+$color-text-tertiary: color.adjust($color-primary, $lightness: 15%, $saturation: -10%);
+$color-text-body: $neutral-800;
+$color-interactive: $color-surface-light;
+$color-interactive-hover: color.scale($color-accent-1, $lightness: -10%);
+$color-shadow: color.change($color-primary, $alpha: 0.1);
+
+// Additional variations
+$color-primary-light: color.scale($color-primary, $lightness: 30%);
+$color-primary-dark: color.scale($color-primary, $lightness: -20%);
+$color-secondary-light: color.scale($color-secondary, $lightness: 30%);
+$color-secondary-dark: color.scale($color-secondary, $lightness: -20%);
+$color-tertiary-light: color.scale($color-tertiary, $lightness: 30%);
+$color-tertiary-dark: color.scale($color-tertiary, $lightness: -20%);
+$color-accent-1-transparent: color.change($color-accent-1, $alpha: 0.7);
+$color-accent-2-complementary: color.complement($color-accent-2);

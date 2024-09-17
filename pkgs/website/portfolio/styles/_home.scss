@@ -1,0 +1,152 @@
+@use "variables" as *;
+
+.home {
+  // Typography
+  h1 {
+    font-size: 2.75rem;
+    margin: 0;
+    color: $color-text-primary;
+  }
+
+  h2 {
+    font-size: 1.5rem;
+    margin: 0;
+    padding-top: 0;
+    color: $color-text-secondary;
+  }
+
+  h3 {
+    font-size: 1rem;
+    margin: 0 0 10px 0;
+    color: $color-text-tertiary;
+  }
+
+  p, ul, li {
+    font-size: 1rem;
+    line-height: 1.4;
+    color: $color-text-body;
+  }
+
+  ul {
+    padding-left: 20px;
+    margin-bottom: 15px;
+  }
+
+  // Main Content
+  main {
+    padding: 20px;
+    min-width: 300px;
+    background-color: $color-surface;
+
+    section {
+      background: $color-surface;
+      padding: 20px;
+      margin: 20px auto;
+    }
+  }
+
+  // Projects List
+  .projects-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+
+    a {
+      text-decoration: none;
+      color: inherit;
+
+      &:hover .project-item {
+        background-color: $color-interactive;
+      }
+    }
+
+    .project-item {
+      border: 1px solid $color-surface-dark;
+      padding: 20px;
+      border-radius: 8px;
+      background-color: $color-surface;
+      box-shadow: 0 2px 5px $color-shadow;
+      transition: background-color 0.3s;
+
+      .header {
+        display: flex;
+        align-items: center;
+
+        img {
+          width: 50px;
+          height: 50px;
+          margin-right: 15px;
+          border-radius: 50%;
+        }
+
+        .title h2 {
+          margin: 0;
+        }
+      }
+
+      .markdown-view {
+        padding-top: 10px;
+
+        .markdown-content p {
+          margin: 5px 0;
+          padding-top: 0;
+          margin-top: 0;
+        }
+      }
+    }
+  }
+
+  // About Me Section
+  .about-container {
+    display: flex;
+    max-width: 50rem;
+    align-items: flex-start;
+
+    .markdown-content {
+      min-width: 200px;
+
+      p {
+        padding-top: 0;
+        margin-top: 0;
+      }
+    }
+  }
+
+  .about-image {
+    width: 200px;
+    height: auto;
+    margin-right: 40px;
+    margin-bottom: 20px;
+    box-shadow: 4px 4px 0px $color-shadow;
+  }
+
+  // Media Queries
+  @media (max-aspect-ratio: 3/4) {
+    main {
+      padding: 10px;
+    }
+
+    .projects-list {
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    }
+
+    .project-item {
+      padding: 10px;
+    }
+
+    .about-container {
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+
+      .about-image {
+        margin-right: 0;
+        margin-bottom: 20px;
+      }
+
+      .markdown-content {
+        min-width: 0;
+      }
+    }
+  }
+}

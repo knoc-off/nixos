@@ -5,8 +5,7 @@
   addons = inputs.firefox-addons.packages.${pkgs.system};
 in
   with addons; [
-
-    bypass-paywalls-clean
+    #bypass-paywalls-clean
 
     # Privacy and Security
     ublock-origin # best ad blocker
@@ -30,9 +29,6 @@ in
     cookie-autodelete # deletes cookies when tab is closed
 
     tridactyl # best vim plugin
-
-    # Kagi addon - Addon hardly works. :(
-    kagi-search
 
     # user script manager.
     violentmonkey
