@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "removed_steam___________________________________________________________________streamlined_firefox.";
+  system.nixos.label = "removed_steam___________________________________________________________________________intermediate";
 }

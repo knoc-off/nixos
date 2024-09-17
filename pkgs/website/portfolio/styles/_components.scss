@@ -1,0 +1,136 @@
+@use "variables" as *;
+
+// Button styles
+.button {
+  display: inline-block;
+  padding: 0.5em 1em;
+  border: none;
+  border-radius: 4px;
+  background-color: $color-primary;
+  color: $color-white;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+
+  &:hover {
+    background-color: $color-primary-dark;
+  }
+
+  &.button-secondary {
+    background-color: $color-secondary;
+
+    &:hover {
+      background-color: $color-secondary-dark;
+    }
+  }
+}
+
+// Card styles
+.card {
+  background-color: $color-surface;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba($color-black, 0.1);
+  padding: 1.5em;
+  margin-bottom: 1.5em;
+
+  .card-title {
+    font-size: 1.25em;
+    margin-bottom: 0.5em;
+    color: $color-text-primary;
+  }
+
+  .card-content {
+    color: $color-text-body;
+  }
+}
+
+// Navbar styles
+.navbar {
+  background-color: $color-primary;
+  padding: 1em 0;
+
+  .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .navbar-brand {
+    font-size: 1.5em;
+    color: $color-white;
+    text-decoration: none;
+  }
+
+  .navbar-menu {
+    display: flex;
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+
+    li {
+      margin-left: 1em;
+    }
+
+    a {
+      color: $color-white;
+      text-decoration: none;
+      transition: color 0.3s ease;
+
+      &:hover {
+        color: $color-accent-1;
+      }
+    }
+  }
+}
+
+// Form styles
+.form-group {
+  margin-bottom: 1em;
+
+  label {
+    display: block;
+    margin-bottom: 0.5em;
+    color: $color-text-secondary;
+  }
+
+  input[type="text"],
+  input[type="email"],
+  textarea {
+    width: 100%;
+    padding: 0.5em;
+    border: 1px solid $neutral-300;
+    border-radius: 4px;
+    font-family: $font-stack;
+  }
+
+  textarea {
+    min-height: 100px;
+  }
+}
+
+// Alert styles
+.alert {
+  padding: 1em;
+  border-radius: 4px;
+  margin-bottom: 1em;
+
+  &.alert-success {
+    background-color: $color-success;
+    color: $color-white;
+  }
+
+  &.alert-info {
+    background-color: $color-info;
+    color: $color-white;
+  }
+
+  &.alert-warning {
+    background-color: $color-warning;
+    color: $color-text-primary;
+  }
+
+  &.alert-danger {
+    background-color: $color-danger;
+    color: $color-white;
+  }
+}

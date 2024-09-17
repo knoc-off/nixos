@@ -1,0 +1,188 @@
+@use "variables" as *;
+
+.cover-letter-page {
+  // Variables
+  --a4-ratio: 1.4142857143;
+  --container-width: min(calc(100vh / var(--a4-ratio)), 100vw);
+  --container-height: min(calc(var(--container-width) * var(--a4-ratio)), 100vh);
+  --base-font-size: calc(var(--container-height) / 60);
+
+  // Colors
+  --h1-color: #{$color-text-primary};
+  --h2-color: #{$color-text-secondary};
+  --h3-color: #{$color-text-tertiary};
+  --body-color: #{$color-text-body};
+  --background-color: #{$background-color};
+  --main-bg-color: #{$color-surface};
+  --shadow-color: #{$color-shadow};
+
+  // Font sizes
+  --h1-size: calc(var(--base-font-size) * 2);
+  --h2-size: calc(var(--base-font-size) * 1.5);
+  --h3-size: calc(var(--base-font-size) * 1.25);
+  --body-size: var(--base-font-size);
+  --icon-size: calc(var(--base-font-size) * 1.2);
+
+  // Reset
+  h1, h2, h3, p, ul, li {
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  ul {
+    padding-left: 2em;
+  }
+
+  // Base styles
+  width: var(--container-width);
+  height: calc(var(--container-height) - 6em);
+  margin: 1em auto;
+  padding: 0em;
+  position: relative;
+  background-color: var(--background-color);
+  overflow: hidden;
+  font-size: var(--base-font-size);
+  box-shadow: 0 0 10px var(--shadow-color);
+
+  // Typography
+  h1 { font-size: var(--h1-size); color: var(--h1-color); font-weight: 700; }
+  h2 { font-size: var(--h2-size); color: var(--h2-color); font-weight: 600; }
+  h3 { font-size: var(--h3-size); color: var(--h3-color); font-weight: 500; }
+  p, ul, li { font-size: var(--body-size); color: var(--body-color); font-weight: 400; }
+
+  .cover-letter {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .letter-body {
+    padding: 2em;
+  }
+
+  .recipient {
+    padding-left: 2em;
+    p {
+      color: rgba($color-text-tertiary, 0.50);
+    }
+  }
+
+  .header {
+    padding: 1em;
+    background: $color-surface-light;
+    margin-bottom: 2em;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+
+    .name-title {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .title {
+      font-size: 1.5rem;
+      margin-top: 0.5em;
+      font-weight: normal;
+    }
+
+    .name {
+      line-height: 1.2;
+      display: flex;
+      flex-direction: column;
+      font-size: 3.0rem;
+      span {
+        font-weight: 700;
+      }
+    }
+
+    .contact {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      text-align: right;
+
+      a {
+        text-decoration: none;
+        color: inherit;
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+      }
+
+      .social {
+        display: none;
+        justify-content: flex-end;
+        margin-top: 0.5em;
+        gap: 0.5em;
+        margin-right: 0.5em;
+
+        a.image-link {
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+        }
+
+        img {
+          width: 2em;
+          height: 2em;
+          box-shadow: 0.3em 0.3em 0 $color-shadow;
+        }
+
+        .link-text {
+          display: none;
+        }
+      }
+
+      .icon {
+        font-family: "Font Awesome 6 Free";
+        font-weight: 900;
+        font-size: var(--icon-size);
+        width: 1.5em;
+        height: 1.5em;
+        text-align: center;
+        margin-left: 0.5em;
+        order: 1;
+        transition: color 0.3s;
+
+        &:hover {
+          color: $color-interactive-hover;
+        }
+      }
+    }
+  }
+
+  .letter-body {
+    flex-grow: 1;
+
+    .greeting {
+      font-size: var(--h2-size);
+      color: var(--h2-color);
+      margin-bottom: 1em;
+    }
+
+    p {
+      margin-bottom: 1em;
+      line-height: 1.6;
+    }
+
+    .closing {
+      margin-top: 2em;
+    }
+
+    .signature {
+      height: 3em;
+      margin-top: 1em;
+    }
+  }
+
+  @media print {
+    box-shadow: none;
+    padding: 0;
+
+    .header, .recipient, .letter-body {
+      page-break-inside: avoid;
+    }
+  }
+}

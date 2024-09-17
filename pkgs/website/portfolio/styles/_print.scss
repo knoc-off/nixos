@@ -1,0 +1,73 @@
+@use "variables" as *;
+
+@page {
+  size: auto;
+  margin: 0mm;
+}
+
+@media print {
+  @page {
+    size: auto;
+    margin: 0mm;
+  }
+
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .resume {
+    --base-font-size: calc(var(--container-height) / 70);
+
+    border: 0px solid $color-primary;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+
+    .resume-project-languages {
+      height: 0.75mm !important;
+
+      .resume-project-language {
+        margin-right: 1% !important;
+        border-radius: 1em !important;
+      }
+    }
+
+    .header,
+    .photo,
+    .main,
+    .sidebar {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .header {
+      background-color: $color-surface-light !important;
+    }
+
+    .main {
+      background-color: $color-surface !important;
+    }
+
+    .sidebar {
+      background-color: $color-surface-dark !important;
+    }
+
+    .social img {
+      box-shadow: 1mm 1mm 0 $color-shadow !important;
+    }
+
+    .main section,
+    .sidebar section {
+      page-break-inside: avoid;
+    }
+  }
+
+  .no-print {
+    display: none !important;
+  }
+}

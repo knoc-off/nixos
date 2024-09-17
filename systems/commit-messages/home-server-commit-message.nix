@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "big_restructure_________________________________________________________________streamlined_firefox.";
+  system.nixos.label = "big_restructure_________________________________________________________________________intermediate";
 }
