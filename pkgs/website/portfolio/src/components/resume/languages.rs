@@ -16,7 +16,6 @@ pub struct LanguagesProps {
 pub fn languages_section(props: &LanguagesProps) -> Html {
     html! {
         <section>
-            <h2>{"LANGUAGES"}</h2>
             <div class="spoken-language-section">
                 { props.languages.iter().map(|lang| html! {
                     <div class="spoken-language">

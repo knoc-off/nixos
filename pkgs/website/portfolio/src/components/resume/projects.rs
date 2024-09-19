@@ -26,7 +26,6 @@ pub struct ProjectsProps {
 pub fn projects_section(props: &ProjectsProps) -> Html {
     html! {
         <section>
-            <h2>{"PROJECTS"}</h2>
             {for props.projects.iter().map(|project| html! {
                 <div class="resume-project">
                     <div class="resume-project-header">

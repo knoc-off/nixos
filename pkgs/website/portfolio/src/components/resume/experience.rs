@@ -18,7 +18,6 @@ pub struct ExperienceProps {
 pub fn experience_section(props: &ExperienceProps) -> Html {
     html! {
         <section>
-            <h2>{"EXPERIENCE"}</h2>
             {for props.experiences.iter().map(|exp| html!(
                 <div>
                     <div class="title-with-detail">

@@ -72,6 +72,12 @@ in rec {
     inherit (rustPkgs) callPackage;
   };
 
+  #nixpkgs#fira-code-nerdfont
+  nerd-ext = import ./svg-tools/icon-extractor {
+    inherit pkgs;
+    fontPath =
+      "${pkgs.fira-code-nerdfont}/share/fonts/truetype/NerdFonts/FiraCodeNerdFontMono-Regular.ttf";
+  };
   material-icons-ext = import ./svg-tools/icon-extractor {
     inherit pkgs;
     fontPath =

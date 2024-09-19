@@ -16,8 +16,8 @@ pub fn header(props: &HeaderProps) -> Html {
         <div class="header">
             <div class="name-title">
                 <div class="name">
-                    <span class="first-name">{ &props.name.first.to_uppercase() }</span>
-                    <span class="last-name">{ &props.name.last.to_uppercase() }</span>
+                    <span class="first-name">{ &props.name.first }</span>
+                    <span class="last-name">{ &props.name.last }</span>
                 </div>
                 <h2 class="title">{ &props.title }</h2>
             </div>

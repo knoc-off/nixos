@@ -45,6 +45,29 @@
     }
   }
 
+  // Social links
+  .image-link {
+    .link-text {
+      visibility: collapse;
+    }
+
+    display: flex;
+    gap: 1em;
+    justify-content: flex-start;
+    margin-top: 1em;
+
+    img {
+      width: 2em !important;
+      height: 2em !important;
+      box-shadow: 0.3em 0.3em 0 var(--shadow-color) !important;
+      filter: grayscale(100%);
+      transition: filter 0.3s;
+
+      &:hover {
+        filter: grayscale(0%);
+      }
+    }
+  }
   // Projects List
   .projects-list {
     display: grid;

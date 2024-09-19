@@ -49,8 +49,8 @@ This nix-flake exports a carbon copy of the editor i use daily. this makes it ex
             <main>
                 <section>
                     <AboutSection />
-                    <h2>{ "My Projects:" }</h2>
-                    <Projects projects={projects} />
+                    //<h2>{ "My Projects:" }</h2>
+                    //<Projects projects={projects} />
                 </section>
             </main>
             <Footer />
