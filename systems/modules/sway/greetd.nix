@@ -19,8 +19,6 @@ in {
   };
 
   environment.etc."greetd/environments".text = ''
-    sway
-    zsh
     bash
   '';
 }

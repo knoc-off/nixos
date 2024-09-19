@@ -10,7 +10,7 @@
     pv
   ];
   imports = [
-    ./zsh.nix
+    #./zsh.nix
     #./fish.nix
     ./nushell.nix
     ./scripts.nix
