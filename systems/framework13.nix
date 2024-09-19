@@ -57,6 +57,9 @@
     # Android emulation
     #./modules/virtualisation/waydroid.nix
     ./modules/gtk
+
+    # enable bash shell customizations
+    ./modules/shell/bash.nix
   ];
 
   # fingerpritn scanner does not work without this, suddenly.
@@ -218,16 +221,12 @@
     fontconfig.defaultFonts = { monospace = [ "FiraCode Nerd Font Mono" ]; };
   };
 
-  programs.zsh.enable = true;
+  programs.zsh.enable = false;
+  users.defaultUserShell = pkgs.bash;
   users.users.knoff = {
     initialPassword = "password";
     isNormalUser = true;
-    shell = if config.programs.zsh.enable then
-      pkgs.zsh
-    else if config.programs.fish.enable then
-      pkgs.fish
-    else
-      pkgs.bash;
+    shell = pkgs.bash;
     extraGroups = [ "wheel" "networkmanager" "audio" "video" "dialout" ];
     openssh.authorizedKeys.keys = [ ];
   };

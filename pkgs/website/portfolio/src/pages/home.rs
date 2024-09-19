@@ -1,5 +1,5 @@
-use yew::prelude::*;
 use crate::components::main_content::MainContent;
+use yew::prelude::*;
 
 #[function_component(Home)]
 pub fn home() -> Html {
@@ -9,3 +9,4 @@ pub fn home() -> Html {
         </div>
     }
 }
+

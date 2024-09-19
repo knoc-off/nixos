@@ -1,5 +1,9 @@
 { pkgs, theme, ... }: {
-  imports = [ ./kitty ./shell ./programs/btop.nix ];
+  imports = [
+    ./kitty
+    ./shell
+    ./programs/btop.nix
+  ];
 
   home.packages = with pkgs; [
     btop # htop but better

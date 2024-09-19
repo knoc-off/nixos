@@ -12,7 +12,6 @@ let
 
 
   sidebarCustomization = import ./userChrome/sidebar.nix { inherit theme firefox-csshacks; };
-  tabsCustomization = import ./userChrome/tabs.nix;
   colorScheme = import ./userChrome/colors.nix { inherit theme; };
 
 in ''

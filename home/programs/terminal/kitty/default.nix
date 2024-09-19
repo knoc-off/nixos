@@ -19,7 +19,7 @@ in {
       name = "FiraCode Nerd Font Mono"; #config.fonts.fontconfig.defaultFonts.monospace; # Smart
       size = 15;
     };
-    shellIntegration.enableZshIntegration = true;
+    shellIntegration.enableZshIntegration = false;
     keybindings = {
       "ctrl+t" = "new_os_window_with_cwd";
       "ctrl+shift+t" = "new_window_with_cwd";

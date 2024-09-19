@@ -14,7 +14,7 @@
           installCargo = true;
           installRustc = true;
         };
-        tsserver.enable = true;
+        ts-ls.enable = true;
       };
       keymaps = {
         silent = true;

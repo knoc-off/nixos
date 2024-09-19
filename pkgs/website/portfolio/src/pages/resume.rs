@@ -25,7 +25,7 @@ pub fn resume() -> Html {
     html! {
         <div>
             <button class="print-button no-print" onclick={print_resume}>{"Print Resume"}</button>
-            <div class="resume">
+            <div class="resume a4-paper">
                 // Add the print button
                 <div class="grid">
                     <Header
