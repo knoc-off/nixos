@@ -39,21 +39,23 @@ pub fn resume() -> Html {
                     </div>
 
                     <div class="main">
+                        <h2>{"Experience"}</h2>
                         <ExperienceSection experiences={resume_data.experience.clone()} />
+                        <h2>{"Education"}</h2>
                         <EducationSection education={resume_data.education.clone()} />
+                        <h2>{"Project Highlight"}</h2>
                         <ProjectsSection projects={resume_data.projects.clone()} />
                     </div>
 
                     <div class="sidebar">
+                        <h2>{"Languages"}</h2>
                         <LanguagesSection languages={resume_data.languages.clone()} />
-                        <SkillsSection skills={resume_data.skills.clone()} />
+
+                        <h2>{"Software"}</h2>
+                        <ItemizedList items={resume_data.software.clone()} />
                         <section>
-                            <h2>{"INTERESTS"}</h2>
-                            <div class="skills">
-                                { resume_data.interests.iter().map(|skill| html! {
-                                    <span>{ skill }</span>
-                                }).collect::<Html>() }
-                            </div>
+                            <h2>{"Interests"}</h2>
+                            <p>{resume_data.interests}</p>
                         </section>
                     </div>
                 </div>
@@ -69,7 +71,7 @@ pub fn create_resume_data() -> ResumeData {
             last: "Selby".to_string(),
             middle: Some("".to_string()),
         },
-        title: "SERVER ADMIN".to_string(),
+        title: "Server Admin, Programmer".to_string(),
         contact: ContactInfo {
             email: "selby@niko.ink".to_string(),
             phone: "+49 176 56615691".to_string(),
@@ -119,7 +121,7 @@ pub fn create_resume_data() -> ResumeData {
             //    ],
             //},
         ],
-        skills: vec![
+        software: vec![
             "Linux".to_string(),
             "NixOS".to_string(),
             "Docker".to_string(),
@@ -134,7 +136,6 @@ pub fn create_resume_data() -> ResumeData {
             "Json".to_string(),
             "Python".to_string(),
             "Git".to_string(),
-            "Project Management".to_string(),
         ],
         education: vec![
             Education {
@@ -175,14 +176,10 @@ pub fn create_resume_data() -> ResumeData {
                 icon: "static/icons/flags/de.svg".to_string(),
             },
         ],
-        interests: vec![
-            "3D printing".to_string(),
-            "Arduino".to_string(),
-            "game development".to_string(),
-            "sketching".to_string(),
-            "board games".to_string(),
-            "cooking".to_string(),
-        ],
+        interests: "I enjoy hosting board game nights
+and cooking for friends and family. I
+also tinker with Arduinos, 3D
+printing, and game development!".to_string(),
 
         projects: vec![
             Project {

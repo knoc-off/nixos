@@ -4,7 +4,7 @@ mod experience;
 mod header;
 mod languages;
 mod projects;
-mod skills;
+mod itemized_list;
 
 pub use contact_info::*;
 pub use education::*;
@@ -12,7 +12,7 @@ pub use experience::*;
 pub use header::*;
 pub use languages::*;
 pub use projects::*;
-pub use skills::*;
+pub use itemized_list::*;
 
 use crate::data::name::Name;
 
@@ -24,9 +24,9 @@ pub struct ResumeData {
     pub summary: String,
     pub photo_path: String,
     pub experience: Vec<Experience>,
-    pub skills: Vec<String>,
+    pub software: Vec<String>,
     pub education: Vec<Education>,
     pub languages: Vec<Language>,
-    pub interests: Vec<String>,
+    pub interests: String,
     pub projects: Vec<Project>,
 }

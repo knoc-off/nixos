@@ -37,7 +37,7 @@ for nix_file in ${SYSTEMS_DIR}/*.nix; do
 
     # Calculate pad amount for the file-specific message
     global_msg_length=${#global_msg}
-    file_msg_pad_amount=$((100 - global_msg_length))
+    file_msg_pad_amount=$((200 - global_msg_length))
 
     # Process the file-specific commit message
     processed_file_msg=$(process_commit_msg "$commit_msg" "$file_msg_pad_amount")

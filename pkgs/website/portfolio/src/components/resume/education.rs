@@ -18,7 +18,6 @@ pub struct EducationProps {
 pub fn education_section(props: &EducationProps) -> Html {
     html! {
         <section>
-            <h2>{"EDUCATION"}</h2>
             {for props.education.iter().map(|edu| html!(
                 <div>
                     <div class="title-with-detail">

@@ -143,7 +143,7 @@ in {
 
 
           # launcher
-          "${mainMod}, SPACE, exec, ${pkgs.ulauncher}/bin/ulauncher"
+          "${mainMod}, SPACE, exec, ${pkgs.ulauncher}/bin/ulauncher" # this launcher sucks
 
           # screenshot
           ", Print, exec, ${pkgs.gscreenshot}/bin/gscreenshot -sc"
@@ -163,8 +163,8 @@ in {
           # playerctl, music control
           ", XF86AudioNext, exec, ${pkgs.playerctl}/bin/playerctl next"
           ", XF86AudioPrev, exec, ${pkgs.playerctl}/bin/playerctl previous"
-          ", XF86AudioPlay, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
-          ", XF86AudioPause, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
+          ", XF86AudioPlay, exec, ${pkgs.playerctl}/bin/playerctl play"
+          ", XF86AudioPause, exec, ${pkgs.playerctl}/bin/playerctl pause"
 
 
           (mvfocus "up" "u")
