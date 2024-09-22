@@ -165,6 +165,7 @@ in {
           ", XF86AudioPrev, exec, ${pkgs.playerctl}/bin/playerctl previous"
           ", XF86AudioPlay, exec, ${pkgs.playerctl}/bin/playerctl play"
           ", XF86AudioPause, exec, ${pkgs.playerctl}/bin/playerctl pause"
+          ", XF86AudioPlayPause, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
 
 
           (mvfocus "up" "u")
