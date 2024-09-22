@@ -1,4 +1,0 @@
-[toolchain]
-channel = "nightly-2023-08-08"  # Use a nightly version known to work with AVR
-targets = ["avr-unknown-gnu-atmega328"]
-components = ["rust-src"]
