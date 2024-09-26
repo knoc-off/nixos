@@ -1,22 +1,22 @@
 {
   name = "dark";
   author = "knoff";
-  base00 = "131415"; # 131415
-  base01 = "1a1c1d"; # 1a1c1d
-  base02 = "242628"; # 242628
-  base03 = "393b3c"; # 393b3c
-  base04 = "adb5bd"; # adb5bd
-  base05 = "ced4da"; # ced4da
-  base06 = "dee2e6"; # dee2e6
-  base07 = "f8f9fa"; # f8f9fa
-  base08 = "F07178"; # F07178
-  base09 = "FF8F40"; # FF8F40
-  base0A = "FFB454"; # FFB454
-  base0B = "B8CC52"; # B8CC52
-  base0C = "95E6CB"; # 95E6CB
-  base0D = "59C2FF"; # 59C2FF
-  base0E = "D2A6FF"; # D2A6FF
-  base0F = "E6B673"; # E6B673
+  base00 = "131415"; #131415
+  base01 = "1a1c1d"; #1a1c1d
+  base02 = "242628"; #242628
+  base03 = "393b3c"; #393b3c
+  base04 = "adb5bd"; #adb5bd
+  base05 = "ced4da"; #ced4da
+  base06 = "dee2e6"; #dee2e6
+  base07 = "f8f9fa"; #f8f9fa
+  base08 = "F07178"; #F07178
+  base09 = "FF8F40"; #FF8F40
+  base0A = "FFB454"; #FFB454
+  base0B = "B8CC52"; #B8CC52
+  base0C = "95E6CB"; #95E6CB
+  base0D = "59C2FF"; #59C2FF
+  base0E = "D2A6FF"; #D2A6FF
+  base0F = "E6B673"; #E6B673
 
   hp = "#FF00FF";
   # these colors are not used in the theme, but are used to find what
