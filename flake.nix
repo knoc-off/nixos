@@ -84,7 +84,6 @@
       flake = false;
     };
 
-
   };
 
   nixConfig = {
@@ -112,9 +111,10 @@
 
       inherit (self) outputs;
 
-      lib = nixpkgs.lib.extend (final: prev: home-manager.lib);
+      #lib = nixpkgs.lib.extend (final: prev: home-manager.lib);
+      inherit (nixpkgs) lib;
 
-      inherit (lib) nixosSystem genAttrs hasPrefix listToAttrs;
+      inherit (lib) nixosSystem listToAttrs;
 
       mkHost = hostname: username: system: {
         name = hostname;
@@ -127,6 +127,7 @@
               system theme # remove this.
             ;
             selfPkgs = self.packages.${system};
+            colorLib = self.lib.${system};
           };
           modules = [
             {
@@ -144,10 +145,10 @@
             inherit system;
             config.allowUnfree = true;
           };
-        in
-        import ./pkgs {
-          inherit inputs self system pkgs shell;
-        };
+        in import ./pkgs { inherit inputs self system pkgs shell; };
+
+
+
 
     in rec {
       packages = forAllSystems (system: mkPkgShell system false);
@@ -157,6 +158,7 @@
 
       overlays = import ./overlays { inherit inputs; };
 
+      lib = forAllSystems (system: import ./lib { inherit (import nixpkgs { inherit system; } ) lib; });
 
       images = {
         rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;
