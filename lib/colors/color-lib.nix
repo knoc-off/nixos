@@ -3,7 +3,7 @@
 let
 
   # Existing functions (assumed to be defined elsewhere)
-  inherit (import ./color-utils.nix { inherit lib; }) convert clamp clampF fmod normHex removeAlpha universal;
+  inherit (import ./color-utils.nix { inherit lib; }) convert clamp clampF fmod normHex removeAlpha universal cbrt;
 
   adjustRgb = rgb: adjustFn:
   let
