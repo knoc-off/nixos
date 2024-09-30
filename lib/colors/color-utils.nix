@@ -1,8 +1,14 @@
 { lib ? import <nixpkgs/lib>, }:
 let
-  inherit (import ./math.nix { inherit lib; }) tan atan sin cos abs sqrt pow cbrt pi;
+  inherit (import ./math.nix { inherit lib; }) tan atan sin cos abs sqrt pow cbrt pi powFloat;
 
   functions = rec {
+
+
+
+    mapAttrs = f: set:
+      builtins.listToAttrs (map (name: { inherit name; value = f name set.${name}; }) (builtins.attrNames set));
+
     # Function to check if a string contains only valid hex characters
     isValidHex = str:
       let
@@ -16,13 +22,11 @@ let
       in
         isValidLength && builtins.all (c: builtins.elem c validChars) chars;
 
-    # Custom min and max functions for floats
-    fmin = x: y: if x < y then x else y;
-    fmax = x: y: if x > y then x else y;
-
-    # Clamp functions using custom fmin and fmax
-    clampF = x: min: max: fmin max (fmax min x);
-    clamp = x: min: max: builtins.floor (fmin max (fmax min x) + 0.5);
+    clampF = x: min: max:
+      if x < min then min
+      else if x > max then max
+      else x;
+    clamp = x: min: max: builtins.floor (lib.min max (lib.max min x) + 0.5);
 
     fmod = x: y: x - y * builtins.floor (x / y);
 
@@ -83,7 +87,7 @@ let
           validationResult = isValidHex cleanHex;
 
           # Normalize the hex code
-          normalizedHex = if builtins.stringLength cleanHex == 3 then
+          normalizedHex = lib.toUpper ( if builtins.stringLength cleanHex == 3 then
             # Expand 3-digit hex to 6-digit
             lib.concatStrings (map (c: c + c) (lib.stringToCharacters cleanHex))
           else if builtins.stringLength cleanHex == 4 then
@@ -92,28 +96,29 @@ let
           else if builtins.elem (builtins.stringLength cleanHex) [6 8] then
             cleanHex
           else
-            throw "Invalid hex color code (wrong length): ${hex}";
+            throw "Invalid hex color code (wrong length): ${hex}");
 
-          # Split the normalized hex code into components
           r = builtins.substring 0 2 normalizedHex;
           g = builtins.substring 2 2 normalizedHex;
           b = builtins.substring 4 2 normalizedHex;
-          a = if builtins.stringLength normalizedHex == 8 then
-                builtins.substring 6 2 normalizedHex
-              else
-                "FF";
-        in if validationResult then {
-          inherit r g b a;
-        }
+          # Split the normalized hex code into components
+          rgb = if builtins.stringLength normalizedHex == 8 then {
+            inherit r g b;
+            a = builtins.substring 6 2 normalizedHex;
+          }
+          else  {
+            inherit r g b;
+          };
+        in if validationResult then rgb
         else
           throw "Invalid hex color code: ${hex}";
 
-      combineHex = { r, g, b, a }:
+      combineHex = { r, g, b, a ? "FF", ...}@hexa:
         let
           padHex = hex:
             if builtins.stringLength hex == 1 then "0${hex}" else hex;
-          result = lib.toUpper "${padHex r}${padHex g}${padHex b}${padHex a}";
-        in if isValidHex result then result else throw "Invalid hex color code: ${result}";
+          result = lib.toUpper "${padHex r}${padHex g}${padHex b}${if (lib.toUpper a) != "FF" then (padHex a) else ""}";
+        in if isValidHex result then result else throw "Invalid hex color code: ${result} \n input: ${builtins.toJSON hexa}";
 
       hexToRgb = hex:
         let
@@ -139,8 +144,8 @@ let
       rgbToHsl = rgb:
         let
           inherit (rgb) r g b a;
-          cmax = fmax r (fmax g b);
-          cmin = fmin r (fmin g b);
+          cmax = lib.max r (lib.max g b);
+          cmin = lib.min r (lib.min g b);
           delta = cmax - cmin;
 
           # Compute Hue
@@ -374,74 +379,6 @@ let
         let
           rgb = okhslToRgb okhsl;
         in rgbToHsl rgb;
-    };
-
-    universal = rec { # Note: Evaluate if keeping this is appropriate based on your project needs
-      toHex = value:
-        let
-          format = helper.determineColorFormat value;
-        in
-          if format == "hex" then normHex value
-          else if format == "rgb" then convert.rgbToHex value
-          else if format == "hsl" then convert.hslToHex value
-          else if format == "okhsl" then convert.okhslToHex (if helper.isOklab value then convert.oklabToOkhsl value else value)
-          else if format == "oklab" then convert.oklabToHex value
-          else throw "Invalid color format for conversion to hex";
-
-      toRgb = value:
-        let
-          format = helper.determineColorFormat value;
-        in
-          if format == "hex" then convert.hexToRgb value
-          else if format == "rgb" then value
-          else if format == "hsl" then convert.hslToRgb value
-          else if format == "okhsl" then convert.okhslToRgb value
-          else if format == "oklab" then convert.oklabToRgb value
-          else throw "Invalid color format for conversion to RGB";
-
-      toHsl = value:
-        let
-          format = helper.determineColorFormat value;
-        in
-          if format == "hex" then convert.hexToHsl value
-          else if format == "rgb" then convert.rgbToHsl value
-          else if format == "hsl" then value
-          else if format == "okhsl" then convert.okhslToHsl value
-          else if format == "oklab" then convert.oklabToHsl (convert.oklabToRgb value)
-          else throw "Invalid color format for conversion to HSL";
-
-      toOklab = value:
-        let
-          format = helper.determineColorFormat value;
-        in
-          if format == "hex" then convert.hexToOklab value
-          else if format == "rgb" then convert.rgbToOklab value
-          else if format == "hsl" then convert.rgbToOklab (convert.hslToRgb value)
-          else if format == "okhsl" then convert.okhslToOklab value
-          else if format == "oklab" then value
-          else throw "Invalid color format for conversion to Oklab";
-
-      toOkhsl = value:
-        let
-          format = helper.determineColorFormat value;
-        in
-          if format == "hex" then convert.hexToOkhsl value
-          else if format == "rgb" then convert.rgbToOkhsl value
-          else if format == "hsl" then convert.hslToOkhsl value
-          else if format == "oklab" then convert.oklabToOkhsl value
-          else if format == "okhsl" then value
-          else throw "Invalid color format for conversion to OKHSL";
-
-      fromOkhsl = value: format:
-        let
-          okhsl = if helper.isOkhsl value then value else universal.toOkhsl value;
-        in
-          if format == "hex" then convert.okhslToHex okhsl
-          else if format == "rgb" then convert.okhslToRgb okhsl
-          else if format == "hsl" then convert.okhslToHsl okhsl
-          else if format == "oklab" then convert.okhslToOklab okhsl
-          else if format == "okhsl" then okhsl
-          else throw "Invalid target format for conversion from OKHSL";
     };
 
     helper = rec {
