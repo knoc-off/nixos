@@ -1,88 +1,165 @@
 # color-lib.nix
 { lib ? import <nixpkgs/lib> }:
 let
-
   types = import ./types.nix { };
-  math = import ./math.nix {inherit lib;};
-  utils = import ./color-utils.nix {inherit lib;};
+  math = import ./math.nix { inherit lib; };
+  utils = import ./color-utils.nix { inherit lib; };
   hex = import ./formats/hex.nix { inherit utils types; };
-  srgb = import ./formats/srgb.nix { inherit math utils types; };
   hsl = import ./formats/hsl.nix { inherit math lib types; };
-  oklab = import ./formats/oklab.nix { inherit math lib utils types srgb; };
+  oklab = import ./formats/oklab.nix { inherit xyz math lib utils types linearRgb; };
   okhsl = import ./formats/okhsl.nix { inherit math utils lib types; };
-  oklch = import ./formats/oklch.nix {inherit math utils types; };
+  oklch = import ./formats/oklch.nix { inherit math utils types; };
+  xyz = import ./formats/xyz.nix { inherit math lib utils types linearRgb; };
+  linearRgb = import ./formats/linearRgb.nix { inherit math utils types; };
+  gammaRgb = import ./formats/gammaRgb.nix { inherit math utils types; };
+in rec {
+  inherit types math utils;
+  inherit hex hsl oklab okhsl oklch xyz linearRgb gammaRgb;
 
+  splitHex = hexStr: types.Hex.check (utils.convert.splitHex hexStr);
 
-  hexStrToOklab = hex:
+  hexStrToRgb = hexStr: hex.ToRgb (splitHex hexStr);
+  rgbToHexStr = rgb: utils.convert.combineHex (gammaRgb.ToHex (types.gammaRgb.strictCheck rgb));
+
+  hexStrToOklab = hexStr:
     let
-      rg = hexStrToRgb hex;
-      rgl = srgb.gammaRgbToLinear rg;
-      ok = oklab.xyzToOklab (oklab.linearRgbToXyz rgl);
+      rgb = hexStrToRgb hexStr;
+      linearRgb' = gammaRgb.ToLinear rgb;
+      xyz' = linearRgb.ToXyz linearRgb';
     in
-      ok;
+      xyz.ToOklab xyz';
 
-  hexStrToRgb = hex: hex.hexToRgb (hex.splitHex hex);
-  rgbToHexStr = rgb: hex.combineHex (hex.rgbToHex rgb);
-
-  # Color manipulation functions
-  adjustOkhsl = { color, hueShift ? 0, saturationScale ? 1, lightnessScale ? 1 }:
+  # Convert hex string to OKHSL
+  hexStrToOkhsl = hexStr:
     let
-      newHue = math.mod (color.h + hueShift) 1;
-      newSaturation = math.clamp { value = color.s * saturationScale; min = 0; max = 1; };
-      newLightness = math.clamp { value = color.l * lightnessScale; min = 0; max = 1; };
+      oklab' = hexStrToOklab hexStr;
+      oklch' = oklab.ToOklch oklab';
     in
-    types.Okhsl.check {
-      h = newHue;
-      s = newSaturation;
-      l = newLightness;
-    };
+      oklch.ToOkhsl oklch';
 
-  # Wrapper functions
-  hexToOkhsl = hex:
+  # Convert OKHSL to hex string
+  okhslToHex = okhsl':
     let
-      oklab = hexStrToOklab hex;
-      oklch = oklch.oklabToOklch oklab;
+      oklch' = okhsl.ToOklch (types.Okhsl.check okhsl');
+      oklab' = oklch.ToOklab oklch';
+      rgb = oklab.ToRgb oklab';
     in
-    oklchToOkhsl oklch;
+      rgbToHexStr rgb;
 
-  okhslToHex = okhsl:
-    let
-      oklch = okhslToOklch okhsl;
-      oklab = oklchToOklab oklch;
-      rgb = oklabToRgb oklab;
-    in
-    rgbToHexStr rgb;
+  # Color manipulation functions for OKHSL
+  okhslmod = {
+    setHue = newHue: color:
+      let
+        color' = types.Okhsl.check color;
+        clampedHue = math.mod newHue 360;
+        newColor = color' // { h = clampedHue; };
+      in
+        types.Okhsl.check newColor;
 
-  manipulateHexColor = { hex, hueShift ? 0, saturationScale ? 1, lightnessScale ? 1 }:
+    setSaturation = newSaturation: color:
+      let
+        color' = types.Okhsl.check color;
+        newColor = color' // { s = math.clamp newSaturation 0 1; };
+      in
+        types.Okhsl.check newColor;
+
+    setLightness = newLightness: color:
+      let
+        color' = types.Okhsl.check color;
+        newColor = color' // { l = math.clamp newLightness 0 1; };
+      in
+        types.Okhsl.check newColor;
+
+    adjustHueBy = deltaHue: color:
+      let
+        color' = types.Okhsl.check color;
+        newHue = math.mod (color'.h + deltaHue) 360;
+        newColor = color' // { h = newHue; };
+      in
+        types.Okhsl.check newColor;
+
+    adjustSaturationBy = deltaSaturation: color:
+      let
+        color' = types.Okhsl.check color;
+        newSaturation = color'.s + deltaSaturation;
+        newColor = color' // { s = math.clamp newSaturation 0 1; };
+      in
+        types.Okhsl.check newColor;
+
+    adjustLightnessBy = deltaLightness: color:
+      let
+        color' = types.Okhsl.check color;
+        newLightness = color'.l + deltaLightness;
+        newColor = color' // { l = math.clamp newLightness 0 1; };
+      in
+        types.Okhsl.check newColor;
+
+    lighten = percent: color:
+      let
+        color' = types.Okhsl.check color;
+        delta = percent / 100.0;
+      in
+        okhslmod.adjustLightnessBy delta color';
+
+    darken = percent: color:
+      let
+        color' = types.Okhsl.check color;
+        delta = (-1.0) * percent / 100.0;
+      in
+        okhslmod.adjustLightnessBy delta color';
+
+    mix = colorA: colorB: weight:
+      let
+        colorA' = types.Okhsl.check colorA;
+        colorB' = types.Okhsl.check colorB;
+        w = math.clamp weight 0.0 1.0;
+        mixValue = a: b: a * (1.0 - w) + b * w;
+        hueDistance = math.mod (colorB'.h - colorA'.h + 540.0) 360.0 - 180.0;
+        newHue = math.mod (colorA'.h + w * hueDistance + 360.0) 360.0;
+        newSaturation = mixValue colorA'.s colorB'.s;
+        newLightness = mixValue colorA'.l colorB'.l;
+        newColor = { h = newHue; s = newSaturation; l = newLightness; };
+      in
+        types.Okhsl.check newColor;
+
+    complement = color:
+      let
+        color' = types.Okhsl.check color;
+      in
+        okhslmod.adjustHueBy 180.0 color';
+
+    invert = color:
+      let
+        color' = types.Okhsl.check color;
+        newHue = math.mod (color'.h + 180.0) 360.0;
+        newSaturation = 1.0 - color'.s;
+        newLightness = 1.0 - color'.l;
+      in
+        types.Okhsl.check { h = newHue; s = newSaturation; l = newLightness; };
+
+    # Wrapper function for adjusting OKHSL color
+    adjustOkhsl = { color, hueShift ? 0.0, saturationScale ? 1.0, lightnessScale ? 1.0 }:
+      let
+        color' = types.Okhsl.check color;
+        adjustedColor = okhslmod.adjustHueBy hueShift color';
+        adjustedSaturation = math.clamp (adjustedColor.s * saturationScale) 0.0 1.0;
+        adjustedLightness = math.clamp (adjustedColor.l * lightnessScale) 0.0 1.0;
+      in
+        types.Okhsl.check {
+          h = adjustedColor.h;
+          s = adjustedSaturation;
+          l = adjustedLightness;
+        };
+  };
+
+  # Wrapper function to manipulate a hex color
+  manipulateHexColor = { hex, hueShift ? 0.0, saturationScale ? 1.0, lightnessScale ? 1.0 }:
     let
-      okhsl = hexToOkhsl hex;
-      adjustedOkhsl = adjustOkhsl {
-        color = okhsl;
+      okhsl' = hexStrToOkhsl hex;
+      adjustedOkhsl = okhslmod.adjustOkhsl {
+        color = okhsl';
         inherit hueShift saturationScale lightnessScale;
       };
     in
-    okhslToHex adjustedOkhsl;
-
-in rec {
-
-  inherit (utils.convert) combineHex;
-
-  splitHex = hex: types.Hex.check ( utils.convert.splitHex hex);
-
-  inherit (hex) hexToRgb rgbToHex;
-  inherit (hsl) hslToRgb rgbToHsl;
-
-  inherit (oklab) oklabToRgb oklabToLinearRgb linearRgbToXyz xyzToOklab oklabToXyz xyzToLinearRgb;
-
-  inherit types;
-
-
-  inherit (srgb ) linearToGammaRgb gammaRgbToLinear;
-
-  inherit (okhsl) oklchToOkhsl okhslToOklch;
-  inherit (oklch) oklabToOklch oklchToOklab;
-
-
-  # New color manipulation functions
-  inherit adjustOkhsl hexToOkhsl okhslToHex manipulateHexColor;
+      okhslToHex adjustedOkhsl;
 }
