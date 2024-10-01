@@ -32,6 +32,24 @@ rec {
     alpha = xyz.alpha;
   };
 
+
+
+  ToOklch = oklab:
+    let
+      lab = types.Oklab.strictCheck oklab;
+      C = math.sqrt (lab.a * lab.a + lab.b * lab.b);
+      h = math.atan2 lab.b lab.a;
+      h_degrees = h * 180 / math.pi;
+      h_positive = if h_degrees < 0 then h_degrees + 360 else h_degrees;
+      result = {
+        L = lab.L;
+        C = C;
+        h = h_positive;
+      };
+    in
+    types.Oklch.check (result // (if lab ? alpha then { inherit (lab) alpha; } else { alpha = 1.0; }));
+
+
   # Combined sRGB to Oklab conversion
   rgbToOklab = rgb:
     xyzToOklab (linearRgbToXyz (srgb.srgbToLinearRgb rgb));

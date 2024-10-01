@@ -1,33 +1,52 @@
-# formats/okhsl.nix
-{ math, utils, lib }:
+# formats/oklch_okhsl.nix
+{ math, lib, utils, types }:
+let
+  # Helper functions
+  toe = x:
+    let
+      k1 = 0.206;
+      k2 = 0.03;
+      k3 = (1.0 + k1) / (1.0 + k2);
+    in 0.5 * (k3 * x - k1 + math.sqrt ((math.powFloat (k3 * x - k1) 2) + (4.0 * k2 * k3 * x)));
 
+  toe_inv = x:
+    let
+      k1 = 0.206;
+      k2 = 0.03;
+      k3 = (1.0 + k1) / (1.0 + k2);
+    in (x * x + k1 * x) / (k3 * (x + k2));
+
+  # Function to calculate Saturation correctly
+  calculateSaturation = { C, L }:
+    let
+      Cmax = 1.0 - math.abs (2.0 * L - 1.0);
+    in
+      if Cmax > 0.0 then C / Cmax else 0.0;
+
+in
 {
-  # Convert OkLab to OkHSL
-  oklabToOkhsl = { L, a, b, alpha ? 1 }: let
-    C = math.sqrt (a * a + b * b);
-    h = math.atan2 b a;
-    # Ensure h is in the range [0, tau)
-    h' = if h < 0 then h + math.tau else h;
-    # Calculate saturation based on Lightness and Chroma
-    denominator = 1 - math.abs (2 * L - 1);
-    S = if denominator > 0 then C / denominator else 0;
-  in {
-    h = h';  # Hue in radians
-    S = utils.clamp S 0 1;  # Ensure S is within [0, 1]
-    L = L;
-    alpha = alpha;
-  };
+  oklchToOkhsl = oklch:
+    let
+      lch = types.Oklch.strictCheck oklch;
+      l_mapped = toe lch.L;  # Apply the toe function to lightness
+      S = calculateSaturation { C = lch.C; L = lch.L; };
+    in
+      types.Okhsl.check {
+        h = lch.h;
+        s = S;
+        l = l_mapped;
+      };
 
-  # Convert OkHSL back to OkLab
-  okhslToOklab = { h, S, L, alpha ? 1 }: let
-    # Calculate Chroma from Saturation and Lightness
-    C = if (1 - math.abs (2 * L - 1)) > 0 then S * (1 - math.abs (2 * L - 1)) else 0;
-    a = C * math.cos h;
-    b = C * math.sin h;
-  in {
-    L = L;
-    a = a;
-    b = b;
-    alpha = alpha;
-  };
+  okhslToOklch = okhsl:
+    let
+      olhsl = types.Okhsl.strictCheck okhsl;
+      L_linear = toe_inv olhsl.l;  # Invert the toe function to get original lightness
+      Cmax = 1.0 - math.abs (2.0 * L_linear - 1.0);
+      C = if Cmax > 0.0 then olhsl.s * Cmax else 0.0;
+    in
+      types.Oklch.check {
+        L = L_linear;
+        C = C;
+        h = olhsl.h;
+      };
 }

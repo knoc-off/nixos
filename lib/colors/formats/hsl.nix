@@ -31,7 +31,7 @@ hslToRgb = hsl@{ h, s, l, a ? 1.0, meta ? {} }:
       { r = x; g = 0; b = c; }
       { r = c; g = 0; b = x; }
     ] (builtins.floor h');
-  in types.RGB.check ({
+  in types.sRGB.check ({
     r = rgb'.r + m;
     g = rgb'.g + m;
     b = rgb'.b + m;

@@ -20,21 +20,7 @@ rec {
   # Absolute value of `x`
   fabs = abs;
 
-  #cbrt = x: let
-  #  absX = abs (1.0 * x);  # Ensure we're working with floats
-  #  helper = guess: let
-  #    newGuess = (2 * guess + absX / (guess * guess)) / 3;
-  #  in
-  #    if (abs (newGuess - guess)) < epsilon
-  #    then newGuess
-  #    else helper newGuess;
-  #  result = helper (if absX < 1 then absX else absX / 3);  # Better initial guess
-  #in
-  #  if x < 0
-  #  then 0 - result
-  #  else result;
-
-    # Accurate cube root implementation
+  # Accurate cube root implementation
   cbrt = x: let
     absX = abs x + 0.0;
     helper = guess: let
@@ -46,26 +32,7 @@ rec {
     initialGuess = if absX < 1 then absX else absX / 3;
     result = helper initialGuess;
   in
-    if x < 0 then -result else result;
-
-  #cbrt = x: let
-  #  sign = if x >= 0.0 then 1 else -1;
-  #  power = if (abs x) > 1.0 then 1 else -1;
-  #  x' = (if power == 1 then 1.0 * x else 1.0 / x) * sign;
-  #  epsilon = 0.0000001;
-  #  bs = l: r: let
-  #    mid = (l + r) / 2.0;
-  #    mid3 = mid * mid * mid;
-  #  in
-  #    if abs (mid3 - x') <= epsilon then mid
-  #    else
-  #      if mid3 < x' then bs mid r
-  #      else bs l mid;
-  #  y' = sign * (bs 0.0 x');
-  #in
-  #  if abs x < epsilon then 0.0 else
-  #  if power == 1 then y' else 1.0 / y';
-
+    if x == 0 then 0 else if x < 0 then -result else result;
 
   # Create a list of numbers from `min` (inclusive) to `max` (exclusive), adding `step` each time.
   arange = min: max: step: let
@@ -170,29 +137,6 @@ rec {
   # Trigonometric function. Takes radian as input.
   tan = x: (sin x) / (cos x);
 
-  # Arctangent function. Polynomial approximation.
-  #atan = x: let
-  #  poly = [
-  #    0.0000000
-  #    0.9999991
-  #    0.0000366
-  #    (0 - 0.3339528)
-  #    0.0056430
-  #    0.1691462
-  #    0.1069422
-  #    (0 - 0.3814731)
-  #    0.3316130
-  #    (0 - 0.1347978)
-  #    0.0222419
-  #  ];
-  #in
-  #  if x < 0
-  #  then -atan (0 - x)
-  #  else if x > 1
-  #  then pi / 2 - atan (1 / x)
-  #  else polynomial x poly;
-
-
   tau = 2 * pi;
 
   atan = x: let
@@ -215,12 +159,6 @@ rec {
     if x == 0 && y > 0 then pi / 2 else
     if x == 0 && y < 0 then (-1) * pi / 2 else
     0.0;
-
-
-
-
-
-
 
   # Degrees to radian.
   deg2rad = x: x * pi / 180;
