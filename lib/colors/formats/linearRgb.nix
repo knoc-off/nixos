@@ -15,7 +15,7 @@ rec {
     };
 
   # CIE XYZ to Oklab conversion
-  xyzToOklab = { X, Y, Z, alpha ? 1, meta ? {} }@xyz: let
+  ToOklab = { X, Y, Z, alpha ? 1, meta ? {} }@xyz: let
     l = 0.8189330101 * xyz.X + 0.3618667424 * xyz.Y - 0.1288597137 * xyz.Z;
     m = 0.0329845436 * xyz.X + 0.9293118715 * xyz.Y + 0.0361456387 * xyz.Z;
     s = 0.0482003018 * xyz.X + 0.2643662691 * xyz.Y + 0.6338517070 * xyz.Z;
@@ -31,6 +31,24 @@ rec {
     inherit L a b;
     alpha = xyz.alpha;
   };
+
+
+
+  ToOklch = oklab:
+    let
+      lab = types.Oklab.strictCheck oklab;
+      C = math.sqrt (lab.a * lab.a + lab.b * lab.b);
+      h = math.atan2 lab.b lab.a;
+      h_degrees = h * 180 / math.pi;
+      h_positive = if h_degrees < 0 then h_degrees + 360 else h_degrees;
+      result = {
+        L = lab.L;
+        C = C;
+        h = h_positive;
+      };
+    in
+    types.Oklch.check (result // (if lab ? alpha then { inherit (lab) alpha; } else { alpha = 1.0; }));
+
 
   # Combined sRGB to Oklab conversion
   rgbToOklab = rgb:

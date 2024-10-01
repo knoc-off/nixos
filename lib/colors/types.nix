@@ -2,181 +2,168 @@
 { }:
 
 let
-  isBetween = value: min: max:
-     value >= min && value <= max;
+  # Helper functions to validate value ranges
+  isBetween = value: min: max: value >= min && value <= max;
+  isIntBetween = value: min: max: builtins.isInt value && value >= min && value <= max;
 
-  isIntBetween = value: min: max:
-    builtins.isInt value && value >= min && value <= max;
+  # Helper to create type definitions with per-attribute validators
+  createType = { name, requiredAttrs, optionalAttrs ? {} }:
 
-  Types = rec {
-    Hex = {
-      name = "Hex";
-      requiredAttrs = ["r" "g" "b"];
-      check = color:
-        let
-          isValidHexPair = value:
-            builtins.isString value &&
-            builtins.stringLength value == 2 &&
-            builtins.match "[0-9A-Fa-f]{2}" value != null;
-        in
-        if builtins.isAttrs color &&
-           builtins.all (attr: builtins.hasAttr attr color && isValidHexPair color.${attr}) ["r" "g" "b"] &&
-           (! builtins.hasAttr "a" color || isValidHexPair color.a)
-        then
-          if builtins.hasAttr "meta" color && color.meta.type == "Hex"
-          then color
-          else color // { meta = { type = "Hex"; }; }
-        else
-          throw "Invalid Hex color: ${builtins.toJSON color}";
-    };
+    let
+      # Function to validate required attributes
+      checkRequired = color:
+        builtins.all (attr:
+          builtins.hasAttr attr color &&
+          requiredAttrs.${attr} (color.${attr})
+        ) (builtins.attrNames requiredAttrs);
 
-    RGB = {
-      name = "RGB";
-      requiredAttrs = ["r" "g" "b"];
-      check = color:
-        if builtins.isAttrs color &&
-           builtins.all (attr:
-             builtins.hasAttr attr color &&
-             isBetween color.${attr} 0.0 1.0
-           ) ["r" "g" "b"]
-        then
-          if builtins.hasAttr "meta" color && color.meta.type == "RGB"
-          then color
-          else color // { meta = { type = "RGB"; }; }
-        else
-          throw "Invalid RGB color: ${builtins.toJSON color}";
-    };
+      # Function to validate optional attributes
+      checkOptional = color:
+        builtins.all (attr:
+          (! builtins.hasAttr attr color) || optionalAttrs.${attr} (color.${attr})
+        ) (builtins.attrNames optionalAttrs);
 
-    sRGB = {
-      name = "sRGB";
-      requiredAttrs = ["r" "g" "b"];
-      check = color:
-        if builtins.isAttrs color &&
-           builtins.all (attr:
-             builtins.hasAttr attr color &&
-             isBetween color.${attr} 0.0 1.0
-           ) ["r" "g" "b"]
-        then
-          if builtins.hasAttr "meta" color && color.meta.type == "sRGB"
-          then color
-          else color // { meta = { type = "sRGB"; }; }
-        else
-          throw "Invalid sRGB color: ${builtins.toJSON color}";
-    };
+      # Combined validation
+      isValid = color:
+        builtins.isAttrs color && checkRequired color && checkOptional color;
 
-    linearRGB = let
-      validateAttrs = color: builtins.all (attr:
-        builtins.hasAttr attr color && isBetween color.${attr} 0.0 1.0
-      ) ["r" "g" "b"];
+      # Update meta.type if necessary
+      updateMeta = color:
+        if builtins.hasAttr "meta" color && color.meta.type == name
+        then color
+        else color // { meta = { type = name; }; };
 
-      errorMsg = color: "Invalid linear RGB color: ${builtins.toJSON color}";
+      # Strict check: ensures meta.type is exactly `name`
+      strictCheck = color:
+        if isValid color && builtins.hasAttr "meta" color && color.meta.type == name
+        then color
+        else if isValid color
+        then throw "Invalid ${name} color type: ${builtins.toJSON color}"
+        else throw "Invalid ${name} color: ${builtins.toJSON color}";
 
-      checkAndUpdate = check: color:
-        if builtins.isAttrs color && validateAttrs color
-        then check color
-        else throw (errorMsg color);
+      # Soft check: updates meta.type if not present or incorrect
+      softCheck = color:
+        if isValid color
+        then updateMeta color
+        else throw "Invalid ${name} color: ${builtins.toJSON color}";
 
     in {
-      name = "linearRGB";
-      requiredAttrs = ["r" "g" "b"];
-
-      strictCheck = checkAndUpdate (color:
-        if color.meta.type == "linearRGB" then color
-        else throw (errorMsg color)
-      );
-
-      softCheck = checkAndUpdate (color:
-        if builtins.hasAttr "meta" color && color.meta.type == "linearRGB"
-        then color
-        else color // { meta = { type = "linearRGB"; }; }
-      );
+      name = name;
+      requiredAttrs = builtins.attrNames requiredAttrs;
+      check = softCheck;
+      strictCheck = strictCheck;
+      softCheck = softCheck;
     };
 
-    HSL = {
+  # Validation functions
+  hexValidate = v:
+    builtins.isString v && builtins.stringLength v == 2 && builtins.match "^[0-9A-Fa-f]{2}$" v != null;
+
+  floatValidate = v: (builtins.isFloat v || builtins.isInt v);
+
+  floatBetween0And1 = v:
+    floatValidate v && isBetween v 0.0 1.0;
+
+  # Define all types using createType
+  Types = rec {
+    # Hex color type
+    Hex = createType {
+      name = "Hex";
+      requiredAttrs = {
+        r = hexValidate;
+        g = hexValidate;
+        b = hexValidate;
+      };
+      optionalAttrs = {
+        a = hexValidate;
+      };
+    };
+
+    sRGB = createType {
+      name = "sRGB"; # Non Gamma ??
+      requiredAttrs = {
+        r = floatBetween0And1;
+        g = floatBetween0And1;
+        b = floatBetween0And1;
+      };
+      optionalAttrs = {
+        a = floatBetween0And1;
+      };
+    };
+
+    # linearRGB color type
+    linearRGB = createType {
+      name = "linearRGB"; # GammaRGB
+      requiredAttrs = {
+        r = floatBetween0And1;
+        g = floatBetween0And1;
+        b = floatBetween0And1;
+      };
+      optionalAttrs = {
+        a = floatBetween0And1;
+      };
+    };
+
+    # HSL color type
+    HSL = createType {
       name = "HSL";
-      requiredAttrs = ["h" "s" "l"];
-      check = color:
-        if builtins.isAttrs color &&
-           builtins.all (attr:
-             builtins.hasAttr attr color &&
-             isBetween color.${attr} 0.0 1.0
-           ) ["h" "s" "l"]
-        then
-          if builtins.hasAttr "meta" color && color.meta.type == "HSL"
-          then color
-          else color // { meta = { type = "HSL"; }; }
-        else
-          throw "Invalid HSL color: ${builtins.toJSON color}";
+      requiredAttrs = {
+        h = floatBetween0And1;
+        s = floatBetween0And1;
+        l = floatBetween0And1;
+      };
+      optionalAttrs = {};
     };
 
-    Oklab = {
+    # Oklab color type
+    Oklab = createType {
       name = "Oklab";
-      requiredAttrs = ["L" "a" "b"];
-      check = color:
-        if builtins.isAttrs color &&
-           builtins.all (attr: builtins.hasAttr attr color) ["L" "a" "b"] &&
-           color.L >= 0 && color.L <= 1 &&
-           color.a >= -0.5 && color.a <= 0.5 &&
-           color.b >= -0.5 && color.b <= 0.5
-        then
-          if builtins.hasAttr "meta" color && color.meta.type == "Oklab"
-          then color
-          else color // { meta = { type = "Oklab"; }; }
-        else
-          throw "Invalid Oklab color: ${builtins.toJSON color}";
+      requiredAttrs = {
+        L = v: floatValidate v && isBetween v 0.0 1.0;
+        a = v: floatValidate v && isBetween v (-0.5) 0.5;
+        b = v: floatValidate v && isBetween v (-0.5) 0.5;
+      };
+      optionalAttrs = {
+        alpha = floatBetween0And1;
+      };
     };
 
-    Okhsl = {
+    # Okhsl color type
+    Okhsl = createType {
       name = "Okhsl";
-      requiredAttrs = ["h" "s" "l"];
-      check = color:
-        if builtins.isAttrs color &&
-           builtins.all (attr:
-             builtins.hasAttr attr color &&
-             isBetween color.${attr} 0.0 1.0
-           ) ["h" "s" "l"]
-        then
-          if builtins.hasAttr "meta" color && color.meta.type == "Okhsl"
-          then color
-          else color // { meta = { type = "Okhsl"; }; }
-        else
-          throw "Invalid Okhsl color: ${builtins.toJSON color}";
+      requiredAttrs = {
+        h = v: isBetween v 0 360;
+        s = floatBetween0And1;
+        l = floatBetween0And1;
+      };
+      optionalAttrs = {};
     };
 
-    Oklch = {
+    # Oklch color type
+    Oklch = createType {
       name = "Oklch";
-      requiredAttrs = ["L" "C" "h"];
-      check = color:
-        if builtins.isAttrs color &&
-           builtins.hasAttr "L" color && isBetween color.L 0.0 1.0 &&
-           builtins.hasAttr "C" color && builtins.isFloat color.C &&
-           builtins.hasAttr "h" color && builtins.isFloat color.h
-        then
-          if builtins.hasAttr "meta" color && color.meta.type == "Oklch"
-          then color
-          else color // { meta = { type = "Oklch"; }; }
-        else
-          throw "Invalid Oklch color: ${builtins.toJSON color}";
+      requiredAttrs = {
+        L = v: floatValidate v && isBetween v 0.0 1.0;
+        C = v: floatValidate v && isBetween v 0 360;
+        h = floatValidate;
+      };
+      optionalAttrs = {};
     };
-    XYZ = {
+
+    # XYZ color type
+    XYZ = createType {
       name = "XYZ";
-      requiredAttrs = ["X" "Y" "Z"];
-      check = color:
-        if builtins.isAttrs color &&
-           builtins.all (attr:
-             builtins.hasAttr attr color &&
-             isBetween color.${attr} 0.0 1.0
-           ) ["X" "Y" "Z"]
-        then
-          if builtins.hasAttr "meta" color && color.meta.type == "XYZ"
-          then color
-          else color // { meta = { type = "XYZ"; }; }
-        else
-          throw "Invalid XYZ color: ${builtins.toJSON color}";
+      requiredAttrs = {
+        X = v: isBetween v 0 0.95048;
+        Y = v: isBetween v 0 1.00001;
+        Z = v: isBetween v 0 1.08906;
+      };
+      optionalAttrs = {
+        a = isBetween 0 1.0;
+
+      };
     };
-
-
-    # You can add more types as needed
   };
+
 in
   Types

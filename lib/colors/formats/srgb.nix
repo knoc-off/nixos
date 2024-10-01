@@ -14,13 +14,19 @@ let
     else 12.92 * c;
 in
 {
-  srgbToLinearRgb = rgb@{ r, g, b, a ? 1, meta ? {} }:
-    types.linearRGB.check (builtins.mapAttrs
+  gammaRgbToLinear = rgb:
+    let
+      rgb' = types.linearRGB.strictCheck rgb;
+    in
+    types.sRGB.check (builtins.mapAttrs
       (k: v: if k == "a" then v else utils.clampF (gammaToLinear v) 0.0 1.0)
-      { inherit r g b a; });
+      { inherit (rgb') r g b a; });
 
-  linearRgbToSrgb = rgb@{ r, g, b, a ? 1, meta ? {} }:
+  linearToGammaRgb = rgb:
+    let
+      rgb' = types.sRGB.strictCheck rgb;
+    in
     types.sRGB.check (builtins.mapAttrs
       (k: v: if k == "a" then v else utils.clampF (linearToGamma v) 0.0 1.0)
-      { inherit r g b a; });
+      { inherit (rgb') r g b a; });
 }
