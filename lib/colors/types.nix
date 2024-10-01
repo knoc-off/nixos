@@ -79,8 +79,8 @@ let
       };
     };
 
-    sRGB = createType {
-      name = "sRGB"; # Non Gamma ??
+    gammaRgb = createType {
+      name = "gammaRgb"; # Non Gamma ??
       requiredAttrs = {
         r = floatBetween0And1;
         g = floatBetween0And1;
@@ -92,7 +92,7 @@ let
     };
 
     # linearRGB color type
-    linearRGB = createType {
+    linearRgb = createType {
       name = "linearRGB"; # GammaRGB
       requiredAttrs = {
         r = floatBetween0And1;

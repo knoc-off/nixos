@@ -4,6 +4,14 @@ rec {
   # https://github.com/xddxdd/nix-math/blob/0750f9a2d52b266a8b2461e1dc31a541bc22655e/default.nix
   inherit (builtins) floor ceil;
 
+
+
+  clamp = x: min: max:
+    if x < min then min
+    else if x > max then max
+    else x;
+  #clamp = x: min: max: builtins.floor (lib.min max (lib.max min x) + 0.5);
+
   pi = 3.14159265358979323846264338327950288;
   epsilon = pow (0.1) 10;
 
