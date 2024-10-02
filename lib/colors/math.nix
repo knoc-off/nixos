@@ -4,7 +4,20 @@ rec {
   # https://github.com/xddxdd/nix-math/blob/0750f9a2d52b266a8b2461e1dc31a541bc22655e/default.nix
   inherit (builtins) floor ceil;
 
+    # Function to compute S_max and T_max based on lightness L
+  computeSTmax = L:
+    let
+      # Prevent division by zero
+      t = L / (1.0 - L + epsilon);
+      S_max = t / (1.0 + t);
+      T_max = 1.0 / (1.0 + t);
+    in
+      {
+        S = clamp S_max 0.0 1.0;
+        T = clamp T_max 0.0 1.0;
+      };
 
+  lerp = a: b: t: a + (b - a) * t;
 
   clamp = x: min: max:
     if x < min then min
