@@ -4,7 +4,6 @@
 let
   # Helper functions to validate value ranges
   isBetween = value: min: max: value >= min && value <= max;
-  isIntBetween = value: min: max: builtins.isInt value && value >= min && value <= max;
 
   # Helper to create type definitions with per-attribute validators
   createType = { name, requiredAttrs, optionalAttrs ? {} }:
@@ -64,7 +63,6 @@ let
   floatBetween0And1 = v:
     floatValidate v && isBetween v 0.0 1.0;
 
-  # Define all types using createType
   Types = rec {
     # Hex color type
     Hex = createType {
@@ -135,6 +133,16 @@ let
         h = v: isBetween v 0 360;
         s = floatBetween0And1;
         l = floatBetween0And1;
+      };
+      optionalAttrs = {};
+    };
+
+    Okhsv = createType {
+      name = "Okhsv";
+      requiredAttrs = {
+        h = v: isBetween v 0 360;
+        s = floatBetween0And1;
+        v = floatBetween0And1;
       };
       optionalAttrs = {};
     };

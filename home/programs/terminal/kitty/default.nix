@@ -1,27 +1,26 @@
 { colorLib, ... }: let
-  ra = x: colorLib.removeAlpha x;
-  sl = colorLib.setLightness;
-  ss = colorLib.setSaturation;
-  mix = colorLib.mix;
-  sh = colorLib.shiftHue;
-  #primaryColor = "#005ebc";
+  sl = l: hex: oklchToHex ( colorLib.oklchmod.setLightness l (colorLib.hexStrToOklch hex));
+  sc = c: hex: oklchToHex ( colorLib.oklchmod.setChroma c (colorLib.hexStrToOklch hex));
+  mix = hex1: hex2: w: oklchToHex ( colorLib.oklchmod.mix (colorLib.hexStrToOklch hex1) (colorLib.hexStrToOklch hex2) w);
+  sh = deg: hex: oklchToHex ( colorLib.oklchmod.adjustHueBy deg (colorLib.hexStrToOklch hex));
+  oklchToHex = colorLib.oklchToHex;
+
   primaryColor = "#268bd2";
 
-  # Function to create a pretty pastel color
+  # Function to create a pastel color with specified lightness and chroma
   makePrettyPastel = color:
     let
-      basePastel = ra (sl (ss color 80) 70);
-      withPrimaryInfluence = mix basePastel primaryColor 15;
+      basePastel = sl 0.70 (sc 0.155 color);
     in
-      ra (sl (ss withPrimaryInfluence 90) 70);
+      basePastel;
 
   # Function to create a light variant
   makeLightVariant = color:
     let
-      lighterColor = ra (sl color 80);
-      slightlyShifted = sh lighterColor 5;
+      lighterColor = sl 0.90 color;
+      slightlyShifted = sh 1 lighterColor;
     in
-      ra (ss slightlyShifted 90);
+      sc 0.25 slightlyShifted;
 
   # Base colors
   baseColors = {
@@ -63,11 +62,11 @@ in {
       visual_bell_duration = "0.0";
 
       # Basic 16 colors
-      color0 = "#${ra (sl baseColors.black 15)}";  # Black
-      color8 = "#${ra (sl baseColors.black 35)}";  # Bright Black (Gray)
+      color0 = "#${sl 0.15 baseColors.black}";  # Black
+      color8 = "#${sl 0.35 baseColors.black}";  # Bright Black (Gray)
 
-      color1 = "#${makePrettyPastel baseColors.red}";  # Red
-      color9 = "#${makeLightVariant color1}";  # Bright Red
+      color1 = "#${makePrettyPastel baseColors.red}";
+      color9 = "#${makeLightVariant color1}";
 
       color2 = "#${makePrettyPastel baseColors.green}";  # Green
       color10 = "#${makeLightVariant color2}";  # Bright Green
@@ -84,20 +83,20 @@ in {
       color6 = "#${makePrettyPastel baseColors.cyan}";  # Cyan
       color14 = "#${makeLightVariant color6}";  # Bright Cyan
 
-      color7 = "#${ra (sl baseColors.white 85)}";  # White
-      color15 = "#${ra (sl baseColors.white 95)}";  # Bright White
+      color7 = "#${sl 0.85 baseColors.white}";  # White
+      color15 = "#${sl 0.95 baseColors.white}";  # Bright White
 
       # Derived colors
       foreground = color7;
-      background = "#${ra (sl ( mix color0 primaryColor 10 ) 10)}";
-      selection_background = color4;
-      selection_foreground = color15;
+      background = "#${sc 0.01 (sl 0.2 primaryColor)}";
+      selection_background = "#${sc 0.02 (sl 0.2 color4)}";
+      selection_foreground = "none";
       url_color = color6;
       cursor = color15;
 
       active_border_color = color4;
       inactive_border_color = color8;
-      active_tab_background = "#${ra (sl color4 30)}";
+      active_tab_background = "#${sl 0.3 color4}";
       active_tab_foreground = color15;
       inactive_tab_background = color0;
       inactive_tab_foreground = color7;

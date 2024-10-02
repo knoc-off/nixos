@@ -12,9 +12,11 @@ let
   xyz = import ./formats/xyz.nix { inherit math lib utils types linearRgb; };
   linearRgb = import ./formats/linearRgb.nix { inherit math utils types; };
   gammaRgb = import ./formats/gammaRgb.nix { inherit math utils types; };
+  okhsv = import ./formats/okhsv.nix { inherit math utils types lib; };
+
 in rec {
   inherit types math utils;
-  inherit hex hsl oklab okhsl oklch xyz linearRgb gammaRgb;
+  inherit hex hsl oklab okhsl oklch xyz linearRgb gammaRgb okhsv;
 
   splitHex = hexStr: types.Hex.check (utils.convert.splitHex hexStr);
 
@@ -28,6 +30,23 @@ in rec {
       xyz' = linearRgb.ToXyz linearRgb';
     in
       xyz.ToOklab xyz';
+
+  # Convert hex string to OKHSL
+  hexStrToOkhsv = hexStr:
+    let
+      oklab' = hexStrToOklab hexStr;
+      oklch' = oklab.ToOklch oklab';
+    in
+      oklch.ToOkhsv oklch';
+
+  # Convert OKHSL to hex string
+  okhsvToHex = okhsv':
+    let
+      oklch' = okhsv.ToOklch (types.Okhsv.check okhsv');
+      oklab' = oklch.ToOklab oklch';
+      rgb = oklab.ToRgb oklab';
+    in
+      rgbToHexStr rgb;
 
   # Convert hex string to OKHSL
   hexStrToOkhsl = hexStr:
@@ -46,120 +65,146 @@ in rec {
     in
       rgbToHexStr rgb;
 
-  # Color manipulation functions for OKHSL
-  okhslmod = {
+
+  # Convert OKHSL to hex string
+  oklchToHex = oklch':
+    let
+      oklab' = oklch.ToOklab (types.Oklch.check oklch');
+      rgb = oklab.ToRgb oklab';
+    in
+      rgbToHexStr rgb;
+
+  # Convert hex string to OKHSL
+  hexStrToOklch = hexStr:
+    let
+      oklab' = hexStrToOklab hexStr;
+      oklch' = oklab.ToOklch oklab';
+    in
+      oklch';
+
+
+
+  oklchmod = {
+    # Set the Hue component to a new value
     setHue = newHue: color:
       let
-        color' = types.Okhsl.check color;
+        color' = types.Oklch.check color;
         clampedHue = math.mod newHue 360;
         newColor = color' // { h = clampedHue; };
       in
-        types.Okhsl.check newColor;
+        types.Oklch.check newColor;
 
-    setSaturation = newSaturation: color:
+    # Set the Chroma component to a new value
+    setChroma = newChroma: color:
       let
-        color' = types.Okhsl.check color;
-        newColor = color' // { s = math.clamp newSaturation 0 1; };
+        color' = types.Oklch.check color;
+        newColor = color' // { C = math.clamp newChroma 0 1; };
       in
-        types.Okhsl.check newColor;
+        types.Oklch.check newColor;
 
+    # Set the Lightness component to a new value
     setLightness = newLightness: color:
       let
-        color' = types.Okhsl.check color;
-        newColor = color' // { l = math.clamp newLightness 0 1; };
+        color' = types.Oklch.check color;
+        newColor = color' // { L = math.clamp newLightness 0 1; };
       in
-        types.Okhsl.check newColor;
+        types.Oklch.check newColor;
 
+    # Adjust the Hue by a delta value
     adjustHueBy = deltaHue: color:
       let
-        color' = types.Okhsl.check color;
+        color' = types.Oklch.check color;
         newHue = math.mod (color'.h + deltaHue) 360;
         newColor = color' // { h = newHue; };
       in
-        types.Okhsl.check newColor;
+        types.Oklch.check newColor;
 
-    adjustSaturationBy = deltaSaturation: color:
+    # Adjust the Chroma by a delta value
+    adjustChromaBy = deltaChroma: color:
       let
-        color' = types.Okhsl.check color;
-        newSaturation = color'.s + deltaSaturation;
-        newColor = color' // { s = math.clamp newSaturation 0 1; };
+        color' = types.Oklch.check color;
+        newChroma = color'.C + deltaChroma;
+        newColor = color' // { C = math.clamp newChroma 0 1; };
       in
-        types.Okhsl.check newColor;
+        types.Oklch.check newColor;
 
+    # Adjust the Lightness by a delta value
     adjustLightnessBy = deltaLightness: color:
       let
-        color' = types.Okhsl.check color;
-        newLightness = color'.l + deltaLightness;
-        newColor = color' // { l = math.clamp newLightness 0 1; };
+        color' = types.Oklch.check color;
+        newLightness = color'.L + deltaLightness;
+        newColor = color' // { L = math.clamp newLightness 0 1; };
       in
-        types.Okhsl.check newColor;
+        types.Oklch.check newColor;
 
+    # Lighten the color by a given percentage
     lighten = percent: color:
       let
-        color' = types.Okhsl.check color;
+        color' = types.Oklch.check color;
         delta = percent / 100.0;
       in
-        okhslmod.adjustLightnessBy delta color';
+        oklchmod.adjustLightnessBy delta color';
 
+    # Darken the color by a given percentage
     darken = percent: color:
       let
-        color' = types.Okhsl.check color;
+        color' = types.Oklch.check color;
         delta = (-1.0) * percent / 100.0;
       in
-        okhslmod.adjustLightnessBy delta color';
+        oklchmod.adjustLightnessBy delta color';
 
+    # Mix two colors based on a weight
     mix = colorA: colorB: weight:
       let
-        colorA' = types.Okhsl.check colorA;
-        colorB' = types.Okhsl.check colorB;
+        colorA' = types.Oklch.check colorA;
+        colorB' = types.Oklch.check colorB;
         w = math.clamp weight 0.0 1.0;
         mixValue = a: b: a * (1.0 - w) + b * w;
+
+        # Calculate the shortest angle difference for Hue mixing
         hueDistance = math.mod (colorB'.h - colorA'.h + 540.0) 360.0 - 180.0;
         newHue = math.mod (colorA'.h + w * hueDistance + 360.0) 360.0;
-        newSaturation = mixValue colorA'.s colorB'.s;
-        newLightness = mixValue colorA'.l colorB'.l;
-        newColor = { h = newHue; s = newSaturation; l = newLightness; };
-      in
-        types.Okhsl.check newColor;
 
+        # Linearly interpolate Chroma and Lightness
+        newChroma = mixValue colorA'.C colorB'.C;
+        newLightness = mixValue colorA'.L colorB'.L;
+
+        newColor = { h = newHue; C = newChroma; L = newLightness; };
+      in
+        types.Oklch.check newColor;
+
+    # Get the complementary color by shifting Hue by 180 degrees
     complement = color:
       let
-        color' = types.Okhsl.check color;
+        color' = types.Oklch.check color;
       in
-        okhslmod.adjustHueBy 180.0 color';
+        oklchmod.adjustHueBy 180.0 color';
 
+    # Invert the color by shifting Hue by 180 degrees and inverting Chroma and Lightness
     invert = color:
       let
-        color' = types.Okhsl.check color;
+        color' = types.Oklch.check color;
         newHue = math.mod (color'.h + 180.0) 360.0;
-        newSaturation = 1.0 - color'.s;
-        newLightness = 1.0 - color'.l;
+        newChroma = 1.0 - color'.C;
+        newLightness = 1.0 - color'.L;
+        newColor = { h = newHue; C = newChroma; L = newLightness; };
       in
-        types.Okhsl.check { h = newHue; s = newSaturation; l = newLightness; };
+        types.Oklch.check newColor;
 
-    # Wrapper function for adjusting OKHSL color
-    adjustOkhsl = { color, hueShift ? 0.0, saturationScale ? 1.0, lightnessScale ? 1.0 }:
+    # Wrapper function for adjusting OKLCH color with optional parameters
+    adjustOklch = { color, hueShift ? 0.0, chromaScale ? 1.0, lightnessScale ? 1.0 }:
       let
-        color' = types.Okhsl.check color;
-        adjustedColor = okhslmod.adjustHueBy hueShift color';
-        adjustedSaturation = math.clamp (adjustedColor.s * saturationScale) 0.0 1.0;
-        adjustedLightness = math.clamp (adjustedColor.l * lightnessScale) 0.0 1.0;
+        color' = types.Oklch.check color;
+        adjustedHue = oklchmod.adjustHueBy hueShift color';
+        adjustedChroma = math.clamp (adjustedHue.C * chromaScale) 0.0 1.0;
+        adjustedLightness = math.clamp (adjustedHue.L * lightnessScale) 0.0 1.0;
       in
-        types.Okhsl.check {
-          h = adjustedColor.h;
-          s = adjustedSaturation;
-          l = adjustedLightness;
+        types.Oklch.check {
+          h = adjustedHue.h;
+          C = adjustedChroma;
+          L = adjustedLightness;
         };
   };
 
-  # Wrapper function to manipulate a hex color
-  manipulateHexColor = { hex, hueShift ? 0.0, saturationScale ? 1.0, lightnessScale ? 1.0 }:
-    let
-      okhsl' = hexStrToOkhsl hex;
-      adjustedOkhsl = okhslmod.adjustOkhsl {
-        color = okhsl';
-        inherit hueShift saturationScale lightnessScale;
-      };
-    in
-      okhslToHex adjustedOkhsl;
+
 }
