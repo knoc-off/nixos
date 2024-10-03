@@ -19,11 +19,6 @@
     };
   };
 
-  isoImage = {
-    isoName = lib.mkForce "laptop-image.iso";
-    #volumeID = "NIXOS_LIVE";
-   # Set the size of the ISO image (in megabytes)
-  };
 
   # Add any additional packages you want in the live environment
   environment.systemPackages = with pkgs; [
@@ -36,6 +31,9 @@
   # Optional: Set your preferred time zone
   time.timeZone = "Europe/Berlin";
 
+  networking.networkmanager.enable = lib.mkForce false;
+
+  #networking.wireless = false;
 
   # Disable auto-login for better security in a live environment
   #services.getty.autologinUser = lib.mkForce null;

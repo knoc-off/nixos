@@ -46,6 +46,10 @@
       QT_AUTO_SCREEN_SCALE_FACTOR = "1";
       CLUTTER_BACKEND = "wayland";
 
+      GTK_THEME = "Fluent-Dark";
+      QT_STYLE_OVERRIDE = "gtk3";
+      QT_QPA_PLATFORMTHEME = "gtk3";
+
 
       # Video and graphics
       MOZ_ENABLE_WAYLAND = "1";
@@ -76,8 +80,8 @@
     platformTheme.name = "gtk3";
 
     style = {
-      name = "adwaita-dark";
-      package = pkgs.adwaita-qt;
+      name = "gtk3";
+      #package = pkgs.adwaita-qt;
     };
   };
 
@@ -118,7 +122,7 @@
         #cursor-theme = "Adwaita-dark";
       };
       "org/gnome/shell/extensions/user-theme" = {
-        name = "Adwaita-dark";
+        name = "Fluent-Dark";
       };
       "org/gnome/gedit/preferences/editor" = {
         scheme = "oblivion";

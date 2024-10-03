@@ -116,27 +116,41 @@
 
       inherit (lib) nixosSystem listToAttrs;
 
-      mkHost = hostname: username: system: {
-        name = hostname;
-        value = nixosSystem {
-          specialArgs = {
-            inherit self # this does the same as outputs
-              inputs outputs # this does the same as self
-              hostname username lib
 
-              system theme # remove this.
-            ;
+      # Unified configuration generator for hosts and images
+      mkConfig = { hostname, user, system, extraModules ? [], extraConfigs ? {} }:
+        nixosSystem {
+          inherit system;
+          specialArgs = {
+            inherit self inputs outputs hostname user lib system theme;
             selfPkgs = self.packages.${system};
             colorLib = self.lib.${system};
-          };
+          } // extraConfigs;
           modules = [
-            {
-              nixpkgs.hostPlatform = system;
-              nixpkgs.buildPlatform = "x86_64-linux";
-            }
+            { nixpkgs.hostPlatform = system; nixpkgs.buildPlatform = "x86_64-linux"; }
             ./systems/${hostname}.nix
-          ];
+          ] ++ extraModules;
         };
+
+      # Host configuration
+      mkHost = hostname: user: system: {
+        name  = hostname;
+        value = mkConfig { inherit hostname user system; };
+      };
+
+      mkImage = hostname: user: system: imageType: rec{
+        name  = "${hostname}-${imageType}";
+        value = (mkConfig {
+          inherit hostname user system;
+          extraModules = [
+            ./systems/modules/live-iso.nix
+            {
+              isoImage = {
+                isoName = lib.mkForce name;
+              };
+            }
+          ];
+        }).config.system.build.isoImage;
       };
 
       mkPkgShell = system: shell:
@@ -160,11 +174,13 @@
 
       lib = forAllSystems (system: import ./lib { inherit (import nixpkgs { inherit system; } ) lib; });
 
-      images = {
-        rpi3A = nixosConfigurations.rpi3A.config.system.build.sdImage;
-        rpi3B = nixosConfigurations.rpi3B.config.system.build.sdImage;
-        laptop = nixosConfigurations.laptop-iso.config.system.build.isoImage;
-      };
+      images = listToAttrs [
+        (mkImage "framework13" "knoff" "x86_64-linux" "isoImage")
+      ];
+      #images = {
+      #  #laptop =  (mkImage "framework13" "knoff" "x86_64-linux").value.config.system.build.isoImage;
+      #  laptop = (mkImage "framework13" "knoff" "x86_64-linux" "isoImage")
+      #};
 
       nixosConfigurations = listToAttrs [
         (mkHost "framework13" "knoff" "x86_64-linux")
