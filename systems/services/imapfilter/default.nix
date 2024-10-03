@@ -12,15 +12,6 @@ let
 
 in {
   sops.secrets = { "services/imap/imapfilter_config" = { }; };
-  # EXAMPLE YAML:
-  #  services:
-  #      imap:
-  #          imapfilter_config: |
-  #              account = IMAP {
-  #                server = 'imap.example.com',
-  #                username = 'me@example.com',
-  #                password = 'pa$$w0rd',
-  #              }
 
   systemd.services.imapfilter = {
     description = "IMAPFilter mail filtering service";

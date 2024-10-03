@@ -89,7 +89,7 @@ in {
       # Derived colors
       foreground = color7;
       background = "#${sc 0.01 (sl 0.2 primaryColor)}";
-      selection_background = "#${sc 0.02 (sl 0.2 color4)}";
+      selection_background = "#${sc 0.02 (sl 0.4 color4)}";
       selection_foreground = "none";
       url_color = color6;
       cursor = color15;
