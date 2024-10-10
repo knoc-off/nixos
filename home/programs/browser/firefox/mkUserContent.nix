@@ -1,4 +1,4 @@
-{ pkgs, theme, firefox-csshacks }:
+{ pkgs, theme, firefox-csshacks, colorLib }:
 
 { removeFlash ? false
 , extraStyles ? ""

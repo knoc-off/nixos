@@ -1,4 +1,19 @@
-{ theme, firefox-csshacks }:
+{ theme, firefox-csshacks, colorLib }:
+let
+  # Convert hex to OKLCH
+  hexToOklch = hexColor: colorLib.hexStrToOklch hexColor;
+
+  # Modify OKLCH colors
+  setLightness = value: color: colorLib.oklchmod.setLightness value color;
+  setChroma = value: color: colorLib.oklchmod.setChroma value color;
+
+  # Convert OKLCH back to hex
+  oklchToHex = oklchColor: colorLib.oklchToHex oklchColor;
+
+  # Theme colors in OKLCH
+  primary = hexToOklch theme.primary;
+  neutral = hexToOklch theme.neutral;
+in
 ''
   /* Sidebar customization */
   #sidebar-box {
@@ -7,8 +22,8 @@
     --uc-sidebar-width: var(--sidebar-width);
     --uc-sidebar-hover-width: 25vw;
     --uc-autohide-transition-type: ease-in-out;
-    background-color: #${theme.base02} !important;
-    foreground-color: #${theme.white00} !important;
+    background-color: ${oklchToHex (setLightness 0.3 primary)} !important;
+    foreground-color: ${oklchToHex (setLightness 0.95 neutral)} !important;
   }
 
   /* URL bar and panel options */
@@ -29,26 +44,26 @@
   #sidebar-search-container,
   #bookmarks-view-children,
   #historyTree {
-    color: #${theme.white00} !important;
-    background-color: #${theme.base01} !important;
-    foreground-color: #${theme.white00} !important;
+    color: ${oklchToHex (setLightness 0.95 neutral)} !important;
+    background-color: ${oklchToHex (setLightness 0.35 primary)} !important;
+    foreground-color: ${oklchToHex (setLightness 0.95 neutral)} !important;
     -moz-appearance: none !important;
     border-color: transparent !important;
   }
 
   /* Search box in the sidebar */
   .sidebar-panel #search-box {
-    background-color: #${theme.base03} !important;
-    foreground-color: #${theme.white00} !important;
-    color: #${theme.white00} !important;
+    background-color: ${oklchToHex (setLightness 0.25 primary)} !important;
+    foreground-color: ${oklchToHex (setLightness 0.95 neutral)} !important;
+    color: ${oklchToHex (setLightness 0.95 neutral)} !important;
   }
 
   /* Sidebar and header background settings */
   #sidebar,
   #sidebar-header {
-    background-color: #${theme.base02} !important;
-    foreground-color: #${theme.white00} !important;
-    color: #${theme.white00} !important;
+    background-color: ${oklchToHex (setLightness 0.3 primary)} !important;
+    foreground-color: ${oklchToHex (setLightness 0.95 neutral)} !important;
+    color: ${oklchToHex (setLightness 0.95 neutral)} !important;
     border-bottom: none !important;
     background-image: var(--lwt-additional-images);
     background-position: auto;

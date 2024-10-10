@@ -94,7 +94,7 @@
     ];
   };
 
-  outputs = inputs@{ self, nixpkgs, home-manager, ... }:
+  outputs = inputs@{ self, nixpkgs, ... }:
     let
 
       theme = import ./theme.nix;
@@ -129,6 +129,7 @@
           modules = [
             { nixpkgs.hostPlatform = system; nixpkgs.buildPlatform = "x86_64-linux"; }
             ./systems/${hostname}.nix
+            ./systems/commit-messages/${hostname}-commit-message.nix
           ] ++ extraModules;
         };
 
@@ -166,6 +167,7 @@
 
     in rec {
       packages = forAllSystems (system: mkPkgShell system false);
+
       devShells = forAllSystems (system: mkPkgShell system true);
 
       nixosModules = import ./modules/nixos/default.nix;

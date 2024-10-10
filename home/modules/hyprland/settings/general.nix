@@ -1,9 +1,21 @@
 {
   config,
   theme,
+  colorLib,
   pkgs,
   ...
 }: let
+
+  h2okl = colorLib.hexStrToOklch;
+  oklchToHex = colorLib.oklchToHex;
+  setLightness = value: color: colorLib.oklchmod.setLightness value color;
+
+  primary = h2okl theme.primary;
+  secondary = h2okl theme.secondary;
+  neutral = h2okl theme.neutral;
+  accent1 = h2okl theme.accent1;
+  accent2 = h2okl theme.accent2;
+
   wallpaper = let
     wallpaper-img = pkgs.fetchurl {
       url = "https://images.squarespace-cdn.com/content/v1/6554594506867677bdd68b03/a30ca789-db30-4413-8dc5-40726c893d7a/SCAV+new+intro+bg+02+copy.jpg";
@@ -32,10 +44,10 @@ in {
     gaps_in = -1;
     gaps_out = -2;
     border_size = 2;
-    "col.active_border" = "0xff${theme.green00}";
-    "col.inactive_border" = "0xff${theme.gray01}";
-    "col.nogroup_border_active" = "0x00${theme.base02}"; # transparent
-    "col.nogroup_border" = "0x99${theme.base01}";
+    "col.active_border" = "0xff${oklchToHex accent1}";
+    "col.inactive_border" = "0xff${oklchToHex (setLightness 0.5 neutral)}";
+    "col.nogroup_border_active" = "0x00${oklchToHex (setLightness 0.2 primary)}"; # transparent
+    "col.nogroup_border" = "0x99${oklchToHex (setLightness 0.3 primary)}";
 
     layout = "master";
     resize_on_border = true;
@@ -44,21 +56,21 @@ in {
   group = {
     insert_after_current = true;
     focus_removed_window = true;
-    "col.border_active" = "0xff${theme.green01}";
-    "col.border_inactive" = "0x99${theme.base03}";
-    "col.border_locked_active" = "0xff${theme.red00}";
-    "col.border_locked_inactive" = "0x99${theme.red01}";
+    "col.border_active" = "0xff${oklchToHex (setLightness 0.6 accent1)}";
+    "col.border_inactive" = "0x99${oklchToHex (setLightness 0.3 primary)}";
+    "col.border_locked_active" = "0xff${oklchToHex accent2}";
+    "col.border_locked_inactive" = "0x99${oklchToHex (setLightness 0.6 accent2)}";
 
     groupbar = {
       font_size = 10;
       gradients = false;
       render_titles = true;
       scrolling = false;
-      text_color = "0xff${theme.base06}";
-      "col.active" = "0xff${theme.blue00}";
-      "col.inactive" = "0x99${theme.blue03}";
-      "col.locked_active" = "0xff${theme.red00}";
-      "col.locked_inactive" = "0x99${theme.red04}";
+      text_color = "0xff${oklchToHex (setLightness 0.8 neutral)}";
+      "col.active" = "0xff${oklchToHex secondary}";
+      "col.inactive" = "0x99${oklchToHex (setLightness 0.6 secondary)}";
+      "col.locked_active" = "0xff${oklchToHex accent2}";
+      "col.locked_inactive" = "0x99${oklchToHex (setLightness 0.6 accent2)}";
     };
   };
 
@@ -75,7 +87,7 @@ in {
     swallow_regex = "kitty";
     # the exception should be anything containing the word 'NAN' or 'nvim'
     swallow_exception_regex = "NAN";
-    background_color = "0xff${theme.base01}";
+    background_color = "0xff${oklchToHex (setLightness 0.2 primary)}";
   };
 
   input = {
@@ -191,7 +203,7 @@ in {
     inactive_opacity = 1;
     drop_shadow = false;
     shadow_range = 0;
-    "col.shadow" = "0xff${theme.base01}";
+    "col.shadow" = "0xff${oklchToHex (setLightness 0.2 primary)}";
     shadow_render_power = 2;
     dim_inactive = true;
     dim_strength = 0.20;

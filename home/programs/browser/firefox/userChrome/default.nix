@@ -1,8 +1,20 @@
-{
-  theme,
-  pkgs,
-  firefox-csshacks,
-}: ''
+{ theme, pkgs, firefox-csshacks, colorLib }:
+let
+  ho = colorLib.hexStrToOklch;
+  oh = colorLib.oklchToHex;
+  sl = value: color: colorLib.oklchmod.setLightness value color;
+  sc = value: color: colorLib.oklchmod.setChroma value color;
+
+  pr = theme.primary;
+  se = theme.secondary;
+  ne = theme.neutral;
+  a1 = theme.accent1;
+  a2 = theme.accent2;
+
+  # Function to reduce chroma (saturation) and set lightness
+  rc = l: c: color: oh (sc c (sl l (ho color)));
+in
+''
   /* Import necessary CSS hacks */
   @import "${firefox-csshacks}/chrome/autohide_sidebar.css";
   @import "${firefox-csshacks}/chrome/autohide_toolbox.css";
@@ -14,7 +26,7 @@
     --uc-sidebar-width: var(--sidebar-width);
     --uc-sidebar-hover-width: 25vw;
     --uc-autohide-transition-type: ease-in-out;
-    background-color: #${theme.base02} !important;
+    background-color: ${rc 0.3 0.1 pr} !important;
   }
 
   /* URL bar and panel options */
@@ -32,12 +44,12 @@
 
   /* Tab browser panels background color */
   .tabbrowser-tabpanels, browser {
-    background-color: #${theme.base02} !important;
+    background-color: ${rc 0.3 0.1 pr} !important;
   }
 
   /* Bookmarks and history panels background color */
   #bookmarksPanel, #history-panel {
-    background-color: #${theme.base01} !important;
+    background-color: ${rc 0.2 0.1 pr} !important;
   }
 
   /* Sidebar color settings */
@@ -45,22 +57,22 @@
   #sidebar-search-container,
   #bookmarks-view-children,
   #historyTree {
-    color: #${theme.base01} !important;
-    background-color: #${theme.base01} !important;
+    color: ${rc 0.2 0.1 pr} !important;
+    background-color: ${rc 0.2 0.1 pr} !important;
     -moz-appearance: none !important;
     border-color: transparent !important;
   }
 
   /* Search box in the sidebar */
   .sidebar-panel #search-box {
-    background-color: #${theme.base03} !important;
-    color: #${theme.base06} !important;
+    background-color: ${rc 0.4 0.1 pr} !important;
+    color: ${rc 0.9 0.1 ne} !important;
   }
 
   /* Sidebar and header background settings */
   #sidebar,
   #sidebar-header {
-    background-color: #${theme.base02} !important;
+    background-color: ${rc 0.3 0.1 pr} !important;
     border-bottom: none !important;
     background-image: var(--lwt-additional-images);
     background-position: auto;
@@ -84,71 +96,71 @@
     -moz-border-radius: 1em;
 
     /* Popup panels */
-    --arrowpanel-background: #${theme.base01} !important;
-    --arrowpanel-border-color: #${theme.base00} !important;
-    --arrowpanel-color: #${theme.base06} !important;
-    --arrowpanel-dimmed: #${theme.base05} !important;
+    --arrowpanel-background: ${rc 0.2 0.1 pr} !important;
+    --arrowpanel-border-color: ${rc 0.1 0.1 pr} !important;
+    --arrowpanel-color: ${rc 0.9 0.1 ne} !important;
+    --arrowpanel-dimmed: ${rc 0.7 0.1 ne} !important;
 
     /* Window and toolbar background */
-    --lwt-accent-color: #${theme.base01} !important;
-    --lwt-accent-color-inactive: #${theme.base00} !important;
-    --toolbar-bgcolor: #${theme.base01} !important;
+    --lwt-accent-color: ${rc 0.2 0.1 pr} !important;
+    --lwt-accent-color-inactive: ${rc 0.1 0.1 pr} !important;
+    --toolbar-bgcolor: ${rc 0.2 0.1 pr} !important;
 
     /* Tabs with system theme - text is not controlled by variable */
-    --tab-selected-bgcolor: #${theme.base02} !important;
+    --tab-selected-bgcolor: ${rc 0.3 0.1 pr} !important;
 
     /* Tabs with any other theme */
-    --lwt-text-color: #${theme.base05} !important;
-    --lwt-selected-tab-background-color: #${theme.base02} !important;
+    --lwt-text-color: ${rc 0.7 0.1 ne} !important;
+    --lwt-selected-tab-background-color: ${rc 0.3 0.1 pr} !important;
 
     /* Toolbar area */
-    --toolbarbutton-icon-fill: #${theme.base06} !important;
-    --lwt-toolbarbutton-hover-background: #${theme.base06} !important;
-    --lwt-toolbarbutton-active-background: #${theme.base05} !important;
+    --toolbarbutton-icon-fill: ${rc 0.9 0.1 ne} !important;
+    --lwt-toolbarbutton-hover-background: ${rc 0.9 0.1 ne} !important;
+    --lwt-toolbarbutton-active-background: ${rc 0.7 0.1 ne} !important;
 
     /* URL bar */
-    --toolbar-field-border-color: #${theme.base04} !important;
-    --toolbar-field-focus-border-color: #${theme.base05} !important;
-    --urlbar-popup-url-color: #${theme.base06} !important;
-    --urlbar-popup-action-row-color: #${theme.base06} !important;
-    --urlbar-popup-subtitle-color: #${theme.base05} !important;
-    --urlbar-popup-title-color: #${theme.base04} !important;
-    --urlbar-popup-background: #${theme.base02} !important;
+    --toolbar-field-border-color: ${rc 0.5 0.1 ne} !important;
+    --toolbar-field-focus-border-color: ${rc 0.7 0.1 ne} !important;
+    --urlbar-popup-url-color: ${rc 0.9 0.1 ne} !important;
+    --urlbar-popup-action-row-color: ${rc 0.9 0.1 ne} !important;
+    --urlbar-popup-subtitle-color: ${rc 0.7 0.1 ne} !important;
+    --urlbar-popup-title-color: ${rc 0.5 0.1 ne} !important;
+    --urlbar-popup-background: ${rc 0.3 0.1 pr} !important;
 
     /* Input fields */
-    --input-background: #${theme.base01} !important;
-    --input-border-color: #${theme.base04} !important;
-    --input-color: #${theme.base06} !important;
+    --input-background: ${rc 0.2 0.1 pr} !important;
+    --input-border-color: ${rc 0.5 0.1 ne} !important;
+    --input-color: ${rc 0.9 0.1 ne} !important;
 
     /* Dropdowns */
-    --dropdown-background: #${theme.base01} !important;
-    --dropdown-border-color: #${theme.base04} !important;
-    --dropdown-color: #${theme.base06} !important;
+    --dropdown-background: ${rc 0.2 0.1 pr} !important;
+    --dropdown-border-color: ${rc 0.5 0.1 ne} !important;
+    --dropdown-color: ${rc 0.9 0.1 ne} !important;
 
     /* Panels */
-    --panel-background: #${theme.base01} !important;
-    --panel-border-color: #${theme.base04} !important;
-    --panel-color: #${theme.base06} !important;
+    --panel-background: ${rc 0.2 0.1 pr} !important;
+    --panel-border-color: ${rc 0.5 0.1 ne} !important;
+    --panel-color: ${rc 0.9 0.1 ne} !important;
 
     /* Context menus */
-    --menu-background: #${theme.base01} !important;
-    --menu-border-color: #${theme.base04} !important;
-    --menu-color: #${theme.base06} !important;
+    --menu-background: ${rc 0.2 0.1 pr} !important;
+    --menu-border-color: ${rc 0.5 0.1 ne} !important;
+    --menu-color: ${rc 0.9 0.1 ne} !important;
 
     /* Buttons */
-    --button-background: #${theme.base02} !important;
-    --button-border-color: #${theme.base04} !important;
-    --button-color: #${theme.base06} !important;
+    --button-background: ${rc 0.3 0.1 pr} !important;
+    --button-border-color: ${rc 0.5 0.1 ne} !important;
+    --button-color: ${rc 0.9 0.1 ne} !important;
 
     /* Scrollbars */
-    --scrollbar-color: #${theme.base04} #${theme.base01} !important;
+    --scrollbar-color: ${rc 0.5 0.1 ne} ${rc 0.2 0.1 pr} !important;
 
     /* Selection */
-    --selection-background: #${theme.base03} !important;
-    --selection-color: #${theme.base06} !important;
+    --selection-background: ${rc 0.4 0.1 pr} !important;
+    --selection-color: ${rc 0.9 0.1 ne} !important;
 
     /* Tooltips */
-    --tooltip-background: #${theme.base01} !important;
-    --tooltip-color: #${theme.base06} !important;
+    --tooltip-background: ${rc 0.2 0.1 pr} !important;
+    --tooltip-color: ${rc 0.9 0.1 ne} !important;
   }
 ''
