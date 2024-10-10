@@ -1,207 +1,199 @@
-# im going to try to document as i go, with comments.
-# each setting that is not super obvious should have, what impact it has, and why.
-# for example enabling 32bit support for opengl, is needed for steam.
-{
-  lib,
-  inputs,
-  config,
-  pkgs,
-  outputs,
-  ...
-}: {
+{ lib, inputs, outputs, colorLib, theme, config, pkgs, self, hostName, system, ... }: {
   imports = [
+
+    { # Home-Manager
+      imports = [ inputs.home-manager.nixosModules.home-manager ];
+
+      home-manager = {
+        useGlobalPkgs = false;
+        useUserPackages = true;
+        users.knoff = import ../home/knoff-laptop.nix;
+        extraSpecialArgs = {
+          inherit inputs outputs self theme colorLib hostName system;
+        };
+      };
+    }
+
     inputs.hardware.nixosModules.common-cpu-amd
     inputs.hardware.nixosModules.common-gpu-amd
     inputs.hardware.nixosModules.common-pc-ssd
 
-    # hardware configs
+    { boot.binfmt.emulatedSystems = [ "aarch64-linux" ]; }
+
+    inputs.disko.nixosModules.disko
+    { disko.devices.disk.main.device = "/dev/nvme0n1"; }
+    ./hardware/disks/bcachefs.nix
+
+    # Hardware configs
     ./hardware/hardware-configuration.nix
-    ./hardware/bluetooth.nix
 
-    # Disko
-    ./hardware/disks/btrfs-luks.nix
+    ./hardware/boot.nix
 
-    # Secure boot
-    inputs.lanzaboote.nixosModules.lanzaboote
-    # https://github.com/nix-community/lanzaboote/blob/master/docs/QUICK_START.md
+    ./modules/misc.nix
 
-    # pipewire / Audio
+    # Pipewire / Audio
     ./modules/audio
 
-    # nix package settings
+    # Nix package settings
     ./modules/nix.nix
 
     # Window manager
-    ./modules/hyprland
+    self.nixosModules.windowManager.hyprland # maybe remove
 
-    # run with the fish function nixcommit
-    # This is an 'auto generated' file that should add a message to the build versions in the boot menu
-    ./commit-messages/desktop-commit-message.nix
+    ./modules/gtk
 
-    # Android emulation
-    #./modules/virtualisation/waydroid.nix
+    # enable bash shell customizations
+    ./modules/shell/bash.nix
   ];
 
-  programs.nix-ld = {
-    enable = true;
-    libraries = with pkgs; [
-      # Dwarf Fortress
-      stdenv.cc.cc
-      SDL2
-      SDL2_image
-      ## DFHACK
-      libz
-    ];
+
+  programs = {
+    # allows running of arbitrary programs.
+    nix-ld = {
+      enable = true;
+      libraries = with pkgs; [ stdenv.cc.cc SDL2 SDL2_image libz ];
+    };
+    dconf.enable = true;
   };
 
-  environment.etc = let
-    themeName = "Fluent-Dark";
-    themePkg = pkgs.fluent-gtk-theme;
-  in {
-    "xdg/gtk-2.0".source = "${themePkg}/share/themes/${themeName}/gtk-2.0";
-    "xdg/gtk-3.0".source = "${themePkg}/share/themes/${themeName}/gtk-3.0";
+  services = {
+    # Yubikey
+    yubikey-agent.enable = true;
+    pcscd.enable = true;
+    udev.packages = [ pkgs.yubikey-personalization ];
 
-    #"xdg/gtk-2.0/gtkrc".text = "gtk-application-prefer-dark-theme=1";
-    #"xdg/gtk-3.0/settings.ini".text = ''
-    #  [Settings]
-    #  gtk-application-prefer-dark-theme=1
-    #  gtk-error-bell=false
-    #'';
-    #"xdg/gtk-4.0/settings.ini".text = ''
-    #  [Settings]
-    #  gtk-application-prefer-dark-theme=1
-    #  gtk-error-bell=false
-    #'';
-  };
+    # Pretty much just needed this for Steam
+    #flatpak.enable = true;
 
-  # Use the latest linux kernel
-  boot.kernelPackages = pkgs.linuxPackages_latest;
+    # Fix wg-quick?
+    resolved.enable = true;
 
-  # Attempt to fix the: GLib-GIO-ERROR**: No GSettings schemas are installed on the system
-  programs.dconf.enable = true;
-  services.fwupd.enable = true;
-
-  # Use the systemd-boot EFI boot loader.
-  # disable if using lanzaboote
-  boot.loader.systemd-boot.enable =
-    if config.boot.lanzaboote.enable
-    then lib.mkForce false
-    else true;
-
-  boot.loader.efi.canTouchEfiVariables = true;
-  boot.lanzaboote = {
-    enable = false;
-    pkiBundle = "/etc/secureboot";
-  };
-
-  networking.hostName = "desktop"; # Define your hostname.
-  networking.networkmanager.enable = true;
-
-  # this allows running flatpaks.
-  services.flatpak.enable = true;
-
-  # Set your time zone.
-  time.timeZone = "Europe/Berlin";
-  nixpkgs.config.allowUnfree = true;
-  nixpkgs.overlays = builtins.attrValues outputs.overlays;
-
-  # Select internationalisation properties.
-  i18n.defaultLocale = "en_US.UTF-8";
-  console = {
-    #font = "Lat2-Terminus16";
-    packages = with pkgs; [terminus_font];
-    #font = "${pkgs.terminus_fonts}/share/consolefonts/ter-u28n.psf.gz";
-    font = "${pkgs.terminus_font}/share/consolefonts/ter-i22b.psf.gz";
-    keyMap = lib.mkDefault "us";
-    useXkbConfig = true; # use xkbOptions in tty.
-  };
-
-  fonts.packages = with pkgs; [
-    noto-fonts
-    noto-fonts-cjk
-    noto-fonts-emoji
-    liberation_ttf
-    fira-code
-    fira-code-symbols
-    mplus-outline-fonts.githubRelease
-    dina-font
-    proggyfonts
-    (nerdfonts.override {fonts = ["FiraCode"];})
-  ];
-
-  fonts = {
-    enableDefaultPackages = true;
-
-    fontconfig = {
-      defaultFonts = {
-        monospace = ["FiraCode Nerd Font Mono"];
+    gtkThemeSymlinks = {
+      enable = true;
+      gtk2 = {
+        themeName = "Fluent-Dark";
+        themePackage = pkgs.fluent-gtk-theme;
       };
+      gtk3 = {
+        themeName = "Fluent-Dark";
+        themePackage = pkgs.fluent-gtk-theme;
+      };
+      gtk4 = {
+        themeName = "Fluent-Dark";
+        themePackage = pkgs.fluent-gtk-theme;
+      };
+      symlinks = {
+        "gtk-2.0/gtkrc" =
+          pkgs.writeText "gtkrc" "gtk-application-prefer-dark-theme=1";
+        "gtk-3.0/settings.ini" = pkgs.writeText "gtk3-settings.ini" ''
+          [Settings]
+          gtk-application-prefer-dark-theme=1
+          gtk-error-bell=false
+        '';
+        "gtk-4.0/settings.ini" = pkgs.writeText "gtk4-settings.ini" ''
+          [Settings]
+          gtk-application-prefer-dark-theme=1
+          gtk-error-bell=false
+        '';
+      };
+    };
+
+    fwupd.enable = true;
+
+    openssh = {
+      enable = true;
+      settings = {
+        PasswordAuthentication = false;
+        KbdInteractiveAuthentication = false;
+        PermitRootLogin = "yes";
+      };
+    };
+
+    xserver.xkb.layout = "us";
+
+    libinput.enable = true;
+
+    logind.extraConfig = ''
+      HandlePowerKey=ignore
+    '';
+  };
+
+  environment = {
+    systemPackages = with pkgs; [
+      gnome.adwaita-icon-theme
+      yubioath-flutter
+      git
+      wget
+      libinput
+    ];
+    # could be useful:
+    #etc."current-system-packages".text = let
+    #  packages =
+    #    builtins.map (p: "${p.name}") config.environment.systemPackages;
+    #  sortedUnique = builtins.sort builtins.lessThan (lib.unique packages);
+    #  formatted = builtins.concatStringsSep "\n" sortedUnique;
+    #in formatted;
+  };
+
+  boot = {
+    kernelPackages = lib.mkDefault pkgs.linuxPackages_latest;
+    initrd.systemd.dbus.enable = true;
+    loader = {
+      systemd-boot.enable =
+        if config.boot.lanzaboote.enable then lib.mkForce false else true;
+      efi.canTouchEfiVariables = true;
     };
   };
 
-  services.openssh = {
-    enable = true;
-    # require public key authentication for better security
-    settings.PasswordAuthentication = false;
-    settings.KbdInteractiveAuthentication = false;
-    #settings.PermitRootLogin = "no";
+  networking = {
+    hostName = "${hostName}";
+    networkmanager.enable = lib.mkDefault true;
   };
 
-  # Configure keymap in X11
-  #services.xserver.layout = "us";
-  services.xserver.xkb.layout = "us";
-  # services.xserver.xkbOptions = "eurosign:e,caps:escape";
-
-  #hardware.opengl.driSupport32Bit = true;
-  hardware.opengl.driSupport32Bit = true;
-  hardware.opengl.enable = true;
-  hardware.pulseaudio.support32Bit = true;
-
-  # Shells
-  programs = {
-    zsh.enable = false;
-    fish.enable = true;
+  nixpkgs = {
+    config.allowUnfree = true;
+    overlays = builtins.attrValues self.outputs.overlays;
   };
 
-  # Define a user account. Don't forget to set a password with ‘passwd’.
-  users.users.knoff = {
-    isNormalUser = true;
-    shell =
-      if config.programs.fish.enable
-      then pkgs.fish
-      else if config.programs.zsh.enable
-      then pkgs.zsh
-      else pkgs.bash;
-    extraGroups = ["wheel" "networkmanager" "audio" "video"];
-    initialPassword = "password";
-    openssh.authorizedKeys.keys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink" # laptop
+  time.timeZone = "Europe/Berlin";
+
+  i18n.defaultLocale = "en_US.UTF-8";
+
+  console = {
+    packages = with pkgs; [ terminus_font ];
+    font = "${pkgs.terminus_font}/share/consolefonts/ter-i22b.psf.gz";
+    keyMap = lib.mkDefault "us";
+    useXkbConfig = true;
+  };
+
+  fonts = {
+    enableDefaultPackages = true;
+    packages = with pkgs; [
+      noto-fonts
+      noto-fonts-cjk
+      noto-fonts-emoji
+      liberation_ttf
+      fira-code
+      fira-code-symbols
+      mplus-outline-fonts.githubRelease
+      dina-font
+      proggyfonts
+      (nerdfonts.override { fonts = [ "FiraCode" ]; })
     ];
+    fontconfig.defaultFonts = { monospace = [ "FiraCode Nerd Font Mono" ]; };
   };
-  users.users.root.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink" # laptop
-  ];
 
-  environment.systemPackages = with pkgs; [
-    # TODO: see if this fixes issues
-    gnome.adwaita-icon-theme
+  programs.zsh.enable = false;
+  users.defaultUserShell = pkgs.bash;
+  users.users.knoff = {
+    initialPassword = "password";
+    isNormalUser = true;
+    shell = pkgs.bash;
+    extraGroups = [ "wheel" "networkmanager" "audio" "video" "dialout" ];
+    openssh.authorizedKeys.keys = [ ];
+  };
 
-    #vulkan-tools
-
-    # misc tools
-    git
-    wget
-    libinput
-  ];
-
-  services.logind.extraConfig = ''
-    # don’t shutdown when power button is short-pressed
-    HandlePowerKey=suspend
-  '';
-
-  # Open ports in the firewall.
-  networking.firewall.allowedTCPPorts = [22 80 433 3000];
-  networking.firewall.allowedUDPPorts = [22 80 433 3000];
+  users.users.root.openssh.authorizedKeys.keys = [ ];
 
   system.stateVersion = "23.11";
 }
