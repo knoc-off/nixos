@@ -55,8 +55,6 @@ in {
 
   #  # Eileen Domain:
   #  security.acme.certs."agedesign.org" = {
-  #    # Supplying password files like this will make your credentials world-readable
-  #    # in the Nix store. This is for demonstration purpose only, do not use this in production.
   #    credentialsFile = {
   #          "NAMECHEAP_API_USER_FILE" = config.sops.secrets."services/acme/namecheap-user2".path;
   #          "NAMECHEAP_API_KEY_FILE" = config.sops.secrets."services/acme/namecheap-key2".path;
