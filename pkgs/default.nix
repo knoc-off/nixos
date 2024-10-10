@@ -60,6 +60,9 @@ in rec {
   };
   embeddedRust = rustPkgs.callPackage ./embedded-rust { };
 
+  # this is pretty cool.
+  nx = config_dir: hostname: rustPkgs.callPackage ./nx-script { inherit config_dir hostname; };
+
   bevy-test = mkPkgOrShell {
     path = ./bevy/test;
     args = {

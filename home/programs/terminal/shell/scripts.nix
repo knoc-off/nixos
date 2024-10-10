@@ -1,92 +1,65 @@
-{ pkgs, self, ... }:
+{ pkgs, self, hostname, ... }:
 let
   config_dir = "/etc/nixos"; # Should relocate to /etc? and symlink?
-  config_name = "framework13";
   inherit (self.packages.${pkgs.system}) writeNuScript;
 in {
   home.packages = [
-    (pkgs.writeShellScriptBin "nx" ''
-      #!/usr/bin/env bash
-      set -e
+    (self.packages.${pkgs.system}.nx config_dir hostname)
 
-      force_flag=false
-      args=("$@")
-
-      # Check if -f flag is present
-      for arg in "$@"; do
-        if [[ $arg == "-f" ]]; then
-          force_flag=true
-          break
-        fi
-      done
-
-      # Remove -f from args if present
-      args=(''${args[@]/-f/})
-
-      case "''${args[0]}" in
-        "rb")
-          cd "${config_dir}"
-
-          if [[ $(git status --porcelain) != "" && $force_flag == false ]]; then
-            echo "git is dirty"
-            exit 1
-          fi
-
-          echo "force rebuild"
-          sudo nixos-rebuild switch --flake "${config_dir}#${config_name}"
-          ;;
-        "rt")
-          sudo nixos-rebuild test --flake "${config_dir}#${config_name}"
-          ;;
-        "cr")
-          nix repl --extra-experimental-features repl-flake "${config_dir}#nixosConfigurations.${config_name}"
-          ;;
-        "vm")
-          sudo nixos-rebuild build-vm --flake "${config_dir}#${config_name}"
-          ;;
-        "cd")
-          query="''${args[@]:1}"
-          file=$(fd . "${config_dir}" --type=d -E .git -H | fzf --query "$query")
-          if [[ -d $file ]]; then
-            echo "$file"
-            cd "$file"
-          fi
-          ;;
-        *)
-          query="''${args[@]}"
-          file=$(fd . "${config_dir}" -e nix -E .git -H | fzf --query "$query")
-          if [[ -f $file ]]; then
-            echo "$file"
-            nvim "$file"
-          fi
-          ;;
-      esac
-    '')
+    (pkgs.writeShellScriptBin "isvpn" ''
+      nmcli connection show --active | grep -q "wgnord" && echo true || echo false
+      '')
 
     (writeNuScript "nixx" ''
-      def main [
-        --sudo (-s): bool,  # Run the command with sudo
-        --bg (-b): bool,    # Run the command in the background
-        package: string,    # The Nix package to run
-        ...args: string     # Additional arguments for the command
-      ] {
+      def --wrapped main [...args: string] {
         mut command = []
+        mut nixx_args = []
+        mut program_args = []
+        mut package = ""
+        mut sudo = false
+        mut bg = false
+
+        let separator_indices = ($args | enumerate | where item == "--" | get index)
+        let separator_index = if ($separator_indices | length) == 0 {
+          null
+        } else {
+          $separator_indices | first
+        }
+
+        if $separator_index != null {
+          $nixx_args = ($args | range ..$separator_index)
+          $program_args = ($args | range ($separator_index + 1)..)
+        } else {
+          $nixx_args = $args
+          $program_args = []
+        }
+
+        # Process nixx arguments
+        for arg in $nixx_args {
+          if $arg == "sudo" {
+            $sudo = true
+          } else if $arg == "bg" {
+            $bg = true
+          } else if $package == "" {
+            $package = $arg
+          }
+        }
 
         if $sudo and $bg {
-          echo "Warning: Using sudo with background tasks may require manual authentication"
+          print "Warning: Using sudo with background tasks may require manual authentication"
         }
 
         if $bg {
-          $command = ($command | append ["pueue", "add"])
+          $command = ($command | append ["pueue" "add"])
         }
 
         $command = ($command | append [
-          "env",
-          "NIXPKGS_ALLOW_UNFREE=1",
-          "nix",
-          "shell",
-          "--impure",
-          $"nixpkgs#($package)",
+          "env"
+          "NIXPKGS_ALLOW_UNFREE=1"
+          "nix"
+          "shell"
+          "--impure"
+          $"nixpkgs#($package)"
           "--command"
         ])
 
@@ -95,20 +68,27 @@ in {
         }
 
         $command = ($command | append $package)
-        $command = ($command | append $args)
+        $command = ($command | append $program_args)
 
         let command_str = ($command | str join " ")
 
         if $bg {
-          let task_id = (^$nu.current-exe -c $command_str | parse "{id}")
-          pueue follow $task_id
+          let pueue_output = (nu -c $command_str | str trim)
+          let task_id = ($pueue_output | parse "New task added (id {id})." | get id | first)
+          if $task_id != null {
+            print $"Task added with ID: ($task_id)"
+            pueue follow $task_id
+          } else {
+            print "Failed to parse task ID. Pueue output:"
+            print $pueue_output
+          }
         } else {
-          ^$nu.current-exe -c $command_str
+          nu -c $command_str
         }
       }
     '')
 
-    (pkgs.writeShellScriptBin "gen-git-msg" ''
+    (pkgs.writeShellScriptBin "git-msg" ''
       git diff HEAD | llm "from the text extract only important changes to craft a concise and simple git commit message, formatted like this:
       <Title of the git commit>
 
@@ -116,8 +96,18 @@ in {
     '')
 
     (pkgs.writeShellScriptBin "compress" ''
-      tar -cf - "$1" | pv -s $(du -sb "$1" | awk '{print $1}') | pigz -9 > "$2".tar.gz
+      tar -cf - "$1" | pv -s $(du -sb "$1" | awk '{print $1}') | ${pkgs.pigz}/bin/pigz -9 > "$2".tar.gz
     '')
+
+    (writeNuScript "rsync-compress" ''
+      def main [source: path, destination: string] {
+        let size = (du -sb $source | split row " " | get 0 | into int)
+        rsync -avz --progress --compress-level=9 $source $destination
+        | pv -lep -s $size
+        | ignore
+      }
+    '')
+
     (pkgs.writeShellScriptBin "chrome" ''
       nix shell nixpkgs#ungoogled-chromium --command chromium $1 &>/dev/null &
     '')
