@@ -18,6 +18,11 @@ in rec {
     inherit (pkgs.python3Packages) callPackage;
   };
 
+
+
+  kitchenowl = pkgs.callPackage ./kitchenowl { };
+
+
   spotify-adblock = pkgs.callPackage ./spotify-adblock { };
   pam-fprint-grosshack = pkgs.callPackage ./grosshack { };
   pam-wrapper = pkgs.callPackage ./pam-wrapper { };

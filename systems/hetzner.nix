@@ -35,9 +35,6 @@
     # nix package settings
     ./modules/nix.nix
 
-    # message at boot.
-    ./commit-messages/hetzner-server-commit-message.nix
-
     # services
     ./services/nginx.nix
 
@@ -49,6 +46,9 @@
 
     # Syncthing
     ./services/syncthing.nix
+
+    # KitchenOwl
+    ./services/kitchenowl.nix
 
     # nextcloud
     # ./services/nextcloud.nix
