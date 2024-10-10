@@ -20,7 +20,7 @@ in rec {
 
 
 
-  kitchenowl = pkgs.callPackage ./kitchenowl { };
+  grosshack = pkgs.callPackage ./grosshack { };
 
 
   spotify-adblock = pkgs.callPackage ./spotify-adblock { };

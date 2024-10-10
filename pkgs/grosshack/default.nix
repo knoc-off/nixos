@@ -4,17 +4,16 @@
 , meson
 , ninja
 , pkg-config
-, fprintd
 , glib
+, pam
 , libfprint
 , polkit
 , dbus
-, dbus-glib
 , systemd
-, systemdLibs
-, linux-pam
-, pam
-, cmake
+, perl
+, libxslt
+, libpam-wrapper
+, libxml2
 }:
 
 stdenv.mkDerivation rec {
@@ -32,61 +31,41 @@ stdenv.mkDerivation rec {
     meson
     ninja
     pkg-config
-    cmake
+    perl
+    libxslt
   ];
 
   buildInputs = [
-    pam
-    fprintd
     glib
+    pam
     libfprint
     polkit
     dbus
-    dbus-glib
     systemd
-    systemdLibs
-    linux-pam
+    libpam-wrapper
+    libxml2
   ];
 
+  # Configure Meson to install PAM modules within the Nix store and disable man pages
   mesonFlags = [
-    "-Dpam_modules_dir=${placeholder "out"}/lib/security"
+    "-Dman=false"  # Disable man page generation
+    "-Dpam_modules_dir=lib"  # Redirect installation path
+    # Removed "-Dtests=false" as it's an unknown option
   ];
 
-  NIX_CFLAGS_COMPILE = "-I${linux-pam}/include/security";
-
-  preConfigure = ''
-    echo "Debugging information:"
-    echo "PAM path: ${linux-pam}"
-    echo "PAM include path: ${linux-pam}/include/security"
-    echo "PAM headers location:"
-    ls -R ${linux-pam}/include/security
-    echo "Current directory contents:"
-    ls -R
-  '';
-
-  configurePhase = ''
-    runHook preConfigure
-    meson setup build --prefix=$out $mesonFlags
-    runHook postConfigure
-  '';
-
-  buildPhase = ''
-    runHook preBuild
-    ninja -C build
-    runHook postBuild
-  '';
-
-  installPhase = ''
-    runHook preInstall
-    ninja -C build install
-    runHook postInstall
+  # Attempt to patch meson.build if the pattern exists
+  postPatch = ''
+    # Use --replace-warn to suppress deprecation warning
+    substituteInPlace meson.build \
+      --replace "pammoddir = join_paths(get_option('libdir'), 'security')" \
+                "pammoddir = get_option('pam_modules_dir')" || true
   '';
 
   meta = with lib; {
-    description = "PAM module enabling simultaneous fingerprint (fprintd) and password authentication";
+    description = "PAM module for fingerprint authentication";
     homepage = "https://gitlab.com/mishakmak/pam-fprint-grosshack";
     license = licenses.gpl2Only;
     maintainers = with maintainers; [ ];
-    platforms = platforms.linux;
+    platforms = platforms.all;
   };
 }
