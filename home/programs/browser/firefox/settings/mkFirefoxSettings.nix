@@ -1,4 +1,4 @@
-{ lib, theme }:
+{ lib, theme, colorLib}:
 
 { enableSmoothScroll ? false
 , enableDarkTheme ? false
@@ -11,7 +11,7 @@
 let
   baseSettings = import ./base.nix;
   smoothScrollSettings = import ./smooth_scroll.nix;
-  themeSettings = import ./theme.nix { inherit theme; };
+  themeSettings = import ./theme.nix { inherit theme colorLib; };
   privacySettings = import ./privacy.nix;
   performanceSettings = import ./performance.nix;
   uiCustomizationSettings = import ./ui_customization.nix;

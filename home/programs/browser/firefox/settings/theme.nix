@@ -1,10 +1,19 @@
-{ theme }:
+{ theme, colorLib }:
+let
+  h2okl = colorLib.hexStrToOklch;
+  oklchToHex = colorLib.oklchToHex;
+  setLightness = value: color: colorLib.oklchmod.setLightness value color;
 
+  primary = h2okl theme.primary;
+  neutral = h2okl theme.neutral;
+
+  darkBackground = oklchToHex (setLightness 0.2 primary);
+in
 {
   # Dark theme
   "devtools.theme" = "dark";
-  "browser.display.background_color" = "#${theme.base02}";
-  "browser.display.background_color.dark" = "#${theme.base02}";
+  "browser.display.background_color" = darkBackground;
+  "browser.display.background_color.dark" = darkBackground;
   "ui.systemUsesDarkTheme" = "1";
 
   # Theme settings

@@ -1,4 +1,4 @@
-{ pkgs, theme, firefox-csshacks }:
+{ pkgs, theme, firefox-csshacks, colorLib }:
 
 { enableSidebarCustomization ? false
 , hideTabs ? false
@@ -6,17 +6,14 @@
 , autohideToolbox ? false
 , autohideSidebar ? false
 , extraStyles ? ""
+, colorSchemeOptions ? {}
 }:
 
 let
-
-
-  sidebarCustomization = import ./userChrome/sidebar.nix { inherit theme firefox-csshacks; };
-  colorScheme = import ./userChrome/colors.nix { inherit theme; };
+  sidebarCustomization = import ./userChrome/sidebar.nix { inherit theme colorLib firefox-csshacks; };
+  colorScheme = import ./userChrome/colors.nix { inherit theme colorLib; } colorSchemeOptions;
 
 in ''
-
-
   ${if autohideToolbox then ''@import "${firefox-csshacks}/chrome/autohide_toolbox.css";'' else ""}
   ${if autohideSidebar then ''@import "${firefox-csshacks}/chrome/autohide_sidebar.css";'' else ""}
   ${if enableSidebarCustomization then sidebarCustomization else ""}

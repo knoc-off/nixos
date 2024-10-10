@@ -1,37 +1,43 @@
-{
-  pkgs,
-  config,
-  theme,
-  ...
-}: let
+{ pkgs, config, theme, colorLib, ... }:
+let
+  h2okl = colorLib.hexStrToOklch;
+  oklchToHex = colorLib.oklchToHex;
+  setLightness = value: color: colorLib.oklchmod.setLightness value color;
+
+  primary = h2okl theme.primary;
+  secondary = h2okl theme.secondary;
+  neutral = h2okl theme.neutral;
+  accent1 = h2okl theme.accent1;
+  accent2 = h2okl theme.accent2;
+
   swaylock-custom = pkgs.writeShellScriptBin "swaylock-custom" ''
     exec ${config.programs.swaylock.package}/bin/swaylock \
-    --layout-bg-color "${theme.base00}" \
-    --layout-border-color "${theme.base02}" \
-    --layout-text-color "${theme.base05}" \
+    --layout-bg-color "${oklchToHex (setLightness 0.2 primary)}" \
+    --layout-border-color "${oklchToHex (setLightness 0.3 primary)}" \
+    --layout-text-color "${oklchToHex (setLightness 0.8 neutral)}" \
     \
-    --line-ver-color "${theme.green00}" \
-    --inside-ver-color "${theme.base03}" \
-    --ring-ver-color "${theme.green01}" \
-    --text-ver-color "${theme.white00}" \
+    --line-ver-color "${oklchToHex accent1}" \
+    --inside-ver-color "${oklchToHex (setLightness 0.25 primary)}" \
+    --ring-ver-color "${oklchToHex (setLightness 0.6 accent1)}" \
+    --text-ver-color "${oklchToHex (setLightness 0.95 neutral)}" \
     \
-    --line-wrong-color "${theme.red00}" \
-    --inside-wrong-color "${theme.base02}" \
-    --ring-wrong-color "${theme.red01}" \
-    --text-wrong-color "${theme.white00}" \
+    --line-wrong-color "${oklchToHex accent2}" \
+    --inside-wrong-color "${oklchToHex (setLightness 0.3 primary)}" \
+    --ring-wrong-color "${oklchToHex (setLightness 0.6 accent2)}" \
+    --text-wrong-color "${oklchToHex (setLightness 0.95 neutral)}" \
     \
-    --line-clear-color "${theme.base00}" \
-    --inside-clear-color "${theme.base02}" \
-    --ring-clear-color "${theme.yellow00}" \
-    --text-clear-color "${theme.white00}" \
+    --line-clear-color "${oklchToHex (setLightness 0.2 primary)}" \
+    --inside-clear-color "${oklchToHex (setLightness 0.3 primary)}" \
+    --ring-clear-color "${oklchToHex secondary}" \
+    --text-clear-color "${oklchToHex (setLightness 0.95 neutral)}" \
     \
-    --ring-color "${theme.base02}" \
-    --key-hl-color "${theme.base0B}" \
-    --text-color "${theme.base05}" \
+    --ring-color "${oklchToHex (setLightness 0.3 primary)}" \
+    --key-hl-color "${oklchToHex secondary}" \
+    --text-color "${oklchToHex (setLightness 0.8 neutral)}" \
     \
-    --line-color "${theme.base00}" \
-    --inside-color "${theme.base01}" \
-    --separator-color "${theme.base02}" \
+    --line-color "${oklchToHex (setLightness 0.2 primary)}" \
+    --inside-color "${oklchToHex (setLightness 0.25 primary)}" \
+    --separator-color "${oklchToHex (setLightness 0.3 primary)}" \
     \
     --indicator-radius "100" \
     --indicator-thickness "1" \

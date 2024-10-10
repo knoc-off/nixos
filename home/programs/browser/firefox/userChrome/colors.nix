@@ -1,75 +1,142 @@
-{ theme }:
+{ theme, colorLib }:
+{ enablePopupPanels ? false
+, enableWindowAndToolbar ? false
+, enableTabs ? false
+, enableURLBar ? false
+, enableInputFields ? false
+, enableDropdowns ? false
+, enablePanels ? false
+, enableContextMenus ? false
+, enableButtons ? false
+, enableScrollbars ? false
+, enableSelection ? false
+, enableTooltips ? false
+}:
+
+let
+  ho = colorLib.hexStrToOklch;
+  oh = colorLib.oklchToHex;
+  sl = value: color: colorLib.oklchmod.setLightness value color;
+  sc = value: color: colorLib.oklchmod.setChroma value color;
+
+  pr = theme.primary;
+  se = theme.secondary;
+  ne = theme.neutral;
+  a1 = theme.accent1;
+  a2 = theme.accent2;
+
+  # Function to reduce chroma (saturation) and set lightness
+  rc = l: c: color: oh (sc c (sl l (ho color)));
+
+  popupPanels = ''
+    /* Popup panels */
+    --arrowpanel-background: ${rc 0.2 0.1 pr} !important;
+    --arrowpanel-border-color: ${rc 0.1 0.1 pr} !important;
+    --arrowpanel-color: ${rc 0.9 0.1 ne} !important;
+    --arrowpanel-dimmed: ${rc 0.7 0.1 ne} !important;
+  '';
+
+  windowAndToolbar = ''
+    /* Window and toolbar background */
+    --lwt-accent-color: ${rc 0.2 0.1 pr} !important;
+    --lwt-accent-color-inactive: ${rc 0.1 0.1 pr} !important;
+    --toolbar-bgcolor: ${rc 0.2 0.1 pr} !important;
+  '';
+
+  tabs = ''
+    /* Tabs with system theme - text is not controlled by variable */
+    --tab-selected-bgcolor: ${rc 0.3 0.1 pr} !important;
+
+    /* Tabs with any other theme */
+    --lwt-text-color: ${rc 0.7 0.1 ne} !important;
+    --lwt-selected-tab-background-color: ${rc 0.3 0.1 pr} !important;
+
+    /* Toolbar area */
+    --toolbarbutton-icon-fill: ${rc 0.9 0.1 ne} !important;
+    --lwt-toolbarbutton-hover-background: ${rc 0.9 0.1 ne} !important;
+    --lwt-toolbarbutton-active-background: ${rc 0.7 0.1 ne} !important;
+  '';
+
+  urlBar = ''
+    /* URL bar */
+    --toolbar-field-border-color: ${rc 0.5 0.1 ne} !important;
+    --toolbar-field-focus-border-color: ${rc 0.7 0.1 ne} !important;
+    --urlbar-popup-url-color: ${rc 0.9 0.1 ne} !important;
+    --urlbar-popup-action-row-color: ${rc 0.9 0.1 ne} !important;
+    --urlbar-popup-subtitle-color: ${rc 0.7 0.1 ne} !important;
+    --urlbar-popup-title-color: ${rc 0.5 0.1 ne} !important;
+    --urlbar-popup-background: ${rc 0.3 0.1 pr} !important;
+  '';
+
+  inputFields = ''
+    /* Input fields */
+    --input-background: ${rc 0.2 0.1 pr} !important;
+    --input-border-color: ${rc 0.5 0.1 ne} !important;
+    --input-color: ${rc 0.9 0.1 ne} !important;
+  '';
+
+  dropdowns = ''
+    /* Dropdowns */
+    --dropdown-background: ${rc 0.2 0.1 pr} !important;
+    --dropdown-border-color: ${rc 0.5 0.1 ne} !important;
+    --dropdown-color: ${rc 0.9 0.1 ne} !important;
+  '';
+
+  panels = ''
+    /* Panels */
+    --panel-background: ${rc 0.2 0.1 pr} !important;
+    --panel-border-color: ${rc 0.5 0.1 ne} !important;
+    --panel-color: ${rc 0.9 0.1 ne} !important;
+  '';
+
+  contextMenus = ''
+    /* Context menus */
+    --menu-background: ${rc 0.2 0.1 pr} !important;
+    --menu-border-color: ${rc 0.5 0.1 ne} !important;
+    --menu-color: ${rc 0.9 0.1 ne} !important;
+  '';
+
+  buttons = ''
+    /* Buttons */
+    --button-background: ${rc 0.3 0.1 pr} !important;
+    --button-border-color: ${rc 0.5 0.1 ne} !important;
+    --button-color: ${rc 0.9 0.1 ne} !important;
+  '';
+
+  scrollbars = ''
+    /* Scrollbars */
+    --scrollbar-color: ${rc 0.5 0.1 ne} ${rc 0.2 0.1 pr} !important;
+  '';
+
+  selection = ''
+    /* Selection */
+    --selection-background: ${rc 0.4 0.1 pr} !important;
+    --selection-color: ${rc 0.9 0.1 ne} !important;
+  '';
+
+  tooltips = ''
+    /* Tooltips */
+    --tooltip-background: ${rc 0.2 0.1 pr} !important;
+    --tooltip-color: ${rc 0.9 0.1 ne} !important;
+  '';
+
+in
 ''
   /* Color configuration */
   :root {
     -moz-border-radius: 1em;
 
-    /* Popup panels */
-    --arrowpanel-background: #${theme.base01} !important;
-    --arrowpanel-border-color: #${theme.base00} !important;
-    --arrowpanel-color: #${theme.base06} !important;
-    --arrowpanel-dimmed: #${theme.base05} !important;
-
-    /* Window and toolbar background */
-    --lwt-accent-color: #${theme.base01} !important;
-    --lwt-accent-color-inactive: #${theme.base00} !important;
-    --toolbar-bgcolor: #${theme.base01} !important;
-
-    /* Tabs with system theme - text is not controlled by variable */
-    --tab-selected-bgcolor: #${theme.base02} !important;
-
-    /* Tabs with any other theme */
-    --lwt-text-color: #${theme.base05} !important;
-    --lwt-selected-tab-background-color: #${theme.base02} !important;
-
-    /* Toolbar area */
-    --toolbarbutton-icon-fill: #${theme.base06} !important;
-    --lwt-toolbarbutton-hover-background: #${theme.base06} !important;
-    --lwt-toolbarbutton-active-background: #${theme.base05} !important;
-
-    /* URL bar */
-    --toolbar-field-border-color: #${theme.base04} !important;
-    --toolbar-field-focus-border-color: #${theme.base05} !important;
-    --urlbar-popup-url-color: #${theme.base06} !important;
-    --urlbar-popup-action-row-color: #${theme.base06} !important;
-    --urlbar-popup-subtitle-color: #${theme.base05} !important;
-    --urlbar-popup-title-color: #${theme.base04} !important;
-    --urlbar-popup-background: #${theme.base02} !important;
-
-    /* Input fields */
-    --input-background: #${theme.base01} !important;
-    --input-border-color: #${theme.base04} !important;
-    --input-color: #${theme.base06} !important;
-
-    /* Dropdowns */
-    --dropdown-background: #${theme.base01} !important;
-    --dropdown-border-color: #${theme.base04} !important;
-    --dropdown-color: #${theme.base06} !important;
-
-    /* Panels */
-    --panel-background: #${theme.base01} !important;
-    --panel-border-color: #${theme.base04} !important;
-    --panel-color: #${theme.base06} !important;
-
-    /* Context menus */
-    --menu-background: #${theme.base01} !important;
-    --menu-border-color: #${theme.base04} !important;
-    --menu-color: #${theme.base06} !important;
-
-    /* Buttons */
-    --button-background: #${theme.base02} !important;
-    --button-border-color: #${theme.base04} !important;
-    --button-color: #${theme.base06} !important;
-
-    /* Scrollbars */
-    --scrollbar-color: #${theme.base04} #${theme.base01} !important;
-
-    /* Selection */
-    --selection-background: #${theme.base03} !important;
-    --selection-color: #${theme.base06} !important;
-
-    /* Tooltips */
-    --tooltip-background: #${theme.base01} !important;
-    --tooltip-color: #${theme.base06} !important;
+    ${if enablePopupPanels then popupPanels else ""}
+    ${if enableWindowAndToolbar then windowAndToolbar else ""}
+    ${if enableTabs then tabs else ""}
+    ${if enableURLBar then urlBar else ""}
+    ${if enableInputFields then inputFields else ""}
+    ${if enableDropdowns then dropdowns else ""}
+    ${if enablePanels then panels else ""}
+    ${if enableContextMenus then contextMenus else ""}
+    ${if enableButtons then buttons else ""}
+    ${if enableScrollbars then scrollbars else ""}
+    ${if enableSelection then selection else ""}
+    ${if enableTooltips then tooltips else ""}
   }
 ''

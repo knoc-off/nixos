@@ -1,4 +1,16 @@
-{ pkgs, theme, ... }: {
+{ pkgs, theme, colorLib, ... }:
+let
+  h2okl = colorLib.hexStrToOklch;
+  oklchToHex = colorLib.oklchToHex;
+  setLightness = value: color: colorLib.oklchmod.setLightness value color;
+
+  primary = h2okl theme.primary;
+  secondary = h2okl theme.secondary;
+  neutral = h2okl theme.neutral;
+  accent1 = h2okl theme.accent1;
+  accent2 = h2okl theme.accent2;
+in
+{
   imports = [
     ./kitty
     ./shell
@@ -40,10 +52,10 @@
       enable = true;
 
       colors = {
-        bg = "#${theme.base01}";
-        "bg+" = "#${theme.base01}";
-        fg = "#${theme.base06}";
-        "fg+" = "#${theme.base06}";
+        bg = "${oklchToHex (setLightness 0.2 primary)}";
+        "bg+" = "${oklchToHex (setLightness 0.25 primary)}";
+        fg = "${oklchToHex (setLightness 0.8 neutral)}";
+        "fg+" = "${oklchToHex (setLightness 0.9 neutral)}";
       };
     };
 
@@ -56,7 +68,6 @@
     bat = {
       enable = true;
       config = {
-        #map-syntax = [ "*.jenkinsfile:Groovy" "*.props:Java Properties" ];
         pager = "less -FR";
         theme = "TwoDark";
       };

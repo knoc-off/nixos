@@ -1,4 +1,4 @@
-{ inputs, pkgs, theme, lib, ... }:
+{ inputs, pkgs, theme, lib, colorLib, ... }:
 let
 
   firefox-csshacks = pkgs.stdenv.mkDerivation {
@@ -13,11 +13,11 @@ let
   };
 
   mkFirefoxSettings =
-    import ./settings/mkFirefoxSettings.nix { inherit lib theme; };
+    import ./settings/mkFirefoxSettings.nix { inherit lib theme colorLib; };
   mkUserChrome =
-    import ./mkUserChrome.nix { inherit pkgs theme firefox-csshacks; };
+    import ./mkUserChrome.nix { inherit pkgs theme firefox-csshacks colorLib; };
   mkUserContent =
-    import ./mkUserContent.nix { inherit pkgs theme firefox-csshacks; };
+    import ./mkUserContent.nix { inherit pkgs theme firefox-csshacks colorLib; };
 
 in {
   programs.firefox = {
@@ -52,12 +52,16 @@ in {
       userChrome = mkUserChrome {
         enableSidebarCustomization = true;
         hideTabs = true;
-        enableColorScheme = false;
+        enableColorScheme = true;
         autohideToolbox = true;
         autohideSidebar = true;
         extraStyles = ''
           /* Any additional custom styles */
         '';
+        colorSchemeOptions = {
+          enableURLBar = true;
+        };
+
       };
 
       # theme for the content firefox presents.
