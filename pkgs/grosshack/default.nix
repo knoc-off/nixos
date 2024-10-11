@@ -49,7 +49,7 @@ stdenv.mkDerivation rec {
   # Configure Meson to install PAM modules within the Nix store and disable man pages
   mesonFlags = [
     "-Dman=false"  # Disable man page generation
-    "-Dpam_modules_dir=lib"  # Redirect installation path
+    "-Dpam_modules_dir=lib/security"  # Redirect installation path
     # Removed "-Dtests=false" as it's an unknown option
   ];
 
