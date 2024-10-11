@@ -18,14 +18,9 @@ in rec {
     inherit (pkgs.python3Packages) callPackage;
   };
 
-
-
   grosshack = pkgs.callPackage ./grosshack { };
 
-
   spotify-adblock = pkgs.callPackage ./spotify-adblock { };
-  pam-fprint-grosshack = pkgs.callPackage ./grosshack { };
-  pam-wrapper = pkgs.callPackage ./pam-wrapper { };
 
   llm-cmd = mkPkgOrShell {
     path = ./llm-cmd;
