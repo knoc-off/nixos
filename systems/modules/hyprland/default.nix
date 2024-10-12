@@ -66,8 +66,6 @@
   ];
 
   security.pam.services.swaylock = lib.mkOverride {} 1001;
-  # I believe this is redundant, but I'm not sure
-  # security.pam.services.swaylock.fprintAuth = config.services.fprintd.enable;
 
   # this should be enabled by default, with hyprland
   security = {

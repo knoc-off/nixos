@@ -12,7 +12,7 @@ let
     # pam-fprint-grosshack
     auth  sufficient  ${pam_fprintd_grosshackSo} timeout=99
     auth  sufficient  pam_unix.so try_first_pass nullok
-  '';
+  ''; # might want to replace pam_unix.so with ${pkgs.pam_unix}/...
 
 
 in
@@ -29,11 +29,4 @@ in
     ags.text = mkDefault (mkBefore grosshackConfig);
     swaylock.text = mkDefault (mkBefore grosshackConfig);
   };
-
-
-  #security.pam.services.swaylock.text = ''
-  #  auth sufficient pam_fprintd.so
-  #  ${pkgs.fprintd}/lib/security/pam_fprintd.so
-  #'';
-  #"${pkgs.fprintd}/lib/security/pam_fprintd.so"
 }
