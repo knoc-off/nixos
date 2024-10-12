@@ -13,15 +13,6 @@
     };
 
 
-    packages = with pkgs; [
-      libsForQt5.qt5.qtwayland
-      adwaita-qt
-      fluent-gtk-theme
-      fluent-icon-theme
-      vanilla-dmz
-      gsettings-desktop-schemas
-      gnome.gnome-settings-daemon
-    ];
 
 
 

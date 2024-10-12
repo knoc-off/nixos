@@ -62,13 +62,13 @@
 
     # Android emulation
     #./modules/virtualisation/waydroid.nix
-    ./modules/gtk
 
     # enable bash shell customizations
     ./modules/shell/bash.nix
 
     #./modules/yubikey.nix
   ];
+
 
 
   programs = {

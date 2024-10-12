@@ -179,10 +179,6 @@
       images = listToAttrs [
         (mkImage "framework13" "knoff" "x86_64-linux" "isoImage")
       ];
-      #images = {
-      #  #laptop =  (mkImage "framework13" "knoff" "x86_64-linux").value.config.system.build.isoImage;
-      #  laptop = (mkImage "framework13" "knoff" "x86_64-linux" "isoImage")
-      #};
 
       nixosConfigurations = listToAttrs [
         (mkHost "framework13" "knoff" "x86_64-linux")
