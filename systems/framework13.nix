@@ -28,8 +28,8 @@
     inputs.stylix.nixosModules.stylix
     {
       stylix.image = pkgs.fetchurl {
-        url = "https://images.squarespace-cdn.com/content/v1/6554594506867677bdd68b03/a30ca789-db30-4413-8dc5-40726c893d7a/SCAV+new+intro+bg+02+copy.jpg";
-        sha256 = "sha256-oGjPyBq56rweu7/Lo9SJudF/vg7uL1X/qpus9fFkEmw=";
+        url = "https://www.pixelstalk.net/wp-content/uploads/2016/05/Epic-Anime-Awesome-Wallpapers.jpg";
+        sha256 = "enQo3wqhgf0FEPHj2coOCvo7DuZv+x5rL/WIo4qPI50=";
       };
       stylix.polarity = "dark";
     }
