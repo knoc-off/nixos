@@ -27,7 +27,6 @@
     #./programs/gaming/steam.nix
     ./programs/gaming/lutris.nix
     ./enviroment.nix
-    ./modules/themes.nix
 
 
     #./programs

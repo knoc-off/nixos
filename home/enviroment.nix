@@ -66,39 +66,39 @@
   };
 
   # enable qt themes
-  qt = {
-    enable = true;
-    platformTheme.name = "gtk3";
+  #qt = {
+  #  enable = true;
+  #  platformTheme.name = "gtk3";
 
-    style = {
-      name = "gtk3";
-      #package = pkgs.adwaita-qt;
-    };
-  };
+  #  style = {
+  #    name = "gtk3";
+  #    #package = pkgs.adwaita-qt;
+  #  };
+  #};
 
-  # enable gtk themes
-  gtk = let
-    extra3-4Config = {
-      gtk-application-prefer-dark-theme = 1;
-    };
-  in {
-    enable = true;
-    theme = {
-      name = "Fluent-Dark";
-      package = pkgs.fluent-gtk-theme;
-    };
-    iconTheme = {
-      name = "Fluent-Dark";
-      package = pkgs.fluent-icon-theme;
-    };
-    cursorTheme = {
-      name = "Vanilla-DMZ";
-      package = pkgs.vanilla-dmz;
-    };
+  ## enable gtk themes
+  #gtk = let
+  #  extra3-4Config = {
+  #    gtk-application-prefer-dark-theme = 1;
+  #  };
+  #in {
+  #  enable = true;
+  #  theme = {
+  #    name = "Fluent-Dark";
+  #    package = pkgs.fluent-gtk-theme;
+  #  };
+  #  iconTheme = {
+  #    name = "Fluent-Dark";
+  #    package = pkgs.fluent-icon-theme;
+  #  };
+  #  cursorTheme = {
+  #    name = "Vanilla-DMZ";
+  #    package = pkgs.vanilla-dmz;
+  #  };
 
-    gtk3.extraConfig = extra3-4Config;
-    gtk4.extraConfig = extra3-4Config;
-  };
+  #  gtk3.extraConfig = extra3-4Config;
+  #  gtk4.extraConfig = extra3-4Config;
+  #};
 
   dconf = {
     enable = true;
