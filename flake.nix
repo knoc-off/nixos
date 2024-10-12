@@ -77,6 +77,10 @@
     # Minecraft servers and packages
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
 
+
+    # Themes
+    stylix.url = "github:danth/stylix/cf8b6e2d4e8aca8ef14b839a906ab5eb98b08561";
+
     # Non-Flake Inputs:
 
     firefox-csshacks = {
