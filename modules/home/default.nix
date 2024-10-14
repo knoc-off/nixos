@@ -1,0 +1,3 @@
+{
+  gtk = import ./gtk.nix;
+}

@@ -1,9 +1,6 @@
 {
-  inputs,
-  pkgs,
-}: let
-  addons = inputs.firefox-addons.packages.${pkgs.system};
-in
+  addons
+}:
   with addons; [
     #bypass-paywalls-clean
 

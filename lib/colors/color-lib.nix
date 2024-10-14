@@ -84,6 +84,18 @@ in rec {
 
 
 
+
+  hexStrSetAlpha = value: hexValue:
+  let
+    split = splitHex hexValue;
+    clampedValue = math.clamp value 0 1;
+    alphaInt = math.floor (255 * clampedValue);
+    newHexValue = split // { a = utils.convert.decToHex alphaInt; };
+  in
+    utils.convert.combineHex (types.Hex.check newHexValue);
+
+
+
   oklchmod = {
     # Set the Hue component to a new value
     setHue = newHue: color:

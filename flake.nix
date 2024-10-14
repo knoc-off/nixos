@@ -175,6 +175,7 @@
       devShells = forAllSystems (system: mkPkgShell system true);
 
       nixosModules = import ./modules/nixos/default.nix;
+      homeModules = import ./modules/home/default.nix;
 
       overlays = import ./overlays { inherit inputs; };
 

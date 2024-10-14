@@ -30,7 +30,7 @@
     '';
 in {
   exec-once = [
-    #"hyprpaper --config ${wallpaper}"
+    "hyprpaper --config ${wallpaper}"
     "pypr"
     "${pkgs.wayland-pipewire-idle-inhibit}/bin/wayland-pipewire-idle-inhibit"
     "[workspace special silent] kitty --class kitty-dropterm --config <(sed '/map ctrl+t new_os_window_with_cwd/d' /home/knoff/.config/kitty/kitty.conf)"

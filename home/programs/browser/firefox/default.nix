@@ -1,24 +1,15 @@
 { inputs, pkgs, theme, lib, colorLib, ... }:
 let
 
+  addons = inputs.firefox-addons.packages.${pkgs.system};
+
   firefox-csshacks = pkgs.stdenv.mkDerivation {
     name = "patched-firefox-csshacks";
     src = inputs.firefox-csshacks;
-
-    #patches = [ ./patches/autohide_toolbox-zone.patch ];
-
     installPhase = ''
       cp -r . $out
     '';
   };
-
-  mkFirefoxSettings =
-    import ./settings/mkFirefoxSettings.nix { inherit lib theme colorLib; };
-  mkUserChrome =
-    import ./mkUserChrome.nix { inherit pkgs theme firefox-csshacks colorLib; };
-  mkUserContent =
-    import ./mkUserContent.nix { inherit pkgs theme firefox-csshacks colorLib; };
-
 in {
   programs.firefox = {
     enable = true;
@@ -28,7 +19,9 @@ in {
       name = "main";
 
       # addons
-      extensions = import ./addons { inherit inputs pkgs; };
+      extensions = import ./addons { inherit addons; };
+
+      userChrome = import ./userChrome.nix { inherit theme colorLib firefox-csshacks;  };
 
       # custom search engines, default, etc.
       search.engines = import ./searchEngines { inherit pkgs; };
@@ -47,36 +40,6 @@ in {
         ];
       };
 
-      # theme for the firefox ui
-      #userChrome = import ./userChrome {inherit theme pkgs;};
-      userChrome = mkUserChrome {
-        enableSidebarCustomization = true;
-        hideTabs = true;
-        enableColorScheme = true;
-        autohideToolbox = true;
-        autohideSidebar = true;
-        extraStyles = ''
-          /* Any additional custom styles */
-        '';
-        colorSchemeOptions = {
-          enableURLBar = true;
-        };
-
-      };
-
-      # theme for the content firefox presents.
-      userContent = mkUserContent { };
-
-      # settings for firefox. telemetry, scrolling, etc.
-      #settings = import ./settings;
-
-      settings = mkFirefoxSettings {
-        enableSmoothScroll = true;
-        enableDarkTheme = true;
-        enablePrivacy = true;
-        enablePerformance = true;
-        enableCustomUI = true;
-      };
     };
     profiles."minimal" = {
       isDefault = false;
@@ -84,7 +47,7 @@ in {
       name = "minimal";
 
       # addons
-      extensions = import ./addons/minimal.nix { inherit inputs pkgs; };
+      extensions = import ./addons/minimal.nix { inherit addons; };
 
       # custom search engines, default, etc.
       search.engines = import ./searchEngines { inherit pkgs; };
@@ -102,57 +65,14 @@ in {
           "fmhy"
         ];
       };
-
-      userChrome = mkUserChrome {
-        enableSidebarCustomization = true;
-        hideTabs = true;
-        enableColorScheme = false;
-        autohideToolbox = true;
-        autohideSidebar = true;
-        extraStyles = ''
-          /* Any additional custom styles */
-        '';
-      };
-
-      # theme for the content firefox presents.
-      userContent = mkUserContent { removeFlash = true; };
-
-      # settings for firefox. telemetry, scrolling, etc.
-      #settings = import ./settings;
-      settings = mkFirefoxSettings {
-        enableSmoothScroll = true;
-        enablePrivacy = true;
-        extraSettings = {
-          # Add any additional settings specific to the minimal profile
-          "browser.tabs.loadInBackground" = false;
-        };
-      };
     };
     profiles."testing" = {
       isDefault = false;
       id = 2;
       name = "testing";
 
-      userChrome = mkUserChrome {
-        enableSidebarCustomization = false;
-        hideTabs = false;
-        enableColorScheme = false;
-        autohideToolbox = false;
-        autohideSidebar = false;
-        extraStyles = ''
-          @import "${firefox-csshacks}/chrome/autohide_main_toolbar.css";
-        '';
-      };
-
-      userContent = mkUserContent { removeFlash = false; };
-
-      settings = mkFirefoxSettings {
-        enableSmoothScroll = true;
-        enablePrivacy = true;
-        extraSettings = {
-          "browser.tabs.loadInBackground" = false;
-        };
-      };
+      extensions = import ./addons { inherit addons; };
+      userChrome = import ./userChrome.nix { inherit theme colorLib firefox-csshacks;  };
     };
   };
 
