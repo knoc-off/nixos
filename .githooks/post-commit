@@ -1,70 +1,45 @@
 #!/usr/bin/env bash
+# Script to update Nix system configuration labels based on commit messages.
 
-# Directory containing the Nix files
-SYSTEMS_DIR="systems"
-# Directory to store commit messages
-COMMIT_MSG_DIR="${SYSTEMS_DIR}/commit-messages"
+SDIR="systems"                   # Directory containing Nix files
+CDIR="$SDIR/commit-messages"     # Directory for commit messages
+MAXLEN=200                       # Maximum length for combined message
 
-# Create the commit messages directory if it doesn't exist
-mkdir -p "$COMMIT_MSG_DIR"
+mkdir -p "$CDIR"                 # Ensure commit message directory exists
 
-# Function to process commit message
-process_commit_msg() {
-    local commit_msg="$1"
-    local pad_amount="$2"
-    local first_line=$(echo "$commit_msg" | head -n 1)
-    local message=$(echo "$first_line" | sed -E 's/^\s+//g' | sed -E 's/\s+$//g' | sed 's/ /_/g' | sed -E 's/[^a-zA-Z0-9:_\.-]//g')
-
-    if [ ${#message} -gt "$pad_amount" ]; then
-        message="${message:0:$pad_amount}"
-    else
-        message="${message}$(printf '%*s' $(($pad_amount-${#message})) | tr ' ' '_')"
-    fi
-
-    echo "$message"
+# Function to process commit messages
+process_msg() {
+    local msg="$1" pad="$2"
+    msg="${msg#"${msg%%[![:space:]]*}"}"          # Trim leading whitespace
+    msg="${msg%"${msg##*[![:space:]]}"}"          # Trim trailing whitespace
+    msg="${msg// /_}"                             # Replace spaces with underscores
+    msg=$(echo "$msg" | tr -cd 'a-zA-Z0-9:_\.-')  # Remove disallowed characters
+    [ ${#msg} -gt "$pad" ] && msg="${msg:0:$pad}" # Truncate if necessary
+    printf "%-${pad}s" "$msg" | tr ' ' '_'        # Pad with underscores
 }
 
-# Process each Nix file
-for nix_file in ${SYSTEMS_DIR}/*.nix; do
-    # Skip if no files match the pattern
-    [[ -e "$nix_file" ]] || continue
+# Get and process the global commit message
+gmsg=$(git log -1 --pretty=%s)                    # Fetch global commit message
+gmsg_len=${#gmsg}
+[ "$gmsg_len" -gt "$MAXLEN" ] && gmsg_len=$MAXLEN
+gmsg=$(process_msg "$gmsg" "$gmsg_len")           # Process global message
 
-    # Get the latest commit message for this file
-    commit_msg=$(git log -1 --pretty=%s -- "$nix_file")
+pad_amt=$((MAXLEN - gmsg_len))                    # Remaining length for file-specific message
 
-    # Get the global commit message
-    global_msg=$(git log -1 --pretty=%s)
-
-    # Calculate pad amount for the file-specific message
-    global_msg_length=${#global_msg}
-    file_msg_pad_amount=$((200 - global_msg_length))
-
-    # Process the file-specific commit message
-    processed_file_msg=$(process_commit_msg "$commit_msg" "$file_msg_pad_amount")
-
-    # Process the global commit message
-    processed_global_msg=$(process_commit_msg "$global_msg" "$global_msg_length")
-
-    # Combine the processed messages
-    combined_msg="${processed_file_msg}${processed_global_msg}"
-
-    # Create a new file name for the commit message
-    filename=$(basename "$nix_file")
-    commit_msg_file="${COMMIT_MSG_DIR}/${filename%.*}-commit-message.nix"
-
-    # Write the combined message to the target file
-    printf "{\n  system.nixos.label = \"%s\";\n}" "$combined_msg" > "$commit_msg_file"
-
-    # Check if there are changes to commit
-    if [[ -n $(git status -s "$commit_msg_file") ]]; then
-        # Stage the changes to the target file
-        git add "$commit_msg_file"
-    fi
+# Process each Nix file in the systems directory
+for f in "$SDIR"/*.nix; do
+    [ -e "$f" ] || continue                       # Skip if no files match
+    cmsg=$(git log -1 --pretty=%s -- "$f")        # Fetch file-specific commit message
+    # Process file-specific message if space allows
+    [ "$pad_amt" -gt 0 ] && fmsg=$(process_msg "$cmsg" "$pad_amt") || fmsg=""
+    combo_msg="$fmsg$gmsg"                        # Combine messages
+    fname="${f##*/}"                              # Extract filename
+    cfile="$CDIR/${fname%.*}-commit-message.nix"  # Commit message file path
+    # Write combined message to the commit message file
+    printf "{\n  system.nixos.label = \"%s\";\n}" "$combo_msg" > "$cfile"
+    # Stage the file if it has changes
+    git diff --quiet "$cfile" || git add "$cfile"
 done
 
-# Amend the current commit to include all changes
-if [[ -n $(git status -s) ]]; then
-    git commit --amend --no-edit
-fi
-
-exit 0
+# Amend the current commit to include staged changes if any
+git diff --cached --quiet || git commit --amend --no-edit
