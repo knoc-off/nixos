@@ -37,11 +37,6 @@
       QT_AUTO_SCREEN_SCALE_FACTOR = "1";
       CLUTTER_BACKEND = "wayland";
 
-      GTK_THEME = "Fluent-Dark";
-      QT_STYLE_OVERRIDE = "gtk3";
-      QT_QPA_PLATFORMTHEME = "gtk3";
-
-
       # Video and graphics
       MOZ_ENABLE_WAYLAND = "1";
       SDL_VIDEODRIVER = "wayland";
@@ -100,29 +95,29 @@
   #  gtk4.extraConfig = extra3-4Config;
   #};
 
-  dconf = {
-    enable = true;
-    settings = {
-      "org/gnome/desktop/interface" = {
-        color-scheme = "prefer-dark";
-        gtk-theme = "Fluent-Dark";
-        icon-theme = "Fluent-Dark";
-        cursor-theme = "Vanilla-DMZ";
-        #gtk-theme = "Adwaita-dark";
-        #icon-theme = "Adwaita-dark";
-        #cursor-theme = "Adwaita-dark";
-      };
-      "org/gnome/shell/extensions/user-theme" = {
-        name = "Fluent-Dark";
-      };
-      "org/gnome/gedit/preferences/editor" = {
-        scheme = "oblivion";
-      };
-      "org/gnome/Terminal/Legacy/Settings" = {
-        theme-variant = "dark";
-      };
-    };
-  };
+  #dconf = {
+  #  enable = true;
+  #  settings = {
+  #    "org/gnome/desktop/interface" = {
+  #      color-scheme = "prefer-dark";
+  #      gtk-theme = "Fluent-Dark";
+  #      icon-theme = "Fluent-Dark";
+  #      cursor-theme = "Vanilla-DMZ";
+  #      #gtk-theme = "Adwaita-dark";
+  #      #icon-theme = "Adwaita-dark";
+  #      #cursor-theme = "Adwaita-dark";
+  #    };
+  #    "org/gnome/shell/extensions/user-theme" = {
+  #      name = "Fluent-Dark";
+  #    };
+  #    "org/gnome/gedit/preferences/editor" = {
+  #      scheme = "oblivion";
+  #    };
+  #    "org/gnome/Terminal/Legacy/Settings" = {
+  #      theme-variant = "dark";
+  #    };
+  #  };
+  #};
 
 
 }

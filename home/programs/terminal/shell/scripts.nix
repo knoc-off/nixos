@@ -10,6 +10,113 @@ in {
       nmcli connection show --active | grep -q "wgnord" && echo true || echo false
       '')
 
+    (pkgs.writeShellScriptBin "wrap-codeblocks" ''
+
+      # Directory to search (default to current directory if not provided)
+      DIRECTORY=''${1:-.}
+
+      # Function to determine the Markdown code block language based on file extension
+      get_filetype() {
+        case "$1" in
+          *.sh) echo "bash" ;;
+          *.py) echo "python" ;;
+          *.mcfunction) echo "mcfunction" ;;
+          *.js) echo "javascript" ;;
+          *.ts) echo "typescript" ;;
+          *.json) echo "json" ;;
+          *.md) echo "markdown" ;;
+          *.txt) echo "plaintext" ;;
+          *.html) echo "html" ;;
+          *.htm) echo "html" ;;
+          *.css) echo "css" ;;
+          *.scss) echo "scss" ;;
+          *.less) echo "less" ;;
+          *.java) echo "java" ;;
+          *.c) echo "c" ;;
+          *.cpp) echo "cpp" ;;
+          *.h) echo "c" ;;
+          *.hpp) echo "cpp" ;;
+          *.cs) echo "csharp" ;;
+          *.rb) echo "ruby" ;;
+          *.php) echo "php" ;;
+          *.rs) echo "rust" ;;
+          *.go) echo "go" ;;
+          *.nix) echo "nix" ;;
+          *.patch) echo "patch" ;;
+          *.yaml) echo "yaml" ;;
+          *.yml) echo "yaml" ;;
+          *.toml) echo "toml" ;;
+          *.xml) echo "xml" ;;
+          *.vue) echo "vue" ;;
+          *.kt) echo "kotlin" ;;
+          *.dart) echo "dart" ;;
+          *.pl) echo "perl" ;;
+          *.pm) echo "perl" ;;
+          *.r) echo "r" ;;
+          *.jl) echo "julia" ;;
+          *.lua) echo "lua" ;;
+          *.sql) echo "sql" ;;
+          *.swift) echo "swift" ;;
+          *.scala) echo "scala" ;;
+          *.groovy) echo "groovy" ;;
+          *.ini) echo "ini" ;;
+          *.bat) echo "batch" ;;
+          *.ps1) echo "powershell" ;;
+          *.vbs) echo "vbscript" ;;
+          *.tex) echo "latex" ;;
+          *.rmd) echo "rmarkdown" ;;
+          *.erl) echo "erlang" ;;
+          *.ex) echo "elixir" ;;
+          *.exs) echo "elixir" ;;
+          *.hs) echo "haskell" ;;
+          *.clj) echo "clojure" ;;
+          *.cljs) echo "clojurescript" ;;
+          *.coffee) echo "coffeescript" ;;
+          *.f90) echo "fortran" ;;
+          *.f95) echo "fortran" ;;
+          *.m) echo "objectivec" ;;
+          *.mm) echo "objectivecpp" ;;
+          *.rkt) echo "racket" ;;
+          *.scm) echo "scheme" ;;
+          *.lisp) echo "lisp" ;;
+          *.asm) echo "assembly" ;;
+          *.s) echo "assembly" ;;
+          *) echo "IGNORE" ;; # Ignore all other file types
+        esac
+      }
+
+      # Use fd to find all files in the specified directory and its subdirectories,
+      # respecting .gitignore and excluding .git directories
+      fd . --exclude .git --type f --hidden --follow "$DIRECTORY" | while read -r file; do
+
+        # Get the filetype for the markdown code block
+        filetype=$(get_filetype "$file")
+
+        # Skip files that are not in the whitelist
+        if [ "$filetype" == "IGNORE" ]; then
+          continue
+        fi
+
+        # Print the file path
+        echo "$file"
+
+        # Print the opening markdown code block with the appropriate filetype
+        echo "\`\`\`$filetype"
+
+        # Print the contents of the file, escaping sequences of three consecutive backticks
+        while IFS= read -r line; do
+          echo "''${line//\`\`\`/\\\`\\\`\\\`}"
+        done < "$file"
+
+        # Print the closing markdown code block
+        echo "\`\`\`"
+
+        # Print a separating line for clarity (optional)
+        echo "----------"
+        printf "\n\n"
+      done
+    '')
+
     (writeNuScript "nixx" ''
       def --wrapped main [...args: string] {
         mut command = []

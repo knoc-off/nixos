@@ -1,5 +1,6 @@
 { pkgs, ... }: {
   plugins = {
+    web-devicons.enable = true;
     lsp = {
       enable = true;
       servers = {
@@ -9,12 +10,12 @@
         html.enable = true;
         jsonls.enable = true;
         pylsp.enable = true;
-        rust-analyzer = {
+        rust_analyzer = {
           enable = true;
           installCargo = true;
           installRustc = true;
         };
-        ts-ls.enable = true;
+        ts_ls.enable = true;
       };
       keymaps = {
         silent = true;

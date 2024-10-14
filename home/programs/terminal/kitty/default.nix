@@ -1,38 +1,9 @@
-{ colorLib, ... }: let
-  sl = l: hex: oklchToHex ( colorLib.oklchmod.setLightness l (colorLib.hexStrToOklch hex));
-  sc = c: hex: oklchToHex ( colorLib.oklchmod.setChroma c (colorLib.hexStrToOklch hex));
-  mix = hex1: hex2: w: oklchToHex ( colorLib.oklchmod.mix (colorLib.hexStrToOklch hex1) (colorLib.hexStrToOklch hex2) w);
-  sh = deg: hex: oklchToHex ( colorLib.oklchmod.adjustHueBy deg (colorLib.hexStrToOklch hex));
+{ colorLib, theme, ... }: let
+  sl = l: hex: oklchToHex (colorLib.oklchmod.setLightness l (colorLib.hexStrToOklch hex));
+  sc = c: hex: oklchToHex (colorLib.oklchmod.setChroma c (colorLib.hexStrToOklch hex));
+  mix = hex1: hex2: w: oklchToHex (colorLib.oklchmod.mix (colorLib.hexStrToOklch hex1) (colorLib.hexStrToOklch hex2) w);
+  sh = deg: hex: oklchToHex (colorLib.oklchmod.adjustHueBy deg (colorLib.hexStrToOklch hex));
   oklchToHex = colorLib.oklchToHex;
-
-  primaryColor = "#268bd2";
-
-  # Function to create a pastel color with specified lightness and chroma
-  makePrettyPastel = color:
-    let
-      basePastel = sl 0.70 (sc 0.155 color);
-    in
-      basePastel;
-
-  # Function to create a light variant
-  makeLightVariant = color:
-    let
-      lighterColor = sl 0.90 color;
-      slightlyShifted = sh 1 lighterColor;
-    in
-      sc 0.25 slightlyShifted;
-
-  # Base colors
-  baseColors = {
-    black = "#000000";
-    red = "#800000";
-    green = "#008000";
-    yellow = "#808000";
-    blue = "#000080";
-    magenta = "#800080";
-    cyan = "#008080";
-    white = "#c0c0c0";
-  };
 
 in {
   imports = [./tab_bar.nix];
@@ -61,55 +32,49 @@ in {
       enable_audio_bell = "no";
       visual_bell_duration = "0.0";
 
-      # Basic 16 colors
-      color0 = "#${sl 0.15 baseColors.black}";  # Black
-      color8 = "#${sl 0.35 baseColors.black}";  # Bright Black (Gray)
+      # base16 colors
+      color0 = theme.base00;  # black
+      color1 = theme.base08;  # red
+      color2 = theme.base0B;  # green
+      color3 = theme.base0A;  # Yellow
+      color4 = theme.base0D;  # Blue
+      color5 = theme.base0E;  # Magenta
+      color6 = theme.base0C;  # Cyan
+      color7 = theme.base05;  # White
 
-      color1 = "#${makePrettyPastel baseColors.red}";
-      color9 = "#${makeLightVariant color1}";
-
-      color2 = "#${makePrettyPastel baseColors.green}";  # Green
-      color10 = "#${makeLightVariant color2}";  # Bright Green
-
-      color3 = "#${makePrettyPastel baseColors.yellow}";  # Yellow
-      color11 = "#${makeLightVariant color3}";  # Bright Yellow
-
-      color4 = "#${makePrettyPastel baseColors.blue}";  # Blue
-      color12 = "#${makeLightVariant color4}";  # Bright Blue
-
-      color5 = "#${makePrettyPastel baseColors.magenta}";  # Magenta
-      color13 = "#${makeLightVariant color5}";  # Bright Magenta
-
-      color6 = "#${makePrettyPastel baseColors.cyan}";  # Cyan
-      color14 = "#${makeLightVariant color6}";  # Bright Cyan
-
-      color7 = "#${sl 0.85 baseColors.white}";  # White
-      color15 = "#${sl 0.95 baseColors.white}";  # Bright White
+      color8 = theme.base03;   # Bright Black (Gray)
+      color9 = theme.base08;   # Bright Red
+      color10 = theme.base0B;  # Bright Green
+      color11 = theme.base0A;  # Bright Yellow
+      color12 = theme.base0D;  # Bright Blue
+      color13 = theme.base0E;  # Bright Magenta
+      color14 = theme.base0C;  # Bright Cyan
+      color15 = theme.base07;  # Bright White
 
       # Derived colors
-      foreground = color7;
-      background = "#${sc 0.01 (sl 0.2 primaryColor)}";
-      selection_background = "#${sc 0.02 (sl 0.4 color4)}";
+      foreground = theme.base05;
+      background = "#${sl 0.2 theme.base00}";
+      selection_background = "#${sc 0.2 (sl 0.6 theme.base0D)}";
       selection_foreground = "none";
-      url_color = color6;
-      cursor = color15;
+      url_color = theme.base0C;
+      cursor = theme.base05;
 
-      active_border_color = color4;
-      inactive_border_color = color8;
-      active_tab_background = "#${sl 0.3 color4}";
-      active_tab_foreground = color15;
-      inactive_tab_background = color0;
-      inactive_tab_foreground = color7;
-      tab_bar_background = color0;
+      active_border_color = theme.base0D;
+      inactive_border_color = theme.base03;
+      active_tab_background = "#${sl 0.3 theme.base0D}";
+      active_tab_foreground = theme.base07;
+      inactive_tab_background = theme.base00;
+      inactive_tab_foreground = theme.base05;
+      tab_bar_background = theme.base00;
 
-      visual_bell_color = color1;
+      visual_bell_color = theme.base08;
 
-      mark1_foreground = color0;
-      mark1_background = color6;
-      mark2_foreground = color0;
-      mark2_background = color4;
-      mark3_foreground = color0;
-      mark3_background = color5;
+      mark1_foreground = theme.base00;
+      mark1_background = theme.base0C;
+      mark2_foreground = theme.base00;
+      mark2_background = theme.base0D;
+      mark3_foreground = theme.base00;
+      mark3_background = theme.base0E;
 
       window_padding_width = 0;
     };

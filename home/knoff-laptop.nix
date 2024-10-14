@@ -28,6 +28,7 @@
     ./programs/gaming/lutris.nix
     ./enviroment.nix
 
+    self.homeModules.gtk
 
     #./programs
     #./services
