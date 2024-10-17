@@ -19,11 +19,4 @@ pkgs.stdenv.mkDerivation {
     mkdir -p $out/chart
     cp  $out/svg_files/
   '';
-
-  meta = with pkgs.lib; {
-    description = "Extract SVG data from a specified icons font package";
-    license = licenses.mit;
-    maintainers = [ maintainers.yourself ];
-    platforms = platforms.all;
-  };
 }

@@ -2,7 +2,7 @@
 let
   sidebar = {
 
-    width = "40px";
+    width = "38px";
     expanded-width = "25vw";
     hide-delay = "100ms";
     animation-duration = "200ms";
@@ -21,6 +21,7 @@ in ''
 
   @import "${firefox-csshacks}/chrome/hide_tabs_toolbar_v2.css";
   @import "${firefox-csshacks}/chrome/page_action_buttons_on_urlbar_hover.css";
+
 
 
   /* for the autohde toolbar */
@@ -47,6 +48,7 @@ in ''
 
   /* Sidebar customization */
   #sidebar-box {
+    min-width: var(--uc-sidebar-width) !important;
     --uc-autohide-sidebar-delay: ${sidebar.hide-delay} !important;
     --uc-autohide-transition-duration: ${sidebar.animation-duration} !important;
     --uc-sidebar-width: ${sidebar.width} !important;

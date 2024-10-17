@@ -51,11 +51,4 @@ stdenv.mkDerivation rec {
     cp .pio/build/*/firmware*.* -r "$out/firmware"
   '';
 
-  meta = with lib; {
-    description = "Marlin is an optimized firmware for RepRap 3D printers based on the Arduino platform";
-    homepage = "https://marlinfw.org/";
-    license = licenses.gpl3Only;
-    platforms = platforms.all;
-    maintainers = with maintainers; [ ]; # Add maintainers if desired
-  };
 }

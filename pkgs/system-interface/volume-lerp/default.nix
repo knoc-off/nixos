@@ -23,7 +23,7 @@ pkgs.python3Packages.buildPythonApplication {
     description = "A script to smoothly change the volume using linear interpolation";
     homepage = "https://example.com";
     license = licenses.mit;
-    maintainers = with maintainers; [your-name];
+    maintainers = with maintainers; [ ];
     platforms = platforms.unix;
   };
 }

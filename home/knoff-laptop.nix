@@ -6,15 +6,14 @@
   ...
 }: {
   imports = [
-    ./programs/editor/default.nix
     ./programs/terminal # default
     ./programs/terminal/programs/pueue.nix
 
-    #./programs/terminal/prompt.nix # starship
-    #./modules/sway
+    ./programs/editor/default.nix
+
+    # Desktop and widgets
     ./modules/hyprland
     ./modules/ags
-    #./modules/eww
 
     # Firefox
     ./programs/browser/firefox

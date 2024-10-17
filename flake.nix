@@ -1,6 +1,101 @@
 {
   description = "A declarative Nix config";
 
+  outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, ... }:
+    let
+
+      theme = import ./theme.nix;
+
+      systems = [
+        "aarch64-linux"
+        "i686-linux"
+        "x86_64-linux"
+        "aarch64-darwin"
+        "x86_64-darwin"
+      ];
+
+      forAllSystems = nixpkgs.lib.genAttrs systems;
+
+      inherit (self) outputs;
+
+      #lib = nixpkgs.lib.extend (final: prev: home-manager.lib);
+      inherit (nixpkgs) lib;
+
+      inherit (lib) nixosSystem listToAttrs;
+
+      # Unified configuration generator for hosts and images
+      mkConfig =
+        { hostname, user, system, extraModules ? [ ], extraConfigs ? { } }:
+        nixosSystem {
+          inherit system;
+          specialArgs = {
+            inherit self inputs outputs hostname user lib system theme;
+            selfPkgs = self.packages.${system};
+            colorLib = self.lib.${system};
+          } // extraConfigs;
+          modules = [
+            {
+              nixpkgs.hostPlatform = system;
+              nixpkgs.buildPlatform = "x86_64-linux";
+            }
+            ./systems/${hostname}.nix
+            ./systems/commit-messages/${hostname}-commit-message.nix
+          ] ++ extraModules;
+        };
+
+      # Host configuration
+      mkHost = hostname: user: system: {
+        name = hostname;
+        value = mkConfig { inherit hostname user system; };
+      };
+
+      mkImage = hostname: user: system: imageType: rec {
+        name = "${hostname}-${imageType}";
+        value = (mkConfig {
+          inherit hostname user system;
+          extraModules = [
+            ./systems/modules/live-iso.nix
+            { isoImage = { isoName = lib.mkForce name; }; }
+          ];
+        }).config.system.build.isoImage;
+      };
+
+      mkPkgs = system:
+        let
+          upkgs = import nixpkgs-unstable {
+            inherit system;
+            config.allowUnfree = true;
+          };
+          pkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
+          };
+        in
+        import ./pkgs { inherit inputs self system pkgs upkgs; };
+
+    in rec {
+      packages = forAllSystems (system: mkPkgs system);
+
+      devShells = forAllSystems (system: mkPkgs system);
+
+      nixosModules = import ./modules/nixos/default.nix;
+      homeModules = import ./modules/home/default.nix;
+
+      overlays = import ./overlays { inherit inputs; };
+
+      lib = forAllSystems (system:
+        import ./lib { inherit (import nixpkgs { inherit system; }) lib; });
+
+      images = listToAttrs
+        [ (mkImage "framework13" "knoff" "x86_64-linux" "isoImage") ];
+
+      nixosConfigurations = listToAttrs [
+        (mkHost "framework13" "knoff" "x86_64-linux")
+        (mkHost "hetzner" "knoff" "x86_64-linux")
+      ];
+
+    };
+
   inputs = {
     # Nixpkgs
     nixpkgs.url = "github:nixos/nixpkgs/nixos-24.05";
@@ -77,7 +172,6 @@
     # Minecraft servers and packages
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
 
-
     # Non-Flake Inputs:
 
     firefox-csshacks = {
@@ -95,97 +189,4 @@
     ];
   };
 
-  outputs = inputs@{ self, nixpkgs, ... }:
-    let
-
-      theme = import ./theme.nix;
-
-      systems = [
-        "aarch64-linux"
-        "i686-linux"
-        "x86_64-linux"
-        "aarch64-darwin"
-        "x86_64-darwin"
-      ];
-
-      forAllSystems = nixpkgs.lib.genAttrs systems;
-
-      inherit (self) outputs;
-
-      #lib = nixpkgs.lib.extend (final: prev: home-manager.lib);
-      inherit (nixpkgs) lib;
-
-      inherit (lib) nixosSystem listToAttrs;
-
-
-      # Unified configuration generator for hosts and images
-      mkConfig = { hostname, user, system, extraModules ? [], extraConfigs ? {} }:
-        nixosSystem {
-          inherit system;
-          specialArgs = {
-            inherit self inputs outputs hostname user lib system theme;
-            selfPkgs = self.packages.${system};
-            colorLib = self.lib.${system};
-          } // extraConfigs;
-          modules = [
-            { nixpkgs.hostPlatform = system; nixpkgs.buildPlatform = "x86_64-linux"; }
-            ./systems/${hostname}.nix
-            ./systems/commit-messages/${hostname}-commit-message.nix
-          ] ++ extraModules;
-        };
-
-      # Host configuration
-      mkHost = hostname: user: system: {
-        name  = hostname;
-        value = mkConfig { inherit hostname user system; };
-      };
-
-      mkImage = hostname: user: system: imageType: rec{
-        name  = "${hostname}-${imageType}";
-        value = (mkConfig {
-          inherit hostname user system;
-          extraModules = [
-            ./systems/modules/live-iso.nix
-            {
-              isoImage = {
-                isoName = lib.mkForce name;
-              };
-            }
-          ];
-        }).config.system.build.isoImage;
-      };
-
-      mkPkgShell = system: shell:
-        let
-          pkgs = import nixpkgs {
-            inherit system;
-            config.allowUnfree = true;
-          };
-        in import ./pkgs { inherit inputs self system pkgs shell; };
-
-
-
-
-    in rec {
-      packages = forAllSystems (system: mkPkgShell system false);
-
-      devShells = forAllSystems (system: mkPkgShell system true);
-
-      nixosModules = import ./modules/nixos/default.nix;
-      homeModules = import ./modules/home/default.nix;
-
-      overlays = import ./overlays { inherit inputs; };
-
-      lib = forAllSystems (system: import ./lib { inherit (import nixpkgs { inherit system; } ) lib; });
-
-      images = listToAttrs [
-        (mkImage "framework13" "knoff" "x86_64-linux" "isoImage")
-      ];
-
-      nixosConfigurations = listToAttrs [
-        (mkHost "framework13" "knoff" "x86_64-linux")
-        (mkHost "hetzner" "knoff" "x86_64-linux")
-      ];
-
-    };
 }

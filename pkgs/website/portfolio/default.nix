@@ -46,6 +46,8 @@ rustPlatform.buildRustPackage rec {
       SystemConfiguration
     ]);
 
+
+
   buildPhase = ''
     runHook preBuild
     mkdir -p $TMPDIR/output
@@ -69,5 +71,25 @@ rustPlatform.buildRustPackage rec {
     mkdir -p $out/lib
     cp -r $TMPDIR/output/* $out/lib/
     runHook postInstall
+  '';
+
+
+  shellHook = ''
+    clear
+    ${pkgs.gum}/bin/gum confirm "create new symbolic links?"
+
+    if [ $? = 0 ]; then
+      mkdir -p static/icons/flags
+      mkdir -p static/fonts/material
+      mkdir -p static/icons/tiny
+
+      cp -rf ${pkgs.circle-flags}/share/circle-flags-svg/* static/icons/flags/
+      cp -rf ${pkgs.material-icons}/share/fonts/opentype/* static/fonts/material/
+      cp -rf ${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/* static/icons/tiny/
+
+      chmod -R a+rw static/icons/flags
+      chmod -R a+rw static/fonts/material
+      chmod -R a+rw static/icons/tiny
+    fi
   '';
 }
