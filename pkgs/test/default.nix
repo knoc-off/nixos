@@ -1,16 +1,34 @@
-{ pkgs, shell ? false, ... }:
+{ pkgs, stdenv, lib, cowsay }:
 
-let
-  package = pkgs.writeShellScriptBin "hello" ''
-    echo "Hello, world!"
+stdenv.mkDerivation rec {
+  pname = "hello-example";
+  version = "1.0.0";
+
+  src = ./.;
+
+  buildInputs = [ cowsay ];
+
+  buildPhase = ''
+    mkdir -p $out/bin
+    echo '#!/bin/sh' > $out/bin/hello
+    echo 'echo "Hello, world!"' >> $out/bin/hello
+    chmod +x $out/bin/hello
   '';
 
-  shellDrv = pkgs.mkShell {
-    buildInputs = [ package pkgs.cowsay ];
-    shellHook = ''
-      echo "Welcome to the example package shell!"
-    '';
+  installPhase = "true";
+
+  shellHook = ''
+    echo "Welcome to the example package shell!"
+  '';
+
+  meta = with lib; {
+    description = "A simple hello world package";
+    license = licenses.mit;
+    platforms = platforms.all;
   };
 
-in
-  if shell then shellDrv else package
+  passthru.shell = pkgs.mkShell {
+    inputsFrom = [ ];
+    buildInputs = [ cowsay ];
+  };
+}

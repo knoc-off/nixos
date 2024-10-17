@@ -1,35 +1,28 @@
-{ pkgs, inputs, system, self, shell ? false }:
-
+{ pkgs, inputs, system, self, upkgs }:
 let
   rustPkgs = pkgs.extend (import inputs.rust-overlay);
 
-  mkPkgOrShell = { path, args ? { }, callPackage ? pkgs.callPackage }:
-    if shell then
-      import path ({ inherit pkgs shell; } // args)
-    else
-      callPackage path ({ inherit shell; } // args);
+  nixvim = inputs.nixvim.legacyPackages.${system};
 
-  #wrapper = path: args: callPackage: importWithArgs { inherit path args callPackage;};
-
-in rec {
-  #test = importWithArgs ./test { };
-  test = mkPkgOrShell {
-    path = ./test;
-    inherit (pkgs.python3Packages) callPackage;
+  customPkgs = import inputs.nixpkgs-unstable {
+    inherit system;
+    config = { allowUnfree = true; };
+    overlays = [ inputs.nixneovimplugins.overlays.default ];
   };
+
+in
+{
+  test = pkgs.python3Packages.callPackage ./test { };
 
   grosshack = pkgs.callPackage ./grosshack { };
 
   spotify-adblock = pkgs.callPackage ./spotify-adblock { };
 
-  llm-cmd = mkPkgOrShell {
-    path = ./llm-cmd;
-    inherit (pkgs.python3Packages) callPackage;
-  };
-
-  # pkgs.python3Packages.callPackage ./llm-cmd { };
+  llm-cmd = pkgs.python3Packages.callPackage ./llm-cmd { };
 
   ttok = pkgs.python3Packages.callPackage ./ttok { };
+
+  replicate-bridge = upkgs.python3Packages.callPackage ./replicate { };
 
   marker = pkgs.python3Packages.callPackage ./marker { };
 
@@ -37,22 +30,12 @@ in rec {
   gate = pkgs.callPackage ./gate { };
   ascii-silhouettify = pkgs.callPackage ./ascii { };
 
-  neovim-nix = let
-    nixvim = inputs.nixvim.legacyPackages.${system};
-
-    customPkgs = import inputs.nixpkgs-unstable {
-      inherit system;
-      config = { allowUnfree = true; };
-      overlays = [ inputs.nixneovimplugins.overlays.default ];
-    };
-  in {
+  neovim-nix = {
     default = nixvim.makeNixvimWithModule {
       pkgs = customPkgs;
       module = import ./neovim/configurations;
     };
   };
-
-  marlin = pkgs.callPackage ./marlin { };
 
   website = {
     actix-backend = rustPkgs.callPackage ./website/actix-backend { };
@@ -60,22 +43,10 @@ in rec {
   };
   embeddedRust = rustPkgs.callPackage ./embedded-rust { };
 
-  # this is pretty cool.
   nx = config_dir: hostname: rustPkgs.callPackage ./nx-script { inherit config_dir hostname; };
 
-  bevy-test = mkPkgOrShell {
-    path = ./bevy/test;
-    args = {
-      rust-toolchain = rustPkgs.rust-bin.selectLatestNightlyWith (toolchain:
-        toolchain.default.override {
-          extensions = [ "rust-src" ];
-          targets = [ "wasm32-unknown-unknown" ];
-        });
-    };
-    inherit (rustPkgs) callPackage;
-  };
+  bevy = rustPkgs.callPackage ./bevy/default.nix {};
 
-  #nixpkgs#fira-code-nerdfont
   nerd-ext = import ./svg-tools/icon-extractor {
     inherit pkgs;
     fontPath =
@@ -176,6 +147,3 @@ in rec {
         destination = "/bin/${name}";
       });
 }
-
-#packages
-#builtins.mapAttrs mkPkgOrShell packages

@@ -34,7 +34,6 @@ rustPlatform.buildRustPackage rec {
 
   meta = with lib; {
     description = "NixOS configuration management tool";
-    homepage = "";
     license = licenses.mit;
     maintainers = with maintainers; [ knoff ];
   };

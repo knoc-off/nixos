@@ -68,7 +68,7 @@ pkgs.stdenv.mkDerivation {
   meta = with pkgs.lib; {
     description = "Extract SVG data and glyph information from a specified icons font package";
     license = licenses.mit;
-    maintainers = [ maintainers.yourself ];
+    maintainers = [ ];
     platforms = platforms.all;
   };
 }
