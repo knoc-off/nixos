@@ -84,41 +84,23 @@ in rec {
       name = "Firefox (${profile.name})";
       comment = "Web Browser";
       exec = "${pkgs.firefox}/bin/firefox --profile ${profile.name}";
-      icon = "${pkgs.firefox}/lib/firefox/browser/chrome/icons/default/default128.png";
+      icon =
+        "${pkgs.firefox}/lib/firefox/browser/chrome/icons/default/default128.png";
       categories = [ "Application" "Network" "WebBrowser" ];
     };
-  in
-    lib.mapAttrs (name: profile: mkFirefoxDesktopEntry profile) programs.firefox.profiles;
-
+  in lib.mapAttrs (name: profile: mkFirefoxDesktopEntry profile)
+  programs.firefox.profiles // {
+    firefox-private = {
+      name = "firefox private";
+      genericName = "Web Browser";
+      exec = "firefox --private-window %U";
+      icon = "${pkgs.firefox}/share/icons/hicolor/128x128/apps/firefox.png";
+      terminal = false;
+      categories = [ "Application" "Network" "WebBrowser" ];
+      mimeType = [ "text/html" "text/xml" ];
+    };
+  };
 }
 
-
 #  xdg.desktopEntries = {
-#    firefox-testing = {
-#      name = "Firefox-testing";
-#      genericName = "Web Browser";
-#      exec = "firefox -p testing %U";
-#      icon = "${pkgs.firefox}/share/icons/hicolor/128x128/apps/firefox.png";
-#      terminal = false;
-#      categories = [ "Application" "Network" "WebBrowser" ];
-#      mimeType = [ "text/html" "text/xml" ];
-#    };
-#    firefox-minimal = {
-#      name = "Firefox-minimal";
-#      genericName = "Web Browser";
-#      exec = "firefox -p minimal %U";
-#      icon = "${pkgs.firefox}/share/icons/hicolor/128x128/apps/firefox.png";
-#      terminal = false;
-#      categories = [ "Application" "Network" "WebBrowser" ];
-#      mimeType = [ "text/html" "text/xml" ];
-#    };
-#    firefox-private = {
-#      name = "firefox private";
-#      genericName = "Web Browser";
-#      exec = "firefox --private-window %U";
-#      icon = "${pkgs.firefox}/share/icons/hicolor/128x128/apps/firefox.png";
-#      terminal = false;
-#      categories = [ "Application" "Network" "WebBrowser" ];
-#      mimeType = [ "text/html" "text/xml" ];
-#    };
 #  };
