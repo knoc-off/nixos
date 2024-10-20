@@ -74,6 +74,23 @@
       "K" = ":m '<-2<CR>gv=gv";
       "J" = ":m '>+1<CR>gv=gv";
     };
+
+    # insert mode mappings
+    insert = lib.mapAttrsToList (key: action: {
+      mode = "i";
+      inherit action key;
+    }) {
+        # Move cursor to the end of the line
+        "<C-e>" = "<End>";
+
+        # Move cursor to the start of the line
+        "<C-a>" = "<Home>";
+
+
+
+
+    };
+
   in helpers.keymaps.mkKeymaps { options.silent = true; } (normal ++ visual);
 
   plugins.which-key = {

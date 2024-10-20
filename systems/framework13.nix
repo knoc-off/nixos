@@ -40,6 +40,7 @@
     # module to setup boot
     ./hardware/boot.nix
 
+    ./modules/wpad.nix
 
 
     # Sops

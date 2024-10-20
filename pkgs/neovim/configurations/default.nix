@@ -14,6 +14,10 @@
     ./plugins/ui/precognition.nix
     ./plugins/productivity/vim-ai.nix
     ./plugins/ui/colorizer.nix
+
+    ./plugins/productivity/copilot.nix
+
+
     ## lsp
     ./plugins/ls
 
