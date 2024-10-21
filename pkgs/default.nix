@@ -15,6 +15,7 @@ in
   test = pkgs.python3Packages.callPackage ./test { };
 
   grosshack = pkgs.callPackage ./grosshack { };
+  blink_led = pkgs.callPackage ./blinkFW13LED { };
 
   spotify-adblock = pkgs.callPackage ./spotify-adblock { };
 
