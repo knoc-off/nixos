@@ -58,18 +58,21 @@
         }).config.system.build.isoImage;
       };
 
+      # Function to create package sets for a given system
       mkPkgs = system:
         let
+          # Import packages from the unstable Nixpkgs channel
           upkgs = import nixpkgs-unstable {
             inherit system;
             config.allowUnfree = true;
           };
+          # Import packages from the stable Nixpkgs channel
           pkgs = import nixpkgs {
             inherit system;
             config.allowUnfree = true;
           };
-        in
-        import ./pkgs { inherit inputs self system pkgs upkgs; };
+          # Import custom packages defined in the ./pkgs directory
+        in import ./pkgs { inherit inputs self system pkgs upkgs; };
 
     in rec {
       packages = forAllSystems (system: mkPkgs system);

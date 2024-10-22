@@ -1,4 +1,4 @@
-{pkgs}:
+{pkgs, hyprfocuscommand ? "hyprctl dispatch movefocus" }:
 let
 
 
@@ -31,7 +31,7 @@ pkgs.writeShellScriptBin "fancyfocus" ''
   fi
 
   # Function to fallback to Hyprland movefocus command
-  movefocus() { hyprctl dispatch movefocus "''${hypr_short[$dir]}"; }
+  movefocus() { ${hyprfocuscommand} "''${hypr_short[$dir]}"; }
 
   # Get active window title
   title=$(hyprctl activewindow -j | jq -r '.title')

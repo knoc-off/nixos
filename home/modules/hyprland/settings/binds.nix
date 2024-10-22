@@ -73,6 +73,59 @@ in {
           }
         '';
 
+        # This script defines a function `focusShiftContained` that moves the focus of the active window
+        # in a specified direction (left, right, up, or down) while ensuring that the window does not move
+        # beyond the screen boundaries.
+        #
+        # Parameters:
+        # - screenx: The width of the screen.
+        # - screeny: The height of the screen.
+        # - direction: The direction to move the focus. It can be one of the following characters:
+        #   - 'l' for left
+        #   - 'r' for right
+        #   - 'u' for up
+        #   - 'd' for down
+        #
+        # The script first retrieves the active window's position and size using `hyprctl`. It then checks
+        # if moving in the specified direction would cause the window to go out of the screen boundaries.
+        # If so, the script exits without moving the focus. Otherwise, it dispatches the move focus command.
+        #
+        # this only works if the windows are tiled, if they are floating then it will not work.
+        focusShiftContained = "${writeNuScript "focusShiftContained" ''
+          def main [screenx: int, screeny: int, direction: string] {
+            let active_window = (hyprctl activewindow -j )
+            let pos = ($active_window | from json | get at)
+            let size = ($active_window | from json | get size)
+
+            # 'direction' can be one of the following characters: l (left), r (right), u (up), d (down).
+            # 'pos' represents the top-left corner. We need to constrain the movement such that if you attempt to move left or right and are already at the maximum limit, the movement should be restricted.
+
+            # if we want to move left then check if the left edge is at 0, if it is then don't move
+            if ($direction == "l" and $pos.0 == 0) {
+              exit 0
+            }
+            if ($direction == "r" and $pos.0 + $size.0 == $screenx) {
+              exit 0
+            }
+            if ($direction == "u" and $pos.1 == 0) {
+              exit 0
+            }
+            if ($direction == "d" and $pos.1 + $size.1 == $screeny) {
+              exit 0
+            }
+
+            hyprctl dispatch movefocus $direction
+          }
+        ''}/bin/focusShiftContained";
+
+        # This script defines a function `screenshot-to-text` that captures a screenshot, processes the image,
+        # extracts text from it using OCR, and copies the extracted text to the clipboard.
+        #
+        # The script performs the following steps:
+        # 1. Captures a screenshot of a selected area and saves it as `/tmp/gscreenshot-image.png`.
+        # 2. Converts the screenshot to grayscale, resizes it, and sharpens the image, saving the processed image as `/tmp/gscreenshot-image-processed.jpg`.
+        # 3. Uses Tesseract OCR to extract text from the processed image and saves the text to `/tmp/tesseract-output.txt`.
+        # 4. Copies the extracted text to the clipboard using `wl-copy`.
         screenshot-to-text = writeNuScript "stt" ''
           def main [] {
             ${pkgs.gscreenshot}/bin/gscreenshot -s -f /tmp/gscreenshot-image.png
@@ -82,17 +135,16 @@ in {
           }
         '';
 
-        fancyfocusscript = import ./window-move.nix { inherit pkgs; };
+        fancyfocusscript = import ./window-move.nix { inherit pkgs; hyprfocuscommand = "${focusShiftContained} 2256 1504 "; };
 
         binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
-        mvfocus = binding "${mainMod}" "movefocus";
         fancyfocus = key: dir: "${mainMod}, ${key}, exec, ${fancyfocusscript}/bin/fancyfocus ${dir}";
         ws = binding "${mainMod}" "workspace";
         resizeactive = binding "${mainMod} CTRL" "resizeactive";
         mvactive = binding "${mainMod} ALT" "moveactive";
         mvtows = binding "${mainMod} SHIFT" "movetoworkspace";
-        #e = "exec, ags -b hypr";
-        arr = [ 1 2 3 4 5 6 7 8 9 ]; # could reduce this to just 1 .. 9 probably
+
+        arr = builtins.genList (n: n + 1) (9 - 1 + 1);
 
         acpi = lib.getExe pkgs.acpi;
       in [
@@ -109,6 +161,7 @@ in {
         "${mainMod}, V, togglefloating"
         "${mainMod}, equal, fullscreen"
         "${mainMod}, O, fakefullscreen"
+        "${mainMod}, k, exec, ${focusShiftContained}/bin/focusShiftContained l 2256 1504"
 
         "${mainMod}, T, exec, ${
           mkHdrop {
