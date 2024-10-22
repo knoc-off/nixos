@@ -11,6 +11,7 @@ let
   '';
 
   blinkScript = pkgs.writeScriptBin "blink" ''
+    echo "$(date) - blink script executed" >> /var/log/blink_script.log
     echo 0 > /sys/class/leds/chromeos\:white\:power/brightness
     sleep 0.5
     echo 1 > /sys/class/leds/chromeos\:white\:power/brightness
@@ -23,7 +24,6 @@ let
     ATTRS{idProduct}=="609c",
     RUN+="${blinkScript}/bin/blink"
   '';
-
 
 in
 {

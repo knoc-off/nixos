@@ -4,10 +4,18 @@ let
 
   nixvim = inputs.nixvim.legacyPackages.${system};
 
+  neovim-plugins = import ./neovim-plugins { inherit (pkgs) vimUtils lua; };
+
+  #nvimplugins-overlay = self: super: {
+  #  neovim-plugins = super.neovim-plugins.overrideAttrs (oldAttrs: {
+
+
   customPkgs = import inputs.nixpkgs-unstable {
     inherit system;
     config = { allowUnfree = true; };
-    overlays = [ inputs.nixneovimplugins.overlays.default ];
+
+    overlays = [ inputs.nixneovimplugins.overlays.default neovim-plugins.overlay ];
+
   };
 
 in
@@ -37,6 +45,7 @@ in
       module = import ./neovim/configurations;
     };
   };
+
 
   website = {
     actix-backend = rustPkgs.callPackage ./website/actix-backend { };

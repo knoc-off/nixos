@@ -28,6 +28,7 @@ in {
       tab_bar_style = "custom";
       tab_bar_margin_height = "0.0 0.0";
       tab_title_template = " {index}: {f'{title[:6]}…{title[-6:]}' if title.rindex(title[-1]) + 1 > 13 else title.center(7)} ";
+      allow_remote_control = "yes";
 
       enable_audio_bell = "no";
       visual_bell_duration = "0.0";
