@@ -1,228 +1,246 @@
-{
-  pkgs,
-  lib,
-  self,
-  config,
-  ...
-}: let
+{ pkgs, lib, self, config, ... }:
+let
 
   #writeNuScript = self.packages.${pkgs.system}.writeNuScript;
   inherit (self.packages.${pkgs.system}) writeNuScript;
-
-
 
   mainMod = config.wayland.windowManager.hyprlandCustom.modkey;
 in {
   wayland.windowManager.hyprland = let
     #fuzzel = "${pkgs.fuzzel}/bin/fuzzel -b ${theme.base02}DD -t ${theme.base06}DD -m ${theme.base04}DD -C ${theme.base05}DD -s ${theme.base03}DD -S ${theme.base07}DD -M ${theme.base07}DD";
     notify-send = "${pkgs.libnotify}/bin/notify-send";
-    notify-msg = "${pkgs.writeShellScriptBin "notify-msg" ''
-      ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:$1 -u low "''${@:2}"
-    ''}/bin/notify-msg";
-    notify-bar = "${pkgs.writeShellScriptBin "notify-bar" ''
-      ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:$1 -h int:value:$2 -u low "''${@:3}"
-    ''}/bin/notify-bar";
+    notify-msg = "${
+        pkgs.writeShellScriptBin "notify-msg" ''
+          ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:$1 -u low "''${@:2}"
+        ''
+      }/bin/notify-msg";
+    notify-bar = "${
+        pkgs.writeShellScriptBin "notify-bar" ''
+          ${notify-send} -t 2000 -h string:x-canonical-private-synchronous:$1 -h int:value:$2 -u low "''${@:3}"
+        ''
+      }/bin/notify-bar";
   in {
     settings = {
       bind = let
-        mkHdrop = {
-          command,              # The command to run (required)
-          background ? false,   # Launch in background if not running
-          class ? null,         # Set the window class name
-          floating ? true,      # Spawn as a floating window
-          gap ? null,           # Gap from screen edge in pixels
-          size ? null,          # Window size as { width = int; height = int; }
-          insensitive ? false,  # Case-insensitive class name matching
-          position ? null,      # Window position: "top", "bottom", "left", or "right"
-          verbose ? false,      # Show detailed notifications
-          version ? false       # Print version information
-        }: let
-          boolToFlag = name: value: if value then "-${name}" else "";
-          nullableArg = name: value: if value != null then "-${name} ${toString value}" else "";
-          hdrop = pkgs.writeShellScriptBin "hdrop" (builtins.readFile (builtins.fetchurl {
-            url = "https://raw.githubusercontent.com/hyprwm/contrib/main/hdrop/hdrop";
-            sha256 = "06bcqqy139xsiyff490sfmz2p7di55naky8n642c7rzcmq36brf2";
-          }));
+        mkHdrop = { command, # The command to run (required)
+          background ? false, # Launch in background if not running
+          class ? null, # Set the window class name
+          floating ? true, # Spawn as a floating window
+          gap ? null, # Gap from screen edge in pixels
+          size ? null, # Window size as { width = int; height = int; }
+          insensitive ? false, # Case-insensitive class name matching
+          position ? null
+          , # Window position: "top", "bottom", "left", or "right"
+          verbose ? false, # Show detailed notifications
+          version ? false # Print version information
+          }:
+          let
+            boolToFlag = name: value: if value then "-${name}" else "";
+            nullableArg = name: value:
+              if value != null then "-${name} ${toString value}" else "";
+            hdrop = pkgs.writeShellScriptBin "hdrop" (builtins.readFile
+              (builtins.fetchurl {
+                url =
+                  "https://raw.githubusercontent.com/hyprwm/contrib/main/hdrop/hdrop";
+                sha256 = "06bcqqy139xsiyff490sfmz2p7di55naky8n642c7rzcmq36brf2";
+              }));
 
-          args = lib.concatStringsSep " " (lib.filter (x: x != "") [
-            (boolToFlag "b" background)
-            (nullableArg "c" class)
-            (boolToFlag "f" floating)
-            (nullableArg "g" gap)
-            (if size != null then "-w ${toString size.width} -h ${toString size.height}" else "")
-            (boolToFlag "i" insensitive)
-            (nullableArg "p" position)
-            (boolToFlag "v" verbose)
-            (boolToFlag "V" version)
-          ]);
-        in "${hdrop}/bin/hdrop ${args} ${command}";
+            args = lib.concatStringsSep " " (lib.filter (x: x != "") [
+              (boolToFlag "b" background)
+              (nullableArg "c" class)
+              (boolToFlag "f" floating)
+              (nullableArg "g" gap)
+              (if size != null then
+                "-w ${toString size.width} -h ${toString size.height}"
+              else
+                "")
+              (boolToFlag "i" insensitive)
+              (nullableArg "p" position)
+              (boolToFlag "v" verbose)
+              (boolToFlag "V" version)
+            ]);
+          in "${hdrop}/bin/hdrop ${args} ${command}";
 
-
-        moveRelativeTo =
-          writeNuScript "mv"
-          ''
-            def main [-w, num: int] {
-              let current_workspace = (hyprctl activeworkspace -j | from json | get id)
-              mut requested_workspace = $current_workspace + $num
-              if ($requested_workspace < 1 ) { $requested_workspace = 1 }
-              if ($requested_workspace > 9 ) { $requested_workspace = 9 }
-              if ($w) {
-                hyprctl dispatch movetoworkspace $requested_workspace
-              } else {
-                hyprctl dispatch workspace $requested_workspace
-              }
+        moveRelativeTo = writeNuScript "mv" ''
+          def main [-w, num: int] {
+            let current_workspace = (hyprctl activeworkspace -j | from json | get id)
+            mut requested_workspace = $current_workspace + $num
+            if ($w) {
+              hyprctl dispatch movetoworkspace $requested_workspace
+            } else {
+              hyprctl dispatch workspace $requested_workspace
             }
-          '';
+          }
+        '';
 
+        screenshot-to-text = writeNuScript "stt" ''
+          def main [] {
+            ${pkgs.gscreenshot}/bin/gscreenshot -s -f /tmp/gscreenshot-image.png
+            ${pkgs.imagemagick}/bin/convert -colorspace gray -fill white  -resize 480%  -sharpen 0x1  /tmp/gscreenshot-image.png /tmp/gscreenshot-image-processed.jpg
+            ${pkgs.tesseract}/bin/tesseract /tmp/gscreenshot-image-processed.jpg /tmp/tesseract-output
+            cat /tmp/tesseract-output.txt | wl-copy
+          }
+        '';
 
-        screenshot-to-text =
-          writeNuScript "stt"
-          ''
-            def main [] {
-              ${pkgs.gscreenshot}/bin/gscreenshot -s -f /tmp/gscreenshot-image.png
-              ${pkgs.imagemagick}/bin/convert -colorspace gray -fill white  -resize 480%  -sharpen 0x1  /tmp/gscreenshot-image.png /tmp/gscreenshot-image-processed.jpg
-              ${pkgs.tesseract}/bin/tesseract /tmp/gscreenshot-image-processed.jpg /tmp/tesseract-output
-              cat /tmp/tesseract-output.txt | wl-copy
-            }
-          '';
+        fancyfocusscript = import ./window-move.nix { inherit pkgs; };
 
         binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
         mvfocus = binding "${mainMod}" "movefocus";
+        fancyfocus = key: dir: "${mainMod}, ${key}, exec, ${fancyfocusscript}/bin/fancyfocus ${dir}";
         ws = binding "${mainMod}" "workspace";
         resizeactive = binding "${mainMod} CTRL" "resizeactive";
         mvactive = binding "${mainMod} ALT" "moveactive";
         mvtows = binding "${mainMod} SHIFT" "movetoworkspace";
         #e = "exec, ags -b hypr";
-        arr = [1 2 3 4 5 6 7 8 9]; # could reduce this to just 1 .. 9 probably
+        arr = [ 1 2 3 4 5 6 7 8 9 ]; # could reduce this to just 1 .. 9 probably
 
         acpi = lib.getExe pkgs.acpi;
-      in
-        [
-          ## Master-Layout binds
-          "${mainMod}, Backslash, layoutmsg, swapwithmaster master"
-          #", XF86Fn, layoutmsg, addmaster"
+      in [
+        ## Master-Layout binds
+        "${mainMod}, Backslash, layoutmsg, swapwithmaster master"
+        #", XF86Fn, layoutmsg, addmaster"
 
-          "${mainMod}, B, exec, ${notify-send} \"$(${acpi} -b | awk '{print $3, $4}')\""
+        ''
+          ${mainMod}, B, exec, ${notify-send} "$(${acpi} -b | awk '{print $3, $4}')"''
 
-          "${mainMod}, Tab, focuscurrentorlast"
-          "${mainMod}, Delete, exit"
-          "${mainMod}, W, killactive"
-          "${mainMod}, V, togglefloating"
-          "${mainMod}, equal, fullscreen"
-          "${mainMod}, O, fakefullscreen"
+        "${mainMod}, Tab, focuscurrentorlast"
+        "${mainMod}, Delete, exit"
+        "${mainMod}, W, killactive"
+        "${mainMod}, V, togglefloating"
+        "${mainMod}, equal, fullscreen"
+        "${mainMod}, O, fakefullscreen"
 
-          "${mainMod}, T, exec, ${mkHdrop {
+        "${mainMod}, T, exec, ${
+          mkHdrop {
             command = "kitty --class kitty-dropterm";
             class = "kitty-dropterm";
-            size = { width = 75; height = 60; };
+            size = {
+              width = 75;
+              height = 60;
+            };
             gap = 5;
             position = "top";
-          }}"
-          "${mainMod}, F, exec, ${mkHdrop {
+          }
+        }"
+        "${mainMod}, F, exec, ${
+          mkHdrop {
             command = "nemo";
             class = "nemo";
-            size = { width = 75; height = 60; };
+            size = {
+              width = 75;
+              height = 60;
+            };
             gap = 5;
             position = "bottom";
-          }}"
-          "${mainMod}, A, exec, ${mkHdrop {
-            command = "firefox --no-remote -P minimal --name firefox-minimal https://poe.com";
+          }
+        }"
+        "${mainMod}, A, exec, ${
+          mkHdrop {
+            command =
+              "firefox --no-remote -P minimal --name firefox-minimal https://poe.com";
             class = "firefox-minimal";
-            size = { width = 55; height = 90; };
+            size = {
+              width = 55;
+              height = 90;
+            };
             gap = 5;
             position = "right";
-          }}"
-          "${mainMod}, Z, exec, ${mkHdrop {
+          }
+        }"
+        "${mainMod}, Z, exec, ${
+          mkHdrop {
             command = "${pkgs.pavucontrol}/bin/pavucontrol";
             class = "pavucontrol";
-            size = { width = 40; height = 90; };
+            size = {
+              width = 40;
+              height = 90;
+            };
             gap = 5;
             position = "right";
-          }}"
+          }
+        }"
 
+        # launcher
+        "${mainMod}, SPACE, exec, ${pkgs.ulauncher}/bin/ulauncher" # this launcher sucks
 
+        # screenshot
+        ", Print, exec, ${pkgs.gscreenshot}/bin/gscreenshot -sc"
+        "SHIFT, Print, exec, ${screenshot-to-text}/bin/stt"
 
-          # launcher
-          "${mainMod}, SPACE, exec, ${pkgs.ulauncher}/bin/ulauncher" # this launcher sucks
+        # misc
+        ", page_down, exec, ${moveRelativeTo}/bin/mv -1 -w" # Up arrow
+        ", page_up, exec, ${moveRelativeTo}/bin/mv 1 -w" # Down arrow
+        ", Home, exec, ${moveRelativeTo}/bin/mv -1" # home sits where my left arrow is
+        ", End, exec, ${moveRelativeTo}/bin/mv 1" # end sits where my right arrow is
 
-          # screenshot
-          ", Print, exec, ${pkgs.gscreenshot}/bin/gscreenshot -sc"
-          "SHIFT, Print, exec, ${screenshot-to-text}/bin/stt"
+        # group
+        "${mainMod}, G, togglegroup, 0"
+        "${mainMod}, L, exec, swaylock-custom 0 120x6 10 0"
+        #"${mainMod}, asciitilde, exec,  ${pkgs.kitty}/bin/kitty nx rt"
 
-          # misc
-          ", page_down, exec, ${moveRelativeTo}/bin/mv -1 -w" # Up arrow
-          ", page_up, exec, ${moveRelativeTo}/bin/mv 1 -w" # Down arrow
-          ", Home, exec, ${moveRelativeTo}/bin/mv -1" # home sits where my left arrow is
-          ", End, exec, ${moveRelativeTo}/bin/mv 1" # end sits where my right arrow is
+        # playerctl, music control
+        ", XF86AudioNext, exec, ${pkgs.playerctl}/bin/playerctl next"
+        ", XF86AudioPrev, exec, ${pkgs.playerctl}/bin/playerctl previous"
+        ", XF86AudioPlay, exec, ${pkgs.playerctl}/bin/playerctl play"
+        ", XF86AudioPause, exec, ${pkgs.playerctl}/bin/playerctl pause"
+        ", XF86AudioPlayPause, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
 
-          # group
-          "${mainMod}, G, togglegroup, 0"
-          "${mainMod}, L, exec, swaylock-custom 0 120x6 10 0"
-          #"${mainMod}, asciitilde, exec,  ${pkgs.kitty}/bin/kitty nx rt"
+        (fancyfocus "up" "up" )
+        (fancyfocus "down" "down" )
+        (fancyfocus "left" "left" )
+        (fancyfocus "right" "right" )
 
-          # playerctl, music control
-          ", XF86AudioNext, exec, ${pkgs.playerctl}/bin/playerctl next"
-          ", XF86AudioPrev, exec, ${pkgs.playerctl}/bin/playerctl previous"
-          ", XF86AudioPlay, exec, ${pkgs.playerctl}/bin/playerctl play"
-          ", XF86AudioPause, exec, ${pkgs.playerctl}/bin/playerctl pause"
-          ", XF86AudioPlayPause, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
-
-
-          (mvfocus "up" "u")
-          (mvfocus "down" "d")
-          (mvfocus "left" "l")
-          (mvfocus "right" "r")
-          (resizeactive "k" "0 -20")
-          (resizeactive "j" "0 20")
-          (resizeactive "l" "20 0")
-          (resizeactive "h" "-20 0")
-          (mvactive "k" "0 -20")
-          (mvactive "j" "0 20")
-          (mvactive "l" "20 0")
-          (mvactive "h" "-20 0")
-        ]
-        ++ (map (i: ws (toString i) (toString i)) arr)
-        ++ (map (i: mvtows (toString i) (toString i)) arr);
+        (resizeactive "k" "0 -20")
+        (resizeactive "j" "0 20")
+        (resizeactive "l" "20 0")
+        (resizeactive "h" "-20 0")
+        (mvactive "k" "0 -20")
+        (mvactive "j" "0 20")
+        (mvactive "l" "20 0")
+        (mvactive "h" "-20 0")
+      ] ++ (map (i: ws (toString i) (toString i)) arr)
+      ++ (map (i: mvtows (toString i) (toString i)) arr);
 
       bindle = let
         wpctl = "${pkgs.wireplumber}/bin/wpctl";
-        inertia = "${writeNuScript "inertia"
-          ''
-            def reset_values [target: path, time: float, value: float] {
-                {
-                    "value": ($value),
-                    "time": ($time),
-                } | to json | save -f $target
-            }
+        inertia = "${
+            writeNuScript "inertia" ''
+              def reset_values [target: path, time: float, value: float] {
+                  {
+                      "value": ($value),
+                      "time": ($time),
+                  } | to json | save -f $target
+              }
 
-            def main [
-                name: string = "default",
-                --increment (-i): float = 1.0,
-                --initialValue (-I): float = 1.0,
-                --speed (-s): float = 0.15
-            ] {
-                let datafile = ("/tmp/inertia-" + $name) | path expand
-                if not (echo $datafile | path exists) {
-                    reset_values $datafile 0 $initialValue
-                }
+              def main [
+                  name: string = "default",
+                  --increment (-i): float = 1.0,
+                  --initialValue (-I): float = 1.0,
+                  --speed (-s): float = 0.15
+              ] {
+                  let datafile = ("/tmp/inertia-" + $name) | path expand
+                  if not (echo $datafile | path exists) {
+                      reset_values $datafile 0 $initialValue
+                  }
 
-                let old = (open $datafile) | from json
+                  let old = (open $datafile) | from json
 
-                let current_time = ${pkgs.ruby}/bin/ruby -e 'puts Time.now.to_f'
-                let current_time = $current_time | into float
-                let delta_time = (($old.time | into float) - ($current_time | into float)) | math abs
+                  let current_time = ${pkgs.ruby}/bin/ruby -e 'puts Time.now.to_f'
+                  let current_time = $current_time | into float
+                  let delta_time = (($old.time | into float) - ($current_time | into float)) | math abs
 
-                if $delta_time > $speed {
-                    reset_values $datafile $current_time $initialValue
-                    return $initialValue
-                }
+                  if $delta_time > $speed {
+                      reset_values $datafile $current_time $initialValue
+                      return $initialValue
+                  }
 
-                let new_value = ($old.value) + ($delta_time * $increment)
-                echo $new_value
-                reset_values $datafile $current_time $new_value
-                return $new_value
-            }
-          ''}/bin/inertia";
+                  let new_value = ($old.value) + ($delta_time * $increment)
+                  echo $new_value
+                  reset_values $datafile $current_time $new_value
+                  return $new_value
+              }
+            ''
+          }/bin/inertia";
         brightness = writeNuScript "brightness" ''
           def main [-u] {
               let value = if ($u) {
@@ -276,19 +294,19 @@ in {
 
       bindl = let
         wpctl = "${pkgs.wireplumber}/bin/wpctl";
-        mute = "${writeNuScript "mute" ''
-          ${wpctl} set-mute @DEFAULT_AUDIO_SINK@ toggle
-          ${notify-bar} volbar (${pkgs.pamixer}/bin/pamixer --get-volume) (${pkgs.pamixer}/bin/pamixer --get-volume-human)
-        ''}/bin/mute";
+        mute = "${
+            writeNuScript "mute" ''
+              ${wpctl} set-mute @DEFAULT_AUDIO_SINK@ toggle
+              ${notify-bar} volbar (${pkgs.pamixer}/bin/pamixer --get-volume) (${pkgs.pamixer}/bin/pamixer --get-volume-human)
+            ''
+          }/bin/mute";
       in [
         ",XF86AudioMute, exec, ${mute}"
         "SUPER, XF86AudioMute, exec, ${mute}"
       ];
 
-      bindm = [
-        "SUPER, mouse:273, resizewindow"
-        "SUPER, mouse:272, movewindow"
-      ];
+      bindm =
+        [ "SUPER, mouse:273, resizewindow" "SUPER, mouse:272, movewindow" ];
     };
   };
 }

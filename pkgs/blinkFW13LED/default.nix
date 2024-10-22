@@ -4,12 +4,8 @@
   pam,
   gcc,
   libpam-wrapper,
+  systemd,
   pkgs,
-  BLINK_SCRIPT ? "${pkgs.writeScriptBin "blink" ''
-    echo 0 > /sys/class/leds/chromeos\:white\:power/brightness
-    sleep 0.5
-    echo 1 > /sys/class/leds/chromeos\:white\:power/brightness
-  ''}/bin/blink",
 }:
 
 stdenv.mkDerivation rec {
@@ -18,18 +14,15 @@ stdenv.mkDerivation rec {
 
   src = ./.;
 
-  buildInputs = [ gcc pam libpam-wrapper ];
+  buildInputs = [ gcc pam libpam-wrapper systemd ];
 
   buildPhase = ''
-    gcc -fPIC -shared -o pam_blink.so pam_blink.c -ldl -DBLINK_SCRIPT=\"${BLINK_SCRIPT}\"
-    gcc -o test_pam_blink test_pam_blink.c -lpam -lpam_misc
+    gcc -shared -fPIC -o pam_led_hook.so pam_led_hook.c -ldl -lsystemd
   '';
 
   installPhase = ''
     mkdir -p $out/lib
-    mkdir -p $out/bin
-    cp pam_blink.so $out/lib/
-    cp test_pam_blink $out/bin/
+    cp pam_led_hook.so $out/lib/
   '';
 
   meta = with lib; {

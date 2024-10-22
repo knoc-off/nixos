@@ -14,6 +14,7 @@
     ./plugins/ui/precognition.nix
     ./plugins/productivity/vim-ai.nix
     ./plugins/ui/colorizer.nix
+    ./plugins/misc/window-manager.nix
 
     ./plugins/productivity/copilot.nix
 
@@ -24,6 +25,7 @@
     # Theme
     ./themes
   ];
+
 
   viAlias = true;
   vimAlias = true;
