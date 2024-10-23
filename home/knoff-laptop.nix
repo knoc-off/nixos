@@ -9,6 +9,9 @@
     ./programs/terminal # default
     ./programs/terminal/programs/pueue.nix
 
+
+    ./programs/filemanager/yazi.nix
+
     ./programs/editor/default.nix
 
     # Desktop and widgets

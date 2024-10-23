@@ -59,7 +59,6 @@ pkgs.writeShellScriptBin "fancyfocus" ''
   echo "socket: $nvim_socket" >> /log/fancyfocus/log.txt
   # Check if Neovim socket exists
   if [[ ! -S "$nvim_socket" ]]; then
-      # Socket doesn't exist; fallback to Hyprland
       movefocus
       exit 0
   fi
