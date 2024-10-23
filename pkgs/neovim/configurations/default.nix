@@ -15,6 +15,7 @@
     ./plugins/productivity/vim-ai.nix
     ./plugins/ui/colorizer.nix
     ./plugins/misc/window-manager.nix
+    ./plugins/ui/vim-zoom.nix
 
     ./plugins/productivity/copilot.nix
 
