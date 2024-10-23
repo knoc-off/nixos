@@ -29,8 +29,7 @@ in {
           gap ? null, # Gap from screen edge in pixels
           size ? null, # Window size as { width = int; height = int; }
           insensitive ? false, # Case-insensitive class name matching
-          position ? null
-          , # Window position: "top", "bottom", "left", or "right"
+          position ? null, # Window position: "top", "bottom", "left", or "right"
           verbose ? false, # Show detailed notifications
           version ? false # Print version information
           }:
@@ -92,31 +91,92 @@ in {
         #
         # this only works if the windows are tiled, if they are floating then it will not work.
         focusShiftContained = "${writeNuScript "focusShiftContained" ''
+          # Main function to shift focus of the active window based on the given direction.
+          # If the active window is at the edge of the screen, it focuses on the closest floating window.
+          # Otherwise, it moves the focus in the given direction.
+          #
+          # Parameters:
+          # - screenx: int - The width of the screen.
+          # - screeny: int - The height of the screen.
+          # - direction: string - The direction to move the focus ('l', 'r', 'u', 'd').
           def main [screenx: int, screeny: int, direction: string] {
-            let active_window = (hyprctl activewindow -j )
-            let pos = ($active_window | from json | get at)
-            let size = ($active_window | from json | get size)
+            let active_window = (hyprctl activewindow -j | from json)
+            let pos = $active_window.at
+            let size = $active_window.size
 
-            # 'direction' can be one of the following characters: l (left), r (right), u (up), d (down).
-            # 'pos' represents the top-left corner. We need to constrain the movement such that if you attempt to move left or right and are already at the maximum limit, the movement should be restricted.
-
-            # if we want to move left then check if the left edge is at 0, if it is then don't move
-            if ($direction == "l" and $pos.0 == 0) {
-              exit 0
-            }
-            if ($direction == "r" and $pos.0 + $size.0 == $screenx) {
-              exit 0
-            }
-            if ($direction == "u" and $pos.1 == 0) {
-              exit 0
-            }
-            if ($direction == "d" and $pos.1 + $size.1 == $screeny) {
-              exit 0
+            def check_bounds [pos: list<int>, size: list<int>, screenx: int, screeny: int, direction: string] {
+              match $direction {
+                "l" => ($pos.0 == 0),
+                "r" => ($pos.0 + $size.0 == $screenx),
+                "u" => ($pos.1 == 0),
+                "d" => ($pos.1 + $size.1 == $screeny),
+                _ => false
+              }
             }
 
-            hyprctl dispatch movefocus $direction
+            if (check_bounds $pos $size $screenx $screeny $direction) {
+              let floating_windows = (hyprctl clients -j | from json | where floating)
+              let activeworkspace = (hyprctl activeworkspace -j | from json).id
+              let floating_windows_on_active_workspace = $floating_windows | where workspace.id == $activeworkspace
+
+              if (($floating_windows_on_active_workspace | length) == 0) {
+                return
+              }
+
+              def get_center [pos: list<int>, size: list<int>] {
+                [($pos.0 + ($size.0 / 2)), ($pos.1 + ($size.1 / 2))]
+              }
+
+              let active_window_center = get_center $pos $size
+              let closest_window = $floating_windows_on_active_workspace | each {|e|
+                let window_center = get_center $e.at $e.size
+                let distance = (($active_window_center.0 - $window_center.0) | math abs) + (($active_window_center.1 - $window_center.1) | math abs)
+                {window: $e, distance: $distance}
+              } | sort-by distance | first | get window
+
+              hyprctl dispatch focuswindow ("address:" + $closest_window.address)
+            } else {
+              hyprctl dispatch movefocus $direction
+            }
           }
         ''}/bin/focusShiftContained";
+
+        execute_lua_in_nvim = pkgs.writeShellScriptBin "execute_lua_in_nvim" ''
+
+          # Function to execute Lua code in Neovim
+          execute_lua_in_nvim() {
+            local title="$1"
+            local lua_code="$2"
+
+            # Extract Neovim PID from window title (expects format '<title> - <PID>')
+            if [[ "$title" =~ [[:space:]]-[[:space:]]([0-9]+)$ ]]; then
+              local nvim_pid="''${BASH_REMATCH[1]}"
+            else
+              echo "No PID found in the title"
+              return 1
+            fi
+
+            # Construct Neovim socket path
+            local nvim_socket="/tmp/nvim_''${nvim_pid}.socket"
+
+            # Check if Neovim socket exists
+            if [[ ! -S "$nvim_socket" ]]; then
+              echo "Neovim socket does not exist"
+              return 1
+            fi
+
+            # Escape single quotes in the Lua code
+            local escaped_lua_code
+            escaped_lua_code=$(printf '%s' "$lua_code" | sed "s/'/'''/g")
+
+            # Execute Lua code in Neovim and get the result
+            local result
+            result=$(nvim --headless --server "$nvim_socket" --remote-expr "ExecuteLua('$escaped_lua_code')")
+
+            echo "$result"
+          }
+        '';
+
 
         # This script defines a function `screenshot-to-text` that captures a screenshot, processes the image,
         # extracts text from it using OCR, and copies the extracted text to the clipboard.
@@ -152,8 +212,7 @@ in {
         "${mainMod}, Backslash, layoutmsg, swapwithmaster master"
         #", XF86Fn, layoutmsg, addmaster"
 
-        ''
-          ${mainMod}, B, exec, ${notify-send} "$(${acpi} -b | awk '{print $3, $4}')"''
+        ''${mainMod}, B, exec, ${notify-send} "$(${acpi} -b | awk '{print $3, $4}')"''
 
         "${mainMod}, Tab, focuscurrentorlast"
         "${mainMod}, Delete, exit"
@@ -171,7 +230,7 @@ in {
               width = 75;
               height = 60;
             };
-            gap = 5;
+            gap = 25;
             position = "top";
           }
         }"
@@ -183,7 +242,7 @@ in {
               width = 75;
               height = 60;
             };
-            gap = 5;
+            gap = 25;
             position = "bottom";
           }
         }"
@@ -194,9 +253,9 @@ in {
             class = "firefox-minimal";
             size = {
               width = 55;
-              height = 90;
+              height = 95;
             };
-            gap = 5;
+            gap = 250;
             position = "right";
           }
         }"
@@ -208,8 +267,8 @@ in {
               width = 40;
               height = 90;
             };
-            gap = 5;
-            position = "right";
+            gap = 25;
+            position = "left";
           }
         }"
 
