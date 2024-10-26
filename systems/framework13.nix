@@ -70,10 +70,6 @@
     #./modules/yubikey.nix
   ];
 
-
-
-
-
   programs = {
     nix-ld = {
       enable = true;
@@ -130,6 +126,15 @@
 
   networking = {
     hostName = hostname;
+    firewall = {
+      enable = true;
+      allowedTCPPorts = [ 22000 ];
+      allowedUDPPorts = [ 21027 ];
+      extraCommands = ''
+        iptables -A INPUT -p tcp --dport 22000 -s niko.ink -j ACCEPT
+        iptables -A INPUT -p udp --dport 21027 -s niko.ink -j ACCEPT
+      '';
+    };
   };
 
   console = {

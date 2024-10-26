@@ -35,6 +35,19 @@
         winhighlight = false,
       }
     })
+
+    vim.o.lazyredraw = true
+
+    -- Collapse the panel if it has the name "copilot-chat"
+    vim.api.nvim_create_autocmd("BufWinEnter", {
+      pattern = "*",
+      callback = function()
+        local win_name = vim.fn.bufname()
+        if win_name == "copilot-chat" then
+          vim.api.nvim_win_set_width(0, 1) -- Set the width to 1
+        end
+      end
+    })
   '';
 
 
@@ -95,7 +108,7 @@
           };
         };
         scroll = {
-          enable = true;
+          enable = false;
         };
         open = {
           enable = false;

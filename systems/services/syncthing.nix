@@ -1,37 +1,42 @@
 { config, pkgs, ... }:
-
 {
-  services.syncthing = {
+  services.syncthing.relay = {
     enable = true;
+    listenAddress = "0.0.0.0";
+    port = 22067;
+    statusListenAddress = "0.0.0.0";
+    statusPort = 22070;
+    pools = null;  # Use default global pool
+    providedBy = "oink-relay";
+    globalRateBps = null;  # No global rate limit
+    perSessionRateBps = null;  # No per session rate limit
+    extraOptions = [];
+  };
 
-    settings = {
-      devices = {
-        "phone" = {
-          id = "NWTJXBI-ID2JZB3-P5CBD4N-5KGCGHD-QO5D6S5-WZ5YCZ3-64J45SV-W4ZVJAN";  # Replace with your phone's device ID
-          addresses = ["dynamic"];
-          introducer = true;
-          autoAcceptFolders = true;
+  services.nginx = {
+    virtualHosts."relay.niko.ink" = {
+      locations = {
+        "/" = {
+          proxyPass = "http://127.0.0.1:22067";
+          proxyWebsockets = true;
+          extraConfig = ''
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+          '';
         };
-      };
-
-      folders = {
-        # You can add specific folders here if needed
-        # By default, Syncthing will create a "Default Folder" in its data directory
-      };
-
-      options = {
-        globalAnnounceEnabled = false;  # Disable global discovery for added security
-        localAnnounceEnabled = true;
-        urAccepted = -1;  # Disable usage reporting
-        relaysEnabled = true;
-        autoAcceptFolders = true;
-      };
-      openDefaultPorts = true;
-      gui = {
-        address = "127.0.0.1:8384";
-        tls = false;
+        "/status" = {
+          proxyPass = "http://127.0.0.1:22070";
+          proxyWebsockets = true;
+          extraConfig = ''
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+          '';
+        };
       };
     };
   };
-
 }
