@@ -33,7 +33,6 @@
     self.homeModules.gtk
 
     #./programs
-    #./services
     #./desktop
     ./programs/virtualization/bottles.nix
 
@@ -42,7 +41,19 @@
     ./xdg-enviroment.nix
   ];
 
-  services.playerctld.enable = true;
+
+  services = {
+    syncthing.enable = true;
+    playerctld.enable = true;
+    emailManager = {
+      enable = true;
+      profile = "knoff";
+    };
+    batsignal.enable = true;
+
+  };
+
+
 
   wayland.windowManager.hyprlandCustom = {
     enable = true;
@@ -91,10 +102,6 @@
     prusa-slicer
   ];
 
-  services.emailManager = {
-    enable = true;
-    profile = "knoff";
-  };
 
   programs.home-manager.enable = true;
   fonts.fontconfig.enable = true;
@@ -113,8 +120,6 @@
 
   # ~ Battery
   # Battery status, and notifications
-  services.batsignal.enable = true;
-
   home = {
     username = "knoff";
     homeDirectory = "/home/knoff";
