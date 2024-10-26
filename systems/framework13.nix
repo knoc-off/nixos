@@ -2,6 +2,8 @@
   imports = [
     #self.nixosModules.knoff
 
+    ./modules/minecraft.nix
+
     { # Home-Manager
       imports = [ inputs.home-manager.nixosModules.home-manager ];
 
