@@ -19,8 +19,12 @@ let
   };
 
 in
+  rec
 {
   test = pkgs.python3Packages.callPackage ./test { };
+
+
+  rcon-cli = pkgs.callPackage ./rcon-cli { };
 
   grosshack = pkgs.callPackage ./grosshack { };
   blink_led = pkgs.callPackage ./blinkFW13LED { };

@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "systems_overhaul._and_kitchenowl_service_nix_______________________________________________________________________________________________________________________________________Add_minecraft_module.";
+  system.nixos.label = "systems_overhaul._and_kitchenowl_service_nix___________________________________________________________________________________________________minecraft:_add_rcon-cli_and_reverse_proxy._dynamic_config";
 }

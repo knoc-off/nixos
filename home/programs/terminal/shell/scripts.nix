@@ -4,6 +4,10 @@ let
   inherit (self.packages.${pkgs.system}) writeNuScript;
 in {
   home.packages = [
+    (pkgs.writeShellScriptBin "anti-sleep" '' # brute force solution...
+      $(pkgs.sox)/bin/play -n synth 604800 sin 440 vol 0.01
+    '')
+
     (self.packages.${pkgs.system}.nx config_dir hostname)
 
     (pkgs.writeShellScriptBin "isvpn" ''
