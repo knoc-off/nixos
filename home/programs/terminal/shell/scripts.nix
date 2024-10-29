@@ -14,6 +14,7 @@ in {
       nmcli connection show --active | grep -q "wgnord" && echo true || echo false
       '')
 
+    # might get rid of this.
     (pkgs.writeShellScriptBin "wrap-codeblocks" ''
 
       # Directory to search (default to current directory if not provided)

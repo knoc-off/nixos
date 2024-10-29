@@ -72,6 +72,64 @@
     #./modules/yubikey.nix
   ];
 
+
+
+
+
+
+
+
+  services.minecraft-server-suite = {
+    enable = true;
+
+    # Optional: Enable RCON support
+    rcon.enable = true;
+
+    # Optional: Enable Gate proxy
+    gate = {
+      enable = false;
+      domain = "kobbl.co";
+      customRoutes = [{
+        host = "kobbl.co";
+        backend = "localhost:25500";
+      }];
+    };
+  };
+
+  # Configure the actual server
+  services.minecraft-servers.servers.beez = {
+    autoStart = false;
+    package = pkgs.fabricServers.fabric-1_21_1;
+    jvmOpts = "-Xmx8G -Xms8G";
+    enable = true;
+    serverProperties = {
+      server-port = 25565;
+      difficulty = 3;  # 0: peaceful, 1: easy, 2: normal, 3: hard
+      motd = "minecraft";
+      spawn-protection = 0;
+
+      # Rcon configuration
+      enable-rcon = true;
+      "rcon.password" = "123";  # doesn't have to be secure, local only
+      "rcon.port" = 25570;
+    };
+    symlinks = {
+      "ops.json" = pkgs.writeTextFile {
+        name = "ops.json";
+        text = ''
+          [
+            {
+              "uuid": "c9e17620-4cc1-4d83-a30a-ef320cc099e6",
+              "name": "knoc_off",
+              "level": 4,
+              "bypassesplayerlimit": true
+            }
+          ]
+        '';
+      };
+    };
+  };
+
   programs = {
     nix-ld = {
       enable = true;
