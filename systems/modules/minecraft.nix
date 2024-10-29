@@ -1,104 +1,110 @@
-{ inputs, self, lib, pkgs, config, ... }: {
-  imports = [
+{ config, lib, pkgs, inputs, self, ... }:
 
+with lib;
+
+let
+  cfg = config.services.minecraft-server-suite;
+
+  # Generate RCON configuration for a server
+  generateRconConfig = serverName: server: {
+    "${serverName}" = {
+      address = "127.0.0.1:${toString server.serverProperties."rcon.port"}";
+      port = server.serverProperties."rcon.port";
+      password = server.serverProperties."rcon.password";
+      timeout = "10s";
+      type = "rcon";
+    };
+  };
+
+in {
+
+  imports = [
     inputs.nix-minecraft.nixosModules.minecraft-servers
     ./minecraft-gate-reverse-proxy.nix
   ];
 
-  nixpkgs.overlays = [ inputs.nix-minecraft.overlay ];
-  nixpkgs.config.allowUnfree = true;
+  options.services.minecraft-server-suite = {
+    enable = mkEnableOption "Enable Minecraft server suite";
 
-  # add a as a package to the system
-  environment.systemPackages = [
-    (let
-      generateRconConfig = serverName: server: {
-        "${serverName}" = {
-          address = "127.0.0.1:${toString server.serverProperties."rcon.port"}";
-          port = server.serverProperties."rcon.port";
-          password = server.serverProperties."rcon.password";
-          timeout = "10s";
-          type = "rcon";
-        };
+    gate = {  # this might not work, have not tested.
+      enable = mkEnableOption "Enable Gate reverse proxy";
+
+      customRoutes = mkOption {
+        type = types.listOf (types.submodule {
+          options = {
+            host = mkOption {
+              type = types.str;
+              description = "Host domain";
+            };
+            backend = mkOption {
+              type = types.str;
+              description = "Backend address";
+            };
+          };
+        });
+        default = [];
+        description = "Additional Gate proxy routes";
       };
 
-      rconConfigs = lib.head (lib.mapAttrsToList
-        (serverName: server: generateRconConfig serverName server)
-        config.services.minecraft-servers.servers);
-
-      rconFile = pkgs.writeTextFile {
-        name = "rcon.yaml";
-        text = pkgs.lib.generators.toYAML { } rconConfigs;
+      domain = mkOption {
+        type = types.str;
+        description = "Base domain for Minecraft servers";
       };
+    };
 
-    in pkgs.writeShellScriptBin "mcrcon" ''
-      ${
-        self.packages.${pkgs.system}.rcon-cli
-      }/bin/gorcon --config ${rconFile} -e $@
-    '')
-  ];
+    rcon = {
+      enable = mkEnableOption "Enable RCON support";
 
-  services.gateService = {
-    enable = false;
-    config = {
-      lite = {
-        enabled = true;
-        routes = lib.mapAttrsToList (serverName: server: {
-          host = "${serverName}.kobbl.co";
-          backend =
-            "localhost:${toString server.serverProperties."server-port"}";
-        }) config.services.minecraft-servers.servers ++ [{ # custom routes
-          host = "kobbl.co";
-          backend = "localhost:25500";
-        }];
+      package = mkOption {
+        type = types.package;
+        default = self.packages.${pkgs.system}.rcon-cli;
+        description = "RCON client package";
       };
     };
   };
 
-  services.minecraft-servers = {
-    eula = true;
-    enable = true;
-    # this server declaration, should be added in the system that calls the module.
-    # that would allow this to be more modular and allow for multiple servers to be defined.
-    servers.beez = {
-      autoStart = false;
-      package = pkgs.fabricServers.fabric-1_21_1;
-      jvmOpts = "-Xmx8G -Xms8G";
+  config = mkIf cfg.enable {
+    nixpkgs.overlays = [ inputs.nix-minecraft.overlay ];
+    nixpkgs.config.allowUnfree = true;
+    # Enable minecraft-servers service
+    services.minecraft-servers = {
+      eula = true;
       enable = true;
-      serverProperties = {
-        server-port = 25565;
-        difficulty = 3; # 0: peaceful, 1: easy, 2: normal, 3: hard
-        motd = "minecraft";
-        spawn-protection = 0;
+    };
 
-        # Rcon
-        enable-rcon = true;
-        "rcon.password" = "123"; # doesnt have to be secure, local only
-        "rcon.port" = 25570;
-        # connect to rcon with `rcon -H localhost -p 25570 -P 123`
-      };
-      symlinks = {
-        "ops.json" = pkgs.writeTextFile {
-          name = "ops.json";
-          text = ''
-            [
-              {
-                "uuid": "c9e17620-4cc1-4d83-a30a-ef320cc099e6",
-                "name": "knoc_off",
-                "level": 4,
-                "bypassesplayerlimit": true
-              }
-            ]
-          '';
+    # Gate reverse proxy configuration
+    services.gateService = mkIf cfg.gate.enable {
+      enable = true;
+      config = {
+        lite = {
+          enabled = true;
+          routes = (mapAttrsToList (serverName: server: {
+            host = "${serverName}.${cfg.gate.domain}";
+            backend = "localhost:${toString server.serverProperties."server-port"}";
+          }) config.services.minecraft-servers.servers) ++ cfg.gate.customRoutes;
         };
       };
     };
-  };
 
-  # create an rcon script for each of the config.sercices.minecraft-servers.servers
-  # so that you can run `rcon <server>` to connect to the server, IE: `rcon beez`
+    # RCON configuration
+    environment.systemPackages = mkIf cfg.rcon.enable [
+      (let
+        rconConfigs = lib.foldl' (acc: server:
+          acc // (generateRconConfig server.name server.value)
+        ) {} (mapAttrsToList (name: value: { inherit name value; }) config.services.minecraft-servers.servers);
 
-  networking = {
-    firewall = {
+        rconFile = pkgs.writeTextFile {
+          name = "rcon.yaml";
+          text = pkgs.lib.generators.toYAML {} rconConfigs;
+        };
+      in pkgs.writeShellScriptBin "mcrcon" ''
+        ${cfg.rcon.package}/bin/gorcon --config ${rconFile} -e $@
+      '')
+    ];
+
+    # i only want the gate services to be outwards facing.
+    # Networking configuration
+    networking.firewall = {
       allowedUDPPorts = [ 25565 ];
       allowedTCPPorts = [ 25565 ];
     };
