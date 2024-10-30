@@ -3,16 +3,12 @@
   services.greetd = {
     enable = true;
     settings.default_session.command =
-      "${pkgs.greetd.tuigreet}/bin/tuigreet --remember --cmd ${
-        pkgs.writeScript "Hyprland_start" ''
-          #! ${pkgs.bash}/bin/bash
-
-          # Do stuff
-
-          # Hyprland
-          ${pkgs.hyprland}/bin/Hyprland
-        ''
-      }";
+    "${pkgs.greetd.tuigreet}/bin/tuigreet --remember --cmd ${pkgs.hyprland}";
+    #${
+    #    pkgs.writeScriptBin "Hyprland_start" ''
+    #      ${pkgs.hyprland}/bin/Hyprland
+    #    ''
+    #  }";
   };
 
   # Enable backlight control

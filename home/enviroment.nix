@@ -38,9 +38,9 @@
       CLUTTER_BACKEND = "wayland";
 
       # Video and graphics
-      MOZ_ENABLE_WAYLAND = "1";
-      SDL_VIDEODRIVER = "wayland";
-      WLR_RENDERER = "vulkan";
+      #MOZ_ENABLE_WAYLAND = "1";
+      #SDL_VIDEODRIVER = "wayland";
+      #WLR_RENDERER = "vulkan";
       # WLR_NO_HARDWARE_CURSORS = "1"; # if no cursor,uncomment this line
 
       # Java GUI settings
