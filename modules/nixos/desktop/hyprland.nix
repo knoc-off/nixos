@@ -1,14 +1,16 @@
-{ inputs, config, pkgs, ... }: {
+{ inputs, config, pkgs, ... }:
+
+let
+  tuigreet = "${pkgs.greetd.tuigreet}/bin/tuigreet";
+  hyprland = "${pkgs.hyprland}/bin/Hyprland";
+
+in {
   # Enable greetd for login
   services.greetd = {
     enable = true;
-    settings.default_session.command =
-    "${pkgs.greetd.tuigreet}/bin/tuigreet --remember --cmd ${pkgs.hyprland}";
-    #${
-    #    pkgs.writeScriptBin "Hyprland_start" ''
-    #      ${pkgs.hyprland}/bin/Hyprland
-    #    ''
-    #  }";
+    settings = {
+      default_session.command = "${tuigreet} --remember --cmd ${hyprland}";
+    };
   };
 
   # Enable backlight control
@@ -31,10 +33,7 @@
   };
 
   # System-wide packages
-  environment.systemPackages = with pkgs; [
-    wl-clipboard
-    xdg-utils
-  ];
+  environment.systemPackages = with pkgs; [ wl-clipboard xdg-utils ];
 
   # Enable polkit
   security.polkit.enable = true;
