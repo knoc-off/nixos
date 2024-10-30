@@ -51,12 +51,12 @@ in
     fzf = {
       enable = true;
 
-      colors = {
-        bg = "${oklchToHex (setLightness 0.2 primary)}";
-        "bg+" = "${oklchToHex (setLightness 0.25 primary)}";
-        fg = "${oklchToHex (setLightness 0.8 neutral)}";
-        "fg+" = "${oklchToHex (setLightness 0.9 neutral)}";
-      };
+      #colors = {
+      #  bg = "#${oklchToHex (setLightness 0.2 primary)}";
+      #  "bg+" = "#${oklchToHex (setLightness 0.25 primary)}";
+      #  fg = "#${oklchToHex (setLightness 0.8 neutral)}";
+      #  "fg+" = "#${oklchToHex (setLightness 0.9 neutral)}";
+      #};
     };
 
     ripgrep = {

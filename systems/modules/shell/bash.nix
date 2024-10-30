@@ -1,8 +1,11 @@
 { config, pkgs, lib, ... }:
-
 {
   programs.bash = {
     interactiveShellInit = ''
+      if [ -f ~/.profile ]; then
+        . ~/.profile
+      fi
+
       # History settings
       export HISTSIZE=10000
       export HISTFILESIZE=20000
