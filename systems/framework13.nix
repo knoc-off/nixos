@@ -64,7 +64,6 @@
 
     # Window manager
     self.nixosModules.windowManager.hyprland
-    #./modules/hyprland
 
     # Android emulation
     #./modules/virtualisation/waydroid.nix
