@@ -51,6 +51,9 @@
       sops.defaultSopsFile = ./secrets/framework13/default.yaml;
       # This will automatically import SSH keys as age keys
       sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+      sops.secrets."ANTHROPIC_API_KEY" = {
+        mode = "0644";
+      };
     }
 
     # Pipewire / Audio
@@ -72,13 +75,6 @@
     #./modules/yubikey.nix
   ];
 
-
-
-
-
-
-
-
   services.minecraft-server-suite = {
     enable = true;
 
@@ -89,14 +85,15 @@
     gate = {
       enable = false;
       domain = "kobbl.co";
-      customRoutes = [{
-        host = "kobbl.co";
-        backend = "localhost:25500";
-      }];
+      customRoutes = [
+        {
+          host = "kobbl.co";
+          backend = "localhost:25500";
+        }
+      ];
     };
   };
 
-  # Configure the actual server
   services.minecraft-servers.servers.beez = {
     autoStart = false;
     package = pkgs.fabricServers.fabric-1_21_1;
@@ -104,7 +101,7 @@
     enable = true;
     serverProperties = {
       server-port = 25565;
-      difficulty = 3;  # 0: peaceful, 1: easy, 2: normal, 3: hard
+      difficulty = 2;  # 0: peaceful, 1: easy, 2: normal, 3: hard
       motd = "minecraft";
       spawn-protection = 0;
 

@@ -9,6 +9,8 @@
     ./programs/terminal # default
     ./programs/terminal/programs/pueue.nix
 
+    ./programs/terminal/shell
+
 
     ./programs/filemanager/yazi.nix
 

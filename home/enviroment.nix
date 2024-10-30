@@ -1,9 +1,12 @@
-{config, pkgs, ...}: {
+{ config, lib, pkgs, ... }: {
+
+  programs.bash.enable = true;
   home = {
     file = {
       mnt = {
         recursive = true;
-        source = config.lib.file.mkOutOfStoreSymlink "/run/media/${config.home.username}";
+        source = config.lib.file.mkOutOfStoreSymlink
+          "/run/media/${config.home.username}";
       };
 
       nixos = {
@@ -13,11 +16,6 @@
     };
 
 
-
-
-
-
-
     sessionVariables = {
       # Editor and shell
       EDITOR = "nvim";
@@ -25,10 +23,12 @@
 
       # Browser
       BROWSER = "firefox";
-
       #GTK_THEME = "Adwaita:dark";
       #GTK2_RC_FILES = "${pkgs.theme-obsidian2}/share/themes/Obsidian-2/gtk-2.0/gtkrc";
       #QT_STYLE_OVERRIDE = "adwaita-dark";
+
+
+      ANTHROPIC_API_KEY="$(cat /run/secrets/ANTHROPIC_API_KEY)";
 
       # GUI toolkit settings
       QT_SCALE_FACTOR = "1";
@@ -119,7 +119,6 @@
   #  };
   #};
 
-
 }
 #env = GDK_BACKEND,wayland,x11
 #env = QT_QPA_PLATFORM,wayland;xcb
@@ -134,4 +133,3 @@
 #env = XCURSOR_THEME,Future-Cursors
 #env = XCURSOR_SIZE,24
 #env = QT_WAYLAND_DISABLE_WINDOWDECORATION,1
-

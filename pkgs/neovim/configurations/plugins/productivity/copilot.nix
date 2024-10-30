@@ -9,7 +9,7 @@
     require("codecompanion").setup({
       strategies = {
         chat = {
-          adapter = "copilot", -- Switch between: anthropic|copilot|gemini|openai
+          adapter = "anthropic", -- Switch between: anthropic|copilot|gemini|openai
           opts = {
             register = "+" -- Register to use for yanking code
           },

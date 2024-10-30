@@ -7,8 +7,6 @@
   accent1 = "#B8CC52";
   accent2 = "#D2A6FF";
 
-
-
   base00 = "#263238";
   base01 = "#2E3C43";
   base02 = "#314549";
@@ -25,13 +23,6 @@
   base0D = "#82AAFF";
   base0E = "#C792EA";
   base0F = "#FF5370";
-
-
-
-
-
-
-
 
 }
 

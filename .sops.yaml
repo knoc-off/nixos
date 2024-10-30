@@ -1,5 +1,6 @@
 keys:
-  - &framework13 age1xxs94a2jtv9ctes23rze0wgess0spqsapnpj8vrw46qx6kg98eeq20jfzt
+  - &framework13h age1xxs94a2jtv9ctes23rze0wgess0spqsapnpj8vrw46qx6kg98eeq20jfzt
+  - &framework13 age1zdytsg2704mgqc6e76umdcgumnkx7ph70tcscs5pcauz0esp4ehsttav5t
   - &hetzner age1kedaufmt9rah4h65gvmml0vfxdjngqsteqqy79rvs4hqs0j9rfaq858cg0
   - &rpi3A age1x203sz3zrzjrj094j5dsyrpk4vj6zkp7jgvl6dvgk32nspyjqf9qkyacjt
   - &homeserver age1yfnk76q5velf4ydxvcajm008w42nkfk3tz2euz6666j89pxe2yjqyl4g03
@@ -7,19 +8,20 @@ creation_rules:
   - path_regex: systems/secrets/hetzner/[^/]+\.(yaml|json|env|ini)$
     key_groups:
       - age:
-        - *framework13
+        - *framework13h
         - *hetzner
   - path_regex: systems/secrets/rpi3A/[^/]+\.(yaml|json|env|ini)$
     key_groups:
       - age:
-        - *framework13
+        - *framework13h
         - *rpi3A
   - path_regex: systems/secrets/framework13/[^/]+\.(yaml|json|env|ini)$
     key_groups:
       - age:
+        - *framework13h
         - *framework13
   - path_regex: systems/secrets/homeserver/[^/]+\.(yaml|json|env|ini)$
     key_groups:
       - age:
-        - *framework13
+        - *framework13h
         - *homeserver
