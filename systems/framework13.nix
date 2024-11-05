@@ -1,4 +1,5 @@
-{ lib, inputs, config, pkgs, self, system, outputs, theme, colorLib, hostname,   ... }: {
+{ lib, inputs, config, pkgs, self, system, outputs, theme, colorLib, hostname
+, user, ... }: {
   imports = [
     #self.nixosModules.knoff
 
@@ -10,9 +11,9 @@
       home-manager = {
         useGlobalPkgs = false;
         useUserPackages = true;
-        users.knoff = import ../home/knoff-laptop.nix;
+        users.${user} = import ../home/knoff-laptop.nix;
         extraSpecialArgs = {
-          inherit inputs outputs self theme colorLib hostname system;
+          inherit inputs outputs self theme colorLib hostname system user;
         };
       };
     }
@@ -44,16 +45,13 @@
 
     ./modules/wpad.nix
 
-
     # Sops
     inputs.sops-nix.nixosModules.sops
     {
       sops.defaultSopsFile = ./secrets/framework13/default.yaml;
       # This will automatically import SSH keys as age keys
       sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
-      sops.secrets."ANTHROPIC_API_KEY" = {
-        mode = "0644";
-      };
+      sops.secrets."ANTHROPIC_API_KEY" = { mode = "0644"; };
     }
 
     # Pipewire / Audio
@@ -84,14 +82,14 @@
     gate = {
       enable = false;
       domain = "kobbl.co";
-      customRoutes = [
-        {
-          host = "kobbl.co";
-          backend = "localhost:25500";
-        }
-      ];
+      customRoutes = [{
+        host = "kobbl.co";
+        backend = "localhost:25500";
+      }];
     };
   };
+
+  virtualisation.waydroid.enable = true;
 
   services.minecraft-servers.servers.beez = {
     autoStart = false;
@@ -100,13 +98,13 @@
     enable = true;
     serverProperties = {
       server-port = 25565;
-      difficulty = 2;  # 0: peaceful, 1: easy, 2: normal, 3: hard
+      difficulty = 2; # 0: peaceful, 1: easy, 2: normal, 3: hard
       motd = "minecraft";
       spawn-protection = 0;
 
       # Rcon configuration
       enable-rcon = true;
-      "rcon.password" = "123";  # doesn't have to be secure, local only
+      "rcon.password" = "123"; # doesn't have to be secure, local only
       "rcon.port" = 25570;
     };
     symlinks = {
@@ -125,6 +123,17 @@
       };
     };
   };
+
+  security.sudo.extraRules = [{
+    #groups = [ "networkmanager" ];
+    users = [ "${user}" ]; # ? auto
+    #groups = [ 1006 ];
+    commands = [{
+      command =
+        "${pkgs.wgnord}/bin/wgnord"; # is this a security issue? its not writable
+      options = [ "NOPASSWD" ];
+    }];
+  }];
 
   programs = {
     nix-ld = {
@@ -218,8 +227,8 @@
 
   # Set default values for the new options
   bootloader = {
-    type = "lanzaboote";  # Default to systemd-boot as in the original config
-    efiSupport = true;  # Enable EFI support by default
+    type = "lanzaboote"; # Default to systemd-boot as in the original config
+    efiSupport = true; # Enable EFI support by default
   };
 
   boot = {
@@ -230,7 +239,7 @@
   };
 
   users = {
-    users.knoff = {
+    users.${user} = {
       isNormalUser = lib.mkDefault true;
       extraGroups = [ "wheel" "networkmanager" "audio" "video" "dialout" ];
       initialPassword = "password";

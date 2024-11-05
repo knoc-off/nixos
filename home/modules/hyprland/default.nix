@@ -6,6 +6,7 @@
   pkgs,
   inputs,
   colorLib,
+  user,
   ...
 }: let
   cfg = config.wayland.windowManager.hyprlandCustom;
@@ -95,7 +96,7 @@ in {
 
       settings = lib.mkMerge [
         cfg.settings
-        (import ./settings/general.nix {inherit config inputs theme lib pkgs colorLib;})
+        (import ./settings/general.nix {inherit config inputs user theme lib pkgs colorLib;})
       ];
     };
 

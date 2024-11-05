@@ -3,6 +3,7 @@
   outputs,
   self,
   pkgs,
+  user,
   ...
 }: {
   imports = [
@@ -49,7 +50,7 @@
     playerctld.enable = true;
     emailManager = {
       enable = true;
-      profile = "knoff";
+      profile = "${user}";
     };
     batsignal.enable = true;
 
@@ -64,7 +65,7 @@
   #disabledModules = ["programs/eww.nix"];
   programs.git = {
     enable = true;
-    userName = "knoff";
+    userName = "${user}";
     userEmail = "selby@niko.ink";
 
     extraConfig = {
@@ -97,7 +98,6 @@
     kdePackages.breeze-icons
     kdePackages.grantleetheme
     libsForQt5.grantleetheme
-    wgnord
 
     telegram-desktop
 
@@ -123,8 +123,8 @@
   # ~ Battery
   # Battery status, and notifications
   home = {
-    username = "knoff";
-    homeDirectory = "/home/knoff";
+    username = "${user}";
+    homeDirectory = "/home/${user}";
   };
 
 
