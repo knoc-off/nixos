@@ -1,6 +1,9 @@
 { config, pkgs, lib, ... }:
 {
   programs.bash = {
+    shellAliases = {
+      wgnord = "sudo ${pkgs.wgnord}/bin/wgnord";
+    };
     interactiveShellInit = ''
       if [ -f ~/.profile ]; then
         . ~/.profile
