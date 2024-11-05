@@ -1,14 +1,29 @@
-{ pkgs, self, hostname, ... }:
+{ pkgs, self, hostname, config, ... }:
 let
   config_dir = "/etc/nixos"; # Should relocate to /etc? and symlink?
   inherit (self.packages.${pkgs.system}) writeNuScript;
 in {
   home.packages = [
-    (pkgs.writeShellScriptBin "anti-sleep" '' # brute force solution...
-      $(pkgs.sox)/bin/play -n synth 604800 sin 440 vol 0.01
+    (pkgs.writeShellScriptBin "anti-sleep" ''
+      #${pkgs.sox}/bin/play -n synth 604800 sin 440 vol 0.01
+      # $1 is the time in seconds to not sleep
+      # ${pkgs.sudo}/bin/sudo ${pkgs.systemd}/bin/systemd-inhibit --what=handle-suspend:sleep --why="Anti-Sleep" --mode=block -- $@
+      # ${pkgs.sox}/bin/play -n synth $1 sin 440 vol 0.01
+
+      ${pkgs.systemd}/bin/systemd-inhibit \
+        --what=sleep:idle:handle-lid-switch \
+        --who="$USER" \
+        --why="Manual sleep prevention" \
+        --mode=block \
+        sleep "$1"
+
     '')
 
     (self.packages.${pkgs.system}.nx config_dir hostname)
+
+    (pkgs.writeShellScriptBin "test-print" ''
+      echo "${config.xdg.configFile."kitty/kitty.conf".text}"
+    '')
 
     (pkgs.writeShellScriptBin "isvpn" ''
       nmcli connection show --active | grep -q "wgnord" && echo true || echo false

@@ -72,77 +72,8 @@ in {
           }
         '';
 
-        # This script defines a function `focusShiftContained` that moves the focus of the active window
-        # in a specified direction (left, right, up, or down) while ensuring that the window does not move
-        # beyond the screen boundaries.
-        #
-        # Parameters:
-        # - screenx: The width of the screen.
-        # - screeny: The height of the screen.
-        # - direction: The direction to move the focus. It can be one of the following characters:
-        #   - 'l' for left
-        #   - 'r' for right
-        #   - 'u' for up
-        #   - 'd' for down
-        #
-        # The script first retrieves the active window's position and size using `hyprctl`. It then checks
-        # if moving in the specified direction would cause the window to go out of the screen boundaries.
-        # If so, the script exits without moving the focus. Otherwise, it dispatches the move focus command.
-        #
-        # this only works if the windows are tiled, if they are floating then it will not work.
-        focusShiftContained = "${writeNuScript "focusShiftContained" ''
-          # Main function to shift focus of the active window based on the given direction.
-          # If the active window is at the edge of the screen, it focuses on the closest floating window.
-          # Otherwise, it moves the focus in the given direction.
-          #
-          # Parameters:
-          # - screenx: int - The width of the screen.
-          # - screeny: int - The height of the screen.
-          # - direction: string - The direction to move the focus ('l', 'r', 'u', 'd').
-          def main [screenx: int, screeny: int, direction: string] {
-            let active_window = (hyprctl activewindow -j | from json)
-            let pos = $active_window.at
-            let size = $active_window.size
-
-            def check_bounds [pos: list<int>, size: list<int>, screenx: int, screeny: int, direction: string] {
-              match $direction {
-                "l" => ($pos.0 == 0),
-                "r" => ($pos.0 + $size.0 == $screenx),
-                "u" => ($pos.1 == 0),
-                "d" => ($pos.1 + $size.1 == $screeny),
-                _ => false
-              }
-            }
-
-            if (check_bounds $pos $size $screenx $screeny $direction) {
-              let floating_windows = (hyprctl clients -j | from json | where floating)
-              let activeworkspace = (hyprctl activeworkspace -j | from json).id
-              let floating_windows_on_active_workspace = $floating_windows | where workspace.id == $activeworkspace
-
-              if (($floating_windows_on_active_workspace | length) == 0) {
-                return
-              }
-
-              def get_center [pos: list<int>, size: list<int>] {
-                [($pos.0 + ($size.0 / 2)), ($pos.1 + ($size.1 / 2))]
-              }
-
-              let active_window_center = get_center $pos $size
-              let closest_window = $floating_windows_on_active_workspace | each {|e|
-                let window_center = get_center $e.at $e.size
-                let distance = (($active_window_center.0 - $window_center.0) | math abs) + (($active_window_center.1 - $window_center.1) | math abs)
-                {window: $e, distance: $distance}
-              } | sort-by distance | first | get window
-
-              hyprctl dispatch focuswindow ("address:" + $closest_window.address)
-            } else {
-              hyprctl dispatch movefocus $direction
-            }
-          }
-        ''}/bin/focusShiftContained";
 
         execute_lua_in_nvim = pkgs.writeShellScriptBin "execute_lua_in_nvim" ''
-
           # Function to execute Lua code in Neovim
           execute_lua_in_nvim() {
             local title="$1"
@@ -195,7 +126,7 @@ in {
           }
         '';
 
-        fancyfocusscript = import ./window-move.nix { inherit pkgs; hyprfocuscommand = "${focusShiftContained} 2256 1504 "; };
+        fancyfocusscript = import ./window-move.nix { inherit pkgs self;  };
 
         binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
         fancyfocus = key: dir: "${mainMod}, ${key}, exec, ${fancyfocusscript}/bin/fancyfocus ${dir}";
@@ -220,11 +151,19 @@ in {
         "${mainMod}, V, togglefloating"
         "${mainMod}, equal, fullscreen"
         "${mainMod}, O, fakefullscreen"
-        "${mainMod}, k, exec, ${focusShiftContained}/bin/focusShiftContained l 2256 1504"
 
         "${mainMod}, T, exec, ${
           mkHdrop {
-            command = "kitty --class kitty-dropterm";
+            command = let
+              kittyConfig = "~/${config.xdg.configFile."kitty/kitty.conf".target}";
+              sedRules = [
+                #"/map ctrl+t new_os_window_with_cwd/d"
+                ''/map ctrl+t new_os_window_with_cwd/c\\map ctrl+t new_window_with_cwd\n''
+                #''$ a\\map ctrl+q close_window''
+              ];
+              sedCommand = "sed '${builtins.concatStringsSep ";" sedRules}'";
+            in
+              "kitty --class kitty-dropterm --config <(${sedCommand} ${kittyConfig})";
             class = "kitty-dropterm";
             size = {
               width = 75;
@@ -236,7 +175,7 @@ in {
         }"
         "${mainMod}, F, exec, ${
           mkHdrop {
-            command = "nemo";
+            command = "${pkgs.cinnamon.nemo}/bin/nemo";
             class = "nemo";
             size = {
               width = 75;
@@ -297,10 +236,10 @@ in {
         ", XF86AudioPause, exec, ${pkgs.playerctl}/bin/playerctl pause"
         ", XF86AudioPlayPause, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
 
-        (fancyfocus "up" "up" )
-        (fancyfocus "down" "down" )
-        (fancyfocus "left" "left" )
-        (fancyfocus "right" "right" )
+        (fancyfocus "up" "u" ) # keybind, and direction
+        (fancyfocus "down" "d" )
+        (fancyfocus "left" "l" )
+        (fancyfocus "right" "r" )
 
         (resizeactive "k" "0 -20")
         (resizeactive "j" "0 20")
