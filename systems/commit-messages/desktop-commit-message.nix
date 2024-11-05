@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "systems_overhaul._and_kitchenowl_service_nix____________________________________________________________________________________________________________________actix-backend:_changes_and_experiments._";
+  system.nixos.label = "systems_overhaul._and_kitchenowl_service_nix_______________________________________________________________________________________________________________________________tying_to_package_triliumNext.";
 }
