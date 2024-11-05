@@ -22,12 +22,11 @@ rustPlatform.buildRustPackage rec {
       pkgs.openssl.dev
       pkgs.pkg-config
       pkgs.zlib.dev
+      pkgs.sqlite
     ]
     ++ lib.optionals pkgs.stdenv.isDarwin (with pkgs.darwin.apple_sdk.frameworks; [
       libiconv
       CoreServices
       SystemConfiguration
     ]);
-
-
 }
