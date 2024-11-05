@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "user_is_passed_to_the_main_function._and_small_system_changes___________________________________________________________________________________________________actix-backend:_changes_and_experiments._";
+  system.nixos.label = "user_is_passed_to_the_main_function._and_small_system_changes______________________________________________________________________________________________________________tying_to_package_triliumNext.";
 }
