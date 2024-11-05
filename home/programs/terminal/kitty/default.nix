@@ -23,15 +23,19 @@ in {
     };
     extraConfig = ''
       touch_scroll_multiplier 3.0
+      allow_remote_control socket
+      listen_on unix:/tmp/kitty-{kitty_pid}.socket
     '';
     settings = rec {
       tab_bar_style = "custom";
       tab_bar_margin_height = "0.0 0.0";
-      tab_title_template = " {index}: {f'{title[:6]}…{title[-6:]}' if title.rindex(title[-1]) + 1 > 13 else title.center(7)} ";
+      tab_title_template = " {index}: {f'{title[:6]}-{title[-6:]}' if title.rindex(title[-1]) + 1 > 13 else title.center(7)} ";
       allow_remote_control = "yes";
 
       enable_audio_bell = "no";
       visual_bell_duration = "0.0";
+
+      focus_follows_mouse = "yes";
 
       # base16 colors
       color0 = theme.base00;  # black
