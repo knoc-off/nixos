@@ -120,36 +120,7 @@ in
       app = droidifyApk;
     };
 
-    droidifyWrapper = pkgs.stdenv.mkDerivation {
-      name = "droidify-wrapper";
-      buildInputs = [ pkgs.makeWrapper ];
-
-      unpackPhase = "true";
-
-      installPhase = ''
-        mkdir -p $out/bin $out/share/applications
-
-        # Create a wrapper script
-        makeWrapper ${droidifyEmulator}/bin/run-test-emulator $out/bin/run-droidify
-
-        # Create a .desktop file
-        cat > $out/share/applications/droidify.desktop << EOF
-        [Desktop Entry]
-        Type=Application
-        Name=Droid-ify
-        Exec=$out/bin/run-droidify
-        Icon=${
-          pkgs.fetchurl {
-            url =
-              "https://raw.githubusercontent.com/Droid-ify/client/master/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png";
-            sha256 = "sha256-r3hKlaMSnnNelZ67NMzuBWbieKcB2CcriTh7TSD+PK0=";
-          }
-        }
-        Categories=Application;
-        EOF
-      '';
-    };
-  in droidifyWrapper;
+  in droidifyEmulator;
 
   writeNuScript = name:
     (script:
@@ -160,4 +131,16 @@ in
         executable = true;
         destination = "/bin/${name}";
       });
+
+
+  writeLuaScript = name: script:
+    pkgs.writeTextFile {
+      inherit name;
+      text = ''
+        #!${pkgs.lua}/bin/lua
+        ${script}
+      '';
+      executable = true;
+      destination = "/bin/${name}";
+    };
 }
