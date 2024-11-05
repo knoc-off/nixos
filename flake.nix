@@ -64,12 +64,18 @@
           # Import packages from the unstable Nixpkgs channel
           upkgs = import nixpkgs-unstable {
             inherit system;
-            config.allowUnfree = true;
+            config = {
+              allowUnfree = true;
+              android_sdk.accept_license = true;
+            };
           };
           # Import packages from the stable Nixpkgs channel
           pkgs = import nixpkgs {
             inherit system;
-            config.allowUnfree = true;
+            config = {
+              allowUnfree = true;
+              android_sdk.accept_license = true;
+            };
           };
           # Import custom packages defined in the ./pkgs directory
         in import ./pkgs { inherit inputs self system pkgs upkgs; };
