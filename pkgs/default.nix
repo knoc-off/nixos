@@ -29,6 +29,10 @@ in
   grosshack = pkgs.callPackage ./grosshack { };
   blink_led = pkgs.callPackage ./blinkFW13LED { };
 
+
+
+  triliumNext = pkgs.callPackage ./triliumNext { };
+
   spotify-adblock = pkgs.callPackage ./spotify-adblock { };
 
   llm-cmd = pkgs.python3Packages.callPackage ./llm-cmd { };
