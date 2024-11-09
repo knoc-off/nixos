@@ -52,7 +52,7 @@
         value = (mkConfig {
           inherit hostname user system;
           extraModules = [
-            ./systems/modules/live-iso.nix
+            ./systems/modules/live-iso.nix # {inherit user;}
             { isoImage = { isoName = lib.mkForce name; }; }
           ];
         }).config.system.build.isoImage;

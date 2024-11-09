@@ -37,7 +37,7 @@
 
     #./programs
     #./desktop
-    ./programs/virtualization/bottles.nix
+    #./programs/virtualization/bottles.nix
 
     ./modules/thunderbird.nix
 
