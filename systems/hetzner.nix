@@ -1,4 +1,4 @@
-{ modulesPath, inputs, outputs, config, lib, pkgs, ... }: {
+{ modulesPath, inputs, outputs, config, lib, pkgs, self, ... }: {
   imports = [
     (modulesPath + "/installer/scan/not-detected.nix")
     (modulesPath + "/profiles/qemu-guest.nix")
@@ -47,25 +47,8 @@
   # override the trilium package to pull from a different source
 
   nixpkgs.overlays = [
-    (final: prev: { # i might just package this myself. and override with my package.
-      trilium-server = prev.trilium-server.overrideAttrs (oldAttrs: {
-        src = pkgs.fetchFromGitHub {
-          owner = "TriliumNext";
-          repo = "Notes";
-          rev = "v0.90.8";
-          sha256 = "sha256-SiU0+BX/CmiiCqve12kglh6Qa2TtTYIYENGFwyGiMsU=";
-        };
-
-        #buildInputs = oldAttrs.buildInputs ++ [ pkgs.nodejs ];
-        postInstall = ''
-          # Link nodejs to the expected location
-          mkdir -p $out/share/trilium-server/node/bin
-          ln -s ${pkgs.nodejs}/bin/node $out/share/trilium-server/node/bin/node
-        '';
-
-        # remove the patches
-        patches = [];
-      });
+    (final: prev: {
+      trilium-server = self.packages.${pkgs.system}.triliumNext;
     })
   ] ++ builtins.attrValues outputs.overlays;
 

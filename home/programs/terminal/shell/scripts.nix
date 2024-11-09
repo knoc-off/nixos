@@ -204,13 +204,13 @@ in {
           let task_id = ($pueue_output | parse "New task added (id {id})." | get id | first)
           if $task_id != null {
             print $"Task added with ID: ($task_id)"
-            pueue follow $task_id
+            # pueue follow $task_id
           } else {
             print "Failed to parse task ID. Pueue output:"
             print $pueue_output
           }
         } else {
-          nu -c $command_str
+          bash -c $command_str
         }
       }
     '')

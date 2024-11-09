@@ -25,6 +25,8 @@ in {
       touch_scroll_multiplier 3.0
       allow_remote_control socket
       listen_on unix:/tmp/kitty-{kitty_pid}.socket
+
+      mouse_map right press ungrabbed mouse_select_command_output
     '';
     settings = rec {
       tab_bar_style = "custom";

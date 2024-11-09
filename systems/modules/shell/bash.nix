@@ -70,27 +70,39 @@
     enable = true;
     settings = {
       add_newline = false;
+      #format = "$directory$git_branch$git_status$cmd_duration$line_break$character";
       format = lib.concatStrings [
         "$directory"
-        "$line_break"
+        "$cmd_duration"
         "$nix_shell"
+        "$line_break"
         "$character"
       ];
+
+      # Ensure proper handling of non-printable characters
+      command_timeout = 500;
       scan_timeout = 10;
+
       character = {
-        success_symbol = "➜";
-        error_symbol = "[~>](bold red)";
+        success_symbol = ">";
+        error_symbol = ">(bold red)";
+        vicmd_symbol = "<";
       };
-      package.disabled = false;
-      nodejs.disabled = false;
-      cmd_duration.disabled = false;
-      directory.truncation_length = 3;
-      directory.truncate_to_repo = true;
-      git_branch.symbol = "🌱 ";
+
+      directory = {
+        truncation_length = 3;
+        truncate_to_repo = true;
+        format = "[$path]($style) ";
+      };
+
+      git_branch = {
+        format = "[$symbol$branch]($style) ";
+        symbol = "* ";
+      };
+
       git_status = {
-        ahead = "⇡$${count}";
-        diverged = "⇕⇡$${ahead_count}⇣$${behind_count}";
-        behind = "⇣$${count}";
+        format = "([$all_status$ahead_behind]($style) )";
+        style = "bold red";
       };
     };
   };
