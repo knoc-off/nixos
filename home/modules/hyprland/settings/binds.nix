@@ -188,7 +188,7 @@ in {
         "${mainMod}, A, exec, ${
           mkHdrop {
             command =
-              "firefox --no-remote -P minimal --name firefox-minimal https://poe.com";
+              "firefox --no-remote -P minimal --name firefox-minimal";
             class = "firefox-minimal";
             size = {
               width = 55;
