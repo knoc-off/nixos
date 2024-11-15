@@ -9,9 +9,10 @@
     require("codecompanion").setup({
       strategies = {
         chat = {
-          adapter = "anthropic", -- Switch between: anthropic|copilot|gemini|openai
+          adapter = "copilot", -- Switch between: anthropic|copilot|gemini|openai
           opts = {
-            register = "+" -- Register to use for yanking code
+            register = "+",
+            model = "claude-3-sonnet" -- Specify the Claude model here
           },
         },
         inline = {
