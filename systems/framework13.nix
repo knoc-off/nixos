@@ -48,10 +48,12 @@
     # Sops
     inputs.sops-nix.nixosModules.sops
     {
-      sops.defaultSopsFile = ./secrets/framework13/default.yaml;
-      # This will automatically import SSH keys as age keys
-      sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
-      sops.secrets."ANTHROPIC_API_KEY" = { mode = "0644"; };
+      sops = {
+        defaultSopsFile = ./secrets/framework13/default.yaml;
+        # This will automatically import SSH keys as age keys
+        age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+        secrets."ANTHROPIC_API_KEY" = { mode = "0644"; };
+      };
     }
 
     # Pipewire / Audio
@@ -89,7 +91,14 @@
     };
   };
 
-  virtualisation.waydroid.enable = true;
+  virtualisation = {
+    waydroid.enable = true;
+
+    libvirtd = {
+      enable = true;
+    };
+  };
+  programs.virt-manager.enable = true;
 
   services.minecraft-servers.servers.beez = {
     autoStart = false;
@@ -241,7 +250,7 @@
   users = {
     users.${user} = {
       isNormalUser = lib.mkDefault true;
-      extraGroups = [ "wheel" "networkmanager" "audio" "video" "dialout" ];
+      extraGroups = [ "wheel" "networkmanager" "audio" "video" "dialout" "libvirtd" ];
       initialPassword = "password";
       openssh.authorizedKeys.keys = [ ];
     };

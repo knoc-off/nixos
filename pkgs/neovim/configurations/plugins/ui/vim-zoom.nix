@@ -10,7 +10,7 @@
       commands = true,
       autoresize = {
         enable = true,
-        width = 0,
+        width = ( math.floor(vim.o.columns * 0.9) ),
         height = 0,
         minwidth = 0,
         minheight = 0,
