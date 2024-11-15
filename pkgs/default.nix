@@ -2,39 +2,18 @@
 let
   rustPkgs = pkgs.extend (import inputs.rust-overlay);
 
-  nixvim = inputs.nixvim.legacyPackages.${system};
-
-  #lib.x86_64-linux.helpers.neovim-plugin.mkNeovimPlugin
-  nixvimLib = inputs.nixvim.lib.${system};
-
-  # overlay nixvimLib on lib
-  newLib = lib // nixvimLib;
-
   neovim-plugins = import ./neovim-plugins { inherit (pkgs) vimUtils lua; };
 
   #nvimplugins-overlay = self: super: {
   #  neovim-plugins = super.neovim-plugins.overrideAttrs (oldAttrs: {
 
-
-  customPkgs = import inputs.nixpkgs-unstable {
-    inherit system;
-    config = { allowUnfree = true; };
-
-    overlays = [ inputs.nixneovimplugins.overlays.default neovim-plugins.overlay ];
-
-  };
-
-in
-  rec
-{
+in rec {
   test = pkgs.python3Packages.callPackage ./test { };
 
   rcon-cli = pkgs.callPackage ./rcon-cli { };
 
   grosshack = pkgs.callPackage ./grosshack { };
   blink_led = pkgs.callPackage ./blinkFW13LED { };
-
-
 
   triliumNext = pkgs.callPackage ./triliumNext { };
 
@@ -52,17 +31,71 @@ in
   gate = pkgs.callPackage ./gate { };
   ascii-silhouettify = pkgs.callPackage ./ascii { };
 
-  neovim-nix = {
+  neovim-nix = let
+    #  customPkgs = import inputs.nixpkgs-unstable {
+    #    inherit system;
+    #    config = { allowUnfree = true; };
+    #    overlays = [
+    #      inputs.nixneovimplugins.overlays.default
+    #      neovim-plugins.overlay
+    #      (self: super: {
+    #        vimPlugins = super.vimPlugins
+    #          // (builtins.removeAttrs inputs.nixneovimplugins.packages
+    #            (builtins.attrNames super.vimPlugins)) // {
+    #              # Uncomment and modify the following if you need to override specific plugins
+    #              # codecompanion-nvim =
+    #              #   inputs.nixneovimplugins.packages.vimExtraPlugins.codecompanion-nvim.overrideAttrs (oldAttrs: rec {
+    #              #     buildInputs = oldAttrs.buildInputs or [ ] ++ [ self.stylua ];
+    #              #   });
+    #            };
+    #      })
+    #    ];
+    #  };
+
+    customPkgs = import inputs.nixpkgs-unstable {
+      inherit system;
+      config = { allowUnfree = true; };
+
+      overlays =
+        [ inputs.nixneovimplugins.overlays.default neovim-plugins.overlay ];
+
+    };
+
+    #nixvimLib = inputs.nixvim.lib.${system};
+
+    # overlay nixvimLib on lib
+    #newLib = lib // nixvimLib;
+
+    #mkpl = nixvimLib.helpers.neovim-plugin.mkNeovimPlugin;
+
+    #codeCompanion = mkpl (import ./neovim/plugins/codeCompanion/default.nix {
+    #  lib = newLib;
+    #  pkgs = customPkgs;
+    #});
+
+    # extraPlugins =  [ pkgs.vimExtraPlugins.codecompanion-nvim ];
+
+    nixvim = inputs.nixvim.legacyPackages.${system};
+
+    #lib.x86_64-linux.helpers.neovim-plugin.mkNeovimPlugin
+
+
+  in {
     default = nixvim.makeNixvimWithModule {
       pkgs = customPkgs;
-      module = import ./neovim/configurations;
+      module = {
+        imports = [
+          ./neovim/configurations
+
+          #codeCompanion
+
+        ];
+      };
     };
-    plugins = nixvimLib.helpers.neovim-plugin.mkNeovimPlugin (import ./neovim/plugins/codeCompanion/default.nix { lib = newLib; });
 
+    #inherit codeCompanion nixvimLib customPkgs;
 
-  #lib.x86_64-linux.helpers.neovim-plugin.mkNeovimPlugin
   };
-
 
   website = {
     actix-backend = rustPkgs.callPackage ./website/actix-backend { };
@@ -70,9 +103,10 @@ in
   };
   embeddedRust = rustPkgs.callPackage ./embedded-rust { };
 
-  nx = config_dir: hostname: rustPkgs.callPackage ./nx-script { inherit config_dir hostname; };
+  nx = config_dir: hostname:
+    rustPkgs.callPackage ./nx-script { inherit config_dir hostname; };
 
-  bevy = rustPkgs.callPackage ./bevy/default.nix {};
+  bevy = rustPkgs.callPackage ./bevy/default.nix { };
 
   nerd-ext = import ./svg-tools/icon-extractor {
     inherit pkgs;
@@ -144,7 +178,6 @@ in
         executable = true;
         destination = "/bin/${name}";
       });
-
 
   writeLuaScript = name: script:
     pkgs.writeTextFile {

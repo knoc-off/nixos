@@ -23,8 +23,8 @@
         chat = {
           window = {
             layout = "vertical", -- float|vertical|horizontal|buffer
-            width = 0.45,
-            height = 0.8
+            width = 0.1, -- ${ toString ( 1.0 / 9.0) }, -- does nothing?
+            height = 0.4
           },
           start_in_insert_mode = false
         },
