@@ -3,6 +3,9 @@
     web-devicons.enable = true;
     lsp = {
       enable = true;
+      #  diagnostics = {
+      #    update_in_insert = false;
+      #  };
       servers = {
         bashls.enable = true;
         clangd.enable = true;

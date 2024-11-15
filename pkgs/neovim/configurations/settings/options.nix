@@ -43,6 +43,12 @@
       colorcolumn = "100"; # Columns to highlight
       laststatus = 3; # When to use a status line for the last window
       fileencoding = "utf-8"; # File-content encoding for the current buffer
+      encoding = "utf-8"; # Encoding used for the terminal
+      fileencodings = "utf-8"; # List of file encodings to try when starting to edit a new file
+      fileformats = "unix"; # File formats to try when starting to edit a new file
+      fileformat = "unix"; # File format of the current buffer
+      list = false; # Show invisible characters
+
       termguicolors = true; # Enables 24-bit RGB color in the |TUI|
       spell = false; # Highlight spelling mistakes (local to window)
       wrap = false; # Prevent text from wrapping

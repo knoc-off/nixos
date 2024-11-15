@@ -1,8 +1,14 @@
-{ pkgs, inputs, system, self, upkgs }:
+{ pkgs, lib, inputs, system, self, upkgs }:
 let
   rustPkgs = pkgs.extend (import inputs.rust-overlay);
 
   nixvim = inputs.nixvim.legacyPackages.${system};
+
+  #lib.x86_64-linux.helpers.neovim-plugin.mkNeovimPlugin
+  nixvimLib = inputs.nixvim.lib.${system};
+
+  # overlay nixvimLib on lib
+  newLib = lib // nixvimLib;
 
   neovim-plugins = import ./neovim-plugins { inherit (pkgs) vimUtils lua; };
 
@@ -22,7 +28,6 @@ in
   rec
 {
   test = pkgs.python3Packages.callPackage ./test { };
-
 
   rcon-cli = pkgs.callPackage ./rcon-cli { };
 
@@ -52,6 +57,10 @@ in
       pkgs = customPkgs;
       module = import ./neovim/configurations;
     };
+    plugins = nixvimLib.helpers.neovim-plugin.mkNeovimPlugin (import ./neovim/plugins/codeCompanion/default.nix { lib = newLib; });
+
+
+  #lib.x86_64-linux.helpers.neovim-plugin.mkNeovimPlugin
   };
 
 

@@ -87,6 +87,8 @@
         success_symbol = ">";
         error_symbol = ">(bold red)";
         vicmd_symbol = "<";
+        # error_symbol = "❯";
+        # vicmd_symbol = "❮";
       };
 
       directory = {

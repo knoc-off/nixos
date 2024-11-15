@@ -78,7 +78,7 @@
             };
           };
           # Import custom packages defined in the ./pkgs directory
-        in import ./pkgs { inherit inputs self system pkgs upkgs; };
+        in import ./pkgs { inherit inputs self system pkgs upkgs lib; };
 
     in rec {
       packages = forAllSystems (system: mkPkgs system);
