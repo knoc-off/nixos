@@ -175,7 +175,7 @@ in {
         }"
         "${mainMod}, F, exec, ${
           mkHdrop {
-            command = "${pkgs.cinnamon.nemo}/bin/nemo";
+            command = "${pkgs.nemo}/bin/nemo";
             class = "nemo";
             size = {
               width = 75;
