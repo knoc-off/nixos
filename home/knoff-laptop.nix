@@ -81,7 +81,8 @@
 
   # TODO: move this to someplace more logical
   home.packages = with pkgs; [
-    (llm.withPlugins [self.packages.${pkgs.system}.llm-cmd])
+    (pkgs.python3.withPackages (ps: [ ps.llm self.packages.${pkgs.system}.llm-cmd ]))
+
     (self.packages.${pkgs.system}.ttok)
 
     skypeforlinux # -- skype phone

@@ -23,7 +23,7 @@
 
   home.packages = with pkgs; [
     # move to desktop module?
-    gnome.gnome-disk-utility
+    gnome-disk-utility
 
     #gedit
     f3d
