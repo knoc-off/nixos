@@ -14,6 +14,10 @@
       # Esc to clear search results
       "<esc>" = ":noh<CR>";
 
+      # run CodeCompanionChat toggle
+      "<leader>cc" = ":CodeCompanionChat toggle<CR>";
+      "<leader>co" = ":CodeCompanionChat copilot_o1<CR>";
+
       # fix Y behaviour
       "Y" = "y$";
 
@@ -80,14 +84,11 @@
       mode = "i";
       inherit action key;
     }) {
-        # Move cursor to the end of the line
-        "<C-e>" = "<End>";
+      # Move cursor to the end of the line
+      "<C-e>" = "<End>";
 
-        # Move cursor to the start of the line
-        "<C-a>" = "<Home>";
-
-
-
+      # Move cursor to the start of the line
+      "<C-a>" = "<Home>";
 
     };
 
