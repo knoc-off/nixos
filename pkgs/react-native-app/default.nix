@@ -1,5 +1,4 @@
 { pkgs, lib, ... }:
-
 let
   androidSdk = pkgs.androidenv.androidPkgs_9_0.androidsdk;
 in
