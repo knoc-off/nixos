@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Snake Game Prototype</title>
+    <!-- Include HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.2"></script>
+    <!-- Styles -->
+    <style>
+        .board {
+            display: grid;
+            grid-template-columns: repeat({{ board_size }}, 20px);
+            grid-template-rows: repeat({{ board_size }}, 20px);
+            gap: 1px;
+            margin: 20px auto;
+            width: max-content;
+        }
+        .cell {
+            width: 20px;
+            height: 20px;
+            background-color: #ddd;
+        }
+        .snake {
+            background-color: green;
+        }
+        .food {
+            background-color: red;
+        }
+        body {
+            text-align: center;
+            font-family: Arial, sans-serif;
+        }
+    </style>
+</head>
+<body onload="initializeGame()">
+    <h1>Snake Game Prototype</h1>
+    <div
+        hx-post="/move"
+        hx-trigger="every 300ms, keydown"
+        hx-swap="innerHTML"
+        hx-include="#direction"
+        hx-vals="session_id='{{ session_id }}'"
+        tabindex="0"
+        id="game-container"
+    >
+        <!-- The game board will be loaded here -->
+        {% include "board.html" %}
+    </div>
+    <input type="hidden" name="direction" id="direction" value="{{ serde_json::to_string(&Direction::Right).unwrap() }}">
+    <script>
+        function initializeGame() {
+            document.getElementById('game-container').focus();
+            document.addEventListener('keydown', function(event) {
+                const directionInput = document.getElementById('direction');
+                switch(event.key) {
+                    case 'ArrowUp':
+                        directionInput.value = '"Up"';
+                        break;
+                    case 'ArrowDown':
+                        directionInput.value = '"Down"';
+                        break;
+                    case 'ArrowLeft':
+                        directionInput.value = '"Left"';
+                        break;
+                    case 'ArrowRight':
+                        directionInput.value = '"Right"';
+                        break;
+                }
+            });
+        }
+    </script>
+</body>
+</html>
