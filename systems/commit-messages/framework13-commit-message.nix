@@ -1,3 +1,3 @@
 {
-  system.nixos.label = "moving_to_new_version_of_nixpkgs._24.11__________________________________________________________________________________________________________________________moving_to_new_version_of_nixpkgs._24.11";
+  system.nixos.label = "moving_to_new_version_of_nixpkgs._24.11___________________________________________________________________________________________________________________________________axum_website_with_tailwindcss_";
 }

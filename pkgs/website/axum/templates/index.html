@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Axum HTMX Example</title>
+    <!-- Include htmx from CDN -->
+    <script src="https://unpkg.com/htmx.org@1.9.2"></script>
+</head>
+<body>
+    <h1>Current Count: {{ count }}</h1>
+    <form
+        hx-post="/click"
+        hx-target="body"
+        hx-swap="outerHTML"
+    >
+        <!-- Pass the current count to the server -->
+        <input type="hidden" name="count" value="{{ count }}">
+        <button type="submit">Increment Counter</button>
+    </form>
+</body>
+</html>
