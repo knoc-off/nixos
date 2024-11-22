@@ -150,7 +150,7 @@ in {
         "${mainMod}, W, killactive"
         "${mainMod}, V, togglefloating"
         "${mainMod}, equal, fullscreen"
-        "${mainMod}, O, fakefullscreen"
+        # "${mainMod}, O, fakefullscreen"
 
         "${mainMod}, T, exec, ${
           mkHdrop {

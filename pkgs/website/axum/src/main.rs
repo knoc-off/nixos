@@ -3,27 +3,33 @@ use axum::{
     extract::Form,
     http::StatusCode,
     response::{Html, IntoResponse},
-    routing::{get, post},
+    routing::{get, get_service, post},
     Router,
 };
 use serde::Deserialize;
+use tower_http::services::ServeDir;
 use tracing_subscriber;
 // use sqlx::sqlite::SqlitePool;
 
 #[tokio::main]
 async fn main() {
-    // initialize tracing
     tracing_subscriber::fmt::init();
 
-    // let pool = SqlitePool::connect("sqlite://count.db").await.unwrap();
-
-    // build our application with routes
     let app = Router::new()
         .route("/", get(index))
-        .route("/click", post(handle_click));
+        .route("/click", post(handle_click))
+        .nest_service(
+            "/static",
+            get_service(ServeDir::new("static")).handle_error(|error| async move {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Unhandled internal error: {}", error),
+                )
+            }),
+        );
 
-    // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    println!("listening on http://0.0.0.0:3000");
     axum::serve(listener, app).await.unwrap();
 }
 

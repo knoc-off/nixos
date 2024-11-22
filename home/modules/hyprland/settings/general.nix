@@ -43,7 +43,7 @@ in {
   ];
 
   general = {
-    gaps_in = -1;
+    gaps_in = 2;
     gaps_out = -2;
     border_size = 2;
     "col.active_border" = "0xff${oklchToHex accent1}";
@@ -130,7 +130,7 @@ in {
   dwindle = {
     pseudotile = true;
     preserve_split = true;
-    no_gaps_when_only = true;
+    #no_gaps_when_only = true;
   };
   master = {
     # See https://wiki.hyprland.org/Configuring/Master-Layout/ for more
@@ -138,7 +138,7 @@ in {
     always_center_master = true;
     new_on_top = true;
     #new_is_master = false;
-    no_gaps_when_only = true;
+    #no_gaps_when_only = true;
 
     #new
     special_scale_factor = 0.5;
@@ -180,7 +180,7 @@ in {
 
   windowrulev2 = let
     float = class: (title: "float, class:(${class}), title:(${title})");
-    fakeFullscreen = class: "fakefullscreen, class:(${class})";
+    # fakeFullscreen = class: "fakefullscreen, class:(${class})";
     #size = class: (title: (size: "float, class:(${class}), title:(${title})"));
     window = class: (title: (to: "workspace ${to}, class:(${class}), title:(${title})"));
   in [
@@ -190,7 +190,7 @@ in {
     (float "steam" ".*Browser.*")
     (float "steam" ".*Friends List.*")
     #(window "thunderbird" ".*" "6")
-    (fakeFullscreen "org.kde.falkon")
+    # (fakeFullscreen "org.kde.falkon")
 
     "noborder,class:(ulauncher),title:(.*)"
     "stayfocused, class:^(FreeCAD)$, title:^(Formula editor)$"
@@ -203,10 +203,10 @@ in {
   decoration = {
     rounding = 3; # 10;
     inactive_opacity = 1;
-    drop_shadow = false;
-    shadow_range = 0;
-    "col.shadow" = "0xff${oklchToHex (setLightness 0.2 primary)}";
-    shadow_render_power = 2;
+    # drop_shadow = false;
+    # shadow_range = 0;
+    # "col.shadow" = "0xff${oklchToHex (setLightness 0.2 primary)}";
+    # shadow_render_power = 2;
     dim_inactive = true;
     dim_strength = 0.20;
 
