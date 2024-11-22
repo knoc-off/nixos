@@ -42,6 +42,7 @@ in rec {
   website = {
     actix-backend = rustPkgs.callPackage ./website/actix-backend { };
     portfolio = rustPkgs.callPackage ./website/portfolio { };
+    axum = rustPkgs.callPackage ./website/axum { };
   };
 
   embeddedRust = rustPkgs.callPackage ./embedded-rust { };

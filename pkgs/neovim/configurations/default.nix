@@ -7,7 +7,7 @@
     ./settings/keymappings.nix
 
     # Plugins
-    ./plugins/compleations.nix
+    ./plugins/completions.nix
     ./plugins/productivity/telescope.nix
     ./plugins/ui/bufferline.nix
     #./plugins/ui/which-key.nix

@@ -94,9 +94,7 @@
   virtualisation = {
     waydroid.enable = true;
 
-    libvirtd = {
-      enable = true;
-    };
+    libvirtd = { enable = true; };
   };
   programs.virt-manager.enable = true;
 
@@ -202,7 +200,7 @@
     hostName = hostname;
     firewall = {
       enable = true;
-      allowedTCPPorts = [ 22000 ];
+      allowedTCPPorts = [ 22000 38071 ];
       allowedUDPPorts = [ 21027 ];
       extraCommands = ''
         iptables -A INPUT -p tcp --dport 22000 -s niko.ink -j ACCEPT
@@ -250,7 +248,8 @@
   users = {
     users.${user} = {
       isNormalUser = lib.mkDefault true;
-      extraGroups = [ "wheel" "networkmanager" "audio" "video" "dialout" "libvirtd" ];
+      extraGroups =
+        [ "wheel" "networkmanager" "audio" "video" "dialout" "libvirtd" ];
       initialPassword = "password";
       openssh.authorizedKeys.keys = [ ];
     };
