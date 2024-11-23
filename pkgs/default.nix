@@ -19,7 +19,8 @@ in rec {
   # Add React Native app package
   react-native-app = pkgs.callPackage ./react-native-app {
     androidSdk = pkgs.androidenv.androidPkgs_9_0.sdk;
-    inherit (pkgs.darwin.apple_sdk.frameworks) CoreServices Foundation UIKit Security;
+    inherit (pkgs.darwin.apple_sdk.frameworks)
+      CoreServices Foundation UIKit Security;
     inherit (pkgs) nodejs_20 yarn watchman cocoapods jdk17 gradle;
   };
 
@@ -27,15 +28,33 @@ in rec {
     customPkgs = import inputs.nixpkgs-unstable {
       inherit system;
       config = { allowUnfree = true; };
-      overlays = [ inputs.nixneovimplugins.overlays.default neovim-plugins.overlay ];
+      overlays = [
+        inputs.nixneovimplugins.overlays.default
+        neovim-plugins.overlay
+
+        (final: prev: {
+          neovim-unwrapped = prev.neovim-unwrapped.overrideAttrs (old: {
+            patches = old.patches ++ [
+              # Fix byte index encoding bounds.
+              # - https://github.com/neovim/neovim/pull/30747
+              # - https://github.com/nix-community/nixvim/issues/2390
+              (final.fetchpatch {
+                name = "fix-lsp-str_byteindex_enc-bounds-checking-30747.patch";
+                url =
+                  "https://patch-diff.githubusercontent.com/raw/neovim/neovim/pull/30747.patch";
+                hash = "sha256-2oNHUQozXKrHvKxt7R07T9YRIIx8W3gt8cVHLm2gYhg=";
+              })
+            ];
+          });
+        })
+
+      ];
     };
     nixvim = inputs.nixvim.legacyPackages.${system};
   in {
     default = nixvim.makeNixvimWithModule {
       pkgs = customPkgs;
-      module = {
-        imports = [ ./neovim/configurations ];
-      };
+      module = { imports = [ ./neovim/configurations ]; };
     };
   };
 
@@ -54,17 +73,20 @@ in rec {
 
   nerd-ext = import ./svg-tools/icon-extractor {
     inherit pkgs;
-    fontPath = "${pkgs.fira-code-nerdfont}/share/fonts/truetype/NerdFonts/FiraCodeNerdFontMono-Regular.ttf";
+    fontPath =
+      "${pkgs.fira-code-nerdfont}/share/fonts/truetype/NerdFonts/FiraCodeNerdFontMono-Regular.ttf";
   };
 
   material-icons-ext = import ./svg-tools/icon-extractor {
     inherit pkgs;
-    fontPath = "${pkgs.material-icons}/share/fonts/opentype/MaterialIconsRound-Regular.otf";
+    fontPath =
+      "${pkgs.material-icons}/share/fonts/opentype/MaterialIconsRound-Regular.otf";
   };
 
   fdroid = let
     droidifyApk = pkgs.fetchurl {
-      url = "https://github.com/Droid-ify/client/releases/download/v0.6.3/app-release.apk";
+      url =
+        "https://github.com/Droid-ify/client/releases/download/v0.6.3/app-release.apk";
       sha256 = "sha256-InJOIXMuGdjNcdZQrcKDPJfSQTLFLjQ1QZhUjZppukQ=";
     };
     droidifyEmulator = pkgs.androidenv.emulateApp {
@@ -96,4 +118,3 @@ in rec {
       destination = "/bin/${name}";
     };
 }
-
