@@ -85,7 +85,7 @@
 
     (self.packages.${pkgs.system}.ttok)
 
-    skypeforlinux # -- skype phone
+    skypeforlinux # skype phone
     audio-recorder
 
     evince
@@ -99,6 +99,8 @@
     kdePackages.breeze-icons
     kdePackages.grantleetheme
     libsForQt5.grantleetheme
+
+    gnome.gnome-calculator
 
     telegram-desktop
 
