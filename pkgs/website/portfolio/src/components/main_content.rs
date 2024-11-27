@@ -4,7 +4,7 @@ use crate::components::{ navbar::Navbar, footer::Footer, about_section::AboutSec
 
 #[function_component(MainContent)]
 pub fn main_content() -> Html {
-    let projects = vec![
+    let _projects = vec![
         Project {
             name: "My Website".to_string(),
             image_url: "/static/icons/tiny/webassembly.svg".to_string(),
