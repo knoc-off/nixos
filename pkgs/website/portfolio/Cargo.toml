@@ -9,15 +9,6 @@ edition = "2018"
 #default = ["console_error_panic_hook"]
 
 [dependencies]
-wasm-bindgen = "0.2.92"
-
-# The `console_error_panic_hook` crate provides better debugging of panics by
-# logging them with `console.error`. This is great for development, but requires
-# all the `std::fmt` and `std::panicking` infrastructure, so isn't great for
-# code size when deploying.
-#console_error_panic_hook = { version = "0.1.7", optional = true }
-#noise = "0.9.0"
-#web-sys = { version = "=0.3.65", features = ["CanvasRenderingContext2d", "ImageData"] }
 web-sys = { version = "0.3.65", features = ["Document", "Element", "HtmlCanvasElement", "CanvasRenderingContext2d", "Window"] }
 js-sys = "0.3.65"
 yew = { version = "0.21.0", features = ["csr"] }
@@ -33,6 +24,7 @@ palette = "0.7.6"
 gloo-net = "0.6.0"
 serde = "1.0.204"
 wasm-bindgen-futures = "0.4.42"
+wasm-bindgen = "0.2.95"
 
 
 
