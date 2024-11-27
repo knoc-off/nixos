@@ -14,17 +14,16 @@ js-sys = "0.3.65"
 yew = { version = "0.21.0", features = ["csr"] }
 gloo = "0.11.0"
 reqwasm = "0.5.0"
-yew-mdx = "0.1.0-alpha.1"
 roxmltree = "0.19.0"
 gloo-utils = "0.2.0"
-pulldown-cmark = "0.10.3"
 gloo-timers = "0.3.0"
-yew-router = "0.18.0"
 palette = "0.7.6"
 gloo-net = "0.6.0"
 serde = "1.0.204"
 wasm-bindgen-futures = "0.4.42"
 wasm-bindgen = "0.2.95"
+yew-router = "0.18.0"
+pulldown-cmark = "0.12.2"
 
 
 

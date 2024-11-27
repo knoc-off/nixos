@@ -24,10 +24,9 @@ rustPlatform.buildRustPackage rec {
     binaryen
 
     dart-sass
+    # use old version of sass.  1.77.2
 
-    #(dart-sass.overrideAttrs (old: {
-    #  version = "1.69.5";
-    #}))
+
 
     tailwindcss
 
