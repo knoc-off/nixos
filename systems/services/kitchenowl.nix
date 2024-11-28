@@ -16,7 +16,7 @@
   # Define the OCI container for KitchenOwl
   virtualisation.oci-containers.containers = {
     kitchenowl = {
-      image = "tombursch/kitchenowl:latest";
+      image = "tombursch/kitchenowl@sha256:55f32b2d9a45df1b789b28a6db8d5a5f9ae2aec394892d394f960a9298a43634";
       ports = [ "3043:8080" ];
       environment = {
         JWT_SECRET_KEY = "PLEASE_CHANGE_ME";

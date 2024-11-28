@@ -46,14 +46,14 @@
   # trilium notes:
   # override the trilium package to pull from a different source
 
-  nixpkgs.overlays = [
-    (final: prev: {
-      trilium-server = self.packages.${pkgs.system}.triliumNext;
-    })
-  ] ++ builtins.attrValues outputs.overlays;
+  #nixpkgs.overlays = [
+  #  (final: prev: {
+  #    trilium-server = self.packages.${pkgs.system}.triliumNext;
+  #  })
+  #] ++ builtins.attrValues outputs.overlays;
 
-  # test
-  services.trilium-server.enable = true;
+  ## test
+  #services.trilium-server.enable = true;
 
   #nixpkgs.overlays = ;
 
