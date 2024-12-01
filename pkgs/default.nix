@@ -69,7 +69,7 @@ in rec {
   nx = config_dir: hostname:
     rustPkgs.callPackage ./nx-script { inherit config_dir hostname; };
 
-  bevy = rustPkgs.callPackage ./bevy/default.nix { };
+  bevy = rustPkgs.callPackage ./bevy { };
 
   nerd-ext = import ./svg-tools/icon-extractor {
     inherit pkgs;
