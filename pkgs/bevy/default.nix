@@ -1,50 +1,68 @@
-{ pkgs, rust-overlay }:
+{ pkgs, rustPlatform, lib }:
 
-let
-  # Use rust-overlay to get the Rust toolchain
-  rust-toolchain = (pkgs.extend rust-overlay.overlays.default).rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
-in
-pkgs.mkShell rec {
+rustPlatform.buildRustPackage rec {
+  pname = "bevy-test";
+  version = "0.1.0";
+  src = ./.;
+  cargoLock.lockFile = ./Cargo.lock;
+
   nativeBuildInputs = with pkgs; [
-    # from https://github.com/bevyengine/bevy/blob/main/docs/linux_dependencies.md#Nix
+    # Bevy dependencies
     pkg-config
 
-    # from https://bevyengine.org/learn/book/getting-started/setup/#enable-fast-compiles-optional
+    # For faster compiles
     mold-wrapped
     clang_16
 
-    rust-toolchain
-
-    # From https://github.com/dpc/htmx-sorta/blob/9e101583ec9391127b5bfcbe421e3ede2d627856/flake.nix#L83-L85
-    # This is required to prevent a mangled bash shell in nix develop
-    # see: https://discourse.nixos.org/t/interactive-bash-with-nix-develop-flake/15486
+    # Addressing shell issues (if needed)
     (pkgs.hiPrio pkgs.bashInteractive)
   ];
 
   buildInputs = with pkgs; [
-    # common bevy dependencies
+    # Common Bevy dependencies
     udev
     alsa-lib
     vulkan-loader
 
-    # bevy x11 feature
+    # Bevy
+    pkg-config
+    alsa-lib
+    vulkan-tools
+    vulkan-headers
+    vulkan-loader
+    vulkan-validation-layers
+    udev
+    clang
+    lld
+
+    # Bevy X11 feature
     xorg.libX11
     xorg.libXcursor
     xorg.libXi
     xorg.libXrandr
 
-    # bevy wayland feature
+    # Bevy Wayland feature
     libxkbcommon
     wayland
 
-    # often this becomes necessary sooner or later
-    # openssl
+    openssl
   ];
 
-  # from bevy setup as well
-  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
+  shellHook = ''
+    # Required
+    #export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$ {
+    #  pkgs.lib.makeLibraryPath [ pkgs.alsaLib pkgs.udev pkgs.vulkan-loader ]
+    #}"
+    export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath buildInputs}
+  '';
 
-  # Some environment to make rust-analyzer work correctly (Still the path prefix issue)
-  # See https://github.com/oxalica/rust-overlay/issues/129
-  RUST_SRC_PATH = "${rust-toolchain}/lib/rustlib/src/rust/library";
+  # Set the library path for Bevy's dependencies
+  #export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath buildInputs}
+
+  meta = with lib; {
+    description = "A Bevy program built with Nix and rustPlatform";
+    homepage = "https://example.com";
+    license = licenses.mit;
+    maintainers = with lib.maintainers; [ yourName ];
+  };
 }
