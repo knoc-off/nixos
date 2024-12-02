@@ -55,6 +55,8 @@ rustPlatform.buildRustPackage rec {
 
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
 
+  patches = [ ./remove-dynamic-linking.patch ];
+
   postInstall = ''
     cp -r assets $out/bin/
   '';

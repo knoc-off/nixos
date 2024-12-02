@@ -70,6 +70,9 @@ in rec {
     rustPkgs.callPackage ./nx-script { inherit config_dir hostname; };
 
   bevy = rustPkgs.callPackage ./bevy { };
+  AOC24 = {
+    day1 = rustPkgs.callPackage ./AdventOfCode2024/Day1 { };
+  };
 
   nerd-ext = import ./svg-tools/icon-extractor {
     inherit pkgs;
