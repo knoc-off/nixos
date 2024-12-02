@@ -125,7 +125,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         TextType::Misc,
         Text::new(""),
         TextFont {
-            font: asset_server.load("fonts/FiraSans-Bold.otf"),
+            font: asset_server.load("fonts/FiraSans-Regular.otf"),
             font_size: 10.0,
             ..default()
         },
@@ -143,7 +143,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         TextType::Misc,
         Text::new(""),
         TextFont {
-            font: asset_server.load("fonts/FiraSans-Bold.otf"),
+            font: asset_server.load("fonts/FiraSans-Regular.otf"),
             font_size: 10.0,
             ..default()
         },
@@ -161,7 +161,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         TextType::Difference,
         Text::new(""),
         TextFont {
-            font: asset_server.load("fonts/FiraSans-Bold.otf"),
+            font: asset_server.load("fonts/FiraSans-Regular.otf"),
             font_size: 10.0,
             ..default()
         },
@@ -180,7 +180,7 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         ColumnText { side: ColumnSide::Result }, // idk not great
         Text::new("-"),
         TextFont {
-            font: asset_server.load("fonts/FiraSans-Bold.otf"),
+            font: asset_server.load("fonts/FiraSans-Regular.otf"),
             font_size: 40.0,
             ..default()
         },

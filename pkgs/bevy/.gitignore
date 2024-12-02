@@ -1,5 +1,7 @@
 # Rust
 /target
 
+/assets
+
 # Nix
 /result
