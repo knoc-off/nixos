@@ -59,6 +59,13 @@ rustPlatform.buildRustPackage rec {
 
   postInstall = ''
     cp -r assets $out/bin/
+
+    # link the fonts, ${pkgs.fira}/share/fonts/opentype/FiraCode-Regular.otf
+    mkdir -p $out/bin/assets/fonts
+
+    ln -s ${pkgs.fira}/share/fonts/opentype/FiraCode-Regular.otf \
+      $out/bin/assets/fonts/FiraSans-Regular.otf
+
   '';
 
   postFixup = ''
