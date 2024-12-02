@@ -63,7 +63,7 @@ rustPlatform.buildRustPackage rec {
     # link the fonts, ${pkgs.fira}/share/fonts/opentype/FiraCode-Regular.otf
     mkdir -p $out/bin/assets/fonts
 
-    ln -s ${pkgs.fira}/share/fonts/opentype/FiraCode-Regular.otf \
+    ln -s ${pkgs.fira}/share/fonts/opentype/FiraSans-Regular.otf \
       $out/bin/assets/fonts/FiraSans-Regular.otf
 
   '';
