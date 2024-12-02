@@ -10,7 +10,7 @@
       commands = true,
       autoresize = {
         enable = true,
-        width = ( math.floor(vim.o.columns * 0.9) ),
+        width = ( math.floor(vim.o.columns * 0.7) ),
         height = 0,
         minwidth = 0,
         minheight = 0,
@@ -44,7 +44,7 @@
       callback = function()
         local win_name = vim.fn.bufname()
         if win_name == "copilot-chat" then
-          vim.api.nvim_win_set_width(0, 1) -- Set the width to 1
+          vim.api.nvim_win_set_width(0, 10)
         end
       end
     })
@@ -122,7 +122,7 @@
             __raw = "require('mini.animate').gen_winblend.linear({ from = 40, to = 100 })";
           };
           timing = {
-            __raw = "require('mini.animate').gen_timing.quartic({ easing = 'out', duration = 400, unit = 'total' })";
+            __raw = "require('mini.animate').gen_timing.quartic({ easing = 'out', duration = 100, unit = 'total' })";
           };
         };
       };
