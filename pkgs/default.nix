@@ -1,3 +1,4 @@
+# these packages can oftem be used as devshells but not always
 { pkgs, lib, inputs, system, self, upkgs }:
 let
   rustPkgs = pkgs.extend (import inputs.rust-overlay);
@@ -23,6 +24,21 @@ in rec {
       CoreServices Foundation UIKit Security;
     inherit (pkgs) nodejs_20 yarn watchman cocoapods jdk17 gradle;
   };
+
+  embeddedRust = rustPkgs.callPackage ./embedded-rust { };
+  bevy = rustPkgs.callPackage ./bevy { };
+
+  website = {
+    actix-backend = rustPkgs.callPackage ./website/actix-backend { };
+    portfolio = rustPkgs.callPackage ./website/portfolio { };
+    axum = rustPkgs.callPackage ./website/axum { };
+  };
+  AOC24 = {
+    day1 = rustPkgs.callPackage ./AdventOfCode2024/Day1 { };
+    day2 = rustPkgs.callPackage ./AdventOfCode2024/Day2 { };
+  };
+  nx = config_dir: hostname:
+    rustPkgs.callPackage ./nx-script { inherit config_dir hostname; };
 
   neovim-nix = let
     customPkgs = import inputs.nixpkgs-unstable {
@@ -58,49 +74,33 @@ in rec {
     };
   };
 
-  website = {
-    actix-backend = rustPkgs.callPackage ./website/actix-backend { };
-    portfolio = rustPkgs.callPackage ./website/portfolio { };
-    axum = rustPkgs.callPackage ./website/axum { };
-  };
+  #nerd-ext = import ./svg-tools/icon-extractor {
+  #  inherit pkgs;
+  #  fontPath =
+  #    "${pkgs.fira-code-nerdfont}/share/fonts/truetype/NerdFonts/FiraCodeNerdFontMono-Regular.ttf";
+  #};
 
-  embeddedRust = rustPkgs.callPackage ./embedded-rust { };
+  #material-icons-ext = import ./svg-tools/icon-extractor {
+  #  inherit pkgs;
+  #  fontPath =
+  #    "${pkgs.material-icons}/share/fonts/opentype/MaterialIconsRound-Regular.otf";
+  #};
 
-  nx = config_dir: hostname:
-    rustPkgs.callPackage ./nx-script { inherit config_dir hostname; };
-
-  bevy = rustPkgs.callPackage ./bevy { };
-  AOC24 = {
-    day1 = rustPkgs.callPackage ./AdventOfCode2024/Day1 { };
-  };
-
-  nerd-ext = import ./svg-tools/icon-extractor {
-    inherit pkgs;
-    fontPath =
-      "${pkgs.fira-code-nerdfont}/share/fonts/truetype/NerdFonts/FiraCodeNerdFontMono-Regular.ttf";
-  };
-
-  material-icons-ext = import ./svg-tools/icon-extractor {
-    inherit pkgs;
-    fontPath =
-      "${pkgs.material-icons}/share/fonts/opentype/MaterialIconsRound-Regular.otf";
-  };
-
-  fdroid = let
-    droidifyApk = pkgs.fetchurl {
-      url =
-        "https://github.com/Droid-ify/client/releases/download/v0.6.3/app-release.apk";
-      sha256 = "sha256-InJOIXMuGdjNcdZQrcKDPJfSQTLFLjQ1QZhUjZppukQ=";
-    };
-    droidifyEmulator = pkgs.androidenv.emulateApp {
-      name = "Droidify";
-      package = pkgs.androidenv.androidPkgs_9_0.androidsdk;
-      platformVersion = "28";
-      abiVersion = "x86";
-      systemImageType = "google_apis_playstore";
-      app = droidifyApk;
-    };
-  in droidifyEmulator;
+  #  fdroid = let
+  #    droidifyApk = pkgs.fetchurl {
+  #      url =
+  #        "https://github.com/Droid-ify/client/releases/download/v0.6.3/app-release.apk";
+  #      sha256 = "sha256-InJOIXMuGdjNcdZQrcKDPJfSQTLFLjQ1QZhUjZppukQ=";
+  #    };
+  #    droidifyEmulator = pkgs.androidenv.emulateApp {
+  #      name = "Droidify";
+  #      package = pkgs.androidenv.androidPkgs_9_0.androidsdk;
+  #      platformVersion = "28";
+  #      abiVersion = "x86";
+  #      systemImageType = "google_apis_playstore";
+  #      app = droidifyApk;
+  #    };
+  #  in droidifyEmulator;
 
   writeNuScript = name: script:
     pkgs.writeTextFile rec {
