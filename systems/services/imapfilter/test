@@ -1,0 +1,42 @@
+account = IMAP {
+  server = 'xxxxxxxxxxxx',
+  username = 'xxxxxxxxx',
+  password = 'xxxxxxxxxxxxx',
+}
+emailsFrom = {
+    ["xxxxxxxxxxxx"] = { "Important", "Family" },
+}
+emailsTo = {
+    ["xxxx@example.com"] = { "\\Seen", "Shopping" },
+    ["xxxx@example.com"] = { "\\Seen", "Newsletter", "Not-Important" },
+    ["xxxx@example.com"] = { "Shopping", "\\Seen" },
+    ["xxxx@example.com"] = { "Newsletter" },
+    ["xxxx@example.com"] = { "Shopping", "\\Seen" },
+}
+-- Auto-generated concatenated filter configs
+-- Files are ordered by priority (lower numbers first)
+
+do -- Start of scope for mail-tagger.lua (Priority: 3)
+  -- Contents of mail-tagger.lua:
+  -- Priority: 3
+  -- Function to tag emails based on the sender's email address.
+
+
+  function filter()
+      messages = account.INBOX:select_all()
+      for email, tags in pairs(emailsFrom) do
+          local from_matches = messages:contain_from(email)
+          if from_matches then
+              from_matches:add_flags(tags)
+          end
+      end
+      for email, tags in pairs(emailsTo) do
+          local to_matches = messages:contain_to(email)
+          if to_matches then
+              to_matches:add_flags(tags)
+          end
+      end
+  end
+
+  become_daemon(60 * 2, filter) -- every 2 minutes
+end -- End of scope for mail-tagger.lua
