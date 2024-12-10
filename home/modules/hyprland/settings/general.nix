@@ -39,13 +39,13 @@ in {
   ];
 
   monitor = [
-    ",preferred,auto,1"
+    ",preferred,auto-up,1"
   ];
 
   general = {
-    gaps_in = 2;
-    gaps_out = -2;
-    border_size = 2;
+    gaps_in = -1;
+    gaps_out = -4;
+    border_size = 4;
     "col.active_border" = "0xff${oklchToHex accent1}";
     "col.inactive_border" = "0xff${oklchToHex (setLightness 0.5 neutral)}";
     "col.nogroup_border_active" = "0x00${oklchToHex (setLightness 0.2 primary)}"; # transparent
@@ -207,7 +207,7 @@ in {
     # shadow_range = 0;
     # "col.shadow" = "0xff${oklchToHex (setLightness 0.2 primary)}";
     # shadow_render_power = 2;
-    dim_inactive = true;
+    dim_inactive = false;
     dim_strength = 0.20;
 
     blur = {
