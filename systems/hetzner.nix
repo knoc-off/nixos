@@ -30,7 +30,7 @@
     ./services/nginx.nix
 
     # mail
-    ./services/imapfilter
+    # ./services/imapfilter
 
     # Matrix
     #./services/matrix/dendrite.nix
