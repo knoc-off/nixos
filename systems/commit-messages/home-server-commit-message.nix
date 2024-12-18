@@ -1,3 +1,4 @@
+{ self, ... }:
 {
-  system.nixos.label = "big_restructure___________________________________________________________________________________________________________________________________________________________removed_direnv_with_.gitignore";
+  system.nixos.label = "testing_new_commit_message__________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________________________________big_restructure";
 }

@@ -3,43 +3,76 @@
 
 SDIR="systems"                   # Directory containing Nix files
 CDIR="$SDIR/commit-messages"     # Directory for commit messages
-MAXLEN=200                       # Maximum length for combined message
+MAXLEN=200                       # Maximum total length for the label
 
 mkdir -p "$CDIR"                 # Ensure commit message directory exists
 
 # Function to process commit messages
 process_msg() {
-    local msg="$1" pad="$2"
+    local msg="$1" pad="$2" side="$3"
     msg="${msg#"${msg%%[![:space:]]*}"}"          # Trim leading whitespace
     msg="${msg%"${msg##*[![:space:]]}"}"          # Trim trailing whitespace
     msg="${msg// /_}"                             # Replace spaces with underscores
     msg=$(echo "$msg" | tr -cd 'a-zA-Z0-9:_\.-')  # Remove disallowed characters
     [ ${#msg} -gt "$pad" ] && msg="${msg:0:$pad}" # Truncate if necessary
-    printf "%-${pad}s" "$msg" | tr ' ' '_'        # Pad with underscores
+    if [ "$side" = "right" ]; then
+        # Pad on the right
+        printf "%-${pad}s" "$msg" | tr ' ' '_'
+    else
+        # Pad on the left
+        printf "%${pad}s" "$msg" | tr ' ' '_'
+    fi
 }
 
 # Get and process the global commit message
 gmsg=$(git log -1 --pretty=%s)                    # Fetch global commit message
-gmsg_len=${#gmsg}
-[ "$gmsg_len" -gt "$MAXLEN" ] && gmsg_len=$MAXLEN
-gmsg=$(process_msg "$gmsg" "$gmsg_len")           # Process global message
 
-pad_amt=$((MAXLEN - gmsg_len))                    # Remaining length for file-specific message
+# Assume a placeholder length for the Nix revision expression
+# Let's assume the revision expression will evaluate to a string of 7 characters (typical short git hash)
+# plus the length of "REV_" prefix and padding
+revision_placeholder_length=15  # adjust as necessary
+
+# Remaining length after accounting for the revision placeholder
+remaining_len=$((MAXLEN - revision_placeholder_length))
+
+# Allocate half length to MSG1 and half to MSG2
+half_len=$((remaining_len / 2))
+
+# Adjust lengths if necessary
+gmsg_len=${#gmsg}
+[ "$gmsg_len" -gt "$half_len" ] && gmsg_len=$half_len
+
+# Process the global commit message (MSG1) with padding on the right
+gmsg_processed=$(process_msg "$gmsg" "$half_len" "right")
 
 # Process each Nix file in the systems directory
 for f in "$SDIR"/*.nix; do
     [ -e "$f" ] || continue                       # Skip if no files match
     cmsg=$(git log -1 --pretty=%s -- "$f")        # Fetch file-specific commit message
-    # Process file-specific message if space allows
-    [ "$pad_amt" -gt 0 ] && fmsg=$(process_msg "$cmsg" "$pad_amt") || fmsg=""
-    combo_msg="$fmsg$gmsg"                        # Combine messages
+
+    cmsg_len=${#cmsg}
+    [ "$cmsg_len" -gt "$half_len" ] && cmsg_len=$half_len
+
+    # Process file-specific message (MSG2) with padding on the left
+    cmsg_processed=$(process_msg "$cmsg" "$half_len" "left")
+
+    # The Nix expression for the revision code remains as is
+    # Combine messages
     fname="${f##*/}"                              # Extract filename
     cfile="$CDIR/${fname%.*}-commit-message.nix"  # Commit message file path
-    # Write combined message to the commit message file
-    printf "{\n  system.nixos.label = \"%s\";\n}" "$combo_msg" > "$cfile"
+
+    # Write the label into the Nix file
+    cat > "$cfile" << EOF
+{ self, ... }:
+{
+  system.nixos.label = "${gmsg_processed}" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "${cmsg_processed}";
+}
+EOF
+
     # Stage the file if it has changes
     git diff --quiet "$cfile" || git add "$cfile"
 done
 
 # Amend the current commit to include staged changes if any
 git diff --cached --quiet || git commit --amend --no-edit
+

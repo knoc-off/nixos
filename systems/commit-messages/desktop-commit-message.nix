@@ -1,3 +1,4 @@
+{ self, ... }:
 {
-  system.nixos.label = "moving_to_new_version_of_nixpkgs._24.11___________________________________________________________________________________________________________________________________removed_direnv_with_.gitignore";
+  system.nixos.label = "testing_new_commit_message__________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________moving_to_new_version_of_nixpkgs._24.11";
 }
