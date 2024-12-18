@@ -100,7 +100,7 @@
     kdePackages.grantleetheme
     libsForQt5.grantleetheme
 
-    gnome.gnome-calculator
+    gnome-calculator
 
     telegram-desktop
 

@@ -232,9 +232,10 @@ in {
         # playerctl, music control
         ", XF86AudioNext, exec, ${pkgs.playerctl}/bin/playerctl next"
         ", XF86AudioPrev, exec, ${pkgs.playerctl}/bin/playerctl previous"
-        ", XF86AudioPlay, exec, ${pkgs.playerctl}/bin/playerctl play"
-        ", XF86AudioPause, exec, ${pkgs.playerctl}/bin/playerctl pause"
+        ", XF86AudioPlay, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
+        ", XF86AudioPause, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
         ", XF86AudioPlayPause, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
+
 
         (fancyfocus "up" "u" ) # keybind, and direction
         (fancyfocus "down" "d" )
