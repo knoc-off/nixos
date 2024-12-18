@@ -12,7 +12,8 @@
     # additional packages to add to gjs's runtime
     extraPackages = with pkgs; [
       gtksourceview
-      webkitgtk
+      # webkitgtk
+      webkitgtk_6_0
       accountsservice
     ];
   };

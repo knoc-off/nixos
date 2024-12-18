@@ -8,8 +8,8 @@
     };
 
     clipboard = {
-      # Use system clipboard
-      register = "unnamed";
+      # clipboard
+      register = "unnamed"; # is the selection register
 
       providers.wl-copy.enable = true;
     };

@@ -61,10 +61,11 @@
           "<CR>" = ''
             cmp.mapping.confirm({
               behavior = cmp.ConfirmBehavior.Insert,
-              select = true,
+              select = false,
             })
           '';
         };
+
 
         sources = [
           {name = "path";}

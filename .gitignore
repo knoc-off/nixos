@@ -2,3 +2,5 @@
 .remoteInstallOptions
 systems/hardware/fingerprint/calib-data.bin
 result
+
+.direnv
