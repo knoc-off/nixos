@@ -1,10 +1,9 @@
-
 use axum::{
     extract::Extension,
-    routing::{get, get_service},
-    Router,
     http::StatusCode,
     response::{Html, IntoResponse},
+    routing::{get, get_service, post},
+    Router,
 };
 
 use axum::response::Response;
@@ -52,9 +51,10 @@ async fn main() {
         .await
         .expect("Failed to connect to the database");
 
-
     let app = Router::new()
         .route("/", get(home))
+        .route("/api/data", get(handlers::api::get_data_table))
+        .route("/api/data", post(handlers::api::add_data))
         .route(&format!("/{}", secret_endpoint), get(hidden))
         .nest_service(
             "/static",
@@ -73,4 +73,3 @@ async fn main() {
         .expect("Failed to bind to port 3000");
     axum::serve(listener, app).await.unwrap();
 }
-

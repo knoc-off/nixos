@@ -19,6 +19,15 @@ in {
 
     '')
 
+    (pkgs.writeShellScriptBin "ping" ''
+      # replace the ping command if no input is given just ping 1.1.1.1
+      if [ -z "$1" ]; then
+        ${pkgs.toybox}/bin/ping 1.1.1.1
+      else
+        ${pkgs.toybox}/bin/ping $@
+      fi
+    '')
+
     (self.packages.${pkgs.system}.nx config_dir hostname)
 
     (pkgs.writeShellScriptBin "test-print" ''
@@ -27,7 +36,7 @@ in {
 
     (pkgs.writeShellScriptBin "isvpn" ''
       nmcli connection show --active | grep -q "wgnord" && echo true || echo false
-      '')
+    '')
 
     # might get rid of this.
     (pkgs.writeShellScriptBin "wrap-codeblocks" ''

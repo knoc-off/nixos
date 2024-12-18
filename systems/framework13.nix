@@ -74,6 +74,13 @@
     #./modules/yubikey.nix
   ];
 
+
+  programs.direnv = {
+    enable = true;
+    silent = true;
+  };
+
+
   services.minecraft-server-suite = {
     enable = true;
 
