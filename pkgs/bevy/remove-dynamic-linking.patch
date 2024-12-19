@@ -1,9 +1,0 @@
---- a/Cargo.toml
-+++ b/Cargo.toml
-@@ -4,7 +4,7 @@ version = "0.1.0"
- edition = "2021"
-
- [dependencies]
--bevy = { version = "0.15.0", features = ["dynamic_linking"] }
-+bevy = { version = "0.15.0" }
- rand = "0.8.5"

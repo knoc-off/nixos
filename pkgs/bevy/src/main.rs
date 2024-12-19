@@ -1,4 +1,5 @@
 use bevy::{prelude::*, render::texture::{Extent3d, TextureDimension, TextureFormat, Image}};
+use bevy_image::image;
 
 fn setup(
     mut commands: Commands,

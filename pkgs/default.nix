@@ -72,6 +72,10 @@ in rec {
       pkgs = customPkgs;
       module = { imports = [ ./neovim/configurations ]; };
     };
+    minimal = nixvim.makeNixvimWithModule {
+      pkgs = customPkgs;
+      module = { imports = [ ./neovim/configurations/minimal.nix ]; };
+    };
   };
 
   #nerd-ext = import ./svg-tools/icon-extractor {

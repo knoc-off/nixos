@@ -41,7 +41,7 @@ in {
               (builtins.fetchurl {
                 url =
                   "https://raw.githubusercontent.com/hyprwm/contrib/main/hdrop/hdrop";
-                sha256 = "06bcqqy139xsiyff490sfmz2p7di55naky8n642c7rzcmq36brf2";
+                sha256 = "02d1pcgqn707z9b91yf22l477idn8pdd3dpls3yz3ivdj6idx18r";
               }));
 
             args = lib.concatStringsSep " " (lib.filter (x: x != "") [
