@@ -7,6 +7,11 @@ rustPlatform.buildRustPackage rec {
   cargoLock.lockFile = ./Cargo.lock;
 
   nativeBuildInputs = with pkgs; [
+
+    # for wrapping the binary
+    makeWrapper
+    patchelf
+
     # Bevy dependencies
     pkg-config
 
@@ -48,13 +53,32 @@ rustPlatform.buildRustPackage rec {
     openssl
   ];
 
-  shellHook = ''
-    # Required
-    #export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$ {
-    #  pkgs.lib.makeLibraryPath [ pkgs.alsaLib pkgs.udev pkgs.vulkan-loader ]
-    #}"
-    export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath buildInputs}
+  LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
+
+  #patches = [ ./remove-dynamic-linking.patch ];
+
+  postPatch = ''
+      substituteInPlace Cargo.toml \
+        --replace 'bevy = { version = "0.15.0", features = ["dynamic_linking"] }' 'bevy = { version = "0.15.0" }'
+
   '';
+
+  postInstall = ''
+    # link the fonts, ${pkgs.fira}/share/fonts/opentype/FiraCode-Regular.otf
+    mkdir -p $out/bin/assets/fonts
+
+    ln -s ${pkgs.fira}/share/fonts/opentype/FiraSans-Regular.otf \
+      $out/bin/assets/fonts/FiraSans-Regular.otf
+
+  '';
+
+  postFixup = ''
+    patchelf --set-rpath ${pkgs.lib.makeLibraryPath buildInputs} $out/bin/${pname}
+  '';
+
+    # Disables dynamic linking when building with Nix
+  cargoBuildOptions = [ "--no-default-features" ];
+
 
   # Set the library path for Bevy's dependencies
   #export LD_LIBRARY_PATH=${pkgs.lib.makeLibraryPath buildInputs}

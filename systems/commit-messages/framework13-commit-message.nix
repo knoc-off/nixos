@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "testing_new_commit_message__________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "________________________________________________________lots_of_small_changes_mainly_cleanup";
+  system.nixos.label = "cleanup_and_bevy____________________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "____________________________________________________________________________cleanup_and_bevy";
 }

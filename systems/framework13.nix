@@ -75,6 +75,24 @@
   ];
 
 
+
+
+  # create a service to run at startup each boot. run wgnord c de to connect to the vpn
+  systemd.services.wgnord = {
+    description = "WireGuard NordVPN";
+    after = [ "network.target" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.wgnord}/bin/wgnord c de";
+    };
+  };
+
+
+
+
+
+
   programs.direnv = {
     enable = true;
     silent = true;
