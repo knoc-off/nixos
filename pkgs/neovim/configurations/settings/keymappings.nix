@@ -63,7 +63,7 @@
       inherit action key;
     }) {
       # Allows replacing with clipboard without replacing clip
-      "p" = ''"_dP'';
+      #"p" = ''"_dP''; # for whatever reason this breaks rust analyzer when pasting too much.
 
       # Repeat Last Command on selected line
       "." = ":normal .<CR>";
@@ -92,7 +92,7 @@
 
     };
 
-  in helpers.keymaps.mkKeymaps { options.silent = true; } (normal ++ visual);
+  in helpers.keymaps.mkKeymaps { options.silent = true; } (normal ++ visual ++ insert);
 
   plugins.which-key = {
     registrations = {

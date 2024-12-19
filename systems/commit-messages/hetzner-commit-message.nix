@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "cleanup_and_bevy____________________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________________________imap_filter_removed";
+  system.nixos.label = "fixed_stupid_rust_analyzer_error____________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________________________imap_filter_removed";
 }
