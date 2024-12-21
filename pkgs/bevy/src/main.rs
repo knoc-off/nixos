@@ -59,6 +59,7 @@ fn setup(
             color: LinearRgba::BLUE,
             mouse_pos: Vec2::new(0.0, 0.0),
             time: time.elapsed_secs_f64() as f32,
+            aspect_ratio: width / height,
         })),
         Transform::default()
             .with_scale(Vec3::new(width, height, 1.0))
@@ -74,6 +75,8 @@ struct CustomMaterial {
     mouse_pos: Vec2,
     #[uniform(2)]
     time: f32,
+    #[uniform(3)]
+    aspect_ratio: f32,
 }
 
 impl Material2d for CustomMaterial {
