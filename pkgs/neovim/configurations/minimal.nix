@@ -3,8 +3,8 @@
     # settings
     ./settings/highlights.nix
     ./settings/options.nix
-    ./settings/autocommands.nix
-    ./settings/keymappings.nix
+    #./settings/autocommands.nix
+    #./settings/keymappings.nix
 
     ## Plugins
     ./plugins/completions.nix
@@ -20,14 +20,12 @@
 
     ./plugins/productivity/copilot.nix
 
-
     ### lsp
     ./plugins/ls
 
     ## Theme
     ./themes
   ];
-
 
   viAlias = true;
   vimAlias = true;

@@ -315,7 +315,9 @@ name = "bevy-test"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy_render",
  "rand",
+ "rand_chacha",
 ]
 
 [[package]]

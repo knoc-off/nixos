@@ -5,7 +5,7 @@ with lib;
 let
   cfg = config.services.minecraft-server-suite;
 
-  # Generate RCON configuration for a server
+  # Generate RCON configuration for a server, local-only
   generateRconConfig = serverName: server: {
     "${serverName}" = {
       address = "127.0.0.1:${toString server.serverProperties."rcon.port"}";
