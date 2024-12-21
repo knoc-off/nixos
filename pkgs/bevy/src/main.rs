@@ -1,72 +1,83 @@
-use bevy::{prelude::*, render::texture::{Extent3d, TextureDimension, TextureFormat, Image}};
-use bevy_image::image;
+use bevy::{
+    prelude::*,
+    reflect::TypePath,
+    render::render_resource::{AsBindGroup, ShaderRef},
+    sprite::{Material2d, Material2dPlugin},
+};
+
+const SHADER_ASSET_PATH: &str = "shaders/animate_shader.wgsl";
+
+fn main() {
+    App::new()
+        .add_plugins((
+            DefaultPlugins,
+            Material2dPlugin::<CustomMaterial>::default(),
+        ))
+        .add_systems(Startup, setup)
+        .add_systems(Update, update_shader)
+        .run();
+}
+
+fn update_shader(
+    mut materials: ResMut<Assets<CustomMaterial>>,
+    time: Res<Time>,
+    window: Query<&Window>,
+    material_query: Query<&MeshMaterial2d<CustomMaterial>>,
+) {
+    let window = window.single();
+    let cursor_position = window.cursor_position().unwrap_or_default();
+    
+    let normalized_pos = Vec2::new(
+        (cursor_position.x / window.width()) * 2.0 - 1.0,
+        (cursor_position.y / window.height()) * 2.0 - 1.0,
+    );
+
+    for mesh_material in material_query.iter() {
+        if let Some(material) = materials.get_mut(&mesh_material.0) {
+            material.time = time.elapsed_secs_f64() as f32;
+            material.mouse_pos = normalized_pos;
+        }
+    }
+}
 
 fn setup(
     mut commands: Commands,
-    mut images: ResMut<Assets<Image>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
     mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<CustomMaterial>>,
+    time: Res<Time>,
+    window: Query<&Window>,
 ) {
-    // Define texture dimensions
-    let width = 256;
-    let height = 256;
+    commands.spawn(Camera2d);
 
-    // Generate your Worley noise pixel data (implement this yourself)
-    let pixel_data = generate_worley_noise(width, height);
+    let window = window.single();
+    let width = window.width();
+    let height = window.height();
 
-    // Create the Image
-    let size = Extent3d {
-        width,
-        height,
-        depth_or_array_layers: 1,
-    };
-    let texture = Image::new(
-        size,
-        TextureDimension::D2,
-        pixel_data,
-        TextureFormat::Rgba8UnormSrgb,
-    );
-
-    // Add the Image to Bevy's asset storage
-    let texture_handle = images.add(texture);
-
-    // Create a material with the texture
-    let material_handle = materials.add(StandardMaterial {
-        base_color_texture: Some(texture_handle.clone()),
-        // Customize other material properties as needed
-        ..Default::default()
-    });
-
-    // Create a mesh to apply the material to
-    let mesh_handle = meshes.add(Mesh::from(shape::Plane { size: 2.0 }));
-
-    // Spawn an entity with the mesh and material
-    commands.spawn_bundle(PbrBundle {
-        mesh: mesh_handle,
-        material: material_handle,
-        transform: Transform::from_xyz(0.0, 0.0, 0.0),
-        ..Default::default()
-    });
-
-    // Add a camera
-    commands.spawn_bundle(Camera3dBundle {
-        transform: Transform::from_xyz(0.0, 0.0, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-        ..Default::default()
-    });
-
-    // Add a light source for 3D rendering
-    commands.spawn_bundle(DirectionalLightBundle {
-        ..Default::default()
-    });
+    commands.spawn((
+        Mesh2d(meshes.add(Rectangle::default())),
+        MeshMaterial2d(materials.add(CustomMaterial {
+            color: LinearRgba::BLUE,
+            mouse_pos: Vec2::new(0.0, 0.0),
+            time: time.elapsed_secs_f64() as f32,
+        })),
+        Transform::default()
+            .with_scale(Vec3::new(width, height, 1.0))
+            .with_translation(Vec3::new(0.0, 0.0, 0.0)),
+    ));
 }
 
-// Your implementation of the Worley noise algorithm
-fn generate_worley_noise(width: u32, height: u32) -> Vec<u8> {
-    // Implement the algorithm and return pixel data in RGBA8 format
-    let mut pixel_data = Vec::with_capacity((width * height * 4) as usize);
-
-    // ... your code here ...
-
-    pixel_data
+#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
+struct CustomMaterial {
+    #[uniform(0)]
+    color: LinearRgba,
+    #[uniform(1)]
+    mouse_pos: Vec2,
+    #[uniform(2)]
+    time: f32,
 }
 
+impl Material2d for CustomMaterial {
+    fn fragment_shader() -> ShaderRef {
+        SHADER_ASSET_PATH.into()
+    }
+}

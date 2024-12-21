@@ -74,9 +74,6 @@
     #./modules/yubikey.nix
   ];
 
-
-
-
   # create a service to run at startup each boot. run wgnord c de to connect to the vpn
   systemd.services.wgnord = {
     description = "WireGuard NordVPN";
@@ -88,16 +85,10 @@
     };
   };
 
-
-
-
-
-
   programs.direnv = {
     enable = true;
     silent = true;
   };
-
 
   services.minecraft-server-suite = {
     enable = true;
@@ -117,7 +108,7 @@
   };
 
   virtualisation = {
-    waydroid.enable = true;
+    waydroid.enable = false;
 
     libvirtd = {
       enable = true;
@@ -128,37 +119,41 @@
   };
   programs.virt-manager.enable = true;
 
-  services.minecraft-servers.servers.beez = {
-    autoStart = false;
-    package = pkgs.fabricServers.fabric-1_21_1;
-    jvmOpts = "-Xmx8G -Xms8G";
-    enable = true;
-    serverProperties = {
-      server-port = 25565;
-      difficulty = 2; # 0: peaceful, 1: easy, 2: normal, 3: hard
-      motd = "minecraft";
-      spawn-protection = 0;
+  services.minecraft-servers.servers = let
+    commonOptions = {
+      autoStart = false;
+      jvmOpts = "-Xmx8G -Xms8G";
+      enable = true;
+      serverProperties = {
+        server-port = 25565;
+        difficulty = 2; # 0: peaceful, 1: easy, 2: normal, 3: hard
+        motd = "minecraft";
+        spawn-protection = 0;
 
-      # Rcon configuration
-      enable-rcon = true;
-      "rcon.password" = "123"; # doesn't have to be secure, local only
-      "rcon.port" = 25570;
-    };
-    symlinks = {
-      "ops.json" = pkgs.writeTextFile {
-        name = "ops.json";
-        text = ''
-          [
-            {
-              "uuid": "c9e17620-4cc1-4d83-a30a-ef320cc099e6",
-              "name": "knoc_off",
-              "level": 4,
-              "bypassesplayerlimit": true
-            }
-          ]
-        '';
+        # Rcon configuration
+        enable-rcon = true;
+        "rcon.password" = "123"; # doesn't have to be secure, local only
+        "rcon.port" = 25570;
+      };
+      symlinks = {
+        "ops.json" = pkgs.writeTextFile {
+          name = "ops.json";
+          text = ''
+            [
+              {
+                "uuid": "c9e17620-4cc1-4d83-a30a-ef320cc099e6",
+                "name": "knoc_off",
+                "level": 4,
+                "bypassesplayerlimit": true
+              }
+            ]
+          '';
+        };
       };
     };
+  in {
+    beez = commonOptions // { package = pkgs.fabricServers.fabric-1_21_1; };
+    test = commonOptions // { package = pkgs.fabricServers.fabric-1_21_4; };
   };
 
   security.sudo.extraRules = [{
