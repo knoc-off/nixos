@@ -1,7 +1,8 @@
 # Rust
 /target
 
-/assets
+# Fonts
+/assets/fonts
 
 # Nix
 /result

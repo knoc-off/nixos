@@ -32,10 +32,13 @@ fn update_shader(
         (cursor_position.y / window.height()) * 2.0 - 1.0,
     );
 
+
     for mesh_material in material_query.iter() {
         if let Some(material) = materials.get_mut(&mesh_material.0) {
             material.time = time.elapsed_secs_f64() as f32;
             material.mouse_pos = normalized_pos;
+
+            material.aspect_ratio = window.width() / window.height();
         }
     }
 }

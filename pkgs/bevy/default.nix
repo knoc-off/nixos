@@ -1,4 +1,4 @@
-{ pkgs, rustPlatform, lib }:
+{ pkgs, rustPlatform, lib, wasm ? false }:
 
 rustPlatform.buildRustPackage rec {
   pname = "bevy-test";
@@ -55,20 +55,25 @@ rustPlatform.buildRustPackage rec {
 
   LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath buildInputs;
 
-  #patches = [ ./remove-dynamic-linking.patch ];
-
   postPatch = ''
-      substituteInPlace Cargo.toml \
-        --replace 'bevy = { version = "0.15.0", features = ["dynamic_linking"] }' 'bevy = { version = "0.15.0" }'
+      #substituteInPlace Cargo.toml \
+      #  --replace 'bevy = { version = "0.15.0", features = ["dynamic_linking"] }' 'bevy = { version = "0.15.0" }'
+
+      # remove the string  "dynamic_linking" from the features array
+      sed -i 's/"dynamic_linking",//g' Cargo.toml
+      sed -i 's/"dynamic_linking"//g' Cargo.toml
 
   '';
 
   postInstall = ''
     # link the fonts, ${pkgs.fira}/share/fonts/opentype/FiraCode-Regular.otf
-    mkdir -p $out/bin/assets/fonts
+    #mkdir -p $out/bin/assets
 
-    ln -s ${pkgs.fira}/share/fonts/opentype/FiraSans-Regular.otf \
-      $out/bin/assets/fonts/FiraSans-Regular.otf
+    cp -r assets $out/bin/assets
+
+
+    #ln -s ${pkgs.fira}/share/fonts/opentype/FiraSans-Regular.otf \
+    #  $out/bin/assets/fonts/FiraSans-Regular.otf
 
   '';
 
