@@ -98,7 +98,7 @@ in {
           text = pkgs.lib.generators.toYAML {} rconConfigs;
         };
       in pkgs.writeShellScriptBin "mcrcon" ''
-        ${cfg.rcon.package}/bin/gorcon --config ${rconFile} -e $@
+        ${cfg.rcon.package}/bin/gorcon --config ${rconFile} -e "$@"
       '')
     ];
 
