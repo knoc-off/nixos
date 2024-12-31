@@ -13,9 +13,9 @@ let
           opts = { stream = false }, -- Stream not supported
           schema = {
             model = {
-              default = 'o1-preview',
+              default = 'o1',
               choices = {
-                'o1-preview',
+                'o1',
                 'o1-mini',
               },
             },
