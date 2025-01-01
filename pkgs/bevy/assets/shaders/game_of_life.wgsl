@@ -1,50 +1,64 @@
-#import bevy_sprite::mesh2d_vertex_output::VertexOutput
+@group(0) @binding(0) var input: texture_storage_2d<r32float, read>;
+@group(0) @binding(1) var output: texture_storage_2d<r32float, write>;
 
-@group(2) @binding(0) var<uniform> time: f32;
-@group(2) @binding(1) var previous_state: texture_2d<f32>;
-@group(2) @binding(2) var state_sampler: sampler;
-
-fn get_cell(uv: vec2<f32>) -> f32 {
-    return textureSample(previous_state, state_sampler, uv).r;
+fn hash(value: u32) -> u32 {
+    var state = value;
+    state = state ^ 2747636419u;
+    state = state * 2654435769u;
+    state = state ^ state >> 16u;
+    state = state * 2654435769u;
+    state = state ^ state >> 16u;
+    state = state * 2654435769u;
+    return state;
 }
 
-fn count_neighbors(uv: vec2<f32>) -> i32 {
-    let pixel_size = vec2<f32>(1.0 / 512.0);
-    var count = 0;
-    
-    for (var i = -1; i <= 1; i++) {
-        for (var j = -1; j <= 1; j++) {
-            if (i == 0 && j == 0) { continue; }
-            
-            let neighbor = uv + vec2<f32>(
-                f32(i) * pixel_size.x,
-                f32(j) * pixel_size.y
-            );
-            
-            count += i32(get_cell(neighbor) > 0.5);
-        }
-    }
-    
-    return count;
+fn randomFloat(value: u32) -> f32 {
+    return f32(hash(value)) / 4294967295.0;
 }
 
-@fragment
-fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
-    let current = get_cell(mesh.uv);
-    let neighbors = count_neighbors(mesh.uv);
-    
-    var next = 0.0;
-    if (current > 0.5) {
-        // Cell is alive
-        if (neighbors == 2 || neighbors == 3) {
-            next = 1.0;
-        }
+@compute @workgroup_size(8, 8, 1)
+fn init(@builtin(global_invocation_id) invocation_id: vec3<u32>, @builtin(num_workgroups) num_workgroups: vec3<u32>) {
+    let location = vec2<i32>(i32(invocation_id.x), i32(invocation_id.y));
+
+    let randomNumber = randomFloat(invocation_id.y << 16u | invocation_id.x);
+    let alive = randomNumber > 0.9;
+    let color = vec4<f32>(f32(alive));
+
+    textureStore(output, location, color);
+}
+
+fn is_alive(location: vec2<i32>, offset_x: i32, offset_y: i32) -> i32 {
+    let value: vec4<f32> = textureLoad(input, location + vec2<i32>(offset_x, offset_y));
+    return i32(value.x);
+}
+
+fn count_alive(location: vec2<i32>) -> i32 {
+    return is_alive(location, -1, -1) +
+           is_alive(location, -1,  0) +
+           is_alive(location, -1,  1) +
+           is_alive(location,  0, -1) +
+           is_alive(location,  0,  1) +
+           is_alive(location,  1, -1) +
+           is_alive(location,  1,  0) +
+           is_alive(location,  1,  1);
+}
+
+@compute @workgroup_size(8, 8, 1)
+fn update(@builtin(global_invocation_id) invocation_id: vec3<u32>) {
+    let location = vec2<i32>(i32(invocation_id.x), i32(invocation_id.y));
+
+    let n_alive = count_alive(location);
+
+    var alive: bool;
+    if (n_alive == 3) {
+        alive = true;
+    } else if (n_alive == 2) {
+        let currently_alive = is_alive(location, 0, 0);
+        alive = bool(currently_alive);
     } else {
-        // Cell is dead
-        if (neighbors == 3) {
-            next = 1.0;
-        }
+        alive = false;
     }
-    
-    return vec4<f32>(next, next, next, 1.0);
+    let color = vec4<f32>(f32(alive));
+
+    textureStore(output, location, color);
 }
