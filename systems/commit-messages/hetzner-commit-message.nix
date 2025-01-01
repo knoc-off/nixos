@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "small_changes_shader_is_now_warp____________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________________________imap_filter_removed";
+  system.nixos.label = "buffer_swapping_in_bevy_shader______________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________________________imap_filter_removed";
 }

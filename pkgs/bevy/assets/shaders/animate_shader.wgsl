@@ -41,5 +41,14 @@ fn fragment(mesh: VertexOutput) -> @location(0) vec4<f32> {
     // Sample texture with warped coordinates
     let texture_color = textureSample(base_color_texture, base_color_sampler, swirl_uv);
 
+
+    // crosshair in the center,
+    let crosshair = 0.001;
+    let crosshair_x = abs(center_corr.x - uv_corr.x) < crosshair;
+    let crosshair_y = abs(center_corr.y - uv_corr.y) < crosshair;
+    if crosshair_x || crosshair_y {
+        //return vec4<f32>(1.0, 0.0, 0.0, 1.0);
+    }
+
     return texture_color; // * material_color;
 }
