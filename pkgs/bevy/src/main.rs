@@ -67,6 +67,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<CustomMaterial>>,
+    asset_server: Res<AssetServer>,
     time: Res<Time>,
     window: Query<&Window>,
 ) {
@@ -82,7 +83,7 @@ fn setup(
             mouse_pos: Vec2::ZERO,
             time: time.elapsed_secs_f64() as f32,
             aspect_ratio: window.width() / window.height(),
-            color_texture: None,
+            color_texture: Some(asset_server.load("textures/image.png")),
         })),
         Transform::default()
             .with_scale(Vec3::new(10., 10., 1.0))

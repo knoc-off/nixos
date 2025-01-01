@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "updated_bevy_animate_shader_________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________________________________big_restructure";
+  system.nixos.label = "small_changes_shader_is_now_warp____________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________________________________big_restructure";
 }
