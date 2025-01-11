@@ -64,6 +64,7 @@
 
     # Window manager
     self.nixosModules.windowManager.hyprland
+    self.nixosModules.desktop.totem # media player
 
     # Android emulation
     #./modules/virtualisation/waydroid.nix

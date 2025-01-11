@@ -28,6 +28,22 @@ in {
       fi
     '')
 
+    # not sure if this works w/o sudo.
+    (pkgs.writeShellScriptBin "vpn" ''
+      if [ -z "$1" ]; then
+        if isvpn; then
+          echo "VPN is already connected"
+        else
+          echo "VPN is not connected"
+          wgnord c de
+        fi
+        exit 0
+      fi
+
+      wgnord c $@
+
+    '')
+
     (self.packages.${pkgs.system}.nx config_dir hostname)
 
     (pkgs.writeShellScriptBin "test-print" ''

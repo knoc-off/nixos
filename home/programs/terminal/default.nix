@@ -13,7 +13,6 @@ in
 {
   imports = [
     ./kitty
-    ./shell
     ./programs/btop.nix
   ];
 

@@ -1,236 +1,332 @@
 use bevy::{
     prelude::*,
     window::WindowResized,
-    reflect::TypePath,
-    render::render_resource::{AsBindGroup, ShaderRef},
-    sprite::{Material2d, Material2dPlugin},
+    render::{
+        extract_resource::{ExtractResource, ExtractResourcePlugin},
+        render_asset::{RenderAssetUsages, RenderAssets},
+        render_graph::{self, RenderGraph, RenderLabel},
+        render_resource::{binding_types::texture_storage_2d, *},
+        renderer::{RenderContext, RenderDevice},
+        texture::GpuImage,
+        Render, RenderApp, RenderSet,
+    },
 };
+use std::borrow::Cow;
 
-use bevy_render::render_resource::Extent3d;
-use bevy_render::render_resource::TextureDimension;
-use bevy_render::render_resource::TextureFormat;
-use bevy_render::render_asset::RenderAssetUsages;
-use bevy_render::render_resource::TextureUsages;
+/// This example uses a shader source file from the assets subdirectory
+const SHADER_ASSET_PATH: &str = "shaders/game_of_life.wgsl";
 
+const DISPLAY_FACTOR: u32 = 4;
+const SIZE: (u32, u32) = (1280 / DISPLAY_FACTOR, 720 / DISPLAY_FACTOR);
+const WORKGROUP_SIZE: u32 = 8;
 
-const SHADER_ASSET_PATH: &str = "shaders/animate_shader.wgsl";
-
-#[derive(Resource)]
-struct AnimateTextures {
-    texture_a: Handle<Image>,
-    texture_b: Handle<Image>,
-    initial_texture: Handle<Image>,
-}
-
-// Modify main to include initialization
 fn main() {
     App::new()
+        .insert_resource(ClearColor(Color::BLACK))
         .add_plugins((
-            DefaultPlugins,
-            Material2dPlugin::<CustomMaterial>::default(),
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        resolution: (
+                            (SIZE.0 * DISPLAY_FACTOR) as f32,
+                            (SIZE.1 * DISPLAY_FACTOR) as f32,
+                        )
+                            .into(),
+                        // uncomment for unthrottled FPS
+                        // present_mode: bevy::window::PresentMode::AutoNoVsync,
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .set(ImagePlugin::default_nearest()),
+            GameOfLifeComputePlugin,
         ))
         .add_systems(Startup, setup)
-        .add_systems(Update, (
-            initialize_render_textures,
-            resize_rectangle_system,
-            update_shader,
-            switch_textures,
-        ).chain())
+        .add_systems(Update, switch_textures)
         .run();
 }
 
-
-fn resize_rectangle_system(
-    mut resize_reader: EventReader<WindowResized>,
-    mut rect_query: Query<&mut Transform, With<Mesh2d>>,
-) {
-    for e in resize_reader.read() {
-        // Update the rectangle to fill the entire window
-        for mut transform in &mut rect_query {
-            // Scale a unit rectangle to window size
-            transform.scale = Vec3::new(e.width, e.height, 1.0);
-
-            // Position it at the center (0, 0)
-            transform.translation = Vec3::new(0.0, 0.0, 0.0);
-
-            println!("Resized to: {} x {}", e.width, e.height);
-        }
-    }
-}
-
-
-fn update_shader(
-    mut materials: ResMut<Assets<CustomMaterial>>,
-    time: Res<Time>,
-    window: Query<&Window>,
-    material_query: Query<&MeshMaterial2d<CustomMaterial>>,
-) {
-    let window = window.single();
-    let cursor_position = window.cursor_position().unwrap_or_default();
-
-    let normalized_pos = Vec2::new(
-        cursor_position.x / window.width(),
-        cursor_position.y / window.height(),
-    );
-
-    for mesh_material in material_query.iter() {
-        if let Some(material) = materials.get_mut(&mesh_material.0) {
-            material.time = time.elapsed_secs_f64() as f32;
-            material.mouse_pos = normalized_pos;
-            material.aspect_ratio = window.width() / window.height();
-        }
-    }
-}
-
-fn initialize_render_textures(
-    mut images: ResMut<Assets<Image>>,
-    textures: Res<AnimateTextures>,
-    mut initialized: Local<bool>,
-) {
-    if *initialized {
-        return;
-    }
-
-    // First clone the initial image data
-    let initial_image = if let Some(img) = images.get(&textures.initial_texture) {
-        if img.texture_descriptor.size.width == 0 {
-            return; // Image not loaded yet
-        }
-        img.clone()
-    } else {
-        return; // Image not available yet
-    };
-
-    // Then update both render textures
-    images.insert(&textures.texture_a.clone(), initial_image.clone());
-    images.insert(&textures.texture_b.clone(), initial_image);
-
-    *initialized = true;
-}
-
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<CustomMaterial>>,
-    mut images: ResMut<Assets<Image>>,
-    asset_server: Res<AssetServer>,
-    time: Res<Time>,
-    window: Query<&Window>,
-) {
-    commands.spawn(Camera2d);
-    let window = window.single();
-
-    // Load initial image
-    let initial_texture = asset_server.load("textures/image.png");
-
-    // Create render textures for ping-pong
-    let mut render_texture = Image::new_fill(
+fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+    let mut image = Image::new_fill(
         Extent3d {
-            width: window.width() as u32,
-            height: window.height() as u32,
+            width: SIZE.0,
+            height: SIZE.1,
             depth_or_array_layers: 1,
         },
         TextureDimension::D2,
         &[0, 0, 0, 255],
-        TextureFormat::Rgba8Unorm,
+        TextureFormat::R32Float,
         RenderAssetUsages::RENDER_WORLD,
     );
+    image.texture_descriptor.usage =
+        TextureUsages::COPY_DST | TextureUsages::STORAGE_BINDING | TextureUsages::TEXTURE_BINDING;
+    let image0 = images.add(image.clone());
+    let image1 = images.add(image);
 
-    // Set up texture usage flags
-    render_texture.texture_descriptor.usage =
-        TextureUsages::COPY_DST
-        | TextureUsages::STORAGE_BINDING
-        | TextureUsages::TEXTURE_BINDING
-        | TextureUsages::RENDER_ATTACHMENT;
-
-    let texture_a = images.add(render_texture.clone());
-    let texture_b = images.add(render_texture);
-
-    commands.insert_resource(AnimateTextures {
-        texture_a: texture_a.clone(),
-        texture_b: texture_b.clone(),
-        initial_texture: initial_texture.clone(),
-    });
-
-    // Spawn the main sprite with initial texture
     commands.spawn((
-        Mesh2d(meshes.add(Rectangle::default())),
-        MeshMaterial2d(materials.add(CustomMaterial {
-            color: LinearRgba::BLUE,
-            mouse_pos: Vec2::ZERO,
-            time: time.elapsed_secs_f64() as f32,
-            aspect_ratio: window.width() / window.height(),
-            color_texture: Some(initial_texture),
-        })),
-        Transform::default()
-            .with_scale(Vec3::new(10., 10., 1.0))
-            .with_translation(Vec3::ZERO),
+        Sprite {
+            image: image0.clone(),
+            custom_size: Some(Vec2::new(SIZE.0 as f32, SIZE.1 as f32)),
+            ..default()
+        },
+        Transform::from_scale(Vec3::splat(DISPLAY_FACTOR as f32)),
     ));
+    commands.spawn(Camera2d);
+
+    commands.insert_resource(GameOfLifeImages {
+        texture_a: image0,
+        texture_b: image1,
+    });
 }
 
 
-fn switch_textures(
-    textures: Res<AnimateTextures>,
+fn resize_system(
+    mut resize_reader: EventReader<WindowResized>,
+    mut sprite_query: Query<(&mut Sprite, &mut Transform)>,
     mut images: ResMut<Assets<Image>>,
-    mut materials: ResMut<Assets<CustomMaterial>>,
-    material_query: Query<&MeshMaterial2d<CustomMaterial>>,
+    game_of_life_images: Res<GameOfLifeImages>,
 ) {
-    for mesh_material in material_query.iter() {
-        if let Some(material) = materials.get_mut(&mesh_material.0) {
-            // Get the current texture
-            let current_texture = if material.color_texture == Some(textures.texture_a.clone()) {
-                &textures.texture_a
-            } else {
-                &textures.texture_b
-            };
+    for e in resize_reader.read() {
+        let width = e.width as u32;
+        let height = e.height as u32;
 
-            // Clone the current frame first
-            let current_image = if let Some(img) = images.get(current_texture) {
-                img.clone()
-            } else {
-                continue;
-            };
-
-            // Determine next texture
-            let next_texture = if current_texture == &textures.texture_a {
-                &textures.texture_b
-            } else {
-                &textures.texture_a
-            };
-
-            // Update the next texture with current frame
-            images.insert(&next_texture.clone(), current_image);
-
-            // Switch the material to use the next texture
-            material.color_texture = Some(next_texture.clone());
+        // Update sprite size and position
+        for (mut sprite, mut transform) in &mut sprite_query {
+            sprite.custom_size = Some(Vec2::new(e.width, e.height));
+            transform.scale = Vec3::ONE;
+            transform.translation = Vec3::ZERO;
         }
+
+        // Create new image with new dimensions
+        let mut new_image = Image::new_fill(
+            Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            TextureDimension::D2,
+            &[0, 0, 0, 255],
+            TextureFormat::R32Float,
+            RenderAssetUsages::RENDER_WORLD,
+        );
+        new_image.texture_descriptor.usage =
+            TextureUsages::COPY_DST
+            | TextureUsages::STORAGE_BINDING
+            | TextureUsages::TEXTURE_BINDING;
+
+        // Update both textures with new dimensions
+        images.insert(game_of_life_images.texture_a.clone(), new_image.clone());
+        images.insert(game_of_life_images.texture_b.clone(), new_image);
     }
 }
 
 
-#[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
-struct CustomMaterial {
-
-    #[uniform(0)]
-    time: f32,
-
-    #[uniform(1)]
-    aspect_ratio: f32,
-
-    #[texture(2)]
-    #[sampler(3)]
-    color_texture: Option<Handle<Image>>,
-
-    #[uniform(4)]
-    mouse_pos: Vec2,
-
-    #[uniform(5)]
-    color: LinearRgba,
-
+// Switch texture to display every frame to show the one that was written to most recently.
+fn switch_textures(images: Res<GameOfLifeImages>, mut sprite: Single<&mut Sprite>) {
+    if sprite.image == images.texture_a {
+        sprite.image = images.texture_b.clone_weak();
+    } else {
+        sprite.image = images.texture_a.clone_weak();
+    }
 }
 
-impl Material2d for CustomMaterial {
-    fn fragment_shader() -> ShaderRef {
-        SHADER_ASSET_PATH.into()
+
+#[derive(Resource, Clone, ExtractResource)]
+struct GameOfLifeImages {
+    texture_a: Handle<Image>,
+    texture_b: Handle<Image>,
+}
+
+#[derive(Resource)]
+struct GameOfLifeImageBindGroups([BindGroup; 2]);
+
+#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
+struct GameOfLifeLabel;
+
+struct GameOfLifeComputePlugin;
+
+impl Plugin for GameOfLifeComputePlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins(ExtractResourcePlugin::<GameOfLifeImages>::default());
+        let render_app = app.sub_app_mut(RenderApp);
+        render_app.add_systems(
+            Render,
+            prepare_bind_group.in_set(RenderSet::PrepareBindGroups),
+        );
+
+        let mut render_graph = render_app.world_mut().resource_mut::<RenderGraph>();
+        render_graph.add_node(GameOfLifeLabel, GameOfLifeNode::default());
+        render_graph.add_node_edge(GameOfLifeLabel, bevy::render::graph::CameraDriverLabel);
+    }
+
+    fn finish(&self, app: &mut App) {
+        let render_app = app.sub_app_mut(RenderApp);
+        render_app.init_resource::<GameOfLifePipeline>();
+    }
+}
+
+fn prepare_bind_group(
+    mut commands: Commands,
+    pipeline: Res<GameOfLifePipeline>,
+    gpu_images: Res<RenderAssets<GpuImage>>,
+    game_of_life_images: Res<GameOfLifeImages>,
+    render_device: Res<RenderDevice>,
+) {
+    let view_a = gpu_images.get(&game_of_life_images.texture_a).unwrap();
+    let view_b = gpu_images.get(&game_of_life_images.texture_b).unwrap();
+    let bind_group_0 = render_device.create_bind_group(
+        None,
+        &pipeline.texture_bind_group_layout,
+        &BindGroupEntries::sequential((&view_a.texture_view, &view_b.texture_view)),
+    );
+    let bind_group_1 = render_device.create_bind_group(
+        None,
+        &pipeline.texture_bind_group_layout,
+        &BindGroupEntries::sequential((&view_b.texture_view, &view_a.texture_view)),
+    );
+    commands.insert_resource(GameOfLifeImageBindGroups([bind_group_0, bind_group_1]));
+}
+
+#[derive(Resource)]
+struct GameOfLifePipeline {
+    texture_bind_group_layout: BindGroupLayout,
+    init_pipeline: CachedComputePipelineId,
+    update_pipeline: CachedComputePipelineId,
+}
+
+impl FromWorld for GameOfLifePipeline {
+    fn from_world(world: &mut World) -> Self {
+        let render_device = world.resource::<RenderDevice>();
+        let texture_bind_group_layout = render_device.create_bind_group_layout(
+            "GameOfLifeImages",
+            &BindGroupLayoutEntries::sequential(
+                ShaderStages::COMPUTE,
+                (
+                    texture_storage_2d(TextureFormat::R32Float, StorageTextureAccess::ReadOnly),
+                    texture_storage_2d(TextureFormat::R32Float, StorageTextureAccess::WriteOnly),
+                ),
+            ),
+        );
+        let shader = world.load_asset(SHADER_ASSET_PATH);
+        let pipeline_cache = world.resource::<PipelineCache>();
+        let init_pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
+            label: None,
+            layout: vec![texture_bind_group_layout.clone()],
+            push_constant_ranges: Vec::new(),
+            shader: shader.clone(),
+            shader_defs: vec![],
+            entry_point: Cow::from("init"),
+            zero_initialize_workgroup_memory: false,
+        });
+        let update_pipeline = pipeline_cache.queue_compute_pipeline(ComputePipelineDescriptor {
+            label: None,
+            layout: vec![texture_bind_group_layout.clone()],
+            push_constant_ranges: Vec::new(),
+            shader,
+            shader_defs: vec![],
+            entry_point: Cow::from("update"),
+            zero_initialize_workgroup_memory: false,
+        });
+
+        GameOfLifePipeline {
+            texture_bind_group_layout,
+            init_pipeline,
+            update_pipeline,
+        }
+    }
+}
+
+enum GameOfLifeState {
+    Loading,
+    Init,
+    Update(usize),
+}
+
+struct GameOfLifeNode {
+    state: GameOfLifeState,
+}
+
+impl Default for GameOfLifeNode {
+    fn default() -> Self {
+        Self {
+            state: GameOfLifeState::Loading,
+        }
+    }
+}
+
+impl render_graph::Node for GameOfLifeNode {
+    fn update(&mut self, world: &mut World) {
+        let pipeline = world.resource::<GameOfLifePipeline>();
+        let pipeline_cache = world.resource::<PipelineCache>();
+
+        match self.state {
+            GameOfLifeState::Loading => {
+                if let CachedPipelineState::Ok(_) = pipeline_cache.get_compute_pipeline_state(pipeline.init_pipeline) {
+                    self.state = GameOfLifeState::Init;
+                }
+            }
+            GameOfLifeState::Init => {
+                if let CachedPipelineState::Ok(_) = pipeline_cache.get_compute_pipeline_state(pipeline.update_pipeline) {
+                    self.state = GameOfLifeState::Update(1);
+                }
+            }
+            GameOfLifeState::Update(0) => {
+                self.state = GameOfLifeState::Update(1);
+            }
+            GameOfLifeState::Update(1) => {
+                self.state = GameOfLifeState::Update(0);
+            }
+            GameOfLifeState::Update(_) => unreachable!(),
+        }
+    }
+
+    fn run(
+        &self,
+        _graph: &mut render_graph::RenderGraphContext,
+        render_context: &mut RenderContext,
+        world: &World,
+    ) -> Result<(), render_graph::NodeRunError> {
+        let bind_groups = &world.resource::<GameOfLifeImageBindGroups>().0;
+        let pipeline_cache = world.resource::<PipelineCache>();
+        let pipeline = world.resource::<GameOfLifePipeline>();
+
+        let mut pass = render_context
+            .command_encoder()
+            .begin_compute_pass(&ComputePassDescriptor::default());
+
+        // Get window size for workgroup calculation
+        let window = world.resource::<ExtractedWindows>().windows[0];
+        let width = (window.physical_width as f32 / window.scale_factor) as u32;
+        let height = (window.physical_height as f32 / window.scale_factor) as u32;
+
+        match self.state {
+            GameOfLifeState::Loading => {}
+            GameOfLifeState::Init => {
+                let init_pipeline = pipeline_cache
+                    .get_compute_pipeline(pipeline.init_pipeline)
+                    .unwrap();
+                pass.set_bind_group(0, &bind_groups[0], &[]);
+                pass.set_pipeline(init_pipeline);
+                pass.dispatch_workgroups(
+                    (width + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE,
+                    (height + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE,
+                    1
+                );
+            }
+            GameOfLifeState::Update(index) => {
+                let update_pipeline = pipeline_cache
+                    .get_compute_pipeline(pipeline.update_pipeline)
+                    .unwrap();
+                pass.set_bind_group(0, &bind_groups[index], &[]);
+                pass.set_pipeline(update_pipeline);
+                pass.dispatch_workgroups(
+                    (width + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE,
+                    (height + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE,
+                    1
+                );
+            }
+        }
+
+        Ok(())
     }
 }

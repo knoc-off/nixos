@@ -15,6 +15,7 @@
       force-window = true;
       ytdl-format = "bestvideo+bestaudio";
       cache-default = 4000000;
+      hwdec = "auto";
     };
     scripts = with pkgs.mpvScripts; [
       sponsorblock
