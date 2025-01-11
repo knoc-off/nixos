@@ -12,6 +12,7 @@
 
     ./programs/terminal/shell
 
+    ./programs/media/video/mpv.nix
 
     ./programs/filemanager/yazi.nix
 

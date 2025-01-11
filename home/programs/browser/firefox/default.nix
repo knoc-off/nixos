@@ -67,15 +67,15 @@ in rec {
         ];
       };
     };
-    profiles."testing" = {
+    profiles."testing2" = {
       isDefault = false;
       id = 2;
-      name = "testing";
+      name = "testing2";
 
-      extensions = import ./addons { inherit addons; };
-      userChrome =
-        import ./userChrome.nix { inherit theme colorLib firefox-csshacks; };
-    };
+      #extensions = import ./addons { inherit addons; };
+      #userChrome =
+      #  import ./userChrome.nix { inherit theme colorLib firefox-csshacks; };
+     };
   };
 
   # auto generate the desktop entries for each profile

@@ -29,7 +29,8 @@ in {
           gap ? null, # Gap from screen edge in pixels
           size ? null, # Window size as { width = int; height = int; }
           insensitive ? false, # Case-insensitive class name matching
-          position ? null, # Window position: "top", "bottom", "left", or "right"
+          position ? null
+          , # Window position: "top", "bottom", "left", or "right"
           verbose ? false, # Show detailed notifications
           version ? false # Print version information
           }:
@@ -72,7 +73,6 @@ in {
           }
         '';
 
-
         execute_lua_in_nvim = pkgs.writeShellScriptBin "execute_lua_in_nvim" ''
           # Function to execute Lua code in Neovim
           execute_lua_in_nvim() {
@@ -108,7 +108,6 @@ in {
           }
         '';
 
-
         # This script defines a function `screenshot-to-text` that captures a screenshot, processes the image,
         # extracts text from it using OCR, and copies the extracted text to the clipboard.
         #
@@ -126,10 +125,52 @@ in {
           }
         '';
 
-        fancyfocusscript = import ./window-move.nix { inherit pkgs self;  };
+        fancyfocusscript = import ./window-move.nix { inherit pkgs self; };
+
+        #{
+        #    "address": "0x3e036f40",
+        #    "mapped": true,
+        #    "hidden": false,
+        #    "at": [0, 9],
+        #    "size": [1463, 1495],
+        #    "workspace": {
+        #        "id": 8,
+        #        "name": "8"
+        #    },
+        #    "floating": false,
+        #    "pseudo": false,
+        #    "monitor": 0,
+        #    "class": "kitty",
+        #    "title": "nixos - 73648",
+        #    "initialClass": "kitty",
+        #    "initialTitle": "kitty",
+        #    "pid": 7675,
+        #    "xwayland": false,
+        #    "pinned": false,
+        #    "fullscreen": 0,
+        #    "fullscreenClient": 0,
+        #    "grouped": ["0x3e036f40", "0x3e068e60"],
+        #    "tags": [],
+        #    "swallowing": "0x0",
+        #    "focusHistoryID": 0
+        #}
+
+        fancyGroupScript = writeNuScript "fancyGroup" ''
+          def main [group: string] {
+            let data = (hyprctl activewindow -j | from json)
+            # get grouped data, if 0 then create group. else move out of group.
+            let grouped = ($data.grouped | length)
+            if ($grouped == 0) {
+              hyprctl dispatch togglegroup
+            } else {
+              hyprctl dispatch moveoutofgroup
+            }
+          }
+      '';
 
         binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
-        fancyfocus = key: dir: "${mainMod}, ${key}, exec, ${fancyfocusscript}/bin/fancyfocus ${dir}";
+        fancyfocus = key: dir:
+          "${mainMod}, ${key}, exec, ${fancyfocusscript}/bin/fancyfocus ${dir}";
         ws = binding "${mainMod}" "workspace";
         resizeactive = binding "${mainMod} CTRL" "resizeactive";
         mvactive = binding "${mainMod} ALT" "moveactive";
@@ -143,9 +184,11 @@ in {
         "${mainMod}, Backslash, layoutmsg, swapwithmaster master"
         #", XF86Fn, layoutmsg, addmaster"
 
-        ''${mainMod}, B, exec, ${notify-send} "$(${acpi} -b | awk '{print $3, $4}')"''
+        ''
+          ${mainMod}, B, exec, ${notify-send} "$(${acpi} -b | awk '{print $3, $4}')"''
 
-        "${mainMod}, Tab, focuscurrentorlast"
+        "${mainMod}, Tab, changegroupactive, f"
+
         "${mainMod}, Delete, exit"
         "${mainMod}, W, killactive"
         "${mainMod}, V, togglefloating"
@@ -155,15 +198,15 @@ in {
         "${mainMod}, T, exec, ${
           mkHdrop {
             command = let
-              kittyConfig = "~/${config.xdg.configFile."kitty/kitty.conf".target}";
+              kittyConfig =
+                "~/${config.xdg.configFile."kitty/kitty.conf".target}";
               sedRules = [
                 #"/map ctrl+t new_os_window_with_cwd/d"
-                ''/map ctrl+t new_os_window_with_cwd/c\\map ctrl+t new_window_with_cwd\n''
+                "/map ctrl+t new_os_window_with_cwd/c\\\\map ctrl+t new_window_with_cwd\\n"
                 #''$ a\\map ctrl+q close_window''
               ];
               sedCommand = "sed '${builtins.concatStringsSep ";" sedRules}'";
-            in
-              "kitty --class kitty-dropterm --config <(${sedCommand} ${kittyConfig})";
+            in "kitty --class kitty-dropterm --config <(${sedCommand} ${kittyConfig})";
             class = "kitty-dropterm";
             size = {
               width = 75;
@@ -187,8 +230,7 @@ in {
         }"
         "${mainMod}, A, exec, ${
           mkHdrop {
-            command =
-              "firefox --no-remote -P minimal --name firefox-minimal";
+            command = "firefox --no-remote -P minimal --name firefox-minimal";
             class = "firefox-minimal";
             size = {
               width = 55;
@@ -225,7 +267,12 @@ in {
         ", End, exec, ${moveRelativeTo}/bin/mv 1" # end sits where my right arrow is
 
         # group
-        "${mainMod}, G, togglegroup, 0"
+        #"${mainMod}, G, togglegroup, 0"
+        "${mainMod}, G, exec, ${fancyGroupScript}/bin/fancyGroup 0"
+        # if active window is not a group then create group, else  moveoutofgroup
+
+
+        # lockscreen
         "${mainMod}, L, exec, swaylock-custom 0 120x6 10 0"
         #"${mainMod}, asciitilde, exec,  ${pkgs.kitty}/bin/kitty nx rt"
 
@@ -236,11 +283,10 @@ in {
         ", XF86AudioPause, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
         ", XF86AudioPlayPause, exec, ${pkgs.playerctl}/bin/playerctl play-pause"
 
-
-        (fancyfocus "up" "u" ) # keybind, and direction
-        (fancyfocus "down" "d" )
-        (fancyfocus "left" "l" )
-        (fancyfocus "right" "r" )
+        (fancyfocus "up" "u") # keybind, and direction
+        (fancyfocus "down" "d")
+        (fancyfocus "left" "l")
+        (fancyfocus "right" "r")
 
         (resizeactive "k" "0 -20")
         (resizeactive "j" "0 20")
