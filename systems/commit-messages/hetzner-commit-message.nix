@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "a_few_changes_mostly_to_the_desktop_environment_added_totem_media_player____________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________________________imap_filter_removed";
+  system.nixos.label = "hypreland_popup_windows_size________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________________________imap_filter_removed";
 }

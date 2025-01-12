@@ -21,13 +21,16 @@ in
     tiv # terminal image viewer
     jq # json parser
     fd # better find
+    qview # image viewer
   ];
 
   programs = {
 
     zoxide.enable = true;
 
-    feh = { enable = true; };
+    #feh = {
+    #  enable = true;
+    #};
 
     eza = {
       enable = true;

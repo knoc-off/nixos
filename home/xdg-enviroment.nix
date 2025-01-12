@@ -21,7 +21,6 @@ let
       "x-gzip" = [ "org.gnome.FileRoller.desktop" ];
       "x-bzip2" = [ "org.gnome.FileRoller.desktop" ];
 
-
       # Example: Use kitty-neovim for markdown
       # "markdown" = [ "kitty-neovim.desktop" ];
 
@@ -61,15 +60,15 @@ let
     };
 
     image = {
-      bmp = [ "feh.desktop" ];
-      gif = [ "feh.desktop" ];
-      jpeg = [ "feh.desktop" ];
-      png = [ "feh.desktop" ];
-      "svg+xml" = [ "feh.desktop" ];
-      tiff = [ "feh.desktop" ];
+      bmp = [ "qview.desktop" ];
+      gif = [ "qview.desktop" ];
+      jpeg = [ "qview.desktop" ];
+      png = [ "qview.desktop" ];
+      "svg+xml" = [ "qview.desktop" ];
+      tiff = [ "qview.desktop" ];
 
-      # "x-icns" = [ "feh.desktop" ];
-      # "x-portable-pixmap" = [ "feh.desktop" ];
+      # "x-icns" = [ "qview.desktop" ];
+      # "x-portable-pixmap" = [ "qview.desktop" ];
     };
 
     inode = {
