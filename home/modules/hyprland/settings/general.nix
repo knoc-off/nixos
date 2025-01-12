@@ -177,13 +177,17 @@ in {
     (w "Spotify" 7)
     #"fakefullscreen, org.kde.falkon"
     #"workspace 7, title:Spotify"
+    # minumum size for floating windows
   ];
 
+  # rules
+  # size [x] [y]	> resizes a floating window (x,y -> (</>)int or (</>)%, < -> maximum size, > -> minimum size, e.g. >20%, 100 or <500)
   windowrulev2 = let
     float = class: (title: "float, class:(${class}), title:(${title})");
     # fakeFullscreen = class: "fakefullscreen, class:(${class})";
     #size = class: (title: (size: "float, class:(${class}), title:(${title})"));
-    window = class: (title: (to: "workspace ${to}, class:(${class}), title:(${title})"));
+    #window = class: (title: (to: "workspace ${to}, class:(${class}), title:(${title})"));
+    #size = class: (title: (size: "size, class:(${class}), title:(${title}), size:(${size})"));
   in [
     #"idleinhibit always, class:(kitty), title:(.*)"
     #"idleinhibit focus, class:(firefox), title:(.*Youtube.*)"
@@ -193,8 +197,17 @@ in {
     #(window "thunderbird" ".*" "6")
     # (fakeFullscreen "org.kde.falkon")
 
+    # windowrulev2 = opacity 0.5 0.5,floating:1
+
+    # make all floating windows have a minimum size of 40% width, and 30% height 3:4
+    #(size ".*" ".*" "<40%, <30%")
+
     "noborder,class:(ulauncher),title:(.*)"
     "stayfocused, class:^(FreeCAD)$, title:^(Formula editor)$"
+    # any window that is floating, and contains the word open in the title, will have a minimum size of 40% width, and 30% height
+    "size 60% 45%, floating:1, title:(.*Open.*|.*Upload.*|.*Save.*|.*Select.*|.*Choose.*)"
+
+    #"opacity 0.5 0.5, floating:1"
 
     # windowrulev2 = stayfocused, class:^(pinentry-) # fix pinentry losing focus
 
