@@ -188,6 +188,10 @@ in {
           ${mainMod}, B, exec, ${notify-send} "$(${acpi} -b | awk '{print $3, $4}')"''
 
         "${mainMod}, Tab, changegroupactive, f"
+        # mainmod + left / right changegroupactive f/b
+        "${mainMod}, LEFT, changegroupactive, b"
+        "${mainMod}, RIGHT, changegroupactive, b"
+
 
         "${mainMod}, Delete, exit"
         "${mainMod}, W, killactive"
@@ -254,7 +258,8 @@ in {
         }"
 
         # launcher
-        "${mainMod}, SPACE, exec, ${pkgs.ulauncher}/bin/ulauncher" # this launcher sucks
+        #"${mainMod}, SPACE, exec, ${pkgs.ulauncher}/bin/ulauncher" # this launcher sucks
+        "${mainMod}, Space, global, kando:example-menu"
 
         # screenshot
         ", Print, exec, ${pkgs.gscreenshot}/bin/gscreenshot -sc"
@@ -269,6 +274,8 @@ in {
         # group
         #"${mainMod}, G, togglegroup, 0"
         "${mainMod}, G, exec, ${fancyGroupScript}/bin/fancyGroup 0"
+        # mod + shift + g = lockactivegroup toggle
+        "${mainMod} SHIFT, G, lockactivegroup, toggle"
         # if active window is not a group then create group, else  moveoutofgroup
 
 

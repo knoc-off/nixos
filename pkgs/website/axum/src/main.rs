@@ -15,7 +15,7 @@ use sqlx::SqlitePool;
 use tracing_subscriber;
 
 mod handlers;
-use handlers::{hidden::hidden, home::home};
+use handlers::{hidden::hidden, home::home, not_found::not_found };
 
 use askama::Template;
 
@@ -57,6 +57,8 @@ async fn main() {
         .route("/api/data", get(handlers::api::get_data_table))
         .route("/api/data", post(handlers::api::add_data))
         .route(&format!("/{}", secret_endpoint), get(hidden))
+        .route("/404", get(not_found))
+        .fallback(get(not_found))
         .nest_service(
             "/static",
             get_service(ServeDir::new("static")).handle_error(|error| async move {

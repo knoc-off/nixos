@@ -177,6 +177,12 @@
   };
 
   services = {
+    gvfs.enable = true;
+    devmon.enable = true;
+    udisks2.enable = true;
+    upower.enable = true;
+    accounts-daemon.enable = true;
+
     # Pretty much just needed this for Steam
     flatpak.enable = true;
 
@@ -208,9 +214,25 @@
 
     libinput.enable = true;
 
-    logind.extraConfig = ''
-      HandlePowerKey=lock
+    # Add udev rules for auto-mounting and launching Nemo
+    udev.extraRules = ''
+
+      # Auto decrypt and mount when device is plugged in
+      ACTION=="add", SUBSYSTEM=="block", ENV{ID_FS_UUID}=="07133380-9f74-41e4-8b04-2b05fb3d94ab", \
+      RUN+="${pkgs.cryptsetup}/bin/cryptsetup luksOpen --key-file /etc/secrets/drives/fa6b949.key $env{DEVNAME} fa6b949", \
+      RUN+="${pkgs.toybox}/bin/mount /dev/mapper/fa6b949 /mnt/fa6b949"
+
     '';
+
+  };
+
+    # Create mount point directory
+  system.activationScripts = {
+    createMountPoint = {
+      text = ''
+        mkdir -p /mnt/fa6b949
+      '';
+    };
   };
 
   #environment = {

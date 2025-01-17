@@ -7,6 +7,7 @@
     #gamescope
     #protontricks
   ];
+  programs.steam.enable = true;
 }
 # package installation, Steam, libraries
 

@@ -26,7 +26,11 @@ in rec {
   };
 
   embeddedRust = rustPkgs.callPackage ./embedded-rust { };
-  bevy = rustPkgs.callPackage ./bevy { };
+  games = {
+    bevy = rustPkgs.callPackage ./bevy { };
+    bevy-game-of-life = rustPkgs.callPackage ./games/bevy-game-of-life { };
+    bevy-simple = rustPkgs.callPackage ./games/bevy-simple { };
+  };
 
   website = {
     actix-backend = rustPkgs.callPackage ./website/actix-backend { };
