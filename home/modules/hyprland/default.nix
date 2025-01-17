@@ -20,6 +20,8 @@ in {
     inputs.hyprland.homeManagerModules.default
   ];
 
+
+
   options.wayland.windowManager.hyprlandCustom = {
     enable = lib.mkEnableOption "Hyprland window manager";
     package = lib.mkOption {
@@ -84,6 +86,7 @@ in {
     # wallpaper manager
     home.packages = [
       pkgs.hyprpaper
+      pkgs.kando
     ];
 
     # Window manager
@@ -101,4 +104,5 @@ in {
     };
 
   };
+
 }

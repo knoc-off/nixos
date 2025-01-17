@@ -1,0 +1,9 @@
+# Rust
+/target
+
+# Fonts
+/assets/fonts
+/assets/textures
+
+# Nix
+/result

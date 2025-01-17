@@ -38,15 +38,8 @@ in {
   # Enable polkit
   security.polkit.enable = true;
 
-  # Enable necessary services
-  services = {
-    gvfs.enable = true;
-    devmon.enable = true;
-    udisks2.enable = true;
-    upower.enable = true;
-    accounts-daemon.enable = true;
-  };
 
   # Enable Wayland for Electron apps
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
+
 }
