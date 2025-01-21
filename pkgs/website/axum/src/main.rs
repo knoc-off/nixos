@@ -15,7 +15,7 @@ use sqlx::SqlitePool;
 use tracing_subscriber;
 
 mod handlers;
-use handlers::{hidden::hidden, home::home, not_found::not_found };
+use handlers::{hidden::hidden, home::home, not_found::not_found, resume::resume_main };
 
 use askama::Template;
 
@@ -42,7 +42,7 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // Read the secret endpoint from the file
-    let secret_endpoint = fs::read_to_string("/etc/secrets/endpoint")
+    let secret_endpoint = fs::read_to_string("/opt/website_data/endpoint")
         .expect("Failed to read the secret endpoint file")
         .trim()
         .to_string();
@@ -57,6 +57,7 @@ async fn main() {
         .route("/api/data", get(handlers::api::get_data_table))
         .route("/api/data", post(handlers::api::add_data))
         .route(&format!("/{}", secret_endpoint), get(hidden))
+        .route("/resume", get(resume_main))
         .route("/404", get(not_found))
         .fallback(get(not_found))
         .nest_service(
