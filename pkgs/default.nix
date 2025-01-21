@@ -33,7 +33,6 @@ in rec {
   };
 
   website = {
-    actix-backend = rustPkgs.callPackage ./website/actix-backend { };
     portfolio = rustPkgs.callPackage ./website/portfolio { };
     axum = rustPkgs.callPackage ./website/axum { };
   };
@@ -109,6 +108,8 @@ in rec {
   #      app = droidifyApk;
   #    };
   #  in droidifyEmulator;
+
+  icon-extractor-json-mapping = import ./svg-tools/icon-extractor/json-mapping.nix;
 
   writeNuScript = name: script:
     pkgs.writeTextFile rec {

@@ -1,0 +1,14 @@
+{
+  "template_patterns": [
+    "templates/*.html",
+    "templates/**/*.html"
+  ],
+  "output_css_path": "static/css/icon-mappings.css",
+  "icon_sets": [
+    {
+      "name": "Material Icons",
+      "base_class": "material-icon",
+      "prefix": "MaterialIconsRound_",
+      "path": "data/material-icons-round.json"
+    }  ]
+}
