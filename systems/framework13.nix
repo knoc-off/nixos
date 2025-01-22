@@ -176,6 +176,7 @@
     dconf.enable = true;
   };
 
+  programs.steam.enable = true;
   services = {
     gvfs.enable = true;
     devmon.enable = true;
@@ -185,6 +186,7 @@
 
     # Pretty much just needed this for Steam
     flatpak.enable = true;
+
 
     # Fix wg-quick?
     resolved.enable = true;

@@ -1,7 +1,7 @@
 { pkgs ? import <nixpkgs> { }
 , package
 , fontPath
-, prefix ? "no-prefix"
+, prefix ? ""
 }:
 
 let
@@ -33,7 +33,7 @@ let
 
       if len(sys.argv) > 2:
           prefix = sys.argv[2]
-          if prefix != "no-prefix":
+          if prefix != "":
               prefix = f"{prefix}_"
 
       try:
@@ -77,8 +77,8 @@ pkgs.stdenv.mkDerivation {
   '';
 
   installPhase = ''
-    mkdir -p $out
-    cp glyph_unicode_map.json $out/
+    mkdir -p $out/share/
+    cp glyph_unicode_map.json $out/share/
   '';
 
   meta = with pkgs.lib; {

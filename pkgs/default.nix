@@ -34,7 +34,9 @@ in rec {
 
   website = {
     portfolio = rustPkgs.callPackage ./website/portfolio { };
-    axum = rustPkgs.callPackage ./website/axum { };
+    axum = rustPkgs.callPackage ./website/axum {
+      inherit icon-extractor-json-mapping icon-pruner;
+    };
   };
   AOC24 = {
     day1 = rustPkgs.callPackage ./AdventOfCode2024/Day1 { };
@@ -109,7 +111,28 @@ in rec {
   #    };
   #  in droidifyEmulator;
 
-  icon-extractor-json-mapping = import ./svg-tools/icon-extractor/json-mapping.nix;
+  icon-extractor-json-mapping = { package, fontPath, prefix ? "" }:
+    import ./svg-tools/icon-extractor/json-mapping.nix {
+      inherit pkgs package fontPath prefix;
+    };
+
+  icon-pruner = { package, fontPath, iconList }:
+    import ./svg-tools/icon-extractor/prune-font-file.nix {
+      inherit pkgs package fontPath iconList;
+    };
+
+  pruned-font = icon-pruner {
+    package = pkgs.material-icons;
+    fontPath = "/share/fonts/opentype/MaterialIconsOutlined-Regular.otf";
+    iconList = [ "map" "c" "d" "e" "f" "g" ];
+  };
+
+  nerd-map = icon-extractor-json-mapping {
+    package = pkgs.fira-code-nerdfont;
+    fontPath =
+      "/share/fonts/truetype/NerdFonts/FiraCodeNerdFontMono-Regular.ttf";
+    prefix = "FiraCode";
+  };
 
   writeNuScript = name: script:
     pkgs.writeTextFile rec {

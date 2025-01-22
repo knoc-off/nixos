@@ -30,7 +30,6 @@
 
     #./modules/firefox.nix
 
-    ./programs/gaming/steam.nix
     ./programs/gaming/lutris.nix
     ./enviroment.nix
 
