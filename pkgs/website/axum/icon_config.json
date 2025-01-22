@@ -1,14 +1,1 @@
-{
-  "template_patterns": [
-    "templates/*.html",
-    "templates/**/*.html"
-  ],
-  "output_css_path": "static/css/icon-mappings.css",
-  "icon_sets": [
-    {
-      "name": "Material Icons",
-      "base_class": "material-icon",
-      "prefix": "MaterialIconsRound_",
-      "path": "data/material-icons-round.json"
-    }  ]
-}
+{"icon_sets":[{"base_class":"mi-round","font":{"file_path":"MaterialIconsRound-Regular.otf","format":"opentype"},"name":"MaterialIconsRound","path":"data/MaterialIconsRound-Regular.otf.json","prefix":"MIRound_"},{"base_class":"mi-sharp","font":{"file_path":"MaterialIconsSharp-Regular.otf","format":"opentype"},"name":"MaterialIconsSharp","path":"data/MaterialIconsSharp-Regular.otf.json","prefix":"MISharp_"}],"output_css_path":"static/css/icons.css","template_patterns":["templates/*.html","templates/**/*.html"]}

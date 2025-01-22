@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "website_overhaul_on_axum____________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________________________imap_filter_removed";
+  system.nixos.label = "big_axum_update_icons_now_are_optimized_and_pruned__________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________________________imap_filter_removed";
 }
