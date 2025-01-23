@@ -10,13 +10,19 @@ let
 
         -- Extend the Copilot adapter with specific parameters and handlers for o1 models
         local adapter = adapters.extend('copilot', {
-          opts = { stream = false }, -- Stream not supported
+          opts = { stream = false }, -- Stream not supported for o1 models
           schema = {
             model = {
-              default = 'o1',
+              order = 1,
+              mapping = "parameters",
+              type = "enum",
+              desc = "ID of the model to use. See the model endpoint compatibility table for details on which models work with the Chat API.",
+              default = "gpt-4o-2024-08-06",
               choices = {
-                'o1',
-                'o1-mini',
+                "gpt-4o-2024-08-06",
+                "claude-3.5-sonnet",
+                ["o1-preview-2024-09-12"] = { opts = { stream = false } },
+                ["o1-mini-2024-09-12"] = { opts = { stream = false } },
               },
             },
           },
@@ -47,11 +53,9 @@ let
     '';
   };
 
-in
-{
+in {
 
   extraPlugins = [ pkgs.vimExtraPlugins.codecompanion-nvim ];
-
 
   extraConfigLua = ''
     -- Load the o1.lua module
@@ -96,23 +100,26 @@ in
   plugins = {
     copilot-lua = {
       enable = true;
-      filetypes = {
-        "*" = true;
-        markdown = false;
-        yaml = false;
-        json = false;
-        toml = false;
-        ini = false;
-        passwd = false;
-        netrc = false;
-        gpg = false;
-        asc = false;
+      settings = {
+        filetypes = {
+          "*" = true;
+          markdown = false;
+          yaml = false;
+          json = false;
+          toml = false;
+          ini = false;
+          passwd = false;
+          netrc = false;
+          gpg = false;
+          asc = false;
+        };
+        suggestion = {
+          enabled = true;
+          autoTrigger = true;
+        };
+        panel = { enabled = true; };
+
       };
-      suggestion = {
-        enabled = true;
-        autoTrigger = true;
-      };
-      panel = { enabled = true; };
     };
 
     copilot-chat = {
@@ -149,7 +156,7 @@ in
             insert = "<C-y>";
           };
           show_diff = { normal = "gd"; };
-          show_system_prompt = { normal = "gp"; };
+          show_info = { normal = "gp"; };
         };
       };
     };

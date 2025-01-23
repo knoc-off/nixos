@@ -195,12 +195,19 @@ let
               with open(mapping_file, 'w') as f:
                   json.dump(glyph_map, f, indent=2)
 
-              shutil.copy2(font_path, fonts_dir / Path(font_path).name)
-
+              # Get used icons before font processing
               if is_dev:
                   used_icons = set(glyph_map.keys())
               else:
                   used_icons = scan_templates(config["template_patterns"], prefix)
+
+              # Process font files
+              if is_dev:
+                  shutil.copy2(font_path, fonts_dir / Path(font_path).name)
+              else:
+                  output_font_path = fonts_dir / Path(font_path).name
+                  glyph_names = [icon[len(prefix):] for icon in used_icons if icon in glyph_map]
+                  prune_font(font_path, glyph_names, output_font_path)
 
               used_icons_by_font[font_name] = list(used_icons)
               complete_css += generate_css(icon_set, glyph_map, used_icons)

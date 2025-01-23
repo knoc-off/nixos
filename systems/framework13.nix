@@ -36,6 +36,14 @@
     ./hardware/hardware-configuration.nix
     ./hardware/bluetooth.nix
     ./hardware/fingerprint
+    # temp fix with kmod issues
+    {
+      hardware = {
+        # disable framework kernel module
+        # https://github.com/NixOS/nixos-hardware/issues/1330
+        framework.enableKmod = false;
+      };
+    }
 
     #misc settings that i usually use.
     ./modules/misc.nix
@@ -76,15 +84,15 @@
   ];
 
   # create a service to run at startup each boot. run wgnord c de to connect to the vpn
-  systemd.services.wgnord = {
-    description = "WireGuard NordVPN";
-    after = [ "network.target" ];
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = "${pkgs.wgnord}/bin/wgnord c de";
-    };
-  };
+  # systemd.services.wgnord = {
+  #   description = "WireGuard NordVPN";
+  #   after = [ "network.target" ];
+  #   wantedBy = [ "multi-user.target" ];
+  #   serviceConfig = {
+  #     Type = "oneshot";
+  #     ExecStart = "${pkgs.wgnord}/bin/wgnord c de";
+  #   };
+  # };
 
 
   programs.direnv = {
@@ -253,10 +261,10 @@
       enable = true;
       allowedTCPPorts = [ 22000 38071 ];
       allowedUDPPorts = [ 21027 ];
-      extraCommands = ''
-        iptables -A INPUT -p tcp --dport 22000 -s niko.ink -j ACCEPT
-        iptables -A INPUT -p udp --dport 21027 -s niko.ink -j ACCEPT
-      '';
+      #extraCommands = ''
+      #  iptables -A INPUT -p tcp --dport 22000 -s niko.ink -j ACCEPT
+      #  iptables -A INPUT -p udp --dport 21027 -s niko.ink -j ACCEPT
+      #'';
     };
   };
 
