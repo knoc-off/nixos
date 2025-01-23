@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "big_axum_update_icons_now_are_optimized_and_pruned__________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________minecraft_changes._disable_waydroid";
+  system.nixos.label = "axum_changed_how_some_of_the_pruning_scripts_were_working___________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________minecraft_changes._disable_waydroid";
 }

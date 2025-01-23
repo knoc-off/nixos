@@ -133,21 +133,29 @@ class IconProcessor:
         return css
 
     def save_used_icons(self):
-        # Create data directory if it doesn't exist
-        output_dir = Path("data")
-        output_dir.mkdir(exist_ok=True)
-        used_icons_path = output_dir / "used_icons.json"
+        # Create nested directory structure
+        output_dir = Path("data/used_icons")
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Remove duplicates and sort icons for each font
-        for font_file in self.used_icons_by_font:
-            self.used_icons_by_font[font_file] = sorted(
-                list(set(self.used_icons_by_font[font_file]))
-            )
+        # Process each font's icons separately
+        for font_file, icons in self.used_icons_by_font.items():
+            # Remove any empty or invalid icons
+            valid_icons = [icon for icon in icons if icon and isinstance(icon, str) and icon.strip()]
+            if not valid_icons:
+                valid_icons = []
+                print(f"Warning: No icons found for {font_file}, using fallback")
+            else:
+                valid_icons = sorted(set(valid_icons))
+                print(f"Font {font_file}: Found {len(valid_icons)} valid icons")
 
-        with open(used_icons_path, "w") as f:
-            json.dump(self.used_icons_by_font, f, indent=2)
+            # Create individual JSON file for each font
+            basename = Path(font_file).stem
+            output_path = output_dir / f"{basename}.json"
 
-        print(f"Used icons information written to: {used_icons_path}")
+            with open(output_path, "w") as f:
+                json.dump(valid_icons, f, indent=2)
+                print(f"Written icon data to {output_path}:")
+                print(json.dumps(valid_icons, indent=2))
 
     def process(self, development_mode=False):
         output_path = Path(self.config["output_css_path"])

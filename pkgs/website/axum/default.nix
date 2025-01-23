@@ -1,76 +1,115 @@
-{ pkgs, icon-extractor-json-mapping, icon-pruner, rustPlatform, lib }:
+{ pkgs, rustPlatform, lib, ... }:
 let
   fonts = [
-    rec {
-      package = pkgs.material-icons;
-      fontPath = "/share/fonts/opentype/MaterialIconsRound-Regular.otf";
-      mapping = icon-extractor-json-mapping { inherit package fontPath; };
-      basename = builtins.baseNameOf fontPath;
+    {
       name = "MaterialIconsRound";
+      package = pkgs.material-icons;
+      file = "${pkgs.material-icons}/share/fonts/opentype/MaterialIconsRound-Regular.otf";
+      format = "opentype";
       base_class = "mi-round";
       prefix = "MIRound_";
     }
-    rec {
-      package = pkgs.material-icons;
-      fontPath = "/share/fonts/opentype/MaterialIconsSharp-Regular.otf";
-      mapping = icon-extractor-json-mapping { inherit package fontPath; };
-      basename = builtins.baseNameOf fontPath;
-      name = "MaterialIconsSharp";
-      base_class = "mi-sharp";
-      prefix = "MISharp_";
+    {
+      name = "MaterialSymbolsRounded";
+      package = pkgs.material-symbols;
+      file = "${pkgs.material-symbols}/share/fonts/TTF/MaterialSymbolsRounded.ttf";
+      format = "opentype";
+      base_class = "ms-round";
+      prefix = "MS_";
     }
   ];
 
-  # Generate icon config JSON
-  iconConfig = pkgs.writeText "icon_config.json" (builtins.toJSON {
-    template_patterns = [
-      "templates/*.html"
-      "templates/**/*.html"
-    ];
-    output_css_path = "static/css/icons.css";
-    icon_sets = map (font: {
-      inherit (font) name base_class prefix;
-      path = "data/${font.basename}.json";
-      font = {
-        file_path = "${font.basename}";  # Just the filename, path will be handled in CSS
-        format = "opentype";
-      };
-    }) fonts;
-  });
+  templatePatterns = [
+    "./templates/*.html"
+    "./templates/**/*.html"
+  ];
 
-  linkStaticContent = pkgs.writeScriptBin "link-static-content" ''
-    # Clean up existing links and directories
-    rm -f ./static/fonts/* ./static/icons/* ./data/*.json ./icon_config.json
+  iconProcessor = import ./icon-processor.nix {
+    inherit pkgs fonts templatePatterns;
+    isDevelopment = false;
+    projectRoot = ./.;
+  };
 
-    mkdir -p ./static/fonts
-    mkdir -p ./static/icons
-    mkdir -p ./static/css
-    mkdir -p data
+  # Development mode processor - includes all icons
+  iconProcessorDev = import ./icon-processor.nix {
+    inherit pkgs fonts templatePatterns;
+    isDevelopment = true;
+    projectRoot = ./.;
+  };
 
-    # Copy icon config
-    cp ${iconConfig} ./icon_config.json
-
-    # Link regular static content
-    ln -sf ${pkgs.circle-flags}/share/circle-flags-svg/ ./static/icons/circle-flags-svg
-    ln -sf ${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/ ./static/icons/super-tiny-icons
-
-    # Link full fonts for development
-    ${builtins.concatStringsSep "\n" (map (font: ''
-      ln -sf ${font.package}${font.fontPath} ./static/fonts/${font.basename}
-      ln -sf ${font.mapping}/share/glyph_unicode_map.json ./data/${font.basename}.json
-    '') fonts)}
-
-    # Generate full CSS with all icons for development
-    python3 ./used-icons.py $1
-  '';
-
-  # script to build the css
+  # Tailwind build script
   cssBuildScript = pkgs.writeScriptBin "tailwind-build" ''
     ${pkgs.tailwindcss}/bin/tailwindcss \
       -i ./styles.css \
       -o ./static/css/styles.css \
       -c ./tailwind.config.js \
       --minify
+  '';
+
+
+  switchToProdScript = pkgs.writeScriptBin "switch-to-prod" ''
+    echo "Switching to production (pruned) assets..."
+
+    # Clean generated directories
+    rm -rf ./static/fonts ./static/icons ./static/css ./data ./debug
+    mkdir -p ./static/fonts ./static/icons ./static/css ./data ./debug
+
+    # Link static content
+    ln -sf ${pkgs.circle-flags}/share/circle-flags-svg/ ./static/icons/circle-flags-svg
+    ln -sf ${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/ ./static/icons/super-tiny-icons
+
+    # Copy production-optimized assets
+    cp -r ${iconProcessor}/share/fonts/* ./static/fonts/
+    cp -r ${iconProcessor}/share/data/* ./data/
+    cp -r ${iconProcessor}/share/css/* ./static/css/
+    cp -r ${iconProcessor}/debug/* ./debug/
+
+    # Rebuild CSS
+    ${cssBuildScript}/bin/tailwind-build
+
+    echo "Switched to production assets. Debug information available in ./debug/"
+  '';
+
+  switchToDevScript = pkgs.writeScriptBin "switch-to-dev" ''
+    echo "Switching to development assets..."
+
+    # Clean and recreate directories
+    rm -rf ./static/fonts ./static/icons ./static/css ./data ./debug
+    mkdir -p ./static/fonts ./static/icons ./static/css ./data ./debug
+
+    # Link static content
+    ln -sf ${pkgs.circle-flags}/share/circle-flags-svg/ ./static/icons/circle-flags-svg
+    ln -sf ${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/ ./static/icons/super-tiny-icons
+
+    # Copy development assets
+    cp -r ${iconProcessorDev}/share/fonts/* ./static/fonts/
+    cp -r ${iconProcessorDev}/share/data/* ./data/
+    cp -r ${iconProcessorDev}/share/css/* ./static/css/
+    cp -r ${iconProcessorDev}/debug/* ./debug/
+
+    # Rebuild CSS
+    ${cssBuildScript}/bin/tailwind-build
+
+    echo "Switched to development assets. Debug information available in ./debug/"
+  '';
+
+
+  devSetupScript = pkgs.writeScriptBin "setup-dev-env" ''
+    # Clean and create directories
+    rm -rf ./static/fonts ./static/icons ./data
+    mkdir -p ./static/fonts ./static/icons ./static/css ./data
+
+    # Link static content
+    ln -sf ${pkgs.circle-flags}/share/circle-flags-svg/ ./static/icons/circle-flags-svg
+    ln -sf ${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/ ./static/icons/super-tiny-icons
+
+    # Link development icon assets
+    cp -r ${iconProcessorDev}/share/fonts/* ./static/fonts/
+    cp -r ${iconProcessorDev}/share/data/* ./data/
+    cp -r ${iconProcessorDev}/share/css/* ./static/css/
+
+    # Build CSS
+    ${cssBuildScript}/bin/tailwind-build
   '';
 
 in rustPlatform.buildRustPackage rec {
@@ -85,106 +124,38 @@ in rustPlatform.buildRustPackage rec {
       targets = [ "wasm32-unknown-unknown" ];
     })
     pkg-config
-    cssBuildScript
-    linkStaticContent
     tailwindcss
     python3
+
+    switchToProdScript
+    switchToDevScript
   ];
 
-  buildInputs = [ pkgs.openssl.dev pkgs.pkg-config pkgs.zlib.dev ];
+  buildInputs = with pkgs; [
+    openssl.dev
+    pkg-config
+    zlib.dev
+  ];
 
-  # In the buildRustPackage part, update preBuild:
   preBuild = ''
-    # Generate directories
-    mkdir -p ./static/fonts
-    mkdir -p ./static/css
-    mkdir -p data
+    # Create required directories
+    mkdir -p ./static/fonts ./static/css ./data
 
-    # Generate used icons JSON (without development flag)
-    python3 ./used-icons.py
-
-    # Load used icons
-    usedIcons=$(cat ./data/used_icons.json)
-
-    # Link pruned fonts for production build
-    ${builtins.concatStringsSep "\n" (map (font: ''
-      icons_list=$(echo "$usedIcons" | jq -r '.["${font.basename}"] // []')
-      pruned_font=$(${icon-pruner {
-        package = font.package;
-        fontPath = font.fontPath;
-        iconList = "$icons_list";
-      }}/share/fonts/*)
-      ln -sf $pruned_font ./static/fonts/${font.basename}
-      ln -sf ${font.mapping}/share/glyph_unicode_map.json ./data/${font.basename}.json
-    '') fonts)}
+    # Copy production-optimized fonts and data
+    cp -r ${iconProcessor}/share/fonts/* ./static/fonts/
+    cp -r ${iconProcessor}/share/data/* ./data/
+    cp -r ${iconProcessor}/share/css/* ./static/css/
 
     # Build CSS
     ${cssBuildScript}/bin/tailwind-build
   '';
 
-  #  shellHook = ''
-  #    echo "Run 'link-static-content' to link static content"
-  #    read -p "Run 'link-static-content' now? [Y/n] " -n 1 -r
-  #    if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
-  #      ${linkStaticContent}/bin/link-static-content
-  #    fi
-  #  '';
-
-  # shellHook = ''
-  #   echo "Run 'link-static-content' to link static content"
-  #   read -p "Run 'link-static-content' now? [Y/n] " -n 1 -r
-  #   if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
-  #     ${linkStaticContent}/bin/link-static-content
-  #   fi
-
-  #   echo -e "\nLinking pruned fonts for testing..."
-
-  #   # Clean up testing directory and any stray symlinks
-  #   rm -rf data/testing MaterialIcons*
-  #   mkdir -p data/testing/fonts
-  #   mkdir -p data/testing/data
-
-  #   # Generate used icons JSON
-  #   python3 ./used-icons.py 2>/dev/null  # Suppress warnings
-
-  #   # Create a default icon list if none exists
-  #   if [ ! -f ./data/used_icons.json ]; then
-  #     echo '{"MaterialIconsRound-Regular.otf": ["home"], "MaterialIconsSharp-Regular.otf": ["home"]}' > ./data/used_icons.json
-  #   fi
-
-  #   # Load used icons
-  #   usedIcons=$(cat ./data/used_icons.json)
-
-  #   # Link pruned fonts for testing
-  #   ${builtins.concatStringsSep "\n" (map (font: ''
-  #     icons_list=$(echo "$usedIcons" | jq -r '.["${font.basename}"] // ["home"]')
-  #     if [ -n "$icons_list" ]; then
-  #       pruned_font_path=$(${icon-pruner {
-  #         package = font.package;
-  #         fontPath = font.fontPath;
-  #         iconList = "$icons_list";
-  #       }}/share/fonts/*)
-  #       if [ -f "$pruned_font_path" ]; then
-  #         cp "$pruned_font_path" "./data/testing/fonts/${font.basename}"
-  #       fi
-  #     fi
-  #     ln -sf ${font.mapping}/share/glyph_unicode_map.json "./data/testing/data/${font.basename}.json"
-  #   '') fonts)}
-
-  #   echo "Pruned fonts linked in data/testing/"
-  # '';
-
   shellHook = ''
-    echo "Run 'link-static-content' to link static content"
-    read -p "Run 'link-static-content' now? [Y/n] " -n 1 -r
-    if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
-      ${linkStaticContent}/bin/link-static-content --development
-    fi
+    ${devSetupScript}/bin/setup-dev-env
   '';
 
   meta = with lib; {
-    description =
-      "An Axum web application with Tailwind CSS integrated via Nix build";
+    description = "An Axum web application with Tailwind CSS integrated via Nix build";
     homepage = "https://example.com";
     license = licenses.mit;
     maintainers = with maintainers; [ knoff ];
