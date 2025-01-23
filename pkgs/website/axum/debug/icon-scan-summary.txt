@@ -1,0 +1,34 @@
+Icon Scanner Debug Information
+============================
+
+Template Patterns Scanned:
+- ./templates/*.html
+- ./templates/**/*.html
+
+Files Scanned:
+
+Pattern: ./templates/*.html
+- ./templates/404.html
+- ./templates/base.html
+- ./templates/data_table.html
+- ./templates/hidden.html
+- ./templates/home.html
+- ./templates/resume.html
+
+Pattern: ./templates/**/*.html
+- ./templates/404.html
+- ./templates/base.html
+- ./templates/data_table.html
+- ./templates/hidden.html
+- ./templates/home.html
+- ./templates/resume.html
+
+Icons Found By Font:
+
+MaterialIconsRound-Regular.otf:
+- MIRound_games
+
+MaterialSymbolsRounded.ttf:
+- MS_contact_mail
+- MS_contact_phone
+- MS_my_location

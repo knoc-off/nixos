@@ -86,6 +86,7 @@
     };
   };
 
+
   programs.direnv = {
     enable = true;
     silent = true;
@@ -293,6 +294,7 @@
 
     # fingerpritn scanner does not work without this, suddenly.
     kernelParams = [ "usbcore.autosuspend=-1" ];
+    kernel.sysctl = { "vm.swappiness" = 20;};
   };
 
   users = {

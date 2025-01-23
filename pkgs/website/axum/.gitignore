@@ -4,8 +4,10 @@
 
 database.db
 database.db*
-/data
-/data/*
+
+./data/testing
+./data/*.otf.json
+./data/*.ttf.json
 
 /static
 

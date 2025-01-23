@@ -44,7 +44,7 @@
           {% let email_str = email|optional_string %}
           {% if email_str != "" %}
             <div class="flex items-center gap-1">
-              <span class="MIRound_mail text-2xl"></span>
+              <span class="MS_contact_mail text-2xl"></span>
               <a href="mailto:{{ email_str }}">{{ email_str }}</a>
             </div>
           {% endif %}
@@ -52,7 +52,7 @@
           {% let phone_str = phone|optional_string %}
           {% if phone_str != "" %}
             <div class="flex items-center gap-1">
-              <span class="MIRound_phone text-2xl"></span>
+              <span class="MS_contact_phone text-2xl"></span>
               <a href="tel:{{ phone_str }}">{{ phone_str }}</a>
             </div>
           {% endif %}
@@ -60,7 +60,7 @@
           {% let location_str = location|optional_string %}
           {% if location_str != "" %}
             <div class="flex items-center gap-1">
-              <span class="MIRound_map text-2xl"></span>
+              <span class="MS_my_location text-2xl"></span>
               <a href="https://www.google.com/maps/search/?api=1&query={{ location_str }}" target="_blank">{{ location_str }}</a>
             </div>
           {% endif %}
@@ -189,7 +189,7 @@
         <div class="flex flex-wrap gap-2">
           <span class="bg-blue-50 px-3 py-1 rounded text-sm font-medium text-gray-700">{{ interests }}</span>
         </div>
-        <span class="MIRound_games"></span>
+        <span class="MIRound_games "></span>
       </section>
     </div>
   </div>
