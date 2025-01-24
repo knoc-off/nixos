@@ -1,52 +1,37 @@
 { pkgs ? import <nixpkgs> { }
-, fonts ? []
+, icons ? []
 , templatePatterns ? [ "templates/*.html" "templates/**/*.html" ]
 , isDevelopment ? false
 , projectRoot ? ./. }:
 
 let
   configData = {
-    icon_sets = map (font: {
-      inherit (font) name prefix;
-      font = {
-        file_path = font.file;
-        format = font.format;
-      };
-      path = "data/${builtins.baseNameOf font.file}.json";
-    }) fonts;
+    icon_sets = map (icon: {
+      inherit (icon) name prefix;
+      path = "static/icons/${icon.name}";
+      source_path = "${icon.package}${icon.path}";
+    }) icons;
 
     template_patterns = templatePatterns;
-    output_css_path = "static/css/icons.css";
+    output_css_path = "static/css/svg-icons.css";
   };
 
   configJson = pkgs.writeTextFile {
-    name = "icon-config.json";
+    name = "svg-icon-config.json";
     text = builtins.toJSON configData;
   };
 
-  combinedScript = pkgs.writeTextFile {
-    name = "process-icons.py";
+  processorScript = pkgs.writeTextFile {
+    name = "process-svg-icons.py";
     text = ''
       import json
       import glob
       import re
-      import shutil
+      import os
       from pathlib import Path
       import sys
-      from fontTools.ttLib import TTFont
-      from fontTools.subset import Subsetter, Options
-
-      def extract_glyph_mapping(font_path, prefix=""):
-          font = TTFont(font_path)
-          glyph_map = {}
-
-          for cmap in font["cmap"].tables:
-              if cmap.isUnicode():
-                  for codepoint, glyphname in cmap.cmap.items():
-                      if glyphname not in [".notdef", ".null", "nonmarkingreturn"]:
-                          glyph_map[f"{prefix}{glyphname}"] = f"{codepoint:04x}"
-
-          return glyph_map
+      import shutil
+      import base64
 
       def scan_templates(template_patterns, prefix):
           used_icons = set()
@@ -63,34 +48,111 @@ let
                               matches = re.findall(pattern, content)
                               if matches:
                                   print(f"Found in {template_file}: {matches}")
-                                  # Add the full icon name back (prefix + match)
                                   used_icons.update(f"{prefix}{match}" for match in matches)
                       except IOError as e:
                           print(f"Warning: Could not read {template_file}: {e}")
               except Exception as e:
                   print(f"Warning: Error processing pattern {template_pattern}: {e}")
 
-          print(f"Total icons found: {used_icons}")
           return used_icons
 
-      def prune_font(input_font_path, icons_to_keep, output_path):
-          font = TTFont(input_font_path)
-          options = Options()
-          options.layout_features = "*"
-          subsetter = Subsetter(options=options)
-          subsetter.populate(glyphs=icons_to_keep)
-          subsetter.subset(font)
-          font.save(output_path)
-          font.close()
+      def process_svg_files(source_path, target_path):
+          svg_files = {}
+          for svg_file in glob.glob(f"{source_path}/*.svg"):
+              name = Path(svg_file).stem
+              # Just store the name, we'll use it to generate the path
+              svg_files[name] = name
+          return svg_files
 
-      def write_debug_info(output_base, template_patterns, icon_sets, used_icons_by_font):
-          debug_dir = output_base / "debug"
-          debug_dir.mkdir(exist_ok=True)
+      def generate_css(icon_set, svg_data, used_icons):
+          css = f"/* Generated {icon_set['name']} SVG CSS */\n"
 
-          # Write scan summary
-          with open(debug_dir / "icon-scan-summary.txt", "w") as f:
-              f.write("Icon Scanner Debug Information\n")
-              f.write("============================\n\n")
+          for icon_name in used_icons:
+              clean_name = icon_name.replace(icon_set["prefix"], "")
+              if clean_name in svg_data:
+                  selector = f".{icon_name}"
+                  # Insert the SVG content directly via CSS content property
+                  css += f"{selector} {{\n"
+                  css += "    display: inline-block;\n"
+                  css += "    width: 1.5rem;\n"  # Default size, can be overridden by Tailwind
+                  css += "    height: 1.5rem;\n"
+                  css += f"    content: ''';\n"  # Empty content for the pseudo-element
+                  css += "}\n\n"
+
+                  # Create a pseudo-element that contains the actual SVG
+                  css += f"{selector}::after {{\n"
+                  css += "    content: ''';\n"
+                  css += "    display: block;\n"
+                  css += "    width: 100%;\n"
+                  css += "    height: 100%;\n"
+                  # Insert actual SVG as background
+                  css += f"    background-color: currentColor;\n"
+                  css += f"    mask: url('../icons/{icon_set['name']}/{clean_name}.svg') no-repeat center / contain;\n"
+                  css += f"    -webkit-mask: url('../icons/{icon_set['name']}/{clean_name}.svg') no-repeat center / contain;\n"
+                  css += "}\n\n"
+
+          return css
+
+      def generate_js(icon_set, svg_data, used_icons):
+          js = """
+      class IconComponent extends HTMLElement {
+          static icons = new Map();
+
+          static async loadIcon(name) {
+              const response = await fetch(`/icons/${name}.svg`);
+              const text = await response.text();
+              // Extract SVG content, preserving viewBox and removing hardcoded sizes
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(text, 'image/svg+xml');
+              const svg = doc.querySelector('svg');
+
+              // Remove fixed dimensions but keep viewBox
+              svg.removeAttribute('width');
+              svg.removeAttribute('height');
+
+              return svg.outerHTML;
+          }
+
+          async connectedCallback() {
+              const iconClass = Array.from(this.classList).find(c => c.startsWith('tif_'));
+              if (!iconClass) return;
+
+              const iconName = iconClass.replace('tif_', ''');
+
+              if (!IconComponent.icons.has(iconName)) {
+                  IconComponent.icons.set(
+                      iconName,
+                      await IconComponent.loadIcon(`tabler-icons-filled/$${iconName}`)
+                  );
+              }
+
+              const svgContent = IconComponent.icons.get(iconName);
+
+              // Create wrapper to preserve classes
+              const wrapper = document.createElement('div');
+              wrapper.innerHTML = svgContent;
+              const svg = wrapper.firstChild;
+
+              // Copy all classes from the component to the SVG
+              svg.classList.add(...this.classList);
+              // Remove the icon identifier class from SVG
+              svg.classList.remove(iconClass);
+
+              // Add default classes for proper sizing
+              svg.classList.add('w-full', 'h-full');
+
+              this.replaceWith(svg);
+          }
+      }
+
+      customElements.define('icon-component', IconComponent);
+      """
+          return js
+
+      def write_debug_info(debug_dir, template_patterns, icon_sets, used_icons_by_set):
+          with open(debug_dir / "svg-scan-summary.txt", "w") as f:
+              f.write("SVG Icon Scanner Debug Information\n")
+              f.write("================================\n\n")
 
               f.write("Template Patterns Scanned:\n")
               for pattern in template_patterns:
@@ -102,122 +164,51 @@ let
                   for file in glob.glob(pattern, recursive=True):
                       f.write(f"- {file}\n")
 
-              f.write("\nIcons Found By Font:\n")
-              for font_name, icons in used_icons_by_font.items():
-                  f.write(f"\n{font_name}:\n")
+              f.write("\nIcons Found By Set:\n")
+              for set_name, icons in used_icons_by_set.items():
+                  f.write(f"\n{set_name}:\n")
                   for icon in sorted(icons):
                       f.write(f"- {icon}\n")
 
-      def generate_css(icon_set, glyph_map, used_icons):
-          css = f"""/* Generated {icon_set["name"]} CSS */
-      @font-face {{
-          font-family: '{icon_set["name"]}';
-          font-style: normal;
-          font-weight: 400;
-          src: url("../fonts/{Path(icon_set["font"]["file_path"]).name}") format("{icon_set["font"]["format"]}");
-      }}
-
-      /* Base icon styles for {icon_set["name"]} */
-      .{icon_set["name"]} {{
-          font-family: '{icon_set["name"]}';
-          font-weight: 900;
-          font-style: normal;
-          font-size: 24px;
-          line-height: 1;
-          letter-spacing: normal;
-          text-transform: none;
-          display: inline-block;
-          white-space: nowrap;
-          word-wrap: normal;
-          direction: ltr;
-          -webkit-font-smoothing: antialiased;
-      }}
-
-      /* Icon-specific styles */
-      """
-          # Collect all icon selectors
-          icon_selectors = []
-          icon_contents = []
-
-          print(f"\nProcessing icons for {icon_set['name']}:")
-          print(f"Available mappings: {list(glyph_map.keys())[:5]}...")
-          print(f"Used icons: {used_icons}")
-
-          for icon_name in used_icons:
-              if icon_name in glyph_map:
-                  selector = f".{icon_name}"
-                  icon_selectors.append(selector)
-                  icon_contents.append(f"{selector}::before {{ content: \"\\{glyph_map[icon_name]}\"; }}")
-                  print(f"Added icon: {icon_name} -> \\{glyph_map[icon_name]}")
-              else:
-                  print(f"Warning: Icon '{icon_name}' not found in glyph map")
-
-          if icon_selectors:
-              # Add shared properties for all icons
-              css += f"{', '.join(icon_selectors)} {{\n"
-              css += f"    font-family: '{icon_set["name"]}';\n"
-              css += "}\n\n"
-
-              # Add individual content properties
-              css += '\n'.join(icon_contents)
-
-          return css
-
       def main():
-          try:
-              with open(sys.argv[1], 'r') as f:
-                  config = json.load(f)
-          except Exception as e:
-              print(f"Error reading config file: {e}")
-              sys.exit(1)
+          with open(sys.argv[1], 'r') as f:
+              config = json.load(f)
 
           output_base = Path(sys.argv[2])
           is_dev = sys.argv[3].lower() == "true"
 
-          fonts_dir = output_base / "share/fonts"
-          data_dir = output_base / "share/data"
           css_dir = output_base / "share/css"
           debug_dir = output_base / "debug"
 
-          for dir in [fonts_dir, data_dir, css_dir, debug_dir]:
+          for dir in [css_dir, debug_dir]:
               dir.mkdir(parents=True, exist_ok=True)
 
           complete_css = ""
-          used_icons_by_font = {}
+          used_icons_by_set = {}
 
           for icon_set in config["icon_sets"]:
-              font_path = icon_set["font"]["file_path"]
-              prefix = icon_set["prefix"]
-              font_name = Path(font_path).name
+              svg_data = process_svg_files(icon_set["source_path"], icon_set["path"])
 
-              glyph_map = extract_glyph_mapping(font_path, prefix)
-              mapping_file = data_dir / f"{font_name}.json"
-              with open(mapping_file, 'w') as f:
-                  json.dump(glyph_map, f, indent=2)
-
-              # Get used icons before font processing
               if is_dev:
-                  used_icons = set(glyph_map.keys())
+                  used_icons = {f"{icon_set['prefix']}{name}" for name in svg_data.keys()}
               else:
-                  used_icons = scan_templates(config["template_patterns"], prefix)
+                  used_icons = scan_templates(config["template_patterns"], icon_set["prefix"])
 
-              # Process font files
-              if is_dev:
-                  shutil.copy2(font_path, fonts_dir / Path(font_path).name)
-              else:
-                  output_font_path = fonts_dir / Path(font_path).name
-                  glyph_names = [icon[len(prefix):] for icon in used_icons if icon in glyph_map]
-                  prune_font(font_path, glyph_names, output_font_path)
+              used_icons_by_set[icon_set["name"]] = list(used_icons)
+              complete_css += generate_css(icon_set, svg_data, used_icons)
 
-              used_icons_by_font[font_name] = list(used_icons)
-              complete_css += generate_css(icon_set, glyph_map, used_icons)
-              complete_css += "\n\n"
-
-          with open(css_dir / "icons.css", 'w') as f:
+          with open(css_dir / "svg-icons.css", 'w') as f:
               f.write(complete_css)
 
-          write_debug_info(output_base, config["template_patterns"],
-                          config["icon_sets"], used_icons_by_font)
+          # Generate and write JS
+          js_dir = output_base / "share/js"
+          js_dir.mkdir(parents=True, exist_ok=True)
+
+          with open(js_dir / "icon-components.js", 'w') as f:
+              f.write(generate_js(icon_set, svg_data, used_icons))
+
+          write_debug_info(debug_dir, config["template_patterns"],
+                          config["icon_sets"], used_icons_by_set)
 
       if __name__ == "__main__":
           main()
@@ -226,22 +217,20 @@ let
 
 in
 pkgs.stdenv.mkDerivation {
-  name = "icon-processor";
+  name = "svg-icon-processor";
 
   dontUnpack = true;
 
   buildInputs = [
     pkgs.python3
-    pkgs.python3Packages.fonttools
-    pkgs.python3Packages.brotli
   ];
 
   buildPhase = ''
     # Copy template files from source
     cp -r ${projectRoot}/* ./
 
-    # Run processing script with the local template directory
-    python3 ${combinedScript} ${configJson} $out ${if isDevelopment then "true" else "false"}
+    # Run processing script
+    python3 ${processorScript} ${configJson} $out ${if isDevelopment then "true" else "false"}
   '';
 
   installPhase = "true";
