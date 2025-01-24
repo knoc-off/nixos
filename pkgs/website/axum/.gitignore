@@ -5,9 +5,10 @@
 database.db
 database.db*
 
-./data/testing
-./data/*.otf.json
-./data/*.ttf.json
+/data
+/data/testing
+/data/*.otf.json
+/data/*.ttf.json
 
 /static
 

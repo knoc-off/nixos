@@ -1,19 +1,42 @@
-{ pkgs, rustPlatform, lib, ... }:
+{ pkgs, rustPlatform, lib, tabler-icons, ... }:
 let
-
-
   htmxJs = pkgs.fetchurl {
     url = "https://unpkg.com/htmx.org@1.9.2/dist/htmx.min.js";
     hash = "sha256-/TRunIY51GJIk/xFXyQHoJtBgwFzbdGOu7B3ZGN/tHg=";
   };
 
+  icons = [
+    {
+      name = "circle-flags";
+      package = pkgs.circle-flags;
+      path = "/share/circle-flags-svg";
+      prefix = "cf_";
+    }
+    {
+      name = "super-tiny-icons";
+      package = pkgs.super-tiny-icons;
+      path = "/share/icons/SuperTinyIcons/svg";
+      prefix = "sti_";
+    }
+    {
+      name = "tabler-icons-outline";
+      package = tabler-icons;
+      path = "/share/icons/outline";
+      prefix = "tio_";
+    }
+    {
+      name = "tabler-icons-filled";
+      package = tabler-icons;
+      path = "/share/icons/filled";
+      prefix = "tif_";
+    }
+  ];
 
   fonts = [
     {
       name = "MaterialIconsRound";
       package = pkgs.material-icons;
-      file =
-        "${pkgs.material-icons}/share/fonts/opentype/MaterialIconsRound-Regular.otf";
+      file = "${pkgs.material-icons}/share/fonts/opentype/MaterialIconsRound-Regular.otf";
       format = "opentype";
       base_class = "mi-round";
       prefix = "MIRound_";
@@ -21,30 +44,40 @@ let
     {
       name = "MaterialSymbolsRounded";
       package = pkgs.material-symbols;
-      file =
-        "${pkgs.material-symbols}/share/fonts/TTF/MaterialSymbolsRounded.ttf";
+      file = "${pkgs.material-symbols}/share/fonts/TTF/MaterialSymbolsRounded.ttf";
       format = "opentype";
       base_class = "ms-round";
       prefix = "MS_";
+    }
+    {
+      name = "FontAwesome";
+      package = pkgs.font-awesome;
+      file = "${pkgs.font-awesome}/share/fonts/opentype/Font Awesome 6 Free-Solid-900.otf";
+      format = "opentype";
+      base_class = "fa-solid";
+      prefix = "fa_";
     }
   ];
 
   templatePatterns = [ "./templates/*.html" "./templates/**/*.html" ];
 
-  iconProcessor = import ./icon-processor.nix {
-    inherit pkgs fonts templatePatterns;
-    isDevelopment = false;
-    projectRoot = ./.;
-  };
 
-  # Development mode processor - includes all icons
-  iconProcessorDev = import ./icon-processor.nix {
-    inherit pkgs fonts templatePatterns;
-    isDevelopment = true;
-    projectRoot = ./.;
-  };
+  fontProcessor = dev:
+    (import ./font-processor.nix {
+      inherit pkgs fonts templatePatterns;
+      isDevelopment = dev;
+      projectRoot = ./.;
+    });
 
-  # Tailwind build script
+
+  iconProcessor = dev:
+    (import ./icon-processor.nix {
+      inherit pkgs icons templatePatterns;
+      isDevelopment = dev;
+      projectRoot = ./.;
+    });
+
+
   cssBuildScript = pkgs.writeScriptBin "tailwind-build" ''
     ${pkgs.tailwindcss}/bin/tailwindcss \
       -i ./styles.css \
@@ -53,86 +86,47 @@ let
       --minify
   '';
 
-  switchToProdScript = pkgs.writeScriptBin "switch-to-prod" ''
-    echo "Switching to production (pruned) assets..."
-
-    # Clean generated directories
+  # Common operations
+  mkDirs = ''
     rm -rf ./static/fonts ./static/icons ./static/css ./data ./debug
     mkdir -p ./static/fonts ./static/icons ./static/css ./data ./debug
-
-    # Link static content
-    ln -sf ${pkgs.circle-flags}/share/circle-flags-svg/ ./static/icons/circle-flags-svg
-    ln -sf ${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/ ./static/icons/super-tiny-icons
-
-    # Copy production-optimized assets with write permissions
-    cp -r ${iconProcessor}/share/fonts/* ./static/fonts/
-    chmod -R u+w ./static/fonts
-
-    cp -r ${iconProcessor}/share/data/* ./data/
-    chmod -R u+w ./data
-
-    cp -r ${iconProcessor}/share/css/* ./static/css/
-    chmod -R u+w ./static/css
-
-    cp -r ${iconProcessor}/debug/* ./debug/
-    chmod -R u+w ./debug
-
-    # Rebuild CSS
-    ${cssBuildScript}/bin/tailwind-build
-
-    echo "Switched to production assets. Debug information available in ./debug/"
   '';
 
-  switchToDevScript = pkgs.writeScriptBin "switch-to-dev" ''
-    echo "Switching to development assets..."
-
-    # Clean and recreate directories
-    rm -rf ./static/fonts ./static/icons ./static/css ./data ./debug
-    mkdir -p ./static/fonts ./static/icons ./static/css ./data ./debug
-
-    # Link static content
-    ln -sf ${pkgs.circle-flags}/share/circle-flags-svg/ ./static/icons/circle-flags-svg
-    ln -sf ${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/ ./static/icons/super-tiny-icons
-
-    # Copy development assets with write permissions
-    cp -r ${iconProcessorDev}/share/fonts/* ./static/fonts/
-    chmod -R u+w ./static/fonts
-
-    cp -r ${iconProcessorDev}/share/data/* ./data/
-    chmod -R u+w ./data
-
-    cp -r ${iconProcessorDev}/share/css/* ./static/css/
-    chmod -R u+w ./static/css
-
-    cp -r ${iconProcessorDev}/debug/* ./debug/
-    chmod -R u+w ./debug
-
-    # Rebuild CSS
-    ${cssBuildScript}/bin/tailwind-build
-
-    echo "Switched to development assets. Debug information available in ./debug/"
+  linkStaticContent = let
+    # Function to create a symbolic link command for a single icon set
+    mkIconLink = icon: ''
+      ln -sf ${icon.package}${icon.path}/ ./static/icons/${icon.name}
+    '';
+    # Map over the icons list and join the commands with newlines
+    linkCommands = builtins.concatStringsSep "\n" (map mkIconLink icons);
+  in ''
+    # Ensure the icons directory exists
+    mkdir -p ./static/icons
+    # Create all icon links
+    ${linkCommands}
   '';
 
-  devSetupScript = pkgs.writeScriptBin "setup-dev-env" ''
-    # Clean and create directories
-    rm -rf ./static/fonts ./static/icons ./data
-    mkdir -p ./static/fonts ./static/icons ./static/css ./static/js ./data
-
-    # Link static content
-    ln -sf ${pkgs.circle-flags}/share/circle-flags-svg/ ./static/icons/circle-flags-svg
-    ln -sf ${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/ ./static/icons/super-tiny-icons
-
-    # Link development icon assets
-    cp -r ${iconProcessorDev}/share/fonts/* ./static/fonts/
-    cp -r ${iconProcessorDev}/share/data/* ./data/
-    cp -r ${iconProcessorDev}/share/css/* ./static/css/
-
-    # Copy htmx
-    cp ${htmxJs} ./static/js/htmx.min.js
-
-    # Build CSS
-    ${cssBuildScript}/bin/tailwind-build
+  copyAssets = isDev: ''
+    cp -r ${fontProcessor isDev}/share/fonts/* ./static/fonts/
+    cp -r ${fontProcessor isDev}/share/data/* ./data/
+    cp -r ${fontProcessor isDev}/share/css/* ./static/css/
+    cp -r ${iconProcessor isDev}/share/css/* ./static/css/
+    cp -r ${fontProcessor isDev}/debug/* ./debug/
+    cp -r ${iconProcessor isDev}/debug/* ./debug/
+    chmod -R u+w ./static/fonts ./data ./static/css ./debug
   '';
+
+  mkEnvScript = name: isDev: message: pkgs.writeScriptBin name ''
+    echo "${message}"
+    ${mkDirs}
+    ${linkStaticContent}
+    ${copyAssets isDev}
+    ${cssBuildScript}/bin/tailwind-build
+    echo "Assets switched. Debug information available in ./debug/"
+  '';
+
+  switchToProdScript = mkEnvScript "switch-to-prod" false "Switching to production (pruned) assets...";
+  switchToDevScript = mkEnvScript "switch-to-dev" true "Switching to development assets...";
 
 in rustPlatform.buildRustPackage rec {
   pname = "axum-website";
@@ -148,37 +142,30 @@ in rustPlatform.buildRustPackage rec {
     pkg-config
     tailwindcss
     python3
-
     switchToProdScript
     switchToDevScript
+    cssBuildScript
   ];
 
   buildInputs = with pkgs; [ openssl.dev pkg-config zlib.dev ];
 
   preBuild = ''
-    # Create required directories
     mkdir -p ./static/fonts ./static/css ./data ./static/js
-
-
-    # Copy htmx
     cp ${htmxJs} ./static/js/htmx.min.js
-
-    # Copy production-optimized fonts and data
-    cp -r ${iconProcessor}/share/fonts/* ./static/fonts/
-    cp -r ${iconProcessor}/share/data/* ./data/
-    cp -r ${iconProcessor}/share/css/* ./static/css/
-
-    # Build CSS
+    ${copyAssets false}
     ${cssBuildScript}/bin/tailwind-build
   '';
 
   shellHook = ''
-    ${devSetupScript}/bin/setup-dev-env
+    ${mkDirs}
+    ${linkStaticContent}
+    ${copyAssets true}
+    cp ${htmxJs} ./static/js/htmx.min.js
+    ${cssBuildScript}/bin/tailwind-build
   '';
 
   meta = with lib; {
-    description =
-      "An Axum web application with Tailwind CSS integrated via Nix build";
+    description = "An Axum web application with Tailwind CSS integrated via Nix build";
     homepage = "https://example.com";
     license = licenses.mit;
     maintainers = with maintainers; [ knoff ];

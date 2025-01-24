@@ -1,5 +1,5 @@
 # these packages can oftem be used as devshells but not always
-{ pkgs, lib, inputs, system, self, upkgs }:
+{ pkgs, lib, inputs, system, upkgs, self }:
 let
   rustPkgs = pkgs.extend (import inputs.rust-overlay);
   neovim-plugins = import ./neovim-plugins { inherit (pkgs) vimUtils lua; };
@@ -16,6 +16,8 @@ in rec {
   texify = pkgs.callPackage ./texify { };
   gate = pkgs.callPackage ./gate { };
   ascii-silhouettify = pkgs.callPackage ./ascii { };
+
+  tabler-icons = pkgs.callPackage ./tabler-icons { };
 
   # Add React Native app package
   react-native-app = pkgs.callPackage ./react-native-app {
@@ -35,7 +37,7 @@ in rec {
   website = {
     portfolio = rustPkgs.callPackage ./website/portfolio { };
     axum = rustPkgs.callPackage ./website/axum {
-      inherit icon-extractor-json-mapping icon-pruner;
+      inherit tabler-icons;
     };
   };
   AOC24 = {
@@ -54,19 +56,20 @@ in rec {
         neovim-plugins.overlay
 
         (final: prev: {
-          neovim-unwrapped = prev.neovim-unwrapped.overrideAttrs (old: {
-            #patches = old.patches ++ [
-            #  # Fix byte index encoding bounds.
-            #  # - https://github.com/neovim/neovim/pull/30747
-            #  # - https://github.com/nix-community/nixvim/issues/2390
-            #  (final.fetchpatch {
-            #    name = "fix-lsp-str_byteindex_enc-bounds-checking-30747.patch";
-            #    url =
-            #      "https://patch-diff.githubusercontent.com/raw/neovim/neovim/pull/30747.patch";
-            #    hash = "sha256-2oNHUQozXKrHvKxt7R07T9YRIIx8W3gt8cVHLm2gYhg=";
-            #  })
-            #];
-          });
+          neovim-unwrapped = prev.neovim-unwrapped.overrideAttrs (old:
+            {
+              #patches = old.patches ++ [
+              #  # Fix byte index encoding bounds.
+              #  # - https://github.com/neovim/neovim/pull/30747
+              #  # - https://github.com/nix-community/nixvim/issues/2390
+              #  (final.fetchpatch {
+              #    name = "fix-lsp-str_byteindex_enc-bounds-checking-30747.patch";
+              #    url =
+              #      "https://patch-diff.githubusercontent.com/raw/neovim/neovim/pull/30747.patch";
+              #    hash = "sha256-2oNHUQozXKrHvKxt7R07T9YRIIx8W3gt8cVHLm2gYhg=";
+              #  })
+              #];
+            });
         })
 
       ];
