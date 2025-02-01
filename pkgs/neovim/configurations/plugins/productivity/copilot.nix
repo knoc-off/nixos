@@ -10,7 +10,6 @@ let
 
         -- Extend the Copilot adapter with specific parameters and handlers for o1 models
         local adapter = adapters.extend('copilot', {
-          opts = { stream = false }, -- Stream not supported for o1 models
           schema = {
             model = {
               order = 1,
@@ -26,25 +25,7 @@ let
               },
             },
           },
-          handlers = {
-            ---Handler to remove system prompt from messages
-            ---@param self CodeCompanion.Adapter
-            ---@param messages table
-            form_messages = function(self, messages)
-              return {
-                messages = vim
-                  .iter(messages)
-                  :filter(function(message) return not (message.role and message.role == 'system') end)
-                  :totable(),
-              }
-            end,
-          },
         })
-
-        -- Remove unsupported settings from the adapter schema
-        local unsupported_settings = { 'temperature', 'max_tokens', 'top_p', 'n' }
-        vim.iter(unsupported_settings):each(function(setting) adapter.schema[setting] = nil end)
-
         adapter.name = 'copilot_o1'
         return adapter
       end

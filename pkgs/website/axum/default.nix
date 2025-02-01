@@ -70,12 +70,24 @@ let
     });
 
 
-  iconProcessor = dev:
-    (import ./icon-processor.nix {
-      inherit pkgs icons templatePatterns;
-      isDevelopment = dev;
-      projectRoot = ./.;
-    });
+  dbSetupScript = pkgs.writeScriptBin "setup-database" ''
+    DB_PATH="/opt/website_data/database.db"
+    DB_DIR="/opt/website_data"
+
+    if [ ! -d "$DB_DIR" ]; then
+      echo "Database-Dir doesn't exist: " $DB_DIR
+      exit 1
+    fi
+
+    if [ ! -f "$DB_PATH" ]; then
+      echo "Initializing database..."
+      ${pkgs.sqlite}/bin/sqlite3 "$DB_PATH" ".databases"
+      echo "Running migrations..."
+      ${pkgs.sqlx-cli}/bin/sqlx migrate run --database-url "sqlite:$DB_PATH"
+    else
+      echo "Database already exists at $DB_PATH"
+    fi
+  '';
 
 
   cssBuildScript = pkgs.writeScriptBin "tailwind-build" ''
@@ -88,8 +100,8 @@ let
 
   # Common operations
   mkDirs = ''
-    rm -rf ./static/fonts ./static/icons ./static/css ./data ./debug
-    mkdir -p ./static/fonts ./static/icons ./static/css ./data ./debug
+    rm -rf ./static/fonts ./static/icons ./static/css
+    mkdir -p ./static/fonts ./static/icons ./static/css
   '';
 
   linkStaticContent = let
@@ -108,12 +120,8 @@ let
 
   copyAssets = isDev: ''
     cp -r ${fontProcessor isDev}/share/fonts/* ./static/fonts/
-    cp -r ${fontProcessor isDev}/share/data/* ./data/
     cp -r ${fontProcessor isDev}/share/css/* ./static/css/
-    cp -r ${iconProcessor isDev}/share/css/* ./static/css/
-    cp -r ${fontProcessor isDev}/debug/* ./debug/
-    cp -r ${iconProcessor isDev}/debug/* ./debug/
-    chmod -R u+w ./static/fonts ./data ./static/css ./debug
+    chmod -R u+w ./static/fonts ./static/css
   '';
 
   mkEnvScript = name: isDev: message: pkgs.writeScriptBin name ''
@@ -122,7 +130,6 @@ let
     ${linkStaticContent}
     ${copyAssets isDev}
     ${cssBuildScript}/bin/tailwind-build
-    echo "Assets switched. Debug information available in ./debug/"
   '';
 
   switchToProdScript = mkEnvScript "switch-to-prod" false "Switching to production (pruned) assets...";
@@ -145,23 +152,33 @@ in rustPlatform.buildRustPackage rec {
     switchToProdScript
     switchToDevScript
     cssBuildScript
+    dbSetupScript
   ];
 
   buildInputs = with pkgs; [ openssl.dev pkg-config zlib.dev ];
 
   preBuild = ''
-    mkdir -p ./static/fonts ./static/css ./data ./static/js
+    mkdir -p ./static/fonts ./static/css ./static/js
     cp ${htmxJs} ./static/js/htmx.min.js
     ${copyAssets false}
     ${cssBuildScript}/bin/tailwind-build
   '';
 
+  # could do the following to make the dev-setup easy, and deployment more automatic.
+  # Generate the database:
+  # > sqlite3 /opt/website_data/database.db ".databases"
+  # Run the sqlx migrations:
+  # > cargo sqlx migrate run --database-url sqlite:/opt/website_data/database.db
   shellHook = ''
     ${mkDirs}
     ${linkStaticContent}
     ${copyAssets true}
-    cp ${htmxJs} ./static/js/htmx.min.js
+    if [ ! -f ./static/js/htmx.min.js ]; then
+        cp ${htmxJs} ./static/js/htmx.min.js
+    fi
     ${cssBuildScript}/bin/tailwind-build
+    ${dbSetupScript}/bin/setup-database
+
   '';
 
   meta = with lib; {

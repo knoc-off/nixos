@@ -63,9 +63,71 @@ pub struct ResumeData {
 }
 
 mod filters {
+    use std::fs;
+    use std::collections::HashMap;
+    use once_cell::sync::Lazy;
+
+    // Define icon set mappings
+    static ICON_SETS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
+        let mut m = HashMap::new();
+        m.insert("cf", "circle-flags");
+        m.insert("sti", "super-tiny-icons");
+        m.insert("tif", "tabler-icons-filled");
+        m.insert("tio", "tabler-icons-outline");
+        m
+    });
+
     pub fn optional_string(opt: &Option<String>) -> ::askama::Result<String> {
         Ok(opt.clone().unwrap_or_default())
     }
+
+pub fn svg_icon(class: &str) -> ::askama::Result<String> {
+    let icon_name = class
+        .split_whitespace()
+        .find(|c| c.starts_with("svg_icon_"))
+        .and_then(|c| c.strip_prefix("svg_icon_"))
+        .ok_or_else(|| askama::Error::Custom("No svg_icon_ class found".into()))?;
+
+    let classes = class
+        .split_whitespace()
+        .filter(|c| !c.starts_with("svg_icon_"))
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    let file_path = match icon_name.split_once('-') {
+        Some((prefix, name)) if ICON_SETS.contains_key(prefix) =>
+            format!("static/icons/{}/{}.svg", ICON_SETS[prefix], name),
+        _ => format!("static/icons/{}.svg", icon_name),
+    };
+
+    match fs::read_to_string(&file_path) {
+        Ok(content) => {
+            if let (Some(start), Some(end)) = (content.find("<svg"), content.rfind("</svg>")) {
+                let svg_part = &content[start..end];
+                if let Some(attr_end) = svg_part.find('>') {
+                    let attrs = svg_part[4..attr_end]
+                        .split_whitespace()
+                        .filter(|a| !a.starts_with("class="))
+                        .collect::<Vec<_>>()
+                        .join(" ");
+                    let inner = &svg_part[attr_end + 1..];
+
+                    Ok(format!(
+                        r#"<svg xmlns="http://www.w3.org/2000/svg"  class="{}" {} currentColor="currentColor">{}</svg>"#,
+                        if classes.is_empty() { "w-6 h-6" } else { &classes },
+                        attrs,
+                        inner
+                    ))
+                } else {
+                    Ok("<!-- Invalid SVG -->".to_string())
+                }
+            } else {
+                Ok("<!-- Invalid SVG -->".to_string())
+            }
+        }
+        Err(_) => Ok(format!("<!-- Failed to load: {} -->", file_path))
+    }
+}
 }
 
 #[derive(Template)]

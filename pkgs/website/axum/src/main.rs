@@ -48,7 +48,7 @@ async fn main() {
         .to_string();
 
     // Initialize the database connection pool
-    let pool = SqlitePool::connect("sqlite:database.db")
+    let pool = SqlitePool::connect("sqlite:/opt/website_data/database.db")
         .await
         .expect("Failed to connect to the database");
 
