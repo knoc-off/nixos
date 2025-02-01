@@ -1,7 +1,7 @@
 {pkgs, ...}: {
   plugins = {
     treesitter = {
-      enable = true;
+      enable = false;
       nixvimInjections = true;
       settings = {
         ensure_installed = [
@@ -32,7 +32,7 @@
       };
     };
     treesitter-textobjects = {enable = true;};
-    mini.enable = true;
+    mini.enable = false;
     indent-blankline = {
       enable = true;
       settings = {
@@ -57,23 +57,23 @@
 
   extraPlugins = with pkgs.vimPlugins; [nvim-treesitter-textsubjects];
   extraConfigLua = ''
-    require('mini.indentscope').setup({
-      symbol = "│",
-      draw = {
-        animation = require('mini.indentscope').gen_animation.none(),
-      },
-    })
+    -- require('mini.indentscope').setup({
+    --   symbol = "│",
+    --   draw = {
+    --     animation = require('mini.indentscope').gen_animation.none(),
+    --   },
+    -- })
 
-    require("nvim-treesitter.configs").setup({
-      textsubjects = {
-        enable = true,
-        prev_selection = ",", -- (Optional) keymap to select the previous selection
-        keymaps = {
-          ["."] = "textsubjects-smart",
-          [";"] = "textsubjects-container-outer",
-          ["i;"] = { "textsubjects-container-inner", desc = "Select inside containers (classes, functions, etc.)" },
-        },
-      },
-    })
+    -- require("nvim-treesitter.configs").setup({
+    --   textsubjects = {
+    --     enable = true,
+    --     prev_selection = ",", -- (Optional) keymap to select the previous selection
+    --     keymaps = {
+    --       ["."] = "textsubjects-smart",
+    --       [";"] = "textsubjects-container-outer",
+    --       ["i;"] = { "textsubjects-container-inner", desc = "Select inside containers (classes, functions, etc.)" },
+    --     },
+    --   },
+    -- })
   '';
 }

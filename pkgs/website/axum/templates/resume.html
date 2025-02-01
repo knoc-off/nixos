@@ -192,16 +192,26 @@
           <span class="bg-[#F6FBFF] px-3 py-1 rounded text-sm font-medium text-gray-700">{{ interests }}</span>
           <!--  the next spans should be horizontally centered, and spaced apart. -->
           <div class="flex justify-between w-full px-3 ">
-            <span class="text-gray-500 text-2xl fa_code"></span>
+            <!--span class="text-gray-500 text-2xl fa_code"></span>
             <span class="text-gray-500 text-2xl fa_chess-knight"></span>
             <span class="text-gray-500 text-2xl fa_gamepad"></span>
-            <span class="text-gray-500 text-2xl fa_dice-five"></span>
-            <svg class="w-6 h-6 stroke-red-500 fill-red-100 stroke-1">
-              <circle cx="5" cy="5" r="4"/>
-            </svg>
-            <svg class="w-6 h-6 stroke-red-500 fill-red-100 stroke-1">
-              <use xlink:href="/static/icons/tabler-icons-filled/stack.svg#icon" />
-            </svg>
+            <span class="text-gray-500 text-2xl fa_dice-five"></span-->
+            <!--
+            {{ "svg_icon_tio-chess-knight stroke-gray-500 fill-gray-100 stroke-4 w-6 h-6"|svg_icon|safe }}
+            {{ "svg_icon_tio-dice-5 text-gray-500 stroke-gray-500 fill-gray-100 stroke-4 w-6 h-6"|svg_icon|safe }}
+            -->
+            {{ "svg_icon_tio-meeple stroke-gray-500 fill-gray-100 stroke-4 w-6 h-6"|svg_icon|safe }}
+            {{ "svg_icon_tio-salad stroke-gray-500 fill-gray-100 stroke-4 w-6 h-6"|svg_icon|safe }}
+            <!--
+            {{ "svg_icon_tio-battery-vertical-charging stroke-gray-500 fill-gray-100 stroke-4 w-6 h-6"|svg_icon|safe }}
+            {{ "svg_icon_tio-device-remote stroke-gray-500 fill-gray-100 stroke-4 w-6 h-6"|svg_icon|safe }}
+            {{ "svg_icon_tio-device-tv-old stroke-gray-500 fill-gray-100 stroke-4 w-6 h-6"|svg_icon|safe }}
+            -->
+            {{ "svg_icon_tio-cpu stroke-gray-500 fill-gray-100 stroke-4 w-6 h-6"|svg_icon|safe }}
+            {{ "svg_icon_tio-code  stroke-gray-500 fill-gray-100 stroke-4 w-6 h-6"|svg_icon|safe }}
+            <!--
+            {{ "svg_icon_tio-device-gamepad  stroke-gray-500 fill-gray-100 stroke-4 w-6 h-6"|svg_icon|safe }}
+            -->
           </div>
         </div>
       </section>

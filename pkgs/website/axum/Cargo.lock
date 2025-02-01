@@ -213,6 +213,7 @@ dependencies = [
  "askama-filters",
  "axum",
  "lazy_static",
+ "once_cell",
  "rand",
  "serde",
  "serde_json",
