@@ -1,7 +1,7 @@
 {pkgs, ...}: {
   plugins = {
     treesitter = {
-      enable = false;
+      enable = true;
       nixvimInjections = true;
       settings = {
         ensure_installed = [

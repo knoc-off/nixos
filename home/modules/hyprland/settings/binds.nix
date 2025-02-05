@@ -259,7 +259,7 @@ in {
 
         # launcher
         #"${mainMod}, SPACE, exec, ${pkgs.ulauncher}/bin/ulauncher" # this launcher sucks
-        "${mainMod}, Space, global, kando:example-menu"
+        "${mainMod}, Space, global, kando:main-menu"
 
         # screenshot
         ", Print, exec, ${pkgs.gscreenshot}/bin/gscreenshot -sc"

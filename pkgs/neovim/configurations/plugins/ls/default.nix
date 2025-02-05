@@ -1,6 +1,6 @@
 {
   imports = [
-    ./treesitter.nix
+    #./treesitter.nix
     ./lsp.nix
     ./cmp.nix
 

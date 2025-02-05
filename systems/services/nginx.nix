@@ -27,31 +27,30 @@ in {
 
   services.nginx.enable = true;
 
+  #services.nginx.virtualHosts."niko.ink" = {
+  #  forceSSL = true;
+  #  enableACME = true;
+  #  locations = {
+  #    "/" = {
+  #      root = "${self.packages.${pkgs.system}.website.portfolio}/lib";
+  #      tryFiles = "$uri $uri/ /index.html";
+  #    };
+  #  };
+  #};
+
+  # passing proxy, port
   services.nginx.virtualHosts."niko.ink" = {
     forceSSL = true;
     enableACME = true;
-    locations = {
-      "/" = {
-        root = "${self.packages.${pkgs.system}.website.portfolio}/lib";
-        tryFiles = "$uri $uri/ /index.html";
-      };
+    locations."/" = {
+      proxyPass = "http://127.0.0.1:3000";
+      proxyWebsockets = true;
+      extraConfig = ''
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+      '';
     };
   };
-
-  # passing proxy, port
-  #  services.nginx.virtualHosts."niko.ink" = {
-  #    forceSSL = true;
-  #    enableACME = true;
-  #    locations."/" = {
-  #      proxyPass = "http://127.0.0.1:8080";
-  #      proxyWebsockets = true;
-  #      extraConfig = ''
-  #        proxy_set_header Upgrade $http_upgrade;
-  #        proxy_set_header Connection "upgrade";
-  #      '';
-  #    };
-  #  };
-  #
 
   #  # Eileen Domain:
   #  security.acme.certs."agedesign.org" = {
