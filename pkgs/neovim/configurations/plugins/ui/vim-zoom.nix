@@ -108,7 +108,7 @@
           };
         };
         scroll = {
-          enable = false;
+          enable = true;
         };
         open = {
           enable = false;

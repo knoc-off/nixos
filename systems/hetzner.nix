@@ -28,6 +28,7 @@
 
     # services
     ./services/nginx.nix
+    ./services/website.nix
 
     # mail
     # ./services/imapfilter

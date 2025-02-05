@@ -85,8 +85,8 @@
 
       devShells = forAllSystems (system: mkPkgs system);
 
-      nixosModules = import ./modules/nixos/default.nix;
-      homeModules = import ./modules/home/default.nix;
+      nixosModules = import ./modules/nixos/default.nix { inherit self; };
+      homeModules = import ./modules/home/default.nix { inherit self; };
 
       overlays = import ./overlays { inherit inputs; };
 

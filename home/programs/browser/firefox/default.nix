@@ -1,6 +1,5 @@
 { inputs, pkgs, theme, lib, colorLib, config, ... }:
 let
-
   addons = inputs.firefox-addons.packages.${pkgs.system};
 
   firefox-csshacks = pkgs.stdenv.mkDerivation {
@@ -10,6 +9,35 @@ let
       cp -r . $out
     '';
   };
+
+  # Extension groups
+  essentialExtensions = with addons; [
+    ublock-origin
+    bitwarden
+    sidebery
+    tridactyl
+  ];
+
+  privacyExtensions = with addons; [
+    smart-referer
+    cookie-autodelete
+    user-agent-string-switcher
+  ];
+
+  appearanceExtensions = with addons; [ darkreader nighttab ];
+
+  utilityExtensions = with addons; [
+    translate-web-pages
+    export-cookies-txt
+    violentmonkey
+    history-cleaner
+    istilldontcareaboutcookies
+  ];
+
+  # Combine extension sets with priorities
+  mkExtensionSet = sets:
+    lib.mkMerge (map (set: lib.mkOverride set.priority set.extensions) sets);
+
 in rec {
   programs.firefox = {
     enable = true;
@@ -18,64 +46,43 @@ in rec {
       id = 0;
       name = "main";
 
-      # addons
-      extensions = import ./addons { inherit addons; };
+      # Full featured profile - all extension sets
+      extensions = mkExtensionSet [
+        {
+          priority = 100;
+          extensions = essentialExtensions;
+        }
+        {
+          priority = 200;
+          extensions = privacyExtensions;
+        }
+      ];
 
-      userChrome =
-        import ./userChrome.nix { inherit theme colorLib firefox-csshacks; };
-
-      # custom search engines, default, etc.
-      search.engines = import ./searchEngines { inherit pkgs; };
-      search = {
-        force = true;
-        default = "duckduckgo";
-        order = [
-          "Annas-Archive"
-          "NixOS Wiki"
-          "Nix Packages"
-          "Nix Options"
-          "Home-Manager"
-          "StackOverflow"
-          "Github"
-          "fmhy"
-        ];
-      };
-
+      userChrome = import ./userChrome.nix { inherit theme colorLib firefox-csshacks; };
+      search = import ./searchEngines { inherit pkgs lib; };
     };
+
     profiles."minimal" = {
       isDefault = false;
       id = 1;
       name = "minimal";
 
-      # addons
-      extensions = import ./addons/minimal.nix { inherit addons; };
+      # Minimal profile - only essential extensions
+      extensions = mkExtensionSet [{
+        priority = 100;
+        extensions = essentialExtensions;
+      }];
 
-      # custom search engines, default, etc.
-      search.engines = import ./searchEngines { inherit pkgs; };
-      search = {
-        force = true;
-        default = "duckduckgo";
-        order = [
-          "Annas-Archive"
-          "NixOS Wiki"
-          "Nix Packages"
-          "Nix Options"
-          "Home-Manager"
-          "StackOverflow"
-          "Github"
-          "fmhy"
-        ];
-      };
+      # Rest of minimal profile config...
+      search = import ./searchEngines { inherit pkgs lib; };
     };
+
     profiles."testing2" = {
       isDefault = false;
       id = 2;
       name = "testing2";
 
-      #extensions = import ./addons { inherit addons; };
-      #userChrome =
-      #  import ./userChrome.nix { inherit theme colorLib firefox-csshacks; };
-     };
+    };
   };
 
   # auto generate the desktop entries for each profile
@@ -101,6 +108,3 @@ in rec {
     };
   };
 }
-
-#  xdg.desktopEntries = {
-#  };

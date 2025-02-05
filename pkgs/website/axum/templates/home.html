@@ -7,6 +7,113 @@
 <div class="container mx-auto mt-8">
     <h1 class="text-3xl font-bold mb-6">Welcome to the Home Page</h1>
 
+
+<body>
+    <style>
+        .scroll-container {
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
+        }
+        .slide {
+            scroll-snap-align: start;
+        }
+    </style>
+    <main class="min-h-screen">
+        <!-- Layout Container -->
+        <div class="container mx-auto px-4">
+            <section class="copy mb-8">
+                <h1 class="text-4xl font-bold mb-4">Title</h1>
+                <p class="text-lg">
+                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                </p>
+            </section>
+
+            <!-- Fullwidth Section with Slider -->
+            <section class="copy mb-8">
+                <div class="container mx-auto px-4">
+                    <h2 class="text-3xl font-bold mb-4">Slides</h2>
+                    <div class="scroll-container flex overflow-x-auto snap-x snap-mandatory px-4 pb-4">
+                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
+                            <h3 class="font-bold">Slide 1</h3>
+                            <p>Lorem ipsum dolor sit amet</p>
+                        </div>
+                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
+                            <h3 class="font-bold">Slide 2</h3>
+                            <p>Consectetur adipiscing elit</p>
+                        </div>
+                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
+                            <h3 class="font-bold">Slide 3</h3>
+                            <p>Sed do eiusmod tempor</p>
+                        </div>
+                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
+                            <h3 class="font-bold">Slide 4</h3>
+                            <p>Ut labore et dolore</p>
+                        </div>
+                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
+                            <h3 class="font-bold">Slide 5</h3>
+                            <p>Magna aliqua</p>
+                        </div>
+                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
+                            <h3 class="font-bold">Slide 6</h3>
+                            <p>Enim ad minim veniam</p>
+                        </div>
+                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
+                            <h3 class="font-bold">Slide 7</h3>
+                            <p>Quis nostrud exercitation</p>
+                        </div>
+                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
+                            <h3 class="font-bold">Slide 8</h3>
+                            <p>Ullamco laboris</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Grid Section -->
+            <section class="container mx-auto px-4 mb-8">
+                <h2 class="text-3xl font-bold mb-4">Grid</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    <div class="bg-green-500 p-4">1</div>
+                    <div class="bg-green-500 p-4">2</div>
+                    <div class="bg-green-500 p-4">3</div>
+                    <div class="bg-green-500 p-4">4</div>
+                    <div class="bg-green-500 p-4">5</div>
+                    <div class="bg-green-500 p-4">6</div>
+                    <div class="bg-green-500 p-4">7</div>
+                    <div class="bg-green-500 p-4">8</div>
+                </div>
+            </section>
+
+            <!-- Max 2 Column Grid -->
+            <section class="container mx-auto px-4">
+                <h2 class="text-3xl font-bold mb-4">Grid with a max of 2 columns</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-white p-4">
+                        <h4 class="font-bold mb-2">Card 1</h4>
+                        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+                    </div>
+                    <div class="bg-white p-4">
+                        <h4 class="font-bold mb-2">Card 2</h4>
+                        <p>Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+                    </div>
+                    <div class="bg-white p-4">
+                        <h4 class="font-bold mb-2">Card 3</h4>
+                        <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco.</p>
+                    </div>
+                    <div class="bg-white p-4">
+                        <h4 class="font-bold mb-2">Card 4</h4>
+                        <p>Duis aute irure dolor in reprehenderit in voluptate velit.</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+</body>
+</html>
+
+
+
     <!-- Add Form -->
     <form hx-post="/api/data"
           hx-target="#data-table"

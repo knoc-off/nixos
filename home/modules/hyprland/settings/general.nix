@@ -113,7 +113,7 @@ in {
       disable_while_typing = false;
 
       natural_scroll = true;
-      scroll_factor = 0.5;
+      scroll_factor = 0.2;
       middle_button_emulation = true;
       tap-and-drag = true;
       drag_lock = false;

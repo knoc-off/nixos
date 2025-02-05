@@ -5,6 +5,8 @@ use std::fs;
 use anyhow::Result;
 use crate::HtmlTemplate;
 
+use crate::config;
+
 #[derive(Debug, Deserialize)]
 pub struct Job {
     pub title: String,
@@ -66,6 +68,7 @@ mod filters {
     use std::fs;
     use std::collections::HashMap;
     use once_cell::sync::Lazy;
+    use crate::config;
 
     // Define icon set mappings
     static ICON_SETS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
@@ -81,23 +84,28 @@ mod filters {
         Ok(opt.clone().unwrap_or_default())
     }
 
-pub fn svg_icon(class: &str) -> ::askama::Result<String> {
-    let icon_name = class
-        .split_whitespace()
-        .find(|c| c.starts_with("svg_icon_"))
-        .and_then(|c| c.strip_prefix("svg_icon_"))
-        .ok_or_else(|| askama::Error::Custom("No svg_icon_ class found".into()))?;
+    pub fn svg_icon(class: &str) -> ::askama::Result<String> {
+        let icon_name = class
+            .split_whitespace()
+            .find(|c| c.starts_with("svg_icon_"))
+            .and_then(|c| c.strip_prefix("svg_icon_"))
+            .ok_or_else(|| askama::Error::Custom("No svg_icon_ class found".into()))?;
 
-    let classes = class
-        .split_whitespace()
-        .filter(|c| !c.starts_with("svg_icon_"))
-        .collect::<Vec<_>>()
-        .join(" ");
+        let classes = class
+            .split_whitespace()
+            .filter(|c| !c.starts_with("svg_icon_"))
+            .collect::<Vec<_>>()
+            .join(" ");
 
-    let file_path = match icon_name.split_once('-') {
-        Some((prefix, name)) if ICON_SETS.contains_key(prefix) =>
-            format!("static/icons/{}/{}.svg", ICON_SETS[prefix], name),
-        _ => format!("static/icons/{}.svg", icon_name),
+        let file_path = match icon_name.split_once('-') {
+            Some((prefix, name)) if ICON_SETS.contains_key(prefix) => {
+                format!("{}/{}.svg",
+                    config::icons_path().display(),
+                    ICON_SETS[prefix].to_owned() + "/" + name)
+            },
+            _ => format!("{}/{}.svg",
+                config::icons_path().display(),
+                icon_name)
     };
 
     match fs::read_to_string(&file_path) {
@@ -150,7 +158,7 @@ pub struct ResumeTemplate {
 }
 
 fn load_resume_data() -> Result<ResumeData> {
-    let file_content = fs::read_to_string("/opt/website_data/resume_data.json")?;
+    let file_content = fs::read_to_string(config::resume_data_path())?;
     let resume_data: ResumeData = serde_json::from_str(&file_content)?;
     Ok(resume_data)
 }

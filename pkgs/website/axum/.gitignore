@@ -5,6 +5,9 @@
 database.db
 database.db*
 
+# user content files. should be unique.
+/user_content
+/website_data
 
 # these are all automatically generated files
 /data

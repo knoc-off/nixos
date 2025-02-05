@@ -30,6 +30,10 @@
       page-break-inside: avoid;
     }
   }
+  @media print {
+    .resume { margin: 0; box-shadow: none; }
+    body { background-color: white; }
+  }
 </style>
 <div class="resume h-[297mm] w-[210mm] my-3 mx-auto bg-white shadow-lg">
   <div class="grid grid-cols-[2.5fr,1fr] grid-rows-[auto,1.2fr] min-h-full">
@@ -131,6 +135,9 @@
           </div>
         {% endif %}
       </section>
+
+
+      <!--   class="hover:scale-110 transform origin-center transition-transform" -->
 
       <!-- Project Highlights -->
       <section>

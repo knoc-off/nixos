@@ -56,6 +56,10 @@
       # M = Alt key
       "<M-k>" = ":move-2<CR>";
       "<M-j>" = ":move+<CR>";
+
+      # scroll by 5 lines with Shift + Up/Down
+      "<S-Up>" = ":execute \"normal! \" . v:count1 * 5 . \"k\"<CR>";
+      "<S-Down>" = ":execute \"normal! \" . v:count1 * 5 . \"j\"<CR>";
     };
 
     visual = lib.mapAttrsToList (key: action: {
@@ -77,6 +81,10 @@
       # move selected line / block of text in mode
       "K" = ":m '<-2<CR>gv=gv";
       "J" = ":m '>+1<CR>gv=gv";
+
+      # move cursor by 5 lines with Shift + Up/Down
+      "<S-Up>" = "5k";
+      "<S-Down>" = "5j";
     };
 
     # insert mode mappings
@@ -89,6 +97,10 @@
 
       # Move cursor to the start of the line
       "<C-a>" = "<Home>";
+
+      # move cursor by 5 lines with Shift + Up/Down
+      "<S-Up>" = "5k";
+      "<S-Down>" = "5j";
 
     };
 
