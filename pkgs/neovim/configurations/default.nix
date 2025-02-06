@@ -18,6 +18,7 @@
     ./plugins/ui/vim-zoom.nix
 
     ./plugins/productivity/copilot.nix
+    #./plugins/productivity/codecompanion.nix
 
 
     ## lsp

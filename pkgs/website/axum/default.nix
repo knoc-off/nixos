@@ -149,6 +149,7 @@ in rustPlatform.buildRustPackage rec {
       extensions = [ "rust-src" ];
       targets = [ "wasm32-unknown-unknown" ];
     })
+    libyaml
     pkg-config
     tailwindcss
     python3

@@ -11,7 +11,6 @@ use axum::{
 mod config;
 
 
-use axum::response::Response;
 use std::fs;
 use tower_http::services::ServeDir;
 
@@ -19,12 +18,12 @@ use sqlx::SqlitePool;
 use tracing_subscriber;
 
 mod middleware;
-use axum::{extract::ConnectInfo, middleware::from_fn_with_state};
+use axum::middleware::from_fn_with_state;
 use middleware::logger::log_request;
 use std::net::SocketAddr;
 
 mod handlers;
-use handlers::{hidden::hidden, home::home, not_found::not_found, resume::resume_main};
+use handlers::{home::home, not_found::not_found, resume::resume_main};
 
 use askama::Template;
 
