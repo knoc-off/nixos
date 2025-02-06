@@ -1,138 +1,133 @@
 {% extends "base.html" %}
 {% block title %}Home Page{% endblock %}
 {% block content %}
-<nav class="bg-white shadow">
+    <nav class="bg-white shadow">
     <!-- ... nav ... -->
-</nav>
-<div class="container mx-auto mt-8">
-    <h1 class="text-3xl font-bold mb-6">Welcome to the Home Page</h1>
+    </nav>
+    <div class="container mx-auto mt-8">
+        <h1 class="text-3xl font-bold mb-6">Welcome to the Home Page</h1>
 
-
-<body>
-    <style>
-        .scroll-container {
-            scroll-snap-type: x mandatory;
-            -webkit-overflow-scrolling: touch;
-            scroll-behavior: smooth;
-        }
-        .slide {
-            scroll-snap-align: start;
-        }
-    </style>
-    <main class="min-h-screen">
-        <!-- Layout Container -->
-        <div class="container mx-auto px-4">
-            <section class="copy mb-8">
-                <h1 class="text-4xl font-bold mb-4">Title</h1>
-                <p class="text-lg">
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-                </p>
-            </section>
-
-            <!-- Fullwidth Section with Slider -->
-            <section class="copy mb-8">
+        <body>
+            <style>
+                .scroll-container {
+                    scroll-snap-type: x mandatory;
+                    -webkit-overflow-scrolling: touch;
+                    scroll-behavior: smooth;
+                }
+                .slide {
+                    scroll-snap-align: start;
+                }
+            </style>
+            <main class="min-h-screen">
+                <!-- Layout Container -->
                 <div class="container mx-auto px-4">
-                    <h2 class="text-3xl font-bold mb-4">Slides</h2>
-                    <div class="scroll-container flex overflow-x-auto snap-x snap-mandatory px-4 pb-4">
-                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
-                            <h3 class="font-bold">Slide 1</h3>
-                            <p>Lorem ipsum dolor sit amet</p>
+                    <section class="copy mb-8">
+                        <h1 class="text-4xl font-bold mb-4">Title</h1>
+                        <p class="text-lg">
+                            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+                        </p>
+                    </section>
+
+
+                    <!-- Sliding cards section. -->
+                    <section class="copy mb-8 relative">
+                        <div class="container mx-auto">
+                            <h2 class="text-3xl font-bold mb-4">Latest Blurbs</h2>
+                            <div class="relative">
+                                <div class="fade-out-left absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-gray-100 to-transparent z-10 pointer-events-none transition-opacity duration-300 opacity-0"></div>
+                                <div class="fade-out-right absolute inset-y-0 right-0 w-16 bg-gradient-to-l from-gray-100 to-transparent z-10 pointer-events-none transition-opacity duration-300"></div>
+                                <div id="blog-slider" class="flex overflow-y-visible overflow-x-auto snap-x snap-mandatory pl-2 pr-[50%] pt-8 pb-8 h-[70vh] md:h-96 space-x-8 scroll-smooth touch-pan-x scroll-pl-12 pl-5"></div>
+                            </div>
                         </div>
-                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
-                            <h3 class="font-bold">Slide 2</h3>
-                            <p>Consectetur adipiscing elit</p>
+                    </section>
+
+                    <!-- Grid Section -->
+                    <section class="container mx-auto px-4 mb-8">
+                        <h2 class="text-3xl font-bold mb-4">Grid</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            <div class="bg-green-500 p-4">1</div>
+                            <div class="bg-green-500 p-4">2</div>
+                            <div class="bg-green-500 p-4">3</div>
+                            <div class="bg-green-500 p-4">4</div>
+                            <div class="bg-green-500 p-4">5</div>
+                            <div class="bg-green-500 p-4">6</div>
+                            <div class="bg-green-500 p-4">7</div>
+                            <div class="bg-green-500 p-4">8</div>
                         </div>
-                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
-                            <h3 class="font-bold">Slide 3</h3>
-                            <p>Sed do eiusmod tempor</p>
+                    </section>
+
+                    <!-- Max 2 Column Grid -->
+                    <section class="container mx-auto px-4">
+                        <h2 class="text-3xl font-bold mb-4">Grid with a max of 2 columns</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="bg-white p-4">
+                                <h4 class="font-bold mb-2">Card 1</h4>
+                                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+                            </div>
+                            <div class="bg-white p-4">
+                                <h4 class="font-bold mb-2">Card 2</h4>
+                                <p>Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
+                            </div>
+                            <div class="bg-white p-4">
+                                <h4 class="font-bold mb-2">Card 3</h4>
+                                <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco.</p>
+                            </div>
+                            <div class="bg-white p-4">
+                                <h4 class="font-bold mb-2">Card 4</h4>
+                                <p>Duis aute irure dolor in reprehenderit in voluptate velit.</p>
+                            </div>
                         </div>
-                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
-                            <h3 class="font-bold">Slide 4</h3>
-                            <p>Ut labore et dolore</p>
-                        </div>
-                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
-                            <h3 class="font-bold">Slide 5</h3>
-                            <p>Magna aliqua</p>
-                        </div>
-                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
-                            <h3 class="font-bold">Slide 6</h3>
-                            <p>Enim ad minim veniam</p>
-                        </div>
-                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
-                            <h3 class="font-bold">Slide 7</h3>
-                            <p>Quis nostrud exercitation</p>
-                        </div>
-                        <div class="slide flex-shrink-0 w-[calc(100vw-2rem)] md:w-[calc(50vw-2rem)] lg:w-[calc(33.33vw-2rem)] xl:w-[calc(25vw-2rem)] bg-blue-500 p-4 mx-2">
-                            <h3 class="font-bold">Slide 8</h3>
-                            <p>Ullamco laboris</p>
-                        </div>
-                    </div>
+                    </section>
                 </div>
-            </section>
+            </main>
+        </body>
+    </html>
 
-            <!-- Grid Section -->
-            <section class="container mx-auto px-4 mb-8">
-                <h2 class="text-3xl font-bold mb-4">Grid</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    <div class="bg-green-500 p-4">1</div>
-                    <div class="bg-green-500 p-4">2</div>
-                    <div class="bg-green-500 p-4">3</div>
-                    <div class="bg-green-500 p-4">4</div>
-                    <div class="bg-green-500 p-4">5</div>
-                    <div class="bg-green-500 p-4">6</div>
-                    <div class="bg-green-500 p-4">7</div>
-                    <div class="bg-green-500 p-4">8</div>
-                </div>
-            </section>
-
-            <!-- Max 2 Column Grid -->
-            <section class="container mx-auto px-4">
-                <h2 class="text-3xl font-bold mb-4">Grid with a max of 2 columns</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="bg-white p-4">
-                        <h4 class="font-bold mb-2">Card 1</h4>
-                        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>
+    <script>
+        document.addEventListener('DOMContentLoaded',()=>{
+            const s=document.getElementById('blog-slider'),
+                  l=document.querySelector('.fade-out-left'),
+                  r=document.querySelector('.fade-out-right');
+            const u=()=>{
+                const d=20;
+                l.style.opacity=s.scrollLeft>d?1:0;
+                r.style.opacity=s.scrollLeft<s.scrollWidth-s.clientWidth-d?1:0;
+            };
+            s.addEventListener('scroll',u);
+            window.addEventListener('resize',u);
+            fetch('/blogs')
+                .then(r=>r.json())
+                .then(b=>{
+                    b.forEach(b=>{
+                        const c=document.createElement('div');
+                        c.className='snap-start flex-shrink-0 w-[85vw] md:w-2/3 aspect-[1/1.5] bg-cover bg-center rounded-lg overflow-hidden shadow-lg relative transition-transform duration-200 ease-in-out cursor-pointer hover:scale-105';
+                        c.style.backgroundImage=`url('${b.metadata.img_url}')`;
+                        c.onclick=e=>{
+                            if(!e.target.classList.contains('tag')){
+                                setTimeout(()=>window.location.href=b.url,200);
+                            }
+                        };
+                        c.innerHTML=`
+                    <div class="absolute inset-0 flex flex-col justify-between">
+                        <div class="bg-white/90 p-4 md:p-6 rounded-br-lg max-w-[80%]">
+                            <h3 class="font-bold text-xl md:text-lg">${b.title}</h3>
+                            <p class="text-base md:text-sm text-gray-600">${b.metadata.date}</p>
+                        </div>
+                        <div class="bg-white/90 p-4 md:p-6">
+                            <p class="text-base md:text-sm text-gray-800">${b.metadata.description}</p>
+                            <div class="flex flex-wrap mt-2">
+                                ${b.metadata.tags.map(t=>`<span class="tag text-sm md:text-xs bg-blue-500 text-white px-3 md:px-2 py-1.5 md:py-1 rounded-full mr-2 mb-2">${t}</span>`).join('')}
+                            </div>
+                        </div>
                     </div>
-                    <div class="bg-white p-4">
-                        <h4 class="font-bold mb-2">Card 2</h4>
-                        <p>Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-                    </div>
-                    <div class="bg-white p-4">
-                        <h4 class="font-bold mb-2">Card 3</h4>
-                        <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco.</p>
-                    </div>
-                    <div class="bg-white p-4">
-                        <h4 class="font-bold mb-2">Card 4</h4>
-                        <p>Duis aute irure dolor in reprehenderit in voluptate velit.</p>
-                    </div>
-                </div>
-            </section>
-        </div>
-    </main>
-</body>
-</html>
-
-
-
-    <!-- Add Form -->
-    <form hx-post="/api/data"
-          hx-target="#data-table"
-          class="mb-6 space-y-4">
-        <input type="text"
-               name="name"
-               placeholder="Enter name"
-               class="px-4 py-2 border rounded-md">
-        <button type="submit"
-                class="px-4 py-2 bg-blue-500 text-white rounded-md">
-            Add Item
-        </button>
-    </form>
-
-    <!-- Data Table -->
-    <div id="data-table"
-         hx-get="/api/data"
-         hx-trigger="load">
+                `;
+                        s.appendChild(c);
+                    });
+                    s.appendChild(Object.assign(document.createElement('div'),{className:'flex-shrink-0 w-[50%]'}));
+                    setTimeout(u, 100);
+                })
+                .catch(e=>console.error('Error fetching blog data:',e));
+        });
+    </script>
     </div>
-</div>
 {% endblock %}
-

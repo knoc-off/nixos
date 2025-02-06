@@ -10,10 +10,14 @@ use std::fs;
 use crate::config;
 use crate::HtmlTemplate;
 use askama::Template;
-use axum::response::Html;
 
 use std::path::PathBuf;
 
+use regex::Regex;
+
+
+use serde_yaml::Value as YamlValue;
+use serde_json::Value as JsonValue;
 
 use axum::response::Redirect;
 
@@ -34,12 +38,26 @@ struct BlogPost {
     id: String,
     title: String,
     url: String,
+    metadata: serde_json::Value,
 }
 
 
 fn get_cache_path(post_id: &str) -> PathBuf {
     config::website_data_path().join("cache").join(format!("{}.html", post_id))
 }
+
+fn extract_metadata(content: &str) -> JsonValue {
+    let re = Regex::new(r"(?s)<!--\s*---\s*(.*?)\s*---\s*-->").unwrap();
+    if let Some(caps) = re.captures(content) {
+        let yaml_str = caps.get(1).unwrap().as_str().trim();
+        match serde_yaml::from_str::<YamlValue>(yaml_str) {
+            Ok(yaml_value) => return serde_json::to_value(yaml_value).unwrap_or_default(),
+            Err(e) => println!("YAML parsing error: {}", e), // Debug print
+        }
+    }
+    JsonValue::Object(serde_json::Map::new())
+}
+
 
 pub async fn list_blog_posts() -> impl IntoResponse {
     let blog_dir = config::website_data_path().join("blogs");
@@ -54,8 +72,14 @@ pub async fn list_blog_posts() -> impl IntoResponse {
                     let content = fs::read_to_string(&path).unwrap_or_default();
                     let title = extract_title(&content);
                     let url = format!("/blog/{}/{}", post_id, title.replace(' ', "-").to_lowercase());
+                    let metadata = extract_metadata(&content);
 
-                    blog_posts.push(BlogPost { id: post_id, title, url });
+                    blog_posts.push(BlogPost {
+                        id: post_id,
+                        title,
+                        url,
+                        metadata,
+                    });
                 }
             }
         }

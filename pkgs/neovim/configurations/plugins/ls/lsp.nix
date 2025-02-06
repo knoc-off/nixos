@@ -15,10 +15,11 @@
         pylsp.enable = true;
         rust_analyzer = {
           enable = true;
-          installCargo = true;
-          installRustc = true;
+          #installCargo = true;
+          #installRustc = true;
         };
         ts_ls.enable = true;
+        tailwindcss.enable = true;
       };
       keymaps = {
         silent = true;
