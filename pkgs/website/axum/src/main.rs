@@ -2,7 +2,7 @@ use axum::{
     extract::Extension,
     http::{Request, StatusCode},
     response::{Html, IntoResponse, Redirect},
-    routing::{get, get_service, patch, put},
+    routing::{get, get_service, put}, // Changed patch to put
     Router,
 };
 use std::fs;
@@ -12,6 +12,7 @@ use sqlx::SqlitePool;
 use tracing_subscriber;
 
 mod config;
+mod utils;
 
 mod handlers;
 use handlers::{home::home, not_found::not_found, resume::resume_main};
@@ -99,7 +100,7 @@ async fn main() {
         .route("/", get(home))
         // Enforce HTTPS for blog endpoints
         .route("/blogs/:post_id/:slug", get(handlers::blog::blog_post))
-        .route("/blogs/:id", patch(handlers::blog::update_blog_post))
+        .route("/blogs/:id", put(handlers::blog::update_blog_post))
         .route("/blogs", get(handlers::blog::list_blog_posts))
         .route("/blogs", put(handlers::blog::create_blog_post))
         .with_state(auth_state)

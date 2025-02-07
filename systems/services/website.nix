@@ -18,7 +18,7 @@
         # result/share/static/{css,fonts,icons,js}
 
         "+${pkgs.coreutils}/bin/mkdir -p /var/lib/axum-website/user-content"
-        "+${pkgs.chown}/bin/chown -R axum:axum /var/lib/axum-website"
+        "+${pkgs.coreutils}/bin/chown -R axum:axum /var/lib/axum-website"
       ];
       ExecStart = "${self.packages.${pkgs.system}.website.axum}/bin/axum-website";
       Restart = "always";

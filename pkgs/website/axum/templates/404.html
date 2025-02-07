@@ -15,6 +15,9 @@
             The page you’re looking for doesn’t exist. But don't worry,
             we’re sure you’ll find something awesome here.
         </p>
+        <p class="text-lg text-gray-600">
+            You were trying to access: {{ attempted_url }}
+        </p>
     </header>
 
     <!-- Middle section: Canvas area for WASM graphic -->
@@ -58,3 +61,4 @@
 </script>
 
 {% endblock %}
+
