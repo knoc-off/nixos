@@ -1,9 +1,10 @@
+use anyhow::{Context, Result};
 use askama::Template;
 use axum::{
     body::Body,
     extract::{Extension, Path, Query, Request, State},
-    http::{header::AUTHORIZATION, StatusCode},
     http::HeaderValue,
+    http::{header::AUTHORIZATION, StatusCode},
     response::{IntoResponse, Json, Redirect},
 };
 use bytes::Bytes;
@@ -11,9 +12,9 @@ use pulldown_cmark::{html::push_html, Options, Parser};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use std::sync::Arc;
-use anyhow::{Context, Result};
 
-use crate::HtmlTemplate;
+use crate::utils::encode_base62;
+use crate::HtmlTemplate; // Import the encoding function
 
 #[derive(Template)]
 #[template(path = "blog.html")]
@@ -24,7 +25,7 @@ struct BlogTemplate {
 
 #[derive(Serialize, Deserialize, Debug, sqlx::FromRow)]
 pub struct BlogPost {
-    pub id: i64,
+    pub id: String,
     pub title: String,
     pub slug: String,
     pub content: String,
@@ -33,20 +34,20 @@ pub struct BlogPost {
     pub updated_at: String,
     pub cached_html: Option<String>,
     pub json_tags: Option<String>,
+    pub deleted: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug, sqlx::FromRow)]
 pub struct BlogPostSummary {
-    pub id: i64,
+    pub id: String, // UUID
     pub title: String,
     pub slug: String,
     pub metadata: String,
     pub created_at: String,
     pub updated_at: String,
     pub json_tags: Option<String>,
-    pub cached_html: Option<String>,
+    //pub cached_html: Option<String>,
 }
-
 
 #[derive(Serialize, Deserialize, Debug, sqlx::FromRow)]
 pub struct Tag {
@@ -62,12 +63,13 @@ pub struct NewBlogPost {
     pub tags: Vec<String>,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct UpdateBlogPost {
     pub title: Option<String>,
     pub content: Option<String>,
     pub metadata: Option<String>,
     pub tags: Option<Vec<String>>,
+    pub deleted: Option<bool>,
 }
 
 // Shared state for authentication
@@ -93,7 +95,9 @@ pub async fn create_blog_post(
     println!("create_blog_post: Auth header: {:?}", auth_header);
 
     match auth_header {
-        Some(auth_token) if auth_token.strip_prefix("Bearer ").unwrap_or(auth_token) == auth_state.api_key => {
+        Some(auth_token)
+            if auth_token.strip_prefix("Bearer ").unwrap_or(auth_token) == auth_state.api_key =>
+        {
             println!("create_blog_post: Authentication successful");
 
             // Manually extract the JSON payload
@@ -128,10 +132,28 @@ pub async fn create_blog_post(
             // Start a transaction
             let mut tx = pool.begin().await.expect("Failed to start transaction");
 
+            // Increment the counter
+            let updated_counter: (i64,) = sqlx::query_as(
+                "UPDATE blog_post_counter SET counter = counter + 1 WHERE id = 1 RETURNING counter",
+            )
+            .fetch_one(&mut *tx)
+            .await
+            .map_err(|e| {
+                eprintln!("Failed to increment counter: {}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Failed to create blog post",
+                )
+            })
+            .expect("error"); // BAD UNWRAP!
+
+            let post_id = encode_base62(updated_counter.0); // Encode the counter value
+
             // Insert the new blog post
             let result = sqlx::query(
-                "INSERT INTO blog_posts (title, slug, content, metadata, json_tags) VALUES (?, ?, ?, ?, ?)"
+                "INSERT INTO blog_posts (id, title, slug, content, metadata, json_tags) VALUES (?, ?, ?, ?, ?, ?)"
             )
+            .bind(&post_id)
             .bind(&title)
             .bind(&slug)
             .bind(&content)
@@ -149,11 +171,13 @@ pub async fn create_blog_post(
                     eprintln!("create_blog_post: Failed to insert blog post: {}", e);
                     println!("create_blog_post: Failed to insert blog post: {}", e);
                     tx.rollback().await.expect("Failed to rollback transaction");
-                    return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to create blog post").into_response();
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Failed to create blog post",
+                    )
+                        .into_response();
                 }
             };
-
-            let blog_post_id = result.last_insert_rowid();
 
             // Insert the tags
             for tag_name in new_post.tags {
@@ -179,7 +203,7 @@ pub async fn create_blog_post(
 
                 // Insert into the join table
                 sqlx::query("INSERT INTO blog_post_tags (blog_post_id, tag_id) VALUES (?, ?)")
-                    .bind(blog_post_id)
+                    .bind(&post_id)
                     .bind(tag_id)
                     .execute(&mut *tx)
                     .await
@@ -195,8 +219,8 @@ pub async fn create_blog_post(
         }
         _ => {
             println!("create_blog_post: Authentication failed");
-            return (StatusCode::UNAUTHORIZED, "Invalid API key").into_response()
-        },
+            return (StatusCode::UNAUTHORIZED, "Invalid API key").into_response();
+        }
     }
 }
 
@@ -204,7 +228,7 @@ pub async fn create_blog_post(
 pub async fn update_blog_post(
     State(auth_state): State<Arc<AuthState>>,
     Extension(pool): Extension<SqlitePool>,
-    Path(id): Path<i64>,
+    Path(id): Path<String>, // UUID
     req: Request,
 ) -> impl IntoResponse {
     // Authentication
@@ -214,7 +238,9 @@ pub async fn update_blog_post(
         .and_then(|header: &HeaderValue| header.to_str().ok());
 
     match auth_header {
-        Some(auth_token) if auth_token.strip_prefix("Bearer ").unwrap_or(auth_token) == auth_state.api_key => {
+        Some(auth_token)
+            if auth_token.strip_prefix("Bearer ").unwrap_or(auth_token) == auth_state.api_key =>
+        {
             // Manually extract the JSON payload
             let body: Body = req.into_body();
             let bytes: Bytes = match axum::body::to_bytes(body, usize::MAX).await {
@@ -234,21 +260,40 @@ pub async fn update_blog_post(
             };
 
             // Fetch the existing blog post
-            let existing_post: BlogPost = match sqlx::query_as("SELECT * FROM blog_posts WHERE id = ?")
-                .bind(id)
-                .fetch_one(&pool)
-                .await {
-                Ok(post) => post,
-                Err(_) => return (StatusCode::NOT_FOUND, "Blog post not found").into_response(),
-            };
+            let existing_post: BlogPost =
+                match sqlx::query_as("SELECT * FROM blog_posts WHERE id = ?")
+                    .bind(&id)
+                    .fetch_one(&pool)
+                    .await
+                {
+                    Ok(post) => post,
+                    Err(_) => {
+                        return (StatusCode::NOT_FOUND, "Blog post not found").into_response()
+                    }
+                };
 
             // Update the fields if they are provided
             let title = updated_post.title.unwrap_or(existing_post.title);
             let content = updated_post.content.unwrap_or(existing_post.content);
             let metadata_json = updated_post.metadata.unwrap_or(existing_post.metadata);
             let slug = title_to_slug(&title);
+            let deleted = updated_post.deleted.unwrap_or(existing_post.deleted);
 
-            let tags = updated_post.tags.unwrap_or(Vec::new());
+            // Preserve existing tags if not provided in the update
+            let tags = match updated_post.tags {
+                Some(new_tags) => new_tags,
+                None => {
+                    // Fetch existing tags from the database
+                    let existing_tags: Vec<Tag> = sqlx::query_as("SELECT t.id, t.name FROM tags t INNER JOIN blog_post_tags bpt ON t.id = bpt.tag_id WHERE bpt.blog_post_id = ?")
+                .bind(&id)
+                .fetch_all(&pool)
+                .await
+                .expect("Failed to fetch existing tags");
+
+                    existing_tags.into_iter().map(|tag| tag.name).collect()
+                }
+            };
+
             let json_tags = serde_json::to_string(&tags).unwrap_or_default();
 
             // Start a transaction
@@ -256,14 +301,15 @@ pub async fn update_blog_post(
 
             // Update the blog post in the database
             let result = sqlx::query(
-                "UPDATE blog_posts SET title = ?, slug = ?, content = ?, metadata = ?, json_tags = ?, cached_html = NULL WHERE id = ?"
+                "UPDATE blog_posts SET title = ?, slug = ?, content = ?, metadata = ?, json_tags = ?, cached_html = NULL, deleted = ? WHERE id = ?"
             )
             .bind(&title)
             .bind(&slug)
             .bind(&content)
             .bind(&metadata_json)
             .bind(&json_tags)
-            .bind(id)
+            .bind(deleted)
+            .bind(&id)
             .execute(&mut *tx)
             .await;
 
@@ -272,13 +318,17 @@ pub async fn update_blog_post(
                 Err(e) => {
                     eprintln!("Failed to update blog post: {}", e);
                     tx.rollback().await.expect("Failed to rollback transaction");
-                    return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to update blog post").into_response();
+                    return (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "Failed to update blog post",
+                    )
+                        .into_response();
                 }
             };
 
             // Delete existing tags for the blog post
             sqlx::query("DELETE FROM blog_post_tags WHERE blog_post_id = ?")
-                .bind(id)
+                .bind(&id)
                 .execute(&mut *tx)
                 .await
                 .expect("Failed to delete existing tags");
@@ -307,7 +357,7 @@ pub async fn update_blog_post(
 
                 // Insert into the join table
                 sqlx::query("INSERT INTO blog_post_tags (blog_post_id, tag_id) VALUES (?, ?)")
-                    .bind(id)
+                    .bind(&id)
                     .bind(tag_id)
                     .execute(&mut *tx)
                     .await
@@ -322,7 +372,6 @@ pub async fn update_blog_post(
         _ => return (StatusCode::UNAUTHORIZED, "Invalid API key").into_response(),
     }
 }
-
 
 /// Extract the title from the first `#` heading in the Markdown content
 pub fn extract_title(content: &str) -> String {
@@ -357,7 +406,6 @@ pub struct BlogQueryParams {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
     pub tags: Option<String>,
-
 }
 
 #[axum::debug_handler]
@@ -369,7 +417,7 @@ pub async fn list_blog_posts(
     let offset = params.offset.unwrap_or(0);
     let tags = params.tags.unwrap_or_default();
 
-    let mut query = "SELECT bp.id, bp.title, bp.slug, bp.metadata, bp.created_at, bp.updated_at, bp.json_tags, bp.cached_html FROM blog_posts bp".to_string();
+    let mut query = "SELECT bp.id, bp.title, bp.slug, bp.metadata, bp.created_at, bp.updated_at, bp.json_tags, bp.cached_html FROM blog_posts bp WHERE bp.deleted = FALSE".to_string();
     let mut where_clauses = Vec::new();
     let mut bind_params: Vec<String> = Vec::new();
 
@@ -380,7 +428,7 @@ pub async fn list_blog_posts(
     }
 
     if !where_clauses.is_empty() {
-        query.push_str(" WHERE ");
+        query.push_str(" AND "); // Add AND before tag conditions
         query.push_str(&where_clauses.join(" AND "));
     }
 
@@ -402,16 +450,30 @@ pub async fn list_blog_posts(
 
 
 pub async fn blog_post(
-    Path((post_id, slug)): Path<(i64, String)>,
+    Path((post_id, slug)): Path<(String, String)>, // UUID
     Extension(pool): Extension<SqlitePool>,
 ) -> impl IntoResponse {
     // Fetch the blog post from the database
-    let blog_post: BlogPost = sqlx::query_as("SELECT * FROM blog_posts WHERE id = ?")
-        .bind(post_id)
+    let blog_post: Result<BlogPost, (StatusCode, String)> = sqlx::query_as("SELECT * FROM blog_posts WHERE id = ?")
+        .bind(&post_id)
         .fetch_one(&pool)
         .await
-        .map_err(|_| (StatusCode::NOT_FOUND, "Blog post not found"))
-        .expect("error fetching blog post");
+        .map_err(|_| (StatusCode::NOT_FOUND, "Blog post not found".to_string()));
+
+    let blog_post = match blog_post {
+        Ok(post) => post,
+        Err(_) => {
+            // Construct the redirect URL
+            let redirect_url = format!("/404?url=/blogs/{}/{}", post_id, slug);
+            return Redirect::temporary(&redirect_url).into_response();
+        }
+    };
+
+    if blog_post.deleted {
+        // Construct the redirect URL
+        let redirect_url = format!("/404?url=/blogs/{}/{}", post_id, slug);
+        return Redirect::temporary(&redirect_url).into_response();
+    }
 
     // Extract the title and generate the correct slug
     let title = extract_title(&blog_post.content);
@@ -442,6 +504,7 @@ pub async fn blog_post(
 
     HtmlTemplate(template).into_response()
 }
+
 
 async fn render_markdown(blog_post: &BlogPost, pool: &SqlitePool) -> Result<String, anyhow::Error> {
     // Set up Markdown parser with all extensions enabled
