@@ -1,29 +1,26 @@
 use axum::{
     extract::Extension,
-    http::StatusCode,
-    response::{Html, IntoResponse},
-    routing::{get, get_service, post},
+    http::{Request, StatusCode},
+    response::{Html, IntoResponse, Redirect},
+    routing::{get, get_service, patch, put},
     Router,
 };
-
-
-
-mod config;
-
-
 use std::fs;
 use tower_http::services::ServeDir;
 
 use sqlx::SqlitePool;
 use tracing_subscriber;
 
+mod config;
+
+mod handlers;
+use handlers::{home::home, not_found::not_found, resume::resume_main};
+
 mod middleware;
 use axum::middleware::from_fn_with_state;
 use middleware::logger::log_request;
 use std::net::SocketAddr;
-
-mod handlers;
-use handlers::{home::home, not_found::not_found, resume::resume_main};
+use std::sync::Arc;
 
 use askama::Template;
 
@@ -45,13 +42,24 @@ impl<T: Template> IntoResponse for HtmlTemplate<T> {
     }
 }
 
+// Middleware to enforce HTTPS
+async fn enforce_https(request: Request<axum::body::Body>, next: axum::middleware::Next) -> impl IntoResponse {
+    if request.uri().scheme_str() == Some("http") {
+        let https_url = format!("https://{}", request.uri());
+        return Redirect::permanent(&https_url).into_response();
+    }
+    next.run(request).await
+}
+
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt::init();
 
-
     println!("Configuration Paths:");
-    println!("├─ Secret Endpoint: {}", config::secret_endpoint_path().display());
+    println!(
+        "├─ Secret Endpoint: {}",
+        config::secret_endpoint_path().display()
+    );
     println!("├─ Database: {}", config::database_path().display());
     println!("├─ User Content: {}", config::user_content_path().display());
     println!("├─ Static Content: {}", config::static_content_path().display());
@@ -59,7 +67,7 @@ async fn main() {
     println!("└─ Icons: {}", config::icons_path().display());
     println!("Database URL: {}", config::database_url());
 
-    // Read the secret endpoint from the file
+    // Read the secret endpoint from the file, in the future ill make this better.
     let secret_endpoint = fs::read_to_string(config::secret_endpoint_path())
         .expect("Failed to read the secret endpoint file")
         .trim()
@@ -70,13 +78,22 @@ async fn main() {
         .await
         .expect("Failed to connect to the database");
 
+    // Read the API key from an environment variable or a file
+    let api_key = fs::read_to_string(config::secret_api_key())
+        .expect("uh oh")
+        .trim()
+        .to_string();
+    print!("api key: {}", api_key);
+    let auth_state = Arc::new(handlers::blog::AuthState { api_key });
+
     let app = Router::new()
         .route("/", get(home))
-        .route("/blog/:post_id/:slug", get(handlers::blog::blog_post))
-        .route("/blog/:post_id", get(handlers::blog::blog_post))
-        .route("/blogs", get(handlers::blog::list_blog_posts)) // New route
-        .route("/api/data", get(handlers::api::get_data_table))
-        .route("/api/data", post(handlers::api::add_data))
+        // Enforce HTTPS for blog endpoints
+        .route("/blogs/:post_id/:slug", get(handlers::blog::blog_post))
+        .route("/blogs/:id", patch(handlers::blog::update_blog_post))
+        .route("/blogs", get(handlers::blog::list_blog_posts))
+        .route("/blogs", put(handlers::blog::create_blog_post))
+        .with_state(auth_state)
         .route(&format!("/{}", secret_endpoint), get(resume_main))
         .route("/404", get(not_found))
         .fallback(get(not_found))
@@ -99,7 +116,9 @@ async fn main() {
             }),
         )
         .layer(from_fn_with_state(pool.clone(), log_request))
-        .layer(Extension(pool));
+        .layer(Extension(pool))
+        // Apply the HTTPS enforcement middleware to all routes
+        .layer(axum::middleware::from_fn(enforce_https));
 
     let port = 3000;
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
