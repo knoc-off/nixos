@@ -28,7 +28,6 @@ pub struct School {
 pub struct Project {
     pub name: String,
     pub description: String,
-    pub icon: Option<String>,
     pub bullets: Vec<String>,
 }
 
