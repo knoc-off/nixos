@@ -1,0 +1,19 @@
+<!-- templates/auth_form.html -->
+{% extends "base.html" %} {% block title %}Authentication{% endblock %} {% block
+content %}
+<div class="container mx-auto mt-8">
+  <h1 class="text-3xl font-bold mb-6">Login</h1>
+  <form action="/auth?redirect_url={{ redirect_url }}" method="post">
+    <div class="mb-4">
+      <label for="username" class="block text-gray-700 text-sm font-bold mb-2">Username:</label>
+      <input type="text" id="username" name="username" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+    </div>
+    <div class="mb-6">
+      <label for="password" class="block text-gray-700 text-sm font-bold mb-2">Password:</label>
+      <input type="password" id="password" name="password" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+    </div>
+    <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Sign In</button>
+  </form>
+</div>
+{% endblock %}
+
