@@ -15,10 +15,11 @@
         pylsp.enable = true;
         rust_analyzer = {
           enable = true;
+          installCargo = false;
+          installRustc = false;
           #installCargo = true;
           #installRustc = true;
         };
-        ts_ls.enable = true;
         tailwindcss.enable = true;
       };
       keymaps = {
@@ -48,8 +49,9 @@
           black.enable = true;
           prettier = {
             enable = true;
-            disableTsServerFormatter = true;
+            #settings.extra_filetypes = [ "javascript" "javascriptreact" "typescript" "typescriptreact" "json" "css" "scss" "less" "html" "htmldjango" ];
           };
+          djhtml.enable = true;
           nixfmt.enable = true;
         };
       };
