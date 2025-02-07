@@ -1,10 +1,14 @@
-{ inputs, config, pkgs, ... }:
+{ inputs, config, pkgs, self, ... }:
 
 let
   tuigreet = "${pkgs.greetd.tuigreet}/bin/tuigreet";
   hyprland = "${pkgs.hyprland}/bin/Hyprland";
 
 in {
+  imports = [
+    self.nixosModules.desktop.totem
+  ];
+
   # Enable greetd for login
   services.greetd = {
     enable = true;
@@ -33,7 +37,8 @@ in {
   };
 
   # System-wide packages
-  environment.systemPackages = with pkgs; [ wl-clipboard xdg-utils ];
+  environment.systemPackages = with pkgs; [ wl-clipboard xdg-utils
+ ];
 
   # Enable polkit
   security.polkit.enable = true;

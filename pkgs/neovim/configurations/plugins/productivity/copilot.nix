@@ -3,7 +3,13 @@
   plugins = {
     copilot-lua = {
       enable = true;
+      autoLoad = true;
       settings = {
+        autostart = true;
+        event = [
+          "InsertEnter"
+          "LspAttach"
+        ];
         filetypes = {
           "*" = true;
           markdown = false;
@@ -21,12 +27,11 @@
           autoTrigger = true;
         };
         panel = { enabled = true; };
-
       };
     };
 
     copilot-chat = {
-      enable = false;
+      enable = true;
       settings = {
         debug = false;
         model = "gpt-4";

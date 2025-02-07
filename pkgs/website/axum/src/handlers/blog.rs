@@ -54,7 +54,7 @@ pub struct Tag {
     pub name: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct NewBlogPost {
     pub title: String,
     pub content: String,
@@ -82,28 +82,39 @@ pub async fn create_blog_post(
     Extension(pool): Extension<SqlitePool>,
     req: Request, // Extract the Request directly
 ) -> impl IntoResponse {
+    println!("create_blog_post: Starting...");
+
     // Authentication
     let auth_header = req
         .headers()
         .get(AUTHORIZATION)
         .and_then(|header: &HeaderValue| header.to_str().ok());
 
+    println!("create_blog_post: Auth header: {:?}", auth_header);
+
     match auth_header {
         Some(auth_token) if auth_token.strip_prefix("Bearer ").unwrap_or(auth_token) == auth_state.api_key => {
+            println!("create_blog_post: Authentication successful");
+
             // Manually extract the JSON payload
             let body: Body = req.into_body();
             let bytes: Bytes = match axum::body::to_bytes(body, usize::MAX).await {
                 Ok(b) => b,
                 Err(e) => {
-                    eprintln!("Failed to read request body: {}", e);
+                    eprintln!("create_blog_post: Failed to read request body: {}", e);
                     return (StatusCode::BAD_REQUEST, "Invalid request body").into_response();
                 }
             };
 
+            println!("create_blog_post: Request body read successfully");
+
             let new_post: NewBlogPost = match serde_json::from_slice(&bytes) {
-                Ok(post) => post,
+                Ok(post) => {
+                    println!("create_blog_post: JSON parsed successfully: {:?}", post);
+                    post
+                }
                 Err(e) => {
-                    eprintln!("Failed to parse JSON: {}", e);
+                    eprintln!("create_blog_post: Failed to parse JSON: {}", e);
                     return (StatusCode::BAD_REQUEST, "Invalid JSON").into_response();
                 }
             };
@@ -130,9 +141,13 @@ pub async fn create_blog_post(
             .await;
 
             let result = match result {
-                Ok(result) => result,
+                Ok(result) => {
+                    println!("create_blog_post: Blog post inserted successfully");
+                    result
+                }
                 Err(e) => {
-                    eprintln!("Failed to insert blog post: {}", e);
+                    eprintln!("create_blog_post: Failed to insert blog post: {}", e);
+                    println!("create_blog_post: Failed to insert blog post: {}", e);
                     tx.rollback().await.expect("Failed to rollback transaction");
                     return (StatusCode::INTERNAL_SERVER_ERROR, "Failed to create blog post").into_response();
                 }
@@ -174,9 +189,14 @@ pub async fn create_blog_post(
             // Commit the transaction
             tx.commit().await.expect("Failed to commit transaction");
 
+            println!("create_blog_post: Transaction committed successfully");
+
             (StatusCode::CREATED, "Blog post created").into_response()
         }
-        _ => return (StatusCode::UNAUTHORIZED, "Invalid API key").into_response(),
+        _ => {
+            println!("create_blog_post: Authentication failed");
+            return (StatusCode::UNAUTHORIZED, "Invalid API key").into_response()
+        },
     }
 }
 
