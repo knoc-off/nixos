@@ -162,7 +162,7 @@ pub async fn create_blog_post(
             .execute(&mut *tx)
             .await;
 
-            let result = match result {
+            let _result = match result {
                 Ok(result) => {
                     println!("create_blog_post: Blog post inserted successfully");
                     result
@@ -448,17 +448,17 @@ pub async fn list_blog_posts(
     Json(blog_posts)
 }
 
-
 pub async fn blog_post(
     Path((post_id, slug)): Path<(String, String)>, // UUID
     Extension(pool): Extension<SqlitePool>,
 ) -> impl IntoResponse {
     // Fetch the blog post from the database
-    let blog_post: Result<BlogPost, (StatusCode, String)> = sqlx::query_as("SELECT * FROM blog_posts WHERE id = ?")
-        .bind(&post_id)
-        .fetch_one(&pool)
-        .await
-        .map_err(|_| (StatusCode::NOT_FOUND, "Blog post not found".to_string()));
+    let blog_post: Result<BlogPost, (StatusCode, String)> =
+        sqlx::query_as("SELECT * FROM blog_posts WHERE id = ?")
+            .bind(&post_id)
+            .fetch_one(&pool)
+            .await
+            .map_err(|_| (StatusCode::NOT_FOUND, "Blog post not found".to_string()));
 
     let blog_post = match blog_post {
         Ok(post) => post,
@@ -481,7 +481,8 @@ pub async fn blog_post(
 
     // If the provided slug doesn't match the correct slug, redirect
     if slug != correct_slug {
-        return Redirect::permanent(&format!("/blogs/{}/{}", post_id, correct_slug)).into_response();
+        return Redirect::permanent(&format!("/blogs/{}/{}", post_id, correct_slug))
+            .into_response();
     }
 
     // Check the cache
@@ -492,7 +493,9 @@ pub async fn blog_post(
         }
         None => {
             println!("No cache found, rendering blog post: {}", post_id);
-            render_markdown(&blog_post, &pool).await.expect("error rendering markdown")
+            render_markdown(&blog_post, &pool)
+                .await
+                .expect("error rendering markdown")
         }
     };
 
@@ -504,7 +507,6 @@ pub async fn blog_post(
 
     HtmlTemplate(template).into_response()
 }
-
 
 async fn render_markdown(blog_post: &BlogPost, pool: &SqlitePool) -> Result<String, anyhow::Error> {
     // Set up Markdown parser with all extensions enabled
