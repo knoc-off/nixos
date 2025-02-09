@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "websute_updated_blogs_are_much_nicer._______________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________________________________big_restructure";
+  system.nixos.label = "updated_nixos_and_small_changes_to_the_website______________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________________________________big_restructure";
 }
