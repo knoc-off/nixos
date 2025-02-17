@@ -67,6 +67,7 @@
     enable = true;
     userName = "${user}";
     userEmail = "selby@niko.ink";
+    lfs.enable = true;
 
     extraConfig = {
       push = {

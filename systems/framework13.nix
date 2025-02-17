@@ -43,6 +43,9 @@
         # https://github.com/NixOS/nixos-hardware/issues/1330
         framework.enableKmod = false;
       };
+
+      # trying stuff out
+      services.xserver.videoDrivers = [ "amdgpu" ];
     }
 
     #misc settings that i usually use.
@@ -254,12 +257,13 @@
   #  in formatted;
   #};
 
+  programs.localsend.enable = true;
   networking = {
     hostName = hostname;
     firewall = {
       enable = true;
-      allowedTCPPorts = [ 22000 38071 ];
-      allowedUDPPorts = [ 21027 ];
+      allowedTCPPorts = [ 22000 38071 21027 53317];
+      allowedUDPPorts = [ 22000 21027 38071 53317];
       #extraCommands = ''
       #  iptables -A INPUT -p tcp --dport 22000 -s niko.ink -j ACCEPT
       #  iptables -A INPUT -p udp --dport 21027 -s niko.ink -j ACCEPT
@@ -297,7 +301,8 @@
   };
 
   boot = {
-    kernelPackages = lib.mkDefault pkgs.linuxPackages_latest;
+
+    #kernelPackages = lib.mkDefault pkgs.linuxPackages_latest;
 
     # fingerpritn scanner does not work without this, suddenly.
     kernelParams = [ "usbcore.autosuspend=-1" ];

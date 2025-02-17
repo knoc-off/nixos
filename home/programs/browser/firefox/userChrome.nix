@@ -22,30 +22,6 @@ in ''
   @import "${firefox-csshacks}/chrome/hide_tabs_toolbar_v2.css";
   @import "${firefox-csshacks}/chrome/page_action_buttons_on_urlbar_hover.css";
 
-
-
-  /* for the autohde toolbar */
-  #navigator-toolbox{
-    z-index: 1 !important;
-    opacity: 10%;
-
-  }
-
-  #navigator-toolbox:hover,
-  #navigator-toolbox:focus-within{
-    z-index: 5 !important;
-  }
-
-  :root{
-    --uc-autohide-toolbox-delay: 200ms;
-    --uc-toolbox-rotation: 75deg;
-  }
-
-  :root[sizemode="maximized"]{
-    --uc-toolbox-rotation: 75deg !important;
-  }
-
-
   /* Sidebar customization */
   #sidebar-box {
     min-width: var(--uc-sidebar-width) !important;
