@@ -42,6 +42,10 @@ async fn main() {
         .route("/upload", post(upload_handler))
         .route("/upload/status/:id", get(upload_status))
         .nest_service(
+            "/results",
+            ServeDir::new("website_data/results/")
+        )
+        .nest_service(
             "/static",
             ServeDir::new(config::static_content_path())
         )
