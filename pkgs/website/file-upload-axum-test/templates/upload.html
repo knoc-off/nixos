@@ -1,7 +1,9 @@
+<!-- templates/upload.html -->
 {% extends "base.html" %}
 
 {% block content %}
-    <div class="max-w-2xl mx-auto bg-white p-6 rounded-lg shadow-sm">
+<div class="max-w-2xl mx-auto p-6">
+    <div class="bg-white rounded-lg shadow-sm p-6">
         <h1 class="text-2xl font-bold mb-4">Document Upload</h1>
 
         <form hx-post="/upload"
@@ -9,14 +11,14 @@
               hx-target="#result"
               class="space-y-4">
 
-            <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+            <div class="border-2 border-dashed border-gray-300 rounded-lg p-6">
                 <input type="file"
                        name="file"
                        required
-                       accept=".pdf,.png,.jpg,.jpeg,.tiff,.doc,.docx"
-                       class="w-full">
+                       class="w-full"
+                       accept=".pdf,.png,.jpg,.jpeg">
                 <p class="text-sm text-gray-500 mt-2">
-                    Supported formats: PDF, PNG, JPEG, TIFF, DOC, DOCX
+                    Supported formats: PDF, PNG, JPEG
                 </p>
             </div>
 
@@ -26,9 +28,10 @@
             </button>
         </form>
 
-
         <div id="result" class="mt-6">
-        <!-- Processing results will appear here -->
+            <!-- Results will appear here -->
         </div>
     </div>
+</div>
 {% endblock %}
+

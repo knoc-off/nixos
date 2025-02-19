@@ -1,7 +1,8 @@
-use std::path::PathBuf;
+// src/config.rs
 use aws_types::SdkConfig;
+use std::path::PathBuf;
 
-pub fn static_content_path() -> PathBuf {
+pub fn static_content_path() -> PathBuf {  // Changed from static_path to match original
     PathBuf::from("static")
 }
 
@@ -13,7 +14,6 @@ pub async fn load_aws_config() -> SdkConfig {
             }
         }
     }
-
     aws_config::from_env().load().await
 }
 
