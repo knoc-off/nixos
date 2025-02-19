@@ -140,7 +140,7 @@ pub async fn upload_handler(
 
                 return Html(format!(
                     r#"
-                    <div id="upload-status" hx-get="/upload/status/{}" hx-trigger="load delay:500ms">
+                    <div id="upload-status" hx-get="/upload/status/{}" hx-trigger="load delay:5000ms">
                         <div class="animate-pulse">
                             <div class="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
                             <div class="h-4 bg-gray-200 rounded w-1/2"></div>
