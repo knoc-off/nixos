@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<html lang="en" data-hx-boost="true">
+<head>
+  <meta charset="UTF-8" />
+  <title>{% block title %}My Axum App{% endblock %}</title>
+  <script src="/static/js/htmx.min.js"></script>
+  <link href="/static/css/styles.css" rel="stylesheet" type="text/css" />
+
+  <!--- might depricate the following soon ---->
+  <link href="/static/css/icons.css" rel="stylesheet" type="text/css" />
+</head>
+<body class="bg-gray-100">
+  {% block content %} {% endblock %}
+</body>
+</html>
