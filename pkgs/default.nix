@@ -47,6 +47,9 @@ in rec {
   nx = config_dir: hostname:
     rustPkgs.callPackage ./nx-script { inherit config_dir hostname; };
 
+
+  yek = rustPkgs.callPackage ./yek {};
+
   neovim-nix = let
     customPkgs = import inputs.nixpkgs-unstable {
       inherit system;

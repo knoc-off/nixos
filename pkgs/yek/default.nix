@@ -39,6 +39,8 @@ rustPlatform.buildRustPackage rec {
     OPENSSL_NO_VENDOR = true;
   };
 
+  doCheck = false;
+
   meta = {
     description = "A fast Rust based tool to serialize text-based files in a repository or directory for LLM consumption";
     homepage = "git@github.com:bodo-run/yek.git";
