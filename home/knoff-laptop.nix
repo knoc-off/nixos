@@ -106,6 +106,10 @@
     telegram-desktop
 
     prusa-slicer
+
+
+    self.packages.${pkgs.system}.yek
+
   ];
 
 
