@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "small_changes_added_yek_____________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "______________________________________added_blogging_ability_to_the_website._simple_markdown";
+  system.nixos.label = "almost_functional_color_conversions_________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "______________________________________added_blogging_ability_to_the_website._simple_markdown";
 }

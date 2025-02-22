@@ -1,0 +1,5 @@
+output_template: |
+  > FILE_PATH
+  ```
+  FILE_CONTENT
+  ```
