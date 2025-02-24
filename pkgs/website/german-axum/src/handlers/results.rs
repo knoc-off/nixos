@@ -4,7 +4,6 @@ use axum::{
     extract::{Extension, Path},
     response::IntoResponse,
 };
-use chrono::NaiveDateTime;
 use sqlx::SqlitePool;
 use crate::models::Analysis;
 use crate::utils::templates::HtmlTemplate;
@@ -20,6 +19,7 @@ pub async fn get_status(
     Path(uuid): Path<String>,
     Extension(pool): Extension<SqlitePool>,
 ) -> impl IntoResponse {
+    // Note the inclusion of the user_id column; since it's Optional we use "user_id?".
     let rec = sqlx::query_as!(
         Analysis,
         r#"
@@ -29,7 +29,8 @@ pub async fn get_status(
             original_text,
             annotated_text,
             score as "score!",
-            created_at as "created_at!"
+            created_at as "created_at!",
+            user_id as "user_id?"
         FROM text_checks
         WHERE uuid = ?
         "#,
@@ -39,9 +40,8 @@ pub async fn get_status(
     .await;
 
     match rec {
-        Ok(Some(analysis)) => {
-            HtmlTemplate(ResultFragmentTemplate { analysis }).into_response()
-        }
+        Ok(Some(analysis)) => HtmlTemplate(ResultFragmentTemplate { analysis })
+            .into_response(),
         _ => {
             // Return a simple loading fragment if not yet available.
             HtmlTemplate(LoadingTemplate {}).into_response()
@@ -60,6 +60,7 @@ pub async fn get_results_page(
     Path(uuid): Path<String>,
     Extension(pool): Extension<SqlitePool>,
 ) -> impl IntoResponse {
+    // Again include user_id as an optional field.
     let rec = sqlx::query_as!(
         Analysis,
         r#"
@@ -69,7 +70,8 @@ pub async fn get_results_page(
             original_text,
             annotated_text,
             score as "score!",
-            created_at as "created_at!"
+            created_at as "created_at!",
+            user_id as "user_id?"
         FROM text_checks
         WHERE uuid = ?
         "#,

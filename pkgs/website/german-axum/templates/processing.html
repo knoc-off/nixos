@@ -1,15 +1,48 @@
+<!-- templates/processing.html -->
 {% extends "base.html" %}
 
 {% block content %}
 <div class="max-w-3xl mx-auto px-4 py-6">
   <h1 class="text-3xl font-bold mb-4">Processing Your Text...</h1>
-  <!-- This container polls /status/{{ uuid }} every second -->
-  <div id="result-container"
-       hx-get="/status/{{ uuid }}"
-       hx-trigger="every 1s"
-       hx-swap="innerHTML">
+  <div id="result-container">
     Loading...
   </div>
 </div>
+<script>
+  function pollStatus() {
+    // Poll the JSON endpoint every second.
+    fetch('/status_json/{{ uuid }}')
+      .then(response => response.json())
+      .then(data => {
+        if (data) {
+          // We got a valid response, so update the container.
+          const container = document.getElementById('result-container');
+          container.innerHTML = `
+            <div id="result">
+              <div class="mb-4">
+                <h2 class="text-xl font-semibold">Original Text</h2>
+                <p>${data.original_text}</p>
+              </div>
+              <div class="mb-4">
+                <h2 class="text-xl font-semibold">Processed Text</h2>
+                <p class="prose">${data.annotated_text}</p>
+              </div>
+              <div class="mb-4">
+                <h2 class="text-xl font-semibold">Score: ${data.score}</h2>
+              </div>
+            </div>
+          `;
+        } else {
+          // The record is not ready—try again in 1 second.
+          setTimeout(pollStatus, 1000);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching status:', err);
+        setTimeout(pollStatus, 1000);
+      });
+  }
+  pollStatus();
+</script>
 {% endblock %}
 
