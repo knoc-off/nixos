@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-6">
+  <h1 class="text-3xl font-bold mb-4">Processing Your Text...</h1>
+  <!-- This container polls /status/{{ uuid }} every second -->
+  <div id="result-container"
+       hx-get="/status/{{ uuid }}"
+       hx-trigger="every 1s"
+       hx-swap="innerHTML">
+    Loading...
+  </div>
+</div>
+{% endblock %}
+

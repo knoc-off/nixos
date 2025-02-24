@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-6">
+  <h1 class="text-3xl font-bold mb-4">Text Checker</h1>
+  <form id="textForm" action="/check" method="post">
+    <textarea id="textInput" name="text" rows="10"
+      class="w-full border border-gray-300 rounded-md p-2"
+      placeholder="Type your text here..."></textarea>
+    <br>
+    <button type="submit"
+      class="mt-4 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
+      Submit Manually
+    </button>
+  </form>
+</div>
+{% endblock %}
+

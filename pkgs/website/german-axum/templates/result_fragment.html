@@ -1,0 +1,15 @@
+<div id="result">
+  <div class="mb-4">
+    <h2 class="text-xl font-semibold">Original Text</h2>
+    <p>{{ analysis.original_text }}</p>
+  </div>
+  <div class="mb-4">
+    <h2 class="text-xl font-semibold">Processed Text</h2>
+    <p class="prose">{{ analysis.to_html()  }}</p>
+
+  </div>
+  <div class="mb-4">
+    <h2 class="text-xl font-semibold">Score: {{ analysis.score }}</h2>
+  </div>
+</div>
+
