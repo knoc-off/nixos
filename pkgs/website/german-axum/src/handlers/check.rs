@@ -1,3 +1,5 @@
+// src/handlers/check.rs
+
 use askama::Template;
 use axum::{
     extract::{Extension, Form},
@@ -40,7 +42,7 @@ pub async fn handle_check(
     } else {
         input.text.clone()
     };
-    // You can add more inline markup rules here.
+    // Compute a sample score. You can add more inline markup rules here.
     let score = if annotated.contains("<<") { 0.8 } else { 1.0 };
     // --- End simulated LLM ---
 
@@ -50,6 +52,7 @@ pub async fn handle_check(
         original_text: input.text,
         annotated_text: annotated,
         score,
+        user_id: None, // Replace with Some(user.id) when authentication is implemented.
     };
 
     if let Err(e) = new_analysis.save(&pool).await {
@@ -58,13 +61,12 @@ pub async fn handle_check(
             .into_response();
     }
 
-    // Return a processing page that polls /status/<uuid> via HTMX.
+    // Return a processing page that polls /status/:uuid via JavaScript or HTMX.
+    #[derive(Template)]
+    #[template(path = "processing.html")]
+    struct ProcessingTemplate {
+        pub uuid: String,
+    }
     HtmlTemplate(ProcessingTemplate { uuid: new_uuid }).into_response()
-}
-
-#[derive(Template)]
-#[template(path = "processing.html")]
-struct ProcessingTemplate {
-    pub uuid: String,
 }
 
