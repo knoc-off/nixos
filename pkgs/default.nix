@@ -11,6 +11,9 @@ in rec {
   spotify-adblock = pkgs.callPackage ./spotify-adblock { };
   llm-cmd = pkgs.python3Packages.callPackage ./llm-cmd { };
   ttok = pkgs.python3Packages.callPackage ./ttok { };
+  wrap = pkgs.python3Packages.callPackage ./wrap-codeblocks { };
+  nixx = pkgs.python3Packages.callPackage ./nixx-script { };
+
   replicate-bridge = upkgs.python3Packages.callPackage ./replicate { };
   marker = pkgs.python3Packages.callPackage ./marker { };
   texify = pkgs.callPackage ./texify { };
