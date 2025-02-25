@@ -3,7 +3,6 @@ use std::{env, net::SocketAddr};
 use sqlx::sqlite::SqlitePoolOptions;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-mod config;
 mod handlers;
 mod models;
 mod routes;

@@ -6,6 +6,7 @@ use axum::{
     response::Response,
 };
 
+#[allow(unused)]
 pub async fn log_request(req: Request<Body>, next: Next) -> Response {
     tracing::debug!("Request: {} {}", req.method(), req.uri());
     next.run(req).await
