@@ -10,12 +10,11 @@ use tokio::{signal, task::AbortHandle};
 use tower_sessions::cookie::Key;
 use tower_sessions_sqlx_store::SqliteStore;
 
-use std::path::PathBuf;
 use tower_http::services::ServeDir;
 
 use crate::{
     users::Backend,
-    web::{auth, protected},
+    web::{auth, protected, register},
 };
 
 pub struct App {
@@ -60,7 +59,7 @@ impl App {
         //
         // This combines the session layer with our backend to establish the auth
         // service which will provide the auth session as a request extension.
-        let backend = Backend::new(self.db);
+        let backend = Backend::new(self.db.clone());
         let auth_layer = AuthManagerLayerBuilder::new(backend, session_layer).build();
         //
         // Add a static file server
@@ -69,6 +68,7 @@ impl App {
         let app = protected::router()
             .route_layer(login_required!(Backend, login_url = "/login"))
             .merge(auth::router())
+            .merge(register::router().with_state(self.db.clone()))  // Add this line
             .nest_service("/static", static_service)
             .layer(MessagesManagerLayer)
             .layer(auth_layer);
