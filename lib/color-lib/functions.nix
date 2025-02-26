@@ -103,7 +103,7 @@ let
           # Split the normalized hex code into components
           rgb = if builtins.stringLength normalizedHex == 8 then {
             inherit r g b;
-            a = builtins.substring 6 2 normalizedHex;
+            alpha = builtins.substring 6 2 normalizedHex;
           } else {
             inherit r g b;
           };
@@ -112,12 +112,12 @@ let
         else
           throw "Invalid hex color code: ${hex}";
 
-      combineHex = { r, g, b, a ? "FF", ... }@hexa:
+      combineHex = { r, g, b, alpha ? "FF", ... }@hexa:
         let
           padHex = hex:
             if builtins.stringLength hex == 1 then "0${hex}" else hex;
           result = lib.toUpper "${padHex r}${padHex g}${padHex b}${
-              if (lib.toUpper a) != "FF" then (padHex a) else ""
+              if (lib.toUpper alpha) != "FF" then (padHex alpha) else ""
             }";
         in if isValidHex result then
           result
@@ -132,18 +132,18 @@ let
           r = (hexToDec c.r) / 255.0;
           g = (hexToDec c.g) / 255.0;
           b = (hexToDec c.b) / 255.0;
-          a = (hexToDec c.a) / 255.0;
-        in { inherit r g b a; };
+          alpha = (hexToDec c.alpha) / 255.0;
+        in { inherit r g b alpha; };
 
       rgbToHex = rgb:
         let
-          inherit (rgb) r g b a;
+          inherit (rgb) r g b alpha;
           mut = x: builtins.floor (x * 255.0 + 0.5);
         in combineHex {
           r = decToHex (mut r);
           g = decToHex (mut g);
           b = decToHex (mut b);
-          a = decToHex (mut a);
+          alpha = decToHex (mut alpha);
         };
     };
   };

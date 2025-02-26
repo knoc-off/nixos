@@ -55,7 +55,7 @@ rec {
   # Improved cube root with iteration limit and validation
   cbrt = x:
     let
-      maxIterations = 100;
+      maxIterations = 3000;
       absX = abs x + 0.0;
 
       helper = guess: iteration:

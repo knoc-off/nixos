@@ -86,11 +86,11 @@ in {
     new_window_takes_over_fullscreen = 2; # new window will un-fullscreen current.
     force_default_wallpaper = 0;
     animate_manual_resizes = true;
-    enable_swallow = false;
+    enable_swallow = true;
     # Any window started from kitty will be swallowed by the terminal
     swallow_regex = "kitty";
     # the exception should be anything containing the word 'NAN' or 'nvim'
-    swallow_exception_regex = "NAN";
+    #swallow_exception_regex = "NAN";
     background_color = "0x99${sl 0.15 theme.base00}";
   };
 

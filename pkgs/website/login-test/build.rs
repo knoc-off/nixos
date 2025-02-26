@@ -2,4 +2,7 @@
 fn main() {
     // trigger recompilation when a new migration is added
     println!("cargo:rerun-if-changed=migrations");
+
+    // Make askama recompile when templates change
+    println!("cargo:rerun-if-changed=templates");
 }

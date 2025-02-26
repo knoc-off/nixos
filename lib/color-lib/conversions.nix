@@ -11,12 +11,12 @@ with core; rec {
   okhsvToRGB = okhsv.toRGB;
   hexToOKHSL = hexStr:
     okhsl.fromRGB (hex.toRGB hexStr) // {
-      alpha = (hex.toRGB hexStr).a;
+      alpha = (hex.toRGB hexStr).alpha;
     };
   okhslToHex = hsl: hex.fromRGB (okhsl.toRGB hsl);
   hexToOKHSV = hexStr:
     okhsv.fromRGB (hex.toRGB hexStr) // {
-      alpha = (hex.toRGB hexStr).a;
+      alpha = (hex.toRGB hexStr).alpha;
     };
   okhsvToHex = hsv: hex.fromRGB (okhsv.toRGB hsv);
   hexToOKLab = hexStr: oklab.linearSRGBToOklab (hex.toRGB hexStr);

@@ -4,7 +4,7 @@ with core;
 with math;
 with oklab; rec {
 
-  toRGB = { h, s, l }:
+  toRGB = { h, s, l, alpha ? 1.0 }:
     let
       a_ = cos (2 * pi * h);
       b_ = sin (2 * pi * h);
@@ -18,13 +18,13 @@ with oklab; rec {
       L = L;
       a = C * a_;
       b = C * b_;
-      alpha = 1.0;
+      alpha = alpha;
     };
 
   # okhsl.nix
-  fromRGB = { r, g, b, a ? 1.0 }:
+  fromRGB = { r, g, b, alpha ? 1.0 }:
     let
-      lab = linearSRGBToOklab { inherit r g b a; };
+      lab = linearSRGBToOklab { inherit r g b alpha; };
       C = sqrt (lab.a * lab.a + lab.b * lab.b);
       h = if C == 0 then 0 else 0.5 + 0.5 * atan2 (-lab.b) (-lab.a) / pi;
       Cs = if C == 0 then {
@@ -40,6 +40,6 @@ with oklab; rec {
       else
         0.8 + 0.2 * (C - Cs.C_mid) / (Cs.C_max - Cs.C_mid);
       l = toe lab.L;
-    in { inherit h s l; };
+    in { inherit h s l alpha; };
 
 }

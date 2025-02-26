@@ -1,46 +1,65 @@
-<html>
-  <head>
-    <title>Login</title>
-    <style>
-      label {
-        display: block;
-        margin-bottom: 5px;
-      }
-    </style>
-  </head>
+{% extends "base.html" %} {% block title %}Login{% endblock %} {% block content
+%}
+<div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-md">
+  <h1 class="text-2xl font-bold text-center mb-6">User Login</h1>
 
-  <body>
-    <ul>
+  {% if messages.len() > 0 %}
+  <div class="mb-4">
+    <ul class="bg-red-50 p-4 rounded-md">
       {% for message in messages %}
-      <li>
-        <span><strong>{{ message }}</strong></span>
-      </li>
+      <li class="text-red-700">{{ message }}</li>
       {% endfor %}
     </ul>
+  </div>
+  {% endif %}
 
-    <form method="post">
-      <fieldset>
-        <legend>User login</legend>
-        <p>
-          <label for="username">Username</label>
-          <input name="username" id="username" value="ferris" />
-        </p>
-        <p>
-          <label for="password">Password</label>
-          <input
-            name="password"
-            id="password"
-            type="password"
-            value="hunter42"
-          />
-        </p>
-      </fieldset>
+  <form method="post" class="space-y-4">
+    <div>
+      <label for="username" class="block text-sm font-medium text-gray-700"
+        >Username</label
+      >
+      <input
+        name="username"
+        id="username"
+        value="ferris"
+        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+      />
+    </div>
 
-      <input type="submit" value="login" />
+    <div>
+      <label for="password" class="block text-sm font-medium text-gray-700"
+        >Password</label
+      >
+      <input
+        name="password"
+        id="password"
+        type="password"
+        value="hunter42"
+        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+      />
+    </div>
 
-      {% if let Some(next) = next %}
-      <input type="hidden" name="next" value="{{next}}" />
-      {% endif %}
-    </form>
-  </body>
-</html>
+    <div>
+      <button
+        type="submit"
+        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+      >
+        Login
+      </button>
+    </div>
+
+    {% if next.is_some() %}
+    <input type="hidden" name="next" value="{{ next.as_ref().unwrap() }}" />
+    {% endif %}
+  </form>
+  <!-- Add this before the final </div> in login.html -->
+  <div class="mt-4 text-center">
+    <p class="text-sm text-gray-600">
+      Don't have an account?
+      <a href="/register" class="font-medium text-blue-600 hover:text-blue-500"
+        >Register</a
+      >
+    </p>
+  </div>
+</div>
+{% endblock %}

@@ -44,29 +44,29 @@ let
       # Split the normalized hex code into components
       rgb = if stringLength normalizedHex == 8 then {
         inherit r g b;
-        a = substring 6 2 normalizedHex;
+        alpha = substring 6 2 normalizedHex;
       } else {
         inherit r g b;
-        a = "FF";
+        alpha = "FF";
       };
     in if validationResult then
       rgb
     else
       throw "Invalid hex color code: ${hex}";
 
-  combineHex = { r, g, b, a ? "FF" }:
+  combineHex = { r, g, b, alpha ? "FF" }:
     let
       padHex = hex:
         if stringLength hex == 1 then "0${hex}" else hex;
       result = toUpper "${padHex r}${padHex g}${padHex b}${
-          if (toUpper a) != "FF" then (padHex a) else ""
+          if (toUpper alpha) != "FF" then (padHex alpha) else ""
         }";
     in if isValidHex result then
       result
     else
       throw ''
         Invalid hex color code: ${result}
-         input: ${builtins.toJSON { inherit r g b a; }}'';
+         input: ${builtins.toJSON { inherit r g b alpha; }}'';
 
 in rec {
   # Core color operations
@@ -85,17 +85,17 @@ in rec {
         r = (hexToDec c.r) / 255.0;
         g = (hexToDec c.g) / 255.0;
         b = (hexToDec c.b) / 255.0;
-        a = (hexToDec c.a) / 255.0;
-      in { inherit r g b a; };
+        alpha = (hexToDec c.alpha) / 255.0;
+      in { inherit r g b alpha; };
 
-    fromRGB = { r, g, b, a ? 1.0 }:
+    fromRGB = { r, g, b, alpha ? 1.0 }:
       let
         mut = x: floor (x * 255.0 + 0.5);
       in combineHex {
         r = toHexString (mut r);
         g = toHexString (mut g);
         b = toHexString (mut b);
-        a = toHexString (mut a);
+        alpha = toHexString (mut alpha);
       };
   };
 

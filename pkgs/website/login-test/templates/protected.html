@@ -1,17 +1,29 @@
-<html>
-  <head>
-    <title>Protected</title>
-  </head>
+{% extends "base.html" %}
 
-  <body>
-    <ul>
-      {% for message in messages %}
-      <li>
-        <span><strong>{{ message }}</strong></span>
-      </li>
-      {% endfor %}
-    </ul>
+{% block title %}Protected Area{% endblock %}
 
-    <p>Logged in as {{username}}</p>
-  </body>
-</html>
+{% block content %}
+<div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-md">
+    <h1 class="text-2xl font-bold text-center mb-6">Protected Area</h1>
+
+    {% if messages.len() > 0 %}
+    <div class="mb-4">
+        <ul class="bg-green-50 p-4 rounded-md">
+            {% for message in messages %}
+            <li class="text-green-700">{{ message }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <div class="text-center">
+        <p class="mb-4">Welcome, <span class="font-bold">{{ username }}</span>!</p>
+        <p class="mb-6">You've successfully accessed the protected area.</p>
+
+        <a href="/logout" class="inline-block py-2 px-4 bg-red-600 text-white rounded hover:bg-red-700">
+            Logout
+        </a>
+    </div>
+</div>
+{% endblock %}
+

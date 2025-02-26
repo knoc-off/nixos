@@ -108,7 +108,11 @@
     prusa-slicer
 
 
+    # ai tools
+    fabric-ai
     self.packages.${pkgs.system}.yek
+
+    self.packages.${pkgs.system}.wrap
 
   ];
 

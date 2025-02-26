@@ -42,6 +42,10 @@ in rec {
     axum = rustPkgs.callPackage ./website/axum {
       inherit tabler-icons;
     };
+
+    axum-login-test = rustPkgs.callPackage ./website/login-test {
+      inherit tabler-icons;
+    };
   };
   AOC24 = {
     day1 = rustPkgs.callPackage ./AdventOfCode2024/Day1 { };
