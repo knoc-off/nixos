@@ -278,6 +278,8 @@ in {
         "${mainMod} SHIFT, G, lockactivegroup, toggle"
         # if active window is not a group then create group, else  moveoutofgroup
 
+        # "${mainMod} SHIFT, S, toggleswallow"
+
 
         # lockscreen
         "${mainMod}, L, exec, swaylock-custom 0 120x6 10 0"

@@ -22,6 +22,7 @@ let
         r = srgbTransferInv rgb.r;
         g = srgbTransferInv rgb.g;
         b = srgbTransferInv rgb.b;
+        alpha = rgb.alpha;
       };
 
       # Step 3: Convert to Oklab

@@ -1,9 +1,11 @@
+mod users;
+mod web;
+mod filters;
+mod config;
+
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 use crate::web::App;
-
-mod users;
-mod web;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,3 +18,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     App::new().await?.serve().await
 }
+

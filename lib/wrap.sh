@@ -173,11 +173,11 @@ process_file() {
   esc_fileSize=$(escape_xml "$fileSize")
 
   echo "  <file name=\"${esc_file}\" language=\"${filetype}\""
-  printf "    <![CDATA[\n    \`\`\`\n"
+  printf "\n    <![CDATA[\n"
   # Output file content. Replace any occurrence of ']]>' to ensure valid XML.
   sed 's/]]>/]]]]><![CDATA[>/g' "$file" |
     sed 's/^/      /'
-  printf "\n    \`\`\`\n    ]]>"
+  printf "\n    ]]>\n"
   echo "  </file>"
 }
 

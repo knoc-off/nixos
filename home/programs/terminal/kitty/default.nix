@@ -14,12 +14,12 @@ in {
       name = "FiraCode Nerd Font Mono";
       size = 15;
     };
-    shellIntegration.enableZshIntegration = false;
+    shellIntegration.enableZshIntegration = true;
     keybindings = {
       "ctrl+t" = "new_os_window_with_cwd";
       "ctrl+shift+t" = "new_window_with_cwd";
       "ctrl+l" = "clear_terminal to_cursor active";
-      "shift+enter" = "send_key alt+enter";
+      "shift+enter" = ''send_text all \\\n'';
     };
     extraConfig = ''
       touch_scroll_multiplier 6.5
