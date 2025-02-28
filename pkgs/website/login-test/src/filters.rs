@@ -1,8 +1,9 @@
 // src/filters.rs
-use annotated_text_parser::{parse_corrections, ParsedText, Correction};
+use annotated_text_parser::{parse_corrections, ParsedText, TextSegment};
 use std::fs;
 use std::path::PathBuf;
 use html_escape;
+use regex::Regex;
 
 // Load SVG file from static directory
 pub fn icon(name: &str) -> askama::Result<String> {
@@ -23,15 +24,21 @@ pub fn class(classes: &str) -> askama::Result<String> {
 pub fn format_corrections<T: std::fmt::Display>(s: T) -> ::askama::Result<String> {
     let text = s.to_string();
 
+    // Check if the text contains JSON errors
+    if text.contains("JSON ERROR:") {
+        return Ok(handle_json_errors(&text));
+    }
+
     match parse_corrections(&text) {
         Ok(parsed) => {
-            let html = render_html(&parsed);
+            // Render the corrections using the new segment-based approach
+            let html = render_corrections_with_segments(&parsed);
             Ok(html)
         },
         Err(err) => {
             // Handle parsing errors by returning original text with error message
             Ok(format!(
-                "<div class='p-2 bg-red-100 text-red-800 rounded mb-4'>Error parsing corrections: {}</div>{}",
+                "<div class=\"p-3 bg-red-100 text-red-800 rounded mb-4\">Error parsing corrections: {}</div>{}",
                 err,
                 html_escape::encode_text(&text)
             ))
@@ -39,88 +46,178 @@ pub fn format_corrections<T: std::fmt::Display>(s: T) -> ::askama::Result<String
     }
 }
 
-// Main function to render the parsed text as HTML
-fn render_html(parsed: &ParsedText) -> String {
-    // Use the corrected text as the base
+// Handle JSON errors in the text
+fn handle_json_errors(text: &str) -> String {
+    let re = Regex::new(r"JSON ERROR: ([^<]+)").unwrap();
+    let mut result = String::new();
+    let mut last_end = 0;
+
+    for cap in re.captures_iter(text) {
+        let full_match = cap.get(0).unwrap();
+        let start = full_match.start();
+        let end = full_match.end();
+
+        // Add text before the error
+        if start > last_end {
+            result.push_str(&html_escape::encode_text(&text[last_end..start]));
+        }
+
+        // Add the error with styling
+        result.push_str(&format!(
+            "<span class=\"bg-red-200 text-red-800\">{}</span>",
+            &text[start..end]
+        ));
+
+        last_end = end;
+    }
+
+    // Add remaining text
+    if last_end < text.len() {
+        result.push_str(&html_escape::encode_text(&text[last_end..]));
+    }
+
+    result
+}
+
+// Render corrections using the new segment-based approach
+fn render_corrections_with_segments(parsed: &ParsedText) -> String {
     let mut html = String::new();
 
-    // Map each correction to its span in the document
-    let spans = build_correction_spans(parsed);
+    // Render the corrected text as a paragraph with inline highlighted corrections
+    html.push_str("<div class=\"corrected-text mb-6 p-4 bg-white rounded-md border border-gray-200\">");
+    html.push_str(&render_segments_inline(&parsed.segments));
+    html.push_str("</div>");
 
-    // Build the HTML with the formatted spans
-    html.push_str(&spans);
+    // Add detailed corrections section
+    html.push_str("<div class=\"corrections-details\">");
+    html.push_str("<h3 class=\"font-bold text-lg mb-3\">Detailed Corrections</h3>");
+    html.push_str(&render_segments_detailed(&parsed.segments));
+    html.push_str("</div>");
 
     // Add suggestions section if it exists
-    if let Some(suggestions_text) = &parsed.suggestions {
+    if let Some(suggestions) = &parsed.suggestions {
         html.push_str(&format!(
-            "<div class=\"mt-5 p-4 bg-gray-50 rounded-md border-l-4 border-gray-500\"><h3 class=\"font-bold mb-2\">Suggestions for Improvement:</h3>{}</div>",
-            suggestions_text
+            "<div class=\"mt-5 p-4 bg-gray-50 rounded-md border-l-4 border-gray-500\">\
+            <h3 class=\"font-bold mb-2\">Suggestions for Improvement:</h3>{}</div>",
+            suggestions
         ));
     }
 
     html
 }
 
-// Build HTML with correction spans
-fn build_correction_spans(parsed: &ParsedText) -> String {
-    if parsed.corrections.is_empty() {
-        // If no corrections, just return the text
-        return parsed.text.clone();
+// Render segments as inline text with highlighted corrections
+fn render_segments_inline(segments: &[TextSegment]) -> String {
+    let mut html = String::new();
+
+    for segment in segments {
+        match segment {
+            TextSegment::Plain(text) => {
+                html.push_str(&html_escape::encode_text(text));
+            },
+            TextSegment::Correction { error_type, original, correction, explanation, children, .. } => {
+                // If there are children, render them recursively
+                if !children.is_empty() {
+                    html.push_str(&render_segments_inline(children));
+                } else {
+                    // Map error types to colors for highlighting
+                    let (bg_color, text_color) = get_error_colors(error_type);
+
+                    // Create tooltip content
+                    let tooltip_content = match explanation {
+                        Some(exp) => format!("{}: {}", original, exp),
+                        None => format!("Original: {}", original),
+                    };
+
+                    // Render the correction with highlighting and tooltip
+                    html.push_str(&format!(
+                        "<span class=\"{} {} px-1 rounded relative group cursor-help\" \
+                        title=\"{}\">{}<span class=\"absolute hidden group-hover:block \
+                        bg-gray-800 text-white text-xs rounded p-2 -mt-16 max-w-xs z-10\">{}</span></span>",
+                        bg_color, text_color,
+                        html_escape::encode_text(&tooltip_content),
+                        html_escape::encode_text(correction),
+                        html_escape::encode_text(&tooltip_content)
+                    ));
+                }
+            }
+        }
     }
 
-    // We'll use a recursive approach to handle nested corrections
-    format_with_corrections(&parsed.text, &parsed.corrections)
+    html
 }
 
-fn format_with_corrections(text: &str, corrections: &[Correction]) -> String {
-    // Handle all corrections at this level
-    let mut formatted_text = text.to_string();
+// Render detailed view of corrections
+fn render_segments_detailed(segments: &[TextSegment]) -> String {
+    let mut html = String::new();
+    let mut correction_index = 1;
 
-    for correction in corrections {
-        // Create the HTML span for this correction
-        let span = create_correction_span(correction);
+    for segment in segments {
+        match segment {
+            TextSegment::Plain(_) => {
+                // Skip plain text in detailed view
+            },
+            TextSegment::Correction { error_type, original, correction, explanation, children, .. } => {
+                // If there are children, include them in the detailed view
+                if !children.is_empty() {
+                    html.push_str(&render_segments_detailed(children));
+                } else {
+                    // Map error types to colors
+                    let (bg_color, text_color) = get_error_colors(error_type);
 
-        // Replace the corrected text with the HTML span
-        formatted_text = formatted_text.replace(&correction.correction, &span);
+                    // Format the correction detail
+                    html.push_str(&format!(
+                        "<div class=\"mb-4 p-3 border rounded\">\
+                            <div class=\"flex items-center gap-2 mb-2\">\
+                                <span class=\"font-bold text-gray-700\">#{}</span>\
+                                <span class=\"{} {} px-2 py-1 rounded text-sm font-medium\">{}</span>\
+                            </div>\
+                            <div class=\"grid grid-cols-1 md:grid-cols-2 gap-3\">\
+                                <div class=\"p-2 bg-red-50 rounded\">\
+                                    <div class=\"font-medium mb-1\">Original:</div>\
+                                    <div>{}</div>\
+                                </div>\
+                                <div class=\"p-2 bg-green-50 rounded\">\
+                                    <div class=\"font-medium mb-1\">Correction:</div>\
+                                    <div>{}</div>\
+                                </div>\
+                            </div>\
+                            {}
+                        </div>",
+                        correction_index,
+                        bg_color, text_color, error_type,
+                        html_escape::encode_text(original),
+                        html_escape::encode_text(correction),
+                        if let Some(exp) = explanation {
+                            format!("<div class=\"mt-2 p-2 bg-gray-50 rounded\">\
+                                <div class=\"font-medium mb-1\">Explanation:</div>\
+                                <div>{}</div>\
+                            </div>", html_escape::encode_text(exp))
+                        } else {
+                            String::new()
+                        }
+                    ));
+
+                    correction_index += 1;
+                }
+            }
+        }
     }
 
-    formatted_text
+    html
 }
 
-fn create_correction_span(correction: &Correction) -> String {
-    // Map error types to colors
-    let color = match correction.error_type.as_str() {
-        "TYPO" => "red",
-        "GRAM" => "blue",
-        "PUNC" => "purple",
-        "WORD" => "orange",
-        "STYL" => "teal",
-        "STRUC" => "green",
-        _ => "gray",
-    };
-
-    // Build tooltip content
-    let mut tooltip = correction.original.clone();
-
-    // Include explanation if available
-    if let Some(explanation) = &correction.explanation {
-        tooltip = format!("{}: {}", tooltip, explanation);
+// Helper function to get colors based on error type
+fn get_error_colors(error_type: &str) -> (&'static str, &'static str) {
+    match error_type {
+        "TYPO" => ("bg-red-100", "text-red-800"),
+        "GRAM" => ("bg-blue-100", "text-blue-800"),
+        "PUNC" => ("bg-purple-100", "text-purple-800"),
+        "WORD" => ("bg-orange-100", "text-orange-800"),
+        "STYL" => ("bg-teal-100", "text-teal-800"),
+        "STRUC" => ("bg-green-100", "text-green-800"),
+        _ => ("bg-gray-100", "text-gray-800"),
     }
-
-    // Escape HTML in the tooltip
-    let escaped_tooltip = html_escape::encode_text(&tooltip);
-
-    // Format nested children first if any
-    let display_text = if !correction.children.is_empty() {
-        format_with_corrections(&correction.correction, &correction.children)
-    } else {
-        html_escape::encode_text(&correction.correction).into_owned()
-    };
-
-    format!(
-        r#"<span class="bg-{}-100 text-{}-800 px-1 rounded-sm cursor-help" title="{}" data-error-type="{}">{}</span>"#,
-        color, color, escaped_tooltip, correction.error_type, display_text
-    )
 }
 
 // Debug version that shows additional information
@@ -128,23 +225,23 @@ fn create_correction_span(correction: &Correction) -> String {
 pub fn format_corrections_debug<T: std::fmt::Display>(s: T) -> ::askama::Result<String> {
     let text = s.to_string();
 
-    match annotated_text_parser::parse_corrections_debug(&text) {
+    match parse_corrections(&text) {
         Ok(parsed) => {
             // Get the standard HTML output
-            let html = render_html(&parsed);
+            let html = render_corrections_with_segments(&parsed);
 
             // Add debugging information
             let debug_html = format!(
                 "{}<div class='mt-4 p-4 bg-gray-100 border border-gray-300 rounded'>\
                 <h3 class='font-bold mb-2'>Debug Information</h3>\
                 <div class='text-xs font-mono whitespace-pre-wrap overflow-auto max-h-96'>\
-                <p>Total corrections: {}</p>\
+                <p>Total segments: {}</p>\
                 <p>Parsed structure:</p>\
                 <pre>{:#?}</pre>\
                 </div></div>",
                 html,
-                parsed.corrections.len(),
-                parsed.corrections
+                parsed.segments.len(),
+                parsed.segments
             );
 
             Ok(debug_html)
