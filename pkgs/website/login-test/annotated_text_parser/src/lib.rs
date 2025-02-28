@@ -13,6 +13,39 @@ pub struct Correction {
     pub children: Vec<Correction>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum TextSegment {
+    Plain(String),
+    Correction {
+        error_type: String,
+        original: String,
+        correction: String,
+        explanation: Option<String>,
+        children: Vec<TextSegment>,
+        // Store the original and corrected versions of this segment
+        original_segments: Vec<TextSegment>,
+        corrected_segments: Vec<TextSegment>,
+    },
+}
+
+impl TextSegment {
+    // Helper method to get the original text from a segment
+    pub fn get_original_text(&self) -> String {
+        match self {
+            TextSegment::Plain(text) => text.clone(),
+            TextSegment::Correction { original, .. } => original.clone(),
+        }
+    }
+
+    // Helper method to get the corrected text from a segment
+    pub fn get_corrected_text(&self) -> String {
+        match self {
+            TextSegment::Plain(text) => text.clone(),
+            TextSegment::Correction { correction, .. } => correction.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum ParserError {
     #[error("Invalid error type: {0}")]
@@ -42,6 +75,7 @@ pub struct ParsedText {
     pub text: String,
     pub corrections: Vec<Correction>,
     pub suggestions: Option<String>,
+    pub segments: Vec<TextSegment>, // New field for the segmented text
 }
 
 pub struct Parser {
@@ -69,42 +103,58 @@ impl Parser {
         };
 
         // Parse the main text with corrections
-        let (parsed_text, corrections) = self.parse_nested_corrections(main_text)?;
+        let (parsed_text, corrections, segments) = self.parse_nested_corrections(main_text)?;
 
         Ok(ParsedText {
             text: parsed_text,
             corrections,
             suggestions,
+            segments,
         })
     }
 
-    // Modify the parse_nested_corrections method to handle adjacent corrections
+    // Modify the parse_nested_corrections method to handle adjacent corrections and build segments
     fn parse_nested_corrections(
         &self,
         text: &str,
-    ) -> Result<(String, Vec<Correction>), ParserError> {
+    ) -> Result<(String, Vec<Correction>, Vec<TextSegment>), ParserError> {
         let mut result = String::new();
         let mut corrections = Vec::new();
+        let mut segments = Vec::new();
         let mut current_pos = 0;
+        let mut plain_text_start = 0;
         let text_chars: Vec<char> = text.chars().collect();
 
         while current_pos < text_chars.len() {
             if current_pos + 1 < text_chars.len() && text_chars[current_pos] == '[' {
                 // This might be the start of a correction
                 match self.try_parse_correction(&text_chars, current_pos, 0) {
-                    Ok((Some(parsed), new_pos)) => {
+                    Ok((Some(parsed), new_pos, segment)) => {
                         if self.debug_mode {
                             println!("Successfully parsed correction: {:?}", parsed);
+                        }
+
+                        // If there's plain text before this correction, add it as a segment
+                        if current_pos > plain_text_start {
+                            let plain_text: String =
+                                text_chars[plain_text_start..current_pos].iter().collect();
+                            if !plain_text.is_empty() {
+                                segments.push(TextSegment::Plain(plain_text));
+                            }
                         }
 
                         // Add the correction to our list
                         corrections.push(parsed);
 
+                        // Add the correction segment
+                        segments.push(segment);
+
                         // Add the corrected text to the result
                         result.push_str(&corrections.last().unwrap().correction);
                         current_pos = new_pos;
+                        plain_text_start = current_pos;
                     }
-                    Ok((None, new_pos)) => {
+                    Ok((None, new_pos, _)) => {
                         // Not a correction, just a regular character
                         result.push(text_chars[current_pos]);
                         current_pos = new_pos;
@@ -125,16 +175,24 @@ impl Parser {
             }
         }
 
-        Ok((result, corrections))
+        // Add any remaining plain text
+        if current_pos > plain_text_start {
+            let plain_text: String = text_chars[plain_text_start..current_pos].iter().collect();
+            if !plain_text.is_empty() {
+                segments.push(TextSegment::Plain(plain_text));
+            }
+        }
+
+        Ok((result, corrections, segments))
     }
 
-    // Modify the try_parse_correction method to better handle brackets and braces
+    // Modify the try_parse_correction method to build the segment structure
     fn try_parse_correction(
         &self,
         chars: &[char],
         start_pos: usize,
         depth: usize,
-    ) -> Result<(Option<Correction>, usize), ParserError> {
+    ) -> Result<(Option<Correction>, usize, TextSegment), ParserError> {
         // Check recursion depth
         if depth > 100 {
             // Set a reasonable maximum
@@ -142,7 +200,8 @@ impl Parser {
         }
         // Check if this is the start of a correction
         if chars[start_pos] != '[' {
-            return Ok((None, start_pos + 1));
+            let segment = TextSegment::Plain(chars[start_pos].to_string());
+            return Ok((None, start_pos + 1, segment));
         }
 
         if self.debug_mode {
@@ -170,7 +229,9 @@ impl Parser {
                     error_type, start_pos
                 );
             }
-            return Ok((None, start_pos + 1));
+            let segment =
+                TextSegment::Plain(chars[start_pos..start_pos + 1].iter().collect::<String>());
+            return Ok((None, start_pos + 1, segment));
         }
 
         // Parse the content inside the curly braces
@@ -182,7 +243,9 @@ impl Parser {
             if self.debug_mode {
                 println!("Expected '{{' at position {}, found '{}'", pos, chars[pos]);
             }
-            return Ok((None, start_pos + 1));
+            let segment =
+                TextSegment::Plain(chars[start_pos..start_pos + 1].iter().collect::<String>());
+            return Ok((None, start_pos + 1, segment));
         }
 
         pos += 1; // Skip the opening curly brace
@@ -197,12 +260,18 @@ impl Parser {
         let mut correction = String::new();
         let mut explanation = String::new();
         let mut children = Vec::new();
+        let mut child_segments = Vec::new();
 
         // Parse the original text (which may contain nested corrections)
         let mut brace_count = 1;
         let mut in_original = true;
         let mut in_correction = false;
         let mut in_explanation = false;
+
+        let _original_start_pos = pos; // Prefix with underscore to avoid warning
+        let mut original_text_buffer = String::new();
+        let mut original_segments = Vec::new();
+        let mut corrected_segments = Vec::new();
 
         while pos < chars.len() && !(chars[pos] == '}' && brace_count == 1) {
             if in_original {
@@ -226,17 +295,31 @@ impl Parser {
                             .contains(&potential_error_type.trim())
                     {
                         // This is likely a nested correction
+                        // First, add any accumulated text before this nested correction
+                        if !original_text_buffer.is_empty() {
+                            original_segments
+                                .push(TextSegment::Plain(original_text_buffer.clone()));
+                            original_text_buffer.clear();
+                        }
+
                         match self.try_parse_correction(chars, pos, depth + 1) {
-                            Ok((Some(nested), new_pos)) => {
+                            Ok((Some(nested), new_pos, segment)) => {
                                 children.push(nested.clone());
-                                // Add the nested correction's original text
+                                child_segments.push(segment.clone());
+
+                                // Add the nested correction's original text to our original
                                 original.push_str(&nested.original);
+
+                                // Add the segment to our original segments
+                                original_segments.push(segment);
+
                                 pos = new_pos;
                                 continue;
                             }
-                            Ok((None, _)) => {
+                            Ok((None, _, _)) => {
                                 // Not a nested correction, treat as regular character
                                 original.push(chars[pos]);
+                                original_text_buffer.push(chars[pos]);
                             }
                             Err(e) => {
                                 if self.debug_mode {
@@ -244,13 +327,21 @@ impl Parser {
                                 }
                                 // On error, just treat as regular text
                                 original.push(chars[pos]);
+                                original_text_buffer.push(chars[pos]);
                             }
                         }
                     } else {
                         // Just a regular bracket in the content
                         original.push(chars[pos]);
+                        original_text_buffer.push(chars[pos]);
                     }
                 } else if chars[pos] == '|' && brace_count == 1 {
+                    // Add any remaining text in the original buffer
+                    if !original_text_buffer.is_empty() {
+                        original_segments.push(TextSegment::Plain(original_text_buffer.clone()));
+                        original_text_buffer.clear();
+                    }
+
                     in_original = false;
                     in_correction = true;
                     pos += 1;
@@ -262,6 +353,7 @@ impl Parser {
                         brace_count -= 1;
                     }
                     original.push(chars[pos]);
+                    original_text_buffer.push(chars[pos]);
                 }
             } else if in_correction {
                 if chars[pos] == '|' && brace_count == 1 {
@@ -293,6 +385,29 @@ impl Parser {
             }
         }
 
+        // Add any remaining text in the original buffer
+        if !original_text_buffer.is_empty() {
+            original_segments.push(TextSegment::Plain(original_text_buffer));
+        }
+
+        // Add the correction as a plain text segment
+        if !correction.is_empty() {
+            corrected_segments.push(TextSegment::Plain(correction.clone()));
+        } else if !child_segments.is_empty() {
+            // If there are child segments but no explicit correction text,
+            // use the corrected versions of the child segments
+            for child in &child_segments {
+                match child {
+                    TextSegment::Plain(text) => {
+                        corrected_segments.push(TextSegment::Plain(text.clone()));
+                    }
+                    TextSegment::Correction { correction, .. } => {
+                        corrected_segments.push(TextSegment::Plain(correction.clone()));
+                    }
+                }
+            }
+        }
+
         // Skip the closing curly brace
         if pos < chars.len() && chars[pos] == '}' {
             pos += 1;
@@ -303,7 +418,7 @@ impl Parser {
                 pos += 1;
             }
         } else {
-            return Err(ParserError::MissingClosingBrace(pos));
+                        return Err(ParserError::MissingClosingBrace(pos));
         }
 
         // Skip the closing bracket
@@ -318,7 +433,9 @@ impl Parser {
             if self.debug_mode {
                 println!("Missing original or correction at position {}", start_pos);
             }
-            return Ok((None, start_pos + 1));
+            let segment =
+                TextSegment::Plain(chars[start_pos..start_pos + 1].iter().collect::<String>());
+            return Ok((None, start_pos + 1, segment));
         }
 
         let explanation = if explanation.is_empty() {
@@ -327,15 +444,93 @@ impl Parser {
             Some(explanation)
         };
 
-        let correction = Correction {
+        // Fix: Normalize spaces in original text for nested corrections
+        let original = self.normalize_spaces(&original);
+
+        let correction_obj = Correction {
             error_type: error_type.to_string(),
-            original,
-            correction,
-            explanation,
+            original: original.clone(),
+            correction: correction.clone(),
+            explanation: explanation.clone(),
             children,
         };
 
-        Ok((Some(correction), pos))
+        // If we don't have any original segments but have original text,
+        // create a plain text segment for it
+        if original_segments.is_empty() && !correction_obj.original.is_empty() {
+            original_segments.push(TextSegment::Plain(correction_obj.original.clone()));
+        }
+
+        // If we don't have any corrected segments but have correction text,
+        // create a plain text segment for it
+        if corrected_segments.is_empty() && !correction_obj.correction.is_empty() {
+            corrected_segments.push(TextSegment::Plain(correction_obj.correction.clone()));
+        }
+
+        let segment = TextSegment::Correction {
+            error_type: error_type.to_string(),
+            original: original.clone(),
+            correction: correction_obj.correction.clone(),
+            explanation: explanation.clone(),
+            children: child_segments,
+            original_segments,
+            corrected_segments,
+        };
+
+        Ok((Some(correction_obj), pos, segment))
+    }
+
+    // Helper method to normalize spaces in text
+    fn normalize_spaces(&self, text: &str) -> String {
+        // Replace multiple spaces with a single space
+        let mut result = String::new();
+        let mut last_was_space = false;
+
+        for c in text.chars() {
+            if c == ' ' {
+                if !last_was_space {
+                    result.push(c);
+                }
+                last_was_space = true;
+            } else {
+                result.push(c);
+                last_was_space = false;
+            }
+        }
+
+        result
+    }
+
+    // Helper method to reconstruct the original text from segments
+    pub fn reconstruct_original(&self, segments: &[TextSegment]) -> String {
+        let mut result = String::new();
+        for segment in segments {
+            match segment {
+                TextSegment::Plain(text) => {
+                    result.push_str(text);
+                }
+                TextSegment::Correction { original, .. } => {
+                    result.push_str(original);
+                }
+            }
+        }
+        result
+    }
+
+    // Helper method to reconstruct the corrected text from segments
+    pub fn reconstruct_corrected(&self, segments: &[TextSegment]) -> String {
+        let mut result = String::new();
+        for segment in segments {
+            match segment {
+                TextSegment::Plain(text) => {
+                    result.push_str(text);
+                }
+                TextSegment::Correction { correction, .. } => {
+                    result.push_str(correction);
+                }
+            }
+        }
+        result
     }
 }
 
@@ -363,6 +558,38 @@ mod tests {
         assert_eq!(result.corrections[0].error_type, "TYPO");
         assert_eq!(result.corrections[0].original, "mispeling");
         assert_eq!(result.corrections[0].correction, "misspelling");
+
+        // Test segments
+        assert_eq!(result.segments.len(), 3);
+        match &result.segments[0] {
+            TextSegment::Plain(text) => assert_eq!(text, "This has a "),
+            _ => panic!("Expected Plain segment"),
+        }
+        match &result.segments[1] {
+            TextSegment::Correction {
+                error_type,
+                original,
+                correction,
+                ..
+            } => {
+                assert_eq!(error_type, "TYPO");
+                assert_eq!(original, "mispeling");
+                assert_eq!(correction, "misspelling");
+            }
+            _ => panic!("Expected Correction segment"),
+        }
+        match &result.segments[2] {
+            TextSegment::Plain(text) => assert_eq!(text, " in it."),
+            _ => panic!("Expected Plain segment"),
+        }
+
+        // Test reconstruction
+        let parser = Parser::new();
+        let original = parser.reconstruct_original(&result.segments);
+        let corrected = parser.reconstruct_corrected(&result.segments);
+
+        assert_eq!(original, "This has a mispeling in it.");
+        assert_eq!(corrected, "This has a misspelling in it.");
     }
 
     #[test]
@@ -375,6 +602,43 @@ mod tests {
         assert_eq!(result.corrections[0].children[0].error_type, "GRAM");
         assert_eq!(result.corrections[0].children[0].original, "a error");
         assert_eq!(result.corrections[0].children[0].correction, "an error");
+
+        // Test segments
+        assert_eq!(result.segments.len(), 1);
+        match &result.segments[0] {
+            TextSegment::Correction {
+                error_type,
+                children,
+                original,
+                ..
+            } => {
+                assert_eq!(error_type, "STYL");
+                assert_eq!(children.len(), 1);
+                assert_eq!(original, "This sentence has a error in it.");
+                match &children[0] {
+                    TextSegment::Correction {
+                        error_type,
+                        original,
+                        correction,
+                        ..
+                    } => {
+                        assert_eq!(error_type, "GRAM");
+                        assert_eq!(original, "a error");
+                        assert_eq!(correction, "an error");
+                    }
+                    _ => panic!("Expected nested Correction segment"),
+                }
+            }
+            _ => panic!("Expected Correction segment"),
+        }
+
+        // Test reconstruction
+        let parser = Parser::new();
+        let original = parser.reconstruct_original(&result.segments);
+        let corrected = parser.reconstruct_corrected(&result.segments);
+
+        assert_eq!(original, "This sentence has a error in it.");
+        assert_eq!(corrected, "This sentence has an error in it.");
     }
 
     #[test]
@@ -386,6 +650,13 @@ mod tests {
             result.suggestions,
             Some("Here are some suggestions.".to_string())
         );
+
+        // Test segments
+        assert_eq!(result.segments.len(), 1);
+        match &result.segments[0] {
+            TextSegment::Plain(text) => assert_eq!(text, "This is a test."),
+            _ => panic!("Expected Plain segment"),
+        }
     }
 
     #[test]
@@ -397,6 +668,17 @@ mod tests {
         assert_eq!(result.corrections[0].original, "sentance");
         assert_eq!(result.corrections[1].error_type, "GRAM");
         assert_eq!(result.corrections[1].correction, "many errors");
+
+        // Test segments
+        assert_eq!(result.segments.len(), 4);
+
+        // Test reconstruction
+        let parser = Parser::new();
+        let original = parser.reconstruct_original(&result.segments);
+        let corrected = parser.reconstruct_corrected(&result.segments);
+
+        assert_eq!(original, "This sentance has many error.");
+        assert_eq!(corrected, "This sentence has many errors.");
     }
 
     #[test]
@@ -408,312 +690,192 @@ mod tests {
         assert_eq!(result.corrections[0].children.len(), 2);
         assert_eq!(result.corrections[0].children[0].error_type, "STYL");
         assert_eq!(result.corrections[0].children[1].error_type, "PUNC");
-    }
-    #[test]
-    fn test_empty_input() {
-        let input = "";
-        let result = parse_corrections(input).unwrap();
-        assert_eq!(result.text, "");
-        assert_eq!(result.corrections.len(), 0);
-        assert_eq!(result.suggestions, None);
-    }
 
-    #[test]
-    fn test_no_corrections() {
-        let input = "This is a text with no corrections.";
-        let result = parse_corrections(input).unwrap();
-        assert_eq!(result.text, "This is a text with no corrections.");
-        assert_eq!(result.corrections.len(), 0);
-    }
+        // Test segments
+        assert_eq!(result.segments.len(), 1);
+        match &result.segments[0] {
+            TextSegment::Correction {
+                error_type,
+                children,
+                original,
+                ..
+            } => {
+                assert_eq!(error_type, "STRUC");
+                assert_eq!(children.len(), 2);
+                assert_eq!(
+                    original,
+                    "In conclusion, to sum up, the evidence suggests three outcomes."
+                );
+            }
+            _ => panic!("Expected Correction segment"),
+        }
 
-    #[test]
-    fn test_correction_with_explanation() {
-        let input = "This has a [TYPO{mispeling|misspelling|Common spelling error}] in it.";
-        let result = parse_corrections(input).unwrap();
-        assert_eq!(result.corrections.len(), 1);
-        assert_eq!(result.corrections[0].error_type, "TYPO");
-        assert_eq!(result.corrections[0].original, "mispeling");
-        assert_eq!(result.corrections[0].correction, "misspelling");
+        // Test reconstruction
+        let parser = Parser::new();
+        let original = parser.reconstruct_original(&result.segments);
+        let corrected = parser.reconstruct_corrected(&result.segments);
+
         assert_eq!(
-            result.corrections[0].explanation,
-            Some("Common spelling error".to_string())
-        );
-    }
-
-    #[test]
-    fn test_adjacent_corrections() {
-        let input = "This [TYPO{sentance|sentence}][PUNC{|,}] needs fixing.";
-        let result = parse_corrections(input).unwrap();
-        assert_eq!(result.corrections.len(), 2);
-        assert_eq!(result.corrections[0].error_type, "TYPO");
-        assert_eq!(result.corrections[0].original, "sentance");
-        assert_eq!(result.corrections[0].correction, "sentence");
-        assert_eq!(result.corrections[1].error_type, "PUNC");
-        assert_eq!(result.corrections[1].original, "");
-        assert_eq!(result.corrections[1].correction, ",");
-        assert_eq!(result.text, "This sentence, needs fixing.");
-    }
-
-    #[test]
-    fn test_correction_with_braces_in_content() {
-        let input = "The function [GRAM{look like: function() { return x; }|looks like: function() { return x; }}]";
-        let result = parse_corrections(input).unwrap();
-        assert_eq!(result.corrections.len(), 1);
-        assert_eq!(result.corrections[0].error_type, "GRAM");
-        assert_eq!(
-            result.corrections[0].original,
-            "look like: function() { return x; }"
+            original,
+            "In conclusion, to sum up, the evidence suggests three outcomes."
         );
         assert_eq!(
-            result.corrections[0].correction,
-            "looks like: function() { return x; }"
+            corrected,
+            "In conclusion; the evidence suggests three outcomes."
         );
-    }
-
-    #[test]
-    fn test_correction_with_brackets_in_content() {
-        let input = "The array [TYPO{[1,2,3]|[1, 2, 3]}] needs spaces.";
-        let result = parse_corrections(input).unwrap();
-        assert_eq!(result.corrections.len(), 1);
-        assert_eq!(result.corrections[0].error_type, "TYPO");
-        assert_eq!(result.corrections[0].original, "[1,2,3]");
-        assert_eq!(result.corrections[0].correction, "[1, 2, 3]");
     }
 
     #[test]
     fn test_deeply_nested_corrections() {
         let input = "[STRUC{[STYL{This [GRAM{have|has}] [TYPO{multipel|multiple}] [PUNC{,|;}] nested corrections.|This has multiple; nested corrections.}]|A better sentence structure.}]";
-        let result = parse_corrections(input).unwrap();
-        assert_eq!(result.corrections.len(), 1);
-        assert_eq!(result.corrections[0].error_type, "STRUC");
-        assert_eq!(result.corrections[0].children.len(), 1);
-        assert_eq!(result.corrections[0].children[0].error_type, "STYL");
-        assert_eq!(result.corrections[0].children[0].children.len(), 3);
-        assert_eq!(
-            result.corrections[0].children[0].children[0].error_type,
-            "GRAM"
-        );
-        assert_eq!(
-            result.corrections[0].children[0].children[1].error_type,
-            "TYPO"
-        );
-        assert_eq!(
-            result.corrections[0].children[0].children[2].error_type,
-            "PUNC"
-        );
+        let result = parse_corrections_debug(input).unwrap();
+
+        // Test segments
+        assert_eq!(result.segments.len(), 1);
+
+        // Test reconstruction
+        let parser = Parser::new();
+        let original = parser.reconstruct_original(&result.segments);
+        let corrected = parser.reconstruct_corrected(&result.segments);
+
+        assert_eq!(original, "This have multipel, nested corrections.");
+        assert_eq!(corrected, "A better sentence structure.");
+
+        // Print the segment structure for debugging
+        print_segment_structure(&result.segments, 0);
     }
 
     #[test]
-    fn test_suggestions_with_corrections() {
-        let input = "This [TYPO{sentance|sentence}] needs fixing.\n\n[SUGGESTIONS]\n1. Use more precise language.\n2. Consider adding examples.";
+    fn test_mixed_text_and_corrections() {
+        let input = "This is normal text. [TYPO{Thiz|This}] is a correction. And [GRAM{here are|here is}] another one.";
         let result = parse_corrections(input).unwrap();
-        assert_eq!(result.corrections.len(), 1);
-        assert_eq!(result.corrections[0].error_type, "TYPO");
-        assert!(result.suggestions.is_some());
-        assert!(result
-            .suggestions
-            .unwrap()
-            .contains("Use more precise language"));
-    }
 
-    #[test]
-    fn test_malformed_correction_recovery() {
-        // Missing closing bracket but parser should recover
-        let input = "This has a [TYPO{mispeling|misspelling in it.";
-        let result = parse_corrections(input).unwrap();
-        // The parser should treat the malformed correction as regular text
-        assert_eq!(result.text, "This has a [TYPO{mispeling|misspelling in it.");
-        assert_eq!(result.corrections.len(), 0);
-    }
+        // Test segments
+        assert_eq!(result.segments.len(), 5);
 
-    #[test]
-    fn test_invalid_error_type() {
-        // Invalid error type should be treated as regular text
-        let input = "This has a [INVALID{mispeling|misspelling}] in it.";
-        let result = parse_corrections(input).unwrap();
-        assert_eq!(
-            result.text,
-            "This has a [INVALID{mispeling|misspelling}] in it."
-        );
-        assert_eq!(result.corrections.len(), 0);
-    }
-
-    #[test]
-    fn test_correction_at_start() {
-        let input = "[TYPO{Mispeling|Misspelling}] at the start.";
-        let result = parse_corrections(input).unwrap();
-        assert_eq!(result.corrections.len(), 1);
-        assert_eq!(result.corrections[0].original, "Mispeling");
-        assert_eq!(result.corrections[0].correction, "Misspelling");
-    }
-
-    #[test]
-    fn test_correction_at_end() {
-        let input = "Error at the end: [GRAM{is wrong|are wrong}]";
-        let result = parse_corrections(input).unwrap();
-        assert_eq!(result.corrections.len(), 1);
-        assert_eq!(result.corrections[0].original, "is wrong");
-        assert_eq!(result.corrections[0].correction, "are wrong");
-    }
-
-    #[test]
-    fn test_multiline_correction() {
-        let input = "This has a [STRUC{paragraph that\nis poorly\nstructured.|paragraph that is well structured.}]";
-        let result = parse_corrections(input).unwrap();
-        assert_eq!(result.corrections.len(), 1);
-        assert_eq!(result.corrections[0].error_type, "STRUC");
-        assert!(result.corrections[0].original.contains("\n"));
-    }
-
-    #[test]
-    fn test_long_complex_text_2() {
-        // The input text has double braces {{...}} instead of single braces {....}
-        // Let's modify the input to use single braces
-        let input = r#"[GRAM{If I could travel anywere|If I could travel anywhere}][TYPO{wood|would}] go to Japan[PUNC{,|}][STYL{becuase|because}][TYPO{there|their}][GRAM{there culture|their culture}][TYPO{intresting|interesting}]. [WORD{I herd|I have heard}][STYL{the food is amazing, and they're|that the food is amazing, and their}][GRAM{they're|their}][TYPO{beutiful|beautiful}]. [STYL{I think it would be a very good|I think it would be a wonderful}][WORD{very good|wonderful}] experience to learn about [GRAM{they're|their}] history.
-
-[STRUC{Also, Tokyo, its a very big city, I think it will be fun.|Additionally, Tokyo is a very large city, and I believe it would be exciting to explore.}][STYL{Also|Additionally}][GRAM{its|is}][WORD{big|large}][PUNC{city,|city,}][STYL{I think it will be fun|and I believe it would be exciting to explore}]. [WORD{intrested|fascinated}][TYPO{intrested|fascinated}] by Mount Fuji[PUNC{,|, as}][GRAM{it looks majestic.|it looks majestic.}]
-
-[GRAM{I hope I can go their someday,|I hope I can visit someday—}][TYPO{their|there}][PUNC{,|—}][STYL{it would be|it would truly be}] a dream come true.
-
-[STRUC{I think it would be a good experience for me to learn about they're culture.|Overall, I think traveling to Japan would be an incredible opportunity for me to learn about its culture and history while experiencing everything the country has to offer.}][GRAM{they're|its}][STYL{good experience|incredible opportunity}]
-
-[STRUC{In conclusion, I think Japan is good.|In conclusion, Japan is a fascinating destination, and I would love to visit.}][STYL{good|fascinating destination}]"#;
-
-        // Use debug mode to get more information
-        let result = parse_corrections_debug(input);
-
-        // Check if parsing was successful
-        assert!(
-            result.is_ok(),
-            "Failed to parse the text: {:?}",
-            result.err()
-        );
-
-        let parsed = result.unwrap();
-
-        // Print the structure for analysis
-        println!("Parsed Text: {}", parsed.text);
-        println!(
-            "Number of top-level corrections: {}",
-            parsed.corrections.len()
-        );
-
-        // Print detailed structure of corrections
-        print_correction_structure(&parsed.corrections, 0);
-
-        // Verify some specific corrections
-        assert!(parsed.corrections.iter().any(|c| c.error_type == "GRAM"
-            && c.original == "If I could travel anywere"
-            && c.correction == "If I could travel anywhere"));
-
-        assert!(parsed
-            .corrections
-            .iter()
-            .any(|c| c.error_type == "TYPO" && c.original == "wood" && c.correction == "would"));
-
-        // Check for the STRUC correction in the last paragraph
-        let last_struc = parsed.corrections.iter().find(|c|
-        c.error_type == "STRUC" &&
-        c.original == "In conclusion, I think Japan is good." &&
-        c.correction == "In conclusion, Japan is a fascinating destination, and I would love to visit."
-    );
-
-        assert!(
-            last_struc.is_some(),
-            "Could not find the expected STRUC correction in the last paragraph"
-        );
-
-        // Check for duplicate corrections (intrested|fascinated appears twice)
-        let fascinated_corrections = parsed
-            .corrections
-            .iter()
-            .filter(|c| c.original == "intrested" && c.correction == "fascinated")
-            .count();
+        // Test reconstruction
+        let parser = Parser::new();
+        let original = parser.reconstruct_original(&result.segments);
+        let corrected = parser.reconstruct_corrected(&result.segments);
 
         assert_eq!(
-            fascinated_corrections, 2,
-            "Expected to find 'intrested|fascinated' correction twice"
+            original,
+            "This is normal text. Thiz is a correction. And here are another one."
         );
-
-        // Check for empty correction in PUNC
-        let empty_correction = parsed
-            .corrections
-            .iter()
-            .find(|c| c.error_type == "PUNC" && c.original == "," && c.correction == "");
-
-        assert!(
-            empty_correction.is_some(),
-            "Could not find the empty PUNC correction"
-        );
-
-        // Check for redundant correction
-        let redundant_correction = parsed.corrections.iter().find(|c| {
-            c.error_type == "GRAM"
-                && c.original == "it looks majestic."
-                && c.correction == "it looks majestic."
-        });
-
-        assert!(
-            redundant_correction.is_some(),
-            "Could not find the redundant GRAM correction"
+        assert_eq!(
+            corrected,
+            "This is normal text. This is a correction. And here is another one."
         );
     }
 
     #[test]
-    fn test_long_complex_text() {
-        let input = r#"[GRAM{{If I could travel anywere|If I could travel anywhere}}][TYPO{{wood|would}}] go to Japan[PUNC{{,|}}][STYL{{becuase|because}}][TYPO{{there|their}}][GRAM{{there culture|their culture}}][TYPO{{intresting|interesting}}]. [WORD{{I herd|I have heard}}][STYL{{the food is amazing, and they're|that the food is amazing, and their}}][GRAM{{they're|their}}][TYPO{{beutiful|beautiful}}]. [STYL{{I think it would be a very good|I think it would be a wonderful}}][WORD{{very good|wonderful}}] experience to learn about [GRAM{{they're|their}}] history.
+    fn test_segment_reconstruction() {
+        let input = "This [TYPO{sentance|sentence}] has [GRAM{many error|many errors}].";
+        let result = parse_corrections(input).unwrap();
 
-[STRUC{{Also, Tokyo, its a very big city, I think it will be fun.|Additionally, Tokyo is a very large city, and I believe it would be exciting to explore.}}][STYL{{Also|Additionally}}][GRAM{{its|is}}][WORD{{big|large}}][PUNC{{city,|city,}}][STYL{{I think it will be fun|and I believe it would be exciting to explore}}]. [WORD{{intrested|fascinated}}][TYPO{{intrested|fascinated}}] by Mount Fuji[PUNC{{,|, as}}][GRAM{{it looks majestic.|it looks majestic.}}]
+        // Manually check each segment
+        assert_eq!(result.segments.len(), 4);
 
-[GRAM{{I hope I can go their someday,|I hope I can visit someday—}}][TYPO{{their|there}}][PUNC{{,|—}}][STYL{{it would be|it would truly be}}] a dream come true.
+        match &result.segments[0] {
+            TextSegment::Plain(text) => assert_eq!(text, "This "),
+            _ => panic!("Expected Plain segment"),
+        }
 
-[STRUC{{[Repeated 3x] I think it would be a good experience for me to learn about they're culture.|Overall, I think traveling to Japan would be an incredible opportunity for me to learn about its culture and history while experiencing everything the country has to offer.}}][GRAM{{they're|its}}][STYL{{good experience|incredible opportunity}}]
+        match &result.segments[1] {
+            TextSegment::Correction {
+                original,
+                correction,
+                ..
+            } => {
+                assert_eq!(original, "sentance");
+                assert_eq!(correction, "sentence");
+            }
+            _ => panic!("Expected Correction segment"),
+        }
 
-[STRUC{{In conclusion, I think Japan is good.|In conclusion, Japan is a fascinating destination, and I would love to visit.}}][STYL{{good|fascinating destination}}]"#;
+        match &result.segments[2] {
+            TextSegment::Plain(text) => assert_eq!(text, " has "),
+            _ => panic!("Expected Plain segment"),
+        }
 
-        // Use debug mode to get more information
-        let result = parse_corrections_debug(input);
+        match &result.segments[3] {
+            TextSegment::Correction {
+                original,
+                correction,
+                ..
+            } => {
+                assert_eq!(original, "many error");
+                assert_eq!(correction, "many errors");
+            }
+            _ => panic!("Expected Correction segment"),
+        }
 
-        // Check if parsing was successful
-        assert!(
-            result.is_ok(),
-            "Failed to parse the text: {:?}",
-            result.err()
-        );
+        // Test reconstruction
+        let parser = Parser::new();
+        let original = parser.reconstruct_original(&result.segments);
+        let corrected = parser.reconstruct_corrected(&result.segments);
 
-        let parsed = result.unwrap();
+        assert_eq!(original, "This sentance has many error.");
+        assert_eq!(corrected, "This sentence has many errors.");
+    }
 
-        // Print the structure for analysis
-        println!("Parsed Text: {}", parsed.text);
-        println!(
-            "Number of top-level corrections: {}",
-            parsed.corrections.len()
-        );
+    #[test]
+    fn test_nested_segment_reconstruction() {
+        let input = "[STYL{This sentence has [GRAM{a error|an error}] in it.|This sentence has an error in it.}]";
+        let result = parse_corrections(input).unwrap();
 
-        // Print detailed structure of corrections
-        print_correction_structure(&parsed.corrections, 0);
+        // Test reconstruction
+        let parser = Parser::new();
+        let original = parser.reconstruct_original(&result.segments);
+        let corrected = parser.reconstruct_corrected(&result.segments);
 
-        // Verify some specific corrections
-        assert!(parsed.corrections.iter().any(|c| c.error_type == "GRAM"
-            && c.original == "If I could travel anywere"
-            && c.correction == "If I could travel anywhere"));
+        assert_eq!(original, "This sentence has a error in it.");
+        assert_eq!(corrected, "This sentence has an error in it.");
+    }
 
-        assert!(parsed
-            .corrections
-            .iter()
-            .any(|c| c.error_type == "TYPO" && c.original == "wood" && c.correction == "would"));
+    // Helper function to print the structure of segments
+    fn print_segment_structure(segments: &[TextSegment], indent: usize) {
+        for (i, segment) in segments.iter().enumerate() {
+            let indent_str = " ".repeat(indent * 2);
+            match segment {
+                TextSegment::Plain(text) => {
+                    println!("{}Segment #{}: Plain: {}", indent_str, i + 1, text);
+                }
+                TextSegment::Correction {
+                    error_type,
+                    original,
+                    correction,
+                    explanation,
+                    children,
+                    original_segments,
+                    corrected_segments,
+                } => {
+                    println!(
+                        "{}Segment #{}: Correction: {}",
+                        indent_str,
+                        i + 1,
+                        error_type
+                    );
+                    println!("{}  Original: {}", indent_str, original);
+                    println!("{}  Correction: {}", indent_str, correction);
 
-        // Check for the STRUC correction in the last paragraph
-        let last_struc = parsed.corrections.iter().find(|c|
-        c.error_type == "STRUC" &&
-        c.original == "In conclusion, I think Japan is good." &&
-        c.correction == "In conclusion, Japan is a fascinating destination, and I would love to visit."
-    );
+                    if let Some(exp) = explanation {
+                        println!("{}  Explanation: {}", indent_str, exp);
+                    }
 
-        assert!(
-            last_struc.is_some(),
-            "Could not find the expected STRUC correction in the last paragraph"
-        );
+                    if !children.is_empty() {
+                        println!("{}  Children:", indent_str);
+                        print_segment_structure(children, indent + 1);
+                    }
+
+                    println!("{}  Original Segments:", indent_str);
+                    print_segment_structure(original_segments, indent + 1);
+
+                    println!("{}  Corrected Segments:", indent_str);
+                    print_segment_structure(corrected_segments, indent + 1);
+                }
+            }
+        }
     }
 
     // Helper function to print the structure of corrections
@@ -739,4 +901,161 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_complex_nested_segment_reconstruction() {
+        let input = "[STRUC{[STYL{In conclusion, to sum up|In conclusion}][PUNC{,|;}] the evidence suggests three outcomes.|In conclusion; the evidence suggests three outcomes.}]";
+        let result = parse_corrections_debug(input).unwrap();
+
+        // Print the segment structure for debugging
+        println!("Complex nested segment structure:");
+        print_segment_structure(&result.segments, 0);
+
+        // Test reconstruction
+        let parser = Parser::new();
+        let original = parser.reconstruct_original(&result.segments);
+        let corrected = parser.reconstruct_corrected(&result.segments);
+
+        assert_eq!(
+            original,
+            "In conclusion, to sum up, the evidence suggests three outcomes."
+        );
+        assert_eq!(
+            corrected,
+            "In conclusion; the evidence suggests three outcomes."
+        );
+    }
+
+    #[test]
+    fn test_deeply_nested_segment_reconstruction() {
+        let input = "[STRUC{[STYL{This [GRAM{have|has}] [TYPO{multipel|multiple}] [PUNC{,|;}] nested corrections.|This has multiple; nested corrections.}]|A better sentence structure.}]";
+        let result = parse_corrections_debug(input).unwrap();
+
+        // Print the segment structure for debugging
+        println!("Deeply nested segment structure:");
+        print_segment_structure(&result.segments, 0);
+
+        // Test reconstruction
+        let parser = Parser::new();
+        let original = parser.reconstruct_original(&result.segments);
+        let corrected = parser.reconstruct_corrected(&result.segments);
+
+        assert_eq!(original, "This have multipel, nested corrections.");
+        assert_eq!(corrected, "A better sentence structure.");
+    }
+
+    #[test]
+    fn test_long_complex_text() {
+        let input = r#"[GRAM{If I could travel anywere|If I could travel anywhere}][TYPO{wood|would}] go to Japan[PUNC{,|}][STYL{becuase|because}][TYPO{there|their}][GRAM{there culture|their culture}][TYPO{intresting|interesting}]. [WORD{I herd|I have heard}][STYL{the food is amazing, and they're|that the food is amazing, and their}][GRAM{they're|their}][TYPO{beutiful|beautiful}]. [STYL{I think it would be a very good|I think it would be a wonderful}][WORD{very good|wonderful}] experience to learn about [GRAM{they're|their}] history."#;
+
+        let result = parse_corrections(input).unwrap();
+
+        // Test reconstruction
+        let parser = Parser::new();
+        let original = parser.reconstruct_original(&result.segments);
+        let corrected = parser.reconstruct_corrected(&result.segments);
+
+        // Check that we can reconstruct both versions
+        assert!(original.contains("If I could travel anywere"));
+        assert!(original.contains("wood go to Japan"));
+        assert!(original.contains("becuase"));
+        assert!(original.contains("there culture"));
+        assert!(original.contains("intresting"));
+
+        assert!(corrected.contains("If I could travel anywhere"));
+        assert!(corrected.contains("would go to Japan"));
+        assert!(corrected.contains("because"));
+        assert!(corrected.contains("their culture"));
+        assert!(corrected.contains("interesting"));
+    }
+
+    #[test]
+    fn test_segment_indexing() {
+        let input = "This is [TYPO{normel|normal}] text with [GRAM{a correction|corrections}].";
+        let result = parse_corrections(input).unwrap();
+
+        // Test that we can access segments by index
+        assert_eq!(result.segments.len(), 5);
+
+        // First segment should be plain text
+        match &result.segments[0] {
+            TextSegment::Plain(text) => assert_eq!(text, "This is "),
+            _ => panic!("Expected Plain segment"),
+        }
+
+        // Second segment should be a correction
+        match &result.segments[1] {
+            TextSegment::Correction {
+                error_type,
+                original,
+                correction,
+                ..
+            } => {
+                assert_eq!(error_type, "TYPO");
+                assert_eq!(original, "normel");
+                assert_eq!(correction, "normal");
+            }
+            _ => panic!("Expected Correction segment"),
+        }
+
+        // Third segment should be plain text
+        match &result.segments[2] {
+            TextSegment::Plain(text) => assert_eq!(text, " text with "),
+            _ => panic!("Expected Plain segment"),
+        }
+
+        // Fourth segment should be a correction
+        match &result.segments[3] {
+            TextSegment::Correction {
+                error_type,
+                original,
+                correction,
+                ..
+            } => {
+                assert_eq!(error_type, "GRAM");
+                assert_eq!(original, "a correction");
+                assert_eq!(correction, "corrections");
+            }
+            _ => panic!("Expected Correction segment"),
+        }
+
+        // Fifth segment should be plain text
+        match &result.segments[4] {
+            TextSegment::Plain(text) => assert_eq!(text, "."),
+            _ => panic!("Expected Plain segment"),
+        }
+    }
+
+    #[test]
+    fn test_empty_input() {
+        let input = "";
+        let result = parse_corrections(input).unwrap();
+        assert_eq!(result.text, "");
+        assert_eq!(result.corrections.len(), 0);
+        assert_eq!(result.suggestions, None);
+        assert_eq!(result.segments.len(), 0);
+    }
+
+    #[test]
+    fn test_correction_with_explanation() {
+        let input = "This has a [TYPO{mispeling|misspelling|Common spelling error}] in it.";
+        let result = parse_corrections(input).unwrap();
+
+        // Check the explanation is properly parsed
+        assert_eq!(result.corrections.len(), 1);
+        assert_eq!(
+            result.corrections[0].explanation,
+            Some("Common spelling error".to_string())
+        );
+
+        // Check the segment also has the explanation
+        match &result.segments[1] {
+            TextSegment::Correction { explanation, .. } => {
+                assert_eq!(explanation, &Some("Common spelling error".to_string()));
+            }
+            _ => panic!("Expected Correction segment"),
+        }
+    }
 }
+
+

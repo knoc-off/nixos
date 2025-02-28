@@ -168,13 +168,15 @@ impl LlmProcessor {
 
         // Create the prompt for the LLM to generate a corrected version
         let correction_prompt = format!(
-            "You are an expert language tutor. Your task is to correct the following essay.\n\n\
-            The essay was written in response to this prompt: \"{}\"\n\n\
-            Here is the essay to correct:\n\n{}\n\n\
-            Please provide a fully corrected version of the essay. Fix all grammar, spelling, \
-            punctuation, word choice, style, and structural issues. Make the essay as good as it can be \
-            while preserving the original meaning and intent.\n\n\
-            Only provide the corrected essay text with no explanations, annotations, or additional comments.\n\
+            "You are an expert language tutor. Your task is to correct the following essay.\n\n
+            The essay was written in response to this prompt: \"{}\"\n\n
+            Here is the essay to correct:\n\n{}\n\n
+            Please provide a fully corrected version of the essay. Fix all grammar, spelling,
+            punctuation, word choice, and very small style/structural issues. Make the essay as good as it can be
+            while preserving the original meaning and intent.\n\n
+
+            Do not take creative liberty with the corrected essay, it should adhear quite closely to the original.
+            Only provide the corrected essay text with no explanations, annotations, or additional comments.\n
             Respond in the same language as the essay is written!",
             prompt_topic, text
         );
@@ -221,55 +223,55 @@ impl LlmProcessor {
 
         // Create the prompt for the LLM to generate annotations
         let annotation_prompt = format!(
-        "You are a highly skilled language expert and educator, adept at identifying and explaining differences between texts. \
-        Your task is to meticulously analyze an original essay and its corrected version, then generate an annotated version of the ORIGINAL essay. \
-        This annotated version should comprehensively highlight all changes needed to transform the original into the corrected version, \
-        using a specific nested annotation format. Your annotations should be precise, informative, and pedagogically valuable.\n\n\
-        **Annotation Format:**\n\
-        Use the following nested annotation format to mark errors:\n\
-        `[TYPE{{original text|corrected text|optional explanation}}]`\n\n\
-        **Annotation Types:**\n\
-        Where `TYPE` is one of the following, chosen based on the primary nature of the error:\n\
-        - `TYPO`: Spelling or typographical errors (e.g., `[TYPO{{mispeling|misspelling}}]`)\n\
-        - `GRAM`: Grammatical errors (e.g., `[GRAM{{The students is|The students are|Subject-verb agreement}}]`)\n\
-        - `PUNC`: Punctuation errors (e.g., `[PUNC{{no comma| ,|Missing comma for clarity}}]`)\n\
-        - `WORD`: Word choice or vocabulary issues (e.g., `[WORD{{utilize|use|'Utilize' is less direct}}]`)\n\
-        - `STYL`: Stylistic issues, including awkward phrasing, redundancy, or lack of clarity (e.g., `[STYL{{In conclusion, to sum up|In conclusion|Redundant phrasing}}]`)\n\
-        - `STRUC`: Structural issues affecting sentence or paragraph organization and flow (e.g., `[STRUC{{This paragraph is disjointed. It lacks a clear topic sentence and transitions.|This paragraph has been reorganized with a clear topic sentence and smooth transitions.|Paragraph lacked focus and coherence}}]`)\n\n\
-        **Nesting Annotations:**\n\
-        You can nest annotations to indicate multiple issues within the same text span. Ensure the most significant error type is the outer layer. For example:\n\
-        `[STYL{{This sentence has [GRAM{{a error|an error}}] and [TYPO{{mispeling|misspelling}}] that needs fixing.|This sentence has an error and misspelling that needs fixing.|Improved overall style while fixing grammar and spelling}}]`\n\n\
-        **Important Considerations:**\n\
-        - **Completeness:** Mark *every* difference between the original and corrected versions, no matter how small.\n\
-        - **Precision:** Choose the most appropriate error type for each annotation. If multiple types apply, prioritize the most impactful one.\n\
-        - **Explanations:** Provide concise and helpful explanations for each correction, focusing on *why* the change was made. Omit explanations only when the correction is self-evident (e.g., simple typos).\n\
-        - **Context:** Consider the surrounding text when determining the error type and explanation.\n\
-        - **Avoid Overlapping Annotations:** Ensure annotations do not overlap. If two errors are very close, consider nesting or combining them.\n\
-        - **Prioritize Clarity:** The goal is to create an annotated text that is easy to understand and use for learning.\n\n\
-        **Examples:**\n\
-        1.  Original: \"The students is studying.\"\n\
-            Corrected: \"The students are studying.\"\n\
-            Annotated: \"[GRAM{{The students is|The students are|Subject-verb agreement}}] studying.\"\n\
-        2.  Original: \"I definately need to study.\"\n\
-            Corrected: \"I definitely need to study.\"\n\
-            Annotated: \"I [TYPO{{definately|definitely}}] need to study.\"\n\
-        3.  Original: \"We need to leverage our core competencies to succeed.\"\n\
-            Corrected: \"We need to use our strengths to succeed.\"\n\
-            Annotated: \"We need to [WORD{{leverage our core competencies|use our strengths}}|Simplified business jargon] to succeed.\"\n\n\
-        **Input Texts:**\n\
-        Here is the ORIGINAL essay:\n\n{}\n\n\
-        Here is the CORRECTED essay:\n\n{}\n\n\
-        **Task:**\n\
-        Generate the annotated version of the ORIGINAL essay, marking all necessary changes to match the corrected version. \
-        Follow the annotation format and guidelines described above. Be comprehensive and precise.\n\
-        your response should Only contain the annotated version of the original
+        "You are a highly skilled language expert and educator, adept at identifying and explaining differences between texts.
+        Your task is to meticulously analyze an original essay and its corrected version, then generate an annotated version of the ORIGINAL essay.
+        This annotated version should comprehensively highlight all changes needed to transform the original into the corrected version,
+        using a specific nested annotation format. Your annotations should be precise, informative, and pedagogically valuable.\n\n
+        **Annotation Format:**\n
+        Use the following nested annotation format to mark errors:\n
+        `[TYPE{{original text|corrected text|optional explanation}}]`\n\n
+        **Annotation Types:**\n
+        Where `TYPE` is one of the following, chosen based on the primary nature of the error:\n
+        - `TYPO`: Spelling or typographical errors (e.g., `[TYPO{{mispeling|misspelling}}]`)\n
+        - `GRAM`: Grammatical errors (e.g., `[GRAM{{The students is|The students are|Subject-verb agreement}}]`)\n
+        - `PUNC`: Punctuation errors (e.g., `[PUNC{{no comma| ,|Missing comma for clarity}}]`)\n
+        - `WORD`: Word choice or vocabulary issues (e.g., `[WORD{{utilize|use|'Utilize' is less direct}}]`)\n
+        **Nesting Annotations:**\n
+        You can nest annotations to indicate multiple issues within the same text span. Ensure the most significant error type is the outer layer. For example:\n
+        **Important Considerations:**\n
+        - **Completeness:** Mark *every* difference between the original and corrected versions, no matter how small.\n
+        - **Precision:** Choose the most appropriate error type for each annotation. If multiple types apply, prioritize the most impactful one.\n
+        - **Explanations:** Provide concise and helpful explanations for each correction, focusing on *why* the change was made. Omit explanations only when the correction is self-evident (e.g., simple typos).\n
+        - **Context:** Consider the surrounding text when determining the error type and explanation.\n
+        - **Avoid Overlapping Annotations:** Ensure annotations do not overlap. If two errors are very close, consider nesting or combining them.\n
+        - **Prioritize Clarity:** The goal is to create an annotated text that is easy to understand and use for learning.\n\n
+        **Examples:**\n
+        1.  Original: \"The students is studying.\"\n
+            Corrected: \"The students are studying.\"\n
+            Annotated: \"[GRAM{{The students is|The students are|Subject-verb agreement}}] studying.\"\n
+        2.  Original: \"I definately need to study.\"\n
+            Corrected: \"I definitely need to study.\"\n
+            Annotated: \"I [TYPO{{definately|definitely}}] need to study.\"\n
+        3.  Original: \"We need to leverage our core competencies to succeed.\"\n
+            Corrected: \"We need to use our strengths to succeed.\"\n
+            Annotated: \"We need to [WORD{{leverage our core competencies|use our strengths}}|Simplified business jargon] to succeed.\"\n\n
+        **Input Texts:**\n
+        Here is the ORIGINAL essay:\n\n{}\n\n
+        Here is the CORRECTED essay:\n\n{}\n\n
+        **Task:**\n
+        Generate the annotated version of the ORIGINAL essay, marking all necessary changes to match the corrected version.
+        Follow the annotation format and guidelines described above. Be comprehensive and precise.\n
+        your response should Only contain the annotated version of the original.
+        Be absolutely sure that first:
+        no words become \"repeated\", so each word is only represented once in each annotation, and does not get repeated.\n
+        and be absolutely sure that each word in the corrected or original gets represented at least once.\n
         Respond in the same language as the essay is written!",
         original_text, corrected_text
     );
 
         // Create the request for annotations
         let annotation_req = ChatCompletionRequest::new(
-            "deepseek/deepseek-r1".to_string(),
+            "deepseek/deepseek-r1-distill-llama-70b".to_string(),
             vec![chat_completion::ChatCompletionMessage {
                 role: MessageRole::user,
                 content: Content::Text(annotation_prompt),
@@ -309,15 +311,15 @@ impl LlmProcessor {
 
         // Create the prompt for the LLM to evaluate prompt relevance
         let relevance_prompt = format!(
-            "You are an essay evaluator. Your task is to evaluate how well the following essay addresses the given prompt.\n\n\
-            Prompt: \"{}\"\n\n\
-            Essay:\n{}\n\n\
-            On a scale of 0 to 100, where:\n\
-            - 0-20: Completely off-topic, doesn't address the prompt at all\n\
-            - 21-40: Barely addresses the prompt, mostly irrelevant\n\
-            - 41-60: Partially addresses the prompt, but with significant gaps\n\
-            - 61-80: Adequately addresses the prompt with minor gaps\n\
-            - 81-100: Fully addresses the prompt with depth and insight\n\n\
+            "You are an essay evaluator. Your task is to evaluate how well the following essay addresses the given prompt.\n\n
+            Prompt: \"{}\"\n\n
+            Essay:\n{}\n\n
+            On a scale of 0 to 100, where:\n
+            - 0-20: Completely off-topic, doesn't address the prompt at all\n
+            - 21-40: Barely addresses the prompt, mostly irrelevant\n
+            - 41-60: Partially addresses the prompt, but with significant gaps\n
+            - 61-80: Adequately addresses the prompt with minor gaps\n
+            - 81-100: Fully addresses the prompt with depth and insight\n\n
             Provide only a single number as your response, representing your score for prompt relevance.",
             prompt_topic, text
         );
