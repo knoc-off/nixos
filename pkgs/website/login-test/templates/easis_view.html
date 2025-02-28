@@ -1,0 +1,156 @@
+pub
+<!-- ./templates/easis_view.html -->
+{% extends "base.html" %} {% block title %}Essay Details{% endblock %} {% block
+content %}
+<div class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-md">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">Essay Details</h1>
+    <div class="flex space-x-2">
+      <a
+        href="/easis/history"
+        class="py-2 px-4 bg-gray-600 text-white rounded hover:bg-gray-700"
+      >
+        Back to History
+      </a>
+      <a
+        href="/easis"
+        class="py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700"
+      >
+        Write New Essay
+      </a>
+    </div>
+  </div>
+
+  <div class="mb-6 bg-yellow-50 p-4 rounded-md">
+    <h2 class="text-lg font-semibold mb-2">Topic:</h2>
+    <p class="text-gray-800">{{ submission.topic }}</p>
+  </div>
+
+  <div class="mb-6">
+    <h2 class="text-lg font-semibold mb-2">Your Essay:</h2>
+    <div class="p-4 border rounded-md bg-gray-50">
+      <p class="whitespace-pre-line">{{ submission.original_text }}</p>
+    </div>
+  </div>
+
+  {% if submission.annotated_text.is_some() %}
+    <div class="mb-6">
+      <div class="flex justify-between items-center mb-2">
+        <h2 class="text-lg font-semibold">Corrections and Feedback:</h2>
+        {% if submission.score.is_some() %}
+          <div
+            class="text-xl font-bold {% if submission.score.unwrap() >= 70 %} text-green-600 {% else if submission.score.unwrap() >= 50 %} text-yellow-600 {% else %} text-red-600 {% endif %}"
+          >
+            Score: {{ submission.score.unwrap() }}/100
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="p-4 border rounded-md bg-blue-50">
+        <div id="annotated-text" class="whitespace-pre-line">
+          {{ submission.annotated_text.as_ref().unwrap()|format_corrections|safe
+          }}
+        </div>
+      </div>
+
+
+
+      <div class="p-4 border rounded-md bg-green-50">
+        <div id="raw-annotated-text" class="whitespace-pre-line">
+          {{ submission.annotated_text.as_ref().unwrap()|safe
+          }}
+        </div>
+      </div>
+
+      <div class="p-4 border rounded-md bg-purple-50">
+        <div id="raw-annotated-text" class="whitespace-pre-line">
+          {{ submission.corrected_text.as_ref().unwrap()|safe
+          }}
+        </div>
+      </div>
+
+
+
+      {% if submission.error_count.is_some() %}
+        <div class="mt-2 text-sm text-gray-600">
+          Found {{ submission.error_count.unwrap() }} error(s)
+        </div>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="mb-6 p-4 bg-gray-100 rounded-md text-center">
+      <p>Your submission is being processed. Check back later for feedback.</p>
+      <div class="mt-4">
+        <div class="animate-pulse flex space-x-4">
+          <div class="flex-1 space-y-4 py-1">
+            <div class="h-4 bg-gray-200 rounded w-3/4"></div>
+            <div class="space-y-2">
+              <div class="h-4 bg-gray-200 rounded"></div>
+              <div class="h-4 bg-gray-200 rounded w-5/6"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="text-sm text-gray-500 mt-6">
+    Submitted on: {{ submission.submitted_at }}
+  </div>
+</div>
+{% endblock %}
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const correctedTextElement = document.getElementById("corrected-text");
+    if (!correctedTextElement) return;
+
+    let content = correctedTextElement.innerHTML;
+
+    // Process typo corrections << original | corrected >>
+    content = content.replace(
+      /&lt;&lt; ([^|]+) \| ([^&]+) &gt;&gt;/g,
+      function (match, original, corrected) {
+        return (
+          '<span class="bg-red-100 line-through relative group cursor-help px-1" title="' +
+          corrected +
+          '">' +
+          original +
+          '<span class="absolute hidden group-hover:block bottom-full left-0 bg-white border border-gray-200 rounded px-2 py-1 text-sm text-green-600 whitespace-nowrap z-10">' +
+          corrected +
+          "</span></span>"
+        );
+      },
+    );
+
+    // Process grammar corrections {{ original | corrected }}
+    content = content.replace(
+      /\{\{ ([^|]+) \| ([^}]+) \}\}/g,
+      function (match, original, corrected) {
+        return (
+          '<span class="bg-blue-100 line-through relative group cursor-help px-1" title="' +
+          corrected +
+          '">' +
+          original +
+          '<span class="absolute hidden group-hover:block bottom-full left-0 bg-white border border-gray-200 rounded px-2 py-1 text-sm text-blue-600 whitespace-nowrap z-10">' +
+          corrected +
+          "</span></span>"
+        );
+      },
+    );
+
+    // Process suggestions section
+    const suggestionsSplit = content.split("[[ SUGGESTIONS ]]");
+    if (suggestionsSplit.length > 1) {
+      const mainContent = suggestionsSplit[0];
+      const suggestionsContent = suggestionsSplit[1];
+
+      content =
+        mainContent +
+      '<div class="mt-5 p-4 bg-gray-50 rounded-md border-l-4 border-gray-500"><h3 class="font-bold mb-2">Suggestions for Improvement:</h3>' +
+      suggestionsContent +
+      "</div>";
+    }
+
+    correctedTextElement.innerHTML = content;
+  });
+</script>
