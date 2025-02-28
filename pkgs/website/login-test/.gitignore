@@ -5,6 +5,7 @@
 **/*.db
 **/*.db*
 
+/text.txt
 # user content files. should be unique.
 /user_content
 /website_data

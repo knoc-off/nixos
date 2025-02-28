@@ -14,7 +14,7 @@ use tower_http::services::ServeDir;
 
 use crate::{
     users::Backend,
-    web::{auth, protected, register},
+    web::{auth, easis, protected, register},
 };
 
 pub struct App {
@@ -31,6 +31,10 @@ impl App {
         sqlx::migrate!().run(&db).await?;
 
         Ok(Self { db })
+    }
+
+    pub fn get_db_pool(&self) -> &SqlitePool {
+        &self.db
     }
 
     pub async fn serve(self) -> Result<(), Box<dyn std::error::Error>> {
@@ -68,7 +72,8 @@ impl App {
         let app = protected::router()
             .route_layer(login_required!(Backend, login_url = "/login"))
             .merge(auth::router())
-            .merge(register::router().with_state(self.db.clone()))  // Add this line
+            .merge(register::router().with_state(self.db.clone()))
+            .merge(easis::router().with_state(self.db.clone()))
             .nest_service("/static", static_service)
             .layer(MessagesManagerLayer)
             .layer(auth_layer);

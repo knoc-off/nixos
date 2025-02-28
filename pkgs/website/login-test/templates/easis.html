@@ -1,0 +1,126 @@
+<!-- ./templates/easis.html -->
+{% extends "base.html" %} {% block title %}English as She Is Spoke - Writing
+Challenge{% endblock %} {% block head %}
+<style>
+  #timer {
+    font-size: 1.5rem;
+    font-weight: bold;
+  }
+
+  .timer-warning {
+    color: #f97316;
+  }
+
+  .timer-danger {
+    color: #ef4444;
+  }
+</style>
+{% endblock %} {% block content %}
+<div class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-md">
+  <div class="flex justify-between items-center mb-6">
+    <h1 class="text-2xl font-bold">English as She Is Spoke</h1>
+    <div id="timer" class="text-gray-700">10:00</div>
+  </div>
+
+  {% if messages.len() > 0 %}
+  <div class="mb-4">
+    <ul class="bg-blue-50 p-4 rounded-md">
+      {% for message in messages %}
+      <li class="text-blue-700">{{ message }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <div class="mb-6 bg-yellow-50 p-4 rounded-md">
+    <h2 class="text-lg font-semibold mb-2">Your Topic:</h2>
+    <p class="text-gray-800">{{ prompt.topic }}</p>
+  </div>
+
+  <form id="essay-form" method="post" action="/easis/submit" class="space-y-4">
+    <input type="hidden" name="prompt_id" value="{{ prompt.id }}" />
+    <input type="hidden" id="time_spent" name="time_spent" value="0" />
+
+    <div>
+      <label for="essay" class="block text-sm font-medium text-gray-700"
+        >Write your essay:</label
+      >
+      <textarea
+        id="essay"
+        name="essay"
+        rows="15"
+        class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+        placeholder="Start writing here..."
+        required
+      ></textarea>
+    </div>
+
+    <div class="flex justify-between">
+      <a
+        href="/easis/history"
+        class="py-2 px-4 bg-gray-600 text-white rounded hover:bg-gray-700"
+      >
+        View History
+      </a>
+      <button
+        type="submit"
+        class="py-2 px-4 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+      >
+        Submit Essay
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+    // Timer functionality
+    let timeLeft = 600; // 10 minutes in seconds
+    let timerElement = document.getElementById('timer');
+    let timeSpentField = document.getElementById('time_spent');
+    let essayForm = document.getElementById('essay-form');
+    let essayTextarea = document.getElementById('essay');
+    let formSubmitted = false; // Flag to track form submission
+
+    function updateTimer() {
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+
+        timerElement.textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+
+        // Update time spent field (10 minutes - time left)
+        timeSpentField.value = 600 - timeLeft;
+
+        // Add warning colors
+        if (timeLeft <= 60) {
+            timerElement.classList.add('timer-danger');
+        } else if (timeLeft <= 180) {
+            timerElement.classList.add('timer-warning');
+        }
+
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            essayForm.submit();
+        } else {
+            timeLeft--;
+        }
+    }
+
+    const timerInterval = setInterval(updateTimer, 1000);
+    updateTimer(); // Initial call
+
+    // Prevent accidental navigation away
+    window.addEventListener('beforeunload', function(e) {
+        if (!formSubmitted && essayTextarea.value.trim().length > 0) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
+    // Set formSubmitted flag on form submission
+    essayForm.addEventListener('submit', function() {
+        formSubmitted = true;
+    });
+</script>
+
+
+{% endblock %}
