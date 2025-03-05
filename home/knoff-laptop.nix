@@ -85,11 +85,18 @@
     (pkgs.python3.withPackages (ps: [ ps.llm self.packages.${pkgs.system}.llm-cmd ]))
 
     (self.packages.${pkgs.system}.ttok)
+    aider-chat
 
-    skypeforlinux # skype phone
+
+    lazysql
+
+    #skypeforlinux # skype phone
     audio-recorder
 
     evince
+    slack
+
+    ripcord
 
     obsidian # notes
 

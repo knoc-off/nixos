@@ -1,5 +1,5 @@
 // src/filters.rs
-use annotated_text_parser::{parse_corrections, ParsedText, TextSegment};
+use annotated_text_parser::{XmlParser, ParsedText, TextSegment};
 use std::fs;
 use std::path::PathBuf;
 use html_escape;

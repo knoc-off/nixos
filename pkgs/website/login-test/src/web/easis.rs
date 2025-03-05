@@ -14,6 +14,7 @@ use sqlx::Row;
 use sqlx::SqlitePool;
 use time::OffsetDateTime;
 
+use crate::annotated_text_parser::parse_xml_corrections;
 use crate::users::AuthSession;
 
 // Models for database entities
@@ -216,7 +217,7 @@ mod get {
             None => return Redirect::to("/login").into_response(),
         };
 
-                // Get all submissions for this user
+        // Get all submissions for this user
         let submissions = match sqlx::query(
             r#"
             SELECT
@@ -319,6 +320,7 @@ mod get {
 
 mod post {
     use super::*;
+    use axum_login::tracing::{error, info}; // Import tracing macros
 
     pub async fn submit_essay(
         State(db): State<SqlitePool>,
@@ -331,6 +333,8 @@ mod post {
             Some(user) => user,
             None => return Redirect::to("/login").into_response(),
         };
+
+        info!("Attempting to submit essay for user ID: {}", user.id());
 
         // Validate the essay
         if form.essay.trim().is_empty() {
@@ -355,10 +359,16 @@ mod post {
 
         match result {
             Ok(_) => {
+                info!("Essay submitted successfully for user {}", user.id()); // Log success
                 messages.success("Your essay has been submitted successfully!");
                 Redirect::to("/easis/history").into_response()
             }
-            Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+            Err(e) => {
+                error!("Failed to submit essay for user {}: {}", user.id(), e); // Log the error
+                messages.error(format!("Failed to submit essay: {}", e));
+                Redirect::to("/easis").into_response()
+            }
         }
     }
 }
+

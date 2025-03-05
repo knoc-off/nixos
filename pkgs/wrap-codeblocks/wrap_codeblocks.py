@@ -4,7 +4,7 @@ File-to-XML Converter with Cascading .gitignore Support
 This script will recursively search a repository (or provided paths)
 and convert files to an XML representation. It automatically collects
 ignore rules from all .gitignore files distributed throughout the
-repository (emulating Git’s cascading behavior) and combines them
+repository (emulating Git's cascading behavior) and combines them
 with any extra ignore patterns passed via the command line.
 
 Usage:
@@ -23,6 +23,19 @@ OPTIONS:
 
 If no search pattern is given, the program searches recursively from
 the current repository root.
+
+Configuration:
+  The script supports a configuration file at ~/.config/wrap-codeblocks.yaml
+  with the following structure:
+
+  ignore:
+    - .direnv/
+    - .gitignore
+    - .envrc
+    - Cargo.lock
+  filetypes:
+    nix: nix
+    rs: rust
 """
 
 import os
@@ -31,23 +44,36 @@ import glob
 import argparse
 import datetime
 from xml.sax.saxutils import escape as xml_escape
+from pathlib import Path
 
 # We'll use posix-style paths when matching ignore files.
 import posixpath
 
-try:
-    import pathspec
-except ImportError:
-    sys.stderr.write("Please install pathspec (pip install pathspec)\n")
-    sys.exit(1)
 
-try:
-    from pygments.lexers import get_lexer_for_filename
-    from pygments.util import ClassNotFound
-except ImportError:
-    get_lexer_for_filename = None
-    sys.stderr.write("Warning: Pygments not installed; custom filetypes "
-                     "will be required for language detection.\n")
+import pathspec
+
+import yaml
+
+from pygments.lexers import get_lexer_for_filename
+from pygments.util import ClassNotFound
+
+
+
+def load_config_file():
+    """
+    Load the configuration file from ~/.config/wrap-codeblocks.yaml if it exists.
+    Returns a dictionary with the configuration or an empty dict if the file doesn't exist.
+    """
+    config_path = Path.home() / ".config" / "wrap-codeblocks.yaml"
+    if not config_path.exists():
+        return {}
+
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            return yaml.safe_load(f) or {}
+    except Exception as e:
+        sys.stderr.write(f"Error loading config file {config_path}: {e}\n")
+        return {}
 
 
 def transform_gitignore_pattern(dir_rel, pattern):
@@ -148,12 +174,21 @@ def load_cascading_gitignore_spec(repo_root, extra_ignores):
     return pathspec.PathSpec.from_lines("gitwildmatch", all_patterns)
 
 
-def build_custom_filetypes(mappings):
+def build_custom_filetypes(mappings, config_filetypes=None):
     """
     Build a dictionary mapping file extensions (without the dot) to language
-    names from custom mappings specified with the -f/--filetype option.
+    names from custom mappings specified with the -f/--filetype option and the config file.
     """
     custom = {}
+
+    # First add filetypes from config
+    if config_filetypes:
+        for ext, lang in config_filetypes.items():
+            ext = ext.lstrip(".").strip().lower()
+            if ext:
+                custom[ext] = lang
+
+    # Then add command-line filetypes (which can override config)
     for mapping in mappings:
         if "=" not in mapping:
             sys.stderr.write(f"Invalid filetype mapping: {mapping}\n")
@@ -163,6 +198,7 @@ def build_custom_filetypes(mappings):
             ext = ext.lstrip(".").strip().lower()
             if ext:
                 custom[ext] = lang
+
     return custom
 
 
@@ -192,13 +228,13 @@ def process_file(file_path, custom_filetypes):
     """
     language = detect_language(file_path, custom_filetypes)
     if language is None:
-        return
+        return False
 
     try:
         statinfo = os.stat(file_path)
     except Exception as e:
         sys.stderr.write(f"Could not stat file {file_path}: {e}\n")
-        return
+        return False
 
     mod_time_str = datetime.datetime.fromtimestamp(
         statinfo.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
@@ -207,8 +243,7 @@ def process_file(file_path, custom_filetypes):
     esc_mod_time = xml_escape(mod_time_str)
     esc_file_size = xml_escape(str(file_size))
 
-    print(f'  <file name="{esc_name}" language="{language}" >')
-          #f'modified="{esc_mod_time}" size="{esc_file_size}">')
+    print(f'  <file name="{esc_name}" language="{language}" modified="{esc_mod_time}" size="{esc_file_size}">')
     print("    <![CDATA[")
     try:
         with open(file_path, "r", encoding="utf-8", errors="replace") as f:
@@ -218,9 +253,10 @@ def process_file(file_path, custom_filetypes):
                 line = line.rstrip("\n").replace("]]>", "]]]]><![CDATA[>")
                 print("      " + line)
     except Exception as e:
-        print("      Error reading file: " + str(e))
+        print(f"      Error reading file: {e}")
     print("    ]]>")
     print("  </file>")
+    return True
 
 
 def collect_files(search_patterns, ignore_spec, repo_root):
@@ -270,7 +306,59 @@ def collect_files(search_patterns, ignore_spec, repo_root):
     return sorted(collected)
 
 
+def build_directory_tree(files, repo_root):
+    """
+    Build a directory tree structure from the list of files.
+    Returns a nested dictionary representing the directory structure.
+    """
+    tree = {}
+    for file_path in files:
+        # Get the path relative to repo_root
+        rel_path = os.path.relpath(file_path, repo_root)
+        parts = rel_path.split(os.sep)
+
+        # Navigate the tree
+        current = tree
+        for i, part in enumerate(parts):
+            if i == len(parts) - 1:  # This is a file
+                if "__files__" not in current:
+                    current["__files__"] = []
+                current["__files__"].append(file_path)
+            else:  # This is a directory
+                if part not in current:
+                    current[part] = {}
+                current = current[part]
+
+    return tree
+
+
+def print_directory_tree_xml(tree, indent=2, level=0):
+    """
+    Print the directory tree as XML.
+    """
+    spaces = " " * (indent * level)
+
+    # Print files at this level
+    if "__files__" in tree:
+        for file_path in tree["__files__"]:
+            print(f"{spaces}<file path=\"{xml_escape(file_path)}\" />")
+
+    # Print directories and their contents
+    for name, contents in sorted(tree.items()):
+        if name == "__files__":
+            continue
+
+        print(f"{spaces}<directory name=\"{xml_escape(name)}\">")
+        print_directory_tree_xml(contents, indent, level + 1)
+        print(f"{spaces}</directory>")
+
+
 def main():
+    # Load configuration file
+    config = load_config_file()
+    config_ignores = config.get('ignore', [])
+    config_filetypes = config.get('filetypes', {})
+
     parser = argparse.ArgumentParser(
         description=("Convert files to XML with embedded code blocks. "
                      "Automatically follows cascading .gitignore patterns."))
@@ -293,17 +381,29 @@ def main():
         help="File or directory search patterns (e.g., *.py).")
     args = parser.parse_args()
 
-    custom_filetypes = build_custom_filetypes(args.filetype)
+    # Combine config and command-line ignores
+    all_ignores = config_ignores + args.ignore
+
+    custom_filetypes = build_custom_filetypes(args.filetype, config_filetypes)
     repo_root = os.getcwd()
-    ignore_spec = load_cascading_gitignore_spec(repo_root, args.ignore)
+    ignore_spec = load_cascading_gitignore_spec(repo_root, all_ignores)
     files = collect_files(args.patterns, ignore_spec, repo_root)
 
     print("<src>")
+    processed_files = []
     for file_path in files:
         try:
-            process_file(file_path, custom_filetypes)
+            if process_file(file_path, custom_filetypes):
+                processed_files.append(file_path)
         except Exception as exc:
             sys.stderr.write(f"Error processing {file_path}: {exc}\n")
+
+    # Add the directory tree structure with only processed files
+    print("  <filetree>")
+    directory_tree = build_directory_tree(processed_files, repo_root)
+    print_directory_tree_xml(directory_tree, level=2)
+    print("  </filetree>")
+
     print("</src>")
 
 
