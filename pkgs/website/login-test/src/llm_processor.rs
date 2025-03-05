@@ -9,7 +9,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 // Use the tracing from axum_login instead
-use axum_login::tracing::{debug, error, info};
+use axum_login::tracing::{debug, error, info, trace};
 
 // Define a custom error type that implements Send + Sync
 #[derive(Debug)]
@@ -48,6 +48,7 @@ impl LlmProcessor {
     }
 
     pub async fn process_pending_submissions(&self) -> Result<(), ProcessorError> {
+        info!("Checking for pending submissions...");
         // Fetch pending submissions (those without corrected_text) and include the prompt topic
         let submissions = sqlx::query!(
             r#"
@@ -58,7 +59,7 @@ impl LlmProcessor {
             JOIN
                 essay_prompts p ON s.prompt_id = p.id
             WHERE
-                s.corrected_text IS NULL
+                s.corrected_text IS NULL OR s.annotated_text IS NULL OR s.annotated_text = ''
             LIMIT 5
             "#
         )
@@ -164,7 +165,7 @@ impl LlmProcessor {
         text: &str,
         prompt_topic: &str,
     ) -> Result<String, ProcessorError> {
-        debug!("Step 1: Generating corrected text for submission {}", id);
+        info!("Step 1: Generating corrected text for submission {}", id);
 
         // Create the prompt for the LLM to generate a corrected version
         let correction_prompt = format!(
@@ -183,7 +184,7 @@ impl LlmProcessor {
 
         // Create the request for corrections
         let correction_req = ChatCompletionRequest::new(
-            "openai/chatgpt-4o-latest".to_string(),
+            "openai/gpt-4o-2024-11-20".to_string(),
             vec![chat_completion::ChatCompletionMessage {
                 role: MessageRole::user,
                 content: Content::Text(correction_prompt),
@@ -219,55 +220,46 @@ impl LlmProcessor {
         original_text: &str,
         corrected_text: &str,
     ) -> Result<String, ProcessorError> {
-        debug!("Step 2: Generating annotated text for submission {}", id);
+        info!("Step 2: Generating annotated text for submission {}", id);
 
-        // Create the prompt for the LLM to generate annotations
+        // Create the prompt for the LLM to generate annotations in XML format
         let annotation_prompt = format!(
-        "You are a highly skilled language expert and educator, adept at identifying and explaining differences between texts.
-        Your task is to meticulously analyze an original essay and its corrected version, then generate an annotated version of the ORIGINAL essay.
-        This annotated version should comprehensively highlight all changes needed to transform the original into the corrected version,
-        using a specific nested annotation format. Your annotations should be precise, informative, and pedagogically valuable.\n\n
-        **Annotation Format:**\n
-        Use the following nested annotation format to mark errors:\n
-        `[TYPE{{original text|corrected text|optional explanation}}]`\n\n
-        **Annotation Types:**\n
-        Where `TYPE` is one of the following, chosen based on the primary nature of the error:\n
-        - `TYPO`: Spelling or typographical errors (e.g., `[TYPO{{mispeling|misspelling}}]`)\n
-        - `GRAM`: Grammatical errors (e.g., `[GRAM{{The students is|The students are|Subject-verb agreement}}]`)\n
-        - `PUNC`: Punctuation errors (e.g., `[PUNC{{no comma| ,|Missing comma for clarity}}]`)\n
-        - `WORD`: Word choice or vocabulary issues (e.g., `[WORD{{utilize|use|'Utilize' is less direct}}]`)\n
-        **Nesting Annotations:**\n
-        You can nest annotations to indicate multiple issues within the same text span. Ensure the most significant error type is the outer layer. For example:\n
-        **Important Considerations:**\n
-        - **Completeness:** Mark *every* difference between the original and corrected versions, no matter how small.\n
-        - **Precision:** Choose the most appropriate error type for each annotation. If multiple types apply, prioritize the most impactful one.\n
-        - **Explanations:** Provide concise and helpful explanations for each correction, focusing on *why* the change was made. Omit explanations only when the correction is self-evident (e.g., simple typos).\n
-        - **Context:** Consider the surrounding text when determining the error type and explanation.\n
-        - **Avoid Overlapping Annotations:** Ensure annotations do not overlap. If two errors are very close, consider nesting or combining them.\n
-        - **Prioritize Clarity:** The goal is to create an annotated text that is easy to understand and use for learning.\n\n
-        **Examples:**\n
-        1.  Original: \"The students is studying.\"\n
-            Corrected: \"The students are studying.\"\n
-            Annotated: \"[GRAM{{The students is|The students are|Subject-verb agreement}}] studying.\"\n
-        2.  Original: \"I definately need to study.\"\n
-            Corrected: \"I definitely need to study.\"\n
-            Annotated: \"I [TYPO{{definately|definitely}}] need to study.\"\n
-        3.  Original: \"We need to leverage our core competencies to succeed.\"\n
-            Corrected: \"We need to use our strengths to succeed.\"\n
-            Annotated: \"We need to [WORD{{leverage our core competencies|use our strengths}}|Simplified business jargon] to succeed.\"\n\n
-        **Input Texts:**\n
-        Here is the ORIGINAL essay:\n\n{}\n\n
-        Here is the CORRECTED essay:\n\n{}\n\n
-        **Task:**\n
-        Generate the annotated version of the ORIGINAL essay, marking all necessary changes to match the corrected version.
-        Follow the annotation format and guidelines described above. Be comprehensive and precise.\n
-        your response should Only contain the annotated version of the original.
-        Be absolutely sure that first:
-        no words become \"repeated\", so each word is only represented once in each annotation, and does not get repeated.\n
-        and be absolutely sure that each word in the corrected or original gets represented at least once.\n
-        Respond in the same language as the essay is written!",
-        original_text, corrected_text
-    );
+            "
+                Analyze an original essay and its corrected version to create an annotated version of the ORIGINAL essay.
+
+                **Annotation Format:** Use XML tags for corrections as follows:
+
+                <correction type=\"TYPE\" explanation=\"optional explanation\">
+                    <original>original text</original>
+                    <corrected>corrected text</corrected>
+                </correction>
+
+                **Types:**
+                - `TYPO`: Spelling errors
+                - `GRAM`: Grammar errors
+                - `PUNC`: Punctuation errors
+                - `WORD`: Word choice issues
+                - `STYL`: Stylistic issues (awkward phrasing, redundancy)
+                - `STRUC`: Structural issues (organization, flow)
+
+                **Guidelines:**
+                - Choose the most appropriate error type
+                - Provide concise explanations for non-obvious corrections
+                - Nest corrections for multiple issues in the same text
+                - Avoid overlapping corrections
+                - Ensure proper XML formatting with opening and closing tags
+                - Each word should appear only once in corrections
+
+                **Example:** \"The students <correction type=\"GRAM\" explanation=\"Subject-verb agreement\"><original>is</original><corrected>are</corrected></correction> studying.\"
+
+                ORIGINAL essay: {}
+
+                CORRECTED essay: {}
+
+                Your Final response should ONLY contain the annotated version of the original essay.
+            ",
+            original_text, corrected_text
+        );
 
         // Create the request for annotations
         let annotation_req = ChatCompletionRequest::new(
@@ -307,8 +299,7 @@ impl LlmProcessor {
         text: &str,
         prompt_topic: &str,
     ) -> Result<i64, ProcessorError> {
-        debug!("Step 3: Evaluating prompt relevance for submission {}", id);
-
+        info!("Step 3: Evaluating prompt relevance for submission {}", id);
         // Create the prompt for the LLM to evaluate prompt relevance
         let relevance_prompt = format!(
             "You are an essay evaluator. Your task is to evaluate how well the following essay addresses the given prompt.\n\n

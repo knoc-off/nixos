@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS essay_submissions (
 );
 
 -- Add some sample prompts
-INSERT INTO essay_prompts (topic) VALUES
-('What would you do if you could travel anywhere in the world?'),
-('How has technology changed our daily lives in the past decade?'),
-('What do you think is the most important invention in human history?');
+-- INSERT INTO essay_prompts (topic) VALUES
+-- ('What would you do if you could travel anywhere in the world?'),
+-- ('How has technology changed our daily lives in the past decade?'),
+-- ('What do you think is the most important invention in human history?');

@@ -86,7 +86,7 @@ in {
     new_window_takes_over_fullscreen = 2; # new window will un-fullscreen current.
     force_default_wallpaper = 0;
     animate_manual_resizes = true;
-    enable_swallow = true;
+    enable_swallow = false;
     # Any window started from kitty will be swallowed by the terminal
     swallow_regex = "kitty";
     # the exception should be anything containing the word 'NAN' or 'nvim'

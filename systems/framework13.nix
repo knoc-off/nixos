@@ -18,6 +18,22 @@
       };
     }
 
+    { # VPN for work.
+      services.openvpn.servers = {
+        work = {
+          config = ''
+            config /etc/secrets/vpn/work/staging/work.ovpn
+            cert /etc/secrets/vpn/work/staging/certificate.pem
+            key /etc/secrets/vpn/work/staging/key.pem
+            # If using PKCS12 instead, uncomment the line below and comment out cert/key lines
+            # pkcs12 /etc/secrets/vpn/client-identity.p12
+            remote-cert-ku a8
+          '';
+          autoStart = false;
+        };
+      };
+    }
+
     #inputs.nixos-cli.nixosModules.nixos-cli
     #{
     #  # Enable the nixos-cli service
@@ -95,7 +111,6 @@
   #     ExecStart = "${pkgs.wgnord}/bin/wgnord c de";
   #   };
   # };
-
 
   programs.direnv = {
     enable = true;
@@ -198,7 +213,6 @@
     # Pretty much just needed this for Steam
     flatpak.enable = true;
 
-
     # Fix wg-quick?
     resolved.enable = true;
 
@@ -239,7 +253,7 @@
 
   };
 
-    # Create mount point directory
+  # Create mount point directory
   system.activationScripts = {
     createMountPoint = {
       text = ''
@@ -262,8 +276,8 @@
     hostName = hostname;
     firewall = {
       enable = true;
-      allowedTCPPorts = [ 22000 38071 21027 53317];
-      allowedUDPPorts = [ 22000 21027 38071 53317];
+      allowedTCPPorts = [ 22000 38071 21027 53317 ];
+      allowedUDPPorts = [ 22000 21027 38071 53317 ];
       #extraCommands = ''
       #  iptables -A INPUT -p tcp --dport 22000 -s niko.ink -j ACCEPT
       #  iptables -A INPUT -p udp --dport 21027 -s niko.ink -j ACCEPT
@@ -306,7 +320,7 @@
 
     # fingerpritn scanner does not work without this, suddenly.
     kernelParams = [ "usbcore.autosuspend=-1" ];
-    kernel.sysctl = { "vm.swappiness" = 20;};
+    kernel.sysctl = { "vm.swappiness" = 20; };
   };
 
   users = {
