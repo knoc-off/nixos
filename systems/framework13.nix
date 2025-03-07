@@ -20,14 +20,23 @@
 
     { # VPN for work.
       services.openvpn.servers = {
-        work = {
+        work-production = {
           config = ''
-            config /etc/secrets/vpn/work/staging/work.ovpn
+            config /etc/secrets/vpn/work/staging/production.ovpn
             cert /etc/secrets/vpn/work/staging/certificate.pem
             key /etc/secrets/vpn/work/staging/key.pem
             # If using PKCS12 instead, uncomment the line below and comment out cert/key lines
             # pkcs12 /etc/secrets/vpn/client-identity.p12
-            remote-cert-ku a8
+          '';
+          autoStart = false;
+        };
+        work-staging = {
+          config = ''
+            config /etc/secrets/vpn/work/staging/staging.ovpn
+            cert /etc/secrets/vpn/work/staging/certificate.pem
+            key /etc/secrets/vpn/work/staging/key.pem
+            # If using PKCS12 instead, uncomment the line below and comment out cert/key lines
+            # pkcs12 /etc/secrets/vpn/client-identity.p12
           '';
           autoStart = false;
         };

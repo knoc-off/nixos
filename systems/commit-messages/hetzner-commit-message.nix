@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "old_parsing_algo.___________________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "______________________________________added_blogging_ability_to_the_website._simple_markdown";
+  system.nixos.label = "changes_____________________________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "______________________________________added_blogging_ability_to_the_website._simple_markdown";
 }
