@@ -34,7 +34,7 @@
         "latex"
         "markdown"
       ];
-      command = "setlocal spell spelllang=en | set scrolloff=1000";
+      command = "setlocal spell spelllang=en | set scrolloff=15";
     }
   ];
 }
