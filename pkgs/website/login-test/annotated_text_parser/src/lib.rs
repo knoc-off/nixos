@@ -54,6 +54,55 @@ impl XmlParser {
         Self::default()
     }
 
+        // Add this function to escape XML special characters
+    fn preprocess_xml(xml: &str) -> String {
+        // First, escape already valid XML entities to prevent double-escaping
+        let mut result = String::with_capacity(xml.len() * 2);
+        let mut chars = xml.chars().peekable();
+
+        while let Some(c) = chars.next() {
+            if c == '&' {
+                // Check if this might be a valid entity reference
+                let mut entity = String::new();
+                let mut is_valid_entity = false;
+
+                // Collect up to 10 characters to check if it's a valid entity
+                // (arbitrary limit to prevent collecting too much on malformed input)
+                for _ in 0..10 {
+                    if let Some(&next) = chars.peek() {
+                        if next == ';' {
+                            entity.push(next);
+                            chars.next(); // consume the ';'
+                            is_valid_entity = true;
+                            break;
+                        } else if next.is_alphanumeric() || next == '#' {
+                            entity.push(next);
+                            chars.next(); // consume the character
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+
+                if is_valid_entity {
+                    // It looks like a valid entity, keep it as is
+                    result.push('&');
+                    result.push_str(&entity);
+                } else {
+                    // Not a valid entity, escape the ampersand
+                    result.push_str("&amp;");
+                    result.push_str(&entity); // Add back any collected characters
+                }
+            } else {
+                result.push(c);
+            }
+        }
+
+        result
+    }
+
     pub fn with_buffer_size(mut self, size: usize) -> Self {
         self.buffer_size = size;
         self
@@ -84,9 +133,11 @@ impl XmlParser {
     }
 
     pub fn parse(&mut self, xml: &str) -> Result<ParsedText, ParserError> {
-        let processed_xml = xml
+        // Preprocess the XML to escape special characters
+        let processed_xml = Self::preprocess_xml(xml)
             .replace("<br/>", "§NEWLINE§")
             .replace("<br />", "§NEWLINE§");
+
 
         let mut reader = Reader::from_str(&processed_xml);
         reader.config_mut().trim_text_start = true;
