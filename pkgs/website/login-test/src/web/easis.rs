@@ -14,7 +14,9 @@ use sqlx::Row;
 use sqlx::SqlitePool;
 use time::OffsetDateTime;
 
-use crate::annotated_text_parser::parse_xml_corrections;
+
+use annotated_text_parser::parse_xml_corrections;
+
 use crate::users::AuthSession;
 
 // Models for database entities
