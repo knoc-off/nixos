@@ -214,6 +214,51 @@ impl LlmProcessor {
         Ok(corrected_text)
     }
 
+    // Helper function to extract XML content from potentially markdown-wrapped response
+    fn extract_xml_content(response: &str) -> Result<String, ProcessorError> {
+        // Check if the response contains a document tag
+        if let Some(start_idx) = response.find("<document>") {
+            if let Some(end_idx) = response.rfind("</document>") {
+                // Return the content between the first <document> and the last </document> tag
+                return Ok(response[start_idx..=end_idx + 10].trim().to_string());
+            }
+        }
+
+        // If we can't find document tags, check for markdown code blocks
+        if response.contains("```xml") || response.contains("```") {
+            // Try to extract content from markdown code blocks
+            let lines: Vec<&str> = response.lines().collect();
+            let mut in_code_block = false;
+            let mut xml_content = String::new();
+
+            for line in lines {
+                if line.trim().starts_with("```") {
+                    in_code_block = !in_code_block;
+                    continue;
+                }
+
+                if in_code_block && line.contains("<document>") {
+                    // We found the start of our XML content
+                    xml_content.push_str(line);
+                    xml_content.push('\n');
+                } else if in_code_block {
+                    xml_content.push_str(line);
+                    xml_content.push('\n');
+                }
+            }
+
+            if !xml_content.is_empty() {
+                return Ok(xml_content.trim().to_string());
+            }
+        }
+
+        // If we couldn't extract XML content, return the original response
+        // This is a fallback, but you might want to handle this differently
+        Err(ProcessorError(
+            "Could not extract valid XML content from LLM response".to_string(),
+        ))
+    }
+
     async fn generate_annotated_text(
         &self,
         id: i64,
@@ -222,48 +267,93 @@ impl LlmProcessor {
     ) -> Result<String, ProcessorError> {
         info!("Step 2: Generating annotated text for submission {}", id);
 
-        // Create the prompt for the LLM to generate annotations in XML format
         let annotation_prompt = format!(
             "
-                Analyze an original essay and its corrected version to create an annotated version of the ORIGINAL essay.
+            Analyze an original essay and its corrected version to create an annotated version of the ORIGINAL essay.
 
-                **Annotation Format:** Use XML tags for corrections as follows:
+            Your task is to identify and mark only the segments where corrections are needed using XML tags. Any text that does not require correction should remain unwrapped and exactly as it appears in the original essay.
 
-                <correction type=\"TYPE\" explanation=\"optional explanation\">
-                    <original>original text</original>
-                    <corrected>corrected text</corrected>
-                </correction>
+            **Annotation Format:**
+            Use XML tags for corrections as follows:
 
-                **Types:**
-                - `TYPO`: Spelling errors
-                - `GRAM`: Grammar errors
-                - `PUNC`: Punctuation errors
-                - `WORD`: Word choice issues
-                - `STYL`: Stylistic issues (awkward phrasing, redundancy)
-                - `STRUC`: Structural issues (organization, flow)
+            <correction type=\"TYPE\">
+                <original>original text</original>
+                <corrected>corrected text</corrected>
+                <explanation>optional explanation</explanation>
+            </correction>
 
-                **Guidelines:**
-                - Choose the most appropriate error type
-                - Provide concise explanations for non-obvious corrections
-                - Nest corrections for multiple issues in the same text
-                - Avoid overlapping corrections
-                - Ensure proper XML formatting with opening and closing tags
-                - Each word should appear only once in corrections
+            **Line Breaks:**
+            Use <br/> tags to indicate explicit line breaks. These will be preserved in the final output.
+            Example: \"First paragraph.<br/>Second paragraph.\"
 
-                **Example:** \"The students <correction type=\"GRAM\" explanation=\"Subject-verb agreement\"><original>is</original><corrected>are</corrected></correction> studying.\"
+            **Error Types:**
+            - `SPELLING`: Spelling errors
+            - `GRAMMAR`: Grammar/syntax errors
+            - `PUNCTUATION`: Punctuation errors
+            - `WORD_CHOICE`: Inappropriate word usage
+            - `STYLE`: Stylistic issues
+            - `STRUCTURAL`: Organization/paragraph issues
+            - `COHERENCE`: Logical flow problems
 
-                ORIGINAL essay: {}
+            **Guidelines:**
+            1. Choose the most specific error type from the list above.
+            2. Provide brief explanations for non-obvious corrections.
+            3. Nest corrections when multiple issues overlap.
+            4. Maintain the original text structure and word order.
+            5. Ensure valid XML formatting with proper nesting.
+            6. Each word in the ORIGINAL essay and in the CORRECTED essay must appear exactly once in your annotated output. No word should be omitted, duplicated, or rearranged. Unmodified text should remain as plain text.
+            7. Use <br/> tags to preserve paragraph breaks and line breaks where they appear in the original or corrected text.
 
-                CORRECTED essay: {}
+            **Example:**
+            Suppose we have the following input:
 
-                Your Final response should ONLY contain the annotated version of the original essay.
+            ORIGINAL essay:
+            \"Alice is a talented artist but she dont recognize her own talent.
+            She needs more confidence.\"
+
+            CORRECTED essay:
+            \"Alice is a talented artist but she does not recognize her own talent.
+            She needs more confidence.\"
+
+            The expected annotated XML output would be:
+
+            <document>
+              Alice is a talented artist but she
+              <correction type=\"GRAMMAR\">
+                <original>dont</original>
+                <corrected>does not</corrected>
+                <explanation>Corrected missing auxiliary verb and fixed contraction</explanation>
+              </correction>
+              recognize her own talent.<br/>
+              She needs more confidence.
+            </document>
+
+            Notice that:
+            - The unmodified parts \"Alice is a talented artist but she\" and \"recognize her own talent.\" remain unchanged.
+            - The word \"dont\" from the original is replaced by \"does not\" from the corrected version.
+            - Every word is represented exactly once in the annotated output.
+            - The line break between paragraphs is preserved with <br/>.
+
+            ORIGINAL essay:
+            ---
+            \n{}\n
+
+            CORRECTED essay:
+            ---
+            \n{}\n
+
+            ____
+
+            make sure you generate the entire file for the complete essay!
+            Your message should start with:
+            <document>
             ",
             original_text, corrected_text
         );
 
         // Create the request for annotations
         let annotation_req = ChatCompletionRequest::new(
-            "deepseek/deepseek-r1-distill-llama-70b".to_string(),
+            "openai/chatgpt-4o-latest".to_string(),
             vec![chat_completion::ChatCompletionMessage {
                 role: MessageRole::user,
                 content: Content::Text(annotation_prompt),
@@ -281,7 +371,7 @@ impl LlmProcessor {
             .map_err(|e| ProcessorError(format!("LLM API error for annotations: {}", e)))?;
 
         // Extract the annotated text from the response
-        let annotated_text = match &annotation_result.choices[0].message.content {
+        let raw_response = match &annotation_result.choices[0].message.content {
             Some(content) => content.clone(),
             None => {
                 return Err(ProcessorError(
@@ -289,6 +379,9 @@ impl LlmProcessor {
                 ))
             }
         };
+
+        // Extract just the XML content, handling potential markdown code blocks
+        let annotated_text = Self::extract_xml_content(&raw_response)?;
 
         Ok(annotated_text)
     }
