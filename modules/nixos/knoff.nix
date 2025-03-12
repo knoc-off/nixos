@@ -1,4 +1,4 @@
-{ inputs, self, outputs, theme, pkgs, hostName, colorLib, ... }:
+{ inputs, pkgs, ... }@args:
 {
   imports = [ inputs.home-manager.nixosModules.home-manager ];
 
@@ -6,8 +6,7 @@
     useGlobalPkgs = false;
     useUserPackages = true;
     users.knoff = import ../../home/knoff-laptop.nix;
-    extraSpecialArgs = {
-      inherit inputs outputs self theme colorLib hostName;
+    extraSpecialArgs = args // {
       inherit (pkgs) system;
     };
   };

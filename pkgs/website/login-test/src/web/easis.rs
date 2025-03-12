@@ -14,10 +14,25 @@ use sqlx::Row;
 use sqlx::SqlitePool;
 use time::OffsetDateTime;
 
-
-use annotated_text_parser::parse_xml_corrections;
-
 use crate::users::AuthSession;
+
+
+
+// Form struct
+#[derive(Deserialize)]
+struct CorrectionTesterForm {
+    xml_input: String,
+}
+
+// Template struct
+#[derive(Template)]
+#[template(path = "correction_tester.html")]
+struct CorrectionTesterTemplate {
+    xml_input: String,
+    formatted_output: String,
+    has_output: bool,
+}
+
 
 // Models for database entities
 #[derive(Clone, Debug, Serialize, sqlx::FromRow)]
@@ -89,12 +104,34 @@ pub fn router() -> Router<SqlitePool> {
         .route("/easis/submit", post(self::post::submit_essay))
         .route("/easis/history", get(self::get::history))
         .route("/easis/view/{id}", get(self::get::view_submission))
+        .route(
+            "/tools/correction-tester",
+            get(self::get::correction_tester),
+        )
+        .route(
+            "/tools/correction-tester",
+            post(self::post::process_corrections),
+        )
 }
 
 mod get {
     use super::*;
     use rand::rng;
     use rand::seq::IndexedRandom; // Add this import correctly // Import thread_rng directly
+
+// In your get module
+pub async fn correction_tester() -> impl IntoResponse {
+    Html(
+        CorrectionTesterTemplate {
+            xml_input: String::new(),
+            formatted_output: String::new(),
+            has_output: false,
+        }
+        .render()
+        .unwrap_or_else(|_| String::from("Error rendering template")),
+    )
+    .into_response()
+}
 
     pub async fn writing_page(
         State(db): State<SqlitePool>,
@@ -323,6 +360,29 @@ mod get {
 mod post {
     use super::*;
     use axum_login::tracing::{error, info}; // Import tracing macros
+    // In your post module
+pub async fn process_corrections(
+    Form(form): Form<CorrectionTesterForm>,
+) -> impl IntoResponse {
+    let xml_input = form.xml_input;
+
+    // Use your existing format_corrections filter directly
+    let (formatted_output, has_output) = match crate::filters::format_corrections(&xml_input) {
+        Ok(output) => (output, true),
+        Err(_) => (String::from("<div class=\"text-red-500\">Error processing XML</div>"), true),
+    };
+
+    Html(
+        CorrectionTesterTemplate {
+            xml_input,
+            formatted_output,
+            has_output,
+        }
+        .render()
+        .unwrap_or_else(|_| String::from("Error rendering template")),
+    )
+    .into_response()
+}
 
     pub async fn submit_essay(
         State(db): State<SqlitePool>,
@@ -373,4 +433,3 @@ mod post {
         }
     }
 }
-
