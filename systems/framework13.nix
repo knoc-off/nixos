@@ -1,5 +1,4 @@
-{ lib, inputs, config, pkgs, self, system, outputs, theme, colorLib, hostname
-, user, ... }: {
+{ lib, inputs, pkgs, self, hostname, user, ... }@args: {
   imports = [
     #self.nixosModules.knoff
 
@@ -12,9 +11,14 @@
         useGlobalPkgs = false;
         useUserPackages = true;
         users.${user} = import ../home/knoff-laptop.nix;
-        extraSpecialArgs = {
-          inherit inputs outputs self theme colorLib hostname system user;
-        };
+        # This could end badly. recursion, etc. yet i kinda like it.
+        extraSpecialArgs = removeAttrs args [
+          "config"      # NixOS system config
+          "lib"         # NixOS lib
+          "pkgs"        # Already available in home-manager
+          "_module"     # Internal NixOS module system stuff
+          "options"     # NixOS options
+        ];
       };
     }
 

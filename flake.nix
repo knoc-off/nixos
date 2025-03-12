@@ -30,6 +30,7 @@
           inherit system;
           specialArgs = {
             inherit self inputs outputs hostname user lib system theme;
+            upkgs = unstablePkgs system;
             selfPkgs = self.packages.${system};
             colorLib = self.lib.${system};
           } // extraConfigs;
@@ -58,17 +59,20 @@
         }).config.system.build.isoImage;
       };
 
+
+          # Import packages from the unstable Nixpkgs channel
+      unstablePkgs = system: import nixpkgs-unstable {
+        inherit system;
+        config = {
+          allowUnfree = true;
+          android_sdk.accept_license = true;
+        };
+      };
+
       # Function to create package sets for a given system
       mkPkgs = system:
         let
-          # Import packages from the unstable Nixpkgs channel
-          upkgs = import nixpkgs-unstable {
-            inherit system;
-            config = {
-              allowUnfree = true;
-              android_sdk.accept_license = true;
-            };
-          };
+          upkgs = unstablePkgs system;
           # Import packages from the stable Nixpkgs channel
           pkgs = import nixpkgs {
             inherit system;

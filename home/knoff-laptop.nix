@@ -3,6 +3,7 @@
   outputs,
   self,
   pkgs,
+  upkgs,
   user,
   ...
 }: {
@@ -85,7 +86,8 @@
     (pkgs.python3.withPackages (ps: [ ps.llm self.packages.${pkgs.system}.llm-cmd ]))
 
     (self.packages.${pkgs.system}.ttok)
-    aider-chat
+    (upkgs.aider-chat)
+    (upkgs.claude-code)
 
 
     lazysql

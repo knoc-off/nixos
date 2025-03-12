@@ -1,0 +1,47 @@
+<!-- templates/correction_tester.html -->
+{% extends "base.html" %}
+{% block title %}Correction Tester{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-md">
+  <h1 class="text-2xl font-bold mb-6">Correction Tester</h1>
+
+  <div class="mb-6">
+    <p class="text-gray-700 mb-4">
+      Paste your XML annotation below to see how it will be rendered using the server's format_corrections filter.
+    </p>
+  </div>
+
+  <form method="post" action="/tools/correction-tester" class="space-y-6">
+    <div>
+      <h2 class="text-lg font-semibold mb-2">XML Input:</h2>
+      <textarea
+        name="xml_input"
+        class="w-full h-64 p-3 border rounded-md font-mono text-sm"
+        placeholder="Paste your XML annotation here..."
+      >{{ xml_input }}</textarea>
+    </div>
+
+    <div class="flex justify-end">
+      <button
+        type="submit"
+        class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+      >
+        Process Corrections
+      </button>
+    </div>
+  </form>
+
+  {% if has_output %}
+  <div class="mt-8">
+    <h2 class="text-lg font-semibold mb-2">Rendered Output:</h2>
+    <div class="border rounded-md overflow-hidden">
+      <div class="p-4 bg-white">
+        {{ formatted_output|safe }}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
