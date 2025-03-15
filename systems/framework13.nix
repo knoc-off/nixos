@@ -108,8 +108,7 @@
     # Android emulation
     #./modules/virtualisation/waydroid.nix
 
-    # enable bash shell customizations
-    ./modules/shell/bash.nix
+    ./modules/shell/fish.nix
 
     #./modules/yubikey.nix
   ];
