@@ -1,6 +1,7 @@
 { pkgs, ... }:
 {
   plugins = {
+    avante.enable = true;
     copilot-lua = {
       enable = true;
       autoLoad = true;

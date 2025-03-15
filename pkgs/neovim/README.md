@@ -34,5 +34,3 @@ This repository contains a Neovim configuration using the Nix package manager an
 can be run with the command:
 
 `# nix run github:knoc-off/nixos/#neovim-nix.default`
-
-nix is required.
