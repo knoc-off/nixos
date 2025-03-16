@@ -30,6 +30,9 @@
     ./services/nginx.nix
     ./services/website.nix
 
+    # VPN
+    ./services/wireguard.nix
+
     # mail
     # ./services/imapfilter
 

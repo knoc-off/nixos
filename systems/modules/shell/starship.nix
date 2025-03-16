@@ -29,16 +29,27 @@
         format = "[$symbol$branch]($style) ";
       };
 
+
       git_status = {
-        format = "[$all_status$ahead_behind]($style) ";
-        ahead = "⇡${"\${count}"}";
-        diverged = "⇕⇡${"\${ahead_count}"}⇣${"\${behind_count}"}";
-        behind = "⇣${"\${count}"}";
-        modified = "!${"\${count}"}";
-        staged = "+${"\${count}"}";
-        renamed = "»${"\${count}"}";
-        deleted = "✘${"\${count}"}";
+        format = "[[($staged$modified$untracked )](bold yellow) ±$ahead_behind]($style) ";
+        staged = "+$count";
+        modified = "~$count";
+        untracked = "…$count";
+        ahead = " ⇡$count";
+        behind = " ⇣$count";
+        diverged = " ⇵ $ahead_count⇣$behind_count";
         style = "bold yellow";
+        # Only show when counts > 0
+        disabled = false;
+        #ahead_behind = true;
+
+        # Status meaning:
+        # ± = git repo indicator
+        # ⇡/⇣ = commits ahead/behind remote
+        # + = staged changes
+        # ~ = modified files
+        # … = untracked files
+        # ✖︎ = merge conflicts
       };
 
       nix_shell = {
