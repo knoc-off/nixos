@@ -106,27 +106,19 @@
 
   in helpers.keymaps.mkKeymaps { options.silent = true; } (normal ++ visual ++ insert);
 
-  plugins.which-key = {
-    registrations = {
-      "<leader>w" = "Format and Save";
-      "<leader>h" = "Window Left";
-
-      # For the arrow key resizing
-      "<C-Up>" = "Resize Up";
-      "<C-Down>" = "Resize Down";
-      "<C-Left>" = "Resize Left";
-      "<C-Right>" = "Resize Right";
-
-      # For the Alt+j/k moving
-      "<M-k>" = "Move Line Up";
-      "<M-j>" = "Move Line Down";
-
-      # Visual mode mappings
-      "v>" = "Indent Right";
-      "v<" = "Indent Left";
-      "v<TAB>" = "Indent Right";
-      "v<S-TAB>" = "Indent Left";
-    };
-  };
+  plugins.which-key.settings.spec = [
+    { "<leader>w" = { name = "Format and Save"; }; }
+    { "<leader>h" = { name = "Window Left"; }; }
+    { "<C-Up>" = { name = "Resize Up"; }; }
+    { "<C-Down>" = { name = "Resize Down"; }; }
+    { "<C-Left>" = { name = "Resize Left"; }; }
+    { "<C-Right>" = { name = "Resize Right"; }; }
+    { "<M-k>" = { name = "Move Line Up"; }; }
+    { "<M-j>" = { name = "Move Line Down"; }; }
+    { "v>" = { name = "Indent Right"; }; }
+    { "v<" = { name = "Indent Left"; }; }
+    { "v<TAB>" = { name = "Indent Right"; }; }
+    { "v<S-TAB>" = { name = "Indent Left"; }; }
+  ];
 
 }

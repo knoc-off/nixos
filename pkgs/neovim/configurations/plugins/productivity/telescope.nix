@@ -53,16 +53,15 @@
     };
   };
 
-  plugins.which-key = {
-    registrations = {
-      "<leader>f" = "Telescope";
-      "<leader>ff" = "Search Find files";
-      "<leader>fF" = "Find files Hidden Also";
-      "<leader>fr" = "Search Recent files";
-      "<leader>fk" = "Search Keymaps";
-      "<leader>fs" = "Search Telescope";
-      "<leader>fg" = "Search Live Grep";
-      "<leader>fu" = "Undo History"; # Added undo registration
-    };
-  };
+  plugins.which-key.settings.spec = [
+    { "<leader>f" = { name = "Telescope"; }; }
+    { "<leader>ff" = { name = "Search Find files"; }; }
+    { "<leader>fF" = { name = "Find files Hidden Also"; }; }
+    { "<leader>fr" = { name = "Search Recent files"; }; }
+    { "<leader>fk" = { name = "Search Keymaps"; }; }
+    { "<leader>fs" = { name = "Search Telescope"; }; }
+    { "<leader>fg" = { name = "Search Live Grep"; }; }
+    { "<leader>fu" = { name = "Undo History"; }; }
+  ];
+
 }

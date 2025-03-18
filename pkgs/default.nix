@@ -37,6 +37,10 @@ in rec {
     bevy-simple = rustPkgs.callPackage ./games/bevy-simple { };
   };
 
+  spider-cli = rustPkgs.callPackage ./spider { };
+  csv-tui = rustPkgs.callPackage ./csv-tui-viewer { };
+  tabiew = rustPkgs.callPackage ./tabiew { };
+
   website = {
     portfolio = rustPkgs.callPackage ./website/portfolio { };
     axum = rustPkgs.callPackage ./website/axum {
