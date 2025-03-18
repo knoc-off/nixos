@@ -58,14 +58,16 @@
     };
   };
 
-  plugins.which-key.registrations = {
-    "<leader>l" = "LSP";
-    "<leader>lf" = "Format file";
-    "<leader>li" = "LspInfo";
-    "<leader>lo" = "Outline";
-    "<leader>lw" = "Workspace Diagnostics";
-    "<leader>ld" = "Line Diagnostics";
-    "<leader>la" = "Code Action";
-    "<leader>ll" = "Toggle Ghost Text";
-  };
+  plugins.which-key.settings.spec = [
+    { "<leader>l" = { name = "LSP"; }; }
+    { "<leader>lf" = { name = "Format file"; }; }
+    { "<leader>li" = { name = "LspInfo"; }; }
+    { "<leader>lo" = { name = "Outline"; }; }
+    { "<leader>lw" = { name = "Workspace Diagnostics"; }; }
+    { "<leader>ld" = { name = "Line Diagnostics"; }; }
+    { "<leader>la" = { name = "Code Action"; }; }
+    { "<leader>ll" = { name = "Toggle Ghost Text"; }; }
+  ];
+
+
 }

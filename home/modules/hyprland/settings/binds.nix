@@ -410,6 +410,16 @@ in {
       in [
         ",XF86AudioMute, exec, ${mute}"
         "SUPER, XF86AudioMute, exec, ${mute}"
+
+        # Trigger when the lid is closed (switch:on)
+        ", switch:on:Lid Switch, exec, hyprctl keyword monitor \"eDP-1, disable\""
+        #", switch:on:Lid Switch, exec, hyprctl keyword monitor \"eDP-1, disable\" && hyprctl dispatch moveworkspaces \"1,HDMI-A-1\""
+
+        # Trigger when the lid is opened (switch:off)
+        # ", switch:off:Lid Switch, exec, hyprctl keyword monitor \"eDP-1, 2560x1440, 0x0, 1\""
+        ", switch:off:Lid Switch, exec, hyprctl keyword monitor eDP-1,preferred,auto,1"
+
+
       ];
 
       bindm =

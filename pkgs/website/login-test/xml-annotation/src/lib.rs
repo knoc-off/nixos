@@ -173,7 +173,7 @@ fn strip_whitespace(text: &str) -> String {
     text.chars().filter(|c| !c.is_whitespace()).collect()
 }
 
-// Modified parse_nodes function
+// Parse nodes - fix the warning about unused tag_name
 fn parse_nodes(node: Node) -> Result<Vec<CorrectionNode>, Box<dyn Error>> {
     let mut nodes = Vec::new();
 
@@ -191,7 +191,7 @@ fn parse_nodes(node: Node) -> Result<Vec<CorrectionNode>, Box<dyn Error>> {
                 }
             }
             NodeType::Element => {
-                let tag_name = child.tag_name().name();
+                let _tag_name = child.tag_name().name(); // Fixed unused variable warning
 
                 if has_correction_tag(&child, "fix") {
                     let explanation = child.attribute("explanation").map(String::from);
@@ -262,7 +262,9 @@ fn parse_nodes(node: Node) -> Result<Vec<CorrectionNode>, Box<dyn Error>> {
                     });
                 } else if has_correction_tag(&child, "segment") {
                     let segment_nodes = parse_nodes(child)?;
-                    nodes.push(CorrectionNode::Segment(segment_nodes));
+                    if !segment_nodes.is_empty() {
+                        nodes.push(CorrectionNode::Segment(segment_nodes));
+                    }
                 } else if has_correction_tag(&child, "original") || has_correction_tag(&child, "corrected") {
                     // These are handled by their parent elements
                     let nested_nodes = parse_nodes(child)?;
@@ -283,19 +285,26 @@ fn parse_nodes(node: Node) -> Result<Vec<CorrectionNode>, Box<dyn Error>> {
     Ok(nodes)
 }
 
-// Reconstruct a single node
+// Completely revised reconstruction functions
 fn reconstruct_node(node: &CorrectionNode, use_corrected: bool) -> String {
     match node {
         CorrectionNode::Text(text) => text.clone(),
         CorrectionNode::Fix { original, corrected, children, .. } => {
             let mut result = String::new();
 
-            // Add content from original or corrected
+            // Use either original or corrected based on the flag
             let nodes = if use_corrected { corrected } else { original };
-            result.push_str(&reconstruct_nodes_with_spacing(nodes, use_corrected));
 
-            // Add content from children
+            // Add the content with proper spacing
+            if !nodes.is_empty() {
+                result.push_str(&reconstruct_nodes_with_spacing(nodes, use_corrected));
+            }
+
+            // Add children content only if they're not part of original/corrected
             if !children.is_empty() {
+                if !result.is_empty() && !result.ends_with(' ') && !result.ends_with('\n') {
+                    result.push(' ');
+                }
                 result.push_str(&reconstruct_nodes_with_spacing(children, use_corrected));
             }
 
@@ -304,24 +313,32 @@ fn reconstruct_node(node: &CorrectionNode, use_corrected: bool) -> String {
         CorrectionNode::Revision { original, corrected, children, .. } => {
             let mut result = String::new();
 
-            // Add content from original or corrected
+            // Use either original or corrected based on the flag
             let nodes = if use_corrected { corrected } else { original };
-            result.push_str(&reconstruct_nodes_with_spacing(nodes, use_corrected));
 
-            // Add content from children
+            // Add the content with proper spacing
+            if !nodes.is_empty() {
+                result.push_str(&reconstruct_nodes_with_spacing(nodes, use_corrected));
+            }
+
+            // Add children content only if they're not part of original/corrected
             if !children.is_empty() {
+                if !result.is_empty() && !result.ends_with(' ') && !result.ends_with('\n') {
+                    result.push(' ');
+                }
                 result.push_str(&reconstruct_nodes_with_spacing(children, use_corrected));
             }
 
             result
         }
-        CorrectionNode::Segment(nodes) => {
-            reconstruct_nodes_with_spacing(nodes, use_corrected)
+        CorrectionNode::Segment(children) => {
+            reconstruct_nodes_with_spacing(children, use_corrected)
         }
     }
 }
 
-// Helper function to reconstruct nodes with proper spacing
+
+// A smarter function that properly handles spacing between nodes
 fn reconstruct_nodes_with_spacing(nodes: &[CorrectionNode], use_corrected: bool) -> String {
     if nodes.is_empty() {
         return String::new();
@@ -330,54 +347,46 @@ fn reconstruct_nodes_with_spacing(nodes: &[CorrectionNode], use_corrected: bool)
     let mut result = String::new();
 
     for (i, node) in nodes.iter().enumerate() {
-        let node_text = reconstruct_node(node, use_corrected);
+        let node_text = match node {
+            CorrectionNode::Text(text) => text.clone(),
+            _ => reconstruct_node(node, use_corrected),
+        };
+
+        // Skip empty nodes
+        if node_text.is_empty() {
+            continue;
+        }
+
+        // Add space before this node if needed
+        if i > 0 && !node_text.is_empty() {
+            let prev_text = result.chars().last();
+            let current_first = node_text.chars().next();
+
+            let need_space = match (prev_text, current_first) {
+                // No space after these characters
+                (Some('('), _) | (Some('['), _) | (Some('{'), _) | (Some(' '), _) |
+                (Some('\n'), _) | (Some('*'), _) | (Some('"'), _) | (Some('\''), _) => false,
+
+                // No space before these characters
+                (_, Some(')')) | (_, Some(']')) | (_, Some('}')) | (_, Some('.')) |
+                (_, Some(',')) | (_, Some(';')) | (_, Some(':')) | (_, Some('!')) |
+                (_, Some('?')) | (_, Some('*')) | (_, Some('"')) | (_, Some('\'')) => false,
+
+                // Otherwise, add space between words
+                (Some(_), Some(_)) => true,
+
+                // Handle null cases
+                _ => false,
+            };
+
+            if need_space {
+                result.push(' ');
+            }
+        }
 
         // Add the node text
         result.push_str(&node_text);
-
-        // Add space if needed between this node and the next one
-        if i < nodes.len() - 1 {
-            let next_node_text = reconstruct_node(&nodes[i + 1], use_corrected);
-
-            // Don't add space if current node is empty
-            if node_text.is_empty() {
-                continue;
-            }
-
-            // Don't add space if next node is empty
-            if next_node_text.is_empty() {
-                continue;
-            }
-
-            // Don't add space if next node is a newline
-            if next_node_text == "\n" {
-                continue;
-            }
-
-            // Don't add space if current node is a newline
-            if node_text == "\n" {
-                continue;
-            }
-
-            // Don't add space if next node starts with punctuation
-            if next_node_text.starts_with(|c: char| {
-                matches!(c, '.' | ',' | ';' | ':' | '!' | '?' | ')' | ']' | '}' | '"' | '\'' | '…')
-            }) {
-                continue;
-            }
-
-            // Don't add space if current node ends with opening punctuation
-            if node_text.ends_with(|c: char| {
-                matches!(c, '(' | '[' | '{' | '"' | '\'')
-            }) {
-                continue;
-            }
-
-            // Otherwise, add a space
-            result.push(' ');
-        }
     }
 
     result
 }
-

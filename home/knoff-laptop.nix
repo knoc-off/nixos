@@ -86,6 +86,8 @@
     (pkgs.python3.withPackages (ps: [ ps.llm self.packages.${pkgs.system}.llm-cmd ]))
 
     (self.packages.${pkgs.system}.ttok)
+    (self.packages.${pkgs.system}.spider-cli)
+    (self.packages.${pkgs.system}.csv-tui)
     (upkgs.aider-chat)
     (upkgs.claude-code)
 

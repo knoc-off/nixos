@@ -10,16 +10,16 @@
     ./plugins/completions.nix
     ./plugins/productivity/telescope.nix
     ./plugins/ui/bufferline.nix
-    #./plugins/ui/which-key.nix
-    ./plugins/ui/precognition.nix
-    ./plugins/productivity/vim-ai.nix
-    #./plugins/ui/colorizer.nix
+    # custom plugin allowing (messy) integration with hyprland.
     ./plugins/misc/window-manager.nix
-    ./plugins/ui/vim-zoom.nix
+    ./plugins/ui/colorizer.nix
 
-    ./plugins/productivity/copilot.nix
+    #./plugins/ui/which-key.nix
+    #./plugins/ui/precognition.nix
+    #./plugins/productivity/vim-ai.nix
+    #./plugins/ui/vim-zoom.nix
+    #./plugins/productivity/copilot.nix
     #./plugins/productivity/codecompanion.nix
-
 
     ## lsp
     ./plugins/ls

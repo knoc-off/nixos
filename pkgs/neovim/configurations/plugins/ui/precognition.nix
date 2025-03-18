@@ -35,10 +35,9 @@
     }
   ];
 
-  # Optional: Add which-key registrations
-  plugins.which-key.registrations = {
-    "<leader>p" = "Precognition";
-    "<leader>pp" = "Peek";
-    "<leader>pt" = "Toggle";
-  };
+  plugins.which-key.settings.spec = [
+    { "<leader>p" = { name = "Precognition"; }; }
+    { "<leader>pp" = { name = "Peek"; }; }
+    { "<leader>pt" = { name = "Toggle"; }; }
+  ];
 }
