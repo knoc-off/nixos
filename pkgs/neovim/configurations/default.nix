@@ -14,7 +14,6 @@
     ./plugins/misc/window-manager.nix
     ./plugins/ui/colorizer.nix
 
-    #./plugins/ui/which-key.nix
     #./plugins/ui/precognition.nix
     #./plugins/productivity/vim-ai.nix
     #./plugins/ui/vim-zoom.nix
