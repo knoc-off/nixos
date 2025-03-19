@@ -106,19 +106,4 @@
 
   in helpers.keymaps.mkKeymaps { options.silent = true; } (normal ++ visual ++ insert);
 
-  plugins.which-key.settings.spec = [
-    { "<leader>w" = { name = "Format and Save"; }; }
-    { "<leader>h" = { name = "Window Left"; }; }
-    { "<C-Up>" = { name = "Resize Up"; }; }
-    { "<C-Down>" = { name = "Resize Down"; }; }
-    { "<C-Left>" = { name = "Resize Left"; }; }
-    { "<C-Right>" = { name = "Resize Right"; }; }
-    { "<M-k>" = { name = "Move Line Up"; }; }
-    { "<M-j>" = { name = "Move Line Down"; }; }
-    { "v>" = { name = "Indent Right"; }; }
-    { "v<" = { name = "Indent Left"; }; }
-    { "v<TAB>" = { name = "Indent Right"; }; }
-    { "v<S-TAB>" = { name = "Indent Left"; }; }
-  ];
-
 }

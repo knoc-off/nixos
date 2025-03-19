@@ -38,17 +38,6 @@
     };
   };
 
-  plugins.which-key.settings.spec = [
-    { "<leader>bp" = { name = "BufferLine Pick"; }; }
-    { "<leader>bc" = { name = "Buffer Delete"; }; }
-    { "<leader>bP" = { name = "Buffer Pin"; }; }
-    { "<leader>bd" = { name = "Buffer Sort by dir"; }; }
-    { "<leader>be" = { name = "Buffer Sort by ext"; }; }
-    { "<leader>bt" = { name = "Buffer Sort by Tabs"; }; }
-    { "<leader>bL" = { name = "Buffer close all to right"; }; }
-    { "<leader>bH" = { name = "Buffer close all to left"; }; }
-  ];
-
   keymaps = let
     normal = lib.mapAttrsToList (key: action: {
       mode = "n";
