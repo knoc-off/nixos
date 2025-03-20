@@ -22,7 +22,6 @@
     #./plugins/productivity/codecompanion.nix
 
     ## lsp
-
     ./plugins/ls/treesitter.nix
 
     ./plugins/ls/lsp.nix
