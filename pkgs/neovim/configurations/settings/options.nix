@@ -58,7 +58,7 @@
       shiftwidth = 2; # Number of spaces used for each step of (auto)indent (local to buffer)
       softtabstop = 0; # If non-zero, number of spaces to insert for a <Tab> (local to buffer)
       expandtab = true; # Expand <Tab> to spaces in Insert mode (local to buffer)
-      autoindent = false; # Do clever autoindenting. kind of annoying
+      autoindent = true; # Do clever autoindenting
 
       textwidth = 0; # Maximum width of text that is being inserted.  A longer line will be
       #   broken after white space to get this width.

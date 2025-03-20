@@ -13,6 +13,7 @@
     # custom plugin allowing (messy) integration with hyprland.
     ./plugins/misc/window-manager.nix
     ./plugins/ui/colorizer.nix
+    ./plugins/which-key.nix
 
 
     #./plugins/ui/precognition.nix
@@ -28,6 +29,7 @@
     ./plugins/ls/cmp.nix
 
     ./plugins/ls/languages/nix.nix
+    ./plugins/ls/languages/python.nix
 
     # Theme
     ./themes
