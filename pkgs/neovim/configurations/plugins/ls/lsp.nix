@@ -12,7 +12,7 @@
         cssls.enable = true;
         html.enable = true;
         jsonls.enable = true;
-        
+
         # Python language servers
         pyright = {
           enable = true;
@@ -29,7 +29,7 @@
             };
           };
         };
-        
+
         pylsp = {
           enable = true;
           settings = {
@@ -46,7 +46,7 @@
             };
           };
         };
-        
+
         rust_analyzer = {
           enable = true;
           installCargo = false;
@@ -93,17 +93,6 @@
     };
   };
 
-  plugins.which-key.settings.spec = [
-    { "<leader>l" = { name = "LSP"; }; }
-    { "<leader>lf" = { name = "Format file"; }; }
-    { "<leader>li" = { name = "LspInfo"; }; }
-    { "<leader>lo" = { name = "Outline"; }; }
-    { "<leader>lw" = { name = "Workspace Diagnostics"; }; }
-    { "<leader>ld" = { name = "Line Diagnostics"; }; }
-    { "<leader>la" = { name = "Code Action"; }; }
-    { "<leader>a" = { name = "Quick Code Action"; }; }
-    { "<leader>ll" = { name = "Toggle Ghost Text"; }; }
-  ];
 
 
 }
