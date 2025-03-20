@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "neovim_changes______________________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________________________________big_restructure";
+  system.nixos.label = "feat:_Add_keybind_to_accept_LSP_code_actions_under_cursorline_______________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________________________________big_restructure";
 }

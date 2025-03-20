@@ -34,6 +34,9 @@
       # Format
       "<leader>f" = ":lua vim.lsp.buf.format()<CR>";
       "<leader>w" = ":lua vim.lsp.buf.format()<CR>:w<CR>";
+      
+      # Accept LSP code action for the current line
+      "<leader>a" = ":lua vim.lsp.buf.code_action()<CR>";
 
       # Repeat Last Macro
       "," = "@@";
