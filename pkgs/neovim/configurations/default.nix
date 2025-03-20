@@ -14,6 +14,7 @@
     ./plugins/misc/window-manager.nix
     ./plugins/ui/colorizer.nix
 
+
     #./plugins/ui/precognition.nix
     #./plugins/productivity/vim-ai.nix
     #./plugins/ui/vim-zoom.nix
@@ -21,7 +22,13 @@
     #./plugins/productivity/codecompanion.nix
 
     ## lsp
-    ./plugins/ls
+
+    ./plugins/ls/treesitter.nix
+
+    ./plugins/ls/lsp.nix
+    ./plugins/ls/cmp.nix
+
+    ./plugins/ls/languages/nix.nix
 
     # Theme
     ./themes
