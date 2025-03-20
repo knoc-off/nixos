@@ -12,7 +12,41 @@
         cssls.enable = true;
         html.enable = true;
         jsonls.enable = true;
-        pylsp.enable = true;
+        
+        # Python language servers
+        pyright = {
+          enable = true;
+          settings = {
+            python = {
+              analysis = {
+                typeCheckingMode = "basic";
+                diagnosticMode = "workspace";
+                inlayHints = {
+                  functionReturnTypes = true;
+                  variableTypes = true;
+                };
+              };
+            };
+          };
+        };
+        
+        pylsp = {
+          enable = true;
+          settings = {
+            plugins = {
+              pycodestyle = {
+                enabled = true;
+                maxLineLength = 100;
+              };
+              pyflakes = { enabled = true; };
+              pylint = { enabled = true; };
+              yapf = { enabled = true; };
+              rope_completion = { enabled = true; };
+              mypy = { enabled = true; };
+            };
+          };
+        };
+        
         rust_analyzer = {
           enable = true;
           installCargo = false;
