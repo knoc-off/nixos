@@ -35,9 +35,4 @@
     }
   ];
 
-  plugins.which-key.settings.spec = [
-    { "<leader>p" = { name = "Precognition"; }; }
-    { "<leader>pp" = { name = "Peek"; }; }
-    { "<leader>pt" = { name = "Toggle"; }; }
-  ];
 }
