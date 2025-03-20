@@ -35,6 +35,7 @@
           gi = "implementation";
           gt = "type_definition";
           "<leader>ca" = "code_action";
+          "<leader>a" = "code_action";
           "<leader>rn" = "rename";
         };
       };
@@ -66,6 +67,7 @@
     { "<leader>lw" = { name = "Workspace Diagnostics"; }; }
     { "<leader>ld" = { name = "Line Diagnostics"; }; }
     { "<leader>la" = { name = "Code Action"; }; }
+    { "<leader>a" = { name = "Quick Code Action"; }; }
     { "<leader>ll" = { name = "Toggle Ghost Text"; }; }
   ];
 
