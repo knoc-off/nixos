@@ -15,7 +15,9 @@ rustPlatform.buildRustPackage rec {
     hash = "sha256-mBGEw3WyjEmDPo9L+CPOtMiVA+2ndQ2pjo7bUBZZO8o=";
   };
 
-  cargoHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+  useFetchCargoVendor = true;
+  cargoHash = "sha256-tDXTiVuQMSPewD5MwDj3pSna22Jelbi3fINszMi9P20=";
+  cargoAuditable = null;
 
   meta = {
     description = "A lightweight TUI application to view and query tabular data files, such as CSV, TSV, and parquet";

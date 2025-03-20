@@ -1,9 +1,12 @@
-{pkgs, ...}: {
+{ pkgs, ... }:
+{
   plugins = {
     treesitter = {
       enable = true;
       nixvimInjections = true;
+      # Optionally set auto_install and other global options
       settings = {
+        auto_install = false;
         ensure_installed = [
           "bash"
           "c"
@@ -20,19 +23,32 @@
           "vim"
           "yaml"
         ];
-        incremental_selection = {
+        incremental_selection = { enable = true; };
+        indent = { enable = true; };
+        highlight = { enable = true; };
+
+        # Configure the textsubjects integration (provided by the extra plugin)
+        textsubjects = {
           enable = true;
-        };
-        indent = {
-          enable = true;
-        };
-        highlight = {
-          enable = true;
+          prev_selection = ",";
+          keymaps = {
+            "<leader>." = "textsubjects-smart";
+            "<leader>;" = "textsubjects-container-outer";
+            "<leader>i;" = "textsubjects-container-inner";
+          };
         };
       };
+      # You can also override the default lua configuration if you need
+      # to combine configuration steps. The module will build a Lua config
+      # by calling:
+      #   require('nvim-treesitter.configs').setup( settings )
+      # so adding textsubjects inside settings ensures it is applied.
     };
-    treesitter-textobjects = {enable = true;};
-    mini.enable = false;
+
+    treesitter-textobjects = {
+      enable = true;
+    };
+
     indent-blankline = {
       enable = true;
       settings = {
@@ -50,30 +66,14 @@
             "''"
           ];
         };
-        indent = {char = "│";};
+        indent = { char = "┊"; };
       };
     };
   };
 
-  extraPlugins = with pkgs.vimPlugins; [nvim-treesitter-textsubjects];
-  extraConfigLua = ''
-    -- require('mini.indentscope').setup({
-    --   symbol = "│",
-    --   draw = {
-    --     animation = require('mini.indentscope').gen_animation.none(),
-    --   },
-    -- })
-
-    -- require("nvim-treesitter.configs").setup({
-    --   textsubjects = {
-    --     enable = true,
-    --     prev_selection = ",", -- (Optional) keymap to select the previous selection
-    --     keymaps = {
-    --       ["."] = "textsubjects-smart",
-    --       [";"] = "textsubjects-container-outer",
-    --       ["i;"] = { "textsubjects-container-inner", desc = "Select inside containers (classes, functions, etc.)" },
-    --     },
-    --   },
-    -- })
-  '';
+  # Install the extra plugin that provides textsubjects queries.
+  # This ensures that the query files (e.g. for textsubjects) are added to
+  # the runtime path.
+  extraPlugins = with pkgs.vimPlugins; [ nvim-treesitter-textsubjects ];
 }
+

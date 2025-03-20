@@ -1,7 +1,10 @@
 # these packages can oftem be used as devshells but not always
-{ pkgs, lib, inputs, system, upkgs, self }:
+{ pkgs, inputs, system, upkgs, ...}:
 let
   rustPkgs = pkgs.extend (import inputs.rust-overlay);
+
+  rustPkgs-fenix = upkgs.extend inputs.fenix.overlays.default;
+
   neovim-plugins = import ./neovim-plugins { inherit (pkgs) vimUtils lua; };
 in rec {
   rcon-cli = pkgs.callPackage ./rcon-cli { };
@@ -39,17 +42,22 @@ in rec {
 
   spider-cli = rustPkgs.callPackage ./spider { };
   csv-tui = rustPkgs.callPackage ./csv-tui-viewer { };
-  tabiew = rustPkgs.callPackage ./tabiew { };
+  tabiew = rustPkgs-fenix.callPackage ./tabiew {
+    rustPlatform = rustPkgs-fenix.makeRustPlatform {
+      cargo = rustPkgs-fenix.fenix.minimal.toolchain;
+      rustc = rustPkgs-fenix.fenix.minimal.toolchain;
+    };
+  };
+
+  inherit rustPkgs-fenix;
+  inherit (inputs) fenix;
 
   website = {
     portfolio = rustPkgs.callPackage ./website/portfolio { };
-    axum = rustPkgs.callPackage ./website/axum {
-      inherit tabler-icons;
-    };
+    axum = rustPkgs.callPackage ./website/axum { inherit tabler-icons; };
 
-    axum-login-test = rustPkgs.callPackage ./website/login-test {
-      inherit tabler-icons;
-    };
+    axum-login-test =
+      rustPkgs.callPackage ./website/login-test { inherit tabler-icons; };
   };
   AOC24 = {
     day1 = rustPkgs.callPackage ./AdventOfCode2024/Day1 { };
@@ -58,8 +66,7 @@ in rec {
   nx = config_dir: hostname:
     rustPkgs.callPackage ./nx-script { inherit config_dir hostname; };
 
-
-  yek = rustPkgs.callPackage ./yek {};
+  yek = rustPkgs.callPackage ./yek { };
 
   neovim-nix = let
     customPkgs = import inputs.nixpkgs-unstable {

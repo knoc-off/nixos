@@ -118,6 +118,15 @@
     # Rust overlay
     rust-overlay.url = "github:oxalica/rust-overlay";
 
+    # fenix
+    fenix = {
+      url = "github:nix-community/fenix";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
+
+
+
     # my custom website
     mywebsite.url = "github:knoc-off/Website";
 

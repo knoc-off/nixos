@@ -87,7 +87,8 @@
 
     (self.packages.${pkgs.system}.ttok)
     (self.packages.${pkgs.system}.spider-cli)
-    (self.packages.${pkgs.system}.csv-tui)
+    (self.packages.${pkgs.system}.tabiew)
+
     (upkgs.aider-chat)
     (upkgs.claude-code)
 
