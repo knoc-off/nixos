@@ -1,12 +1,5 @@
-#NixOS, home-manager, system configuration, package installation, program enablement, system options.
-{
-  outputs,
-  self,
-  pkgs,
-  upkgs,
-  user,
-  ...
-}: {
+# NixOS, home-manager, system configuration, package installation, program enablement, system options.
+{ outputs, self, pkgs, upkgs, user, ... }: {
   imports = [
     ./programs/terminal # default
     ./programs/terminal/programs/pueue.nix
@@ -45,7 +38,6 @@
     ./xdg-enviroment.nix
   ];
 
-
   services = {
     syncthing.enable = true;
     playerctld.enable = true;
@@ -57,13 +49,8 @@
 
   };
 
+  wayland.windowManager.hyprlandCustom = { enable = true; };
 
-
-  wayland.windowManager.hyprlandCustom = {
-    enable = true;
-  };
-
-  #disabledModules = ["programs/eww.nix"];
   programs.git = {
     enable = true;
     userName = "${user}";
@@ -71,19 +58,22 @@
     lfs.enable = true;
 
     extraConfig = {
-      push = {
-        autoSetupRemote = "true";
+      push = { autoSetupRemote = "true"; };
+      alias = {
+        # Corrected slog command: reverse-sorted, last 15 commits, most recent at the bottom, with line numbers
+        slog = ''!git log --all --reverse --pretty=format:'%C(auto)%h %Cgreen%ad %Creset%s%C(auto)%d %C(bold blue)(%an)' --date=short | tail -n 15 | tac | nl -ba -nln -w2 | tac && printf "\n\n"'';
+
+        # Squash alias: interactive rebase for squashing commits
+        squash = "!f() { git rebase -i HEAD~$1; }; f";
       };
     };
   };
-
-  programs.nix-index = {
-    enable = true;
-  };
+  programs.nix-index = { enable = true; };
 
   # TODO: move this to someplace more logical
   home.packages = with pkgs; [
-    (pkgs.python3.withPackages (ps: [ ps.llm self.packages.${pkgs.system}.llm-cmd ]))
+    (pkgs.python3.withPackages
+      (ps: [ ps.llm self.packages.${pkgs.system}.llm-cmd ]))
 
     (self.packages.${pkgs.system}.ttok)
     (self.packages.${pkgs.system}.spider-cli)
@@ -91,7 +81,6 @@
 
     (upkgs.aider-chat)
     (upkgs.claude-code)
-
 
     lazysql
 
@@ -119,7 +108,6 @@
 
     prusa-slicer
 
-
     # ai tools
     fabric-ai
     self.packages.${pkgs.system}.yek
@@ -128,15 +116,11 @@
 
   ];
 
-
   programs.home-manager.enable = true;
   fonts.fontconfig.enable = true;
 
   nixpkgs = {
-    overlays =
-      [
-      ]
-      ++ builtins.attrValues outputs.overlays;
+    overlays = [ ] ++ builtins.attrValues outputs.overlays;
 
     config = {
       allowUnfree = true;
@@ -150,7 +134,6 @@
     username = "${user}";
     homeDirectory = "/home/${user}";
   };
-
 
   # Nicely reload system units when changing configs
   systemd.user.startServices = "sd-switch";
