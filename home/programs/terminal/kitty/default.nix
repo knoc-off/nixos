@@ -1,12 +1,22 @@
-{ colorLib, theme, ... }: let
-  sl = l: hex: oklchToHex (colorLib.oklchmod.setLightness l (colorLib.hexStrToOklch hex));
-  sc = c: hex: oklchToHex (colorLib.oklchmod.setChroma c (colorLib.hexStrToOklch hex));
-  mix = hex1: hex2: w: oklchToHex (colorLib.oklchmod.mix (colorLib.hexStrToOklch hex1) (colorLib.hexStrToOklch hex2) w);
-  sh = deg: hex: oklchToHex (colorLib.oklchmod.adjustHueBy deg (colorLib.hexStrToOklch hex));
+{ colorLib, theme, ... }:
+let
+  sl = l: hex:
+    oklchToHex (colorLib.oklchmod.setLightness l (colorLib.hexStrToOklch hex));
+  sc = c: hex:
+    oklchToHex (colorLib.oklchmod.setChroma c (colorLib.hexStrToOklch hex));
+  mix = hex1: hex2: w:
+    oklchToHex (colorLib.oklchmod.mix (colorLib.hexStrToOklch hex1)
+      (colorLib.hexStrToOklch hex2) w);
+  sh = deg: hex:
+    oklchToHex (colorLib.oklchmod.adjustHueBy deg (colorLib.hexStrToOklch hex));
   oklchToHex = colorLib.oklchToHex;
 
 in {
-  imports = [./tab_bar.nix];
+  imports = [ ./tab_bar.nix ];
+
+  home.sessionVariables = {
+    TERMINAL = "kitty";
+  };
 
   programs.kitty = {
     enable = true;
@@ -31,7 +41,8 @@ in {
     settings = rec {
       tab_bar_style = "custom";
       tab_bar_margin_height = "0.0 0.0";
-      tab_title_template = " {index}: {f'{title[:6]}-{title[-6:]}' if title.rindex(title[-1]) + 1 > 13 else title.center(7)} ";
+      tab_title_template =
+        " {index}: {f'{title[:6]}-{title[-6:]}' if title.rindex(title[-1]) + 1 > 13 else title.center(7)} ";
       allow_remote_control = "yes";
 
       enable_audio_bell = "no";
@@ -40,23 +51,23 @@ in {
       focus_follows_mouse = "yes";
 
       # base16 colors
-      color0 = theme.base00;  # black
-      color1 = theme.base08;  # red
-      color2 = theme.base0B;  # green
-      color3 = theme.base0A;  # Yellow
-      color4 = theme.base0D;  # Blue
-      color5 = theme.base0E;  # Magenta
-      color6 = theme.base0C;  # Cyan
-      color7 = theme.base05;  # White
+      color0 = theme.base00; # black
+      color1 = theme.base08; # red
+      color2 = theme.base0B; # green
+      color3 = theme.base0A; # Yellow
+      color4 = theme.base0D; # Blue
+      color5 = theme.base0E; # Magenta
+      color6 = theme.base0C; # Cyan
+      color7 = theme.base05; # White
 
-      color8 = theme.base03;   # Bright Black (Gray)
-      color9 = theme.base08;   # Bright Red
-      color10 = theme.base0B;  # Bright Green
-      color11 = theme.base0A;  # Bright Yellow
-      color12 = theme.base0D;  # Bright Blue
-      color13 = theme.base0E;  # Bright Magenta
-      color14 = theme.base0C;  # Bright Cyan
-      color15 = theme.base07;  # Bright White
+      color8 = theme.base03; # Bright Black (Gray)
+      color9 = theme.base08; # Bright Red
+      color10 = theme.base0B; # Bright Green
+      color11 = theme.base0A; # Bright Yellow
+      color12 = theme.base0D; # Bright Blue
+      color13 = theme.base0E; # Bright Magenta
+      color14 = theme.base0C; # Bright Cyan
+      color15 = theme.base07; # Bright White
 
       # Derived colors
       foreground = theme.base05;

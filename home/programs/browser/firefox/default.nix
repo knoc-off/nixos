@@ -39,6 +39,12 @@ let
     lib.mkMerge (map (set: lib.mkOverride set.priority set.extensions) sets);
 
 in rec {
+
+  home.sessionVariables = {
+    BROWSER = "firefox";
+  };
+
+
   programs.firefox = {
     enable = true;
     profiles."main" = {
@@ -58,7 +64,8 @@ in rec {
         }
       ];
 
-      userChrome = import ./userChrome.nix { inherit theme colorLib firefox-csshacks; };
+      userChrome =
+        import ./userChrome.nix { inherit theme colorLib firefox-csshacks; };
       search = import ./searchEngines { inherit pkgs lib; };
     };
 

@@ -12,6 +12,7 @@
 
     ./programs/editor/default.nix
 
+
     # Desktop and widgets
     ./modules/hyprland
     ./modules/ags
@@ -21,6 +22,7 @@
 
     # music
     ./programs/media/audio/spotify.nix
+    ./programs/media/audio/framework13-easyeffects.nix
 
     #./modules/firefox.nix
 
@@ -36,6 +38,13 @@
     ./modules/thunderbird.nix
 
     ./xdg-enviroment.nix
+
+
+
+
+
+
+
   ];
 
   services = {
@@ -64,7 +73,7 @@
         slog = ''!git log --all --reverse --pretty=format:'%C(auto)%h %Cgreen%ad %Creset%s%C(auto)%d %C(bold blue)(%an)' --date=short | tail -n 15 | tac | nl -ba -nln -w2 | tac && printf "\n\n"'';
 
         # Squash alias: interactive rebase for squashing commits
-        squash = "!f() { git rebase -i HEAD~$1; }; f";
+        rebase = "!f() { git rebase -i HEAD~$1; }; f";
       };
     };
   };
