@@ -1,4 +1,4 @@
-{ pkgs, self, ... }:
+{ pkgs, ... }:
 
 let
   mimeSets = {
@@ -108,17 +108,6 @@ in {
     terminal = false;
   };
 
-  xdg.desktopEntries = {
-    kitty-neovim = {
-      name = "Kitty Neovim";
-      genericName = "Text Editor";
-      exec = "kitty --detach nvim %U";
-      icon = "${pkgs.neovim}/share/icons/hicolor/128x128/apps/nvim.png";
-      terminal = false;
-      categories = [ "Application" "Development" "IDE" ];
-      mimeType = [ "text/plain" ];
-    };
-  };
 
   home.packages = with pkgs; [
     # move to desktop module?

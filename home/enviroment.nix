@@ -15,20 +15,10 @@
       };
     };
 
-
+    # this should be distributed in each file that adds the package.
     sessionVariables = {
-      # Editor and shell
-      EDITOR = "nvim";
-      TERMINAL = "kitty";
-
-      # Browser
-      BROWSER = "firefox";
-      #GTK_THEME = "Adwaita:dark";
-      #GTK2_RC_FILES = "${pkgs.theme-obsidian2}/share/themes/Obsidian-2/gtk-2.0/gtkrc";
-      #QT_STYLE_OVERRIDE = "adwaita-dark";
-
-
-      ANTHROPIC_API_KEY="$(cat /run/secrets/ANTHROPIC_API_KEY)";
+      ANTHROPIC_API_KEY = "$(cat /run/secrets/ANTHROPIC_API_KEY)";
+      OPENROUTER_API_KEY = "$(cat /etc/secrets/gpt/openrouter )"; # SOPS !TODO
 
       # GUI toolkit settings
       QT_SCALE_FACTOR = "1";
@@ -36,15 +26,6 @@
       QT_WAYLAND_DISABLE_WINDOWDECORATION = "1";
       QT_AUTO_SCREEN_SCALE_FACTOR = "1";
       CLUTTER_BACKEND = "wayland";
-
-      # Video and graphics
-      #MOZ_ENABLE_WAYLAND = "1";
-      #SDL_VIDEODRIVER = "wayland";
-      #WLR_RENDERER = "vulkan";
-      # WLR_NO_HARDWARE_CURSORS = "1"; # if no cursor,uncomment this line
-
-      # Java GUI settings
-      #_JAVA_AWT_WM_NONREPARENTING = "1";
 
       # Desktop environment settings
       XDG_CURRENT_DESKTOP = "Hyprland";
