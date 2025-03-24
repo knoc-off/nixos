@@ -1,4 +1,4 @@
-{ pkgs, ... }: {
+{ ... }: {
   plugins = {
     web-devicons.enable = true;
     lsp = {
@@ -51,8 +51,6 @@
           enable = true;
           installCargo = false;
           installRustc = false;
-          #installCargo = true;
-          #installRustc = true;
         };
         tailwindcss.enable = true;
       };
@@ -77,22 +75,6 @@
 
     lsp-format.enable = false;
 
-    none-ls = {
-      enable = true;
-      sources = {
-        formatting = {
-          black.enable = true;
-          prettier = {
-            enable = true;
-            #settings.extra_filetypes = [ "javascript" "javascriptreact" "typescript" "typescriptreact" "json" "css" "scss" "less" "html" "htmldjango" ];
-          };
-          djhtml.enable = true;
-          nixfmt.enable = true;
-        };
-      };
-    };
   };
-
-
 
 }

@@ -180,6 +180,9 @@
     # add ags / Widgets, etc.
     ags.url = "github:Aylur/ags";
 
+    astal.url = "github:Aylur/astal";
+    astal.inputs.nixpkgs.follows = "nixpkgs-unstable";
+
     # Secrets management
     sops-nix.url = "github:Mic92/sops-nix";
 

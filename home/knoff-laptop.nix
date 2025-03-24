@@ -1,5 +1,5 @@
 # NixOS, home-manager, system configuration, package installation, program enablement, system options.
-{ outputs, self, pkgs, upkgs, user, ... }: {
+{ outputs, self, pkgs, upkgs, user, inputs, system, ... }: {
   imports = [
     ./programs/terminal # default
     ./programs/terminal/programs/pueue.nix
@@ -12,10 +12,8 @@
 
     ./programs/editor/default.nix
 
-
     # Desktop and widgets
     ./modules/hyprland
-    ./modules/ags
 
     # Firefox
     ./programs/browser/firefox
@@ -39,11 +37,48 @@
 
     ./xdg-enviroment.nix
 
+    {
+      imports = [ inputs.ags.homeManagerModules.default ];
 
+      programs.ags = {
+        enable = true;
 
+        # null or path, leave as null if you don't want hm to manage the config
+        #configDir = ./configs;
+        configDir = null;
 
+        # additional packages to add to gjs's runtime
+        extraPackages = with pkgs; [
+          gtksourceview
+          # webkitgtk
+          webkitgtk_6_0
+          accountsservice
+          inputs.astal.packages.${system}.default
 
+          inputs.astal.packages.${system}.io
+          #inputs.astal.packages.${system}.astal3
+          #inputs.astal.packages.${system}.astal4
+          inputs.astal.packages.${system}.apps
+          inputs.astal.packages.${system}.auth
+          inputs.astal.packages.${system}.battery
+          inputs.astal.packages.${system}.bluetooth
+          inputs.astal.packages.${system}.cava
+          inputs.astal.packages.${system}.greet
+          inputs.astal.packages.${system}.hyprland
+          inputs.astal.packages.${system}.mpris
+          inputs.astal.packages.${system}.network
+          inputs.astal.packages.${system}.notifd
+          inputs.astal.packages.${system}.powerprofiles
+          inputs.astal.packages.${system}.river
+          inputs.astal.packages.${system}.tray
+          inputs.astal.packages.${system}.wireplumber
 
+        ];
+      };
+      #home.packages = [
+      #];
+
+    }
 
   ];
 
@@ -60,76 +95,90 @@
 
   wayland.windowManager.hyprlandCustom = { enable = true; };
 
-  programs.git = {
-    enable = true;
-    userName = "${user}";
-    userEmail = "selby@niko.ink";
-    lfs.enable = true;
+  programs = {
+    git = {
+      enable = true;
+      userName = "${user}";
+      userEmail = "selby@niko.ink";
+      lfs.enable = true;
 
-    extraConfig = {
-      push = { autoSetupRemote = "true"; };
-      alias = {
-        # Corrected slog command: reverse-sorted, last 15 commits, most recent at the bottom, with line numbers
-        slog = ''!git log --all --reverse --pretty=format:'%C(auto)%h %Cgreen%ad %Creset%s%C(auto)%d %C(bold blue)(%an)' --date=short | tail -n 15 | tac | nl -ba -nln -w2 | tac && printf "\n\n"'';
+      extraConfig = {
+        push = { autoSetupRemote = "true"; };
+        alias = {
+          # Corrected slog command: reverse-sorted, last 15 commits, most recent at the bottom, with line numbers
+          slog = ''
+            !git log --all --reverse --pretty=format:'%C(auto)%h %Cgreen%ad %Creset%s%C(auto)%d %C(bold blue)(%an)' --date=short | tail -n 15 | tac | nl -ba -nln -w2 | tac && printf "\n\n"'';
 
-        # Squash alias: interactive rebase for squashing commits
-        rebase = "!f() { git rebase -i HEAD~$1; }; f";
+          # Squash alias: interactive rebase for squashing commits
+          rebase = "!f() { git rebase -i HEAD~$1; }; f";
+        };
       };
     };
+    nix-index = { enable = true; };
+    home-manager.enable = true;
   };
-  programs.nix-index = { enable = true; };
-
   # TODO: move this to someplace more logical
-  home.packages = with pkgs; [
-    (pkgs.python3.withPackages
-      (ps: [ ps.llm self.packages.${pkgs.system}.llm-cmd ]))
+  home = {
 
-    (self.packages.${pkgs.system}.ttok)
-    (self.packages.${pkgs.system}.spider-cli)
-    (self.packages.${pkgs.system}.tabiew)
+    packages = with pkgs; [
+      (pkgs.python3.withPackages
+        (ps: [ ps.llm self.packages.${pkgs.system}.llm-cmd ]))
 
-    (upkgs.aider-chat)
-    (upkgs.claude-code)
+      self.packages.${pkgs.system}.ttok
+      self.packages.${pkgs.system}.spider-cli
+      self.packages.${pkgs.system}.tabiew
 
-    lazysql
+      upkgs.aider-chat
+      #upkgs.claude-code
+      #upkgs.astal.hyprland
 
-    #skypeforlinux # skype phone
-    audio-recorder
+      lazysql
 
-    evince
-    slack
+      #skypeforlinux # skype phone
+      audio-recorder
 
-    ripcord
+      evince
+      slack
 
-    obsidian # notes
+      ripcord
 
-    koodo-reader # books
+      obsidian # notes
 
-    prismlauncher
+      koodo-reader # books
 
-    kdePackages.breeze-icons
-    kdePackages.grantleetheme
-    libsForQt5.grantleetheme
+      prismlauncher
 
-    gnome-calculator
+      kdePackages.breeze-icons
+      kdePackages.grantleetheme
+      libsForQt5.grantleetheme
 
-    telegram-desktop
+      gnome-calculator
 
-    prusa-slicer
+      telegram-desktop
 
-    # ai tools
-    fabric-ai
-    self.packages.${pkgs.system}.yek
+      prusa-slicer
 
-    self.packages.${pkgs.system}.wrap
+      # ai tools
+      fabric-ai
+      self.packages.${pkgs.system}.yek
 
-  ];
+      self.packages.${pkgs.system}.wrap
 
-  programs.home-manager.enable = true;
+    ];
+
+    # ~ Battery
+    # Battery status, and notifications
+    username = "${user}";
+    homeDirectory = "/home/${user}";
+    # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
+    stateVersion = "23.05";
+
+  };
+
   fonts.fontconfig.enable = true;
 
   nixpkgs = {
-    overlays = [ ] ++ builtins.attrValues outputs.overlays;
+    overlays = builtins.attrValues outputs.overlays;
 
     config = {
       allowUnfree = true;
@@ -137,16 +186,6 @@
     };
   };
 
-  # ~ Battery
-  # Battery status, and notifications
-  home = {
-    username = "${user}";
-    homeDirectory = "/home/${user}";
-  };
-
   # Nicely reload system units when changing configs
   systemd.user.startServices = "sd-switch";
-
-  # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
-  home.stateVersion = "23.05";
 }

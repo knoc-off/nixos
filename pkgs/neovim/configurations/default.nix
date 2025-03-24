@@ -14,7 +14,6 @@
     ./plugins/misc/window-manager.nix
     ./plugins/ui/colorizer.nix
 
-
     #./plugins/ui/precognition.nix
     #./plugins/productivity/vim-ai.nix
     #./plugins/ui/vim-zoom.nix
@@ -25,15 +24,17 @@
     ./plugins/ls/treesitter.nix
 
     ./plugins/ls/lsp.nix
+    ./plugins/ls/none-ls.nix
     ./plugins/ls/cmp.nix
 
+    ## Languages to enable. these add configurations to the above ls items.
     ./plugins/ls/languages/nix.nix
     ./plugins/ls/languages/python.nix
+    ./plugins/ls/languages/typescript.nix
 
     # Theme
     ./themes
   ];
-
 
   viAlias = true;
   vimAlias = true;
