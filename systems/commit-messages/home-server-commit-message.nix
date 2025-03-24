@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "style:_Fix_keymapping_definitions_for_consistency_and_clarity_______________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________________________________big_restructure";
+  system.nixos.label = "refactor:_Update_which-key_spec_to_array_format_with_icons_and_nesting______________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________________________________big_restructure";
 }
