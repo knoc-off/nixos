@@ -1,5 +1,9 @@
 {
-  plugins.which-key = {
+  plugins = {
+    mini.icons.enable = true;
+    nvim-web-devicons.enable = true;
+    
+    which-key = {
     enable = true;
     settings = {
       plugins = {
@@ -75,6 +79,7 @@
       disable = {
         ft = [ ];  # filetypes
         bt = [ ];  # buftypes
+      };
       };
     };
   };
