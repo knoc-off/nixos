@@ -4,6 +4,41 @@
     maplocalleader = " ";
   };
 
+  plugins.which-key = {
+    registrations = {
+      "<leader>" = {
+        name = "+leader";
+        c = {
+          name = "+code";
+          c = "Toggle CodeCompanionChat";
+          o = "Copilot Chat";
+        };
+        f = "Format buffer";
+        w = "Format and save";
+        a = "Code action";
+        h = "Move to left window";
+        l = "Move to right window";
+      };
+      "<C-Up>" = "Resize window up";
+      "<C-Down>" = "Resize window down";
+      "<C-Left>" = "Resize window left";
+      "<C-Right>" = "Resize window right";
+      "<M-k>" = "Move line up";
+      "<M-j>" = "Move line down";
+      "<S-Up>" = "Scroll up 5 lines";
+      "<S-Down>" = "Scroll down 5 lines";
+      "<C-c>" = "Switch to last buffer";
+      "<C-x>" = "Close window";
+      "<C-e>" = "End of line";
+      "<C-a>" = "Start of line";
+      L = "End of line";
+      H = "Start of line";
+      "," = "Repeat last macro";
+      Y = "Yank to end of line";
+      "<esc>" = "Clear search highlight";
+    };
+  };
+
   keymaps = let
     normal = lib.mapAttrsToList (key: action: {
       mode = "n";
