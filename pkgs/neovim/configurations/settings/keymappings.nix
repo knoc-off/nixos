@@ -4,39 +4,37 @@
     maplocalleader = " ";
   };
 
-  plugins.which-key = {
-    registrations = {
-      "<leader>" = {
-        name = "+leader";
-        c = {
-          name = "+code";
-          c = "Toggle CodeCompanionChat";
-          o = "Copilot Chat";
-        };
-        f = "Format buffer";
-        w = "Format and save";
-        a = "Code action";
-        h = "Move to left window";
-        l = "Move to right window";
-      };
-      "<C-Up>" = "Resize window up";
-      "<C-Down>" = "Resize window down";
-      "<C-Left>" = "Resize window left";
-      "<C-Right>" = "Resize window right";
-      "<M-k>" = "Move line up";
-      "<M-j>" = "Move line down";
-      "<S-Up>" = "Scroll up 5 lines";
-      "<S-Down>" = "Scroll down 5 lines";
-      "<C-c>" = "Switch to last buffer";
-      "<C-x>" = "Close window";
-      "<C-e>" = "End of line";
-      "<C-a>" = "Start of line";
-      L = "End of line";
-      H = "Start of line";
-      "," = "Repeat last macro";
-      Y = "Yank to end of line";
-      "<esc>" = "Clear search highlight";
-    };
+  plugins.which-key.settings.spec = {
+    "<leader>" = {
+      name = "+leader",
+      c = {
+        name = "+code",
+        c = { "<cmd>CodeCompanionChat toggle<CR>", "Toggle CodeCompanionChat" },
+        o = { "<cmd>CodeCompanionChat copilot_o1<CR>", "Copilot Chat" },
+      },
+      f = { "<cmd>lua vim.lsp.buf.format()<CR>", "Format buffer" },
+      w = { "<cmd>lua vim.lsp.buf.format()<CR><cmd>w<CR>", "Format and save" },
+      a = { "<cmd>lua vim.lsp.buf.code_action()<CR>", "Code action" },
+      h = { "<C-w>h", "Move to left window" },
+      l = { "<C-w>l", "Move to right window" },
+    },
+    "<C-Up>" = { "<cmd>resize -2<CR>", "Resize window up" },
+    "<C-Down>" = { "<cmd>resize +2<CR>", "Resize window down" },
+    "<C-Left>" = { "<cmd>vertical resize +2<CR>", "Resize window left" },
+    "<C-Right>" = { "<cmd>vertical resize -2<CR>", "Resize window right" },
+    "<M-k>" = { "<cmd>move-2<CR>", "Move line up" },
+    "<M-j>" = { "<cmd>move+<CR>", "Move line down" },
+    "<S-Up>" = { "<cmd>execute \"normal! \" . v:count1 * 5 . \"k\"<CR>", "Scroll up 5 lines" },
+    "<S-Down>" = { "<cmd>execute \"normal! \" . v:count1 * 5 . \"j\"<CR>", "Scroll down 5 lines" },
+    "<C-c>" = { "<cmd>b#<CR>", "Switch to last buffer" },
+    "<C-x>" = { "<cmd>close<CR>", "Close window" },
+    "<C-e>" = "<End>",
+    "<C-a>" = "<Home>",
+    L = "$",
+    H = "^",
+    "," = "@@",
+    Y = "y$",
+    "<esc>" = "<cmd>noh<CR>",
   };
 
   keymaps = let
