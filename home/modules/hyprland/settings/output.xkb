@@ -1,0 +1,20 @@
+xkb_keymap {
+  xkb_keycodes { include "evdev+aliases(qwerty)" };
+  xkb_types    { include "complete" };
+  xkb_compat   { include "complete" };
+  xkb_symbols  {
+    include "pc+us+inet(evdev)"
+    name[Group1]= "US with custom umlaut mappings";
+
+    // Map the key that normally produces "u" to produce "ü" with AltGr.
+    key <AD07> { [ u, U, udiaeresis, Udiaeresis ] };
+
+    // Map the key that normally produces "o" to produce "ö" with AltGr.
+    key <AD09> { [ o, O, odiaeresis, Odiaeresis ] };
+
+    // Map the key that normally produces "a" to produce "ä" with AltGr.
+    key <AC01> { [ a, A, adiaeresis, Adiaeresis ] };
+  };
+  xkb_geometry { include "pc(pc105)" };
+};
+
