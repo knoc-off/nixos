@@ -4,12 +4,14 @@
     #./settings/highlights.nix
     ./settings/options.nix
     #./settings/autocommands.nix
-    #./settings/keymappings.nix
+    ./settings/keymappings.nix
 
     ## Plugins
     # ./plugins/completions.nix
     # ./plugins/productivity/telescope.nix
     # ./plugins/ui/bufferline.nix
+
+    ./plugins/ui/which-key.nix
 
     # ./plugins/ui/precognition.nix
     # ./plugins/productivity/vim-ai.nix
