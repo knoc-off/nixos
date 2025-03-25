@@ -96,9 +96,10 @@ in {
 
   input = {
     kb_layout = "us";
+    # kb_variant = "altgr-intl";
     kb_options = "caps:super";
-    #kb_variant = "altgr-intl";
-    kb_file = "${./output.xkb}";
+    # kb_variant = "altgr-intl";
+    # kb_file = "${./output.xkb}";
 
     # focus follows mouse
     follow_mouse = 1;

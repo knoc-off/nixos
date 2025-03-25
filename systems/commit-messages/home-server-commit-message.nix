@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "nvim_whichkey_migration.____________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________________________________big_restructure";
+  system.nixos.label = "keyboard_macros_for_umlauts_________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________________________________big_restructure";
 }
