@@ -1,158 +1,106 @@
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 
 {
-  # Core Audio Configuration
-  hardware.pulseaudio.enable = false; # Use PipeWire, not PulseAudio
-  security.rtkit.enable = true;       # Allow processes to use realtime priorities
+  # ======================
+  # Core Audio Stack
+  # ======================
+  hardware.pulseaudio.enable = false;  # Required for PipeWire
+  security.rtkit.enable = true;        # Realtime priority management
 
-  # Bluetooth Configuration
-  hardware.bluetooth = {
-    enable = true;
-    package = pkgs.bluez.override {
-      enableExperimental = true; # Enable experimental features for better codec support
-    };
-    settings = {
-      General = {
-        Enable = "Source,Sink,Media,Socket";
-        ControllerMode = "dual";       # Allow both BR/EDR and LE modes
-        JustWorksRepairing = "always";
-        Privacy = "device";
-        Experimental = true;
-      };
-    };
-  };
-
-  services.blueman.enable = true; # GUI tool for managing Bluetooth devices
-
+  # ======================
   # PipeWire Configuration
+  # ======================
   services.pipewire = {
     enable = true;
-    alsa.enable = true;
-    alsa.support32Bit = true;
+
+    # ALSA integration
+    alsa = {
+      enable = true;
+      support32Bit = true;  # For legacy applications
+    };
+
+    # PulseAudio compatibility
     pulse.enable = true;
-    jack.enable = true; # Enable JACK support for pro audio use-cases
 
-    # WirePlumber configuration for Bluetooth and audio
-    wireplumber.enable = true;
-    wireplumber.extraConfig = {
-      # Low-latency audio configuration
-      "92-low-latency" = {
-        "context.properties" = {
-          "default.clock.rate" = 48000;
-          "default.clock.quantum" = 64;     # Balanced setting for latency vs stability
-          "default.clock.min-quantum" = 32;
-          "default.clock.max-quantum" = 8192;
-        };
-      };
+    # Professional audio support
+    jack.enable = true;
 
-      # Bluetooth audio configuration
-      "10-bluetooth-policy" = {
-        "monitor.bluez.properties" = {
-          "bluez5.enable" = true;
-          "bluez5.headset-roles" = [ "hsp_hs" "hsp_ag" "hfp_hf" "hfp_ag" ];
-          "bluez5.codecs" = [ "ldac" "aptx_hd" "aptx" "aac" "sbc_xq" "sbc" ];
-          "bluez5.auto-connect" = [ "a2dp_sink" "hfp_hf" "hsp_hs" ];
-          "bluez5.msbc-support" = true;     # Enable mSBC for better call quality
-          "bluez5.sbc-xq-support" = true;   # Enable SBC XQ for better audio quality
-          "bluez5.hfphsp-backend" = "native";  # Use native backend for HFP/HSP
-        };
-      };
+    # WirePlumber configuration (replaces media-session)
+    wireplumber = {
+      enable = true;
 
-      # Automatic profile switching for calls
-      "20-bluetooth-switching" = {
-        "monitor.bluez.rules" = [
-          {
-            matches = [ { "device.name" = "~bluez_card.*"; } ];
-            actions = {
-              update-props = {
-                "bluez5.autoswitch-profile" = true;
-                "bluez5.reconnect-profiles" = [ "hfp_hf" "hsp_hs" "a2dp_sink" ];
-              };
-            };
+      # Low-latency tuning
+      configPackages = [
+        (pkgs.writeTextDir "share/wireplumber/main.lua.d/99-lowlatency.lua" ''
+          default_clock_rate = 48000
+          default_clock_quantum = 64
+          default_clock_min_quantum = 32
+          default_clock_max_quantum = 8192
+
+          alsa_monitor.properties = {
+            ["alsa.jack-device"] = false,
+            ["alsa.reserve"] = true,
+            ["alsa.midi.rate"] = default_clock_rate
           }
-        ];
-      };
 
-      # Enable auto-switching to newly connected audio devices
-      "30-auto-connect" = {
-        "device.properties" = {
-          "device.nick" = "system";
-        };
-        "device.rules" = [
-          {
-            matches = [{ "device.name" = "~alsa_card.*"; }];
-            actions = {
-              update-props = {
-                "device.nick" = "alsa-device";
-                "device.description" = "ALSA Device";
-              };
-            };
+          node_monitor.properties = {
+            ["session.suspend-timeout-seconds"] = 0,
+            ["node.pause-on-idle"] = false
           }
-        ];
-        "alsa.rules" = [
-          {
-            matches = [
-              { "node.name" = "~alsa_output.*"; }
-              { "node.name" = "~alsa_input.*"; }
-            ];
-            actions = {
-              update-props = {
-                "session.suspend-timeout-seconds" = 0;  # Disable node suspension
-                "node.pause-on-idle" = false;
-              };
-            };
-          }
-        ];
-      };
-
-      # PulseAudio compatibility configuration
-      "50-pulseaudio-compat" = {
-        "pulse.properties" = {
-          "server.address" = [ "unix:native" ];
-          "vm.overrides" = {
-            "pulse.min.quantum" = "1024/48000";
-          };
-        };
-        "pulse.rules" = [
-          {
-            matches = [ { "application.name" = "~.*"; } ];
-            actions = {
-              update-props = {
-                "pulse.adapt.suspend-timeout-seconds" = 0;
-              };
-            };
-          }
-        ];
-      };
+        '')
+      ];
     };
   };
 
-  # Udev Rules to avoid Bluetooth power-management issues
+  # ======================
+  # Kernel Tweaks
+  # ======================
+  boot.kernelParams = [
+    "snd_hda_intel.power_save=0"   # Prevent audio crackling
+    "snd_hda_intel.dmic_detect=0"  # Fix internal mic issues
+  ];
+
+  # ======================
+  # Udev Rules
+  # ======================
   services.udev.extraRules = ''
-    # Disable autosuspend for Bluetooth adapters
-    ACTION=="add", SUBSYSTEM=="bluetooth", ATTR{power/control}="on"
+    # Prevent USB audio devices from suspending
+    ACTION=="add", SUBSYSTEM=="sound", ATTR{power/control}="on"
   '';
 
-  # Kernel Parameters - Fix potential issues with audio hardware
-  boot.kernelParams = [
-    "snd_hda_intel.power_save=0"  # Prevent crackling on some Intel HD Audio devices
-    "snd_hda_intel.dmic_detect=0" # Fix issues with some internal microphones
-  ];
-
-  # Install additional tools for managing and debugging audio/Bluetooth
+  # ======================
+  # Audio Tools
+  # ======================
   environment.systemPackages = with pkgs; [
-    pavucontrol     # GUI volume control tool
-    helvum          # Patchbay for PipeWire routing
-    easyeffects     # Audio effects/equalizer GUI
-    pamixer         # Command-line mixer tool
-    bluez-tools     # Command-line Bluetooth utilities
-    bluetuith       # TUI-based Bluetooth manager
-    alsa-utils      # ALSA utilities (alsamixer, etc.)
+    # Control
+    pavucontrol         # Volume mixer
+    helvum              # Patchbay for routing
+    qjackctl            # JACK control panel
+
+    # Effects
+    easyeffects         # System-wide effects
+    calf                # Professional plugins
+
+    # Diagnostics
+    alsa-utils          # amixer, aplay, etc.
+    pulseaudio-ctl      # CLI control
+    sound-theme-freedesktop  # System sounds
   ];
 
-  # Ensure the necessary firmware is available for Bluetooth adapters
-  hardware.firmware = with pkgs; [
-    firmwareLinuxNonfree
-  ];
+  # ======================
+  # Professional Audio
+  # ======================
+  environment.variables = {
+    # JACK configuration
+    JACK_NO_AUDIO_RESERVATION = "1";  # Better for consumer audio interfaces
+    PIPEWIRE_LATENCY = "64/48000";     # Default latency
+  };
+
+  # Optional: Real-time privileges for audio group
+  users.extraGroups.audio.extraRules = ''
+    KERNEL=="rtc0", GROUP="audio"
+    @audio - rtprio 95
+    @audio - memlock unlimited
+  '';
 }
 
