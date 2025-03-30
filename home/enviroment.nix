@@ -1,6 +1,6 @@
 { config, lib, pkgs, ... }: {
 
-  programs.bash.enable = true;
+  # programs.bash.enable = true;
   home = {
     file = {
       mnt = {

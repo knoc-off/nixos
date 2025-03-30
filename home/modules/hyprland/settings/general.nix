@@ -1,16 +1,11 @@
-{
-  config,
-  user,
-  theme,
-  colorLib,
-  pkgs,
-  ...
-}: let
+{ config, user, theme, colorLib, pkgs, ... }:
+let
 
   h2okl = colorLib.hexStrToOklch;
   oklchToHex = colorLib.oklchToHex;
   setLightness = value: color: colorLib.oklchmod.setLightness value color;
-  sl = l: hex: oklchToHex (colorLib.oklchmod.setLightness l (colorLib.hexStrToOklch hex));
+  sl = l: hex:
+    oklchToHex (colorLib.oklchmod.setLightness l (colorLib.hexStrToOklch hex));
 
   primary = h2okl theme.primary;
   secondary = h2okl theme.secondary;
@@ -20,16 +15,15 @@
 
   wallpaper = let
     wallpaper-img = pkgs.fetchurl {
-      url = "https://www.metalocus.es/sites/default/files/metalocus_piranesi_amsterdam_kunstal_01.jpg";
+      url =
+        "https://www.metalocus.es/sites/default/files/metalocus_piranesi_amsterdam_kunstal_01.jpg";
       sha256 = "sha256-hRFjY/mTa4zcXs/NjZ4FJ6guhUwmlsmWr546ZvDSWX8=";
     };
-  in
-    pkgs.writeText "wallpaper"
-    ''
-      preload = ${wallpaper-img}
-      wallpaper = eDP-1, ${wallpaper-img}
-      splash = false
-    '';
+  in pkgs.writeText "wallpaper" ''
+    preload = ${wallpaper-img}
+    wallpaper = eDP-1, ${wallpaper-img}
+    splash = false
+  '';
 in {
   exec-once = [
     "hyprpaper --config ${wallpaper}"
@@ -40,9 +34,7 @@ in {
     #"[workspace special silent] kitty --class kitty-dropterm --config <(sed '/map ctrl+t new_os_window_with_cwd/d' /home/${user}/.config/kitty/kitty.conf)"
   ];
 
-  monitor = [
-    ",preferred,auto-up,1"
-  ];
+  monitor = [ ",preferred,auto-up,1" ];
 
   general = {
     gaps_in = -1;
@@ -50,7 +42,8 @@ in {
     border_size = 4;
     "col.active_border" = "0xff${oklchToHex accent1}";
     "col.inactive_border" = "0xff${oklchToHex (setLightness 0.5 neutral)}";
-    "col.nogroup_border_active" = "0x00${oklchToHex (setLightness 0.2 primary)}"; # transparent
+    "col.nogroup_border_active" =
+      "0x00${oklchToHex (setLightness 0.2 primary)}"; # transparent
     "col.nogroup_border" = "0x99${oklchToHex (setLightness 0.3 primary)}";
 
     layout = "master";
@@ -63,7 +56,8 @@ in {
     "col.border_active" = "0xff${oklchToHex (setLightness 0.6 accent1)}";
     "col.border_inactive" = "0x99${oklchToHex (setLightness 0.3 primary)}";
     "col.border_locked_active" = "0xff${oklchToHex accent2}";
-    "col.border_locked_inactive" = "0x99${oklchToHex (setLightness 0.6 accent2)}";
+    "col.border_locked_inactive" =
+      "0x99${oklchToHex (setLightness 0.6 accent2)}";
 
     groupbar = {
       font_size = 10;
@@ -83,7 +77,8 @@ in {
     disable_hyprland_logo = true;
     disable_splash_rendering = true; # the setting does nothing...
     "col.splash" = "0x00000000";
-    new_window_takes_over_fullscreen = 2; # new window will un-fullscreen current.
+    new_window_takes_over_fullscreen =
+      2; # new window will un-fullscreen current.
     force_default_wallpaper = 0;
     animate_manual_resizes = true;
     enable_swallow = false;
@@ -127,9 +122,7 @@ in {
     float_switch_override_focus = 2;
   };
 
-  binds = {
-    allow_workspace_cycles = true;
-  };
+  binds = { allow_workspace_cycles = true; };
 
   dwindle = {
     pseudotile = true;
@@ -160,68 +153,75 @@ in {
     #workspace_swipe_numbered = true;
   };
 
-  windowrule = let
-    f = regex: "float, ${regex}";
-    w = regex: (number: "workspace ${builtins.toString number}, ${regex}");
-  in [
-    (f "org.gnome.Calculator")
-    (f "org.gnome.Nautilus")
-    (f "pavucontrol")
-    (f "nm-connection-editor")
-    (f "blueberry.py")
-    (f "org.gnome.Settings")
-    (f "org.gnome.design.Palette")
-    (f "Color Picker")
-    (f "xdg-desktop-portal")
-    (f "xdg-desktop-portal-gnome")
-    (f "transmission-gtk")
-    (f "com.github.Aylur.ags")
-    (f ".gscreenshot-wrapped")
-    (w "Spotify" 7)
-    #"fakefullscreen, org.kde.falkon"
-    #"workspace 7, title:Spotify"
-    # minumum size for floating windows
-    "noblur, kando"
-    "opaque, kando"
-    "size 100% 100%, kando"
-    "noborder, kando"
-    "noanim, kando"
-    "float, kando"
-    "pin, kando"
-  ];
-
-  # rules
-  # size [x] [y]	> resizes a floating window (x,y -> (</>)int or (</>)%, < -> maximum size, > -> minimum size, e.g. >20%, 100 or <500)
   windowrulev2 = let
-    float = class: (title: "float, class:(${class}), title:(${title})");
-    # fakeFullscreen = class: "fakefullscreen, class:(${class})";
-    #size = class: (title: (size: "float, class:(${class}), title:(${title})"));
-    #window = class: (title: (to: "workspace ${to}, class:(${class}), title:(${title})"));
-    #size = class: (title: (size: "size, class:(${class}), title:(${title}), size:(${size})"));
+    # Floats a window based on its class regex
+    floatClass = regex: "float, class:(${regex})";
+
+    floatTitle = titleRegex: "float, title:(${titleRegex})";
+
+    # Assigns a window to a workspace based on its class regex
+    workspaceClass = regex:
+      (number: "workspace ${builtins.toString number}, class:(${regex})");
+
+    # Applies a generic rule to a window based on its class regex
+    ruleClass = rule: regex: "${rule}, class:(${regex})";
+
+    # Floats a window based on its class AND title regex
+    floatClassTitle = class:
+      (title: "float, class:(${class}), title:(${title})");
+
+    # --- Other potential helpers (can be uncommented and used if needed) ---
+    fakeFullscreen = class: "fakefullscreen, class:(${class})";
+    assignWorkspace = class: (title: (to: "workspace ${to}, class:(${class}), title:(${title})"));
+    setSize = class: (title: (size: "size ${size}, class:(${class}), title:(${title})"));
+    # idleInhibitRule = mode: class: (title: "idleinhibit ${mode}, class:(${class}), title:(${title})");
+
   in [
-    #"idleinhibit always, class:(kitty), title:(.*)"
-    #"idleinhibit focus, class:(firefox), title:(.*Youtube.*)"
-    #(idleinhibit "focus" "firefox" ".*YouTube.*")
-    (float "steam" ".*Browser.*")
-    (float "steam" ".*Friends List.*")
-    #(window "thunderbird" ".*" "6")
-    # (fakeFullscreen "org.kde.falkon")
+    # --- Rules converted from original 'windowrule' block ---
+    (floatClass "org.gnome.Calculator")
+    (floatClass "org.gnome.Nautilus")
+    (floatClass "pavucontrol")
+    (floatClass "nm-connection-editor")
+    (floatClass "blueberry.py")
+    (floatClass "org.gnome.Settings")
+    (floatClass "org.gnome.design.Palette")
+    (floatClass "Color Picker") # Assuming 'Color Picker' is a class
+    (floatClass "xdg-desktop-portal")
+    (floatClass "xdg-desktop-portal-gnome")
+    (floatClass "transmission-gtk")
+    (floatTitle "astal-popup-menu")
+    # <-- New functionfloatClass "com.github.Aylur.ags")
+    # Need to escape the leading dot for regex
+    (floatClass "\\.gscreenshot-wrapped")
+    (floatClass "astal-popup-menu")
+    (workspaceClass "Spotify" 7)
+    # Rules for 'kando'
+    (ruleClass "noblur" "kando")
+    (ruleClass "opaque" "kando")
+    (ruleClass "size 100% 100%" "kando")
+    (ruleClass "noborder" "kando")
+    (ruleClass "noanim" "kando")
+    (ruleClass "float" "kando")
+    (ruleClass "pin" "kando")
 
-    # windowrulev2 = opacity 0.5 0.5,floating:1
+    # --- Rules from original 'windowrulev2' block ---
+    # (idleInhibitRule "always" "kitty" ".*") # Example using a potential helper
+    # (idleInhibitRule "focus" "firefox" ".*Youtube.*") # Example using a potential helper
+    (floatClassTitle "steam" ".*Browser.*")
+    (floatClassTitle "steam" ".*Friends List.*")
+    # (assignWorkspace "thunderbird" ".*" "6") # Example using a potential helper
+    # (fakeFullscreen "org.kde.falkon") # Example using a potential helper
 
-    # make all floating windows have a minimum size of 40% width, and 30% height 3:4
-    #(size ".*" ".*" "<40%, <30%")
-
-    "noborder,class:(ulauncher),title:(.*)"
+    # --- Hardcoded rules ---
+    # "opacity 0.5 0.5, floating:1"
+    # "size >40% >30%, floating:1" # Example minimum size
+    "noborder, class:(ulauncher), title:(.*)"
     "stayfocused, class:^(FreeCAD)$, title:^(Formula editor)$"
-    # any window that is floating, and contains the word open in the title, will have a minimum size of 40% width, and 30% height
+    # any window that is floating, and contains specific words in the title, will have a size of 45%x45%
     "size 45% 45%, floating:1, title:(.*Open.*|.*Upload.*|.*Save.*|.*Select.*|.*Choose.*)"
-
-    #"opacity 0.5 0.5, floating:1"
-
-    # windowrulev2 = stayfocused, class:^(pinentry-) # fix pinentry losing focus
-
-    #(window "firefox" ".*" "special:firefox")
+    # "opacity 0.5 0.5, floating:1"
+    # "stayfocused, class:^(pinentry-)" # fix pinentry losing focus
+    # "workspace special:firefox, class:(firefox), title:(.*)"
   ];
 
   decoration = {
@@ -232,14 +232,14 @@ in {
     # "col.shadow" = "0xff${oklchToHex (setLightness 0.2 primary)}";
     # shadow_render_power = 2;
     dim_inactive = false;
-    dim_strength = 0.20;
+    dim_strength = 0.2;
 
     blur = {
       enabled = false;
       size = 8;
       passes = 3;
       new_optimizations = "on";
-      noise = 0.01;
+      noise = 1.0e-2;
       contrast = 0.9;
       brightness = 0.8;
     };

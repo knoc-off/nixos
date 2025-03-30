@@ -5,6 +5,7 @@
     ./programs/terminal/programs/pueue.nix
 
     ./programs/terminal/shell
+    ./programs/terminal/shell/fish.nix
 
     ./programs/media/video/mpv.nix
 
@@ -32,6 +33,16 @@
     #./programs
     #./desktop
     #./programs/virtualization/bottles.nix
+
+    { # bluetooth
+      #       systemd.user.services.mpris-proxy = {
+      #         description = "Mpris proxy";
+      #         after = [ "network.target" "sound.target" ];
+      #         wantedBy = [ "default.target" ];
+      #         serviceConfig.ExecStart = "${pkgs.bluez}/bin/mpris-proxy";
+      #       };
+
+    }
 
     ./modules/thunderbird.nix
 
