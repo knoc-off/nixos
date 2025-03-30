@@ -1,4 +1,4 @@
-{ pkgs, self, ... }:
+{ pkgs, self, lib, ... }:
 let
   renamedMinimal = pkgs.symlinkJoin {
     name = "nvim-minimal";
@@ -27,7 +27,7 @@ in {
 
   ];
   #home.packages = [  ];
-  home.sessionVariables = { EDITOR = "nvim"; };
+  home.sessionVariables = { EDITOR = lib.mkForce "nvim"; };
 
   xdg.desktopEntries = {
     kitty-neovim = {

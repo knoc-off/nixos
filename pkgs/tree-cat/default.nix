@@ -3,10 +3,14 @@
 , makeWrapper
 , pkg-config
 , openssl
+, tree-sitter
+, stdenv
+, tree-sitter-grammars
+, pkgs
 }:
 
-rustPlatform.buildRustPackage rec {
-  pname = "nx";
+pkgs.rustPlatform.buildRustPackage rec {
+  pname = "tree-cat";
   version = "0.1.0";
 
   src = ./.;
@@ -18,10 +22,16 @@ rustPlatform.buildRustPackage rec {
   nativeBuildInputs = [
     makeWrapper
     pkg-config
+    tree-sitter
+    tree-sitter-grammars.tree-sitter-rust
+    stdenv.cc
   ];
+
 
   buildInputs = [
     openssl
+    tree-sitter
+    tree-sitter-grammars.tree-sitter-rust
   ];
 
   meta = with lib; {

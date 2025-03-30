@@ -1,4 +1,4 @@
-{ config, pkgs, lib, ... }:
+{ config, upkgs, pkgs, lib, ... }:
 
 {
   # ======================
@@ -71,7 +71,7 @@
   # ======================
   # Audio Tools
   # ======================
-  environment.systemPackages = with pkgs; [
+  environment.systemPackages = with upkgs; [
     # Control
     pavucontrol         # Volume mixer
     helvum              # Patchbay for routing
@@ -96,11 +96,5 @@
     PIPEWIRE_LATENCY = "64/48000";     # Default latency
   };
 
-  # Optional: Real-time privileges for audio group
-  users.extraGroups.audio.extraRules = ''
-    KERNEL=="rtc0", GROUP="audio"
-    @audio - rtprio 95
-    @audio - memlock unlimited
-  '';
 }
 

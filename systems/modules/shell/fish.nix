@@ -1,54 +1,56 @@
-{ config, lib, pkgs, ... }:
-
+{ config, lib, pkgs, user, ... }: # TODO: make all of the special arguments default? its better if it hard fails
 {
   imports = [
     ./starship.nix
   ];
 
+  users.defaultUserShell = pkgs.fish;
+  users.users.${user}.shell = pkgs.fish;
+
+  environment.variables = {
+    EDITOR = "vi";
+    VISUAL = "vi";
+  };
+
   programs.fish = {
     enable = true;
+
     interactiveShellInit = ''
-      # Zoxide integration
-      ${pkgs.zoxide}/bin/zoxide init fish | source
+    #   # Terminal title
+    #   function fish_title
+    #     set -q argv[1]; or set argv fish
+    #     echo (status current-command) " "
+    #     pwd
+    #   end
 
-      # FZF key bindings
-      ${pkgs.fzf}/bin/fzf --fish | source
-
-      # Terminal title
-      function fish_title
-        set -q argv[1]; or set argv fish
-        echo (status current-command) " "
-        pwd
-      end
-
-      # Better history search
-      function history-search
-        history | fzf --height=40% | read -l command
-        and commandline -rb $command
-      end
-      bind \cr history-search
+    #   # Better history search
+    #   function history-search
+    #     history | fzf --height=40% | read -l command
+    #     and commandline -rb $command
+    #   end
+    #   bind \cr history-search
 
 
-      function __newline
-          commandline -i "\n"
-      end
+    function __newline
+        commandline -i "\n"
+    end
 
-      bind \n __newline
+    #   bind \n __newline
 
-      function __edit_command
-          set -l tmpfile (mktemp)
-          commandline > $tmpfile
-          $EDITOR $tmpfile
-          commandline -r (cat $tmpfile)
-          commandline -f repaint
-          rm $tmpfile
-      end
+    #   function __edit_command
+    #       set -l tmpfile (mktemp)
+    #       commandline > $tmpfile
+    #       $EDITOR $tmpfile
+    #       commandline -r (cat $tmpfile)
+    #       commandline -f repaint
+    #       rm $tmpfile
+    #   end
 
 
-      # Set key bindings
-      bind -M insert \e\n __newline  # Alt-Enter for newline
-      bind -M insert \cr history-search
-      bind -M insert \ee __edit_command  # Alt-e for editor
+    #   # Set key bindings
+    #   bind -M insert \e\n __newline  # Alt-Enter for newline
+    #   bind -M insert \cr history-search
+    #   bind -M insert \ee __edit_command  # Alt-e for editor
 
 
 

@@ -1,11 +1,22 @@
 # these packages can oftem be used as devshells but not always
-{ pkgs, inputs, system, upkgs, ...}:
+{ pkgs, inputs, system, upkgs, ... }:
 let
   rustPkgs = pkgs.extend (import inputs.rust-overlay);
 
   rustPkgs-fenix = upkgs.extend inputs.fenix.overlays.default;
 
   neovim-plugins = import ./neovim-plugins { inherit (pkgs) vimUtils lua; };
+
+  rustPlatform = rustPkgs-fenix.makeRustPlatform {
+    cargo = rustPkgs-fenix.fenix.minimal.toolchain;
+    rustc = rustPkgs-fenix.fenix.minimal.toolchain;
+  };
+
+  rustPlatform-dev = rustPkgs-fenix.makeRustPlatform {
+    cargo = rustPkgs-fenix.fenix.complete.toolchain;
+    rustc = rustPkgs-fenix.fenix.complete.toolchain;
+  };
+
 in rec {
   rcon-cli = pkgs.callPackage ./rcon-cli { };
   grosshack = pkgs.callPackage ./grosshack { };
@@ -42,12 +53,8 @@ in rec {
 
   spider-cli = rustPkgs.callPackage ./spider { };
   csv-tui = rustPkgs.callPackage ./csv-tui-viewer { };
-  tabiew = rustPkgs-fenix.callPackage ./tabiew {
-    rustPlatform = rustPkgs-fenix.makeRustPlatform {
-      cargo = rustPkgs-fenix.fenix.minimal.toolchain;
-      rustc = rustPkgs-fenix.fenix.minimal.toolchain;
-    };
-  };
+  tabiew = rustPkgs-fenix.callPackage ./tabiew { inherit rustPlatform; };
+  treeview = rustPkgs-fenix.callPackage ./tree-cat { rustPlatform = rustPlatform-dev; };
 
   inherit rustPkgs-fenix;
   inherit (inputs) fenix;

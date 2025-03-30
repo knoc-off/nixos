@@ -51,15 +51,10 @@ let
       ;; Row 5 (7 keys): transparent.
       _ _ _ _ _ _ _
     )
-
-
-
   '';
 
 in {
   imports = [
-    #self.nixosModules.knoff
-
     ./modules/minecraft.nix
 
     { # Home-Manager
@@ -109,7 +104,7 @@ in {
       hardware.uinput.enable = true;
 
       services.kanata = {
-        enable = true;
+        enable = false;
         package = pkgs.kanata;
 
         keyboards = {
@@ -420,6 +415,7 @@ in {
 
   users = {
     users.${user} = {
+      #shell = pkgs.fish;
       isNormalUser = lib.mkDefault true;
       extraGroups =
         [ "wheel" "networkmanager" "audio" "video" "dialout" "libvirtd" "uinput" ];

@@ -59,15 +59,15 @@
         }).config.system.build.isoImage;
       };
 
-
-          # Import packages from the unstable Nixpkgs channel
-      unstablePkgs = system: import nixpkgs-unstable {
-        inherit system;
-        config = {
-          allowUnfree = true;
-          android_sdk.accept_license = true;
+      # Import packages from the unstable Nixpkgs channel
+      unstablePkgs = system:
+        import nixpkgs-unstable {
+          inherit system;
+          config = {
+            allowUnfree = true;
+            android_sdk.accept_license = true;
+          };
         };
-      };
 
       # Function to create package sets for a given system
       mkPkgs = system:
@@ -84,10 +84,9 @@
           # Import custom packages defined in the ./pkgs directory
         in import ./pkgs { inherit inputs self system pkgs upkgs lib; };
 
-    in rec {
-      packages = forAllSystems (system: mkPkgs system);
-
-      devShells = forAllSystems (system: mkPkgs system);
+    in {
+      packages = forAllSystems mkPkgs;
+      devShells = forAllSystems mkPkgs;
 
       nixosModules = import ./modules/nixos/default.nix;
       homeModules = import ./modules/home/default.nix;
@@ -123,9 +122,6 @@
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
-
-
-
 
     # my custom website
     mywebsite.url = "github:knoc-off/Website";
