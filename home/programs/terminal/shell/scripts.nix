@@ -234,35 +234,24 @@ in {
       exit 0
     '')
 
-    (pkgs.writeShellScriptBin "adr" ''
-      # Default model
-      MODEL="openrouter/anthropic/claude-3.5-sonnet"
-      WEAK_MODEL="openrouter/google/gemini-2.0-flash-001"
+      (pkgs.writeShellScriptBin "adr" ''
+        M="openrouter/anthropic/claude-3.5-sonnet"
+        W="openrouter/google/gemini-2.0-flash-001"
+        A=$#
 
-      # Parse arguments
-      while [[ $# -gt 0 ]]; do
-        case "$1" in
-          -s)
-            # Use smart model (Claude 3.7)
-            MODEL="openrouter/anthropic/claude-3.7-sonnet"
-            shift
-            ;;
-          -d)
-            # Use DeepSeek model
-            MODEL="deepseek/deepseek-chat-v3-0324"
-            shift
-            ;;
-          *)
-            # Pass through all other arguments
-            ARGS="$ARGS $1"
-            shift
-            ;;
-        esac
-      done
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            -s) M="openrouter/anthropic/claude-3.7-sonnet"; shift;;
+            -d) M="deepseek/deepseek-chat-v3-0324"; shift;;
+            *) B="$B \"$1\""; shift;;
+          esac
+        done
 
-      # Run aider with the selected model and other arguments
-      ${upkgs.aider-chat}/bin/aider --model "$MODEL" --weak-model "$WEAK_MODEL" --no-auto-lint --no-auto-test --no-attribute-committer --no-attribute-author --dark-mode --edit-format diff $ARGS
-    '')
+        [ $A -eq 0 ] && B="--message /commit"
+
+        eval ${upkgs.aider-chat}/bin/aider --model "\"$M\"" --weak-model "\"$W\"" --no-auto-lint --no-auto-test --no-attribute-committer --no-attribute-author --dark-mode --edit-format diff $B
+      '')
+
 
     (pkgs.writeShellScriptBin "ping" ''
       # replace the ping command if no input is given just ping 1.1.1.1
