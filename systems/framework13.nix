@@ -189,6 +189,24 @@ in {
     ./modules/shell/fish.nix
 
     #./modules/yubikey.nix
+
+    {
+      services.mysql = {
+        # 1. Enable the service definition (uses default package, dataDir etc.)
+        enable = true;
+
+        # 2. Configure MySQL to only listen locally
+        settings = { mysqld = { bind-address = "127.0.0.1"; }; };
+
+        package = pkgs.mysql84;
+
+      };
+
+      # 3. Prevent automatic startup
+      #systemd.services.mysql.wantedBy = pkgs.lib.mkForce [ ];
+      #systemd.services.mysql.enable = pkgs.lib.mkForce false;
+    }
+
   ];
 
   # create a service to run at startup each boot. run wgnord c de to connect to the vpn
@@ -417,8 +435,15 @@ in {
     users.${user} = {
       #shell = pkgs.fish;
       isNormalUser = lib.mkDefault true;
-      extraGroups =
-        [ "wheel" "networkmanager" "audio" "video" "dialout" "libvirtd" "uinput" ];
+      extraGroups = [
+        "wheel"
+        "networkmanager"
+        "audio"
+        "video"
+        "dialout"
+        "libvirtd"
+        "uinput"
+      ];
       initialPassword = "password";
       openssh.authorizedKeys.keys = [ ];
     };

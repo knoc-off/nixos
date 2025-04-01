@@ -1,10 +1,9 @@
-{ pkgs, self, hostname, config, ... }:
+{ pkgs, upkgs, self, hostname, config, ... }:
 let
   config_dir = "/etc/nixos"; # Should relocate to /etc? and symlink?
   inherit (self.packages.${pkgs.system}) writeNuScript;
 in {
   home.packages = [
-
 
     (pkgs.writeShellScriptBin "anti-sleep" ''
 
@@ -15,8 +14,6 @@ in {
         --mode=block \
         sleep "$1"
     '')
-
-
 
     (pkgs.writeShellScriptBin "pipewire-combine-sinks" ''
       #!/usr/bin/env bash
@@ -237,8 +234,35 @@ in {
       exit 0
     '')
 
+    (pkgs.writeShellScriptBin "adr" ''
+      # Default model
+      MODEL="openrouter/anthropic/claude-3.5-sonnet"
+      WEAK_MODEL="openrouter/google/gemini-2.0-flash-001"
 
+      # Parse arguments
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          -s)
+            # Use smart model (Claude 3.7)
+            MODEL="openrouter/anthropic/claude-3.7-sonnet"
+            shift
+            ;;
+          -d)
+            # Use DeepSeek model
+            MODEL="deepseek/deepseek-chat-v3-0324"
+            shift
+            ;;
+          *)
+            # Pass through all other arguments
+            ARGS="$ARGS $1"
+            shift
+            ;;
+        esac
+      done
 
+      # Run aider with the selected model and other arguments
+      ${upkgs.aider-chat}/bin/aider --model "$MODEL" --weak-model "$WEAK_MODEL" --no-auto-lint --no-auto-test --no-attribute-committer --no-attribute-author --dark-mode --edit-format diff $ARGS
+    '')
 
     (pkgs.writeShellScriptBin "ping" ''
       # replace the ping command if no input is given just ping 1.1.1.1

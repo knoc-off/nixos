@@ -11,6 +11,10 @@
         body = "tar -cf - \"$argv[1]\" | pv -s $(du -sb \"$argv[1]\" | awk '{print $1}') | pigz -9 > \"$argv[2]\".tar.gz";
         description = "Compress a file or directory";
       };
+      cli = {
+        body = "fabric -p cli \"$argv\" --stream";
+        description = "Compress a file or directory";
+      };
       #decompress = "pv \"$argv[1]\" | pigz -d | tar -xf -";
       chrome = "nix shell nixpkgs#$argv[1] -- $argv[2..-1] &>/dev/null &";
       cdToFile = ''pushd "$(fd . --exclude .git --exclude .gitignore -t f | fzf | xargs dirname)"'';
