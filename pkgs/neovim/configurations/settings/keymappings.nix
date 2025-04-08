@@ -78,10 +78,10 @@
       "#" = ":let @/='\\<<C-R>=expand(\"<cword>\")<CR>\\>'<CR>:set hlsearch<CR>";
       
       # No-jump search forward
-      "/" = helpers.mkRaw "function() local query = vim.fn.input('/', vim.fn.getreg('/')); if query ~= '' then vim.fn.setreg('/', query); vim.fn.search(query, 'n'); vim.opt.hlsearch = true; end end";
+      "/" = helpers.mkRaw "function() local query = vim.fn.input('/'); if query ~= '' then vim.fn.setreg('/', query); vim.fn.search(query, 'n'); vim.opt.hlsearch = true; end end";
       
       # No-jump search backward
-      "?" = helpers.mkRaw "function() local query = vim.fn.input('?', vim.fn.getreg('/')); if query ~= '' then vim.fn.setreg('/', query); vim.fn.search(query, 'bn'); vim.opt.hlsearch = true; end end";
+      "?" = helpers.mkRaw "function() local query = vim.fn.input('?'); if query ~= '' then vim.fn.setreg('/', query); vim.fn.search(query, 'bn'); vim.opt.hlsearch = true; end end";
     };
 
     visual = lib.mapAttrsToList (key: action: {
