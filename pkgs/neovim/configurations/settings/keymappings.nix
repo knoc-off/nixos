@@ -72,6 +72,10 @@
       
       # Yank word under cursor and set it as search pattern
       "<S-#>" = "yiw:let @/ = @\"<CR>:set hlsearch<CR>";
+      
+      # Highlight word under cursor without moving
+      "*" = ":let @/='\\<<C-R>=expand(\"<cword>\")<CR>\\>'<CR>:set hlsearch<CR>";
+      "#" = ":let @/='\\<<C-R>=expand(\"<cword>\")<CR>\\>'<CR>:set hlsearch<CR>";
     };
 
     visual = lib.mapAttrsToList (key: action: {
