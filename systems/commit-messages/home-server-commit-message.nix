@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "test:_Add_comprehensive_tests_for_math_and_equations_library________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________________________________big_restructure";
+  system.nixos.label = "fix:_Correct_arange2_to_include_inclusive_end_in_generated_list_____________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________________________________big_restructure";
 }
