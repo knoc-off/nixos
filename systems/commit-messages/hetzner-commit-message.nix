@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "fix:_Add_missing_semicolons_to_test_attribute_sets_in_math-tests.nix________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
+  system.nixos.label = "test:_Add_comprehensive_tests_for_math_and_equations_library________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
 }
