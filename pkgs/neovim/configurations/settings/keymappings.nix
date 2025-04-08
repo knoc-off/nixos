@@ -63,6 +63,12 @@
       # scroll by 5 lines with Shift + Up/Down
       "<S-Up>" = ":execute \"normal! \" . v:count1 * 5 . \"k\"<CR>";
       "<S-Down>" = ":execute \"normal! \" . v:count1 * 5 . \"j\"<CR>";
+
+      # Always search forward using the current @/ pattern.
+      "n" = ":<C-U>call search(@/, 'W')<CR>";
+
+      # Always search backward using the current @/ pattern.
+      "N" = ":<C-U>call search(@/, 'bW')<CR>";
     };
 
     visual = lib.mapAttrsToList (key: action: {
