@@ -21,6 +21,8 @@
               analysis = {
                 typeCheckingMode = "basic";
                 diagnosticMode = "workspace";
+                # Set missing type stubs diagnostic to warning instead of error
+                reportMissingTypeStubs = "warning"; 
                 inlayHints = {
                   functionReturnTypes = true;
                   variableTypes = true;
