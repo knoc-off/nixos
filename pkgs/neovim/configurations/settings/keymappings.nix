@@ -69,6 +69,9 @@
 
       # Always search backward using the current @/ pattern.
       "N" = ":<C-U>call search(@/, 'bW')<CR>";
+      
+      # Yank word under cursor and set it as search pattern
+      "<S-#>" = "yiw:let @/ = @\"<CR>:set hlsearch<CR>";
     };
 
     visual = lib.mapAttrsToList (key: action: {
