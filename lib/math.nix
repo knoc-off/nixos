@@ -83,7 +83,7 @@ rec {
   arange2 = min: max: step:
     assert step > 0;
     assert max >= min;
-    let count = ceil ((max - min) / step);
+    let count = floor ((max - min) / step) + 1;
     in lib.genList (i: min + step * i) count;
 
   # Improved polynomial evaluation
