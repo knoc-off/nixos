@@ -101,14 +101,12 @@ rec {
       fracPart = if builtins.length parts > 1 then
         let
           fracStr = builtins.elemAt parts 1;
-          fracValue = builtins.parseDrvNameVersion "name-${fracStr}";
+          tomlStr = "f = 0.${fracStr}";
+          parsed = builtins.fromTOML tomlStr;
         in
-          if fracValue != null then
-            fracValue.versionInt / (pow 10 (lib.stringLength fracStr))
-          else
-            0
+          parsed.f
       else
-        0;
+        0.0;
     in intPart + fracPart;
 
   # Improved fraction detection
