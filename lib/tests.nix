@@ -13,11 +13,15 @@ let
       okHsl = rgbToOKHSL rgb;
       okHsv = rgbToOKHSV rgb;
 
+      okLabValue = oklabToRGB okLab;
+      okHslValue = okhslToRGB okHsl;
+      okHsvValue = okhsvToRGB okHsv;
+
       roundtrip = {
         hex = rgbToHex rgb;
-        lab = oklabToRGB okLab;
-        hsl = okhslToRGB okHsl;
-        hsv = okhsvToRGB okHsv;
+        lab = rgbToHex (oklabToRGB okLab);
+        hsl = rgbToHex (okhslToRGB okHsl);
+        hsv = rgbToHex (okhsvToRGB okHsv);
       };
 
       conversions = [
@@ -64,7 +68,7 @@ let
         < eps;
 
     in {
-      inherit rgb okLab okHsl okHsv roundtrip;
+      inherit rgb okLab okHsl okHsv okLabValue okHslValue okHsvValue roundtrip;
       tests = map (c: c // { result = if c.test then "PASS" else "FAIL"; })
         conversions;
     };
