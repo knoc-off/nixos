@@ -99,8 +99,14 @@ rec {
       parts = lib.splitString "." str;
       intPart = lib.toInt (builtins.head parts);
       fracPart = if builtins.length parts > 1 then
-        lib.toInt (builtins.elemAt parts 1)
-        / (pow 10 (lib.stringLength (builtins.elemAt parts 1)))
+        let
+          fracStr = builtins.elemAt parts 1;
+          fracValue = builtins.parseDrvNameVersion "name-${fracStr}";
+        in
+          if fracValue != null then
+            fracValue.versionInt / (pow 10 (lib.stringLength fracStr))
+          else
+            0
       else
         0;
     in intPart + fracPart;
