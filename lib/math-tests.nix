@@ -30,7 +30,7 @@ rec {
   testCoreFunctions = {
     # Test safeDiv
     testSafeDivNormal = assertWithinTolerance "safeDiv (normal)" 2.0 (math.safeDiv 6.0 3.0) epsilon;
-    testSafeDivByZero = assert math.safeDiv 5.0 0.0 == 0;
+    testSafeDivByZero = assert math.safeDiv 5.0 0.0 == 0; # Added semicolon
   };
 
   testBasicArithmeticHelpers = {
