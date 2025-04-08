@@ -81,7 +81,8 @@
       "/" = helpers.mkRaw ''
         function()
           local query = vim.fn.input('/', vim.fn.getreg('/'))
-          if query ~= '' then
+          if query ~= '' 
+          then
             vim.fn.setreg('/', query)
             vim.fn.search(query, 'n')
             vim.opt.hlsearch = true
@@ -93,7 +94,8 @@
       "?" = helpers.mkRaw ''
         function()
           local query = vim.fn.input('?', vim.fn.getreg('/'))
-          if query ~= '' then
+          if query ~= '' 
+          then
             vim.fn.setreg('/', query)
             vim.fn.search(query, 'bn')
             vim.opt.hlsearch = true
