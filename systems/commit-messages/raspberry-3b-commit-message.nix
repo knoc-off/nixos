@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "feat:_Add_math-tests.nix_library____________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________minecraft_changes._disable_waydroid";
+  system.nixos.label = "feat:_Add_comprehensive_tests_for_math.nix_and_equations.nix________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________minecraft_changes._disable_waydroid";
 }
