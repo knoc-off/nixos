@@ -21,9 +21,7 @@
         nixfmt.enable = true;
       };
       diagnostics = {
-        mypy = {
-          enable = true;
-        };
+        # mypy disabled as pyright handles type checking
       };
     };
   };
