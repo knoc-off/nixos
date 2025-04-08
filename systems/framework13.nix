@@ -191,16 +191,28 @@ in {
     #./modules/yubikey.nix
 
     {
-      services.mysql = {
-        # 1. Enable the service definition (uses default package, dataDir etc.)
+
+      services.postgresql = {
         enable = true;
-
-        # 2. Configure MySQL to only listen locally
-        settings = { mysqld = { bind-address = "127.0.0.1"; }; };
-
-        package = pkgs.mysql84;
+        package = pkgs.postgresql_16;
 
       };
+      #services.mysql = {
+      #  # 1. Enable the service definition (uses default package, dataDir etc.)
+      #  enable = true;
+
+      #  # 2. Configure MySQL to only listen locally
+      #  settings = {
+      #    mysqld = {
+      #      socket = "/var/run/mysqld/mysqld.sock";
+      #      port = 3306;
+      #      bind-address = "127.0.0.1";
+      #    };
+      #  };
+
+      #  package = pkgs.mysql84;
+
+      #};
 
       # 3. Prevent automatic startup
       #systemd.services.mysql.wantedBy = pkgs.lib.mkForce [ ];

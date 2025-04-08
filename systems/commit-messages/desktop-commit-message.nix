@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "chore:_Remove_tree-cat_package_and_update_starship_prompt_symbols.__________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________moving_to_new_version_of_nixpkgs._24.11";
+  system.nixos.label = "feat:_Update_aider_model_and_starship_prompt_add_postgresql_________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________moving_to_new_version_of_nixpkgs._24.11";
 }

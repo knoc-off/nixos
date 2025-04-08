@@ -27,6 +27,14 @@ let
   #   removeAlpha
   #   convert;
 
+
+
+  # What works:
+  #  hexToOKHSL
+  #  gexToOKHSV - sortof differs too greatly.
+
+
+
 in rec {
   # Export all modules
   inherit core oklab okhsl okhsv conversions math;
