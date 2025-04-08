@@ -63,7 +63,8 @@
       g = "git";
       nrs = "sudo nixos-rebuild switch";
       ncg = "nix-collect-garbage -d";
-      adf = "aider --model openrouter/anthropic/claude-3.7-sonnet --weak-model openrouter/google/gemini-2.0-flash-001 --no-auto-lint --no-auto-test --no-attribute-committer --no-attribute-author --dark-mode --edit-format diff --file main.py lib/phantombuster.py";
+      #adf = "aider --model openrouter/anthropic/claude-3.7-sonnet --weak-model openrouter/google/gemini-2.0-flash-001 --no-auto-lint --no-auto-test --no-attribute-committer --no-attribute-author --dark-mode --edit-format diff --file main.py lib/phantombuster.py";
+      adf = "aider --model openrouter/google/gemini-2.0-flash-001 --weak-model openrouter/google/gemini-2.0-flash-001 --no-auto-lint --no-auto-test --no-attribute-committer --no-attribute-author --dark-mode --edit-format diff --file ";
     };
 
     shellAliases = {

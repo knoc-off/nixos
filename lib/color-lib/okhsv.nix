@@ -2,9 +2,9 @@
 { core, math, oklab }:
 with core;
 with math;
-with oklab; rec {
+with oklab;  {
 
-  toRGB = { h, s, v }:
+  toRGB = { h, s, v, alpha ? 1.0 }:
     if v < epsilon then { r = 0; g = 0; b = 0; alpha = 1.0; }
     else let
       a_ = cos (2 * pi * h);
@@ -45,7 +45,7 @@ with oklab; rec {
         L = L_final;
         a = C_final * a_;
         b = C_final * b_;
-        alpha = 1.0;
+        inherit alpha;
       };
     in rgb;
 
@@ -58,7 +58,7 @@ with oklab; rec {
         r = srgbTransferInv r;
         g = srgbTransferInv g;
         b = srgbTransferInv b;
-        alpha = alpha;
+        inherit alpha;
       };
       lab = linearSRGBToOklab linearRGB;
       L = lab.L;

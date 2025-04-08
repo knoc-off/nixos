@@ -235,14 +235,14 @@ in {
     '')
 
       (pkgs.writeShellScriptBin "adr" ''
-        M="openrouter/anthropic/claude-3.5-sonnet"
+        M="openrouter/google/gemini-2.0-flash-001"
         W="openrouter/google/gemini-2.0-flash-001"
         A=$#
 
         while [ $# -gt 0 ]; do
           case "$1" in
-            -s) M="openrouter/anthropic/claude-3.7-sonnet"; shift;;
-            -d) M="deepseek/deepseek-chat-v3-0324"; shift;;
+            -s) M="openrouter/google/gemini-2.5-pro-preview-03-25"; shift;;
+            -d) M="openrouter/google/gemini-2.0-flash-001"; shift;;
             *) B="$B \"$1\""; shift;;
           esac
         done
@@ -250,6 +250,7 @@ in {
         [ $A -eq 0 ] && B="--message /commit"
 
         eval ${upkgs.aider-chat}/bin/aider --model "\"$M\"" --weak-model "\"$W\"" --no-auto-lint --no-auto-test --no-attribute-committer --no-attribute-author --dark-mode --edit-format diff $B
+        # aider --model openrouter/google/gemini-2.0-flash-001 --weak-model openrouter/google/gemini-2.0-flash-001 --no-auto-lint --no-auto-test --no-attribute-committer --no-attribute-author --dark-mode --edit-format diff --file
       '')
 
 
