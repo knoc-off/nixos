@@ -5,6 +5,18 @@
     #  event = "InsertEnter";
     #  command = "norm zz";
     #}
+    
+    # Preserve view when searching with / or ?
+    {
+      event = "CmdlineEnter";
+      pattern = "/,?";
+      command = "let b:search_save_view = winsaveview()";
+    }
+    {
+      event = "CmdlineLeave";
+      pattern = "/,?";
+      command = "call winrestview(b:search_save_view)";
+    }
 
     # Remove trailing whitespace on save
     {
