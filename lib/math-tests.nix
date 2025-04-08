@@ -142,11 +142,11 @@ let
       testModNegativeDen = assert (math.mod 7 (-3) == -2); true; # Result has same sign as divisor
       testModBothNegative = assert (math.mod (-7) (-3) == -1); true;
       testModZero = assert (math.mod 6 3 == 0); true;
-      # Test fmod (float modulo)
-      testFmodPositive = assertWithinTolerance "fmod (positive)" 1.0 (math.fmod 7.0 3.0) epsilon;
-      testFmodNegativeNum = assertWithinTolerance "fmod (negative num)" (-1.0) (math.fmod (-7.0) 3.0) epsilon; # Different from integer mod
-      testFmodNegativeDen = assertWithinTolerance "fmod (negative den)" 1.0 (math.fmod 7.0 (-3.0)) epsilon; # Different from integer mod
-      testFmodBothNegative = assertWithinTolerance "fmod (both negative)" (-1.0) (math.fmod (-7.0) (-3.0)) epsilon;
+      # Test fmod (float modulo) - Result has the same sign as the dividend (x)
+      testFmodPositive = assertWithinTolerance "fmod (positive)" 1.0 (math.fmod 7.0 3.0) epsilon; # 7.0 - 3.0 * floor(7.0/3.0) = 7.0 - 3.0 * 2.0 = 1.0
+      testFmodNegativeNum = assertWithinTolerance "fmod (negative num)" 2.0 (math.fmod (-7.0) 3.0) epsilon; # -7.0 - 3.0 * floor(-7.0/3.0) = -7.0 - 3.0 * (-3.0) = -7.0 + 9.0 = 2.0
+      testFmodNegativeDen = assertWithinTolerance "fmod (negative den)" (-2.0) (math.fmod 7.0 (-3.0)) epsilon; # 7.0 - (-3.0) * floor(7.0/-3.0) = 7.0 - (-3.0) * (-3.0) = 7.0 - 9.0 = -2.0
+      testFmodBothNegative = assertWithinTolerance "fmod (both negative)" (-1.0) (math.fmod (-7.0) (-3.0)) epsilon; # -7.0 - (-3.0) * floor(-7.0/-3.0) = -7.0 - (-3.0) * 2.0 = -7.0 + 6.0 = -1.0
     };
 
     testLogExp = {
