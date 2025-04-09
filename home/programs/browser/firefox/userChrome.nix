@@ -1,4 +1,4 @@
-{ theme, firefox-csshacks, colorLib }:
+{ theme, firefox-csshacks, color-lib }:
 let
   sidebar = {
 
