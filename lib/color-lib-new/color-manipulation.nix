@@ -75,34 +75,51 @@ let
 
   # --- Hex <-> RGB Conversion (using new helpers) ---
 
-  # Converts a hex color string (e.g., "#RRGGBB", "RGB", "#RGBA", etc.) to an RGB attribute set { r, g, b } with values 0.0-1.0
+  # Converts a hex color string (e.g., "#RRGGBB", "RGB", "#RGBA", etc.) to an RGB attribute set { r, g, b } with values 0.0-1.0, plus the original alpha hex string.
   hexToRgb = hex:
-    let parts = splitHex hex;
+    let parts = splitHex hex; # parts = { r, g, b, alpha } as hex strings
     in {
       r = (hexToDec parts.r) / 255.0;
       g = (hexToDec parts.g) / 255.0;
       b = (hexToDec parts.b) / 255.0;
-      # alpha = (hexToDec parts.alpha) / 255.0; # Alpha ignored for Oklab conversions
+      alpha = parts.alpha; # Keep alpha as hex string "FF", "80", etc.
     };
 
-  # Converts an RGB attribute set { r, g, b } (values 0.0-1.0) to a hex color string "#RRGGBB"
-  rgbToHex = rgb:
+  # Converts an RGB attribute set { r, g, b } (values 0.0-1.0) and an alpha hex string { alpha } to a hex color string "#RRGGBBAA" or "#RRGGBB"
+  rgbToHex = rgbWithAlpha: # Expects { r, g, b, alpha } where alpha is hex string
     let
       # Use lib.toHexString for cleaner byte conversion
       toHexByte = val: lib.toHexString (builtins.floor (clamp val 0.0 1.0 * 255.0 + 0.5)); # Add 0.5 for rounding
-    in combineHex { r = toHexByte rgb.r; g = toHexByte rgb.g; b = toHexByte rgb.b; }; # Alpha defaults to FF
+    in combineHex {
+      r = toHexByte rgbWithAlpha.r;
+      g = toHexByte rgbWithAlpha.g;
+      b = toHexByte rgbWithAlpha.b;
+      alpha = rgbWithAlpha.alpha; # Pass the original alpha hex string
+    };
 
   # --- Color Manipulation Functions ---
 
-  # Generic function to modify a component of a color model
+  # Generic function to modify a component of a color model, preserving alpha
   modifyComponent = modelConversionFunc: inverseModelConversionFunc: componentName: modifierFunc: hexColor:
     let
-      rgb = hexToRgb hexColor;
-      modelColor = modelConversionFunc rgb;
+      # 1. Convert hex to RGB + Alpha (hex string)
+      rgbWithAlpha = hexToRgb hexColor;
+      rgbOnly = { r = rgbWithAlpha.r; g = rgbWithAlpha.g; b = rgbWithAlpha.b; };
+      originalAlpha = rgbWithAlpha.alpha;
+
+      # 2. Convert RGB to target model (e.g., Okhsl)
+      modelColor = modelConversionFunc rgbOnly;
+
+      # 3. Modify the component in the target model
       modifiedValue = modifierFunc modelColor.${componentName};
       modifiedModelColor = modelColor // { ${componentName} = modifiedValue; }; # Update the specific component
-      modifiedRgb = inverseModelConversionFunc modifiedModelColor;
-    in rgbToHex modifiedRgb;
+
+      # 4. Convert back to RGB
+      modifiedRgbOnly = inverseModelConversionFunc modifiedModelColor;
+
+      # 5. Combine modified RGB with original Alpha and convert back to hex
+      modifiedRgbWithAlpha = modifiedRgbOnly // { alpha = originalAlpha; };
+    in rgbToHex modifiedRgbWithAlpha;
 
   # --- Okhsl Manipulation ---
 
