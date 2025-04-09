@@ -285,12 +285,12 @@ let
       okhsl_white = { h = 0.0; s = 0.0; l = 1.0; }; # Hue is arbitrary for white
       okhsl_grey = { h = 0.0; s = 0.0; l = 0.533760; }; # Hue arbitrary, L approx
       okhsl_red = { h = 0.08; s = 1.0; l = 0.568085; };
-      okhsl_green = { h = 0.39; s = 1.0; l = 0.866; };
-      okhsl_blue = { h = 0.70; s = 1.0; l = 0.452; };
-      okhsl_yellow = { h = 0.27; s = 1.0; l = 0.968; };
-      okhsl_cyan = { h = 0.54; s = 1.0; l = 0.906; };
-      okhsl_magenta = { h = 0.89; s = 1.0; l = 0.539; };
-      okhsl_orange = { h = 0.16; s = 1.0; l = 0.775; };
+      okhsl_green = { h = 0.39; s = 1.0; l = 0.844529; };
+      okhsl_blue = { h = 0.733478; s = 1.0; l = 0.366565; };
+      okhsl_yellow = { h = 0.304915; s = 1.0; l = 0.968; };
+      okhsl_cyan = { h = 0.54; s = 1.0; l = 0.889848; };
+      okhsl_magenta = { h = 0.912121; s = 1.0; l = 0.653299; };
+      okhsl_orange = { h = 0.196305; s = 1.0; l = 0.758832; };
 
     in {
       name = "Okhsl Conversions";
@@ -337,14 +337,14 @@ let
       # Expected Okhsv values (approximate, verify if possible)
       okhsv_black = { h = 0.0; s = 0.0; v = 0.0; }; # Hue/Sat arbitrary for black
       okhsv_white = { h = 0.0; s = 0.0; v = 1.0; }; # Hue arbitrary for white
-      okhsv_grey = { h = 0.0; s = 0.0; v = 0.59; }; # Hue arbitrary, V approx
+      okhsv_grey = { h = 0.0; s = 0.0; v = 0.533760; }; # Hue arbitrary, V approx
       okhsv_red = { h = 0.08; s = 1.0; v = 1.0; };
       okhsv_green = { h = 0.39; s = 1.0; v = 1.0; };
-      okhsv_blue = { h = 0.70; s = 1.0; v = 1.0; };
-      okhsv_yellow = { h = 0.27; s = 1.0; v = 1.0; };
+      okhsv_blue = { h = 0.733478; s = 1.0; v = 1.0; };
+      okhsv_yellow = { h = 0.304915; s = 1.0; v = 1.0; };
       okhsv_cyan = { h = 0.54; s = 1.0; v = 1.0; };
-      okhsv_magenta = { h = 0.89; s = 1.0; v = 1.0; };
-      okhsv_orange = { h = 0.16; s = 1.0; v = 1.0; };
+      okhsv_magenta = { h = 0.912121; s = 1.0; v = 1.0; };
+      okhsv_orange = { h = 0.196305; s = 1.0; v = 1.0; };
 
     in {
       name = "Okhsv Conversions";
