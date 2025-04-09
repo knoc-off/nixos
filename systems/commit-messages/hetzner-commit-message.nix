@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "refactor:_Use_color-lib_functions_for_dunst_theme_configuration_____________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
+  system.nixos.label = "refactor:_Rename_colorLib_to_color-lib_in_dunst_module______________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
 }
