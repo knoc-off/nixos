@@ -75,26 +75,29 @@ let
 
   # --- Hex <-> RGB Conversion (using new helpers) ---
 
-  # Converts a hex color string (e.g., "#RRGGBB", "RGB", "#RGBA", etc.) to an RGB attribute set { r, g, b } with values 0.0-1.0, plus the original alpha hex string.
+  # Converts a hex color string (e.g., "#RRGGBB", "RGB", "#RGBA", etc.) to an RGB attribute set { r, g, b, alpha } with values 0.0-1.0.
   hexToRgb = hex:
     let parts = splitHex hex; # parts = { r, g, b, alpha } as hex strings
     in {
       r = (hexToDec parts.r) / 255.0;
       g = (hexToDec parts.g) / 255.0;
       b = (hexToDec parts.b) / 255.0;
-      alpha = parts.alpha; # Keep alpha as hex string "FF", "80", etc.
+      alpha = (hexToDec parts.alpha) / 255.0; # Convert alpha hex to float 0.0-1.0
     };
 
-  # Converts an RGB attribute set { r, g, b } (values 0.0-1.0) and an alpha hex string { alpha } to a hex color string "#RRGGBBAA" or "#RRGGBB"
-  rgbToHex = rgbWithAlpha: # Expects { r, g, b, alpha } where alpha is hex string
+  # Converts an RGB attribute set { r, g, b, alpha } (values 0.0-1.0) to a hex color string "#RRGGBBAA" or "#RRGGBB" (if alpha is 1.0)
+  rgbToHex = rgbWithFloatAlpha: # Expects { r, g, b, alpha } where alpha is float
     let
       # Use lib.toHexString for cleaner byte conversion
       toHexByte = val: lib.toHexString (builtins.floor (clamp val 0.0 1.0 * 255.0 + 0.5)); # Add 0.5 for rounding
+      alphaFloat = clamp rgbWithFloatAlpha.alpha 0.0 1.0;
+      # Only include alpha hex if alpha is noticeably less than 1.0
+      alphaHex = if alphaFloat >= (1.0 - epsilon) then "FF" else toHexByte alphaFloat;
     in combineHex {
-      r = toHexByte rgbWithAlpha.r;
-      g = toHexByte rgbWithAlpha.g;
-      b = toHexByte rgbWithAlpha.b;
-      alpha = rgbWithAlpha.alpha; # Pass the original alpha hex string
+      r = toHexByte rgbWithFloatAlpha.r;
+      g = toHexByte rgbWithFloatAlpha.g;
+      b = toHexByte rgbWithFloatAlpha.b;
+      alpha = alphaHex; # Pass hex alpha, combineHex handles omitting "FF"
     };
 
   # --- Color Manipulation Functions ---
@@ -102,10 +105,10 @@ let
   # Generic function to modify a component of a color model, preserving alpha
   modifyComponent = modelConversionFunc: inverseModelConversionFunc: componentName: modifierFunc: hexColor:
     let
-      # 1. Convert hex to RGB + Alpha (hex string)
-      rgbWithAlpha = hexToRgb hexColor;
-      rgbOnly = { r = rgbWithAlpha.r; g = rgbWithAlpha.g; b = rgbWithAlpha.b; };
-      originalAlpha = rgbWithAlpha.alpha;
+      # 1. Convert hex to RGB + Alpha (float)
+      rgbWithFloatAlpha = hexToRgb hexColor;
+      rgbOnly = { r = rgbWithFloatAlpha.r; g = rgbWithFloatAlpha.g; b = rgbWithFloatAlpha.b; };
+      originalFloatAlpha = rgbWithFloatAlpha.alpha; # Alpha is now a float
 
       # 2. Convert RGB to target model (e.g., Okhsl)
       modelColor = modelConversionFunc rgbOnly;
@@ -117,9 +120,9 @@ let
       # 4. Convert back to RGB
       modifiedRgbOnly = inverseModelConversionFunc modifiedModelColor;
 
-      # 5. Combine modified RGB with original Alpha and convert back to hex
-      modifiedRgbWithAlpha = modifiedRgbOnly // { alpha = originalAlpha; };
-    in rgbToHex modifiedRgbWithAlpha;
+      # 5. Combine modified RGB with original float Alpha and convert back to hex
+      modifiedRgbWithFloatAlpha = modifiedRgbOnly // { alpha = originalFloatAlpha; };
+    in rgbToHex modifiedRgbWithFloatAlpha;
 
   # --- Okhsl Manipulation ---
 
