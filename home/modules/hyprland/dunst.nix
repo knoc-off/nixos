@@ -9,7 +9,7 @@ let
   accent1 = theme.accent1;
   accent2 = theme.accent2;
 
-  lighten = amount: hex:
+  setLightness = amount: hex:
     let
       rgb = hexToRgb hex;
       adjusted = setOkhslLightness amount hex;
@@ -28,18 +28,18 @@ in
         origin = "top-right";
         corner_radius = 5;
         progress_bar_corner_radius = 5;
-        frame_color = lighten 0.3 primary;
+        frame_color = setLightness 0.3 primary;
         font = "Droid Sans 9";
       };
       urgency_normal = {
-        background = lighten 0.2 primary;
-        foreground = lighten 0.95 neutral;
+        background = setLightness 0.2 primary;
+        foreground = setLightness 0.95 neutral;
         highlight = accent1;
         timeout = 10;
       };
       urgency_critical = {
-        background = lighten 0.4 accent2;
-        foreground = lighten 0.95 neutral;
+        background = setLightness 0.4 accent2;
+        foreground = setLightness 0.95 neutral;
         highlight = accent2;
         timeout = 0;
       };
