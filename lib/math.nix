@@ -255,22 +255,13 @@ rec {
       in term0 + term1 + term2 + term3 + term4 + term5 + term6 + term7 + term8
       + term9 + term10 + term11 + term12 + term13;
 
-      # Force trace for exp_r
-      exp_r = builtins.seq (builtins.trace
-        "exp(${toString x}): exp_r (direct sum)=${toString exp_r_untraced}"
-        null) exp_r_untraced;
-
       # --- Step 3: Calculate 2^k ---
       pow2_k_untraced = integerPow 2.0 k_int;
-      pow2_k = builtins.seq
-        (builtins.trace "exp(${toString x}): pow2_k=${toString pow2_k_untraced}"
-          null) pow2_k_untraced;
+      pow2_k = pow2_k_untraced;
 
-      # --- Step 4: Combine and Final Trace ---
-      result_untraced = pow2_k * exp_r;
-      result = builtins.seq
-        (builtins.trace "exp(${toString x}): result=${toString result_untraced}"
-          null) result_untraced;
+      # --- Step 4: Combine and Final Result ---
+      result_untraced = pow2_k * exp_r_untraced;
+      result = result_untraced;
 
     in result;
 
