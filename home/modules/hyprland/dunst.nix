@@ -1,14 +1,21 @@
 { theme, colorLib, ... }:
-let
-  h2okl = colorLib.hexStrToOklch;
-  oklchToHex = colorLib.oklchToHex;
-  setLightness = value: color: colorLib.oklchmod.setLightness value color;
 
-  primary = h2okl theme.primary;
-  secondary = h2okl theme.secondary;
-  neutral = h2okl theme.neutral;
-  accent1 = h2okl theme.accent1;
-  accent2 = h2okl theme.accent2;
+let
+  inherit (colorLib) hexToRgb rgbToHex adjustOkhslLightness;
+
+  primary = theme.primary;
+  secondary = theme.secondary;
+  neutral = theme.neutral;
+  accent1 = theme.accent1;
+  accent2 = theme.accent2;
+
+  lighten = amount: hex:
+    let
+      rgb = hexToRgb hex;
+      adjusted = adjustOkhslLightness amount hex;
+    in
+      adjusted;
+
 in
 {
   services.dunst = {
@@ -21,19 +28,19 @@ in
         origin = "top-right";
         corner_radius = 5;
         progress_bar_corner_radius = 5;
-        frame_color = oklchToHex (setLightness 0.3 primary);
+        frame_color = lighten 0.3 primary;
         font = "Droid Sans 9";
       };
       urgency_normal = {
-        background = oklchToHex (setLightness 0.2 primary);
-        foreground = oklchToHex (setLightness 0.95 neutral);
-        highlight = oklchToHex accent1;
+        background = lighten 0.2 primary;
+        foreground = lighten 0.95 neutral;
+        highlight = accent1;
         timeout = 10;
       };
       urgency_critical = {
-        background = oklchToHex (setLightness 0.4 accent2);
-        foreground = oklchToHex (setLightness 0.95 neutral);
-        highlight = oklchToHex accent2;
+        background = lighten 0.4 accent2;
+        foreground = lighten 0.95 neutral;
+        highlight = accent2;
         timeout = 0;
       };
     };
