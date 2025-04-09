@@ -234,25 +234,47 @@ in {
       exit 0
     '')
 
-      (pkgs.writeShellScriptBin "adr" ''
-        M="openrouter/google/gemini-2.0-flash-001"
-        W="openrouter/google/gemini-2.0-flash-001"
-        A=$#
+    (pkgs.writeShellScriptBin "adr" ''
+      #!/usr/bin/env bash
+      set -euo pipefail
 
-        while [ $# -gt 0 ]; do
-          case "$1" in
-            -s) M="openrouter/google/gemini-2.5-pro-preview-03-25"; shift;;
-            -d) M="openrouter/google/gemini-2.0-flash-001"; shift;;
-            *) B="$B \"$1\""; shift;;
-          esac
-        done
+      # Config
+      SMART_MODEL="openrouter/google/gemini-2.5-pro-preview-03-25"
+      FAST_MODEL="openrouter/google/gemini-2.0-flash-001"
+      MODEL="$FAST_MODEL"
+      WEAK_MODEL="$FAST_MODEL"
+      ARGS=()
 
-        [ $A -eq 0 ] && B="--message /commit"
+      # Parse args
+      while [ $# -gt 0 ]; do
+        case "$1" in
+          -s) MODEL="$SMART_MODEL"; shift ;;
+          -d) MODEL="$FAST_MODEL"; shift ;;
+          *) ARGS+=("$1"); shift ;;
+        esac
+      done
 
-        eval ${upkgs.aider-chat}/bin/aider --model "\"$M\"" --weak-model "\"$W\"" --no-auto-lint --no-auto-test --no-attribute-committer --no-attribute-author --dark-mode --edit-format diff $B
-        # aider --model openrouter/google/gemini-2.0-flash-001 --weak-model openrouter/google/gemini-2.0-flash-001 --no-auto-lint --no-auto-test --no-attribute-committer --no-attribute-author --dark-mode --edit-format diff --file
-      '')
+      # Default action
+      if [ ''${#ARGS[@]} -eq 0 ]; then
+        ARGS=("--message" "/commit")
+      fi
 
+      # Execute
+      ${upkgs.aider-chat}/bin/aider \
+        --alias "f:$FAST_MODEL" \
+        --alias "s:$SMART_MODEL" \
+        --alias "fast:$FAST_MODEL" \
+        --alias "smart:$SMART_MODEL" \
+        --model "$MODEL" \
+        --weak-model "$WEAK_MODEL" \
+        --no-auto-lint \
+        --no-auto-test \
+        --no-attribute-committer \
+        --no-attribute-author \
+        --dark-mode \
+        --edit-format diff \
+        "''${ARGS[@]}"
+    '')
 
     (pkgs.writeShellScriptBin "ping" ''
       # replace the ping command if no input is given just ping 1.1.1.1

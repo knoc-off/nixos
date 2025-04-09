@@ -99,13 +99,6 @@ in rec {
       };
   };
 
-  # Color space conversion core
-  srgbTransfer = a:
-    if a <= 3.1308e-3 then 12.92 * a else 1.055 * powFloat a (1/2.4) - 5.5e-2;
-
-  srgbTransferInv = a:
-    if a <= 4.045e-2 then a / 12.92 else powFloat ((a + 5.5e-2) / 1.055) 2.4;
-
   # Validation and normalization
   normHex = hex: combineHex (splitHex hex);
   removeAlpha = hex: builtins.substring 0 6 (normHex hex);
