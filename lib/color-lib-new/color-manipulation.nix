@@ -70,7 +70,7 @@ let
   combineHex = { r, g, b, alpha ? "FF" }:
     let
       padHex = hex: if stringLength hex == 1 then "0${hex}" else hex;
-      result = toUpper "#${padHex r}${padHex g}${padHex b}${if (toUpper alpha) != "FF" then (padHex alpha) else ""}";
+      result = toUpper "${padHex r}${padHex g}${padHex b}${if (toUpper alpha) != "FF" then (padHex alpha) else ""}";
     in if isValidHex result then result else throw "Invalid combined hex: ${result}";
 
   # --- Hex <-> RGB Conversion (using new helpers) ---
