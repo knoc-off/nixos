@@ -1,7 +1,7 @@
 { theme, color-lib, ... }:
 
 let
-  inherit (color-lib) hexToRgb rgbToHex adjustOkhslLightness;
+  inherit (color-lib) hexToRgb rgbToHex setOkhslLightness;
 
   primary = theme.primary;
   secondary = theme.secondary;
@@ -12,7 +12,7 @@ let
   lighten = amount: hex:
     let
       rgb = hexToRgb hex;
-      adjusted = adjustOkhslLightness amount hex;
+      adjusted = setOkhslLightness amount hex;
     in
       adjusted;
 
