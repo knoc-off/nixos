@@ -1,8 +1,9 @@
 # This file is now a function that accepts color-lib and lib
+# This file is now a function that accepts color-lib and lib
 { color-lib, lib }:
 
 let
-  inherit (color-lib) mixColors setOkhslLightness setOkhslSaturation adjustOkhslHue;
+  inherit (color-lib) mixColors setOkhslLightness setOkhslSaturation adjustOkhslHue getOkhslLightness; # Added getOkhslLightness
 
   # --- Core Palette ---
   primary =   "#59C2FF"; # Blue
@@ -55,6 +56,10 @@ let
   base0E = setAccent accentL accentS hueMagenta; # Magenta
   base0F = setAccent accentL accentS hueViolet;  # Violet / Alt Red
 
+  # --- Determine Theme Type ---
+  bgLightness = getOkhslLightness bg;
+  themeType = if bgLightness < 0.5 then "dark" else "light";
+
 in {
   # Expose Core Palette
   inherit primary secondary neutral accent1 accent2;
@@ -65,5 +70,8 @@ in {
 
   # Expose the mixing function
   inherit mixColors;
+
+  # Expose the theme type
+  inherit themeType;
 }
 
