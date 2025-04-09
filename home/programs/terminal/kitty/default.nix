@@ -1,17 +1,4 @@
 { color-lib, theme, ... }:
-# No longer need the let block with old helpers
-# let
-#   sl = l: hex:
-#     oklchToHex (color-lib.oklchmod.setLightness l (color-lib.hexStrToOklch hex));
-#   sc = c: hex:
-#     oklchToHex (color-lib.oklchmod.setChroma c (color-lib.hexStrToOklch hex));
-#   mix = hex1: hex2: w:
-#     oklchToHex (color-lib.oklchmod.mix (color-lib.hexStrToOklch hex1)
-#       (color-lib.hexStrToOklch hex2) w);
-#   sh = deg: hex:
-#     oklchToHex (color-lib.oklchmod.adjustHueBy deg (color-lib.hexStrToOklch hex));
-#   oklchToHex = color-lib.oklchToHex;
-# in
 {
   imports = [ ./tab_bar.nix ];
 
