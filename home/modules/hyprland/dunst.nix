@@ -1,7 +1,7 @@
 { theme, color-lib, ... }:
 
 let
-  inherit (color-lib) hexToRgb rgbToHex setOkhslLightness;
+  inherit (color-lib) hexToRgb rgbToHex setOkhslLightness mixColors;
 
   primary = theme.primary;
   secondary = theme.secondary;
