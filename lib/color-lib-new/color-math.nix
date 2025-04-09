@@ -330,19 +330,54 @@ in rec {
         b = srgb_transfer_function_inv rgb.b;
       };
       lab = linear_srgb_to_oklab rgb_linear;
+      L = lab.L;
+      l = toe L;
 
       C_cand = math.sqrt (lab.a * lab.a + lab.b * lab.b);
-      C = if C_cand < epsilon then epsilon else C_cand; # Avoid division by zero; handle grey case
-      a_ = lab.a / C;
-      b_ = lab.b / C;
 
-      L = lab.L;
-      # atan2 range is [-pi, pi]. Map to [0, 1]
-      h_atan = math.atan2 (-lab.b) (-lab.a);
-      h = (h_atan / math.pi) * 0.5 + 0.5;
+      # Handle grey axis
+      h = if C_cand < epsilon then 0.0 else
+        let
+          # Standard hue calculation: atan2(y, x) -> atan2(b, a)
+          h_atan = math.atan2 lab.b lab.a; # Range [-pi, pi]
+          h_norm = h_atan / (2.0 * math.pi); # Range [-0.5, 0.5]
+        in if h_norm < 0.0 then h_norm + 1.0 else h_norm; # Range [0, 1]
+      s = if C_cand < epsilon then 0.0 else
+        let
+          C = C_cand; # Use actual chroma now
+          a_ = lab.a / C;
+          b_ = lab.b / C;
+          cs = get_Cs L a_ b_;
+          C_0 = cs.C_0;
+          C_mid = cs.C_mid;
+          C_max = cs.C_max;
 
-      cs = get_Cs L a_ b_;
-      C_0 = cs.C_0;
+          mid = 0.8;
+          mid_inv = 1.25;
+
+          # Inverse interpolation (unchanged logic, just moved inside else)
+          s_calc = if C < C_mid then
+            let
+              k_1 = mid * C_0;
+              k_2 = (1.0 - k_1 / (C_mid + epsilon));
+              t = C / (k_1 + k_2 * C + epsilon);
+            in t * mid
+          else
+            let
+              k_0 = C_mid;
+              k_1 = (1.0 - mid) * C_mid * C_mid * mid_inv * mid_inv / (C_0 + epsilon);
+              k_2 = (1.0 - k_1 / (C_max - C_mid + epsilon));
+              t = (C - k_0) / (k_1 + k_2 * (C - k_0) + epsilon);
+            in mid + (1.0 - mid) * t;
+        in s_calc; # End of saturation calculation for non-grey colors
+
+    in { h = h; s = math.clamp s 0.0 1.0; l = l; }; # Returns { h, s, l }
+# --- Okhsl section before this point is modified ---
+# --- Okhsv section starts below ---
+
+  okhsv_to_srgb = hsv: # hsv = { h, s, v }
+    let
+      h = hsv.h;
       C_mid = cs.C_mid;
       C_max = cs.C_max;
 
@@ -425,19 +460,92 @@ in rec {
         b = srgb_transfer_function_inv rgb.b;
       };
       lab = linear_srgb_to_oklab rgb_linear;
+      L_orig = lab.L;
 
       C_cand = math.sqrt (lab.a * lab.a + lab.b * lab.b);
-      C_orig = if C_cand < epsilon then epsilon else C_cand; # Avoid division by zero; handle grey case
-      a_ = lab.a / C_orig;
-      b_ = lab.b / C_orig;
 
-      L_orig = lab.L;
-      # atan2 range is [-pi, pi]. Map to [0, 1]
-      h_atan = math.atan2 (-lab.b) (-lab.a);
-      h = (h_atan / math.pi) * 0.5 + 0.5;
+      # Handle grey axis
+      h = if C_cand < epsilon then 0.0 else
+        let
+          # Standard hue calculation: atan2(y, x) -> atan2(b, a)
+          h_atan = math.atan2 lab.b lab.a; # Range [-pi, pi]
+          h_norm = h_atan / (2.0 * math.pi); # Range [-0.5, 0.5]
+        in if h_norm < 0.0 then h_norm + 1.0 else h_norm; # Range [0, 1]
+      s = if C_cand < epsilon then 0.0 else
+        let
+          C_orig = C_cand; # Use actual chroma
+          a_ = lab.a / C_orig;
+          b_ = lab.b / C_orig;
 
-      cusp = find_cusp a_ b_;
-      ST_max = to_ST cusp;
+          cusp = find_cusp a_ b_;
+          ST_max = to_ST cusp;
+          S_max = ST_max.S;
+          T_max = ST_max.T;
+          S_0 = 0.5;
+          k = 1.0 - S_0 / (S_max + epsilon);
+
+          # Find L_v, C_v
+          t_den = C_orig + L_orig * T_max + epsilon;
+          t = T_max / t_den;
+          L_v = t * L_orig;
+          C_v = t * C_orig;
+
+          # Find L_vt, C_vt
+          L_vt = toe_inv L_v;
+          C_vt = C_v * L_vt / (L_v + epsilon);
+
+          # Invert the scaling step
+          rgb_scale = oklab_to_linear_srgb { L = L_vt; a = a_ * C_vt; b = b_ * C_vt; };
+          max_rgb_scale = math.max rgb_scale.r (math.max rgb_scale.g (math.max rgb_scale.b 0.0));
+          scale_L = math.cbrt (1.0 / (max_rgb_scale + epsilon));
+
+          L_unscaled = L_orig / scale_L;
+          C_unscaled = C_orig / scale_L;
+
+          # Invert the toe compensation
+          L_final = toe L_unscaled;
+          C_final = C_unscaled * L_final / (L_unscaled + epsilon);
+
+          # Compute final s (v is computed outside this 'else')
+          s_den = (T_max * S_0) + T_max * k * C_v + epsilon;
+          s_calc = (S_0 + T_max) * C_v / s_den;
+        in s_calc; # End of saturation calculation for non-grey colors
+
+      # Compute final v
+      v = if C_cand < epsilon then
+            # Approximate v for grey colors using perceptual lightness
+            toe L_orig
+          else
+            # Calculate v using the derived L_final and L_v for chromatic colors
+            let
+              # Need L_v from the 's' calculation block above
+              C_orig = C_cand;
+              a_ = lab.a / C_orig;
+              b_ = lab.b / C_orig;
+              cusp = find_cusp a_ b_;
+              ST_max = to_ST cusp;
+              T_max = ST_max.T;
+              t_den = C_orig + L_orig * T_max + epsilon;
+              t = T_max / t_den;
+              L_v = t * L_orig;
+              # Need L_final from the 's' calculation block above
+              S_max = ST_max.S;
+              S_0 = 0.5;
+              k = 1.0 - S_0 / (S_max + epsilon);
+              C_v = t * C_orig;
+              L_vt = toe_inv L_v;
+              C_vt = C_v * L_vt / (L_v + epsilon);
+              rgb_scale = oklab_to_linear_srgb { L = L_vt; a = a_ * C_vt; b = b_ * C_vt; };
+              max_rgb_scale = math.max rgb_scale.r (math.max rgb_scale.g (math.max rgb_scale.b 0.0));
+              scale_L = math.cbrt (1.0 / (max_rgb_scale + epsilon));
+              L_unscaled = L_orig / scale_L;
+              L_final = toe L_unscaled;
+            in L_final / (L_v + epsilon);
+
+    in { h = h; s = math.clamp s 0.0 1.0; v = math.clamp v 0.0 1.0; }; # Returns { h, s, v }
+# --- srgb_to_okhsv section before this point is modified ---
+
+}
       S_max = ST_max.S;
       T_max = ST_max.T;
       S_0 = 0.5;
