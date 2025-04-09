@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "feat:_Use_color-lib_to_adjust_lightness_of_bright_kitty_colors______________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________feat:_Update_aider_model_and_starship_prompt_add_postgresql";
+  system.nixos.label = "refactor:_Darken_background_color_using_color-lib.setOkhslLightness_________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________feat:_Update_aider_model_and_starship_prompt_add_postgresql";
 }
