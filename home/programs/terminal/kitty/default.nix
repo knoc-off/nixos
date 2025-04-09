@@ -39,48 +39,48 @@
       focus_follows_mouse = "yes";
 
       # base16 colors
-      color0 = theme.base00; # black
-      color1 = theme.base08; # red
-      color2 = theme.base0B; # green
-      color3 = theme.base0A; # Yellow
-      color4 = theme.base0D; # Blue
-      color5 = theme.base0E; # Magenta
-      color6 = theme.base0C; # Cyan
-      color7 = theme.base05; # White
+      color0 = "#${theme.base00}"; # black
+      color1 = "#${theme.base08}"; # red
+      color2 = "#${theme.base0B}"; # green
+      color3 = "#${theme.base0A}"; # Yellow
+      color4 = "#${theme.base0D}"; # Blue
+      color5 = "#${theme.base0E}"; # Magenta
+      color6 = "#${theme.base0C}"; # Cyan
+      color7 = "#${theme.base05}"; # White
 
-      color8 = theme.base03; # Bright Black (Gray)
-      color9 = theme.base08; # Bright Red
-      color10 = theme.base0B; # Bright Green
-      color11 = theme.base0A; # Bright Yellow
-      color12 = theme.base0D; # Bright Blue
-      color13 = theme.base0E; # Bright Magenta
-      color14 = theme.base0C; # Bright Cyan
-      color15 = theme.base07; # Bright White
+      color8 = "#${theme.base03}"; # Bright Black (Gray)
+      color9 = "#${theme.base08}"; # Bright Red
+      color10 = "#${theme.base0B}"; # Bright Green
+      color11 = "#${theme.base0A}"; # Bright Yellow
+      color12 = "#${theme.base0D}"; # Bright Blue
+      color13 = "#${theme.base0E}"; # Bright Magenta
+      color14 = "#${theme.base0C}"; # Bright Cyan
+      color15 = "#${theme.base07}"; # Bright White
 
       # Derived colors
-      foreground = theme.base05;
-      background = theme.base00; # Use base00 directly
-      selection_background = theme.base02; # Use base02 (Dark Selection Background)
+      foreground = "#${theme.base05}";
+      background = "#${theme.base00}"; # Use base00 directly
+      selection_background = "#${theme.base02}"; # Use base02 (Dark Selection Background)
       selection_foreground = "none";
-      url_color = theme.base0C;
-      cursor = theme.base05;
+      url_color = "#${theme.base0C}";
+      cursor = "#${theme.base05}";
 
-      active_border_color = theme.base0D;
-      inactive_border_color = theme.base03;
-      active_tab_background = theme.base01; # Use base01 (Dark Background highlight)
-      active_tab_foreground = theme.base07;
-      inactive_tab_background = theme.base00;
-      inactive_tab_foreground = theme.base05;
-      tab_bar_background = theme.base00;
+      active_border_color = "#${theme.base0D}";
+      inactive_border_color = "#${theme.base03}";
+      active_tab_background = "#${theme.base01}"; # Use base01 (Dark Background highlight)
+      active_tab_foreground = "#${theme.base07}";
+      inactive_tab_background = "#${theme.base00}";
+      inactive_tab_foreground = "#${theme.base05}";
+      tab_bar_background = "#${theme.base00}";
 
-      visual_bell_color = theme.base08;
+      visual_bell_color = "#${theme.base08}";
 
-      mark1_foreground = theme.base00;
-      mark1_background = theme.base0C;
-      mark2_foreground = theme.base00;
-      mark2_background = theme.base0D;
-      mark3_foreground = theme.base00;
-      mark3_background = theme.base0E;
+      mark1_foreground = "#${theme.base00}";
+      mark1_background = "#${theme.base0C}";
+      mark2_foreground = "#${theme.base00}";
+      mark2_background = "#${theme.base0D}";
+      mark3_foreground = "#${theme.base00}";
+      mark3_background = "#${theme.base0E}";
 
       window_padding_width = 0;
     };
