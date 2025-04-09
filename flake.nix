@@ -32,7 +32,7 @@
             inherit self inputs outputs hostname user lib system theme;
             upkgs = unstablePkgs system;
             selfPkgs = self.packages.${system};
-            colorLib = self.lib.${system};
+            color-lib = self.lib.${system}.color-lib;
           } // extraConfigs;
           modules = [
             ./systems/${hostname}.nix
