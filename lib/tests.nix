@@ -76,6 +76,7 @@ let
   colors = {
     black = "#000000";
     red = "#ff0000";
+    baf = "#baf";
   };
 
   colorTests = lib.mapAttrs (name: color: testColor color) colors;
