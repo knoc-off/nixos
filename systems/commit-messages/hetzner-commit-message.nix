@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "feat:_Add_functions_to_retrieve_color_components_lightness_value_etc._______________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
+  system.nixos.label = "feat:_Add_color_mixing_function_to_theme.nix_using_Okhsl_color_space________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
 }
