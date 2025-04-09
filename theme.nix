@@ -61,14 +61,32 @@ let
   themeType = if bgLightness < 0.5 then "dark" else "light";
 
 in {
-  # Expose Core Palette
-  inherit primary secondary neutral accent1 accent2;
+  # Expose Core Palette (removing '#' prefix)
+  primary = lib.removePrefix "#" primary;
+  secondary = lib.removePrefix "#" secondary;
+  neutral = lib.removePrefix "#" neutral;
+  accent1 = lib.removePrefix "#" accent1;
+  accent2 = lib.removePrefix "#" accent2;
 
-  # Expose Generated Base16 Palette
-  inherit base00 base01 base02 base03 base04 base05 base06 base07;
-  inherit base08 base09 base0A base0B base0C base0D base0E base0F;
+  # Expose Generated Base16 Palette (removing '#' prefix)
+  base00 = lib.removePrefix "#" base00;
+  base01 = lib.removePrefix "#" base01;
+  base02 = lib.removePrefix "#" base02;
+  base03 = lib.removePrefix "#" base03;
+  base04 = lib.removePrefix "#" base04;
+  base05 = lib.removePrefix "#" base05;
+  base06 = lib.removePrefix "#" base06;
+  base07 = lib.removePrefix "#" base07;
+  base08 = lib.removePrefix "#" base08;
+  base09 = lib.removePrefix "#" base09;
+  base0A = lib.removePrefix "#" base0A;
+  base0B = lib.removePrefix "#" base0B;
+  base0C = lib.removePrefix "#" base0C;
+  base0D = lib.removePrefix "#" base0D;
+  base0E = lib.removePrefix "#" base0E;
+  base0F = lib.removePrefix "#" base0F;
 
-  # Expose the mixing function
+  # Expose the mixing function (it already returns hex without '#')
   inherit mixColors;
 
   # Expose the theme type
