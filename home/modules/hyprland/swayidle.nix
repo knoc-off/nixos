@@ -1,36 +1,43 @@
-{ pkgs, config, theme, colorLib, ... }:
+{ pkgs, config, theme, color-lib, ... }:
 let
-  rc = colorLib.rgba;
-  setAlpha = colorLib.hexStrSetAlpha;
+  # Helper function to set alpha on a hex color string using color-lib
+  setAlpha = alphaValue: hexColor:
+    let
+      rgb = color-lib.hexToRgb hexColor;
+      # rgbToHex expects alpha as a float 0.0-1.0
+      rgbWithNewAlpha = rgb // { alpha = alphaValue; };
+    in
+      # Remove the '#' prefix as swaylock expects colors without it for --*-color args
+      lib.removePrefix "#" (color-lib.rgbToHex rgbWithNewAlpha);
 
   swaylock-custom = pkgs.writeShellScriptBin "swaylock-custom" ''
     exec ${config.programs.swaylock.package}/bin/swaylock \
     --layout-bg-color "${theme.base01}" \
     --layout-border-color "${theme.base02}" \
-    --layout-text-color "${theme.base05}" \
+    --layout-text-color "${lib.removePrefix "#" theme.base05}" \
     \
-    --line-ver-color "${theme.base0D}" \
-    --inside-ver-color "${theme.base01}" \
+    --line-ver-color "${lib.removePrefix "#" theme.base0D}" \
+    --inside-ver-color "${lib.removePrefix "#" theme.base01}" \
     --ring-ver-color "${setAlpha 0.6 theme.base0D}" \
-    --text-ver-color "${theme.base06}" \
+    --text-ver-color "${lib.removePrefix "#" theme.base06}" \
     \
-    --line-wrong-color "${theme.base08}" \
-    --inside-wrong-color "${theme.base01}" \
+    --line-wrong-color "${lib.removePrefix "#" theme.base08}" \
+    --inside-wrong-color "${lib.removePrefix "#" theme.base01}" \
     --ring-wrong-color "${setAlpha 0.6 theme.base08}" \
-    --text-wrong-color "${theme.base06}" \
+    --text-wrong-color "${lib.removePrefix "#" theme.base06}" \
     \
-    --line-clear-color "${theme.base00}" \
-    --inside-clear-color "${theme.base01}" \
-    --ring-clear-color "${theme.base0C}" \
-    --text-clear-color "${theme.base06}" \
+    --line-clear-color "${lib.removePrefix "#" theme.base00}" \
+    --inside-clear-color "${lib.removePrefix "#" theme.base01}" \
+    --ring-clear-color "${lib.removePrefix "#" theme.base0C}" \
+    --text-clear-color "${lib.removePrefix "#" theme.base06}" \
     \
-    --ring-color "${theme.base02}" \
-    --key-hl-color "${theme.base0C}" \
-    --text-color "${theme.base05}" \
+    --ring-color "${lib.removePrefix "#" theme.base02}" \
+    --key-hl-color "${lib.removePrefix "#" theme.base0C}" \
+    --text-color "${lib.removePrefix "#" theme.base05}" \
     \
-    --line-color "${theme.base00}" \
-    --inside-color "${theme.base01}" \
-    --separator-color "${theme.base02}" \
+    --line-color "${lib.removePrefix "#" theme.base00}" \
+    --inside-color "${lib.removePrefix "#" theme.base01}" \
+    --separator-color "${lib.removePrefix "#" theme.base02}" \
     \
     --indicator-radius "100" \
     --indicator-thickness "1" \
