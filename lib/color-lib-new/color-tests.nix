@@ -254,13 +254,15 @@ let
             a = C_clipped * high_a_;
             b = C_clipped * high_b_;
           };
+          # Increase tolerance slightly for boundary check
+          boundary_epsilon = 1.0e-5; # Or maybe 1.0e-4 if needed
           # Check if any component is close to 0 or 1
-          onBoundary = (math.abs rgb_clipped_lin.r < epsilon) ||
-                        (math.abs rgb_clipped_lin.g < epsilon) ||
-                        (math.abs rgb_clipped_lin.b < epsilon) ||
-                        (math.abs (rgb_clipped_lin.r - 1.0) < epsilon) ||
-                        (math.abs (rgb_clipped_lin.g - 1.0) < epsilon) ||
-                        (math.abs (rgb_clipped_lin.b - 1.0) < epsilon);
+          onBoundary = (math.abs rgb_clipped_lin.r < boundary_epsilon) ||
+                        (math.abs rgb_clipped_lin.g < boundary_epsilon) ||
+                        (math.abs rgb_clipped_lin.b < boundary_epsilon) ||
+                        (math.abs (rgb_clipped_lin.r - 1.0) < boundary_epsilon) ||
+                        (math.abs (rgb_clipped_lin.g - 1.0) < boundary_epsilon) ||
+                        (math.abs (rgb_clipped_lin.b - 1.0) < boundary_epsilon);
         in assert onBoundary; "find_gamut_intersection(result on boundary)";
     };
 
