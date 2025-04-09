@@ -1,17 +1,18 @@
-{ colorLib, theme, ... }:
-let
-  sl = l: hex:
-    oklchToHex (colorLib.oklchmod.setLightness l (colorLib.hexStrToOklch hex));
-  sc = c: hex:
-    oklchToHex (colorLib.oklchmod.setChroma c (colorLib.hexStrToOklch hex));
-  mix = hex1: hex2: w:
-    oklchToHex (colorLib.oklchmod.mix (colorLib.hexStrToOklch hex1)
-      (colorLib.hexStrToOklch hex2) w);
-  sh = deg: hex:
-    oklchToHex (colorLib.oklchmod.adjustHueBy deg (colorLib.hexStrToOklch hex));
-  oklchToHex = colorLib.oklchToHex;
-
-in {
+{ color-lib, theme, ... }:
+# No longer need the let block with old helpers
+# let
+#   sl = l: hex:
+#     oklchToHex (color-lib.oklchmod.setLightness l (color-lib.hexStrToOklch hex));
+#   sc = c: hex:
+#     oklchToHex (color-lib.oklchmod.setChroma c (color-lib.hexStrToOklch hex));
+#   mix = hex1: hex2: w:
+#     oklchToHex (color-lib.oklchmod.mix (color-lib.hexStrToOklch hex1)
+#       (color-lib.hexStrToOklch hex2) w);
+#   sh = deg: hex:
+#     oklchToHex (color-lib.oklchmod.adjustHueBy deg (color-lib.hexStrToOklch hex));
+#   oklchToHex = color-lib.oklchToHex;
+# in
+{
   imports = [ ./tab_bar.nix ];
 
   home.sessionVariables = {
@@ -71,15 +72,15 @@ in {
 
       # Derived colors
       foreground = theme.base05;
-      background = "#${sl 0.2 theme.base00}";
-      selection_background = "#${sc 0.2 (sl 0.6 theme.base0D)}";
+      background = theme.base00; # Use base00 directly
+      selection_background = theme.base02; # Use base02 (Dark Selection Background)
       selection_foreground = "none";
       url_color = theme.base0C;
       cursor = theme.base05;
 
       active_border_color = theme.base0D;
       inactive_border_color = theme.base03;
-      active_tab_background = "#${sl 0.3 theme.base0D}";
+      active_tab_background = theme.base01; # Use base01 (Dark Background highlight)
       active_tab_foreground = theme.base07;
       inactive_tab_background = theme.base00;
       inactive_tab_foreground = theme.base05;
