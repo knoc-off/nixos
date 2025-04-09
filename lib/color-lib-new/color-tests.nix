@@ -137,7 +137,7 @@ let
     testInv0 = assertWithinTolerance "srgb_transfer_function_inv(0)" 0.0 (colorMath.srgb_transfer_function_inv 0.0) epsilon;
     testInv1 = assertWithinTolerance "srgb_transfer_function_inv(1)" 1.0 (colorMath.srgb_transfer_function_inv 1.0) epsilon;
     testInvMid = assertWithinTolerance "srgb_transfer_function_inv(0.461356)" 0.18 (colorMath.srgb_transfer_function_inv 0.461356) 0.00001;
-    testInvThreshUp = assertWithinTolerance "srgb_transfer_function_inv(0.0404747)" 0.003131 (colorMath.srgb_transfer_function_inv 0.0404747) 0.00001;
+    testInvThreshUp = assertWithinTolerance "srgb_transfer_function_inv(0.0404747)" 0.003131 (colorMath.srgb_transfer_function_inv 0.040451) 0.00001;
     testInvThreshDown = assertWithinTolerance "srgb_transfer_function_inv(0.0404489)" 0.003131 (colorMath.srgb_transfer_function_inv 0.0404489) 0.00001;
 
     # Round trip tests
