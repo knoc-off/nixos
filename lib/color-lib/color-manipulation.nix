@@ -228,6 +228,32 @@ let
   adjustOkhsvHue = deltaH: hexColor:
     modifyOkhsvHue ( currentH: currentH + deltaH ) hexColor; # Wrapping handled by modifyOkhsvHue
 
+  # --- Component Getter Functions ---
+
+  # Generic function to get a component from a specific color model
+  getComponent = modelConversionFunc: componentName: hexColor:
+    let
+      # 1. Convert hex to RGB + Alpha (float)
+      rgbWithFloatAlpha = hexToRgb hexColor;
+      rgbOnly = { r = rgbWithFloatAlpha.r; g = rgbWithFloatAlpha.g; b = rgbWithFloatAlpha.b; };
+
+      # 2. Convert RGB to target model (e.g., Okhsl)
+      modelColor = modelConversionFunc rgbOnly;
+
+      # 3. Return the requested component
+    in modelColor.${componentName};
+
+  # --- Okhsl Getters ---
+  getOkhslLightness = hexColor: getComponent srgb_to_okhsl "l" hexColor;
+  getOkhslSaturation = hexColor: getComponent srgb_to_okhsl "s" hexColor;
+  getOkhslHue = hexColor: getComponent srgb_to_okhsl "h" hexColor;
+
+  # --- Okhsv Getters ---
+  getOkhsvValue = hexColor: getComponent srgb_to_okhsv "v" hexColor;
+  getOkhsvSaturation = hexColor: getComponent srgb_to_okhsv "s" hexColor;
+  getOkhsvHue = hexColor: getComponent srgb_to_okhsv "h" hexColor;
+
+
 in {
   # Export core conversion functions
   inherit hexToRgb rgbToHex;
@@ -243,4 +269,8 @@ in {
   inherit setOkhsvValue adjustOkhsvValue scaleOkhsvValue;
   inherit setOkhsvSaturation adjustOkhsvSaturation scaleOkhsvSaturation;
   inherit setOkhsvHue adjustOkhsvHue;
+
+  # Export component getter functions
+  inherit getOkhslLightness getOkhslSaturation getOkhslHue;
+  inherit getOkhsvValue getOkhsvSaturation getOkhsvHue;
 }
