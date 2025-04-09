@@ -3,8 +3,7 @@
 
   outputs = inputs@{ self, nixpkgs, nixpkgs-unstable, ... }:
     let
-
-      theme = import ./theme.nix;
+      # theme is now defined inside mkConfig where color-lib is available
 
       systems = [
         "aarch64-linux"
@@ -26,13 +25,18 @@
       # Unified configuration generator for hosts and images
       mkConfig =
         { hostname, user, system, extraModules ? [ ], extraConfigs ? { } }:
-        nixosSystem {
+        let
+          # Define color-lib and theme here where lib and system are known
+          color-lib = self.lib.${system}.color-lib;
+          # Pass color-lib and lib to the theme function
+          theme = import ./theme.nix { inherit color-lib lib; };
+        in nixosSystem {
           inherit system;
           specialArgs = {
-            inherit self inputs outputs hostname user lib system theme;
+            inherit self inputs outputs hostname user lib system theme color-lib; # Pass theme and color-lib
             upkgs = unstablePkgs system;
             selfPkgs = self.packages.${system};
-            color-lib = self.lib.${system}.color-lib;
+            # color-lib is already defined above and passed
           } // extraConfigs;
           modules = [
             ./systems/${hostname}.nix
