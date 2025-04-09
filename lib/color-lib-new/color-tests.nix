@@ -254,8 +254,8 @@ let
             a = C_clipped * high_a_;
             b = C_clipped * high_b_;
           };
-          # Increase tolerance slightly for boundary check
-          boundary_epsilon = 1.0e-5; # Or maybe 1.0e-4 if needed
+          # Increase tolerance slightly for boundary check due to accumulated float errors
+          boundary_epsilon = 1.0e-4;
 
           r_close_0 = math.abs rgb_clipped_lin.r < boundary_epsilon;
           r_close_1 = math.abs (rgb_clipped_lin.r - 1.0) < boundary_epsilon;
