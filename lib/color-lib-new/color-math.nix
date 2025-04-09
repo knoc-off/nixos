@@ -516,41 +516,6 @@ in rec {
             in L_final / (L_v + epsilon);
 
     in { h = h; s = math.clamp s 0.0 1.0; v = math.clamp v 0.0 1.0; }; # Returns { h, s, v }
+
 # --- srgb_to_okhsv section before this point is modified ---
-
-}
-      S_max = ST_max.S;
-      T_max = ST_max.T;
-      S_0 = 0.5;
-      k = 1.0 - S_0 / (S_max + epsilon);
-
-      # Find L_v, C_v
-      t_den = C_orig + L_orig * T_max + epsilon;
-      t = T_max / t_den;
-      L_v = t * L_orig;
-      C_v = t * C_orig;
-
-      # Find L_vt, C_vt
-      L_vt = toe_inv L_v;
-      C_vt = C_v * L_vt / (L_v + epsilon);
-
-      # Invert the scaling step
-      rgb_scale = oklab_to_linear_srgb { L = L_vt; a = a_ * C_vt; b = b_ * C_vt; };
-      max_rgb_scale = math.max rgb_scale.r (math.max rgb_scale.g (math.max rgb_scale.b 0.0));
-      scale_L = math.cbrt (1.0 / (max_rgb_scale + epsilon));
-
-      L_unscaled = L_orig / scale_L;
-      C_unscaled = C_orig / scale_L;
-
-      # Invert the toe compensation
-      L_final = toe L_unscaled;
-      C_final = C_unscaled * L_final / (L_unscaled + epsilon);
-
-      # Compute final v and s
-      v = L_final / (L_v + epsilon);
-      s_den = (T_max * S_0) + T_max * k * C_v + epsilon;
-      s = (S_0 + T_max) * C_v / s_den;
-
-    in { h = h; s = math.clamp s 0.0 1.0; v = math.clamp v 0.0 1.0; }; # Returns { h, s, v }
-
 }
