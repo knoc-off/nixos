@@ -375,33 +375,6 @@ in rec {
 # --- Okhsl section before this point is modified ---
 # --- Okhsv section starts below ---
 
-  okhsv_to_srgb = hsv: # hsv = { h, s, v }
-    let
-      h = hsv.h;
-      C_mid = cs.C_mid;
-      C_max = cs.C_max;
-
-      mid = 0.8;
-      mid_inv = 1.25;
-
-      # Inverse interpolation
-      s = if C < epsilon then 0.0 # Handle grey axis
-          else if C < C_mid then
-            let
-              k_1 = mid * C_0;
-              k_2 = (1.0 - k_1 / (C_mid + epsilon));
-              t = C / (k_1 + k_2 * C + epsilon);
-            in t * mid
-          else
-            let
-              k_0 = C_mid;
-              k_1 = (1.0 - mid) * C_mid * C_mid * mid_inv * mid_inv / (C_0 + epsilon);
-              k_2 = (1.0 - k_1 / (C_max - C_mid + epsilon));
-              t = (C - k_0) / (k_1 + k_2 * (C - k_0) + epsilon);
-            in mid + (1.0 - mid) * t;
-
-      l = toe L;
-    in { h = h; s = math.clamp s 0.0 1.0; l = l; }; # Returns { h, s, l }
 
   okhsv_to_srgb = hsv: # hsv = { h, s, v }
     let
