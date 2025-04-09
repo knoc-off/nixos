@@ -130,13 +130,13 @@ let
     name = "sRGB Transfer Functions";
     test0 = assertWithinTolerance "srgb_transfer_function(0)" 0.0 (colorMath.srgb_transfer_function 0.0) epsilon;
     test1 = assertWithinTolerance "srgb_transfer_function(1)" 1.0 (colorMath.srgb_transfer_function 1.0) epsilon;
-    testMid = assertWithinTolerance "srgb_transfer_function(0.18)" 0.425402 (colorMath.srgb_transfer_function 0.18) 0.00001;
+    testMid = assertWithinTolerance "srgb_transfer_function(0.18)" 0.461356 (colorMath.srgb_transfer_function 0.18) 0.00001;
     testThreshUp = assertWithinTolerance "srgb_transfer_function(0.0031309)" 0.0404747 (colorMath.srgb_transfer_function 0.0031309) 0.00001;
     testThreshDown = assertWithinTolerance "srgb_transfer_function(0.0031307)" 0.0404489 (colorMath.srgb_transfer_function 0.0031307) 0.00001;
 
     testInv0 = assertWithinTolerance "srgb_transfer_function_inv(0)" 0.0 (colorMath.srgb_transfer_function_inv 0.0) epsilon;
     testInv1 = assertWithinTolerance "srgb_transfer_function_inv(1)" 1.0 (colorMath.srgb_transfer_function_inv 1.0) epsilon;
-    testInvMid = assertWithinTolerance "srgb_transfer_function_inv(0.425402)" 0.18 (colorMath.srgb_transfer_function_inv 0.425402) 0.00001;
+    testInvMid = assertWithinTolerance "srgb_transfer_function_inv(0.461356)" 0.18 (colorMath.srgb_transfer_function_inv 0.461356) 0.00001;
     testInvThreshUp = assertWithinTolerance "srgb_transfer_function_inv(0.0404747)" 0.003131 (colorMath.srgb_transfer_function_inv 0.0404747) 0.00001;
     testInvThreshDown = assertWithinTolerance "srgb_transfer_function_inv(0.0404489)" 0.003131 (colorMath.srgb_transfer_function_inv 0.0404489) 0.00001;
 
