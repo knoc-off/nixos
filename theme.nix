@@ -45,7 +45,7 @@ let
   # Adjust these values (e.g., l=0.7, s=0.8) to taste
   setAccent = l: s: hex: setOkhslSaturation s (setOkhslLightness l hex);
   accentL = 0.70; # Target lightness for accents
-  accentS = 0.85; # Target saturation for accents
+  accentS = 0.70; # Target saturation for accents
 
   base08 = setAccent accentL accentS hueRed;     # Red
   base09 = setAccent accentL accentS hueOrange;  # Orange
