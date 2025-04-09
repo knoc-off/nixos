@@ -10,12 +10,24 @@
 */
 
 rec {
-  # Constants
+  # --- Constants ---
   pi = 3.141592653589793;
-  tau = 2 * pi;
-  epsilon = pow (0.1) 10; # Small number for floating-point comparisons
+  tau = 2.0 * pi;
+  pi_half = pi / 2.0;
+  epsilon = pow 0.1 10; # Small number for floating-point comparisons (1e-10)
 
-  # Core functions
+  # Natural Logarithm related
+  ln2 = 0.6931471805599453; # ln(2)
+  ln2_inv = 1.0 / ln2; # 1 / ln(2) ~ 1.442695...
+
+  # Square Root related
+  sqrt2 = 1.4142135623730951; # sqrt(2)
+  sqrt1_2 = 1.0 / sqrt2; # 1/sqrt(2) ~ 0.707106...
+
+  # Physics/Geography
+  earthRadiusMeters = 6371000.0; # Mean radius of Earth in meters
+
+  # --- Core Functions ---
   safeDiv = num: den: if den == 0 then 0 else num / den;
 
   # Basic arithmetic helpers
@@ -146,11 +158,6 @@ rec {
   ln = x:
     assert x > 0.0; # Logarithm is only defined for positive numbers
     let
-      # High-precision constants
-      ln2 = 0.6931471805599453; # ln(2)
-      sqrt2 = 1.4142135623730951; # sqrt(2)
-      sqrt1_2 = 0.7071067811865476; # 1/sqrt(2)
-
       # Normalize x to m * 2^order, where m is in [sqrt(1/2), sqrt(2))
       # This range ensures y = (m-1)/(m+1) is small for fast series convergence.
       normalize = base: order:
@@ -217,13 +224,12 @@ rec {
           res_abs = pow_iter base abs_exp 1.0;
         in if exp_int < 0 then 1.0 / res_abs else res_abs;
 
-      # High-precision constants
-      ln2 = 0.6931471805599453; # ln(2)
-      ln2_inv = 1.4426950408889634; # 1 / ln(2)
-
       # --- Step 1: Range Reduction ---
-      k_float = x * ln2_inv;
-      k_int = builtins.floor (k_float + 0.5);
+      # Reduce x to r + k*ln(2), where r is in [-ln(2)/2, ln(2)/2]
+      # We want x = k*ln(2) + r  =>  x/ln(2) = k + r/ln(2)
+      # Let k = round(x/ln(2)), then r = x - k*ln(2)
+      k_float = x * ln2_inv; # x / ln(2)
+      k_int = builtins.floor (k_float + 0.5); # round to nearest integer
       k = (builtins.fromJSON (builtins.toJSON k_int)); # Removed trace
       r_untraced = x - (k * ln2);
       r = r_untraced; # Removed trace
@@ -281,16 +287,11 @@ rec {
 
   sin = x:
     let
-      # High-precision constants
-      pi = 3.141592653589793;
-      tau = 6.283185307179586; # 2 * pi
-      pi_half = 1.5707963267948966; # pi / 2
+      # Small value for convergence checks (using the global epsilon)
+      # epsilon = 1.0e-15; # Local epsilon removed
 
-      # Small value for convergence checks
-      epsilon = 1.0e-15; # Adjust based on desired precision vs float limits
-
-      # Helper for absolute value
-      fabs = val: if val < 0.0 then -val else val;
+      # Helper for absolute value (using global abs/fabs)
+      # fabs = val: if val < 0.0 then -val else val; # Local fabs removed
 
       # Helper for floating point modulo (remainder)
       # fmod(a, n) = a - n * floor(a / n)
@@ -436,12 +437,12 @@ rec {
         assert lon >= -180.0 && lon <= 180.0;
         true;
 
-      # Earth's radius in meters
-      radius = 6371000;
-
       # Validate all coordinates
       _ = validateCoords lat1 lon1;
       __ = validateCoords lat2 lon2;
+
+      # Use the global earthRadiusMeters constant
+      radius = earthRadiusMeters;
 
       rad_lat = deg2rad ((1.0 * lat2) - (1.0 * lat1));
       rad_lon = deg2rad ((1.0 * lon2) - (1.0 * lon1));
