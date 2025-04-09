@@ -1,42 +1,96 @@
 { lib ? import <nixpkgs/lib>, math ? import ../math.nix { inherit lib; }, colorMath ? import ./color-math.nix { inherit lib math; } }:
 
 let
-  inherit (math) clamp hexToDec;
+  inherit (lib) stringToCharacters toUpper removePrefix stringLength elem all concatStrings substring map filter;
+  inherit (math) clamp; # Removed hexToDec from math
   inherit (colorMath) srgb_to_okhsl okhsl_to_srgb srgb_to_okhsv okhsv_to_srgb;
   epsilon = 1.0e-8;
 
-  # --- Hex <-> RGB Conversion ---
+  # --- Hex Helpers (copied from color-tests.nix) ---
 
-  # Converts a hex color string (e.g., "#RRGGBB" or "RRGGBB") to an RGB attribute set { r, g, b } with values 0.0-1.0
-  hexToRgb = hex:
+  hexDigitToDec = hexDigit:
     let
-      hex' = builtins.replaceStrings [ "#" ] [ "" ] hex;
-      r_hex = builtins.substring 0 2 hex';
-      g_hex = builtins.substring 2 2 hex';
-      b_hex = builtins.substring 4 2 hex';
-      r_int = hexToDec r_hex;
-      g_int = hexToDec g_hex;
-      b_int = hexToDec b_hex;
+      hexChars = {
+        "0" = 0; "1" = 1; "2" = 2; "3" = 3; "4" = 4; "5" = 5; "6" = 6; "7" = 7; "8" = 8; "9" = 9;
+        "A" = 10; "B" = 11; "C" = 12; "D" = 13; "E" = 14; "F" = 15;
+        "a" = 10; "b" = 11; "c" = 12; "d" = 13; "e" = 14; "f" = 15;
+      };
+    in if builtins.hasAttr hexDigit hexChars then
+      hexChars.${hexDigit}
+    else
+      throw "Invalid hex digit: ${hexDigit}";
+
+  hexToDec = hexStr:
+    assert builtins.isString hexStr;
+    let
+      hexDigits = stringToCharacters hexStr;
+      # Validate all digits are hex
+      _ = map (d: assert hexDigitToDec d >= 0; true) hexDigits;
+      hexToDecHelper = digits: acc:
+        if digits == [ ] then acc
+        else let
+          digit = builtins.head digits;
+          remainingDigits = builtins.tail digits;
+          digitValue = hexDigitToDec digit;
+        in hexToDecHelper remainingDigits (acc * 16 + digitValue);
+    in if hexStr == "" then
+      throw "Empty hex string"
+    else
+      hexToDecHelper hexDigits 0;
+
+  isValidHex = str:
+    let
+      cleanHex = removePrefix "#" str;
+      validChars = [ "0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "A" "B" "C" "D" "E" "F" ];
+      chars = stringToCharacters (toUpper cleanHex);
+      validLengths = [ 3 4 6 8 ];
+      isValidLength = elem (stringLength cleanHex) validLengths;
+    in isValidLength && all (c: elem c validChars) chars;
+
+  splitHex = hex:
+    let
+      cleanHex = removePrefix "#" hex;
+      _ = if !(isValidHex cleanHex) then throw "Invalid hex color code: ${hex}" else true;
+      normalizedHex = toUpper (
+        if stringLength cleanHex == 3 then
+          concatStrings (map (c: c + c) (stringToCharacters cleanHex))
+        else if stringLength cleanHex == 4 then
+          concatStrings (map (c: c + c) (stringToCharacters cleanHex))
+        else
+          cleanHex # Already 6 or 8
+      );
+      r = substring 0 2 normalizedHex;
+      g = substring 2 2 normalizedHex;
+      b = substring 4 2 normalizedHex;
+    in if stringLength normalizedHex == 8 then
+      { inherit r g b; alpha = substring 6 2 normalizedHex; }
+    else
+      { inherit r g b; alpha = "FF"; };
+
+  combineHex = { r, g, b, alpha ? "FF" }:
+    let
+      padHex = hex: if stringLength hex == 1 then "0${hex}" else hex;
+      result = toUpper "#${padHex r}${padHex g}${padHex b}${if (toUpper alpha) != "FF" then (padHex alpha) else ""}";
+    in if isValidHex result then result else throw "Invalid combined hex: ${result}";
+
+  # --- Hex <-> RGB Conversion (using new helpers) ---
+
+  # Converts a hex color string (e.g., "#RRGGBB", "RGB", "#RGBA", etc.) to an RGB attribute set { r, g, b } with values 0.0-1.0
+  hexToRgb = hex:
+    let parts = splitHex hex;
     in {
-      r = r_int / 255.0;
-      g = g_int / 255.0;
-      b = b_int / 255.0;
+      r = (hexToDec parts.r) / 255.0;
+      g = (hexToDec parts.g) / 255.0;
+      b = (hexToDec parts.b) / 255.0;
+      # alpha = (hexToDec parts.alpha) / 255.0; # Alpha ignored for Oklab conversions
     };
 
   # Converts an RGB attribute set { r, g, b } (values 0.0-1.0) to a hex color string "#RRGGBB"
   rgbToHex = rgb:
     let
-      toHexByte = val:
-        let
-          byte = builtins.floor (clamp val 0.0 1.0 * 255.0 + 0.5); # Add 0.5 for rounding
-          hexChars = "0123456789ABCDEF";
-          highNibble = builtins.substring (byte / 16) 1 hexChars;
-          lowNibble = builtins.substring (math.mod byte 16) 1 hexChars;
-        in highNibble + lowNibble;
-      r_hex = toHexByte rgb.r;
-      g_hex = toHexByte rgb.g;
-      b_hex = toHexByte rgb.b;
-    in "#${r_hex}${g_hex}${b_hex}";
+      # Use lib.toHexString for cleaner byte conversion
+      toHexByte = val: lib.toHexString (builtins.floor (clamp val 0.0 1.0 * 255.0 + 0.5)); # Add 0.5 for rounding
+    in combineHex { r = toHexByte rgb.r; g = toHexByte rgb.g; b = toHexByte rgb.b; }; # Alpha defaults to FF
 
   # --- Color Manipulation Functions ---
 
