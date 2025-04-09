@@ -224,13 +224,9 @@ rec {
       # --- Step 1: Range Reduction ---
       k_float = x * ln2_inv;
       k_int = builtins.floor (k_float + 0.5);
-      k = builtins.seq
-        (builtins.trace "exp(${toString x}): k_int=${toString k_int}" null)
-        (builtins.fromJSON (builtins.toJSON k_int));
+      k = (builtins.fromJSON (builtins.toJSON k_int)); # Removed trace
       r_untraced = x - (k * ln2);
-      r = builtins.seq
-        (builtins.trace "exp(${toString x}): r=${toString r_untraced}" null)
-        r_untraced;
+      r = r_untraced; # Removed trace
 
       # --- Step 2: Calculate e^r using direct summation of Taylor series ---
       # e^r = 1 + r + r^2/2! + r^3/3! + ...
