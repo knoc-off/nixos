@@ -12,7 +12,7 @@ let
   accent2 =   "#D2A6FF"; # Light Purple/Accent Magenta
 
   # Define anchor background and foreground
-  bg = "#263238"; # Dark Background
+  bg = color-lib.setOkhslLightness 0.15 "#263238"; # Dark Background
   fg = "#FAFAFF"; # Light Foreground
 
   # Define neutral based on bg/fg mix or a fixed value
