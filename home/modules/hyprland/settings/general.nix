@@ -1,17 +1,5 @@
-{ config, user, theme, colorLib, pkgs, ... }:
+{ config, user, theme, color-lib, pkgs, ... }:
 let
-
-  h2okl = colorLib.hexStrToOklch;
-  oklchToHex = colorLib.oklchToHex;
-  setLightness = value: color: colorLib.oklchmod.setLightness value color;
-  sl = l: hex:
-    oklchToHex (colorLib.oklchmod.setLightness l (colorLib.hexStrToOklch hex));
-
-  primary = h2okl theme.primary;
-  secondary = h2okl theme.secondary;
-  neutral = h2okl theme.neutral;
-  accent1 = h2okl theme.accent1;
-  accent2 = h2okl theme.accent2;
 
   wallpaper = let
     wallpaper-img = pkgs.fetchurl {
@@ -40,11 +28,10 @@ in {
     gaps_in = -1;
     gaps_out = -4;
     border_size = 4;
-    "col.active_border" = "0xff${oklchToHex accent1}";
-    "col.inactive_border" = "0xff${oklchToHex (setLightness 0.5 neutral)}";
-    "col.nogroup_border_active" =
-      "0x00${oklchToHex (setLightness 0.2 primary)}"; # transparent
-    "col.nogroup_border" = "0x99${oklchToHex (setLightness 0.3 primary)}";
+    "col.active_border" = "0xff${theme.accent1}";
+    "col.inactive_border" = "0xff${theme.neutral}";
+    "col.nogroup_border_active" = "0x00${theme.primary}"; # transparent
+    "col.nogroup_border" = "0x99${theme.primary}";
 
     layout = "master";
     resize_on_border = true;
@@ -53,22 +40,21 @@ in {
   group = {
     insert_after_current = true;
     focus_removed_window = true;
-    "col.border_active" = "0xff${oklchToHex (setLightness 0.6 accent1)}";
-    "col.border_inactive" = "0x99${oklchToHex (setLightness 0.3 primary)}";
-    "col.border_locked_active" = "0xff${oklchToHex accent2}";
-    "col.border_locked_inactive" =
-      "0x99${oklchToHex (setLightness 0.6 accent2)}";
+    "col.border_active" = "0xff${theme.accent1}";
+    "col.border_inactive" = "0x99${theme.primary}";
+    "col.border_locked_active" = "0xff${theme.accent2}";
+    "col.border_locked_inactive" = "0x99${theme.accent2}";
 
     groupbar = {
       font_size = 10;
       gradients = false;
       render_titles = false;
       scrolling = false;
-      text_color = "0xff${oklchToHex (setLightness 0.8 neutral)}";
-      "col.active" = "0xff${oklchToHex secondary}";
-      "col.inactive" = "0x99${oklchToHex (setLightness 0.6 secondary)}";
-      "col.locked_active" = "0xff${oklchToHex accent2}";
-      "col.locked_inactive" = "0x99${oklchToHex (setLightness 0.6 accent2)}";
+      text_color = "0xff${theme.neutral}";
+      "col.active" = "0xff${theme.secondary}";
+      "col.inactive" = "0x99${theme.secondary}";
+      "col.locked_active" = "0xff${theme.accent2}";
+      "col.locked_inactive" = "0x99${theme.accent2}";
     };
   };
 
@@ -77,8 +63,7 @@ in {
     disable_hyprland_logo = true;
     disable_splash_rendering = true; # the setting does nothing...
     "col.splash" = "0x00000000";
-    new_window_takes_over_fullscreen =
-      2; # new window will un-fullscreen current.
+    new_window_takes_over_fullscreen = 2; # new window will un-fullscreen current.
     force_default_wallpaper = 0;
     animate_manual_resizes = true;
     enable_swallow = false;
@@ -86,7 +71,7 @@ in {
     swallow_regex = "kitty";
     # the exception should be anything containing the word 'NAN' or 'nvim'
     #swallow_exception_regex = "NAN";
-    background_color = "0x99${sl 0.15 theme.base00}";
+    background_color = "0x99${theme.base00}";
   };
 
   input = {
