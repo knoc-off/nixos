@@ -284,7 +284,7 @@ let
       okhsl_black = { h = 0.0; s = 0.0; l = 0.0; }; # Hue is arbitrary for black
       okhsl_white = { h = 0.0; s = 0.0; l = 1.0; }; # Hue is arbitrary for white
       okhsl_grey = { h = 0.0; s = 0.0; l = 0.533760; }; # Hue arbitrary, L approx
-      okhsl_red = { h = 0.08; s = 1.0; l = 0.628; };
+      okhsl_red = { h = 0.08; s = 1.0; l = 0.568085; };
       okhsl_green = { h = 0.39; s = 1.0; l = 0.866; };
       okhsl_blue = { h = 0.70; s = 1.0; l = 0.452; };
       okhsl_yellow = { h = 0.27; s = 1.0; l = 0.968; };
