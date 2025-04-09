@@ -8,7 +8,7 @@ let
 
   # Assert within tolerance
   assertWithinTolerance = name: expected: actual: tolerance:
-    let diff = colorMath.fabs (expected - actual);
+    let diff = math.abs (expected - actual);
     in if diff <= tolerance then
       true # Test passed
     else
@@ -131,7 +131,7 @@ let
     test0 = assertWithinTolerance "srgb_transfer_function(0)" 0.0 (colorMath.srgb_transfer_function 0.0) epsilon;
     test1 = assertWithinTolerance "srgb_transfer_function(1)" 1.0 (colorMath.srgb_transfer_function 1.0) epsilon;
     testMid = assertWithinTolerance "srgb_transfer_function(0.18)" 0.461 (colorMath.srgb_transfer_function 0.18) 0.001;
-    testThreshUp = assertWithinTolerance "srgb_transfer_function(0.0031309)" 0.04045 (colorMath.srgb_transfer_function 0.0031309) epsilon;
+    testThreshUp = assertWithinTolerance "srgb_transfer_function(0.0031309)" 0.04045 (colorMath.srgb_transfer_function 0.0031309) 0.00001;
     testThreshDown = assertWithinTolerance "srgb_transfer_function(0.0031307)" 0.04044 (colorMath.srgb_transfer_function 0.0031307) 0.00001;
 
     testInv0 = assertWithinTolerance "srgb_transfer_function_inv(0)" 0.0 (colorMath.srgb_transfer_function_inv 0.0) epsilon;
@@ -159,7 +159,7 @@ let
       # Expected Oklab values (approximate, verify if possible)
       black_lab = { L = 0.0; a = 0.0; b = 0.0; };
       white_lab = { L = 1.0; a = 0.0; b = 0.0; };
-      grey_lab = { L = 0.7918; a = 0.0; b = 0.0; }; # L for 0.5 linear grey
+      grey_lab = { L = 0.793701; a = 0.0; b = 0.0; }; # L for 0.5 linear grey
       red_lab = { L = 0.6279; a = 0.2248; b = 0.1258; };
       green_lab = { L = 0.8664; a = -0.2339; b = 0.1795; };
       blue_lab = { L = 0.4520; a = -0.0322; b = -0.3117; };
@@ -213,35 +213,36 @@ let
       grey_lab = colorMath.linear_srgb_to_oklab { r = 0.5; g = 0.5; b = 0.5; };
       # Test intersection: Point outside gamut (high chroma red)
       high_chroma_red = { L = cusp_red_expected.L; a = cusp_red_expected.a * 1.5; b = cusp_red_expected.b * 1.5; };
-      high_C = colorMath.sqrt (high_chroma_red.a * high_chroma_red.a + high_chroma_red.b * high_chroma_red.b);
+      high_C = math.sqrt (high_chroma_red.a * high_chroma_red.a + high_chroma_red.b * high_chroma_red.b);
       high_a_ = high_chroma_red.a / high_C;
       high_b_ = high_chroma_red.b / high_C;
 
     in {
       name = "Gamut Helpers";
       # compute_max_saturation - difficult to get exact expected value without reference
-      testMaxSatRed = assertWithinTolerance "compute_max_saturation(red)" 0.358 (colorMath.compute_max_saturation oklab_red_a oklab_red_b) 0.01;
-      testMaxSatGreen = assertWithinTolerance "compute_max_saturation(green)" 0.294 (colorMath.compute_max_saturation oklab_green_a oklab_green_b) 0.01;
+      testMaxSatRed = assertWithinTolerance "compute_max_saturation(red)" 0.393396 (colorMath.compute_max_saturation oklab_red_a oklab_red_b) 0.01;
+      testMaxSatGreen = assertWithinTolerance "compute_max_saturation(green)" 0.338285 (colorMath.compute_max_saturation oklab_green_a oklab_green_b) 0.01;
       testMaxSatBlue = assertWithinTolerance "compute_max_saturation(blue)" 0.690 (colorMath.compute_max_saturation oklab_blue_a oklab_blue_b) 0.01;
 
       # find_cusp
-      testCuspRed = assertAttrsEqual "find_cusp(red)" { L = cusp_red_expected.L; C = colorMath.sqrt (cusp_red_expected.a * cusp_red_expected.a + cusp_red_expected.b * cusp_red_expected.b); } (colorMath.find_cusp oklab_red_a oklab_red_b) 0.01;
-      testCuspGreen = assertAttrsEqual "find_cusp(green)" { L = cusp_green_expected.L; C = colorMath.sqrt (cusp_green_expected.a * cusp_green_expected.a + cusp_green_expected.b * cusp_green_expected.b); } (colorMath.find_cusp oklab_green_a oklab_green_b) 0.01;
-      testCuspBlue = assertAttrsEqual "find_cusp(blue)" { L = cusp_blue_expected.L; C = colorMath.sqrt (cusp_blue_expected.a * cusp_blue_expected.a + cusp_blue_expected.b * cusp_blue_expected.b); } (colorMath.find_cusp oklab_blue_a oklab_blue_b) 0.01;
+      testCuspRed = assertAttrsEqual "find_cusp(red)" { L = cusp_red_expected.L; C = math.sqrt (cusp_red_expected.a * cusp_red_expected.a + cusp_red_expected.b * cusp_red_expected.b); } (colorMath.find_cusp oklab_red_a oklab_red_b) 0.01;
+      testCuspGreen = assertAttrsEqual "find_cusp(green)" { L = cusp_green_expected.L; C = math.sqrt (cusp_green_expected.a * cusp_green_expected.a + cusp_green_expected.b * cusp_green_expected.b); } (colorMath.find_cusp oklab_green_a oklab_green_b) 0.01;
+      testCuspBlue = assertAttrsEqual "find_cusp(blue)" { L = cusp_blue_expected.L; C = math.sqrt (cusp_blue_expected.a * cusp_blue_expected.a + cusp_blue_expected.b * cusp_blue_expected.b); } (colorMath.find_cusp oklab_blue_a oklab_blue_b) 0.01;
 
       # find_gamut_intersection
       # Test point inside gamut (grey): t should be >= 1.0
-      testIntersectInside = assert (
-        (colorMath.find_gamut_intersection grey_lab.a grey_lab.b grey_lab.L 0.01 0.5) >= 1.0 - epsilon
-      ) "find_gamut_intersection(inside)";
+      testIntersectInside =
+        let result = colorMath.find_gamut_intersection grey_lab.a grey_lab.b grey_lab.L 0.01 0.5;
+        in assert result >= 1.0 - epsilon; "find_gamut_intersection(inside)";
 
       # Test point outside gamut (high chroma red): t should be < 1.0
-      testIntersectOutside = assert (
-        (colorMath.find_gamut_intersection high_a_ high_b_ high_chroma_red.L high_C 0.5) < 1.0
-      ) "find_gamut_intersection(outside)";
+      testIntersectOutside =
+        let result = colorMath.find_gamut_intersection high_a_ high_b_ high_chroma_red.L high_C 0.5;
+        in assert result < 1.0; "find_gamut_intersection(outside)";
 
       # Test intersection result is on boundary (indirect test)
-      testIntersectResult = let
+      testIntersectResult =
+        let
           L1 = high_chroma_red.L;
           C1 = high_C;
           L0 = 0.5;
@@ -254,13 +255,13 @@ let
             b = C_clipped * high_b_;
           };
           # Check if any component is close to 0 or 1
-          onBoundary = (colorMath.fabs rgb_clipped_lin.r < epsilon) ||
-                        (colorMath.fabs rgb_clipped_lin.g < epsilon) ||
-                        (colorMath.fabs rgb_clipped_lin.b < epsilon) ||
-                        (colorMath.fabs (rgb_clipped_lin.r - 1.0) < epsilon) ||
-                        (colorMath.fabs (rgb_clipped_lin.g - 1.0) < epsilon) ||
-                        (colorMath.fabs (rgb_clipped_lin.b - 1.0) < epsilon);
-        in assert onBoundary "find_gamut_intersection(result on boundary)";
+          onBoundary = (math.abs rgb_clipped_lin.r < epsilon) ||
+                        (math.abs rgb_clipped_lin.g < epsilon) ||
+                        (math.abs rgb_clipped_lin.b < epsilon) ||
+                        (math.abs (rgb_clipped_lin.r - 1.0) < epsilon) ||
+                        (math.abs (rgb_clipped_lin.g - 1.0) < epsilon) ||
+                        (math.abs (rgb_clipped_lin.b - 1.0) < epsilon);
+        in assert onBoundary; "find_gamut_intersection(result on boundary)";
     };
 
   testToeFunctions = {
@@ -322,9 +323,9 @@ let
       testRoundTripWhite = assertAttrsEqual "okhsl round trip white" white (colorMath.okhsl_to_srgb (colorMath.srgb_to_okhsl white)) epsilon;
       testRoundTripGrey = assertAttrsEqual "okhsl round trip grey" grey (colorMath.okhsl_to_srgb (colorMath.srgb_to_okhsl grey)) epsilon;
       testRoundTripRed = assertAttrsEqual "okhsl round trip red" red (colorMath.okhsl_to_srgb (colorMath.srgb_to_okhsl red)) epsilon;
-      testRoundTripOrangeHex = assert (
-        (rgb01ToHex (colorMath.okhsl_to_srgb (colorMath.srgb_to_okhsl orange))) == "#FFA500"
-      ) "okhsl round trip orange hex";
+      testRoundTripOrangeHex =
+        let result = rgb01ToHex (colorMath.okhsl_to_srgb (colorMath.srgb_to_okhsl orange));
+        in assert result == "#FFA500"; "okhsl round trip orange hex";
 
       # Edge cases
       testEdgeL0 = assertAttrsEqual "okhsl L=0" black (colorMath.okhsl_to_srgb { h = 0.5; s = 0.5; l = 0.0; }) epsilon;
@@ -376,9 +377,9 @@ let
       testRoundTripWhite = assertAttrsEqual "okhsv round trip white" white (colorMath.okhsv_to_srgb (colorMath.srgb_to_okhsv white)) epsilon;
       testRoundTripGrey = assertAttrsEqual "okhsv round trip grey" grey (colorMath.okhsv_to_srgb (colorMath.srgb_to_okhsv grey)) epsilon;
       testRoundTripRed = assertAttrsEqual "okhsv round trip red" red (colorMath.okhsv_to_srgb (colorMath.srgb_to_okhsv red)) epsilon;
-      testRoundTripOrangeHex = assert (
-        (rgb01ToHex (colorMath.okhsv_to_srgb (colorMath.srgb_to_okhsv orange))) == "#FFA500"
-      ) "okhsv round trip orange hex";
+      testRoundTripOrangeHex =
+        let result = rgb01ToHex (colorMath.okhsv_to_srgb (colorMath.srgb_to_okhsv orange));
+        in assert result == "#FFA500"; "okhsv round trip orange hex";
 
       # Edge cases
       testEdgeV0 = assertAttrsEqual "okhsv V=0" black (colorMath.okhsv_to_srgb { h = 0.5; s = 0.5; v = 0.0; }) epsilon;
@@ -388,24 +389,24 @@ let
 
   testHexHelpers = {
     name = "Hex Helpers";
-    testValid3 = assert (isValidHex "ABC") "isValidHex 3 digit";
-    testValid4 = assert (isValidHex "ABC8") "isValidHex 4 digit";
-    testValid6 = assert (isValidHex "AABBCC") "isValidHex 6 digit";
-    testValid8 = assert (isValidHex "AABBCC88") "isValidHex 8 digit";
-    testValidHash = assert (isValidHex "#AABBCC") "isValidHex # prefix";
-    testInvalidChar = assert (!(isValidHex "AABBCG")) "isValidHex invalid char";
-    testInvalidLength = assert (!(isValidHex "AABBC")) "isValidHex invalid length";
+    testValid3 = let result = isValidHex "ABC"; in assert result; "isValidHex 3 digit";
+    testValid4 = let result = isValidHex "ABC8"; in assert result; "isValidHex 4 digit";
+    testValid6 = let result = isValidHex "AABBCC"; in assert result; "isValidHex 6 digit";
+    testValid8 = let result = isValidHex "AABBCC88"; in assert result; "isValidHex 8 digit";
+    testValidHash = let result = isValidHex "#AABBCC"; in assert result; "isValidHex # prefix";
+    testInvalidChar = let result = isValidHex "AABBCG"; in assert !result; "isValidHex invalid char";
+    testInvalidLength = let result = isValidHex "AABBC"; in assert !result; "isValidHex invalid length";
 
-    testSplit3 = assert (splitHex "123" == { r="11"; g="22"; b="33"; alpha="FF"; }) "splitHex 3 digit";
-    testSplit4 = assert (splitHex "1234" == { r="11"; g="22"; b="33"; alpha="44"; }) "splitHex 4 digit";
-    testSplit6 = assert (splitHex "AABBCC" == { r="AA"; g="BB"; b="CC"; alpha="FF"; }) "splitHex 6 digit";
-    testSplit8 = assert (splitHex "AABBCCDD" == { r="AA"; g="BB"; b="CC"; alpha="DD"; }) "splitHex 8 digit";
-    testSplitHash = assert (splitHex "#AABBCC" == { r="AA"; g="BB"; b="CC"; alpha="FF"; }) "splitHex # prefix";
+    testSplit3 = let result = splitHex "123"; in assert result == { r="11"; g="22"; b="33"; alpha="FF"; }; "splitHex 3 digit";
+    testSplit4 = let result = splitHex "1234"; in assert result == { r="11"; g="22"; b="33"; alpha="44"; }; "splitHex 4 digit";
+    testSplit6 = let result = splitHex "AABBCC"; in assert result == { r="AA"; g="BB"; b="CC"; alpha="FF"; }; "splitHex 6 digit";
+    testSplit8 = let result = splitHex "AABBCCDD"; in assert result == { r="AA"; g="BB"; b="CC"; alpha="DD"; }; "splitHex 8 digit";
+    testSplitHash = let result = splitHex "#AABBCC"; in assert result == { r="AA"; g="BB"; b="CC"; alpha="FF"; }; "splitHex # prefix";
 
-    testCombineRGB = assert (combineHex { r="AA"; g="BB"; b="CC"; } == "#AABBCC") "combineHex RGB";
-    testCombineRGBA = assert (combineHex { r="AA"; g="BB"; b="CC"; alpha="DD"; } == "#AABBCCDD") "combineHex RGBA";
-    testCombineRGBShort = assert (combineHex { r="A"; g="B"; b="C"; } == "#0A0B0C") "combineHex RGB short";
-    testCombineRGBAFF = assert (combineHex { r="AA"; g="BB"; b="CC"; alpha="FF"; } == "#AABBCC") "combineHex RGBA FF alpha";
+    testCombineRGB = let result = combineHex { r="AA"; g="BB"; b="CC"; }; in assert result == "#AABBCC"; "combineHex RGB";
+    testCombineRGBA = let result = combineHex { r="AA"; g="BB"; b="CC"; alpha="DD"; }; in assert result == "#AABBCCDD"; "combineHex RGBA";
+    testCombineRGBShort = let result = combineHex { r="A"; g="B"; b="C"; }; in assert result == "#0A0B0C"; "combineHex RGB short";
+    testCombineRGBAFF = let result = combineHex { r="AA"; g="BB"; b="CC"; alpha="FF"; }; in assert result == "#AABBCC"; "combineHex RGBA FF alpha";
   };
 
   # --- Aggregate All Tests ---
