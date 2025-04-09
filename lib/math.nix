@@ -103,8 +103,7 @@ rec {
           fracStr = builtins.elemAt parts 1;
           tomlStr = "f = 0.${fracStr}";
           parsed = builtins.fromTOML tomlStr;
-        in
-          parsed.f
+        in parsed.f
       else
         0.0;
     in intPart + fracPart;
@@ -143,42 +142,148 @@ rec {
 
   fmod = x: y: x - y * floor (x / y);
 
-  # Improved natural logarithm with validation
+  # Improved natural logarithm using range reduction and a fast-converging series
   ln = x:
-    assert x > 0.0;
+    assert x > 0.0; # Logarithm is only defined for positive numbers
     let
-      ln2 = 0.6931471805599453;
-      normalize = base: order:
-        if base < 2.0 && base >= 1.0 then {
-          inherit base order;
-        } else if base >= 2.0 then
-          normalize (base / 2.0) (order + 1)
-        else
-          normalize (base * 2.0) (order - 1);
-      x' = normalize x 0;
-      lnx = x:
-        (-1.7417939)
-        + (2.8212026 + ((-1.4699568) + (0.44717955 - 5.6570851e-2 * x) * x) * x)
-        * x;
-    in lnx x'.base + (x'.order * ln2);
+      # High-precision constants
+      ln2 = 0.6931471805599453; # ln(2)
+      sqrt2 = 1.4142135623730951; # sqrt(2)
+      sqrt1_2 = 0.7071067811865476; # 1/sqrt(2)
 
-  # Improved exponential function
+      # Normalize x to m * 2^order, where m is in [sqrt(1/2), sqrt(2))
+      # This range ensures y = (m-1)/(m+1) is small for fast series convergence.
+      normalize = base: order:
+        if base < sqrt2 && base >= sqrt1_2 then {
+          # Base is in the target range
+          m = base;
+          inherit order;
+        } else if base >= sqrt2 then
+        # Base is too large, divide by 2 and increment order
+          normalize (base / 2.0) (order + 1)
+        else # base < sqrt1_2
+        # Base is too small, multiply by 2 and decrement order
+          normalize (base * 2.0) (order - 1);
+
+      # Perform the normalization
+      x_normalized = normalize x 0;
+      m = x_normalized.m; # The mantissa in the range [sqrt(1/2), sqrt(2))
+      order = x_normalized.order; # The exponent for base 2
+
+      # Calculate ln(m) using the series for 2 * artanh(y) where y = (m-1)/(m+1)
+      # ln(m) = 2 * (y + y^3/3 + y^5/5 + y^7/7 + ...)
+      ln_m = let
+        y = (m - 1.0) / (m + 1.0);
+        y2 = y * y; # y^2, used repeatedly
+
+        # Calculate series terms iteratively for better precision and efficiency
+        # term_n = y^(2n+1) / (2n+1)
+        term_1 = y; # n=0
+        term_3 = term_1 * y2 / 3.0; # n=1
+        term_5 = term_3 * y2 * 3.0 / 5.0; # n=2
+        term_7 = term_5 * y2 * 5.0 / 7.0; # n=3
+        term_9 = term_7 * y2 * 7.0 / 9.0; # n=4
+        term_11 = term_9 * y2 * 9.0 / 11.0; # n=5
+        term_13 = term_11 * y2 * 11.0 / 13.0; # n=6
+        # Adding more terms increases accuracy further, but convergence is fast.
+        # term_15 = term_13 * y2 * 13.0 / 15.0; # n=7
+
+        # Sum the terms
+        sum_terms = term_1 + term_3 + term_5 + term_7 + term_9 + term_11
+          + term_13;
+        # + term_15;
+
+      in 2.0 * sum_terms; # ln(m) = 2 * artanh(y)
+
+      # Combine the results: ln(x) = ln(m) + order * ln(2)
+    in ln_m + (order * ln2);
+
+  # Improved exponential function with forced tracing (using direct sum for e^r)
   exp = x:
     let
-      ln2Inv = 1.4426950408889634;
-      sign = if x >= 0.0 then 1 else (-1);
-      x' = x * sign * ln2Inv;
-      truncated = builtins.floor x';
-      fractated = x' - truncated;
-      twoPowXPart = x:
-        1.41421 + 0.980258 * (x - 0.5) + 0.339732 * pow (x - 0.5) 2 + 7.84947e-2
-        * pow (x - 0.5) 3 + 1.36021e-2 * pow (x - 0.5) 4 + 1.88565e-3
-        * pow (x - 0.5) 5;
-      res = (pow 2 truncated) * twoPowXPart fractated;
-    in if sign == 1 then res else 1.0 / res;
+      # Helper function for integer power (exponentiation by squaring, iterative)
+      integerPow = base: exp_int:
+        let
+          abs_exp = if exp_int < 0 then -exp_int else exp_int;
+          pow_iter = current_base: current_exp: current_res:
+            if current_exp == 0 then
+              current_res
+            else if (mod current_exp 2 == 1) then
+              pow_iter (current_base * current_base) (current_exp / 2)
+              (current_res * current_base)
+            else
+              pow_iter (current_base * current_base) (current_exp / 2)
+              current_res;
+          res_abs = pow_iter base abs_exp 1.0;
+        in if exp_int < 0 then 1.0 / res_abs else res_abs;
+
+      # High-precision constants
+      ln2 = 0.6931471805599453; # ln(2)
+      ln2_inv = 1.4426950408889634; # 1 / ln(2)
+
+      # --- Step 1: Range Reduction ---
+      k_float = x * ln2_inv;
+      k_int = builtins.floor (k_float + 0.5);
+      k = builtins.seq
+        (builtins.trace "exp(${toString x}): k_int=${toString k_int}" null)
+        (builtins.fromJSON (builtins.toJSON k_int));
+      r_untraced = x - (k * ln2);
+      r = builtins.seq
+        (builtins.trace "exp(${toString x}): r=${toString r_untraced}" null)
+        r_untraced;
+
+      # --- Step 2: Calculate e^r using direct summation of Taylor series ---
+      # e^r = 1 + r + r^2/2! + r^3/3! + ...
+      # Calculate terms iteratively: term_n = term_{n-1} * r / n
+      exp_r_untraced = let
+        r_val = r; # Use the traced value of r
+        term0 = 1.0;
+        term1 = term0 * r_val / 1.0;
+        term2 = term1 * r_val / 2.0;
+        term3 = term2 * r_val / 3.0;
+        term4 = term3 * r_val / 4.0;
+        term5 = term4 * r_val / 5.0;
+        term6 = term5 * r_val / 6.0;
+        term7 = term6 * r_val / 7.0;
+        term8 = term7 * r_val / 8.0;
+        term9 = term8 * r_val / 9.0;
+        term10 = term9 * r_val / 10.0;
+        term11 = term10 * r_val / 11.0;
+        term12 = term11 * r_val / 12.0;
+        term13 = term12 * r_val / 13.0;
+        # Add more terms if needed, but 13 should be sufficient
+      in term0 + term1 + term2 + term3 + term4 + term5 + term6 + term7 + term8
+      + term9 + term10 + term11 + term12 + term13;
+
+      # Force trace for exp_r
+      exp_r = builtins.seq (builtins.trace
+        "exp(${toString x}): exp_r (direct sum)=${toString exp_r_untraced}"
+        null) exp_r_untraced;
+
+      # --- Step 3: Calculate 2^k ---
+      pow2_k_untraced = integerPow 2.0 k_int;
+      pow2_k = builtins.seq
+        (builtins.trace "exp(${toString x}): pow2_k=${toString pow2_k_untraced}"
+          null) pow2_k_untraced;
+
+      # --- Step 4: Combine and Final Trace ---
+      result_untraced = pow2_k * exp_r;
+      result = builtins.seq
+        (builtins.trace "exp(${toString x}): result=${toString result_untraced}"
+          null) result_untraced;
+
+    in result;
 
   # Improved power functions
-  pow = x: times: assert builtins.isInt times; multiply (lib.replicate times x);
+  #pow = x: times: assert builtins.isInt times; multiply (lib.replicate times x);
+
+  pow = b: e:
+    if e == 0 then
+      1.0
+    else if e > 0 then
+      b * pow b (e - 1)
+    else
+      1.0 / (pow b (-e));
 
   powFloat = x: a: exp (a * ln x);
 
@@ -187,20 +292,78 @@ rec {
     assert builtins.isInt x && x >= 0;
     if x == 0 then 1 else multiply (lib.range 1 x);
 
-  # Trigonometric functions (radian input)
   sin = x:
     let
-      maxIterations = 20;
-      x' = mod (1.0 * x) tau; # Normalize to [0, 2π)
-      step = i:
-        (pow (-1) (i - 1)) * (pow x' (2 * i - 1)) / factorial (2 * i - 1);
-      helper = tmp: i:
-        let value = step i;
-        in if i >= maxIterations || (fabs value) < epsilon then
-          tmp
-        else
-          helper (tmp + value) (i + 1);
-    in helper 0 1;
+      # High-precision constants
+      pi = 3.141592653589793;
+      tau = 6.283185307179586; # 2 * pi
+      pi_half = 1.5707963267948966; # pi / 2
+
+      # Small value for convergence checks
+      epsilon = 1.0e-15; # Adjust based on desired precision vs float limits
+
+      # Helper for absolute value
+      fabs = val: if val < 0.0 then -val else val;
+
+      # Helper for floating point modulo (remainder)
+      # fmod(a, n) = a - n * floor(a / n)
+      fmod = a: n: a - n * (builtins.floor (a / n));
+
+      # --- Step 1: Range Reduction ---
+
+      # Reduce x to the primary range [-pi, pi) using tau = 2*pi
+      # x_mod_tau = fmod x tau; # This gives [0, tau) or (-tau, 0]
+      # A common way to get [-pi, pi) is: fmod(x + pi, tau) - pi
+      x_reduced_pi = fmod (x + pi) tau - pi;
+
+      # Now x_reduced_pi is in [-pi, pi)
+
+      # Use symmetry to map to [0, pi/2] and track sign
+      initial_sign = if x_reduced_pi < 0.0 then -1.0 else 1.0;
+      x_abs = x_reduced_pi * initial_sign; # Now in [0, pi)
+
+      # If x_abs > pi/2, use sin(a) = sin(pi - a)
+      x_final = if x_abs > pi_half then pi - x_abs else x_abs;
+      # x_final is now in [0, pi/2]
+
+      # --- Step 2: Calculate sin(x_final) using iterative Taylor series ---
+      # sin(y) = y - y^3/3! + y^5/5! - ...
+      # term_{n+1} = term_n * (-y^2) / ((2n+3)*(2n+2))
+
+      series_sum = let
+        y = x_final;
+        y_squared = y * y;
+
+        # Recursive helper for summation
+        # current_sum: the sum accumulated so far
+        # current_term: the last term added (or the first term y)
+        # n: the index related to the power (starts at 0 for y^1)
+        sum_loop = current_sum: current_term: n:
+          let
+            # Check for convergence: if the absolute value of the term
+            # is negligible compared to the sum, or just very small.
+            # Also limit iterations to prevent infinite loops in edge cases.
+            converged = (fabs current_term < epsilon)
+              || (n > 20); # Max 20 iterations typical for double precision
+            # converged = (fabs current_term < epsilon * (fabs current_sum)) || (fabs current_term < epsilon) || (n > 20); # Relative check
+
+            # Calculate the next term
+            next_n = n + 1.0;
+            denominator = (2.0 * next_n + 1.0) * (2.0 * next_n);
+            next_term = current_term * (-1.0 * y_squared) / denominator;
+            next_sum = current_sum + next_term;
+
+          in if converged then
+            current_sum # Return the sum when converged
+          else
+          # Continue recursion
+            sum_loop next_sum next_term next_n;
+
+        # Start the loop: sum starts with the first term, first term is y, n=0
+      in sum_loop y y 0.0;
+
+      # --- Step 3: Apply the sign ---
+    in initial_sign * series_sum;
 
   cos = x: sin (0.5 * pi - x);
 
@@ -220,7 +383,6 @@ rec {
   # Additional conversion functions
   rad2deg = x: x * 180 / pi;
   deg2rad = x: x * pi / 180;
-
 
   # Improved inverse trigonometric functions
   atan = x:
@@ -323,15 +485,15 @@ rec {
           delta = if abs denominator > epsilon then y / denominator else 0;
           newX = x - delta;
           absDelta = abs delta;
-        in
-          if iteration >= maxIterations then
-            throw "halley: Maximum iterations reached (last delta: ${toString absDelta})"
-          else if absDelta < epsilon then
-            newX
-          else
-            helper newX (iteration + 1);
-    in
-      helper x0 0;
+        in if iteration >= maxIterations then
+          throw "halley: Maximum iterations reached (last delta: ${
+            toString absDelta
+          })"
+        else if absDelta < epsilon then
+          newX
+        else
+          helper newX (iteration + 1);
+    in helper x0 0;
 
   # Improved hex to decimal conversion with validation
   hexToDec = hexStr:
