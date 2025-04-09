@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "refactor:_Remove__prefix_from_color_values_in_theme.nix_____________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________moving_to_new_version_of_nixpkgs._24.11";
+  system.nixos.label = "feat:_Use_color-lib_to_adjust_lightness_of_bright_kitty_colors______________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________moving_to_new_version_of_nixpkgs._24.11";
 }

@@ -1,4 +1,4 @@
-{ color-lib, theme, ... }:
+{ color-lib, theme, lib, ... }:
 {
   imports = [ ./tab_bar.nix ];
 
@@ -48,14 +48,15 @@
       color6 = "#${theme.base0C}"; # Cyan
       color7 = "#${theme.base05}"; # White
 
-      color8 = "#${theme.base03}"; # Bright Black (Gray)
-      color9 = "#${theme.base08}"; # Bright Red
-      color10 = "#${theme.base0B}"; # Bright Green
-      color11 = "#${theme.base0A}"; # Bright Yellow
-      color12 = "#${theme.base0D}"; # Bright Blue
-      color13 = "#${theme.base0E}"; # Bright Magenta
-      color14 = "#${theme.base0C}"; # Bright Cyan
-      color15 = "#${theme.base07}"; # Bright White
+      # Bright colors adjusted for more lightness
+      color8 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base03}")}"; # Bright Black (Gray)
+      color9 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base08}")}"; # Bright Red
+      color10 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base0B}")}"; # Bright Green
+      color11 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base0A}")}"; # Bright Yellow
+      color12 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base0D}")}"; # Bright Blue
+      color13 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base0E}")}"; # Bright Magenta
+      color14 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base0C}")}"; # Bright Cyan
+      color15 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base07}")}"; # Bright White
 
       # Derived colors
       foreground = "#${theme.base05}";
