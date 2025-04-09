@@ -256,14 +256,16 @@ let
           };
           # Increase tolerance slightly for boundary check
           boundary_epsilon = 1.0e-5; # Or maybe 1.0e-4 if needed
-          # Check if any component is close to 0 or 1
-          onBoundary = (math.abs rgb_clipped_lin.r < boundary_epsilon) ||
-                        (math.abs rgb_clipped_lin.g < boundary_epsilon) ||
-                        (math.abs rgb_clipped_lin.b < boundary_epsilon) ||
-                        (math.abs (rgb_clipped_lin.r - 1.0) < boundary_epsilon) ||
-                        (math.abs (rgb_clipped_lin.g - 1.0) < boundary_epsilon) ||
-                        (math.abs (rgb_clipped_lin.b - 1.0) < boundary_epsilon);
-        in assert onBoundary; "find_gamut_intersection(result on boundary)";
+
+          r_close_0 = math.abs rgb_clipped_lin.r < boundary_epsilon;
+          r_close_1 = math.abs (rgb_clipped_lin.r - 1.0) < boundary_epsilon;
+          g_close_0 = math.abs rgb_clipped_lin.g < boundary_epsilon;
+          g_close_1 = math.abs (rgb_clipped_lin.g - 1.0) < boundary_epsilon;
+          b_close_0 = math.abs rgb_clipped_lin.b < boundary_epsilon;
+          b_close_1 = math.abs (rgb_clipped_lin.b - 1.0) < boundary_epsilon;
+
+        in
+        assert r_close_0 || r_close_1 || g_close_0 || g_close_1 || b_close_0 || b_close_1; "find_gamut_intersection(result on boundary)";
     };
 
   testToeFunctions = {
