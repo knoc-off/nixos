@@ -272,14 +272,16 @@ let
     name = "Toe Functions";
     testToe0 = assertWithinTolerance "toe(0)" 0.0 (colorMath.toe 0.0) epsilon;
     testToe1 = assertWithinTolerance "toe(1)" 1.0 (colorMath.toe 1.0) epsilon;
-    testToeMid = assertWithinTolerance "toe(0.184)" 0.5 (colorMath.toe 0.18419) 0.001; # Oklab L for CIELab L*=50
+    # Test the Oklab L value that should yield perceptual lightness 0.5
+    testToeMid = assertWithinTolerance "toe(0.56883)" 0.5 (colorMath.toe 0.56883) 0.001;
 
     testToeInv0 = assertWithinTolerance "toe_inv(0)" 0.0 (colorMath.toe_inv 0.0) epsilon;
     testToeInv1 = assertWithinTolerance "toe_inv(1)" 1.0 (colorMath.toe_inv 1.0) epsilon;
-    testToeInvMid = assertWithinTolerance "toe_inv(0.5)" 0.184 (colorMath.toe_inv 0.5) 0.001;
+    # Test the Oklab L value corresponding to perceptual lightness 0.5
+    testToeInvMid = assertWithinTolerance "toe_inv(0.5)" 0.56883 (colorMath.toe_inv 0.5) 0.001;
 
     testRoundTrip0_1 = assertWithinTolerance "toe round trip 0.1" 0.1 (colorMath.toe_inv (colorMath.toe 0.1)) epsilon;
-    testRoundTrip0_5 = assertWithinTolerance "toe round trip 0.5" 0.5 (colorMath.toe_inv (colorMath.toe 0.5)) epsilon;
+    testRoundTrip0_5 = assertWithinTolerance "toe round trip 0.5" 0.5 (colorMath.toe_inv (colorMath.toe 0.5)) epsilon; # This tests the inverse relationship at the midpoint
     testRoundTrip0_9 = assertWithinTolerance "toe round trip 0.9" 0.9 (colorMath.toe_inv (colorMath.toe 0.9)) epsilon;
   };
 
