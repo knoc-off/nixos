@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "refactor:_Simplify_firefox_theme_config_use_direct_color_values.____________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
+  system.nixos.label = "refactor:_Replace_colorLib_with_color-lib_and_use_theme_variables.__________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
 }

@@ -1,14 +1,14 @@
-{ pkgs, theme, colorLib, ... }:
+{ pkgs, theme, color-lib, ... }:
 let
-  h2okl = colorLib.hexStrToOklch;
-  oklchToHex = colorLib.oklchToHex;
-  setLightness = value: color: colorLib.oklchmod.setLightness value color;
+  #h2okl = color-lib.hexStrToOklch;
+  #oklchToHex = color-lib.oklchToHex;
+  #setLightness = value: color: color-lib.oklchmod.setLightness value color;
 
-  primary = h2okl theme.primary;
-  secondary = h2okl theme.secondary;
-  neutral = h2okl theme.neutral;
-  accent1 = h2okl theme.accent1;
-  accent2 = h2okl theme.accent2;
+  #primary = h2okl theme.primary;
+  #secondary = h2okl theme.secondary;
+  #neutral = h2okl theme.neutral;
+  #accent1 = h2okl theme.accent1;
+  #accent2 = h2okl theme.accent2;
 in
 {
   imports = [
