@@ -273,7 +273,7 @@ let
       h1 = okhsl1.h;
       h2 = okhsl2.h;
       diff = h2 - h1;
-      dist = abs diff;
+      dist = math.abs diff;
 
       # Adjust hues for shortest path interpolation if distance > 0.5
       h1_adj = if dist > 0.5 && diff > 0.0 then h1 + 1.0 else h1;
