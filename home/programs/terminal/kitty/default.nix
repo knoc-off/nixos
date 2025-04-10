@@ -49,14 +49,14 @@
       color7 = "#${theme.base05}"; # White
 
       # Bright colors adjusted for more lightness
-      color8 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base03}")}"; # Bright Black (Gray)
-      color9 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base08}")}"; # Bright Red
-      color10 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base0B}")}"; # Bright Green
-      color11 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base0A}")}"; # Bright Yellow
-      color12 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base0D}")}"; # Bright Blue
-      color13 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base0E}")}"; # Bright Magenta
-      color14 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base0C}")}"; # Bright Cyan
-      color15 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.15 "#${theme.base07}")}"; # Bright White
+      color8 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.1 "#${theme.base03}")}"; # Bright Black (Gray)
+      color9 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.1 "#${theme.base08}")}"; # Bright Red
+      color10 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.1 "#${theme.base0B}")}"; # Bright Green
+      color11 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.1 "#${theme.base0A}")}"; # Bright Yellow
+      color12 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.1 "#${theme.base0D}")}"; # Bright Blue
+      color13 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.1 "#${theme.base0E}")}"; # Bright Magenta
+      color14 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.1 "#${theme.base0C}")}"; # Bright Cyan
+      color15 = "#${lib.removePrefix "#" (color-lib.adjustOkhslLightness 0.1 "#${theme.base07}")}"; # Bright White
 
       # Derived colors
       foreground = "#${theme.base05}";
