@@ -1,4 +1,4 @@
-{ color-lib, lib }:
+{ color-lib, lib, math }:
 let
   inherit (color-lib)
     mixColors setOkhslLightness setOkhslSaturation adjustOkhslHue
