@@ -57,12 +57,6 @@ let
   themeType = if bgLightness < 0.5 then "dark" else "light";
 
 in {
-  # Expose Core Palette (removing '#' prefix)
-  primary = lib.removePrefix "#" primary; # theme.primary
-  secondary = lib.removePrefix "#" secondary; # theme.secondary
-  neutral = lib.removePrefix "#" neutral; # theme.neutral
-  accent1 = lib.removePrefix "#" accent1; # theme.accent1
-  accent2 = lib.removePrefix "#" accent2; # theme.accent2
 
   # Expose Generated Base16 Palette (removing '#' prefix)
   base00 = lib.removePrefix "#" base00; # theme.base00
