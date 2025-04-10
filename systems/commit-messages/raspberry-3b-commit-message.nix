@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "style:_Adjust_lightness_of_bright_colors_in_kitty_config____________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________minecraft_changes._disable_waydroid";
+  system.nixos.label = "feat:_Enhance_kitty_colors_with_lightness_and_saturation_adjustments________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________minecraft_changes._disable_waydroid";
 }
