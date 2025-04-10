@@ -287,8 +287,21 @@ let
       mixed_okhsl = { inherit h s l; };
       mixed_rgb_only = okhsl_to_srgb mixed_okhsl;
       mixed_rgb_alpha = mixed_rgb_only // { inherit alpha; };
-
     in rgbToHex mixed_rgb_alpha;
+
+  # Match Lightness and Saturation
+  # Takes two hex colors: colorToModify and referenceColor.
+  # Returns colorToModify with its Okhsl lightness and saturation set to match referenceColor.
+  matchLightnessSaturation = colorToModify: referenceColor:
+    let
+      targetL = getOkhslLightness referenceColor;
+      targetS = getOkhslSaturation referenceColor;
+      # Apply the target lightness first
+      modifiedLightness = setOkhslLightness targetL colorToModify;
+      # Then apply the target saturation to the result
+      finalColor = setOkhslSaturation targetS modifiedLightness;
+    in finalColor;
+
 
 in {
   # Export core conversion functions
@@ -312,4 +325,7 @@ in {
 
   # Export the color mixing function
   inherit mixColors;
+
+  # Export the matching function
+  inherit matchLightnessSaturation;
 }
