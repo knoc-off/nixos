@@ -2,7 +2,7 @@
 let
   inherit (color-lib)
     mixColors setOkhslLightness setOkhslSaturation adjustOkhslHue
-    getOkhslLightness; # Added getOkhslLightness
+    getOkhslLightness setOkhslHue; # Added setOkhslHue
 
   # Define anchor background and foreground
   bg = color-lib.setOkhslLightness 0.15 "#263238"; # Dark Background
@@ -22,35 +22,49 @@ let
   base06 = setOkhslLightness 0.90 fg; # Light Background highlight
   base07 = fg; # Lightest Foreground
 
-  hueRed =     "#F94144"; # Original base0F
-  hueOrange =  "#F8961E"; # "#FF8F40"
-  hueYellow =  "#F9C74F"; # Original base0A
-  hueGreen =   "#90BE6D"; # "#B8CC52"
-  hueCyan =    "#4D908E"; # Adjusted Cyan - More distinct from Blue
-  hueBlue =    "#59C2FF"; # "#59C2FF"
-  hueMagenta = "#C792EA"; # Original base0E
-  hueViolet =  "#ec0868"; # Original base08 (using as Violet/Alt Red)
+  # --- Define Hues for Core Palette ---
+  # Keep these for defining primary/secondary etc. if needed, or replace their usage below.
+  coreHueBlue =    "#59C2FF";
+  coreHueOrange =  "#F8961E";
+  coreHueGreen =   "#90BE6D";
+  coreHueMagenta = "#C792EA";
 
   # --- Core Palette ---
-  primary = hueBlue; # Blue
-  secondary = hueOrange; # Orange
-  accent1 = hueGreen; # Green
-  accent2 = hueMagenta; # Light Purple
+  primary = coreHueBlue; # Blue
+  secondary = coreHueOrange; # Orange
+  accent1 = coreHueGreen; # Green
+  accent2 = coreHueMagenta; # Light Purple
 
   # --- Generate Accent Colors (base08-base0F) ---
-  # Set consistent lightness and saturation for accents
-  setAccent = l: s: hex: setOkhslSaturation s (setOkhslLightness l hex);
   accentL = 0.7; # Target lightness for accents
   accentS = 0.7; # Target saturation for accents
 
-  base08 = setAccent accentL accentS hueRed;      # Red
-  base09 = setAccent accentL accentS hueOrange;   # Orange
-  base0A = setAccent accentL accentS hueYellow;   # Yellow
-  base0B = setAccent accentL accentS hueGreen;    # Green
-  base0C = setAccent accentL accentS hueCyan;     # Cyan
-  base0D = setAccent accentL accentS hueBlue;     # Blue
-  base0E = setAccent accentL accentS hueMagenta;  # Magenta
-  base0F = setAccent accentL accentS hueViolet;   # Violet
+  # Generate 8 evenly spaced hue values (0.0 to 0.875) using arange
+  numHues = 8;
+  hueStep = 1.0 / numHues;
+  # math.arange generates `floor((max - min) / step)` elements.
+  # So arange 0.0 1.0 step generates floor(1.0 / step) = floor(numHues) = numHues elements.
+  accentHues = math.arange 0.0 1.0 hueStep; # Generates [0.0, 0.125, ..., 0.875]
+
+  # Helper function to create an accent color with a specific numeric hue
+  # Takes a base color, target L, target S, and the target numeric Hue (0.0-1.0)
+  createAccent = baseColor: targetL: targetS: targetHue:
+    let
+      modifiedL = setOkhslLightness targetL baseColor;
+      modifiedLS = setOkhslSaturation targetS modifiedL;
+      finalColor = setOkhslHue targetHue modifiedLS;
+    in finalColor;
+
+  # Use the helper and the generated numeric hues for base08-base0F
+  # We use 'neutral' as the starting point, its original L/S/H don't matter.
+  base08 = createAccent neutral accentL accentS (builtins.elemAt accentHues 0); # Hue 0.0   (Red)
+  base09 = createAccent neutral accentL accentS (builtins.elemAt accentHues 1); # Hue 0.125 (Orange)
+  base0A = createAccent neutral accentL accentS (builtins.elemAt accentHues 2); # Hue 0.25  (Yellow)
+  base0B = createAccent neutral accentL accentS (builtins.elemAt accentHues 3); # Hue 0.375 (Green)
+  base0C = createAccent neutral accentL accentS (builtins.elemAt accentHues 4); # Hue 0.5   (Cyan)
+  base0D = createAccent neutral accentL accentS (builtins.elemAt accentHues 5); # Hue 0.625 (Blue)
+  base0E = createAccent neutral accentL accentS (builtins.elemAt accentHues 6); # Hue 0.75  (Magenta)
+  base0F = createAccent neutral accentL accentS (builtins.elemAt accentHues 7); # Hue 0.875 (Violet)
 
   # --- Determine Theme Type ---
   bgLightness = getOkhslLightness bg;
