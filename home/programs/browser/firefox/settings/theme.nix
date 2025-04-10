@@ -1,14 +1,4 @@
 { theme, color-lib }:
-let
-  #h2okl = color-lib.hexStrToOklch;
-  #oklchToHex = color-lib.oklchToHex;
-  #setLightness = value: color: color-lib.oklchmod.setLightness value color;
-
-  #primary = h2okl theme.primary;
-  #neutral = h2okl theme.neutral;
-
-  #darkBackground = oklchToHex (setLightness 0.2 primary);
-in
 {
   # Dark theme
   "devtools.theme" = "dark";

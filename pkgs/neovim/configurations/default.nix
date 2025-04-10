@@ -12,7 +12,9 @@
     ./plugins/ui/bufferline.nix
     # custom plugin allowing (messy) integration with hyprland.
     ./plugins/misc/window-manager.nix
-    ./plugins/ui/colorizer.nix
+
+    #./plugins/ui/colorizer.nix
+    ./plugins/ui/highlight-colors.nix
 
     #./plugins/ui/precognition.nix
     #./plugins/productivity/vim-ai.nix

@@ -5,7 +5,7 @@
   theme,
   pkgs,
   inputs,
-  colorLib,
+  color-lib,
   user,
   ...
 }: let
@@ -99,7 +99,7 @@ in {
 
       settings = lib.mkMerge [
         cfg.settings
-        (import ./settings/general.nix {inherit config inputs user theme lib pkgs colorLib;})
+        (import ./settings/general.nix {inherit config inputs user theme lib pkgs color-lib;})
       ];
     };
 

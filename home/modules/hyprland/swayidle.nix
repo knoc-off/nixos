@@ -1,4 +1,4 @@
-{ pkgs, config, theme, color-lib, ... }:
+{ pkgs, config, theme, lib, color-lib, ... }:
 let
   # Helper function to set alpha on a hex color string using color-lib
   setAlpha = alphaValue: hexColor:
