@@ -1,4 +1,4 @@
-{ lib, inputs, outputs, colorLib, theme, config, pkgs, self, hostName, system, ... }: {
+{ lib, inputs, outputs, color-lib, theme, config, pkgs, self, hostName, system, ... }: {
   imports = [
 
     { # Home-Manager
@@ -9,7 +9,7 @@
         useUserPackages = true;
         users.knoff = import ../home/knoff-laptop.nix;
         extraSpecialArgs = {
-          inherit inputs outputs self theme colorLib hostName system;
+          inherit inputs outputs self theme color-lib hostName system;
         };
       };
     }

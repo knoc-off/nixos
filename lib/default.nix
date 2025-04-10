@@ -1,3 +1,4 @@
 { lib ? import <nixpkgs/lib> }:
-
-import ./colors/color-lib.nix { inherit lib; }
+{
+  color-lib = import ./color-lib/color-manipulation.nix { inherit lib; };
+}

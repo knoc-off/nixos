@@ -1,15 +1,8 @@
-# This file is now a function that accepts color-lib and lib
-# This file is now a function that accepts color-lib and lib
 { color-lib, lib }:
-
 let
-  inherit (color-lib) mixColors setOkhslLightness setOkhslSaturation adjustOkhslHue getOkhslLightness; # Added getOkhslLightness
-
-  # --- Core Palette ---
-  primary =   "#59C2FF"; # Blue
-  secondary = "#FF8F40"; # Orange
-  accent1 =   "#B8CC52"; # Green
-  accent2 =   "#D2A6FF"; # Light Purple/Accent Magenta
+  inherit (color-lib)
+    mixColors setOkhslLightness setOkhslSaturation adjustOkhslHue
+    getOkhslLightness; # Added getOkhslLightness
 
   # Define anchor background and foreground
   bg = color-lib.setOkhslLightness 0.15 "#263238"; # Dark Background
@@ -20,41 +13,44 @@ let
 
   # --- Generate Grayscale (base00-base07) ---
   # Adjust lightness values for desired contrast steps
-  base00 = bg;                             # Darkest Background
-  base01 = setOkhslLightness 0.28 bg;      # Dark Background highlight
-  base02 = setOkhslLightness 0.32 bg;      # Dark Selection Background
-  base03 = setOkhslLightness 0.45 bg;      # Comments, low-contrast foreground
-  base04 = setOkhslLightness 0.80 fg;      # Default Foreground secondary
-  base05 = setOkhslLightness 0.92 fg;      # Default Foreground primary
-  base06 = setOkhslLightness 0.97 fg;      # Light Background highlight
-  base07 = fg;                             # Lightest Foreground
+  base00 = bg; # Darkest Background
+  base01 = setOkhslLightness 0.28 bg; # Dark Background highlight
+  base02 = setOkhslLightness 0.32 bg; # Dark Selection Background
+  base03 = setOkhslLightness 0.45 bg; # Comments, low-contrast foreground
+  base04 = setOkhslLightness 0.70 fg; # Default Foreground secondary
+  base05 = setOkhslLightness 0.80 fg; # Default Foreground primary
+  base06 = setOkhslLightness 0.90 fg; # Light Background highlight
+  base07 = fg; # Lightest Foreground
 
-  # --- Define Base Hues for Accents (base08-base0F) ---
-  # Using existing colors as hue sources
-  hueRed     = "#FF5370"; # Original base0F
-  hueOrange  = secondary; # "#FF8F40"
-  hueYellow  = "#FFCB6B"; # Original base0A
-  hueGreen   = accent1;   # "#B8CC52"
-  hueCyan    = "#89DDFF"; # Original base0C
-  hueBlue    = primary;   # "#59C2FF"
+  hueRed =     "#F94144"; # Original base0F
+  hueOrange =  "#F8961E"; # "#FF8F40"
+  hueYellow =  "#F9C74F"; # Original base0A
+  hueGreen =   "#90BE6D"; # "#B8CC52"
+  hueCyan =    "#4D908E"; # Adjusted Cyan - More distinct from Blue
+  hueBlue =    "#59C2FF"; # "#59C2FF"
   hueMagenta = "#C792EA"; # Original base0E
-  hueViolet  = "#F07178"; # Original base08 (using as Violet/Alt Red)
+  hueViolet =  "#ec0868"; # Original base08 (using as Violet/Alt Red)
+
+  # --- Core Palette ---
+  primary = hueBlue; # Blue
+  secondary = hueOrange; # Orange
+  accent1 = hueGreen; # Green
+  accent2 = hueMagenta; # Light Purple
 
   # --- Generate Accent Colors (base08-base0F) ---
   # Set consistent lightness and saturation for accents
-  # Adjust these values (e.g., l=0.7, s=0.8) to taste
   setAccent = l: s: hex: setOkhslSaturation s (setOkhslLightness l hex);
-  accentL = 0.70; # Target lightness for accents
-  accentS = 0.70; # Target saturation for accents
+  accentL = 0.7; # Target lightness for accents
+  accentS = 0.7; # Target saturation for accents
 
-  base08 = setAccent accentL accentS hueRed;     # Red
-  base09 = setAccent accentL accentS hueOrange;  # Orange
-  base0A = setAccent accentL accentS hueYellow;  # Yellow
-  base0B = setAccent accentL accentS hueGreen;   # Green
-  base0C = setAccent accentL accentS hueCyan;    # Cyan
-  base0D = setAccent accentL accentS hueBlue;    # Blue
-  base0E = setAccent accentL accentS hueMagenta; # Magenta
-  base0F = setAccent accentL accentS hueViolet;  # Violet / Alt Red
+  base08 = setAccent accentL accentS hueRed;      # Red
+  base09 = setAccent accentL accentS hueOrange;   # Orange
+  base0A = setAccent accentL accentS hueYellow;   # Yellow
+  base0B = setAccent accentL accentS hueGreen;    # Green
+  base0C = setAccent accentL accentS hueCyan;     # Cyan
+  base0D = setAccent accentL accentS hueBlue;     # Blue
+  base0E = setAccent accentL accentS hueMagenta;  # Magenta
+  base0F = setAccent accentL accentS hueViolet;   # Violet
 
   # --- Determine Theme Type ---
   bgLightness = getOkhslLightness bg;
@@ -62,34 +58,27 @@ let
 
 in {
   # Expose Core Palette (removing '#' prefix)
-  primary = lib.removePrefix "#" primary;
-  secondary = lib.removePrefix "#" secondary;
-  neutral = lib.removePrefix "#" neutral;
-  accent1 = lib.removePrefix "#" accent1;
-  accent2 = lib.removePrefix "#" accent2;
+  primary = lib.removePrefix "#" primary; # theme.primary
+  secondary = lib.removePrefix "#" secondary; # theme.secondary
+  neutral = lib.removePrefix "#" neutral; # theme.neutral
+  accent1 = lib.removePrefix "#" accent1; # theme.accent1
+  accent2 = lib.removePrefix "#" accent2; # theme.accent2
 
   # Expose Generated Base16 Palette (removing '#' prefix)
-  base00 = lib.removePrefix "#" base00;
-  base01 = lib.removePrefix "#" base01;
-  base02 = lib.removePrefix "#" base02;
-  base03 = lib.removePrefix "#" base03;
-  base04 = lib.removePrefix "#" base04;
-  base05 = lib.removePrefix "#" base05;
-  base06 = lib.removePrefix "#" base06;
-  base07 = lib.removePrefix "#" base07;
-  base08 = lib.removePrefix "#" base08;
-  base09 = lib.removePrefix "#" base09;
-  base0A = lib.removePrefix "#" base0A;
-  base0B = lib.removePrefix "#" base0B;
-  base0C = lib.removePrefix "#" base0C;
-  base0D = lib.removePrefix "#" base0D;
-  base0E = lib.removePrefix "#" base0E;
-  base0F = lib.removePrefix "#" base0F;
-
-  # Expose the mixing function (it already returns hex without '#')
-  inherit mixColors;
-
-  # Expose the theme type
-  inherit themeType;
+  base00 = lib.removePrefix "#" base00; # theme.base00
+  base01 = lib.removePrefix "#" base01; # theme.base01
+  base02 = lib.removePrefix "#" base02; # theme.base02
+  base03 = lib.removePrefix "#" base03; # theme.base03
+  base04 = lib.removePrefix "#" base04; # theme.base04
+  base05 = lib.removePrefix "#" base05; # theme.base05
+  base06 = lib.removePrefix "#" base06; # theme.base06
+  base07 = lib.removePrefix "#" base07; # theme.base07
+  base08 = lib.removePrefix "#" base08; # theme.base08
+  base09 = lib.removePrefix "#" base09; # theme.base09
+  base0A = lib.removePrefix "#" base0A; # theme.base0A
+  base0B = lib.removePrefix "#" base0B; # theme.base0B
+  base0C = lib.removePrefix "#" base0C; # theme.base0C
+  base0D = lib.removePrefix "#" base0D; # theme.base0D
+  base0E = lib.removePrefix "#" base0E; # theme.base0E
+  base0F = lib.removePrefix "#" base0F; # theme.base0F
 }
-

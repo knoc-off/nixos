@@ -1,4 +1,4 @@
-{ inputs, pkgs, theme, lib, colorLib, config, ... }:
+{ inputs, pkgs, theme, lib, color-lib, config, ... }:
 let
   addons = inputs.firefox-addons.packages.${pkgs.system};
 
@@ -65,7 +65,7 @@ in rec {
       ];
 
       userChrome =
-        import ./userChrome.nix { inherit theme colorLib firefox-csshacks; };
+        import ./userChrome.nix { inherit theme color-lib firefox-csshacks; };
       search = import ./searchEngines { inherit pkgs lib; };
     };
 

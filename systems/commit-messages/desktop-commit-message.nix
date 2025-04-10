@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "feat:_Add_matchLightnessSaturation_function_to_color-manipulation.nix_______________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________moving_to_new_version_of_nixpkgs._24.11";
+  system.nixos.label = "feat:_Refactor_theme.nix_for_improved_color_palette_generation______________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "______________________________feat:_Refactor_theme.nix_for_improved_color_palette_generation";
 }
