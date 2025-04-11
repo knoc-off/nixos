@@ -1,16 +1,7 @@
-{ theme, color-lib, lib, ... }:
+{ theme, color-lib, math, lib, ... }:
 let
-  # Helper function to generate a range of floats
-  arange = start: end: step:
-    let
-      gen = n: start + (builtins.toFloat n) * step;
-      # Determine the maximum index 'n' such that gen(n) <= end + epsilon
-      maxN = builtins.floor ((end - start) / step + 1e-9);
-    in
-      lib.genList gen (maxN + 1);
-
   # Generate the zoom values list
-  zoomValuesList = arange 0.30 2.00 0.02;
+  zoomValuesList = math.arange 0.30 2.00 0.02;
 
   # Format each value as a string and join with commas
   zoomValuesString = lib.concatStringsSep "," (lib.map builtins.toString zoomValuesList);
