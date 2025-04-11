@@ -1,4 +1,4 @@
-{ inputs, pkgs, theme, lib, color-lib, config, ... }:
+{ inputs, math, pkgs, theme, lib, color-lib, config, ... }:
 let
   addons = inputs.firefox-addons.packages.${pkgs.system};
 
@@ -8,6 +8,10 @@ let
     installPhase = ''
       cp -r . $out
     '';
+  };
+
+
+
 in rec {
 
   home.sessionVariables = {
@@ -62,6 +66,11 @@ in rec {
       isDefault = false;
       id = 2;
       name = "testing2";
+
+      settings = import ./settings/default.nix {inherit theme math lib color-lib;};
+      extensions = with addons; [sidebery];
+      userChrome =
+        import ./userChrome-minimal.nix { inherit theme color-lib firefox-csshacks; };
 
     };
   };

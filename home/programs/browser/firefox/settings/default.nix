@@ -11,6 +11,9 @@ in
   # Core Functionality & Performance
   # =========================================================================
 
+  # auto enable extensions
+  "extensions.autoDisableScopes" = 0;
+
   # Enable Fission (Site Isolation)
   "fission.autostart" = true;
 
@@ -167,8 +170,8 @@ in
   "browser.anchor_color" = "#${theme.base0D}"; # Link color (light) - Using Blue
   "browser.anchor_color.dark" = "#${theme.base0D}"; # Link color (dark) - Using Blue
   "browser.display.background_color" = "#${theme.base00}"; # Page background (light)
-  "browser.display.background_color.dark" = "#${theme.base00}"; # Page background (dark)
-  "browser.display.foreground_color" = "#${theme.base05}"; # Page text (light)
+  "browser.display.background_color.dark" = "#${theme.base01}"; # Page background (dark)
+  "browser.display.foreground_color" = "#${theme.base06}"; # Page text (light)
   "browser.display.foreground_color.dark" = "#${theme.base07}"; # Page text (dark)
   # New Tab Page accent colors - using a sequence of base colors
   "browser.newtabpage.activity-stream.newNewtabExperience.colors" =

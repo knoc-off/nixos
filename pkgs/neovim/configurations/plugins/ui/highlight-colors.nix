@@ -1,56 +1,48 @@
+{ color-lib, lib, theme, ... }:
+
 {
   plugins.highlight-colors = {
     enable = true;
 
-    # Choose rendering style (background, foreground, or virtual)
-    render = "background";
+    # All configuration options go under settings
+    settings = {
+      # Choose rendering style
+      render = "background";
 
-    # Virtual text configuration (applies when render = "virtual")
-    virtual_symbol = "■";
-    virtual_symbol_prefix = "";
-    virtual_symbol_suffix = " ";
-    virtual_symbol_position = "inline";
+      # Enable color formats you need
+      enable_hex = true;
+      enable_named_colors = true;
 
-    # Enable various color formats
-    enable_hex = true;
-    enable_short_hex = true;
-    enable_rgb = true;
-    enable_hsl = true;
-    enable_ansi = true;
-    enable_hsl_without_function = true;
-    enable_var_usage = true;
-    enable_named_colors = true;
-    enable_tailwind = true;
+      # Custom colors with properly escaped labels
+      custom_colors = let
+        mkThemeColors = themeSet:
+          lib.mapAttrsToList (name: value: {
+            # Construct the label string: "theme.<key>"
+            label = "theme.${name}";
+            # Construct the color string: "#<value>"
+            color = "#${value}";
+          }) themeSet;
+      in [
+        {
+          label = "%-%-primary";
+          color = "#4287f5";
+        }
+        {
+          label = "%-%-secondary";
+          color = "#42f5aa";
+        }
+        {
+          label = "%-%-warning";
+          color = "#f5d742";
+        }
+        {
+          label = "%-%-error";
+          color = "#f54242";
+        }
+      ] ++ (mkThemeColors theme);
+    };
 
-    # Custom colors (with properly escaped labels)
-    custom_colors = [
-      {
-        label = "%-%-primary%-color";
-        color = "#3498db";
-      }
-      {
-        label = "%-%-secondary%-color";
-        color = "#2ecc71";
-      }
-      {
-        label = "%-%-accent%-color";
-        color = "#e74c3c";
-      }
-      {
-        label = "%-%-background%-dark";
-        color = "#1a1a2e";
-      }
-      {
-        label = "%-%-text%-light";
-        color = "#f0f0f0";
-      }
-    ];
-
-    # Exclude certain filetypes or buftypes from highlighting
-    exclude_filetypes = [ "NvimTree" "TelescopePrompt" "lazy" ];
-    exclude_buftypes = [ "nofile" "terminal" ];
-
-    # Enable integration with nvim-cmp
-    cmpIntegration = true;
+    # Optional cmp integration at the plugin level
+    # cmpIntegration = true;
   };
 }

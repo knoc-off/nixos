@@ -2,13 +2,6 @@
 
 let
   inherit (color-lib) hexToRgb rgbToHex setOkhslLightness mixColors;
-
-  primary = theme.primary;
-  secondary = theme.secondary;
-  neutral = theme.neutral;
-  accent1 = theme.accent1;
-  accent2 = theme.accent2;
-
 in
 {
   services.dunst = {
@@ -27,13 +20,13 @@ in
       urgency_normal = {
         background = theme.base01;
         foreground = theme.base05;
-        highlight = theme.accent1;
+        highlight = theme.base0B;
         timeout = 10;
       };
       urgency_critical = {
         background = theme.base08;
         foreground = theme.base07;
-        highlight = theme.accent2;
+        highlight = theme.base0E;
         timeout = 0;
       };
     };

@@ -455,6 +455,7 @@ in {
         "dialout"
         "libvirtd"
         "uinput"
+        "lp"
       ];
       initialPassword = "password";
       openssh.authorizedKeys.keys = [ ];

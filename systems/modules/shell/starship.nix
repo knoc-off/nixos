@@ -53,7 +53,7 @@
       };
 
       python = {
-        symbol = "py ";
+        symbol = "";
         version_format = "$major.$minor";
         # Format with parentheses
         format = "([$symbol$version]($style))";
@@ -64,7 +64,7 @@
       };
 
       rust = {
-        symbol = "rs ";
+        symbol = "";
         version_format = "$major.$minor";
         # Format with parentheses
         format = "([$symbol$version]($style))";
