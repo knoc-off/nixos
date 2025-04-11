@@ -162,9 +162,23 @@ in
 
 
   # --- colors ---
-
-
-
+  "browser.active_color" = "#${theme.base0E}"; # Active link color (light) - Using Magenta/Purple
+  "browser.active_color.dark" = "#${theme.base0E}"; # Active link color (dark) - Using Magenta/Purple
+  "browser.anchor_color" = "#${theme.base0D}"; # Link color (light) - Using Blue
+  "browser.anchor_color.dark" = "#${theme.base0D}"; # Link color (dark) - Using Blue
+  "browser.display.background_color" = "#${theme.base00}"; # Page background (light)
+  "browser.display.background_color.dark" = "#${theme.base00}"; # Page background (dark)
+  "browser.display.foreground_color" = "#${theme.base05}"; # Page text (light)
+  "browser.display.foreground_color.dark" = "#${theme.base07}"; # Page text (dark)
+  # New Tab Page accent colors - using a sequence of base colors
+  "browser.newtabpage.activity-stream.newNewtabExperience.colors" =
+    "#${theme.base08},#${theme.base09},#${theme.base0A},#${theme.base0B},#${theme.base0C},#${theme.base0D},#${theme.base0E}";
+  "browser.visited_color" = "#${theme.base0E}"; # Visited link color (light) - Using Magenta/Purple
+  "browser.visited_color.dark" = "#${theme.base0F}"; # Visited link color (dark) - Using Brown/Lighter Purple
+  "editor.background_color" = "#${theme.base01}"; # Text input background (light)
+  # PDF.js highlight colors mapped to theme accents
+  "pdfjs.highlightEditorColors" =
+    "yellow=#${theme.base0A},green=#${theme.base0B},blue=#${theme.base0D},pink=#${theme.base0E},red=#${theme.base08}";
 
   # =========================================================================
   # UI Customization (Behavior, Tabs, URL Bar)
