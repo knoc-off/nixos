@@ -8,36 +8,6 @@ let
     installPhase = ''
       cp -r . $out
     '';
-  };
-
-  # Extension groups
-  essentialExtensions = with addons; [
-    ublock-origin
-    bitwarden
-    sidebery
-    tridactyl
-  ];
-
-  privacyExtensions = with addons; [
-    smart-referer
-    cookie-autodelete
-    user-agent-string-switcher
-  ];
-
-  appearanceExtensions = with addons; [ darkreader nighttab ];
-
-  utilityExtensions = with addons; [
-    translate-web-pages
-    export-cookies-txt
-    violentmonkey
-    history-cleaner
-    istilldontcareaboutcookies
-  ];
-
-  # Combine extension sets with priorities
-  mkExtensionSet = sets:
-    lib.mkMerge (map (set: lib.mkOverride set.priority set.extensions) sets);
-
 in rec {
 
   home.sessionVariables = {
@@ -52,16 +22,17 @@ in rec {
       id = 0;
       name = "main";
 
-      # Full featured profile - all extension sets
-      extensions = mkExtensionSet [
-        {
-          priority = 100;
-          extensions = essentialExtensions;
-        }
-        {
-          priority = 200;
-          extensions = privacyExtensions;
-        }
+      # Extensions for the main profile
+      extensions = with addons; [
+        # Essential
+        ublock-origin
+        bitwarden
+        sidebery
+        tridactyl
+        # Privacy
+        smart-referer
+        cookie-autodelete
+        user-agent-string-switcher
       ];
 
       userChrome =
@@ -74,11 +45,14 @@ in rec {
       id = 1;
       name = "minimal";
 
-      # Minimal profile - only essential extensions
-      extensions = mkExtensionSet [{
-        priority = 100;
-        extensions = essentialExtensions;
-      }];
+      # Extensions for the minimal profile
+      extensions = with addons; [
+        # Essential
+        ublock-origin
+        bitwarden
+        sidebery
+        tridactyl
+      ];
 
       # Rest of minimal profile config...
       search = import ./searchEngines { inherit pkgs lib; };
