@@ -1,4 +1,21 @@
-{ theme, color-lib, ... }: {
+{ theme, color-lib, lib, ... }:
+let
+  # Helper function to generate a range of floats
+  arange = start: end: step:
+    let
+      gen = n: start + (builtins.toFloat n) * step;
+      # Determine the maximum index 'n' such that gen(n) <= end + epsilon
+      maxN = builtins.floor ((end - start) / step + 1e-9);
+    in
+      lib.genList gen (maxN + 1);
+
+  # Generate the zoom values list
+  zoomValuesList = arange 0.30 2.00 0.02;
+
+  # Format each value as a string and join with commas
+  zoomValuesString = lib.concatStringsSep "," (lib.map builtins.toString zoomValuesList);
+in
+{
   # =========================================================================
   # Core Functionality & Performance
   # =========================================================================
@@ -185,8 +202,7 @@
 
   # --- Zoom ---
   # Define custom zoom levels for finer control
-  "toolkit.zoomManager.zoomValues" =
-    "0.30,0.32,0.34,0.36,0.38,0.40,0.42,0.44,0.46,0.48,0.50,0.52,0.54,0.56,0.58,0.60,0.62,0.64,0.66,0.68,0.70,0.72,0.74,0.76,0.78,0.80,0.82,0.84,0.86,0.88,0.90,0.92,0.94,0.96,0.98,1.0,1.02,1.04,1.06,1.08,1.10,1.12,1.14,1.16,1.18,1.20,1.22,1.24,1.26,1.28,1.30,1.32,1.34,1.36,1.38,1.40,1.42,1.44,1.46,1.48,1.50,1.52,1.54,1.56,1.58,1.60,1.62,1.64,1.66,1.68,1.70,1.72,1.74,1.76,1.78,1.80,1.82,1.84,1.86,1.88,1.90,1.92,1.94,1.96,1.98,2";
+  "toolkit.zoomManager.zoomValues" = zoomValuesString;
 
   # --- Smooth Scrolling ---
   "general.autoScroll" = true; # Enable middle-mouse button scrolling
