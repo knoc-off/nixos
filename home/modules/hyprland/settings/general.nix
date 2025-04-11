@@ -28,10 +28,10 @@ in {
     gaps_in = -1;
     gaps_out = -4;
     border_size = 4;
-    "col.active_border" = "0xff${theme.accent1}";
-    "col.inactive_border" = "0xff${theme.neutral}";
-    "col.nogroup_border_active" = "0x00${theme.primary}"; # transparent
-    "col.nogroup_border" = "0x99${theme.primary}";
+    "col.active_border" = "0xff${theme.base0B}";
+    "col.inactive_border" = "0xff${theme.base0D}";
+    "col.nogroup_border_active" = "0x00${theme.base0D}"; # transparent
+    "col.nogroup_border" = "0x99${theme.base0D}";
 
     layout = "master";
     resize_on_border = true;
@@ -40,21 +40,21 @@ in {
   group = {
     insert_after_current = true;
     focus_removed_window = true;
-    "col.border_active" = "0xff${theme.accent1}";
-    "col.border_inactive" = "0x99${theme.primary}";
-    "col.border_locked_active" = "0xff${theme.accent2}";
-    "col.border_locked_inactive" = "0x99${theme.accent2}";
+    "col.border_active" = "0xff${theme.base0B}";
+    "col.border_inactive" = "0x99${theme.base0D}";
+    "col.border_locked_active" = "0xff${theme.base0F}";
+    "col.border_locked_inactive" = "0x99${theme.base0F}";
 
     groupbar = {
       font_size = 10;
       gradients = false;
       render_titles = false;
       scrolling = false;
-      text_color = "0xff${theme.neutral}";
-      "col.active" = "0xff${theme.secondary}";
-      "col.inactive" = "0x99${theme.secondary}";
-      "col.locked_active" = "0xff${theme.accent2}";
-      "col.locked_inactive" = "0x99${theme.accent2}";
+      text_color = "0xff${theme.base0D}";
+      "col.active" = "0xff${theme.base0A}";
+      "col.inactive" = "0x99${theme.base0A}";
+      "col.locked_active" = "0xff${theme.base0F}";
+      "col.locked_inactive" = "0x99${theme.base0F}";
     };
   };
 

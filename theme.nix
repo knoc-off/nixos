@@ -22,22 +22,9 @@ let
   base06 = setOkhslLightness 0.90 fg; # Light Background highlight
   base07 = fg; # Lightest Foreground
 
-  # --- Define Hues for Core Palette ---
-  # Keep these for defining primary/secondary etc. if needed, or replace their usage below.
-  coreHueBlue =    "#59C2FF";
-  coreHueOrange =  "#F8961E";
-  coreHueGreen =   "#90BE6D";
-  coreHueMagenta = "#C792EA";
-
-  # --- Core Palette ---
-  primary = coreHueBlue; # Blue
-  secondary = coreHueOrange; # Orange
-  accent1 = coreHueGreen; # Green
-  accent2 = coreHueMagenta; # Light Purple
-
   # --- Generate Accent Colors (base08-base0F) ---
-  accentL = 0.7; # Target lightness for accents
-  accentS = 0.7; # Target saturation for accents
+  accentL = 0.8; # Target lightness for accents
+  accentS = 0.8; # Target saturation for accents
 
   # Generate 8 evenly spaced hue values (0.0 to 0.875) using arange
   numHues = 8;
@@ -71,6 +58,7 @@ let
   themeType = if bgLightness < 0.5 then "dark" else "light";
 
 in {
+  #type = themeType;
 
   # Expose Generated Base16 Palette (removing '#' prefix)
   base00 = lib.removePrefix "#" base00; # theme.base00

@@ -1,5 +1,5 @@
 # these packages can oftem be used as devshells but not always
-{ pkgs, inputs, system, upkgs, ... }:
+{ pkgs, inputs, system, upkgs, color-lib, math, theme, ... }:
 let
   rustPkgs = pkgs.extend (import inputs.rust-overlay);
 
@@ -18,6 +18,14 @@ let
   };
 
 in rec {
+  materia-theme = pkgs.callPackage ./matera-theme {
+    configBase16 = {
+      name = "materia-theme";
+      kind = "dark";
+      colors = theme;
+    };
+  };
+
   rcon-cli = pkgs.callPackage ./rcon-cli { };
   grosshack = pkgs.callPackage ./grosshack { };
   blink_led = pkgs.callPackage ./blinkFW13LED { };
@@ -54,7 +62,8 @@ in rec {
   spider-cli = rustPkgs.callPackage ./spider { };
   csv-tui = rustPkgs.callPackage ./csv-tui-viewer { };
   tabiew = rustPkgs-fenix.callPackage ./tabiew { inherit rustPlatform; };
-  treeview = rustPkgs-fenix.callPackage ./tree-cat { rustPlatform = rustPlatform-dev; };
+  treeview =
+    rustPkgs-fenix.callPackage ./tree-cat { rustPlatform = rustPlatform-dev; };
 
   inherit rustPkgs-fenix;
   inherit (inputs) fenix;
@@ -106,6 +115,7 @@ in rec {
   in {
     default = nixvim.makeNixvimWithModule {
       pkgs = customPkgs;
+      extraSpecialArgs = { inherit color-lib theme; };
       module = { imports = [ ./neovim/configurations ]; };
     };
     minimal = nixvim.makeNixvimWithModule {

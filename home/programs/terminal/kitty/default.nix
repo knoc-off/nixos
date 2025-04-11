@@ -3,6 +3,9 @@ let
   inherit (color-lib) setOkhslLightness setOkhslSaturation;
   lighten = setOkhslLightness 0.6;
   saturate = setOkhslSaturation 0.8;
+
+  sa = hex: lighten ( saturate hex);
+
 in
 {
   imports = [ ./tab_bar.nix ];
@@ -54,17 +57,17 @@ in
       color7 = "#${theme.base05}"; # White
 
       # Bright colors adjusted for more lightness and saturation
-      color8 = "#${lib.removePrefix "#" (saturate (lighten "#${theme.base03}"))}"; # Bright Black (Gray)
-      color9 = "#${lib.removePrefix "#" (saturate (lighten "#${theme.base08}"))}"; # Bright Red
-      color10 = "#${lib.removePrefix "#" (saturate (lighten "#${theme.base0B}"))}"; # Bright Green
-      color11 = "#${lib.removePrefix "#" (saturate (lighten "#${theme.base0A}"))}"; # Bright Yellow
-      color12 = "#${lib.removePrefix "#" (saturate (lighten "#${theme.base0D}"))}"; # Bright Blue
-      color13 = "#${lib.removePrefix "#" (saturate (lighten "#${theme.base0E}"))}"; # Bright Magenta
-      color14 = "#${lib.removePrefix "#" (saturate (lighten "#${theme.base0C}"))}"; # Bright Cyan
-      color15 = "#${lib.removePrefix "#" (saturate (lighten "#${theme.base07}"))}"; # Bright White
+      color8 = "#${ sa theme.base03}"; # Bright Black (Gray)
+      color9 = "#${ sa theme.base08}"; # Bright Red
+      color10 = "#${sa theme.base0B}"; # Bright Green
+      color11 = "#${sa theme.base0A}"; # Bright Yellow
+      color12 = "#${sa theme.base0D}"; # Bright Blue
+      color13 = "#${sa theme.base0E}"; # Bright Magenta
+      color14 = "#${sa theme.base0C}"; # Bright Cyan
+      color15 = "#${sa theme.base07}"; # Bright White
 
       # Derived colors
-      foreground = "#${theme.base05}";
+      foreground = "#${theme.base06}";
       background = "#${theme.base00}"; # Use base00 directly
       selection_background = "#${theme.base02}"; # Use base02 (Dark Selection Background)
       selection_foreground = "none";

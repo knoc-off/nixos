@@ -27,16 +27,16 @@
         { hostname, user, system, extraModules ? [ ], extraConfigs ? { } }:
         let
           # Define color-lib and theme here where lib and system are known
-          color-lib = self.lib.${system}.color-lib;
+          inherit (self.lib.${system}) math color-lib;
           # Pass color-lib and lib to the theme function
-          theme = import ./theme.nix { inherit color-lib lib; };
+          theme = import ./theme.nix { inherit color-lib math lib; };
         in nixosSystem {
           inherit system;
           specialArgs = {
-            inherit self inputs outputs hostname user lib system theme color-lib; # Pass theme and color-lib
+            inherit self inputs outputs hostname user lib system theme color-lib
+              math; # Pass theme and color-lib
             upkgs = unstablePkgs system;
             selfPkgs = self.packages.${system};
-            # color-lib is already defined above and passed
           } // extraConfigs;
           modules = [
             ./systems/${hostname}.nix
@@ -77,6 +77,12 @@
       mkPkgs = system:
         let
           upkgs = unstablePkgs system;
+
+          inherit (self.lib.${system}) math color-lib;
+
+          # Pass color-lib and lib to the theme function
+          theme = import ./theme.nix { inherit color-lib math lib; };
+
           # Import packages from the stable Nixpkgs channel
           pkgs = import nixpkgs {
             inherit system;
@@ -86,7 +92,10 @@
             };
           };
           # Import custom packages defined in the ./pkgs directory
-        in import ./pkgs { inherit inputs self system pkgs upkgs lib; };
+          # i dont like pushing through my own lib as a dependency, makes it too self-reliant and less distributable. but i really value the possibilities
+        in import ./pkgs {
+          inherit inputs self system pkgs upkgs lib color-lib math theme;
+        };
 
     in {
       packages = forAllSystems mkPkgs;

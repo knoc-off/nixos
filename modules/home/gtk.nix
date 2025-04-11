@@ -1,11 +1,11 @@
-{ pkgs, config, ... }:
+{ self, pkgs, config, ... }:
 {
   gtk = {
     enable = true;
 
     theme = {
-    	name = "Nordic";
-      package = pkgs.nordic;
+    	name = "materia-theme";
+      package = self.packages.${pkgs.system}.materia-theme;
     };
     iconTheme = {
       name = "Nordzy";
