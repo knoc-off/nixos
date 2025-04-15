@@ -20,10 +20,13 @@ fn setup(mut commands: Commands) {
     // Spawn the camera
     commands.spawn((
         Camera3d::default(), // Use Camera3d component directly
-        Transform::from_xyz(0.0, 10.0, 0.0).looking_at(Vec3::ZERO, Vec3::Z), // Top-down view looking along -Y
+        Transform::from_xyz(0.0, 10.0, 0.0).looking_at(Vec3::ZERO, Vec3::Z),
         Projection::Orthographic(OrthographicProjection {
-            scale: 10.0, // Adjust scale for initial zoom level
-            // ..default() removed as OrthographicProjection doesn't implement Default
+            scale: 10.0,
+            far: 1000.0,
+            near: -1000.0,
+            area: Rect::new(-1.0, -1.0, 1.0, 1.0),
+            depth_calculation: bevy::render::camera::DepthCalculation::ZDifference,
         }),
     ));
 
@@ -40,7 +43,7 @@ fn setup(mut commands: Commands) {
 
 fn draw_grid(mut gizmos: Gizmos) {
     let half_size = GRID_SIZE / 2.0;
-    let color = Color::DARK_GRAY; // Use a valid color constant
+    let color = Color::rgb(0.3, 0.3, 0.3); // Use a valid color constant
 
     for i in 0..=(GRID_SIZE / GRID_SPACING) as i32 {
         let pos = -half_size + i as f32 * GRID_SPACING;
