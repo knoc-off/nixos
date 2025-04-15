@@ -27,6 +27,30 @@ fn init(@builtin(global_invocation_id) invocation_id: vec3<u32>, @builtin(num_wo
     textureStore(output, location, color);
 }
 
+
+// Fragment shader inputs must match the vertex shader outputs
+// and the CustomMaterial definition.
+struct FragmentInput {
+    @location(0) uv: vec2<f32>,
+};
+
+// Bindings must match CustomMaterial in main.rs
+@group(1) @binding(0) var<uniform> time: f32;
+@group(1) @binding(1) var<uniform> aspect_ratio: f32;
+@group(1) @binding(2) var t_color: texture_2d<f32>;
+@group(1) @binding(3) var s_color: sampler;
+@group(1) @binding(4) var<uniform> mouse_pos: vec2<f32>;
+@group(1) @binding(5) var<uniform> color: vec4<f32>; // Matches LinearRgba
+
+@fragment
+fn fragment(in: FragmentInput) -> @location(0) vec4<f32> {
+    // Sample the texture provided by the material
+    // Use the color uniform as a fallback or multiplier if needed
+    return textureSample(t_color, s_color, in.uv) * color;
+    // Or just return the texture color directly:
+    // return textureSample(t_color, s_color, in.uv);
+}
+
 fn is_alive(location: vec2<i32>, offset_x: i32, offset_y: i32) -> i32 {
     let value: vec4<f32> = textureLoad(input, location + vec2<i32>(offset_x, offset_y));
     return i32(value.x);
