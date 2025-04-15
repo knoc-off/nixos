@@ -26,6 +26,8 @@ fn setup(mut commands: Commands) {
             far: 1000.0,
             near: -1000.0,
             area: Rect::new(-1.0, -1.0, 1.0, 1.0),
+            scaling_mode: bevy::render::camera::ScalingMode::WindowSize(1.0), // Add scaling mode
+            viewport_origin: Vec2::new(0.5, 0.5), // Add viewport origin (center)
         }),
     ));
 
