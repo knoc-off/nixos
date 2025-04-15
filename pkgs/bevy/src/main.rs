@@ -1,6 +1,6 @@
 use bevy::{
     prelude::*,
-    input::mouse::{MouseMotion, MouseWheel},
+    input::mouse::MouseWheel,
 };
 
 const GRID_SIZE: f32 = 20.0;
@@ -18,30 +18,29 @@ fn main() {
 
 fn setup(mut commands: Commands) {
     // Spawn the camera
-    commands.spawn(Camera3dBundle {
-        transform: Transform::from_xyz(0.0, 10.0, 0.0).looking_at(Vec3::ZERO, Vec3::Z), // Top-down view looking along -Y
-        projection: OrthographicProjection {
+    commands.spawn((
+        Camera3d::default(), // Use Camera3d component directly
+        Transform::from_xyz(0.0, 10.0, 0.0).looking_at(Vec3::ZERO, Vec3::Z), // Top-down view looking along -Y
+        Projection::Orthographic(OrthographicProjection {
             scale: 10.0, // Adjust scale for initial zoom level
-            ..default()
-        }.into(),
-        ..default()
-    });
+            // ..default() removed as OrthographicProjection doesn't implement Default
+        }),
+    ));
 
     // Add lighting
-    commands.spawn(PointLightBundle {
-        point_light: PointLight {
+    commands.spawn((
+        PointLight { // Use PointLight component directly
             intensity: 1500.0,
             shadows_enabled: true,
-            ..default()
+            ..default() // PointLight itself implements Default
         },
-        transform: Transform::from_xyz(4.0, 8.0, 4.0),
-        ..default()
-    });
+        Transform::from_xyz(4.0, 8.0, 4.0),
+    ));
 }
 
 fn draw_grid(mut gizmos: Gizmos) {
     let half_size = GRID_SIZE / 2.0;
-    let color = Color::GRAY;
+    let color = Color::DARK_GRAY; // Use a valid color constant
 
     for i in 0..=(GRID_SIZE / GRID_SPACING) as i32 {
         let pos = -half_size + i as f32 * GRID_SPACING;
@@ -86,14 +85,14 @@ fn camera_controls(
 
     if direction.length_squared() > 0.0 {
         direction = direction.normalize();
-        transform.translation += direction * CAMERA_MOVE_SPEED * time.delta_seconds();
+        transform.translation += direction * CAMERA_MOVE_SPEED * time.delta_secs(); // Use delta_secs()
     }
 
     // Handle zoom with mouse wheel
     if let Projection::Orthographic(ref mut ortho) = *projection {
         for event in mouse_wheel_events.read() {
             let scroll_amount = event.y;
-            ortho.scale -= scroll_amount * CAMERA_ZOOM_SPEED * time.delta_seconds();
+            ortho.scale -= scroll_amount * CAMERA_ZOOM_SPEED * time.delta_secs(); // Use delta_secs()
             ortho.scale = ortho.scale.max(0.1); // Prevent scale from becoming zero or negative
         }
     }
