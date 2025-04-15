@@ -26,7 +26,6 @@ fn setup(mut commands: Commands) {
             far: 1000.0,
             near: -1000.0,
             area: Rect::new(-1.0, -1.0, 1.0, 1.0),
-            depth_calculation: bevy::render::camera::DepthCalculation::ZDifference,
         }),
     ));
 
