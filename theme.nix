@@ -25,7 +25,6 @@ let
   accentHues = math.arange 0.0 1.0 hueStep; # Generates [0.0, 0.125, ..., 0.875]
 
 
-
   # --- Generate Grayscale (base00-base07) ---
   # Generate 8 evenly spaced lightness values from bg lightness to fg lightness
   l_bg = getOkhslLightness bg;
