@@ -25,19 +25,19 @@
       in [
         {
           label = "%-%-primary";
-          color = "#4287f5";
+          color = "#${theme.base0D}";
         }
         {
           label = "%-%-secondary";
-          color = "#42f5aa";
+          color = "#${theme.base0B}";
         }
         {
           label = "%-%-warning";
-          color = "#f5d742";
+          color = "#${theme.base0C}";
         }
         {
           label = "%-%-error";
-          color = "#f54242";
+          color = "#${theme.base08}";
         }
       ] ++ (mkThemeColors theme);
     };
