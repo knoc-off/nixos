@@ -2,7 +2,7 @@
 let
   inherit (color-lib)
     mixColors setOkhslLightness setOkhslSaturation adjustOkhslHue
-    getOkhslLightness setOkhslHue; # Added setOkhslHue
+    getOkhslLightness getOkhslSaturation setOkhslHue; # Added getOkhslSaturation, setOkhslHue
 
   # Define anchor background and foreground
   bg = color-lib.setOkhslLightness 0.15 "#263238"; # Dark Background
@@ -41,8 +41,13 @@ let
       prop = builtins.elemAt mixProportions n;
       light = builtins.elemAt grayLightnesses n;
       mixedColor = mixColors bg fg prop;
+      # Slightly reduce saturation
+      currentSat = getOkhslSaturation mixedColor;
+      newSat = currentSat * 0.9; # Reduce saturation to 90%
+      desaturatedColor = setOkhslSaturation newSat mixedColor;
     in
-      setOkhslLightness light mixedColor
+      # Set the target lightness on the desaturated color
+      setOkhslLightness light desaturatedColor
   ) 8;
 
   # Assign generated colors to base00-base07
