@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "Refactor:_Generate_base_colors_using_lightness_interpolation________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
+  system.nixos.label = "refactor:_Improve_grayscale_color_generation_in_theme.nix___________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
 }
