@@ -27,15 +27,34 @@ let
 
 
   # --- Generate Grayscale (base00-base07) ---
-  # Adjust lightness values for desired contrast steps
-  base00 = bg; # Darkest Background
-  base01 = setOkhslLightness 0.28 m ; # Dark Background highlight
-  base02 = setOkhslLightness 0.32 neutral; # Dark Selection Background
-  base03 = setOkhslLightness 0.45 neutral; # Comments, low-contrast foreground
-  base04 = setOkhslLightness 0.70 neutral; # Default Foreground secondary
-  base05 = setOkhslLightness 0.80 neutral; # Default Foreground primary
-  base06 = setOkhslLightness 0.90 neutral; # Light Background highlight
-  base07 = fg; # Lightest Foreground
+  # Generate 8 evenly spaced lightness values from bg lightness to fg lightness
+  l_bg = getOkhslLightness bg;
+  l_fg = getOkhslLightness fg;
+  grayLightnesses = lib.lists.genList (n: l_bg + n * (l_fg - l_bg) / 7) 8;
+
+  # Generate 8 evenly spaced mixing proportions from 0.0 (bg) to 1.0 (fg)
+  mixProportions = lib.lists.genList (n: n * 1.0 / 7) 8;
+
+  # Generate base colors by mixing bg and fg according to proportions,
+  # then setting the corresponding lightness.
+  baseColors = lib.lists.genList (n:
+    let
+      prop = builtins.elemAt mixProportions n;
+      light = builtins.elemAt grayLightnesses n;
+      mixedColor = mixColors bg fg prop;
+    in
+      setOkhslLightness light mixedColor
+  ) 8;
+
+  # Assign generated colors to base00-base07
+  base00 = builtins.elemAt baseColors 0; # Darkest Background
+  base01 = builtins.elemAt baseColors 1;
+  base02 = builtins.elemAt baseColors 2;
+  base03 = builtins.elemAt baseColors 3; # Comments, low-contrast foreground
+  base04 = builtins.elemAt baseColors 4; # Default Foreground secondary
+  base05 = builtins.elemAt baseColors 5; # Default Foreground primary
+  base06 = builtins.elemAt baseColors 6;
+  base07 = builtins.elemAt baseColors 7; # Lightest Foreground
 
 
 
