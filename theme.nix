@@ -42,9 +42,10 @@ let
       mixedColor = mixColors bg fg prop;
       # Slightly reduce saturation
       desaturatedColor = setOkhslSaturation 0.25 mixedColor;
+      lightnessSetColor = setOkhslLightness light desaturatedColor;
     in
-      # Set the target lightness on the desaturated color
-      setOkhslLightness light desaturatedColor
+      # Mix with neutral for cohesion
+      mixColors lightnessSetColor neutral 0.1
   ) 8;
 
   # Assign generated colors to base00-base07
@@ -66,8 +67,10 @@ let
     let
       modifiedL = setOkhslLightness targetL baseColor;
       modifiedLS = setOkhslSaturation targetS modifiedL;
-      finalColor = setOkhslHue targetHue modifiedLS;
-    in finalColor;
+      hueSetColor = setOkhslHue targetHue modifiedLS;
+    in
+      # Mix with neutral for cohesion
+      mixColors hueSetColor neutral 0.1;
 
   # Use the helper and the generated numeric hues for base08-base0F
   # We use 'neutral' as the starting point, its original L/S/H don't matter.
