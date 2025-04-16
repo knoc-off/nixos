@@ -35,7 +35,7 @@
     ./plugins/ls/languages/typescript.nix
 
     # Theme
-    ./themes
+    ./themes/default.nix
   ];
 
   viAlias = true;

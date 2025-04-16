@@ -120,6 +120,7 @@ in rec {
     };
     minimal = nixvim.makeNixvimWithModule {
       pkgs = customPkgs;
+      extraSpecialArgs = { inherit color-lib theme; };
       module = { imports = [ ./neovim/configurations/minimal.nix ]; };
     };
   };

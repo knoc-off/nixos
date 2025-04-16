@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "feat:_Mix_neutral_color_into_base_colors_for_palette_cohesion_______________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________minecraft_changes._disable_waydroid";
+  system.nixos.label = "feat:_Implement_theme_using_Okhsl_color_space_for_better_color_perception___________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________minecraft_changes._disable_waydroid";
 }
