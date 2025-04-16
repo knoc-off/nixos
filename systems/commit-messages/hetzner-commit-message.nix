@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "fix:_Add_missing_fields_to_OrthographicProjection_initializer_______________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
+  system.nixos.label = "refactor:_Simplify_theme_generation_and_adjust_grayscale_colors_____________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
 }

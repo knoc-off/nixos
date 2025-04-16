@@ -10,17 +10,8 @@ let
 
   # Define neutral based on bg/fg mix or a fixed value
   neutral = mixColors bg fg 0.5; # Or keep "#CED4DA";
+  m = mixColors;
 
-  # --- Generate Grayscale (base00-base07) ---
-  # Adjust lightness values for desired contrast steps
-  base00 = bg; # Darkest Background
-  base01 = setOkhslLightness 0.28 bg; # Dark Background highlight
-  base02 = setOkhslLightness 0.32 bg; # Dark Selection Background
-  base03 = setOkhslLightness 0.45 bg; # Comments, low-contrast foreground
-  base04 = setOkhslLightness 0.70 fg; # Default Foreground secondary
-  base05 = setOkhslLightness 0.80 fg; # Default Foreground primary
-  base06 = setOkhslLightness 0.90 fg; # Light Background highlight
-  base07 = fg; # Lightest Foreground
 
   # --- Generate Accent Colors (base08-base0F) ---
   accentL = 0.8; # Target lightness for accents
@@ -32,6 +23,22 @@ let
   # math.arange generates `floor((max - min) / step)` elements.
   # So arange 0.0 1.0 step generates floor(1.0 / step) = floor(numHues) = numHues elements.
   accentHues = math.arange 0.0 1.0 hueStep; # Generates [0.0, 0.125, ..., 0.875]
+
+
+
+  # --- Generate Grayscale (base00-base07) ---
+  # Adjust lightness values for desired contrast steps
+  base00 = bg; # Darkest Background
+  base01 = setOkhslLightness 0.28 m ; # Dark Background highlight
+  base02 = setOkhslLightness 0.32 neutral; # Dark Selection Background
+  base03 = setOkhslLightness 0.45 neutral; # Comments, low-contrast foreground
+  base04 = setOkhslLightness 0.70 neutral; # Default Foreground secondary
+  base05 = setOkhslLightness 0.80 neutral; # Default Foreground primary
+  base06 = setOkhslLightness 0.90 neutral; # Light Background highlight
+  base07 = fg; # Lightest Foreground
+
+
+
 
   # Helper function to create an accent color with a specific numeric hue
   # Takes a base color, target L, target S, and the target numeric Hue (0.0-1.0)
