@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "refactor:_Improve_grayscale_color_generation_in_theme.nix___________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________________________________________gtk";
+  system.nixos.label = "feat:_Lower_saturation_of_base_colors_slightly______________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________________________________________gtk";
 }
