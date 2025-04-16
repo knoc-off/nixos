@@ -10,12 +10,11 @@ let
 
   # Define neutral based on bg/fg mix or a fixed value
   neutral = mixColors bg fg 0.5; # Or keep "#CED4DA";
-  m = mixColors;
 
 
   # --- Generate Accent Colors (base08-base0F) ---
-  accentL = 0.8; # Target lightness for accents
-  accentS = 0.8; # Target saturation for accents
+  accentL = 0.5; # Target lightness for accents
+  accentS = 0.5; # Target saturation for accents
 
   # Generate 8 evenly spaced hue values (0.0 to 0.875) using arange
   numHues = 8;
@@ -42,9 +41,7 @@ let
       light = builtins.elemAt grayLightnesses n;
       mixedColor = mixColors bg fg prop;
       # Slightly reduce saturation
-      currentSat = getOkhslSaturation mixedColor;
-      newSat = currentSat * 0.9; # Reduce saturation to 90%
-      desaturatedColor = setOkhslSaturation newSat mixedColor;
+      desaturatedColor = setOkhslSaturation 0.25 mixedColor;
     in
       # Set the target lightness on the desaturated color
       setOkhslLightness light desaturatedColor
