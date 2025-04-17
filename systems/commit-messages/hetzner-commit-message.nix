@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "fix:_Remove_duplicate_function_signature_in_theme.nix_______________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
+  system.nixos.label = "chore:_Adjust_accent_hue_offset_for_color_cohesion__________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
 }
