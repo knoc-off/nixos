@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "style:_Adjust_base_background_and_accent_color_generation___________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________________________________big_restructure";
+  system.nixos.label = "feat:_Add_hueOffset_to_control_accent_color_starting_point__________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_____________________________________________________________________________big_restructure";
 }

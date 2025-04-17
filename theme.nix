@@ -1,9 +1,11 @@
 { lib, math, color-lib }:
 
+{ lib, math, color-lib }:
+
 let
   # Import necessary functions from the provided libraries
   inherit (lib) elemAt removePrefix;
-  inherit (lib.lists) genList imap0; # Added imap0, kept genList for now if needed elsewhere
+  inherit (lib.lists) genList imap0 map; # Added map
   inherit (math) arange; # Assuming math.nix provides arange
   inherit (color-lib)
     # Core manipulation functions
@@ -20,6 +22,10 @@ let
   # These anchor the entire grayscale ramp.
   bg = "#1b2429"; # Dark Blue-Gray
   fg = "#ECEFF1"; # Light Gray
+
+  # --- Hue Offset ---
+  # Define an offset for the accent hues (0.0 to 1.0, wraps around)
+  hueOffset = 0.0; # Default: 0.0 (no offset)
 
   # --- Neutral Tone ---
   # A mid-tone used for subtle mixing to increase cohesion across colors.
@@ -79,7 +85,13 @@ let
   # Generate 8 evenly spaced hues in Okhsl (0.0 to 1.0 scale)
   numHues = 8;
   # Generates [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]
-  accentHues = arange 0.0 1.0 (1.0 / numHues);
+  baseAccentHues = arange 0.0 1.0 (1.0 / numHues);
+
+  # Helper for float modulo 1.0 (wraps hue values)
+  mod1 = x: x - builtins.floor x;
+
+  # Apply the offset to the base hues
+  offsetAccentHues = map (hue: mod1 (hue + hueOffset)) baseAccentHues;
 
   # Helper function to create an accent color.
   # Starts from the neutral base, sets the target L/S, applies the specific hue,
@@ -96,16 +108,16 @@ let
     in
       setOkhslLightness accentL neutralMixedColor;
 
-  # Generate the 8 accent colors using the standard Base16 hue order (approx)
-  # Red, Orange, Yellow, Green, Cyan, Blue, Magenta, Violet/Brown/etc.
-  base08 = createAccent (elemAt accentHues 0); # Red
-  base09 = createAccent (elemAt accentHues 1); # Orange
-  base0A = createAccent (elemAt accentHues 2); # Yellow
-  base0B = createAccent (elemAt accentHues 3); # Green
-  base0C = createAccent (elemAt accentHues 4); # Cyan
-  base0D = createAccent (elemAt accentHues 5); # Blue
-  base0E = createAccent (elemAt accentHues 6); # Magenta
-  base0F = createAccent (elemAt accentHues 7); # Violet/Brown
+  # Generate the 8 accent colors using the offset hues
+  # The perceived color (Red, Orange, etc.) will depend on the hueOffset.
+  base08 = createAccent (elemAt offsetAccentHues 0); # Accent 1
+  base09 = createAccent (elemAt offsetAccentHues 1); # Accent 2
+  base0A = createAccent (elemAt offsetAccentHues 2); # Accent 3
+  base0B = createAccent (elemAt offsetAccentHues 3); # Accent 4
+  base0C = createAccent (elemAt offsetAccentHues 4); # Accent 5
+  base0D = createAccent (elemAt offsetAccentHues 5); # Accent 6
+  base0E = createAccent (elemAt offsetAccentHues 6); # Accent 7
+  base0F = createAccent (elemAt offsetAccentHues 7); # Accent 8
 
   # --- Determine Theme Type (Optional Metadata) ---
   bgLightness = getOkhslLightness bg;
