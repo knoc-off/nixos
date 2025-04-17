@@ -4,7 +4,7 @@ let
   # Import necessary functions from the provided libraries
   inherit (lib) elemAt removePrefix;
   inherit (lib.lists) genList imap0 map; # Added map
-  inherit (math) arange; # Assuming math.nix provides arange
+  inherit (math) arange pow; # Added pow
   inherit (color-lib)
     # Core manipulation functions
     setOkhslLightness
@@ -21,9 +21,14 @@ let
   bg = "#1b2429"; # Dark Blue-Gray
   fg = "#ECEFF1"; # Light Gray
 
-  # --- Hue Offset ---
+  # --- Hue Offset & Curve ---
   # Define an offset for the accent hues (0.0 to 1.0, wraps around)
   hueOffset = 0.05; # Default: 0.0 (no offset)
+  # Define an exponent to curve the hue distribution.
+  # 1.0 = linear spacing.
+  # > 1.0 = expands steps towards the end (blues/violets), compresses start (reds).
+  # < 1.0 = compresses steps towards the end, expands start.
+  hueExponent = 1.5; # Default: 1.0
 
   # --- Neutral Tone ---
   # A mid-tone used for subtle mixing to increase cohesion across colors.
@@ -82,8 +87,12 @@ let
 
   # Generate 8 evenly spaced hues in Okhsl (0.0 to 1.0 scale)
   numHues = 8;
-  # Generates [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]
-  baseAccentHues = arange 0.0 1.0 (1.0 / numHues);
+  # Generate 8 hues with non-linear spacing controlled by hueExponent.
+  # Maps index `i` (0 to numHues-1) to a hue value using `(i / (numHues - 1)) ^ hueExponent`.
+  baseAccentHues = genList (i:
+    let x = i * 1.0 / (numHues - 1); # Normalized index [0.0, 1.0]
+    in pow x hueExponent # Apply the exponent curve
+  ) numHues;
 
   # Helper for float modulo 1.0 (wraps hue values)
   mod1 = x: x - builtins.floor x;
