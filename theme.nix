@@ -23,7 +23,7 @@ let
 
   # --- Hue Offset ---
   # Define an offset for the accent hues (0.0 to 1.0, wraps around)
-  hueOffset = 0.125; # Default: 0.0 (no offset)
+  hueOffset = 0.05; # Default: 0.0 (no offset)
 
   # --- Neutral Tone ---
   # A mid-tone used for subtle mixing to increase cohesion across colors.
