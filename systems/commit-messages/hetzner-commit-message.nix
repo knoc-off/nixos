@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "fix:_Handle_zero_base_in_powFloat_to_avoid_log_of_zero______________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
+  system.nixos.label = "chore:_Adjust_default_hue_offset_and_exponent_for_theme_colors______________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
 }
