@@ -4,7 +4,7 @@ let
   # Import necessary functions from the provided libraries
   inherit (lib) elemAt removePrefix;
   inherit (lib.lists) genList imap0 map; # Added map
-  inherit (math) arange powFloat; # Use powFloat for float exponents
+  inherit (math) arange; # Assuming math.nix provides arange
   inherit (color-lib)
     # Core manipulation functions
     setOkhslLightness
@@ -21,17 +21,9 @@ let
   bg = "#1b2429"; # Dark Blue-Gray
   fg = "#ECEFF1"; # Light Gray
 
-  # --- Hue Offset & Curve ---
+  # --- Hue Offset ---
   # Define an offset for the accent hues (0.0 to 1.0, wraps around)
-  hueOffset = 0.0; # Default: 0.0 (no offset)
-  # Define an exponent to curve the hue distribution.
-  # 1.0 = linear spacing.
-  # > 1.0 = expands steps towards the end (blues/violets), compresses start (reds).
-  # < 1.0 = compresses steps towards the end, expands start.
-  hueExponent = 1.5; # Default: 1.0 - Let's use a slightly stronger exponent for demonstration
-  # Define the point in the normalized hue range (0.0 to 1.0) where the exponent curve starts applying.
-  # Hues before this threshold will have a more linear distribution.
-  curveStartThreshold = 0.25; # e.g., Apply curve mainly after the first 25% (reds/oranges)
+  hueOffset = 0.05; # Default: 0.0 (no offset)
 
   # --- Neutral Tone ---
   # A mid-tone used for subtle mixing to increase cohesion across colors.
@@ -90,34 +82,8 @@ let
 
   # Generate 8 evenly spaced hues in Okhsl (0.0 to 1.0 scale)
   numHues = 8;
-  # Generate 8 hues with non-linear spacing controlled by hueExponent.
-  # Maps index `i` (0 to numHues-1) to a hue value using `(i / (numHues - 1)) ^ hueExponent`.
-  baseAccentHues = genList (i:
-    let
-      x = i * 1.0 / (numHues - 1); # Normalized index [0.0, 1.0]
-
-      # Calculate where this hue would land *after* the offset is applied
-      potentialOffsetHue = mod1 (x + hueOffset);
-
-      # Define the linear range start/end based on offset and threshold
-      linearStart = mod1 hueOffset;
-      linearEnd = mod1 (hueOffset + curveStartThreshold);
-
-      # Check if the potential hue falls within the linear range (handles wrapping)
-      isInLinearRange = if linearStart < linearEnd then
-        # Case 1: Linear range does not wrap around 1.0 (e.g., start=0.1, end=0.35)
-        potentialOffsetHue >= linearStart && potentialOffsetHue < linearEnd
-      else
-        # Case 2: Linear range wraps around 1.0 (e.g., start=0.8, end=0.05)
-        potentialOffsetHue >= linearStart || potentialOffsetHue < linearEnd;
-
-      # Use exponent 1.0 if in linear range, otherwise use hueExponent
-      exponentToUse = if isInLinearRange then 1.0 else hueExponent;
-
-    in
-      # Calculate the base hue using the determined exponent
-      powFloat x exponentToUse
-  ) numHues;
+  # Generates [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]
+  baseAccentHues = arange 0.0 1.0 (1.0 / numHues);
 
   # Helper for float modulo 1.0 (wraps hue values)
   mod1 = x: x - builtins.floor x;

@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "feat:_Apply_curveStartThreshold_relative_to_hueOffset_with_wrapping_________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________________________________________gtk";
+  system.nixos.label = "refactor:_Improve_theming_and_colorscheme_configurations____________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________________________________________gtk";
 }

@@ -2,7 +2,7 @@
 let
   inherit (color-lib) setOkhslLightness setOkhslSaturation;
   lighten = setOkhslLightness 0.6;
-  saturate = setOkhslSaturation 0.8;
+  saturate = setOkhslSaturation 0.9;
 
   sa = hex: lighten ( saturate hex);
 
@@ -54,7 +54,7 @@ in
       color4 = "#${theme.base0D}"; # Blue
       color5 = "#${theme.base0E}"; # Magenta
       color6 = "#${theme.base0C}"; # Cyan
-      color7 = "#${theme.base05}"; # White
+      color7 = "#${theme.base06}"; # White
 
       # Bright colors adjusted for more lightness and saturation
       color8 = "#${ sa theme.base03}"; # Bright Black (Gray)
