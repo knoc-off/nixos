@@ -278,7 +278,12 @@ rec {
     else
       1.0 / (pow b (-e));
 
-  powFloat = x: a: exp (a * ln x);
+  powFloat = x: a:
+    if x == 0.0 then
+      assert a > 0.0; # 0^a is 0 only if a > 0. Handle other cases if needed.
+      0.0
+    else
+      exp (a * ln x);
 
   # Improved factorial with validation
   factorial = x:
