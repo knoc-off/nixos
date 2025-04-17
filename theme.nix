@@ -23,12 +23,12 @@ let
 
   # --- Hue Offset & Curve ---
   # Define an offset for the accent hues (0.0 to 1.0, wraps around)
-  hueOffset = 0.05; # Default: 0.0 (no offset)
+  hueOffset = 0.0; # Default: 0.0 (no offset)
   # Define an exponent to curve the hue distribution.
   # 1.0 = linear spacing.
   # > 1.0 = expands steps towards the end (blues/violets), compresses start (reds).
   # < 1.0 = compresses steps towards the end, expands start.
-  hueExponent = 1.5; # Default: 1.0
+  hueExponent = 1.1; # Default: 1.0
 
   # --- Neutral Tone ---
   # A mid-tone used for subtle mixing to increase cohesion across colors.
