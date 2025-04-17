@@ -91,7 +91,7 @@ let
   # Maps index `i` (0 to numHues-1) to a hue value using `(i / (numHues - 1)) ^ hueExponent`.
   baseAccentHues = genList (i:
     let x = i * 1.0 / (numHues - 1); # Normalized index [0.0, 1.0]
-    in pow x hueExponent # Apply the exponent curve
+    in powFloat x hueExponent # Apply the exponent curve using powFloat
   ) numHues;
 
   # Helper for float modulo 1.0 (wraps hue values)
