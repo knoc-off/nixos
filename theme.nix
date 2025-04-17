@@ -4,7 +4,7 @@ let
   # Import necessary functions from the provided libraries
   inherit (lib) elemAt removePrefix;
   inherit (lib.lists) genList imap0 map; # Added map
-  inherit (math) arange pow; # Added pow
+  inherit (math) arange powFloat; # Use powFloat for float exponents
   inherit (color-lib)
     # Core manipulation functions
     setOkhslLightness
