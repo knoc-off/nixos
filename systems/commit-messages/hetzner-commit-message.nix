@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "feat:_Apply_hue_exponent_curve_conditionally_based_on_threshold.____________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
+  system.nixos.label = "feat:_Apply_curveStartThreshold_relative_to_hueOffset_with_wrapping_________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
 }

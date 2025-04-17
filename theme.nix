@@ -95,10 +95,28 @@ let
   baseAccentHues = genList (i:
     let
       x = i * 1.0 / (numHues - 1); # Normalized index [0.0, 1.0]
-      # Apply the exponent curve only after the threshold
-      exponentToUse = if x < curveStartThreshold then 1.0 else hueExponent;
+
+      # Calculate where this hue would land *after* the offset is applied
+      potentialOffsetHue = mod1 (x + hueOffset);
+
+      # Define the linear range start/end based on offset and threshold
+      linearStart = mod1 hueOffset;
+      linearEnd = mod1 (hueOffset + curveStartThreshold);
+
+      # Check if the potential hue falls within the linear range (handles wrapping)
+      isInLinearRange = if linearStart < linearEnd then
+        # Case 1: Linear range does not wrap around 1.0 (e.g., start=0.1, end=0.35)
+        potentialOffsetHue >= linearStart && potentialOffsetHue < linearEnd
+      else
+        # Case 2: Linear range wraps around 1.0 (e.g., start=0.8, end=0.05)
+        potentialOffsetHue >= linearStart || potentialOffsetHue < linearEnd;
+
+      # Use exponent 1.0 if in linear range, otherwise use hueExponent
+      exponentToUse = if isInLinearRange then 1.0 else hueExponent;
+
     in
-      powFloat x exponentToUse # Apply the potentially conditional exponent curve
+      # Calculate the base hue using the determined exponent
+      powFloat x exponentToUse
   ) numHues;
 
   # Helper for float modulo 1.0 (wraps hue values)
