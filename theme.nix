@@ -18,7 +18,7 @@ let
   # --- Theme Anchors ---
   # Define the darkest background and lightest foreground hex codes.
   # These anchor the entire grayscale ramp.
-  bg = "#263238"; # Dark Blue-Gray
+  bg = "#1b2429"; # Dark Blue-Gray
   fg = "#ECEFF1"; # Light Gray
 
   # --- Neutral Tone ---
@@ -73,14 +73,13 @@ let
   # --- Accent Color Generation (base08-base0F) ---
   # Define target perceptual lightness and saturation for accents.
   # Adjust these for desired vibrancy and contrast.
-  accentL = 0.70; # Target lightness (perceptual) - adjust as needed
-  accentS = 0.65; # Target saturation (perceptual) - adjust as needed
+  accentL = 0.75; # Target lightness (perceptual) - adjust as needed
+  accentS = 1.0; # Target saturation (perceptual) - adjust as needed
 
   # Generate 8 evenly spaced hues in Okhsl (0.0 to 1.0 scale)
   numHues = 8;
-  hueStep = 1.0 / numHues;
   # Generates [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875]
-  accentHues = arange 0.0 1.0 hueStep;
+  accentHues = arange 0.0 1.0 (1.0 / numHues);
 
   # Helper function to create an accent color.
   # Starts from the neutral base, sets the target L/S, applies the specific hue,
