@@ -114,6 +114,7 @@
 
       nixosConfigurations = listToAttrs [
         (mkHost "framework13" "knoff" "x86_64-linux")
+        (mkHost "nuci5" "knoff" "x86_64-linux")
         (mkHost "hetzner" "knoff" "x86_64-linux")
       ];
 
