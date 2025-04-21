@@ -4,7 +4,7 @@ let
   # Import necessary functions from the provided libraries
   inherit (lib) elemAt removePrefix;
   inherit (lib.lists) genList imap0 map;
-  inherit (math) cubicBezier; # Import standard cubic-bezier function
+  inherit (math) linearInterpolatePoints; # Use linear interpolation for grays
   inherit (color-lib)
     # Core manipulation functions
     setOkhslLightness
@@ -31,13 +31,22 @@ let
   neutral = mixColors bg fg 0.5; # Mix halfway between bg and fg
 
   # --- Grayscale Generation (base00-base07) ---
-  # Generate 8 perceptually uniform lightness steps between bg and fg.
+  # Generate 8 lightness steps between bg and fg using a custom interpolation curve.
   l_bg = getOkhslLightness bg;
   l_fg = getOkhslLightness fg;
   numGrays = 8;
 
+  # Define the points for the custom lightness interpolation curve
+  # Creates a slow rise, then a jump, then another slow rise.
+  lightnessInterpolationPoints = [
+    [ 0.0 0.0 ] # Start at t=0, factor=0
+    [ 0.5 0.2 ] # At t=0.5, factor=0.2 (before jump)
+    [ 0.5 0.8 ] # At t=0.5, factor=0.8 (after jump)
+    [ 1.0 1.0 ] # End at t=1, factor=1
+  ];
+
   # Create the grayscale palette:
-  # Generate t values from 0.0 to 1.0 for the Bézier function input.
+  # Generate t values from 0.0 to 1.0 for the interpolation function input.
   # Iterate through the t values using index-aware map.
   # For each step, calculate the target lightness using the Bézier curve.
   # Calculate the corresponding color mix between bg and fg based on t.
@@ -48,20 +57,20 @@ let
       # Generate t value (interpolation factor) from 0.0 to 1.0
       t = n * 1.0 / (numGrays - 1);
 
-      # Calculate target lightness factor using the linear cubic-bezier(0,0,1,1)
-      # Output is 0.0 to 1.0
-      bezierLightnessFactor = cubicBezier 0.7 0.2 0.3 0.8 t;
+      # Calculate target lightness factor using linear interpolation between defined points
+      # Output is 0.0 to 1.0, following the custom curve
+      lightnessFactor = linearInterpolatePoints lightnessInterpolationPoints t;
       # Scale the factor to the [l_bg, l_fg] range
-      targetLightness = l_bg + bezierLightnessFactor * (l_fg - l_bg);
+      targetLightness = l_bg + lightnessFactor * (l_fg - l_bg);
 
-      # Interpolate base color between bg and fg using the same t
+      # Interpolate base color between bg and fg using the same t (linear mix)
       interpolatedColor = mixColors bg fg t;
 
       # Mix with neutral for cohesion
       neutralMixRatio = 0.1;
       neutralMixedColor = mixColors interpolatedColor neutral neutralMixRatio;
 
-      # Set the target lightness calculated by the Bézier curve
+      # Set the target lightness calculated by the linear interpolation curve
       finalColor = setOkhslLightness targetLightness neutralMixedColor;
     in
       finalColor
