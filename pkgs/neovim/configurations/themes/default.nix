@@ -147,19 +147,19 @@
         # Diff Highlighting
         DiffAdd = {
           fg = "$green";
-          bg = "#${color-lib.adjustOkhslLightness (-0.85) theme.base0B}";
+          bg = "#${color-lib.setOkhslLightness 0.15 theme.base0B}";
         };
         DiffChange = {
           fg = "$blue";
-          bg = "#${color-lib.adjustOkhslLightness (-0.85) theme.base0D}";
+          bg = "#${color-lib.setOkhslLightness 0.15 theme.base0D}";
         };
         DiffDelete = {
           fg = "$red";
-          bg = "#${color-lib.adjustOkhslLightness (-0.85) theme.base08}";
+          bg = "#${color-lib.setOkhslLightness 0.15 theme.base08}";
         };
         DiffText = {
           fg = "$fg";
-          bg = "#${color-lib.adjustOkhslLightness (-0.75) theme.base0E}";
+          bg = "#${color-lib.setOkhslLightness 0.25 theme.base0E}";
         };
 
         # Syntax Highlighting
@@ -229,7 +229,7 @@
         Float = { fg = "$orange"; };
         Constant = {
           fg = "$orange";
-          fmt = "$${cfg.code_style.constants}";
+          fmt = "${code_style.constants}";
         };
 
         # Messages and Errors

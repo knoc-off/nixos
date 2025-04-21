@@ -1,5 +1,4 @@
-{ color-lib, lib, theme, ... }:
-
+{ config, color-lib, lib, theme, ... }:
 {
   plugins.highlight-colors = {
     enable = true;

@@ -1,7 +1,7 @@
 { color-lib, theme, lib, ... }:
 let
   inherit (color-lib) setOkhslLightness setOkhslSaturation;
-  lighten = setOkhslLightness 0.6;
+  lighten = setOkhslLightness 0.7;
   saturate = setOkhslSaturation 0.9;
 
   sa = hex: lighten ( saturate hex);
@@ -48,23 +48,23 @@ in
 
       # base16 colors
       color0 = "#${theme.base00}"; # black
-      color1 = "#${theme.base08}"; # red
-      color2 = "#${theme.base0B}"; # green
-      color3 = "#${theme.base0A}"; # Yellow
-      color4 = "#${theme.base0D}"; # Blue
-      color5 = "#${theme.base0E}"; # Magenta
-      color6 = "#${theme.base0C}"; # Cyan
+      color1 = "#${sa theme.base08}"; # red
+      color2 = "#${sa theme.base0B}"; # green
+      color3 = "#${sa theme.base0A}"; # Yellow
+      color4 = "#${sa theme.base0D}"; # Blue
+      color5 = "#${sa theme.base0E}"; # Magenta
+      color6 = "#${sa theme.base0C}"; # Cyan
       color7 = "#${theme.base06}"; # White
 
       # Bright colors adjusted for more lightness and saturation
-      color8 = "#${ sa theme.base03}"; # Bright Black (Gray)
-      color9 = "#${ sa theme.base08}"; # Bright Red
-      color10 = "#${sa theme.base0B}"; # Bright Green
-      color11 = "#${sa theme.base0A}"; # Bright Yellow
-      color12 = "#${sa theme.base0D}"; # Bright Blue
-      color13 = "#${sa theme.base0E}"; # Bright Magenta
-      color14 = "#${sa theme.base0C}"; # Bright Cyan
-      color15 = "#${sa theme.base07}"; # Bright White
+      color8 = "#${ theme.base03}"; # Bright Black (Gray)
+      color9 = "#${ theme.base08}"; # Bright Red
+      color10 = "#${theme.base0B}"; # Bright Green
+      color11 = "#${theme.base0A}"; # Bright Yellow
+      color12 = "#${theme.base0D}"; # Bright Blue
+      color13 = "#${theme.base0E}"; # Bright Magenta
+      color14 = "#${theme.base0C}"; # Bright Cyan
+      color15 = "#${theme.base07}"; # Bright White
 
       # Derived colors
       foreground = "#${theme.base06}";

@@ -84,7 +84,7 @@ let
   accentL = 0.6; # Target lightness (perceptual) - adjust as needed
   accentS = 0.97; # Target saturation (perceptual) - adjust as needed
 
-  numHues = 8;
+  numHues = 9; # We do 9 because we dont want it to wrap fully
 
   # Helper for float modulo 1.0 (wraps hue values)
   mod1 = x: x - builtins.floor x;
@@ -94,9 +94,10 @@ let
     let
       # Generate t value (interpolation factor) from 0.0 to 1.0
       t = n * 1.0 / (numHues - 1);
-      # Calculate base hue factor using the custom cubic-bezier(.28,.16,.08,.13)
-      # Output is 0.0 to 1.0
-      baseHueFactor = cubicBezier 0.28 0.16 0.08 0.13 t;
+      # Calculate base hue factor using the custom cubic-bezier
+      # We up the number of warm colors
+      #baseHueFactor = cubicBezier 0.34 0.07 0.37 0.43 t;
+      baseHueFactor = cubicBezier 0.38 0.11 0.37 0.43 t;
       # Apply offset and wrap using mod1
       offsetHue = mod1 (baseHueFactor + hueOffset);
     in

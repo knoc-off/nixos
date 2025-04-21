@@ -55,6 +55,129 @@ rec {
   # Linear interpolation
   lerp = a: b: t: assert t >= 0.0 && t <= 1.0; a + (b - a) * t;
 
+  # Helper function to calculate the X coordinate of the cubic Bézier curve
+  # for a given parameter u and control points x1, x2
+  cubicBezierX = x1: x2: u:
+    let
+      u1 = 1.0 - u;
+      u1Squared = u1 * u1;
+      uSquared = u * u;
+      # x(u) = 3*(1-u)^2*u*x1 + 3*(1-u)*u^2*x2 + u^3*1
+      # (P0x=0 term is zero)
+    in 3.0 * u1Squared * u * x1 + 3.0 * u1 * uSquared * x2 + uSquared * u;
+
+  # Helper function to calculate the Y coordinate of the cubic Bézier curve
+  # for a given parameter u and control points y1, y2
+  cubicBezierY = y1: y2: u:
+    let
+      u1 = 1.0 - u;
+      u1Squared = u1 * u1;
+      uSquared = u * u;
+      # y(u) = 3*(1-u)^2*u*y1 + 3*(1-u)*u^2*y2 + u^3*1
+      # (P0y=0 term is zero)
+    in 3.0 * u1Squared * u * y1 + 3.0 * u1 * uSquared * y2 + uSquared * u;
+
+  # Standard cubic Bézier easing function using numerical search
+  # Takes control points (x1, y1, x2, y2) and input time t (0 to 1)
+  cubicBezier = x1: y1: x2: y2: t:
+    let
+      # Clamp input time
+      clampedT = clamp t 0.0 1.0;
+
+      # Handle edge cases
+      result = if clampedT == 0.0 then
+        0.0
+      else if clampedT == 1.0 then
+        1.0
+      else
+        let
+          # Binary search to find the parameter 'u' such that cubicBezierX(u) ≈ t
+          maxIterations =
+            12; # Adjust for desired precision (12 is often enough)
+          tolerance = 1.0e-6; # Adjust for desired precision
+
+          findU = low: high: iteration:
+            let
+              mid = (low + high) / 2.0;
+              x_mid = cubicBezierX x1 x2 mid;
+              error = x_mid - clampedT;
+            in if iteration >= maxIterations || abs error < tolerance then
+              mid # Found a suitable u
+            else if error < 0.0 then
+            # x_mid is too small, need larger u
+              findU mid high (iteration + 1)
+            else
+            # x_mid is too large, need smaller u
+              findU low mid (iteration + 1);
+
+          # Perform the search starting in the [0, 1] interval for u
+          u_approx = findU 0.0 1.0 0;
+
+          # Calculate the corresponding Y value using the found u
+        in cubicBezierY y1 y2 u_approx;
+    in result;
+
+  # --- Keep the other Bézier functions as they were, they are correct ---
+  # --- for their specific definitions (e.g., bezier3 takes 4 points) ---
+
+  # Linear Bézier curve (equivalent to lerp)
+  bezier1 = p0: p1: t: lerp p0 p1 t;
+
+  # Full cubic Bézier curve with explicit control points
+  # Takes all four points: p0, p1, p2, p3
+  bezier3 = p0: p1: p2: p3: t:
+    let
+      t1 = 1.0 - t;
+      t1Squared = t1 * t1;
+      t1Cubed = t1Squared * t1;
+      tSquared = t * t;
+      tCubed = tSquared * t;
+      term1 = t1Cubed * p0;
+      term2 = 3.0 * t1Squared * t * p1;
+      term3 = 3.0 * t1 * tSquared * p2;
+      term4 = tCubed * p3;
+    in term1 + term2 + term3 + term4;
+
+  # General Bézier curve for any number of control points
+  # Takes a list of control points and a parameter t
+  bezier = points: t:
+    assert builtins.isList points;
+    assert builtins.length points >= 2;
+    let
+      n = builtins.length points - 1;
+
+      # Binomial coefficient calculation
+      binomial = n: k: factorial n / (factorial k * factorial (n - k));
+
+      # Calculate the term for each control point
+      calculateTerm = i:
+        let
+          coef = binomial n i;
+          tPower = pow t i;
+          t1Power = pow (1.0 - t) (n - i);
+          point = builtins.elemAt points i;
+        in coef * tPower * t1Power * point;
+
+      # Generate list of indices from 0 to n
+      indices = lib.genList (i: i) (n + 1);
+
+      # Calculate all terms
+      terms = map calculateTerm indices;
+    in sum terms;
+
+  # Create a Bézier curve function from control points
+  # Returns a function that takes a parameter t and returns the interpolated value
+  createBezierFunction = points:
+    assert builtins.isList points;
+    assert builtins.length points >= 2;
+    t:
+    bezier points (clamp t 0.0 1.0);
+
+  # Create a standard cubic Bézier easing function with the CSS-style parameters
+  # Returns a function that takes a parameter t and returns the interpolated value
+  createCubicBezier = x1: y1: x2: y2: t:
+    cubicBezier x1 y1 x2 y2 t; # Use the corrected cubicBezier
+
   # Basic arithmetic operations with validation
   sub = builtins.foldl' builtins.sub 0;
   sum = builtins.foldl' builtins.add 0;
