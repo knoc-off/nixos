@@ -39,15 +39,14 @@ let
   # Define the range around the midpoint (0.5) for the lightness interpolation.
   # A value of 0.2 means the lightness will be 0.5 - 0.2 = 0.3 just before the midpoint
   # and 0.5 + 0.2 = 0.7 just after the midpoint.
-  midpointLightnessRange = 0.2;
+  midpointLightnessRange = 0.15;
 
   # Define the points for the custom lightness interpolation curve
   # Creates a slow rise, a defined midpoint, and then a faster rise.
   lightnessInterpolationPoints = [
     [ 0.0 0.0 ] # Start at t=0, factor=0
-    [ 0.49 (0.5 - midpointLightnessRange) ] # Point just before midpoint
-    [ 0.5 0.5 ] # Exact midpoint
-    [ 0.51 (0.5 + midpointLightnessRange) ] # Point just after midpoint
+    [ 0.5 (0.5 - midpointLightnessRange) ] # Point just before midpoint
+    [ 0.6 (0.5 + midpointLightnessRange) ] # Point just after midpoint
     [ 1.0 1.0 ] # End at t=1, factor=1
   ];
 
