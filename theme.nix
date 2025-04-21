@@ -50,7 +50,7 @@ let
 
       # Calculate target lightness factor using the linear cubic-bezier(0,0,1,1)
       # Output is 0.0 to 1.0
-      bezierLightnessFactor = cubicBezier 0.0 0.0 1.0 1.0 t;
+      bezierLightnessFactor = cubicBezier 0.7 0.2 0.3 0.8 t;
       # Scale the factor to the [l_bg, l_fg] range
       targetLightness = l_bg + bezierLightnessFactor * (l_fg - l_bg);
 
