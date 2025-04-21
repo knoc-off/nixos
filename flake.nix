@@ -81,7 +81,7 @@
           inherit (self.lib.${system}) math color-lib;
 
           # Pass color-lib and lib to the theme function
-          theme = import ./theme.nix { inherit color-lib math lib; };
+          theme = import ./theme.nix { inherit color-lib math lib self; };
 
           # Import packages from the stable Nixpkgs channel
           pkgs = import nixpkgs {
