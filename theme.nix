@@ -4,7 +4,7 @@ let
   # Import necessary functions from the provided libraries
   inherit (lib) elemAt removePrefix;
   inherit (lib.lists) genList imap0 map;
-  inherit (math) createBezierFunction; # Import Bézier function creator
+  inherit (math) cubicBezier; # Import standard cubic-bezier function
   inherit (color-lib)
     # Core manipulation functions
     setOkhslLightness
@@ -24,15 +24,6 @@ let
   # --- Hue Offset ---
   # Define an offset for the accent hues (0.0 to 1.0, wraps around)
   hueOffset = 0.08; # Default: 0.0 (no offset)
-
-  # --- Bézier Curves ---
-  # Define the Bézier functions for interpolation
-  # Grayscale lightness uses cubic-bezier(0,0,1,1) -> linear interpolation
-  # Control points (y-values): [start_y, control1_y, control2_y, end_y]
-  bezierGrayscaleLightness = createBezierFunction [ 0.0 0.0 1.0 1.0 ];
-
-  # Accent hues use cubic-bezier(.28,.16,.08,.13)
-  bezierAccentHue = createBezierFunction [ 0.0 0.16 0.13 1.0 ];
 
   # --- Neutral Tone ---
   # A mid-tone used for subtle mixing to increase cohesion across colors.
@@ -57,9 +48,10 @@ let
       # Generate t value (interpolation factor) from 0.0 to 1.0
       t = n * 1.0 / (numGrays - 1);
 
-      # Calculate target lightness using the grayscale Bézier curve
-      # Output is 0.0 to 1.0, scale it to the [l_bg, l_fg] range
-      bezierLightnessFactor = bezierGrayscaleLightness t;
+      # Calculate target lightness factor using the linear cubic-bezier(0,0,1,1)
+      # Output is 0.0 to 1.0
+      bezierLightnessFactor = cubicBezier 0.0 0.0 1.0 1.0 t;
+      # Scale the factor to the [l_bg, l_fg] range
       targetLightness = l_bg + bezierLightnessFactor * (l_fg - l_bg);
 
       # Interpolate base color between bg and fg using the same t
@@ -102,10 +94,11 @@ let
     let
       # Generate t value (interpolation factor) from 0.0 to 1.0
       t = n * 1.0 / (numHues - 1);
-      # Calculate base hue using the accent Bézier curve (output 0.0 to 1.0)
-      baseHue = bezierAccentHue t;
+      # Calculate base hue factor using the custom cubic-bezier(.28,.16,.08,.13)
+      # Output is 0.0 to 1.0
+      baseHueFactor = cubicBezier 0.28 0.16 0.08 0.13 t;
       # Apply offset and wrap using mod1
-      offsetHue = mod1 (baseHue + hueOffset);
+      offsetHue = mod1 (baseHueFactor + hueOffset);
     in
       offsetHue
   ) (genList (x: x) numHues); # Generate list [0, 1, ..., numHues-1]
