@@ -185,11 +185,11 @@ rec {
   linearInterpolatePoints = points: t:
     let
       # --- Input Validation ---
-      _ = assert builtins.isList points;
-      _ = assert builtins.length points >= 2;
-      _ = assert builtins.all (p: builtins.isList p && builtins.length p == 2) points;
+      _assertList = assert builtins.isList points; ""; # Use dummy var to ensure evaluation
+      _assertLength = assert builtins.length points >= 2; "";
+      _assertPointsFormat = assert builtins.all (p: builtins.isList p && builtins.length p == 2) points; "";
       # Optional: Add assertion that points are sorted by x?
-      # _ = assert lib.foldl' (acc: p: if acc == null then p else if p.x >= acc.x then p else throw "Points not sorted by x") null (map (p: { x = elemAt p 0; y = elemAt p 1; }) points) != null;
+      # _assertSorted = assert lib.foldl' (acc: p: if acc == null then p else if p.x >= acc.x then p else throw "Points not sorted by x") null (map (p: { x = elemAt p 0; y = elemAt p 1; }) points) != null; "";
 
       numPoints = builtins.length points;
       firstPoint = builtins.elemAt points 0;
