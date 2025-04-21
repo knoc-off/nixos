@@ -69,14 +69,14 @@ let
 
   # Assign generated grays to base00-base07 following Base16 convention
   # (base00 = darkest, base07 = lightest)
-  base00 = elemAt baseColors 0; # Darkest Background
-  base01 = elemAt baseColors 1; # Lighter Background (UI)
+  base00 = elemAt baseColors 0; # Default Background
+  base01 = elemAt baseColors 1; # Lighter Background (e.g., UI elements)
   base02 = elemAt baseColors 2; # Selection Background
-  base03 = elemAt baseColors 3; # Comments, Low-contrast Fg
-  base04 = elemAt baseColors 4; # Default Foreground (secondary)
-  base05 = elemAt baseColors 5; # Default Foreground (primary)
-  base06 = elemAt baseColors 6; # Light Foreground (UI)
-  base07 = elemAt baseColors 7; # Lightest Foreground
+  base03 = elemAt baseColors 3; # Comments, Invisibles, Line Highlighting
+  base04 = elemAt baseColors 4; # Dark Foreground (Used for status bars)
+  base05 = elemAt baseColors 5; # Default Foreground (Used for text)
+  base06 = elemAt baseColors 6; # Light Foreground (Not often used)
+  base07 = elemAt baseColors 7; # Light Background (e.g., UI elements)
 
   # --- Accent Color Generation (base08-base0F) ---
   # Define target perceptual lightness and saturation for accents.
