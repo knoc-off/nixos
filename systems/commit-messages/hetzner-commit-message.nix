@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "feat:_Implement_Bzier_curves_for_lightness_and_hue_in_theme.nix_____________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
+  system.nixos.label = "fix:_Pass_extra_arguments_to_theme_function_________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
 }
