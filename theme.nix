@@ -23,7 +23,7 @@ let
 
   # --- Hue Offset ---
   # Define an offset for the accent hues (0.0 to 1.0, wraps around)
-  hueOffset = 0.05; # Default: 0.0 (no offset)
+  hueOffset = 0.08; # Default: 0.0 (no offset)
 
   # --- Neutral Tone ---
   # A mid-tone used for subtle mixing to increase cohesion across colors.
@@ -77,8 +77,8 @@ let
   # --- Accent Color Generation (base08-base0F) ---
   # Define target perceptual lightness and saturation for accents.
   # Adjust these for desired vibrancy and contrast.
-  accentL = 0.75; # Target lightness (perceptual) - adjust as needed
-  accentS = 1.0; # Target saturation (perceptual) - adjust as needed
+  accentL = 0.6; # Target lightness (perceptual) - adjust as needed
+  accentS = 0.97; # Target saturation (perceptual) - adjust as needed
 
   # Generate 8 evenly spaced hues in Okhsl (0.0 to 1.0 scale)
   numHues = 8;
@@ -133,13 +133,13 @@ in {
   base05 = lib.removePrefix "#" base05; # theme.base05
   base06 = lib.removePrefix "#" base06; # theme.base06
   base07 = lib.removePrefix "#" base07; # theme.base07
-  base08 = lib.removePrefix "#" base08; # theme.base08
-  base09 = lib.removePrefix "#" base09; # theme.base09
-  base0A = lib.removePrefix "#" base0A; # theme.base0A
-  base0B = lib.removePrefix "#" base0B; # theme.base0B
-  base0C = lib.removePrefix "#" base0C; # theme.base0C
-  base0D = lib.removePrefix "#" base0D; # theme.base0D
-  base0E = lib.removePrefix "#" base0E; # theme.base0E
-  base0F = lib.removePrefix "#" base0F; # theme.base0F
+  base08 = lib.removePrefix "#" base08; # theme.base08 # Red
+  base09 = lib.removePrefix "#" base09; # theme.base09 # Orange
+  base0A = lib.removePrefix "#" base0A; # theme.base0A # Yellow
+  base0B = lib.removePrefix "#" base0B; # theme.base0B # green
+  base0C = lib.removePrefix "#" base0C; # theme.base0C # Blue
+  base0D = lib.removePrefix "#" base0D; # theme.base0D # cyan
+  base0E = lib.removePrefix "#" base0E; # theme.base0E # purple
+  base0F = lib.removePrefix "#" base0F; # theme.base0F # violet
 }
 
