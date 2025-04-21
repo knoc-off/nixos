@@ -1,4 +1,4 @@
-{ lib, math, color-lib }:
+{ lib, math, color-lib, ... }:
 
 let
   # Import necessary functions from the provided libraries
