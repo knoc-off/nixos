@@ -4,7 +4,7 @@ let
   # Import necessary functions from the provided libraries
   inherit (lib) elemAt removePrefix;
   inherit (lib.lists) genList imap0 map;
-  inherit (math) linearInterpolatePoints; # Use linear interpolation for grays
+  inherit (math) cubicBezier linearInterpolatePoints; # Use linear interpolation for grays
   inherit (color-lib)
     # Core manipulation functions
     setOkhslLightness
