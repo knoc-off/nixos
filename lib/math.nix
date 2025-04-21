@@ -178,6 +178,61 @@ rec {
   createCubicBezier = x1: y1: x2: y2: t:
     cubicBezier x1 y1 x2 y2 t; # Use the corrected cubicBezier
 
+  # Linear interpolation between a set of points
+  # Takes a list of points [[x0, y0], [x1, y1], ..., [xn, yn]] sorted by x,
+  # and an input value t (typically 0.0 to 1.0, but clamped to the range of x values).
+  # Returns the linearly interpolated y-value corresponding to t.
+  linearInterpolatePoints = points: t:
+    let
+      # --- Input Validation ---
+      _ = assert builtins.isList points;
+      _ = assert builtins.length points >= 2;
+      _ = assert builtins.all (p: builtins.isList p && builtins.length p == 2) points;
+      # Optional: Add assertion that points are sorted by x?
+      # _ = assert lib.foldl' (acc: p: if acc == null then p else if p.x >= acc.x then p else throw "Points not sorted by x") null (map (p: { x = elemAt p 0; y = elemAt p 1; }) points) != null;
+
+      numPoints = builtins.length points;
+      firstPoint = builtins.elemAt points 0;
+      lastPoint = builtins.elemAt points (numPoints - 1);
+      firstX = builtins.elemAt firstPoint 0;
+      lastX = builtins.elemAt lastPoint 0;
+
+      # Clamp t to the range of x-values in the points
+      clampedT = clamp t firstX lastX;
+
+      # --- Find the segment containing t ---
+      findSegment = index:
+        let
+          p0 = builtins.elemAt points index;
+          p1 = builtins.elemAt points (index + 1);
+          x0 = builtins.elemAt p0 0;
+          y0 = builtins.elemAt p0 1;
+          x1 = builtins.elemAt p1 0;
+          y1 = builtins.elemAt p1 1;
+        in if clampedT >= x0 && clampedT <= x1 then
+          # Found the segment
+          let
+            # Avoid division by zero if x0 == x1 (shouldn't happen with sorted distinct points)
+            rangeX = x1 - x0;
+            t_local = if rangeX < epsilon then 0.0 else (clampedT - x0) / rangeX;
+          in lerp y0 y1 t_local
+        else if index + 2 >= numPoints then
+          # Should not happen if t is clamped correctly, but as fallback return last point's y
+          builtins.elemAt lastPoint 1
+        else
+          # Check next segment
+          findSegment (index + 1);
+
+    in if clampedT <= firstX then
+      # t is before the first point
+      builtins.elemAt firstPoint 1
+    else if clampedT >= lastX then
+      # t is after the last point
+      builtins.elemAt lastPoint 1
+    else
+      # t is within the range, find the segment
+      findSegment 0;
+
   # Basic arithmetic operations with validation
   sub = builtins.foldl' builtins.sub 0;
   sum = builtins.foldl' builtins.add 0;
