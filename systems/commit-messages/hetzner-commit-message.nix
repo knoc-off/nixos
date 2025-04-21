@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "refactor:_Use_lib_in_hyprland_module________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
+  system.nixos.label = "refactor:_Use_lib.mkDefault_to_allow_overriding_hyprland_settings___________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
 }

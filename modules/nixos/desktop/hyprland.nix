@@ -11,40 +11,39 @@ in {
 
   # Enable greetd for login
   services.greetd = {
-    enable = true;
-    settings = {
+    enable = lib.mkDefault true;
+    settings = lib.mkDefault {
       default_session.command = "${tuigreet} --remember --cmd ${hyprland}";
     };
   };
 
   # Enable backlight control
-  programs.light.enable = true;
+  programs.light.enable = lib.mkDefault true;
 
   # Allow X compositor
-  services.xserver.displayManager.startx.enable = true;
+  services.xserver.displayManager.startx.enable = lib.mkDefault true;
 
   # Enable Hyprland
   programs.hyprland = {
-    enable = true;
-    package = inputs.hyprland.packages.${pkgs.system}.hyprland;
-    xwayland.enable = true;
+    enable = lib.mkDefault true;
+    package = lib.mkDefault inputs.hyprland.packages.${pkgs.system}.hyprland;
+    xwayland.enable = lib.mkDefault true;
   };
 
   # XDG portal configuration
   xdg.portal = {
-    enable = true;
-    extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
+    enable = lib.mkDefault true;
+    extraPortals = lib.mkDefault [ pkgs.xdg-desktop-portal-gtk ];
   };
 
   # System-wide packages
-  environment.systemPackages = with pkgs; [ wl-clipboard xdg-utils
- ];
+  environment.systemPackages = lib.mkDefault (with pkgs; [ wl-clipboard xdg-utils ]);
 
   # Enable polkit
-  security.polkit.enable = true;
+  security.polkit.enable = lib.mkDefault true;
 
 
   # Enable Wayland for Electron apps
-  environment.sessionVariables.NIXOS_OZONE_WL = "1";
+  environment.sessionVariables.NIXOS_OZONE_WL = lib.mkDefault "1";
 
 }
