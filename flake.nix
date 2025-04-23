@@ -36,7 +36,7 @@
             inherit self inputs outputs hostname user lib system theme color-lib
               math; # Pass theme and color-lib
             upkgs = unstablePkgs system;
-            selfPkgs = self.packages.${system};
+            # selfPkgs = self.packages.${system};
           } // extraConfigs;
           modules = [
             ./systems/${hostname}.nix
@@ -114,7 +114,7 @@
 
       nixosConfigurations = listToAttrs [
         (mkHost "framework13" "knoff" "x86_64-linux")
-        (mkHost "nuci5" "knoff" "x86_64-linux")
+        (mkHost "nuci5" "tv" "x86_64-linux")
         (mkHost "hetzner" "knoff" "x86_64-linux")
       ];
 

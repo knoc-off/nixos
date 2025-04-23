@@ -199,6 +199,9 @@ in {
         "${mainMod}, equal, fullscreen"
         # "${mainMod}, O, fakefullscreen"
 
+        # OBS RECORD TOGGLE
+        "${mainMod},F10, pass,^(com\.obsproject\.Studio)$"
+
         "${mainMod}, T, exec, ${
           mkHdrop {
             command = let
