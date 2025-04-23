@@ -5,9 +5,7 @@ let
   hyprland = "${pkgs.hyprland}/bin/Hyprland";
 
 in {
-  imports = [
-    self.nixosModules.desktop.totem
-  ];
+  #imports = [ self.nixosModules.desktop.totem ];
 
   # Enable greetd for login
   services.greetd = {
@@ -33,15 +31,24 @@ in {
   # XDG portal configuration
   xdg.portal = {
     enable = lib.mkDefault true;
-    extraPortals = lib.mkDefault [ pkgs.xdg-desktop-portal-gtk ];
+    extraPortals = lib.mkDefault [
+      pkgs.xdg-desktop-portal-gtk
+      pkgs.xdg-desktop-portal-hyprland
+    ];
   };
 
   # System-wide packages
-  environment.systemPackages = lib.mkDefault (with pkgs; [ wl-clipboard xdg-utils ]);
+  environment.systemPackages = lib.mkDefault (with pkgs; [
+    wl-clipboard
+    xdg-utils
+
+    vaapiVdpau
+    libvdpau-va-gl
+
+  ]);
 
   # Enable polkit
   security.polkit.enable = lib.mkDefault true;
-
 
   # Enable Wayland for Electron apps
   environment.sessionVariables.NIXOS_OZONE_WL = lib.mkDefault "1";

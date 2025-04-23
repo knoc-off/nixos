@@ -117,7 +117,7 @@ in {
     f3d
 
     #(gimp-with-plugins.override { plugins = with gimpPlugins; [ resynthesizer ]; })
-    gimp
+    #gimp
 
     feh
   ];

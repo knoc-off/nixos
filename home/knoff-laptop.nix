@@ -140,6 +140,7 @@
       self.packages.${pkgs.system}.tabiew
 
       upkgs.aider-chat
+      upkgs.gimp3
       #upkgs.claude-code
       #upkgs.astal.hyprland
 
