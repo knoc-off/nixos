@@ -30,45 +30,68 @@
         intel-media-driver
       ];
 
+      # XDG portal configuration
+      xdg.portal = {
+        enable = lib.mkDefault true;
+        extraPortals = lib.mkDefault [
+          pkgs.xdg-desktop-portal-gtk
+          pkgs.xdg-desktop-portal-hyprland
+        ];
+      };
+      xdg.portal.config.common.default = "*";
+
       environment.variables.LIBVA_DRIVER_NAME = "i915";
 
       # doesnt need to be super secure here
       services = {
-        getty.autologinUser = user;
+        #getty.autologinUser = user;
         xserver.displayManager.startx.enable = false;
-        greetd.enable = false;
+        greetd = {
+          enable = true;
+          settings = {
+            default_session = {
+              #command = "${pkgs.bash}/bin/bash";
+              command = "${pkgs.dwl}/bin/dwl -s ${pkgs.kodi-wayland}/bin/kodi";
+                # "${pkgs.dwl}/bin/dwl -s '${pkgs.jellyfin-media-player}/bin/jellyfinmediaplayer'";
+              user = user;
+            };
+          };
+        };
+        seatd = {
+          enable = true;
+          # Add the greetd user to the seat group
+          user = user; # config.services.greetd.user;
+        };
       };
 
       # Ensure the user exists (replace with your actual user settings)
       users.users.${user} = {
         isNormalUser = true;
-        extraGroups = [ "wheel" "render" "seat" "video" "audio" "input" "networkmanager" ]; # Add necessary groups
+        extraGroups = [
+          "wheel"
+          "render"
+          "seat"
+          "video"
+          "audio"
+          "input"
+          "networkmanager"
+        ]; # Add necessary groups
         # shell = pkgs.bash; # Or your preferred shell
         # home = "/home/${autoLoginUser}"; # Optional: Explicitly set home if needed
         # uid = 1000; # Optional: Set UID if needed
+
+        # packages = with pkgs; [ dwl ];
 
         # --- Systemd User Service for Hyprland ---
         # This service will be automatically started when 'autoLoginUser' logs in.
       };
       # Make sure these groups exist
       users.groups = {
-        input = {};
-        render = {};
-        seat = {};
+        input = { };
+        render = { };
+        seat = { };
       };
-      services.xserver.displayManager.sessionPackages = [ pkgs.dwl ];
-
-      systemd.user.services.my-service = {
-        description = "My custom service";
-        wantedBy = [ "default.target" ];
-        serviceConfig = {
-          Type = "simple";
-          ExecStart = "${pkgs.dwl}/bin/dwl";
-          Restart = "on-failure";
-        };
-      };
-
-
+      #services.displayManager.sessionPackages = [pkgs.dwl];
 
       # System-wide packages
       environment.systemPackages = lib.mkDefault (with pkgs; [
@@ -82,7 +105,7 @@
 
     }
 
-    inputs.hardware.nixosModules.common-cpu-intel
+    #inputs.hardware.nixosModules.common-cpu-intel
 
     # nix package settings
     ./modules/nix.nix
