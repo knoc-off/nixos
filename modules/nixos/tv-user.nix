@@ -1,4 +1,4 @@
-{ inputs, user, args, ... }: {
+{ inputs, user, pkgs, ... }@args: {
   imports = [ inputs.home-manager.nixosModules.home-manager ];
 
   home-manager.backupFileExtension = "bak";

@@ -13,6 +13,8 @@
         html.enable = true;
         jsonls.enable = true;
 
+        openscad_lsp.enable = true;
+
         # Python language servers
         pyright = {
           enable = true;
@@ -22,7 +24,7 @@
                 typeCheckingMode = "basic";
                 diagnosticMode = "workspace";
                 # Set missing type stubs diagnostic to warning instead of error
-                reportMissingTypeStubs = "warning"; 
+                reportMissingTypeStubs = "warning";
                 inlayHints = {
                   functionReturnTypes = true;
                   variableTypes = true;
