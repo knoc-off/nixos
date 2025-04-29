@@ -1,4 +1,4 @@
-{ lib, inputs, pkgs, self, hostname, user, ... }@args:
+{ lib, inputs, pkgs, self, hostname, user, config, ... }@args:
 let
 
   kanataConfig = pkgs.writeText "kanata-german_override-config.kdb" ''
@@ -57,89 +57,7 @@ in {
   imports = [
     ./modules/minecraft.nix
 
-    #  { # Home-Manager
-    #    imports = [ inputs.home-manager.nixosModules.home-manager ];
-
-    #    home-manager = {
-    #      useGlobalPkgs = false;
-    #      useUserPackages = true;
-    #      users.${user} = import ../home/knoff-laptop.nix;
-    #      # This could end badly. recursion, etc. yet i kinda like it.
-    #      extraSpecialArgs = removeAttrs args [
-    #        "config" # NixOS system config
-    #        "lib" # NixOS lib
-    #        "pkgs" # Already available in home-manager
-    #        "_module" # Internal NixOS module system stuff
-    #        "options" # NixOS options
-    #      ];
-    #    };
-    #  }
-
-
-    {
-      imports = [ self.nixosModules.home { inherit user; } ];
-
-    }
-
-    { # VPN for work.
-      services.openvpn.servers = {
-        work-production = {
-          config = ''
-            config /etc/secrets/vpn/work/staging/production.ovpn
-            cert /etc/secrets/vpn/work/staging/certificate.pem
-            key /etc/secrets/vpn/work/staging/key.pem
-            # If using PKCS12 instead, uncomment the line below and comment out cert/key lines
-            # pkcs12 /etc/secrets/vpn/client-identity.p12
-          '';
-          autoStart = false;
-        };
-        work-staging = {
-          config = ''
-            config /etc/secrets/vpn/work/staging/staging.ovpn
-            cert /etc/secrets/vpn/work/staging/certificate.pem
-            key /etc/secrets/vpn/work/staging/key.pem
-            # If using PKCS12 instead, uncomment the line below and comment out cert/key lines
-            # pkcs12 /etc/secrets/vpn/client-identity.p12
-          '';
-          autoStart = false;
-        };
-      };
-    }
-
-    {
-      hardware.uinput.enable = true;
-
-      services.kanata = {
-        enable = false;
-        package = pkgs.kanata;
-
-        keyboards = {
-          german_override = {
-            # Let Kanata auto-detect keyboard devices.
-            devices = [ ];
-            # Remove the unsupported `--verbose` flag by keeping extraArgs empty.
-            extraArgs = [ ];
-            # Disable the TCP server by setting port to null.
-            port = null;
-            # Use the generated configuration file.
-            configFile = kanataConfig;
-            # These are unused when configFile is provided.
-            config = "";
-            extraDefCfg = "";
-          };
-        };
-      };
-    }
-
-    #inputs.nixos-cli.nixosModules.nixos-cli
-    #{
-    #  # Enable the nixos-cli service
-    #  services.nixos-cli = {
-    #    enable = true;
-    #  };
-    #}
-
-    inputs.hardware.nixosModules.framework-13-7040-amd
+    (self.nixosModules.home { inherit args; })
 
     inputs.disko.nixosModules.disko
     { disko.devices.disk.vdb.device = "/dev/nvme0n1"; }
@@ -149,31 +67,101 @@ in {
     ./hardware/hardware-configuration.nix
     ./hardware/bluetooth.nix
     ./hardware/fingerprint
-    # temp fix with kmod issues
-    {
-      hardware = {
-        # disable framework kernel module
-        # https://github.com/NixOS/nixos-hardware/issues/1330
-        framework.enableKmod = false;
-      };
 
-      # trying stuff out
-      services.xserver.videoDrivers = [ "amdgpu" ];
+    inputs.hardware.nixosModules.framework-13-7040-amd
+
+    { # VPN for work.
+      services.openvpn.servers = {
+        work-production = {
+          config = ''
+            config /etc/secrets/vpn/work/staging/production.ovpn
+          '';
+          autoStart = false;
+        };
+        work-staging = {
+          config = ''
+            config /etc/secrets/vpn/work/staging/staging.ovpn
+            # cert /etc/secrets/vpn/work/staging/certificate.pem
+            # key /etc/secrets/vpn/work/staging/key.pem
+            ## If using PKCS12 instead, uncomment the line below and comment out cert/key lines
+            # pkcs12 /etc/secrets/vpn/client-identity.p12
+          '';
+          autoStart = false;
+        };
+      };
     }
 
-    #misc settings that i usually use.
-    ./modules/misc.nix
+    # {
+    #   hardware.uinput.enable = true;
+
+    #   services.kanata = {
+    #     enable = false;
+    #     package = pkgs.kanata;
+
+    #     keyboards = {
+    #       german_override = {
+    #         # Let Kanata auto-detect keyboard devices.
+    #         devices = [ ];
+    #         # Remove the unsupported `--verbose` flag by keeping extraArgs empty.
+    #         extraArgs = [ ];
+    #         # Disable the TCP server by setting port to null.
+    #         port = null;
+    #         # Use the generated configuration file.
+    #         configFile = kanataConfig;
+    #         # These are unused when configFile is provided.
+    #         config = "";
+    #         extraDefCfg = "";
+    #       };
+    #     };
+    #   };
+    # }
+
+    {
+      networking.networkmanager.enable = lib.mkDefault true;
+
+      console.keyMap = lib.mkDefault "us";
+
+      programs = { dconf.enable = lib.mkDefault true; };
+
+      services = {
+        resolved.enable = lib.mkDefault true;
+        fwupd.enable = lib.mkDefault true;
+        openssh = {
+          enable = lib.mkDefault true;
+          settings.PermitRootLogin = lib.mkDefault "no";
+        };
+        xserver.xkb.layout = lib.mkDefault "us";
+        printing.enable = lib.mkDefault true;
+        avahi = {
+          enable = lib.mkDefault true;
+          nssmdns4 = lib.mkDefault true;
+        };
+        libinput.enable = lib.mkDefault true;
+      };
+
+      fonts = { enableDefaultPackages = lib.mkDefault true; };
+
+      environment.systemPackages = lib.mkDefault (with pkgs; [
+        gnome.adwaita-icon-theme
+        yubioath-flutter
+        git
+        wget
+        libinput
+      ]);
+
+      time.timeZone = lib.mkDefault "Europe/Berlin";
+      i18n.defaultLocale = lib.mkDefault "en_US.UTF-8";
+
+    }
 
     # module to setup boot
     ./hardware/boot.nix
 
-    ./modules/wpad.nix
-
-    # Sops
+    # Sops. I think this could be some kind of module. to abstract the annoying parts of it.
     inputs.sops-nix.nixosModules.sops
     {
       sops = {
-        defaultSopsFile = ./secrets/framework13/default.yaml;
+        defaultSopsFile = ./secrets/${hostname}/default.yaml;
         # This will automatically import SSH keys as age keys
         age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
         secrets."ANTHROPIC_API_KEY" = { mode = "0644"; };
@@ -184,46 +172,34 @@ in {
     ./modules/audio
 
     # Nix package settings
-    ./modules/nix.nix
+    {
+
+      nixpkgs.config.allowUnfree = true;
+      nix = {
+        registry = {
+          nixpkgs.flake = inputs.nixpkgs;
+          nixos-hardware.flake = inputs.hardware;
+        };
+        #nix.nixPath = [ "/etc/nix/path" ];
+        #environment.etc."nix/path/nixpkgs".source = inputs.nixpkgs;
+        nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
+        settings = {
+          substituters = [ "https://hyprland.cachix.org" ];
+          trusted-public-keys = [
+            "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc="
+          ];
+          experimental-features = [ "nix-command" "flakes" "pipe-operators" ];
+          trusted-users = [ "@wheel" ];
+        };
+      };
+    }
 
     # Window manager
     self.nixosModules.windowManager.hyprland
 
-    # Android emulation
-    #./modules/virtualisation/waydroid.nix
-
     ./modules/shell/fish.nix
 
     #./modules/yubikey.nix
-
-    {
-
-      services.postgresql = {
-        enable = true;
-        package = pkgs.postgresql_16;
-
-      };
-      #services.mysql = {
-      #  # 1. Enable the service definition (uses default package, dataDir etc.)
-      #  enable = true;
-
-      #  # 2. Configure MySQL to only listen locally
-      #  settings = {
-      #    mysqld = {
-      #      socket = "/var/run/mysqld/mysqld.sock";
-      #      port = 3306;
-      #      bind-address = "127.0.0.1";
-      #    };
-      #  };
-
-      #  package = pkgs.mysql84;
-
-      #};
-
-      # 3. Prevent automatic startup
-      #systemd.services.mysql.wantedBy = pkgs.lib.mkForce [ ];
-      #systemd.services.mysql.enable = pkgs.lib.mkForce false;
-    }
 
   ];
 
@@ -238,25 +214,11 @@ in {
   #   };
   # };
 
-  programs.direnv = {
-    enable = true;
-    silent = true;
-  };
-
-  services.minecraft-server-suite = {
-    enable = true;
-
-    # Optional: Enable RCON support
-    rcon.enable = true;
-
-    # Optional: Enable Gate proxy
-    gate = {
-      enable = false;
-      domain = "kobbl.co";
-      customRoutes = [{
-        host = "kobbl.co";
-        backend = "localhost:25500";
-      }];
+  programs = {
+    virt-manager.enable = true;
+    direnv = {
+      enable = true;
+      silent = true;
     };
   };
 
@@ -270,48 +232,65 @@ in {
 
     };
   };
-  programs.virt-manager.enable = true;
 
-  services.minecraft-servers.servers = let
-    commonOptions = {
-      autoStart = false;
-      jvmOpts = "-Xmx8G -Xms8G";
-      enable = true;
-      serverProperties = {
-        server-port = 25565;
-        difficulty = 2; # 0: peaceful, 1: easy, 2: normal, 3: hard
-        motd = "minecraft";
-        spawn-protection = 0;
+  # ================ minecraft =============
+  # services.minecraft-servers.servers = let
+  #   commonOptions = {
+  #     autoStart = false;
+  #     jvmOpts = "-Xmx8G -Xms8G";
+  #     enable = true;
+  #     serverProperties = {
+  #       server-port = 25565;
+  #       difficulty = 2; # 0: peaceful, 1: easy, 2: normal, 3: hard
+  #       motd = "minecraft";
+  #       spawn-protection = 0;
 
-        # Rcon configuration
-        enable-rcon = true;
-        "rcon.password" = "123"; # doesn't have to be secure, local only
-        "rcon.port" = 25570;
-      };
-      symlinks = {
-        "ops.json" = pkgs.writeTextFile {
-          name = "ops.json";
-          text = ''
-            [
-              {
-                "uuid": "c9e17620-4cc1-4d83-a30a-ef320cc099e6",
-                "name": "knoc_off",
-                "level": 4,
-                "bypassesplayerlimit": true
-              }
-            ]
-          '';
-        };
-      };
-    };
-  in {
-    beez = commonOptions // { package = pkgs.fabricServers.fabric-1_21_1; };
-    test = commonOptions // { package = pkgs.fabricServers.fabric-1_21_4; };
-  };
+  #       # Rcon configuration
+  #       enable-rcon = true;
+  #       "rcon.password" = "123"; # doesn't have to be secure, local only
+  #       "rcon.port" = 25570;
+  #     };
+  #     symlinks = {
+  #       "ops.json" = pkgs.writeTextFile {
+  #         name = "ops.json";
+  #         text = ''
+  #           [
+  #             {
+  #               "uuid": "c9e17620-4cc1-4d83-a30a-ef320cc099e6",
+  #               "name": "knoc_off",
+  #               "level": 4,
+  #               "bypassesplayerlimit": true
+  #             }
+  #           ]
+  #         '';
+  #       };
+  #     };
+  #   };
+  # in {
+  #   beez = commonOptions // { package = pkgs.fabricServers.fabric-1_21_1; };
+  #   test = commonOptions // { package = pkgs.fabricServers.fabric-1_21_4; };
+  # };
+  # services.minecraft-server-suite = {
+  #   enable = true;
+
+  #   # Optional: Enable RCON support
+  #   rcon.enable = true;
+
+  #   # Optional: Enable Gate proxy
+  #   gate = {
+  #     enable = false;
+  #     domain = "kobbl.co";
+  #     customRoutes = [{
+  #       host = "kobbl.co";
+  #       backend = "localhost:25500";
+  #     }];
+  #   };
+  # };
+  # ================ minecraft =============
 
   security.sudo.extraRules = [{
     #groups = [ "networkmanager" ];
-    users = [ "${user}" ]; # ? auto
+    users = [ user ];
     #groups = [ 1006 ];
     commands = [{
       command =
@@ -321,6 +300,7 @@ in {
   }];
 
   programs = {
+    # not super needed.
     nix-ld = {
       enable = true;
       libraries = with pkgs; [ stdenv.cc.cc SDL2 SDL2_image libz ];
@@ -369,17 +349,14 @@ in {
 
     # Add udev rules for auto-mounting and launching Nemo
     udev.extraRules = ''
-
       # Auto decrypt and mount when device is plugged in
       ACTION=="add", SUBSYSTEM=="block", ENV{ID_FS_UUID}=="07133380-9f74-41e4-8b04-2b05fb3d94ab", \
       RUN+="${pkgs.cryptsetup}/bin/cryptsetup luksOpen --key-file /etc/secrets/drives/fa6b949.key $env{DEVNAME} fa6b949", \
       RUN+="${pkgs.toybox}/bin/mount /dev/mapper/fa6b949 /mnt/fa6b949"
-
     '';
-
   };
 
-  # Create mount point directory
+  # Create mount point directory, this needs to be changed maybe?
   system.activationScripts = {
     createMountPoint = {
       text = ''
@@ -436,15 +413,15 @@ in {
 
   # Set default values for the new options
   bootloader = {
-    type = "lanzaboote"; # Default to systemd-boot as in the original config
-    efiSupport = true; # Enable EFI support by default
+    type = "lanzaboote";
+    efiSupport = true;
   };
 
   boot = {
 
     #kernelPackages = lib.mkDefault pkgs.linuxPackages_latest;
 
-    # fingerpritn scanner does not work without this, suddenly.
+    # fingerpritn scanner does not work without this, suddenly. TODO: Try to remove this
     kernelParams = [ "usbcore.autosuspend=-1" ];
     kernel.sysctl = { "vm.swappiness" = 20; };
   };
@@ -453,16 +430,17 @@ in {
     users.${user} = {
       #shell = pkgs.fish;
       isNormalUser = lib.mkDefault true;
-      extraGroups = [
+      extraGroups = [ # we should automate this. if networkmanager is enabled, then add it, etc.
         "wheel"
-        "networkmanager"
         "audio"
         "video"
         "dialout"
-        "libvirtd"
         "uinput"
         "lp"
-      ];
+      ] ++
+        (if config.virtualisation.libvirtd.enable then ["libvirtd"] else [] )
+        ++
+        (if config.networking.networkmanager.enable then ["networkmanager"] else [] );
       initialPassword = "password";
       openssh.authorizedKeys.keys = [ ];
     };

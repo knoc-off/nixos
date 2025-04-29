@@ -240,7 +240,8 @@ in {
 
       # Config
       SMART_MODEL="openrouter/google/gemini-2.5-pro-preview-03-25"
-      FAST_MODEL="openrouter/google/gemini-2.0-flash-001"
+      FAST_MODEL="openrouter/google/gemini-2.5-flash-preview"
+      MEDIUM_MODEL="openrouter/google/gemini-2.5-flash-preview:thinking"
       MODEL="$FAST_MODEL"
       WEAK_MODEL="$FAST_MODEL"
       ARGS=()
@@ -249,6 +250,7 @@ in {
       while [ $# -gt 0 ]; do
         case "$1" in
           -s) MODEL="$SMART_MODEL"; shift ;;
+          -m) MODEL="$MEDIUM_MODEL"; shift ;;
           -d) MODEL="$FAST_MODEL"; shift ;;
           *) ARGS+=("$1"); shift ;;
         esac
@@ -262,9 +264,11 @@ in {
       # Execute
       ${upkgs.aider-chat}/bin/aider \
         --alias "f:$FAST_MODEL" \
+        --alias "m:$MEDIUM_MODEL" \
         --alias "s:$SMART_MODEL" \
         --alias "fast:$FAST_MODEL" \
         --alias "smart:$SMART_MODEL" \
+        --alias "medium:$MEDIUM_MODEL" \
         --model "$MODEL" \
         --weak-model "$WEAK_MODEL" \
         --no-auto-lint \

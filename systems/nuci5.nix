@@ -1,4 +1,5 @@
-{ modulesPath, inputs, outputs, config, lib, pkgs, self, user, ... }: {
+{ modulesPath, inputs, hostname, outputs, config, lib, pkgs, self, user, ...
+}@args: {
   imports = [
     # Sops
     # inputs.sops-nix.nixosModules.sops
@@ -15,9 +16,12 @@
     #       { };
     #   };
     # }
+
     # Disko
     inputs.disko.nixosModules.disko
     ./hardware/disks/simple-disk.nix
+
+    (self.nixosModules.home { inherit args; })
 
     # need some kind of WM
     # self.nixosModules.windowManager.hyprland
@@ -42,48 +46,37 @@
 
       environment.variables.LIBVA_DRIVER_NAME = "i915";
 
+      # might want to swap over to cage. but dwl is more powerful, if i want to run web-browser
+      # services.cage.user = "kodi";
+      # services.cage.program = "${pkgs.kodi-wayland}/bin/kodi-standalone";
+      # services.cage.enable = true;
+
       # doesnt need to be super secure here
       services = {
-        #getty.autologinUser = user;
         xserver.displayManager.startx.enable = false;
         greetd = {
           enable = true;
           settings = {
             default_session = {
-              #command = "${pkgs.bash}/bin/bash";
-              command = "${pkgs.dwl}/bin/dwl -s ${pkgs.kodi-wayland}/bin/kodi";
-                # "${pkgs.dwl}/bin/dwl -s '${pkgs.jellyfin-media-player}/bin/jellyfinmediaplayer'";
-              user = user;
+              #command = "${pkgs.dwl}/bin/dwl -s kodi";
+              command = "${pkgs.bash}/bin/bash";
+              inherit user;
             };
           };
         };
         seatd = {
           enable = true;
-          # Add the greetd user to the seat group
-          user = user; # config.services.greetd.user;
+          inherit user;
         };
       };
 
       # Ensure the user exists (replace with your actual user settings)
       users.users.${user} = {
         isNormalUser = true;
-        extraGroups = [
-          "wheel"
-          "render"
-          "seat"
-          "video"
-          "audio"
-          "input"
-          "networkmanager"
-        ]; # Add necessary groups
-        # shell = pkgs.bash; # Or your preferred shell
-        # home = "/home/${autoLoginUser}"; # Optional: Explicitly set home if needed
-        # uid = 1000; # Optional: Set UID if needed
+        extraGroups =
+          [ "wheel" "render" "seat" "video" "audio" "input" "networkmanager" ];
 
         # packages = with pkgs; [ dwl ];
-
-        # --- Systemd User Service for Hyprland ---
-        # This service will be automatically started when 'autoLoginUser' logs in.
       };
       # Make sure these groups exist
       users.groups = {
@@ -100,15 +93,46 @@
 
         dwl
         firefox
-
       ]);
+    }
 
+    {
+      # create a service to run at startup each boot. run wgnord c de to connect to the vpn
+      systemd.services.wgnord = {
+        description = "WireGuard NordVPN";
+        after = [ "network.target" ];
+        wantedBy = [ "multi-user.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = "${pkgs.wgnord}/bin/wgnord c de";
+        };
+      };
     }
 
     #inputs.hardware.nixosModules.common-cpu-intel
 
     # nix package settings
-    ./modules/nix.nix
+    {
+
+      nixpkgs.config.allowUnfree = true;
+      nix = {
+        registry = {
+          nixpkgs.flake = inputs.nixpkgs;
+          nixos-hardware.flake = inputs.hardware;
+        };
+        #nix.nixPath = [ "/etc/nix/path" ];
+        #environment.etc."nix/path/nixpkgs".source = inputs.nixpkgs;
+        nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
+        settings = {
+          substituters = [ "https://hyprland.cachix.org" ];
+          trusted-public-keys = [
+            "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc="
+          ];
+          experimental-features = [ "nix-command" "flakes" "pipe-operators" ];
+          trusted-users = [ "@wheel" ];
+        };
+      };
+    }
 
     # VPN Server
     # ./services/wireguard.nix
@@ -117,9 +141,11 @@
     # ./services/syncthing.nix # this should be enabled again, for media?
 
   ];
+
   nix.settings.auto-optimise-store = true;
 
-  networking.hostName = "nux";
+  networking.hostName = hostname;
+
   # Firewall
   networking.firewall = {
     enable = true;
