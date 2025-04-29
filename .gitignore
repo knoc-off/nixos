@@ -6,3 +6,4 @@ target
 
 .direnv
 .aider*
+*.qcow2

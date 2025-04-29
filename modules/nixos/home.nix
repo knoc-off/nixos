@@ -1,11 +1,15 @@
-{ inputs, user, args, ... }: {
-  imports = [ inputs.home-manager.nixosModules.home-manager ];
+{ args, ... }: {
+  imports = [ args.inputs.home-manager.nixosModules.home-manager ];
 
   home-manager.backupFileExtension = "bak";
   home-manager = {
+
     useGlobalPkgs = false;
     useUserPackages = true;
-    users.${user} = import ../home/knoff-laptop.nix;
+
+    # this is the single-crossover point between nixos and home-manager
+    users.${args.user} = import ../../home/${args.user}.nix;
+
     # This could end badly. recursion, etc. yet i kinda like it.
     extraSpecialArgs = removeAttrs args [
       "config" # NixOS system config
