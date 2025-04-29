@@ -5,13 +5,24 @@ let
   hyprland = "${pkgs.hyprland}/bin/Hyprland";
 
 in {
-  #imports = [ self.nixosModules.desktop.totem ];
+  imports = [ self.nixosModules.desktop.totem ];
 
   # Enable greetd for login
   services.greetd = {
-    enable = lib.mkDefault true;
-    settings = lib.mkDefault {
+    enable = true;
+    settings = {
       default_session.command = "${tuigreet} --remember --cmd ${hyprland}";
+
+      # default_session.command =
+      #   "./${pkgs.greetd.tuigreet}/bin/tuigreet --remember --cmd ./${
+      #     pkgs.writeScriptBin "Hyprland_start" ''
+      #       ${pkgs.hyprland}/bin/Hyprland
+      #     ''
+      #   }";
+      # default_session = {
+      #   command = "./${hyprland}";
+      #   user = "knoff";
+      # };
     };
   };
 
@@ -19,7 +30,7 @@ in {
   programs.light.enable = lib.mkDefault true;
 
   # Allow X compositor
-  services.xserver.displayManager.startx.enable = lib.mkDefault true;
+  # services.xserver.displayManager.startx.enable = lib.mkDefault true;
 
   # Enable Hyprland
   programs.hyprland = {
@@ -38,14 +49,8 @@ in {
   };
 
   # System-wide packages
-  environment.systemPackages = lib.mkDefault (with pkgs; [
-    wl-clipboard
-    xdg-utils
-
-    vaapiVdpau
-    libvdpau-va-gl
-
-  ]);
+  environment.systemPackages =
+    lib.mkDefault (with pkgs; [ wl-clipboard xdg-utils ]);
 
   # Enable polkit
   security.polkit.enable = lib.mkDefault true;

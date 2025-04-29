@@ -37,6 +37,11 @@ in {
     resize_on_border = true;
   };
 
+  debug = {
+    disable_logs = false;
+
+  };
+
   group = {
     insert_after_current = true;
     focus_removed_window = true;
