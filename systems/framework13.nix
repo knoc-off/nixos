@@ -197,6 +197,27 @@ in {
     # Window manager
     self.nixosModules.windowManager.hyprland
 
+    {
+
+        # services = {
+        #   greetd = {
+        #     enable = true;
+        #     settings = {
+        #       default_session = {
+        #         command = "${pkgs.dwl}/bin/dwl -s kodi";
+        #         #command = "${pkgs.bash}/bin/bash";
+        #         inherit user;
+        #       };
+        #     };
+        #   };
+        #   seatd = {
+        #     enable = true;
+        #     inherit user;
+        #   };
+        # };
+
+    }
+
     ./modules/shell/fish.nix
 
     #./modules/yubikey.nix
@@ -430,17 +451,21 @@ in {
     users.${user} = {
       #shell = pkgs.fish;
       isNormalUser = lib.mkDefault true;
-      extraGroups = [ # we should automate this. if networkmanager is enabled, then add it, etc.
-        "wheel"
-        "audio"
-        "video"
-        "dialout"
-        "uinput"
-        "lp"
-      ] ++
-        (if config.virtualisation.libvirtd.enable then ["libvirtd"] else [] )
-        ++
-        (if config.networking.networkmanager.enable then ["networkmanager"] else [] );
+      extraGroups =
+        [ # we should automate this. if networkmanager is enabled, then add it, etc.
+          "wheel"
+          "audio"
+          "video"
+          "dialout"
+          "uinput"
+          "lp"
+        ] ++ (if config.virtualisation.libvirtd.enable then
+          [ "libvirtd" ]
+        else
+          [ ]) ++ (if config.networking.networkmanager.enable then
+            [ "networkmanager" ]
+          else
+            [ ]);
       initialPassword = "password";
       openssh.authorizedKeys.keys = [ ];
     };
