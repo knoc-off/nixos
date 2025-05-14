@@ -1,7 +1,5 @@
 { pkgs, theme, color-lib, ... }:
 {
-  imports = [ ./kitty ./programs/btop.nix ];
-
   home.packages = with pkgs; [
     btop # htop but better
     tiv # terminal image viewer
@@ -13,10 +11,6 @@
   programs = {
 
     zoxide.enable = true;
-
-    #feh = {
-    #  enable = true;
-    #};
 
     eza = {
       enable = true;
@@ -37,13 +31,6 @@
 
     fzf = {
       enable = true;
-
-      #colors = {
-      #  bg = "#${oklchToHex (setLightness 0.2 primary)}";
-      #  "bg+" = "#${oklchToHex (setLightness 0.25 primary)}";
-      #  fg = "#${oklchToHex (setLightness 0.8 neutral)}";
-      #  "fg+" = "#${oklchToHex (setLightness 0.9 neutral)}";
-      #};
     };
 
     ripgrep = {

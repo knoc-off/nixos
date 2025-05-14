@@ -59,7 +59,8 @@
           settings = {
             default_session = {
               #command = "${pkgs.dwl}/bin/dwl -s kodi";
-              command = "${pkgs.bash}/bin/bash";
+              command = "${pkgs.dwl}/bin/dwl -s firefox";
+              #command = "${pkgs.bash}/bin/bash";
               inherit user;
             };
           };
@@ -93,21 +94,44 @@
 
         dwl
         firefox
+
+        bluetuith # TUI manager
+        bluez-tools # CLI utilities
+        bluez-alsa # ALSA backend (optional)
+        wireshark # HCI analysis
       ]);
+
+      hardware.bluetooth = {
+        enable = true;
+        powerOnBoot = true;
+        package = pkgs.bluez.override { enableExperimental = true; };
+        settings = {
+          General = {
+            ControllerMode = "dual"; # BR/EDR + LE
+            JustWorksRepairing = "always"; # Fix pairing issues
+            Experimental = true; # Battery reports
+            FastConnectable = true;
+            ReconnectAttempts = 7;
+          };
+        };
+        disabledPlugins = [ "sap" ]; # Disable SIM Access Profile
+      };
+      services.blueman.enable = true; # GUI manager
+
     }
 
-    {
-      # create a service to run at startup each boot. run wgnord c de to connect to the vpn
-      systemd.services.wgnord = {
-        description = "WireGuard NordVPN";
-        after = [ "network.target" ];
-        wantedBy = [ "multi-user.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          ExecStart = "${pkgs.wgnord}/bin/wgnord c de";
-        };
-      };
-    }
+    # {
+    #   # create a service to run at startup each boot. run wgnord c de to connect to the vpn
+    #   systemd.services.wgnord = {
+    #     description = "WireGuard NordVPN";
+    #     after = [ "network.target" ];
+    #     wantedBy = [ "multi-user.target" ];
+    #     serviceConfig = {
+    #       Type = "oneshot";
+    #       ExecStart = "${pkgs.wgnord}/bin/wgnord c de";
+    #     };
+    #   };
+    # }
 
     #inputs.hardware.nixosModules.common-cpu-intel
 
@@ -148,7 +172,7 @@
 
   # Firewall
   networking.firewall = {
-    enable = true;
+    enable = false;
     allowedTCPPorts = [ ];
   };
 

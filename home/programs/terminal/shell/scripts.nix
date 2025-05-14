@@ -1,427 +1,473 @@
 { pkgs, upkgs, self, hostname, config, ... }:
 let
   config_dir = "/etc/nixos"; # Should relocate to /etc? and symlink?
-  inherit (self.packages.${pkgs.system}) writeNuScript;
+  inherit (self.packages.${pkgs.system}) mkComplgenScript;
 in {
   home.packages = [
 
-    (pkgs.writeShellScriptBin "anti-sleep" ''
+    (mkComplgenScript {
+      name = "csv_to_excel";
+      scriptContent = ''
+        #!${pkgs.bash}/bin/bash
+        set -euo pipefail
+        if [ "$#" -ne 2 ]; then echo "Usage: csv_to_excel <input.csv> <output.xlsx>"; exit 1; fi
+        input_csv="$1"; output_xlsx="$2"
+        if [ ! -f "$input_csv" ]; then echo "Error: Input CSV file not found: '$input_csv'"; exit 1; fi
+        # Note: Python path comes from runtimeDeps via wrapper
+        python -c "import pandas as pd; import sys; df = pd.read_csv(sys.argv[1], encoding='utf-8'); df.to_excel(sys.argv[2], index=False)" "$input_csv" "$output_xlsx"
+        echo "Converted '$input_csv' to '$output_xlsx'"
+      '';
+      # Grammar using external command 'fd'
+      grammar = ''
+        csv_to_excel {{{ ${pkgs.fd}/bin/fd --type f --extension csv --max-depth 1 . --color never --hidden --no-ignore }}} "Input CSV file" <PATH> "Output XLSX file";'';
+      # Runtime dependency for the script itself
+      runtimeDeps =
+        [ (pkgs.python3.withPackages (ps: [ ps.pandas ps.openpyxl ])) ];
+    })
 
-      ${pkgs.systemd}/bin/systemd-inhibit \
-        --what=sleep:idle:handle-lid-switch \
-        --who="$USER" \
-        --why="Manual sleep prevention" \
-        --mode=block \
-        sleep "$1"
-    '')
+    (mkComplgenScript {
+      name = "excel_to_csv";
+      # Minimal script content, relies on Python/pandas for error handling
+      scriptContent = ''
+        #!${pkgs.bash}/bin/bash
+        # Python path comes from runtimeDeps via wrapper
+        python -c "import pandas as pd; import sys; pd.read_excel(sys.argv[1]).to_csv(sys.argv[2], index=False, encoding='utf-8')" "$1" "$2"
+      '';
+      # Grammar for completion
+      grammar = ''
+        excel_to_csv {{{ ${pkgs.fd}/bin/fd --type f --extension xlsx --extension xls --max-depth 1 . --color never --hidden --no-ignore }}} "Input Excel file" <PATH> "Output CSV file";
+      '';
+      # Runtime dependencies
+      runtimeDeps =
+        [ (pkgs.python3.withPackages (ps: [ ps.pandas ps.openpyxl ])) ];
+    })
 
-    (pkgs.writeShellScriptBin "pipewire-combine-sinks" ''
-      #!/usr/bin/env bash
-      set -euo pipefail
+    (mkComplgenScript {
+      name = "anti-sleep";
+      scriptContent = ''
+        #!${pkgs.bash}/bin/bash
+        set -euo pipefail
 
-      # Function to get a more user-friendly name for a sink
-      get_friendly_name() {
-        local node_name="$1"
+        # --- Configuration ---
+        # systemd-inhibit arguments
+        INHIBIT_WHAT="sleep:idle:handle-lid-switch"
+        INHIBIT_WHO="$USER" # Use the current user
+        INHIBIT_MODE="block"
 
-        # Extract device name from node name
-        local device_id=""
+        # --- Argument Parsing & Duration Calculation ---
+        usage() {
+          echo "Usage: anti-sleep <duration | HH:MM>"
+          echo "  duration: e.g., 30m, 1h, 6h, or any value accepted by 'sleep' (like 90s, 2h30m)"
+          echo "  HH:MM:    Target time (24-hour format), e.g., 13:00. Inhibits sleep until that time today (or tomorrow if the time has passed)."
+          exit 1
+        }
 
-        if [[ "$node_name" =~ bluez_output\.([0-9A-F_]+)\. ]]; then
-          device_id="bluez_card.''${BASH_REMATCH[1]}"
-        elif [[ "$node_name" =~ alsa_output\.([^\.]+)\. ]]; then
-          device_id="alsa_card.''${BASH_REMATCH[1]}"
+        if [ "$#" -ne 1 ]; then
+          usage
         fi
 
-        # If we found a device ID, look up its description
-        if [ -n "$device_id" ]; then
-          local description=$(${pkgs.pipewire}/bin/pw-dump | ${pkgs.jq}/bin/jq -r --arg id "$device_id" '
-            [.[] | select(.type == "PipeWire:Interface:Device")
-             | select(.info.props["device.name"] == $id)
-             | .info.props["device.description"]][0]')
+        input="$1"
+        duration_sec=""
+        why_message="Manual sleep prevention" # Default reason
 
-          if [ "$description" != "null" ] && [ -n "$description" ]; then
-            echo "$description"
-            return 0
+        # Check for predefined keywords first
+        case "$input" in
+          30m)
+            duration_sec=1800 # 30 * 60
+            why_message="Preventing sleep for 30 minutes"
+            ;;
+          1h)
+            duration_sec=3600 # 1 * 60 * 60
+            why_message="Preventing sleep for 1 hour"
+            ;;
+          6h)
+            duration_sec=21600 # 6 * 60 * 60
+            why_message="Preventing sleep for 6 hours"
+            ;;
+          # Check if it looks like HH:MM time format
+          [0-2][0-9]:[0-5][0-9])
+            # Validate time format more strictly (e.g., 24:00 is invalid)
+            if ! date -d "$input" >/dev/null 2>&1; then
+               echo "Error: Invalid time format '$input'. Use HH:MM (24-hour)."
+               exit 1
+            fi
+
+            current_epoch=$(date +%s)
+            target_epoch=$(date -d "$input" +%s)
+
+            # If target time is in the past today, assume target is tomorrow
+            if [ "$target_epoch" -lt "$current_epoch" ]; then
+              target_epoch=$(date -d "$input + 1 day" +%s)
+              why_message="Preventing sleep until $input tomorrow"
+            else
+              why_message="Preventing sleep until $input today"
+            fi
+
+            duration_sec=$((target_epoch - current_epoch))
+            ;;
+          # Otherwise, assume it's a duration string for 'sleep' command
+          *)
+            # Basic validation: Check if 'sleep' understands the duration
+            if ! sleep "$input" --help >/dev/null 2>&1 && ! sleep "$input" 0 ; then
+               echo "Error: Invalid duration or time format: '$input'"
+               usage
+            fi
+            # We let systemd-inhibit pass the raw duration string to sleep
+            # This allows formats like '2h30m', '90s' etc.
+            # Note: We don't calculate seconds here, pass the string directly.
+            duration_sec="$input"
+            why_message="Preventing sleep for duration '$input'"
+            ;;
+        esac
+
+        if [ -z "$duration_sec" ]; then
+           echo "Error: Could not determine sleep duration from input '$input'"
+           usage
+        fi
+
+        # --- Execute systemd-inhibit ---
+        echo "$why_message (Duration: $duration_sec seconds/specifier)"
+        echo "Press Ctrl+C to cancel the inhibit lock."
+
+        # Use exec to replace the shell process with systemd-inhibit
+        # This ensures signals (like Ctrl+C) are handled correctly by systemd-inhibit
+        exec ${pkgs.systemd}/bin/systemd-inhibit \
+          --what="$INHIBIT_WHAT" \
+          --who="$INHIBIT_WHO" \
+          --why="$why_message" \
+          --mode="$INHIBIT_MODE" \
+          ${pkgs.coreutils}/bin/sleep "$duration_sec"
+
+        # This part is unlikely to be reached because of 'exec'
+        echo "Sleep inhibit finished or was cancelled."
+      '';
+
+      # Grammar for command-line completion
+      grammar = ''
+        anti-sleep ( 30m | 1h | 6h | 18:00 | <TIME(HH:MM)> | <DURATION> ) "Duration or Time";
+      '';
+
+      # Runtime dependencies for the script
+      runtimeDeps =
+        [ pkgs.systemd pkgs.coreutils ]; # coreutils for date and sleep
+    })
+
+    (mkComplgenScript {
+      name = "pipewire-combine-sinks";
+      scriptContent = ''
+        #!${pkgs.bash}/bin/bash
+        set -euo pipefail
+
+        PW_DUMP="${pkgs.pipewire}/bin/pw-dump"
+        PW_CLI="${pkgs.pipewire}/bin/pw-cli"
+        JQ="${pkgs.jq}/bin/jq"
+        PACTL="${pkgs.pulseaudio}/bin/pactl"
+        WPCTL="${pkgs.wireplumber}/bin/wpctl"
+        SLEEP="${pkgs.coreutils}/bin/sleep"
+
+        usage() {
+          echo "Usage: $0 [OPTION]"
+          echo "  Interactively combine two PipeWire audio sinks."
+          echo
+          echo "Options:"
+          echo "  -c, --clean    Remove all existing combined sinks and exit."
+          echo "  -h, --help     Show this help message and exit."
+          exit 0
+        }
+
+        remove_combined_sinks() {
+          echo "Cleaning old combined sinks..."
+          mapfile -t combined_ids < <(
+            "$PW_DUMP" | "$JQ" -r '
+              .[] | select(.type == "PipeWire:Interface:Node" and
+                           (.info.props["node.name"]? | test("combined"))) | .id'
+          )
+          if [ ''${#combined_ids[@]} -eq 0 ]; then
+             echo "No combined sinks found."
+             return
           fi
+          echo "Removing ''${#combined_ids[@]} sink(s)..."
+          for id in "''${combined_ids[@]}"; do
+            "$PW_CLI" destroy "$id" || echo "Warn: Failed to remove $id" >&2
+          done
+          echo "Cleanup finished."
+        }
+
+        # --- Argument Parsing ---
+        if [ $# -gt 0 ]; then
+          case "$1" in
+            -c|--clean) remove_combined_sinks; exit 0 ;;
+            -h|--help)  usage ;;
+            *) echo "Unknown option: $1"; usage ;;
+          esac
         fi
 
-        # Fallback: For combined sinks, just return "Combined Output"
-        if [[ "$node_name" == "combined"* ]]; then
-          echo "Combined Output ($node_name)"
-          return 0
+        # --- Main Logic ---
+        remove_combined_sinks # Clean before creating new
+
+        echo "Scanning for audio sinks..."
+        # Get sink ID, name, and description (fallback to name) in one go (TSV format)
+        mapfile -t sinks_data < <(
+          "$PW_DUMP" | "$JQ" -r '
+            .[] | select(.type == "PipeWire:Interface:Node" and
+                         .info.props["media.class"] == "Audio/Sink")
+            | [.id, .info.props["node.name"],
+               (.info.props["node.description"]? // .info.props["node.name"])]
+            | @tsv'
+        )
+
+        if [ ''${#sinks_data[@]} -lt 2 ]; then
+          echo "Error: Need at least 2 sinks to combine." >&2; exit 1
         fi
 
-        # Last resort: return the node name itself
-        echo "$node_name"
-      }
-
-      # Function to remove all combined sinks
-      remove_combined_sinks() {
-        echo "Searching for existing combined sinks..."
-
-        # Find all nodes with "combined" in their name
-        combined_sinks=$(${pkgs.pipewire}/bin/pw-dump  | \
-          ${pkgs.jq}/bin/jq -r '[.[]
-            | select(.type == "PipeWire:Interface:Node")
-            | select(.info.props["node.name"] | contains("combined"))
-            | {id: .id, name: .info.props["node.name"]}]')
-
-        num_combined=$(echo "$combined_sinks" | ${pkgs.jq}/bin/jq 'length')
-
-        if [ "$num_combined" -eq 0 ]; then
-          echo "No existing combined sinks found."
-          return 0
-        fi
-
-        echo "Found $num_combined existing combined sink(s):"
-
-        # Display and destroy each combined sink
-        for (( i=0; i < num_combined; i++ )); do
-          id=$(echo "$combined_sinks" | ${pkgs.jq}/bin/jq -r ".[$i].id")
-          name=$(echo "$combined_sinks" | ${pkgs.jq}/bin/jq -r ".[$i].name")
-          echo "  → Removing: $name (ID: $id)"
-
-          ${pkgs.pipewire}/bin/pw-cli destroy "$id" || echo "  Warning: Failed to remove sink $id"
+        echo "Available Sinks:"
+        declare -a sink_ids sink_names sink_descs
+        for i in "''${!sinks_data[@]}"; do
+          # Parse TSV data directly into variables
+          IFS=$'\t' read -r id name desc <<< "''${sinks_data[$i]}"
+          sink_ids+=("$id")
+          sink_names+=("$name")
+          sink_descs+=("$desc")
+          printf "[%d] %s\n" "$((i+1))" "$desc" # Use printf for formatting
         done
 
-        echo "All combined sinks removed."
-        return 0
-      }
+        # --- User Selection ---
+        select_sink() {
+          local prompt="$1"
+          local exclude_index="$2" # Optional index to exclude
+          local selection index
+          while true; do
+            read -rp "$prompt [1-''${#sink_ids[@]}]: " selection
+            if [[ "$selection" =~ ^[0-9]+$ ]] && \
+               [ "$selection" -ge 1 ] && [ "$selection" -le ''${#sink_ids[@]} ]; then
+              index=$((selection - 1))
+              if [ -z "$exclude_index" ] || [ "$index" -ne "$exclude_index" ]; then
+                echo "$index" # Return the selected index
+                return
+              else
+                echo "Cannot select the same device twice." >&2
+              fi
+            else
+              echo "Invalid selection." >&2
+            fi
+          done
+        }
 
-      # Check for command-line arguments
-      if [ $# -gt 0 ]; then
-        if [ "$1" = "--clean" ] || [ "$1" = "-c" ]; then
-          remove_combined_sinks
-          exit 0
-        elif [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-          echo "Usage: pipewire-combine-sinks [OPTION]"
-          echo ""
-          echo "Options:"
-          echo "  -c, --clean    Remove all existing combined sinks without creating a new one"
-          echo "  -h, --help     Display this help message"
-          echo ""
-          echo "With no options, the script will guide you through creating a new combined sink."
-          exit 0
-        else
-          echo "Unknown option: $1"
-          echo "Use --help to see available options."
-          exit 1
+        idx1=$(select_sink "Select first device")
+        idx2=$(select_sink "Select second device" "$idx1") # Exclude first selection
+
+        # --- Create Combined Sink ---
+        read -rp "Enter name for combined sink [combined]: " combined_name
+        combined_name=''${combined_name:-combined}
+
+        echo "Creating '$combined_name' with:"
+        echo "  → ''${sink_descs[$idx1]}"
+        echo "  → ''${sink_descs[$idx2]}"
+
+        "$PACTL" load-module module-combine-sink \
+          sink_name="$combined_name" \
+          slaves="''${sink_names[$idx1]},''${sink_names[$idx2]}"
+
+        echo "Combined sink created. Waiting for registration..."
+        "$SLEEP" 2 # Give PipeWire/PulseAudio time
+
+        # --- Set Default ---
+        # Find the ID of the newly created sink
+        new_sink_id=$("$PW_DUMP" | "$JQ" -r --arg name "$combined_name" '
+          [.[] | select(.type == "PipeWire:Interface:Node" and
+                        .info.props["node.name"] == $name)][0].id // empty'
+        )
+
+        if [ -z "$new_sink_id" ]; then
+           echo "Error: Could not find created sink '$combined_name'." >&2; exit 1
         fi
-      fi
 
-      # First, remove any existing combined sinks
-      remove_combined_sinks
+        echo "Setting '$combined_name' (ID: $new_sink_id) as default..."
+        "$WPCTL" set-default "$new_sink_id"
 
-      echo "Scanning for audio devices..."
+        echo "Success! Audio should now play on both devices."
+        echo "Run '$0 --clean' to remove combined sinks."
+      '';
 
-      # Get all audio sinks
-      SINKS_JSON=$(${pkgs.pipewire}/bin/pw-dump  | \
-        ${pkgs.jq}/bin/jq '[.[]
-          | select(.type == "PipeWire:Interface:Node")
-          | select(.info.props["media.class"] == "Audio/Sink")
-          | { id: .id, node_name: .info.props["node.name"] }
-        ]')
+      # Grammar for command-line completion (simple options)
+      grammar = ''
+        pipewire-combine-sinks (-c | --clean | -h | --help)?;
+      '';
 
-      NUM_SINKS=$(echo "$SINKS_JSON" | ${pkgs.jq}/bin/jq 'length')
+      # Runtime dependencies
+      runtimeDeps = [
+        pkgs.bash
+        pkgs.pipewire
+        pkgs.jq
+        pkgs.pulseaudio
+        pkgs.wireplumber
+        pkgs.coreutils
+      ];
+    })
 
-      if [ "$NUM_SINKS" -lt 2 ]; then
-        echo "Error: You need at least two active audio sink devices to combine."
-        exit 1
-      fi
+    (mkComplgenScript {
+      name = "adr";
+      scriptContent = ''
+        #!${pkgs.bash}/bin/bash
+        set -euo pipefail
 
-      echo "Available Audio Sink Devices:"
+        SMART_MODEL="openrouter/google/gemini-2.5-pro-preview-03-25"
+        FAST_MODEL="openrouter/google/gemini-2.5-flash-preview"
+        MEDIUM_MODEL="openrouter/google/gemini-2.5-flash-preview:thinking"
+        MODEL="$FAST_MODEL"
+        WEAK_MODEL="$FAST_MODEL"
+        AIDER_ARGS=() # Renamed from ARGS to avoid confusion with shell ARGS
 
-      # Create arrays to store sink information
-      declare -a sink_ids
-      declare -a sink_node_names
-      declare -a sink_display_names
+        # Parse flags and file/other arguments
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            -s) MODEL="$SMART_MODEL"; shift ;;
+            -m) MODEL="$MEDIUM_MODEL"; shift ;;
+            -d) MODEL="$FAST_MODEL"; shift ;;
+            *) AIDER_ARGS+=("$1"); shift ;;
+          esac
+        done
 
-      # Process each sink and get friendly names
-      for (( i=0; i < NUM_SINKS; i++ )); do
-        id=$(echo "$SINKS_JSON" | ${pkgs.jq}/bin/jq -r ".[$i].id")
-        node_name=$(echo "$SINKS_JSON" | ${pkgs.jq}/bin/jq -r ".[$i].node_name")
-
-        # Get a friendly name for this sink
-        friendly_name=$(get_friendly_name "$node_name")
-
-        sink_ids+=("$id")
-        sink_node_names+=("$node_name")
-        sink_display_names+=("$friendly_name")
-
-        # Display the sink with its friendly name
-        echo "[$((i+1))] $friendly_name"
-      done
-
-      # Ask for user selection for the first sink
-      while true; do
-        read -rp "Select first device [1-$NUM_SINKS]: " selection1
-        if [[ "$selection1" =~ ^[0-9]+$ ]] && [ "$selection1" -ge 1 ] && \
-           [ "$selection1" -le "$NUM_SINKS" ]; then
-          index1=$((selection1 - 1))
-          break
-        else
-          echo "Invalid selection. Please try again."
+        if [ ''${#AIDER_ARGS[@]} -eq 0 ]; then
+          AIDER_ARGS=("--message" "/commit")
         fi
-      done
 
-      # Ask for user selection for the second sink
-      while true; do
-        read -rp "Select second device [1-$NUM_SINKS]: " selection2
-        if [[ "$selection2" =~ ^[0-9]+$ ]] && [ "$selection2" -ge 1 ] && \
-           [ "$selection2" -le "$NUM_SINKS" ] && [ "$selection2" -ne "$selection1" ]; then
-          index2=$((selection2 - 1))
-          break
+        ${upkgs.aider-chat}/bin/aider \
+          --alias "f:$FAST_MODEL" \
+          --alias "m:$MEDIUM_MODEL" \
+          --alias "s:$SMART_MODEL" \
+          --alias "fast:$FAST_MODEL" \
+          --alias "smart:$SMART_MODEL" \
+          --alias "medium:$MEDIUM_MODEL" \
+          --model "$MODEL" \
+          --weak-model "$WEAK_MODEL" \
+          --no-auto-lint \
+          --no-auto-test \
+          --no-attribute-committer \
+          --no-attribute-author \
+          --dark-mode \
+          --edit-format diff \
+          "''${AIDER_ARGS[@]}"
+      '';
+      # Corrected grammar:
+      grammar = ''
+        adr [(-s | -m | -d)] [{{{${pkgs.fd}/bin/fd --type f --hidden --no-ignore --max-depth 1 . --exec sh -c 'if ${pkgs.file}/bin/file -b --mime-type "$1" 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q "^text/"; then echo "$1"; fi' {} \;}}} "File"] ... [<OTHER_ARG> "Other Argument"] ... ;'';
+      runtimeDeps = [
+        upkgs.aider-chat
+        pkgs.fd
+        pkgs.file # For file type detection in completion
+        pkgs.gnugrep # For grep in completion
+        pkgs.bash # For the script itself
+      ];
+    })
+
+    (mkComplgenScript {
+      name = "ping"; # The command name users will type
+
+      scriptContent = ''
+        #!${pkgs.bash}/bin/bash
+        # Use exec to replace this script process with ping for cleaner signal handling
+        if [ -z "$1" ]; then
+          echo "No target specified, pinging default: 1.1.1.1"
+          # Use inetutils ping, which is more standard than toybox's
+          exec ${pkgs.inetutils}/bin/ping 1.1.1.1
         else
-          if [ "$selection2" -eq "$selection1" ]; then
-            echo "You cannot choose the same device twice."
-          else
-            echo "Invalid selection. Please try again."
-          fi
+          # Pass all arguments exactly as received to the real ping
+          exec ${pkgs.inetutils}/bin/ping "$@"
         fi
-      done
+      '';
 
-      # Get the node names for the selected sinks
-      node1="''${sink_node_names[$index1]}"
-      node2="''${sink_node_names[$index2]}"
+      # Grammar for command-line completion
+      grammar = ''
+        ping {{{
+          [ -f "$HOME/.ssh/known_hosts" ] && \
+          ${pkgs.gawk}/bin/awk '
+            # Skip comments, hashed hosts (|1|...), and markers (@...)
+            /^#/ || /^\|/ || /^@/ { next }
+            {
+              # Get the first field (host list)
+              hosts = $1
+              # Remove bracket/port notation like [host]:port
+              gsub(/\[|\]:[0-9]+/, "", hosts)
+              # Split comma-separated hosts and print each one
+              n = split(hosts, arr, ",")
+              for (i = 1; i <= n; i++) {
+                print arr[i]
+              }
+            }
+          ' "$HOME/.ssh/known_hosts" | ${pkgs.coreutils}/bin/sort -u
+        }}} "Target host/IP"
 
-      # Get the display names for the selected sinks
-      display1="''${sink_display_names[$index1]}"
-      display2="''${sink_display_names[$index2]}"
+        # Allow any other host/IP not in the list
+        <HOST>
 
-      # Prompt for a name for the combined sink
-      read -rp "Enter name for the combined sink [combined]: " combined_name
-      combined_name=''${combined_name:-combined}
+        # Allow any subsequent arguments (like -c, -i, etc.)
+        ... ;
+      '';
 
-      echo ""
-      echo "Creating combined sink '''"$combined_name"''' using:"
-      echo "  → $display1"
-      echo "  → $display2"
-      echo ""
-
-      # Create the combined sink using pactl (the method that worked)
-      module_id=$(${pkgs.pulseaudio}/bin/pactl load-module module-combine-sink \
-        sink_name="$combined_name" \
-        slaves="$node1,$node2")
-
-      echo "Combined sink created successfully."
-
-      # Wait for the sink to register
-      sleep 2
-
-      # Look up the combined sink ID
-      combined_sink_id=$(${pkgs.pipewire}/bin/pw-dump  | \
-        ${pkgs.jq}/bin/jq -r --arg name "$combined_name" '
-          [ .[] | select(.type == "PipeWire:Interface:Node")
-            | select(.info.props["node.name"] == $name)
-          ][0].id
-        ')
-
-      if [ -z "$combined_sink_id" ] || [ "$combined_sink_id" == "null" ]; then
-        echo "Error: Could not find the combined sink in the PipeWire registry."
-        exit 1
-      fi
-
-      echo "Setting '''"$combined_name"''' as the default audio output..."
-
-      # Set the combined sink as default
-      ${pkgs.wireplumber}/bin/wpctl set-default "$combined_sink_id"
-
-      echo "Success: Combined sink is now the default output."
-      echo "Audio will now play through both selected devices."
-      echo ""
-      echo "Note: This combined sink will disappear after a reboot."
-      echo "To remove all combined sinks without rebooting, run: pipewire-combine-sinks --clean"
-      exit 0
-    '')
-
-    (pkgs.writeShellScriptBin "adr" ''
-      #!/usr/bin/env bash
-      set -euo pipefail
-
-      # Config
-      SMART_MODEL="openrouter/google/gemini-2.5-pro-preview-03-25"
-      FAST_MODEL="openrouter/google/gemini-2.5-flash-preview"
-      MEDIUM_MODEL="openrouter/google/gemini-2.5-flash-preview:thinking"
-      MODEL="$FAST_MODEL"
-      WEAK_MODEL="$FAST_MODEL"
-      ARGS=()
-
-      # Parse args
-      while [ $# -gt 0 ]; do
-        case "$1" in
-          -s) MODEL="$SMART_MODEL"; shift ;;
-          -m) MODEL="$MEDIUM_MODEL"; shift ;;
-          -d) MODEL="$FAST_MODEL"; shift ;;
-          *) ARGS+=("$1"); shift ;;
-        esac
-      done
-
-      # Default action
-      if [ ''${#ARGS[@]} -eq 0 ]; then
-        ARGS=("--message" "/commit")
-      fi
-
-      # Execute
-      ${upkgs.aider-chat}/bin/aider \
-        --alias "f:$FAST_MODEL" \
-        --alias "m:$MEDIUM_MODEL" \
-        --alias "s:$SMART_MODEL" \
-        --alias "fast:$FAST_MODEL" \
-        --alias "smart:$SMART_MODEL" \
-        --alias "medium:$MEDIUM_MODEL" \
-        --model "$MODEL" \
-        --weak-model "$WEAK_MODEL" \
-        --no-auto-lint \
-        --no-auto-test \
-        --no-attribute-committer \
-        --no-attribute-author \
-        --dark-mode \
-        --edit-format diff \
-        "''${ARGS[@]}"
-    '')
-
-    (pkgs.writeShellScriptBin "ping" ''
-      # replace the ping command if no input is given just ping 1.1.1.1
-      if [ -z "$1" ]; then
-        ''${pkgs.toybox}/bin/ping 1.1.1.1
-      else
-        ${pkgs.toybox}/bin/ping $@
-      fi
-    '')
-
-    # not sure if this works w/o sudo.
-    (pkgs.writeShellScriptBin "vpn" ''
-      if [ -z "$1" ]; then
-        if isvpn; then
-          echo "VPN is already connected"
-        else
-          echo "VPN is not connected"
-          wgnord c de
-        fi
-        exit 0
-      fi
-
-      wgnord c $@
-
-    '')
+      # Runtime dependencies for the script itself
+      # Note: Dependencies for the *grammar command* (awk, sort) are separate
+      # and assumed to be available in the completion environment,
+      # but we specify them explicitly above for clarity/robustness.
+      runtimeDeps = [
+        pkgs.bash # For the script execution
+        pkgs.inetutils # For the actual ping command
+        # Dependencies needed for the completion command:
+        pkgs.gawk # GNU awk is robust for parsing
+        pkgs.coreutils # For sort
+      ];
+    })
 
     (self.packages.${pkgs.system}.nx config_dir hostname)
-
-    (pkgs.writeShellScriptBin "test-print" ''
-      echo "${config.xdg.configFile."kitty/kitty.conf".text}"
-    '')
-
-    (pkgs.writeShellScriptBin "isvpn" ''
-      nmcli connection show --active | grep -q "wgnord" && echo true || echo false
-    '')
-
-    (writeNuScript "nixx" ''
-      def --wrapped main [...args: string] {
-        mut command = []
-        mut nixx_args = []
-        mut program_args = []
-        mut package = ""
-        mut sudo = false
-        mut bg = false
-
-        let separator_indices = ($args | enumerate | where item == "--" | get index)
-        let separator_index = if ($separator_indices | length) == 0 {
-          null
-        } else {
-          $separator_indices | first
-        }
-
-        if $separator_index != null {
-          $nixx_args = ($args | range ..$separator_index)
-          $program_args = ($args | range ($separator_index + 1)..)
-        } else {
-          $nixx_args = $args
-          $program_args = []
-        }
-
-        # Process nixx arguments
-        for arg in $nixx_args {
-          if $arg == "sudo" {
-            $sudo = true
-          } else if $arg == "bg" {
-            $bg = true
-          } else if $package == "" {
-            $package = $arg
-          }
-        }
-
-        if $sudo and $bg {
-          print "Warning: Using sudo with background tasks may require manual authentication"
-        }
-
-        if $bg {
-          $command = ($command | append ["pueue" "add"])
-        }
-
-        $command = ($command | append [
-          "env"
-          "NIXPKGS_ALLOW_UNFREE=1"
-          "nix"
-          "shell"
-          "--impure"
-          $"nixpkgs#($package)"
-          "--command"
-        ])
-
-        if $sudo {
-          $command = ($command | append "sudo")
-        }
-
-        $command = ($command | append $package)
-        $command = ($command | append $program_args)
-
-        let command_str = ($command | str join " ")
-
-        if $bg {
-          let pueue_output = (nu -c $command_str | str trim)
-          let task_id = ($pueue_output | parse "New task added (id {id})." | get id | first)
-          if $task_id != null {
-            print $"Task added with ID: ($task_id)"
-            # pueue follow $task_id
-          } else {
-            print "Failed to parse task ID. Pueue output:"
-            print $pueue_output
-          }
-        } else {
-          bash -c $command_str
-        }
-      }
-    '')
-
-    (pkgs.writeShellScriptBin "git-msg" ''
-      git diff HEAD | llm "from the text extract only important changes to craft a concise and simple git commit message, formatted like this:
-      <Title of the git commit>
-
-      <body, Details of the commit>"
-    '')
-
-    (pkgs.writeShellScriptBin "compress" ''
-      tar -cf - "$1" | pv -s $(du -sb "$1" | awk '{print $1}') | ${pkgs.pigz}/bin/pigz -9 > "$2".tar.gz
-    '')
-
-    (writeNuScript "rsync-compress" ''
-      def main [source: path, destination: string] {
-        let size = (du -sb $source | split row " " | get 0 | into int)
-        rsync -avz --progress --compress-level=9 $source $destination
-        | pv -lep -s $size
-        | ignore
-      }
-    '')
 
     (pkgs.writeShellScriptBin "chrome" ''
       nix shell nixpkgs#ungoogled-chromium --command chromium $1 &>/dev/null &
     '')
-    (pkgs.writeShellScriptBin "connect" ''
-      echo "nmcli device wifi rescan"
-      nmcli device wifi rescan
-      echo "nmcli device wifi connect $@"
-      nmcli device wifi connect $@
-    '')
 
+    (mkComplgenScript {
+      name = "connect";
+      scriptContent = ''
+        #!${pkgs.bash}/bin/bash
+        set -euo pipefail
+        if [ $# -lt 1 ]; then echo "Usage: connect <SSID> [password]"; exit 1; fi
+        nmcli device wifi rescan
+        nmcli device wifi connect "$@"
+      '';
+      grammar = ''
+        connect {{{ ${pkgs.networkmanager}/bin/nmcli -t -f SSID dev wifi list }}} "SSID" [password: string];
+      '';
+      runtimeDeps = [ pkgs.networkmanager ];
+    })
+
+    (mkComplgenScript {
+      name = "compress";
+      scriptContent = ''
+        #!${pkgs.bash}/bin/bash
+        set -euo pipefail
+        if [ "$#" -ne 2 ]; then echo "Usage: compress <source> <dest.tar.gz>"; exit 1; fi
+        [ ! -e "$1" ] && { echo "Error: Source not found"; exit 1; }
+        tar -cf - "$1" | pv -s $(du -sb "$1" | awk '{print $1}') | ${pkgs.pigz}/bin/pigz -9 > "$2".tar.gz
+      '';
+      grammar = ''
+        compress {{{ ${pkgs.fd}/bin/fd --type directory --type file --max-depth 1 . --color never }}} "Source" <PATH> "Destination";
+      '';
+      runtimeDeps = [ pkgs.pigz pkgs.pv ];
+    })
+
+    (mkComplgenScript {
+      name = "rsync-compress";
+      scriptContent = ''
+        #!${pkgs.bash}/bin/bash
+        set -euo pipefail
+        if [ "$#" -ne 2 ]; then echo "Usage: rsync-compress <source> <dest>"; exit 1; fi
+        [ ! -e "$1" ] && { echo "Error: Source not found"; exit 1; }
+        size=$(du -sb "$1" | awk '{print $1}')
+        rsync -avz --progress --compress-level=9 "$1" "$2" | pv -lep -s "$size"
+      '';
+      grammar = ''
+        rsync-compress {{{ ${pkgs.fd}/bin/fd --type directory --type file --max-depth 1 . --color never }}} "Source" <PATH> "Destination";
+      '';
+      runtimeDeps = [ pkgs.rsync pkgs.pv ];
+    })
   ];
 }

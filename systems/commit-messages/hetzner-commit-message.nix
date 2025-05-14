@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "fixed_hyprland______________________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
+  system.nixos.label = "feat:_Add_Avante.nvim_improve_scripts_update_configs________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________wireguard";
 }

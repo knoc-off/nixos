@@ -1,44 +1,35 @@
-{ pkgs, ... }:
+{ pkgs, config, lib, ... }:
 
 let
   mimeSets = {
     application = {
-      # Existing entries
-      pdf = [ "org.gnome.Evince.desktop" ];
-      json = [ "kitty-neovim.desktop" ];
-      xml = [ "kitty-neovim.desktop" ];
-      "x-shellscript" = [ "kitty-neovim.desktop" ];
-      "x-perl" = [ "kitty-neovim.desktop" ];
-      "x-python" = [ "kitty-neovim.desktop" ];
-      "x-ruby" = [ "kitty-neovim.desktop" ];
-      "x-php" = [ "kitty-neovim.desktop" ];
-      "x-java" = [ "kitty-neovim.desktop" ];
-      "x-javascript" = [ "kitty-neovim.desktop" ];
-      zip = [ "org.gnome.FileRoller.desktop" ];
-      "x-rar" = [ "org.gnome.FileRoller.desktop" ];
-      "x-7z-compressed" = [ "org.gnome.FileRoller.desktop" ];
-      "x-tar" = [ "org.gnome.FileRoller.desktop" ];
-      "x-gzip" = [ "org.gnome.FileRoller.desktop" ];
-      "x-bzip2" = [ "org.gnome.FileRoller.desktop" ];
+      # Base applications (always active)
+      "application/pdf" =
+        [ "org.gnome.Evince.desktop" ]; # Changed pdf to application/pdf
+      "application/zip" =
+        [ "org.gnome.FileRoller.desktop" ]; # Changed zip to application/zip
+      "application/vnd.rar" =
+        [ "org.gnome.FileRoller.desktop" ]; # Changed x-rar
+      "application/x-7z-compressed" = [ "org.gnome.FileRoller.desktop" ];
+      "application/x-tar" = [ "org.gnome.FileRoller.desktop" ];
+      "application/gzip" = [ "org.gnome.FileRoller.desktop" ]; # Changed x-gzip
+      "application/x-bzip2" = [ "org.gnome.FileRoller.desktop" ];
 
-      # Example: Use kitty-neovim for markdown
-      # "markdown" = [ "kitty-neovim.desktop" ];
+    }
+    # The '//' operator merges the result of lib.mkIf with the base set
+      // lib.mkIf (config.xdg.desktopEntries ? "term-neovim") {
+        # These associations are added only if the 'term-neovim' desktop entry is defined
 
-      # Example: Use kitty-neovim for LaTeX
-      # "x-tex" = [ "kitty-neovim.desktop" ];
-
-      # Example: Use kitty-neovim for Rust
-      # "x-rust" = [ "kitty-neovim.desktop" ];
-
-      # Example: Use LibreOffice for .doc or .docx
-      # "msword"        = [ "libreoffice-writer.desktop" ];
-      # "vnd.openxmlformats-officedocument.wordprocessingml.document" = [ "libreoffice-writer.desktop" ];
-
-      # Example: Conditionally enable Go file type
-      # "x-golang" = lib.mkIf (lib.elem pkgs.go config.environment.systemPackages) {
-      #   [ "kitty-neovim.desktop" ];
-      # };
-    };
+        "application/json" = [ "term-neovim.desktop" ];
+        "application/xml" = [ "term-neovim.desktop" ]; # Or text/xml
+        "application/x-shellscript" = [ "term-neovim.desktop" ];
+        "application/x-perl" = [ "term-neovim.desktop" ]; # Or text/x-perl
+        "application/x-python" = [ "term-neovim.desktop" ]; # Or text/x-python
+        "application/x-ruby" = [ "term-neovim.desktop" ]; # Or text/x-ruby
+        "application/x-php" = [ "term-neovim.desktop" ];
+        "text/x-java-source" = [ "term-neovim.desktop" ]; # For .java files
+        "application/javascript" = [ "term-neovim.desktop" ];
+      };
 
     video = {
       mp4 = [ "mpv.desktop" ];
@@ -108,10 +99,10 @@ in {
     terminal = false;
   };
 
-
   home.packages = with pkgs; [
     # move to desktop module?
     gnome-disk-utility
+    file-roller
 
     #gedit
     f3d

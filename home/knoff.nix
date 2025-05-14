@@ -1,7 +1,11 @@
 # NixOS, home-manager, system configuration, package installation, program enablement, system options.
-{ outputs, self, pkgs, upkgs, user, inputs, system, ... }: {
+{ outputs, self, pkgs, upkgs, user, inputs, system, color-lib, theme, ... }:
+
+{
   imports = [
     ./programs/terminal # default
+    ./programs/terminal/kitty
+    ./programs/terminal/foot
     ./programs/terminal/programs/pueue.nix
 
     ./programs/terminal/shell
@@ -64,6 +68,9 @@
           # webkitgtk
           webkitgtk_6_0
           accountsservice
+
+
+          # move all of the below to its own config file.
           inputs.astal.packages.${system}.default
 
           inputs.astal.packages.${system}.io
@@ -100,6 +107,8 @@
       enable = true;
       profile = "${user}";
     };
+
+    # never works reliably
     batsignal.enable = true;
 
   };
@@ -129,6 +138,15 @@
     home-manager.enable = true;
   };
   # TODO: move this to someplace more logical
+
+
+    # Assumes 'theme' is an attribute set available in this scope,
+  # containing attributes like theme.base00, theme.base01, ..., theme.base0F
+  # which are strings like "1e1e1e", "cd3131", etc.
+
+
+
+
   home = {
 
     packages = with pkgs; [

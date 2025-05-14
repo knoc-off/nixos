@@ -176,6 +176,70 @@ in rec {
     prefix = "FiraCode";
   };
 
+  mkComplgenScript = { name, scriptContent, grammar, runtimeDeps ? [ ] }:
+    pkgs.stdenv.mkDerivation {
+      pname = name;
+      version = "0.1.0";
+
+      # Dependencies needed only during the build process
+      nativeBuildInputs = [ pkgs.complgen pkgs.makeWrapper ];
+
+      # Dependencies needed by the script itself at runtime
+      # These are made available in the Nix store
+      buildInputs = runtimeDeps;
+
+      env.grammar = grammar;
+      env.scriptContent = scriptContent;
+
+      src = pkgs.lib.cleanSource ./.;
+
+      installPhase = ''
+        runHook preInstall
+
+        # Ensure output directories exist
+        mkdir -p $out/bin
+        mkdir -p $out/share/bash-completion/completions
+        mkdir -p $out/share/fish/vendor_completions.d
+        mkdir -p $out/share/zsh/site-functions
+
+        # Write the script from the environment variable
+        echo -n "$scriptContent" > $out/bin/${name} # Use name for the executable
+        chmod +x $out/bin/${name}
+
+        # Write the grammar from the environment variable to a temporary file
+        echo -n "$grammar" > grammar.usage
+
+        # Generate completions using complgen aot
+        echo "Generating completions for ${name}..."
+        ${pkgs.complgen}/bin/complgen aot grammar.usage --bash-script $out/share/bash-completion/completions/${name}
+        ${pkgs.complgen}/bin/complgen aot grammar.usage --fish-script $out/share/fish/vendor_completions.d/${name}.fish
+        ${pkgs.complgen}/bin/complgen aot grammar.usage --zsh-script $out/share/zsh/site-functions/_${name}
+
+        # Basic check if generation produced files (adjust if needed)
+        if [ ! -s "$out/share/fish/vendor_completions.d/${name}.fish" ]; then
+            echo "Error: Fish completion generation likely failed for ${name} (output file empty or missing)."
+        fi
+
+        rm grammar.usage # Clean up temporary grammar file
+
+        # Wrap the program to include runtime dependencies in PATH
+        # Ensures that commands from runtimeDeps (like python) are found
+        local rt_path="${pkgs.lib.makeBinPath runtimeDeps}"
+        echo "Wrapping ${name} with PATH: $rt_path"
+        wrapProgram $out/bin/${name} --prefix PATH : "$rt_path"
+
+        runHook postInstall
+      '';
+
+      meta = {
+        description =
+          "Script '${name}' with multi-shell completions via complgen";
+        # license = pkgs.lib.licenses.mit; # Set an appropriate license
+        platforms = pkgs.lib.platforms.all;
+      };
+    };
+
+
   writeNuScript = name: script:
     pkgs.writeTextFile rec {
       inherit name;

@@ -49,8 +49,7 @@ in {
   };
 
   # System-wide packages
-  environment.systemPackages =
-    lib.mkDefault (with pkgs; [ wl-clipboard xdg-utils ]);
+  environment.systemPackages = with pkgs; [ wl-clipboard xdg-utils ];
 
   # Enable polkit
   security.polkit.enable = lib.mkDefault true;
