@@ -30,11 +30,11 @@ in {
   home.sessionVariables = { EDITOR = lib.mkForce "nvim"; };
 
   xdg.desktopEntries = {
-    kitty-neovim = {
+    term-neovim = {
       name = "Kitty Neovim";
       genericName = "Text Editor";
       exec =
-        "kitty --detach nvim %U"; # this "nvim" can be replace by an explicit link to a binary
+        "${pkgs.foot}/bin/foot -T Neovim nvim %U"; # this "nvim" can be replace by an explicit link to a binary
       icon = "${pkgs.neovim}/share/icons/hicolor/128x128/apps/nvim.png";
       terminal = false;
       categories = [ "Application" "Development" "IDE" ];
