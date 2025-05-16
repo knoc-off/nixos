@@ -33,4 +33,6 @@ in ''
    @import "${firefox-csshacks}/content/transparent_reader_toolbar.css"
   */
    @import "${firefox-csshacks}/content/two_column_addons.css"
+
+
 ''

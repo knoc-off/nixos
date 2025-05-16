@@ -1,0 +1,9 @@
+partial alphanumeric_keys
+xkb_symbols "german_custom" {
+  // Remap key <AC09> (physical “o”) so that AltGr yields “ö”
+  key <AC09> { [ o, O, odiaeresis, Odiaeresis ] };
+
+  // Remap key <AC10> (physical “p”) so that AltGr yields “ó”
+  key <AC10> { [ p, P, oacute, Oacute ] };
+};
+
