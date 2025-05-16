@@ -18,7 +18,7 @@
     ./programs/editor/default.nix
 
     # Desktop and widgets
-    ./modules/hyprland
+    # ./modules/hyprland
 
     # Firefox
     ./programs/browser/firefox
@@ -32,7 +32,10 @@
     ./programs/gaming/lutris.nix
     ./enviroment.nix
 
+    ./desktop/hyprland.nix
+
     self.homeModules.gtk
+    # self.homeModules.hyprland
 
     #./programs
     #./desktop
@@ -112,8 +115,6 @@
     batsignal.enable = true;
 
   };
-
-  wayland.windowManager.hyprlandCustom = { enable = true; };
 
   programs = {
     git = {

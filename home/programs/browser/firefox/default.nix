@@ -10,14 +10,9 @@ let
     '';
   };
 
-
-
 in rec {
 
-  home.sessionVariables = {
-    BROWSER = "firefox";
-  };
-
+  home.sessionVariables = { BROWSER = "firefox"; };
 
   programs.firefox = {
     enable = true;
@@ -38,6 +33,23 @@ in rec {
         cookie-autodelete
         user-agent-string-switcher
       ];
+
+      userContent = ''
+        /* Firefox profile directory/chrome/userContent.css */
+        @-moz-document url-prefix("about:home") {
+          #root,
+          .newtab-main,
+          .outer-wrapper {
+            background-color: #1a1a1a !important;  /* Dark background color */
+            color: #ffffff !important;             /* Text color */
+          }
+
+          /* Optional: Remove background images */
+          .wallpaper-input[style*="background-image"] {
+            background-image: none !important;
+          }
+        }
+      '';
 
       userChrome =
         import ./userChrome.nix { inherit theme color-lib firefox-csshacks; };
@@ -67,10 +79,12 @@ in rec {
       id = 2;
       name = "testing2";
 
-      settings = import ./settings/default.nix {inherit theme math lib color-lib;};
-      extensions = with addons; [sidebery];
-      userChrome =
-        import ./userChrome-minimal.nix { inherit theme color-lib firefox-csshacks; };
+      settings =
+        import ./settings/default.nix { inherit theme math lib color-lib; };
+      extensions = with addons; [ sidebery ];
+      userChrome = import ./userChrome-minimal.nix {
+        inherit theme color-lib firefox-csshacks;
+      };
 
     };
   };

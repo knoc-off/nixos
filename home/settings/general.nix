@@ -1,4 +1,4 @@
-{ config, user, theme, color-lib, pkgs, ... }:
+{ theme, pkgs, ... }:
 let
 
   wallpaper = let

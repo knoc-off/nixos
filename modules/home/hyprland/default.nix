@@ -1,26 +1,14 @@
 # The goal of this module is to setup a decent base.
-{
-  config,
-  lib,
-  theme,
-  pkgs,
-  inputs,
-  color-lib,
-  user,
-  ...
-}: let
-  cfg = config.wayland.windowManager.hyprlandCustom;
+{ config, lib, pkgs, inputs, ... }:
+let cfg = config.wayland.windowManager.hyprlandCustom;
 in {
   imports = [
-    # AGS is my notifier
     ./dunst.nix
     #./pyprland.nix
     ./swayidle.nix
     ./settings/binds.nix
     inputs.hyprland.homeManagerModules.default
   ];
-
-
 
   options.wayland.windowManager.hyprlandCustom = {
     enable = lib.mkEnableOption "Hyprland window manager";
@@ -40,13 +28,12 @@ in {
         [
           #hyprexpo
 
-
         ];
       description = "Hyprland plugins to use.";
     };
     settings = lib.mkOption {
       type = lib.types.attrs;
-      default = {};
+      default = { };
       description = "Hyprland configuration settings.";
     };
   };
@@ -55,7 +42,7 @@ in {
     services.cliphist = {
       enable = true;
       allowImages = true;
-      extraOptions = ["--history-size=1000"];
+      extraOptions = [ "--history-size=1000" ];
       systemdTarget = "hyprland-session.target";
     };
 
@@ -79,14 +66,12 @@ in {
     };
 
     # lockscreen
-    programs.swaylock = {
-      package = pkgs.swaylock-effects;
-    };
+    programs.swaylock = { package = pkgs.swaylock-effects; };
 
     # wallpaper manager
     home.packages = [
       pkgs.hyprpaper
-      pkgs.kando
+      # pkgs.kando # I cant believe how much i dislike kando.
     ];
 
     # Window manager
@@ -99,7 +84,9 @@ in {
 
       settings = lib.mkMerge [
         cfg.settings
-        (import ./settings/general.nix {inherit config inputs user theme lib pkgs color-lib;})
+        (import ./settings/general.nix { # this should  be different
+          inherit config inputs lib pkgs; # append custom things to pass in? i realize now how bad i set this up
+        })
       ];
     };
 

@@ -4,32 +4,34 @@ let
   mimeSets = {
     application = {
       # Base applications (always active)
-      "application/pdf" =
-        [ "org.gnome.Evince.desktop" ]; # Changed pdf to application/pdf
-      "application/zip" =
-        [ "org.gnome.FileRoller.desktop" ]; # Changed zip to application/zip
-      "application/vnd.rar" =
-        [ "org.gnome.FileRoller.desktop" ]; # Changed x-rar
-      "application/x-7z-compressed" = [ "org.gnome.FileRoller.desktop" ];
-      "application/x-tar" = [ "org.gnome.FileRoller.desktop" ];
-      "application/gzip" = [ "org.gnome.FileRoller.desktop" ]; # Changed x-gzip
-      "application/x-bzip2" = [ "org.gnome.FileRoller.desktop" ];
-
+      pdf = [ "org.gnome.Evince.desktop" ];
+      zip = [ "org.gnome.FileRoller.desktop" ];
+      "vnd.rar" = [ "org.gnome.FileRoller.desktop" ];
+      "x-7z-compressed" = [ "org.gnome.FileRoller.desktop" ];
+      "x-tar" = [ "org.gnome.FileRoller.desktop" ];
+      gzip = [ "org.gnome.FileRoller.desktop" ];
+      "x-bzip2" = [ "org.gnome.FileRoller.desktop" ];
     }
     # The '//' operator merges the result of lib.mkIf with the base set
       // lib.mkIf (config.xdg.desktopEntries ? "term-neovim") {
         # These associations are added only if the 'term-neovim' desktop entry is defined
-
-        "application/json" = [ "term-neovim.desktop" ];
-        "application/xml" = [ "term-neovim.desktop" ]; # Or text/xml
-        "application/x-shellscript" = [ "term-neovim.desktop" ];
-        "application/x-perl" = [ "term-neovim.desktop" ]; # Or text/x-perl
-        "application/x-python" = [ "term-neovim.desktop" ]; # Or text/x-python
-        "application/x-ruby" = [ "term-neovim.desktop" ]; # Or text/x-ruby
-        "application/x-php" = [ "term-neovim.desktop" ];
-        "text/x-java-source" = [ "term-neovim.desktop" ]; # For .java files
-        "application/javascript" = [ "term-neovim.desktop" ];
+        json = [ "term-neovim.desktop" ];
+        xml = [ "term-neovim.desktop" ]; # Assuming application/xml. If text/xml, move to 'text' section below.
+        "x-shellscript" = [ "term-neovim.desktop" ];
+        "x-perl" = [ "term-neovim.desktop" ];
+        "x-python" = [ "term-neovim.desktop" ];
+        "x-ruby" = [ "term-neovim.desktop" ];
+        php = [ "term-neovim.desktop" ];
+        javascript = [ "term-neovim.desktop" ];
       };
+
+    text = lib.mkIf (config.xdg.desktopEntries ? "term-neovim") {
+      # For .java files, assuming text/x-java-source
+      "x-java-source" = [ "term-neovim.desktop" ];
+      # If "application/xml" above was meant to be "text/xml", move "xml" entry here.
+      # If "application/x-perl" above was meant to be "text/x-perl", move "x-perl" entry here.
+      # etc. for other text types
+    };
 
     video = {
       mp4 = [ "mpv.desktop" ];
