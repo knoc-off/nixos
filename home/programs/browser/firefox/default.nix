@@ -40,8 +40,8 @@ in rec {
           #root,
           .newtab-main,
           .outer-wrapper {
-            background-color: #1a1a1a !important;  /* Dark background color */
-            color: #ffffff !important;             /* Text color */
+            background-color: #${theme.base00} !important;  /* Dark background color */
+            color: #${theme.base07} !important;             /* Text color */
           }
 
           /* Optional: Remove background images */

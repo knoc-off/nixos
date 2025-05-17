@@ -5,7 +5,6 @@ let
   mainMod = "SUPER";
 in {
   wayland.windowManager.hyprland = let
-    #fuzzel = "${pkgs.fuzzel}/bin/fuzzel -b ${theme.base02}DD -t ${theme.base06}DD -m ${theme.base04}DD -C ${theme.base05}DD -s ${theme.base03}DD -S ${theme.base07}DD -M ${theme.base07}DD";
     notify-send = "${pkgs.libnotify}/bin/notify-send";
     notify-msg = "${
         pkgs.writeShellScriptBin "notify-msg" ''
@@ -125,34 +124,6 @@ in {
 
         fancyfocusscript = import ./window-move.nix { inherit pkgs self; };
 
-        #{
-        #    "address": "0x3e036f40",
-        #    "mapped": true,
-        #    "hidden": false,
-        #    "at": [0, 9],
-        #    "size": [1463, 1495],
-        #    "workspace": {
-        #        "id": 8,
-        #        "name": "8"
-        #    },
-        #    "floating": false,
-        #    "pseudo": false,
-        #    "monitor": 0,
-        #    "class": "kitty",
-        #    "title": "nixos - 73648",
-        #    "initialClass": "kitty",
-        #    "initialTitle": "kitty",
-        #    "pid": 7675,
-        #    "xwayland": false,
-        #    "pinned": false,
-        #    "fullscreen": 0,
-        #    "fullscreenClient": 0,
-        #    "grouped": ["0x3e036f40", "0x3e068e60"],
-        #    "tags": [],
-        #    "swallowing": "0x0",
-        #    "focusHistoryID": 0
-        #}
-
         fancyGroupScript = writeNuScript "fancyGroup" ''
           def main [group: string] {
             let data = (hyprctl activewindow -j | from json)
@@ -164,7 +135,7 @@ in {
               hyprctl dispatch moveoutofgroup
             }
           }
-      '';
+        '';
 
         binding = mod: cmd: key: arg: "${mod}, ${key}, ${cmd}, ${arg}";
         fancyfocus = key: dir:
@@ -190,7 +161,6 @@ in {
         "${mainMod}, LEFT, changegroupactive, b"
         "${mainMod}, RIGHT, changegroupactive, b"
 
-
         "${mainMod}, Delete, exit"
         "${mainMod}, W, killactive"
         "${mainMod}, V, togglefloating"
@@ -198,7 +168,7 @@ in {
         # "${mainMod}, O, fakefullscreen"
 
         # OBS RECORD TOGGLE
-        "${mainMod},F10, pass,^(com\.obsproject\.Studio)$"
+        "${mainMod},F10, pass,^(com.obsproject.Studio)$"
 
         "${mainMod}, T, exec, ${
           mkHdrop {
@@ -280,7 +250,6 @@ in {
         # if active window is not a group then create group, else  moveoutofgroup
 
         # "${mainMod} SHIFT, S, toggleswallow"
-
 
         # lockscreen
         "${mainMod}, L, exec, swaylock-custom 0 120x6 10 0"
@@ -410,7 +379,7 @@ in {
           }/bin/mute";
       in [
         ",XF86AudioMute, exec, ${mute}"
-        "SUPER, XF86AudioMute, exec, ${mute}"
+        "${mainMod}, XF86AudioMute, exec, ${mute}"
 
         # Trigger when the lid is closed (switch:on)
         # ", switch:on:Lid Switch, exec, hyprctl keyword monitor \"eDP-1, disable\""
@@ -420,11 +389,18 @@ in {
         # ", switch:off:Lid Switch, exec, hyprctl keyword monitor \"eDP-1, 2560x1440, 0x0, 1\""
         # ", switch:off:Lid Switch, exec, hyprctl keyword monitor eDP-1,preferred,auto,1"
 
+        # Trigger when the lid is closed (switch:on)
+        ", switch:on:Lid Switch, exec, hyprctl dispatch dpms off eDP-1"
+        # ", switch:on:Lid Switch, exec, hyprctl dispatch dpms off eDP-1 && hyprctl dispatch moveworkspaces \"1,HDMI-A-1\""
 
+        # Trigger when the lid is opened (switch:off)
+        ", switch:off:Lid Switch, exec, hyprctl dispatch dpms on eDP-1"
       ];
 
-      bindm =
-        [ "SUPER, mouse:273, resizewindow" "SUPER, mouse:272, movewindow" ];
+      bindm = [
+        "${mainMod}, mouse:273, resizewindow"
+        "${mainMod}, mouse:272, movewindow"
+      ];
     };
   };
 }

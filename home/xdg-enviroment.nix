@@ -1,36 +1,43 @@
-{ pkgs, config, lib, ... }:
+{ pkgs, ... }:
 
 let
   mimeSets = {
     application = {
-      # Base applications (always active)
+      # Existing entries
       pdf = [ "org.gnome.Evince.desktop" ];
+      json = [ "term-neovim.desktop" ];
+      xml = [ "term-neovim.desktop" ];
+      "x-shellscript" = [ "term-neovim.desktop" ];
+      "x-perl" = [ "term-neovim.desktop" ];
+      "x-python" = [ "term-neovim.desktop" ];
+      "x-ruby" = [ "term-neovim.desktop" ];
+      "x-php" = [ "term-neovim.desktop" ];
+      "x-java" = [ "term-neovim.desktop" ];
+      "x-javascript" = [ "term-neovim.desktop" ];
       zip = [ "org.gnome.FileRoller.desktop" ];
-      "vnd.rar" = [ "org.gnome.FileRoller.desktop" ];
+      "x-rar" = [ "org.gnome.FileRoller.desktop" ];
       "x-7z-compressed" = [ "org.gnome.FileRoller.desktop" ];
       "x-tar" = [ "org.gnome.FileRoller.desktop" ];
-      gzip = [ "org.gnome.FileRoller.desktop" ];
+      "x-gzip" = [ "org.gnome.FileRoller.desktop" ];
       "x-bzip2" = [ "org.gnome.FileRoller.desktop" ];
-    }
-    # The '//' operator merges the result of lib.mkIf with the base set
-      // lib.mkIf (config.xdg.desktopEntries ? "term-neovim") {
-        # These associations are added only if the 'term-neovim' desktop entry is defined
-        json = [ "term-neovim.desktop" ];
-        xml = [ "term-neovim.desktop" ]; # Assuming application/xml. If text/xml, move to 'text' section below.
-        "x-shellscript" = [ "term-neovim.desktop" ];
-        "x-perl" = [ "term-neovim.desktop" ];
-        "x-python" = [ "term-neovim.desktop" ];
-        "x-ruby" = [ "term-neovim.desktop" ];
-        php = [ "term-neovim.desktop" ];
-        javascript = [ "term-neovim.desktop" ];
-      };
 
-    text = lib.mkIf (config.xdg.desktopEntries ? "term-neovim") {
-      # For .java files, assuming text/x-java-source
-      "x-java-source" = [ "term-neovim.desktop" ];
-      # If "application/xml" above was meant to be "text/xml", move "xml" entry here.
-      # If "application/x-perl" above was meant to be "text/x-perl", move "x-perl" entry here.
-      # etc. for other text types
+      # Example: Use term-neovim for markdown
+      # "markdown" = [ "term-neovim.desktop" ];
+
+      # Example: Use term-neovim for LaTeX
+      # "x-tex" = [ "term-neovim.desktop" ];
+
+      # Example: Use term-neovim for Rust
+      # "x-rust" = [ "term-neovim.desktop" ];
+
+      # Example: Use LibreOffice for .doc or .docx
+      # "msword"        = [ "libreoffice-writer.desktop" ];
+      # "vnd.openxmlformats-officedocument.wordprocessingml.document" = [ "libreoffice-writer.desktop" ];
+
+      # Example: Conditionally enable Go file type
+      # "x-golang" = lib.mkIf (lib.elem pkgs.go config.environment.systemPackages) {
+      #   [ "term-neovim.desktop" ];
+      # };
     };
 
     video = {
@@ -101,10 +108,10 @@ in {
     terminal = false;
   };
 
+
   home.packages = with pkgs; [
     # move to desktop module?
     gnome-disk-utility
-    file-roller
 
     #gedit
     f3d
@@ -121,10 +128,10 @@ in {
 
     defaultApplications = toMimeApps mimeSets;
     #defaultApplications =
-    #mkMimeMap { prefix = "application"; entries = mimeDefaults.application; }
-    #// mkMimeMap { prefix = "text";        entries = mimeDefaults.text; }
-    #// mkMimeMap { prefix = "video";       entries = mimeDefaults.video; }
-    #// mkMimeMap { prefix = "audio";       entries = mimeDefaults.audio; }
-    #// mkMimeMap { prefix = "image";       entries = mimeDefaults.image; };
+    # mkMimeMap { prefix = "application"; entries = mimeDefaults.application; }
+    # mkMimeMap { prefix = "text";        entries = mimeDefaults.text; }
+    # mkMimeMap { prefix = "video";       entries = mimeDefaults.video; }
+    # mkMimeMap { prefix = "audio";       entries = mimeDefaults.audio; }
+    # mkMimeMap { prefix = "image";       entries = mimeDefaults.image; };
   };
 }
