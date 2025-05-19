@@ -1,59 +1,4 @@
-{ lib, inputs, pkgs, self, hostname, user, config, ... }@args:
-let
-
-  kanataConfig = pkgs.writeText "kanata-german_override-config.kdb" ''
-    ;; Global configuration: process unmapped keys.
-    (defcfg process-unmapped-keys yes)
-
-    ;;; Define exactly one source of keys (defsrc).
-    ;;; This uses a typical US QWERTY–like layout (approximate 60% keyboard).
-    (defsrc
-      grv    1    2    3    4    5    6    7    8    9    0    -    =    bspc
-      tab    q    w    e    r    t    y    u    i    o    p    [    ]    \
-      caps   a    s    d    f    g    h    j    k    l    ;    '    ret
-      lsft   z    x    c    v    b    n    m    ,    .    /    rsft
-      lctl   lmet lalt           spc            ralt rmet rctl
-    )
-
-    ;;; Define aliases.
-    ;;; remap the physical "caps" (from defsrc) → "cap" which outputs lmet (Super)
-    ;;; and remap the physical ralt → "ralt-umlaut", which while held activates the umlaut layer.
-    (defalias
-      cap         lmet
-      ralt-umlaut (layer-while-held umlaut)
-    )
-
-    ;;; The default (base) layer.
-    ;;; In this layer, the defsrc position for physical Caps outputs our alias @cap
-    ;;; and the defsrc position for Right Alt outputs our alias @ralt-umlaut.
-    (deflayer default
-      grv    1    2    3    4    5    6    7    8    9    0    -    =    bspc
-      tab    q    w    e    r    t    y    u    i    o    p    [    ]    \
-      @cap   a    s    d    f    g    h    j    k    l    ;    '    ret
-      lsft   z    x    c    v    b    n    m    ,    .    /    rsft
-      lctl   lmet lalt           spc            @ralt-umlaut rmet rctl
-    )
-
-    ;;; The umlaut layer.
-    ;;; When this layer is active (by holding Right Alt), we override selected keys:
-    ;;; • In row 2, the 8th key ("u") becomes "ü" and the 10th key ("o") becomes "ö".
-    ;;; • In row 3, the 2nd key ("a") becomes "ä".
-    ;;; All unspecified keys are transparent (using "_") and thus fall back to the lower layer.
-    (deflayer umlaut
-      ;; Row 1 (14 keys): pass-through.
-      _ _ _ _ _ _ _ _ _ _ _ _ _ _
-      ;; Row 2 (14 keys): override key 8 and key 10.
-      tab  q   w   e   r   t   y   (unicode ü)   i   (unicode ö)   p   [   ]   \
-      ;; Row 3 (13 keys): override the second key ("a") with "ä".
-      _  (unicode ä)    _   _   _   _   _   _   _   _   _   _   _
-      ;; Row 4 (12 keys): transparent.
-      _ _ _ _ _ _ _ _ _ _ _ _
-      ;; Row 5 (7 keys): transparent.
-      _ _ _ _ _ _ _
-    )
-  '';
-
-in {
+{ lib, inputs, pkgs, self, hostname, user, config, ... }@args: {
   imports = [
     ./modules/minecraft.nix
 
@@ -92,6 +37,62 @@ in {
     }
 
     # {
+    # let
+    #
+    #   kanataConfig = pkgs.writeText "kanata-german_override-config.kdb" ''
+    #     ;; Global configuration: process unmapped keys.
+    #     (defcfg process-unmapped-keys yes)
+    #
+    #     ;;; Define exactly one source of keys (defsrc).
+    #     ;;; This uses a typical US QWERTY–like layout (approximate 60% keyboard).
+    #     (defsrc
+    #       grv    1    2    3    4    5    6    7    8    9    0    -    =    bspc
+    #       tab    q    w    e    r    t    y    u    i    o    p    [    ]    \
+    #       caps   a    s    d    f    g    h    j    k    l    ;    '    ret
+    #       lsft   z    x    c    v    b    n    m    ,    .    /    rsft
+    #       lctl   lmet lalt           spc            ralt rmet rctl
+    #     )
+    #
+    #     ;;; Define aliases.
+    #     ;;; remap the physical "caps" (from defsrc) → "cap" which outputs lmet (Super)
+    #     ;;; and remap the physical ralt → "ralt-umlaut", which while held activates the umlaut layer.
+    #     (defalias
+    #       cap         lmet
+    #       ralt-umlaut (layer-while-held umlaut)
+    #     )
+    #
+    #     ;;; The default (base) layer.
+    #     ;;; In this layer, the defsrc position for physical Caps outputs our alias @cap
+    #     ;;; and the defsrc position for Right Alt outputs our alias @ralt-umlaut.
+    #     (deflayer default
+    #       grv    1    2    3    4    5    6    7    8    9    0    -    =    bspc
+    #       tab    q    w    e    r    t    y    u    i    o    p    [    ]    \
+    #       @cap   a    s    d    f    g    h    j    k    l    ;    '    ret
+    #       lsft   z    x    c    v    b    n    m    ,    .    /    rsft
+    #       lctl   lmet lalt           spc            @ralt-umlaut rmet rctl
+    #     )
+    #
+    #     ;;; The umlaut layer.
+    #     ;;; When this layer is active (by holding Right Alt), we override selected keys:
+    #     ;;; • In row 2, the 8th key ("u") becomes "ü" and the 10th key ("o") becomes "ö".
+    #     ;;; • In row 3, the 2nd key ("a") becomes "ä".
+    #     ;;; All unspecified keys are transparent (using "_") and thus fall back to the lower layer.
+    #     (deflayer umlaut
+    #       ;; Row 1 (14 keys): pass-through.
+    #       _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    #       ;; Row 2 (14 keys): override key 8 and key 10.
+    #       tab  q   w   e   r   t   y   (unicode ü)   i   (unicode ö)   p   [   ]   \
+    #       ;; Row 3 (13 keys): override the second key ("a") with "ä".
+    #       _  (unicode ä)    _   _   _   _   _   _   _   _   _   _   _
+    #       ;; Row 4 (12 keys): transparent.
+    #       _ _ _ _ _ _ _ _ _ _ _ _
+    #       ;; Row 5 (7 keys): transparent.
+    #       _ _ _ _ _ _ _
+    #     )
+    #   '';
+    #
+    # in
+
     #   hardware.uinput.enable = true;
 
     #   services.kanata = {
@@ -199,22 +200,22 @@ in {
 
     {
 
-        # services = {
-        #   greetd = {
-        #     enable = true;
-        #     settings = {
-        #       default_session = {
-        #         command = "${pkgs.dwl}/bin/dwl -s kodi";
-        #         #command = "${pkgs.bash}/bin/bash";
-        #         inherit user;
-        #       };
-        #     };
-        #   };
-        #   seatd = {
-        #     enable = true;
-        #     inherit user;
-        #   };
-        # };
+      # services = {
+      #   greetd = {
+      #     enable = true;
+      #     settings = {
+      #       default_session = {
+      #         command = "${pkgs.dwl}/bin/dwl -s kodi";
+      #         #command = "${pkgs.bash}/bin/bash";
+      #         inherit user;
+      #       };
+      #     };
+      #   };
+      #   seatd = {
+      #     enable = true;
+      #     inherit user;
+      #   };
+      # };
 
     }
 
