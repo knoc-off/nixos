@@ -1,5 +1,4 @@
-{ modulesPath, inputs, hostname, outputs, config, lib, pkgs, self, user, ...
-}@args: {
+{ inputs, hostname, lib, pkgs, self, user, ... }@args: {
   imports = [
     # Sops
     # inputs.sops-nix.nixosModules.sops
@@ -20,6 +19,7 @@
     # Disko
     inputs.disko.nixosModules.disko
     ./hardware/disks/simple-disk.nix
+    ./modules/audio/default.nix
 
     (self.nixosModules.home { inherit args; })
 
@@ -39,10 +39,9 @@
         enable = lib.mkDefault true;
         extraPortals = lib.mkDefault [
           pkgs.xdg-desktop-portal-gtk
-          pkgs.xdg-desktop-portal-hyprland
         ];
       };
-      xdg.portal.config.common.default = "*";
+      xdg.portal.config.common.default = "gtk";
 
       environment.variables.LIBVA_DRIVER_NAME = "i915";
 
@@ -58,8 +57,9 @@
           enable = true;
           settings = {
             default_session = {
-              #command = "${pkgs.dwl}/bin/dwl -s kodi";
+              # command = "${pkgs.dwl}/bin/dwl -s kodi";
               command = "${pkgs.dwl}/bin/dwl -s firefox";
+              # command = "${pkgs.dwl}/bin/dwl -s ${pkgs.foot}/bin/foot";
               #command = "${pkgs.bash}/bin/bash";
               inherit user;
             };
@@ -169,6 +169,27 @@
   nix.settings.auto-optimise-store = true;
 
   networking.hostName = hostname;
+
+  # programs.kdeconnect = {
+
+  #   enable = true;
+  #   package = pkgs.kdePackages.kdeconnect-kde;
+  # };
+  # services.rustdesk-server = {
+
+  #   enable = true;
+
+  #   openFirewall = true;
+
+  #   signal = {
+  #     enable = true;
+  #    relayHosts = ["192.168.16.118"]; # 127.0.0.1 ?
+  #   };
+
+  #   relay = {
+  #     enable = true;
+  #   };
+  # };
 
   # Firewall
   networking.firewall = {

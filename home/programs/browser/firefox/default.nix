@@ -74,6 +74,19 @@ in rec {
       search = import ./searchEngines { inherit pkgs lib; };
     };
 
+    profiles."projection" = {
+      isDefault = false;
+      id = 3;
+      name = "projection";
+
+      settings =
+        import ./settings/default.nix { inherit theme math lib color-lib; };
+      extensions = with addons; [ sidebery ];
+      userChrome = import ./userChrome-minimal.nix {
+        inherit theme color-lib firefox-csshacks;
+      };
+    };
+
     profiles."testing2" = {
       isDefault = false;
       id = 2;
