@@ -1,4 +1,4 @@
-{ inputs, hostname, lib, pkgs, self, user, ... }@args: {
+{ inputs, hostname, lib, pkgs, self, user, config, ... }@args: {
   imports = [
     # Sops
     # inputs.sops-nix.nixosModules.sops
@@ -37,9 +37,7 @@
       # XDG portal configuration
       xdg.portal = {
         enable = lib.mkDefault true;
-        extraPortals = lib.mkDefault [
-          pkgs.xdg-desktop-portal-gtk
-        ];
+        extraPortals = lib.mkDefault [ pkgs.xdg-desktop-portal-gtk ];
       };
       xdg.portal.config.common.default = "gtk";
 
@@ -59,8 +57,9 @@
             default_session = {
               # command = "${pkgs.dwl}/bin/dwl -s kodi";
               command = "${pkgs.dwl}/bin/dwl -s firefox";
+              # command = ''${pkgs.dwl}/bin/dwl -s "mpv udp://0.0.0.0:1234 --idle=yes --force-window --title=\"LAN Stream Receiver\""'';
               # command = "${pkgs.dwl}/bin/dwl -s ${pkgs.foot}/bin/foot";
-              #command = "${pkgs.bash}/bin/bash";
+              # command = "${pkgs.bash}/bin/bash";
               inherit user;
             };
           };
@@ -94,6 +93,7 @@
 
         dwl
         firefox
+        mpv
 
         bluetuith # TUI manager
         bluez-tools # CLI utilities
@@ -118,6 +118,38 @@
       };
       services.blueman.enable = true; # GUI manager
 
+    }
+
+    {
+      # Enable Steam with recommended settings
+      programs.steam = {
+        enable = true;
+        # Optional: Add any extra packages you want in Steam's environment
+        # extraPackages = with pkgs; [ gamescope ];
+
+        # Optional: Enable Gamescope session if needed
+        # gamescopeSession.enable = true;
+
+        # Optional: Enable protontricks for Proton game management
+        # protontricks.enable = true;
+      };
+
+      # Optional: Open firewall ports if needed
+      # programs.steam.remotePlay.openFirewall = true;
+      # programs.steam.dedicatedServer.openFirewall = true;
+
+      # Hardware support for Steam devices
+      hardware.steam-hardware.enable = true;
+
+      # Required 32-bit graphics support
+      hardware.opengl = {
+        enable = true;
+        driSupport32Bit = true;
+      };
+
+      # Sound support (choose one)
+      services.pipewire.alsa.support32Bit = true; # For PipeWire
+      # services.pulseaudio.support32Bit = true;   # For PulseAudio
     }
 
     # {
@@ -195,6 +227,7 @@
   networking.firewall = {
     enable = false;
     allowedTCPPorts = [ ];
+    allowedUDPPorts = [ 1234 ];
   };
 
   boot.loader.grub = {

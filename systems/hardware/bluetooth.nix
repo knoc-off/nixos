@@ -1,5 +1,4 @@
 { config, upkgs, lib, ... }:
-
 {
   # ======================
   # Bluetooth Core
@@ -14,7 +13,6 @@
         JustWorksRepairing = "always"; # Fix pairing issues
         Experimental = true; # Battery reports
         FastConnectable = true;
-        ReconnectAttempts = 7;
       };
     };
     disabledPlugins = [ "sap" ]; # Disable SIM Access Profile

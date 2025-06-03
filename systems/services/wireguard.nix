@@ -1,4 +1,4 @@
-{pkgs}:
+{pkgs, ...}:
 {
   # enable NAT
   networking.nat.enable = true;

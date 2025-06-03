@@ -24,14 +24,14 @@
     ./hardware/disks/simple-disk.nix
 
     # nix package settings
-    ./modules/nix.nix
+    #./modules/nix.nix
 
     # services
     ./services/nginx.nix
     ./services/website.nix
 
     # VPN
-    ./services/wireguard.nix
+    #./services/wireguard.nix
 
     # mail
     # ./services/imapfilter

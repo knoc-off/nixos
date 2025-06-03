@@ -46,5 +46,5 @@
     x11.enable = true;
   };
 
-  home.sessionVariables.GTK_THEME = "Nordic";
+  home.sessionVariables.GTK_THEME = "materia-theme";
 }

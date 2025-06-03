@@ -2,7 +2,7 @@
   imports = [
     ./dunst.nix
     #./pyprland.nix
-    ./swayidle.nix
+    # ./swayidle.nix
     ./hyprland-binds.nix
     inputs.hyprland.homeManagerModules.default
   ];
@@ -39,7 +39,6 @@
   # wallpaper manager
   home.packages = [
     pkgs.hyprpaper
-    # pkgs.kando # I cant believe how much i dislike kando.
   ];
 
   # Window manager

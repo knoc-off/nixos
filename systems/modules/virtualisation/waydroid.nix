@@ -1,5 +1,5 @@
 {...}: {
-  virtualisation.waydroid.enable = true;
+  virtualisation.waydroid.enable = false;
 
   # oneshot service to init waydroid:
   #systemd.services.waydroid-init = {

@@ -152,7 +152,7 @@
 
     packages = with pkgs; [
       (pkgs.python3.withPackages
-        (ps: [ ps.llm self.packages.${pkgs.system}.llm-cmd ]))
+      (ps: [ ps.llm self.packages.${pkgs.system}.llm-cmd ]))
 
       self.packages.${pkgs.system}.ttok
       self.packages.${pkgs.system}.spider-cli
@@ -166,56 +166,43 @@
       lazysql
 
       #skypeforlinux # skype phone
-      audio-recorder
+      # audio-recorder
 
-      evince
+      evince # Move this to xdg ...
       slack
 
       ripcord
 
-      obsidian # notes
 
-      koodo-reader # books
+      # obsidian # notes
 
-      prismlauncher
+      # koodo-reader # books
 
+      # prismlauncher # Minecraft
+
+      # not sure if i need any of these:
       kdePackages.breeze-icons
       kdePackages.grantleetheme
       libsForQt5.grantleetheme
 
+
+      # ill make my own calculator soon, with ags.
       gnome-calculator
 
-      telegram-desktop
-
+      # it would be cool to make prusa-slicer declaritive. might work on a module for it. #TODO
       prusa-slicer
 
       # ai tools
-      fabric-ai
-      self.packages.${pkgs.system}.yek
+      fabric-ai # Meh. not a fan, but it works well
 
-      self.packages.${pkgs.system}.wrap
-
+      openscad
     ];
 
-    # ~ Battery
-    # Battery status, and notifications
-    username = "${user}";
-    homeDirectory = "/home/${user}";
-    # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
     stateVersion = "23.05";
-
   };
 
   fonts.fontconfig.enable = true;
 
-  nixpkgs = {
-    overlays = builtins.attrValues outputs.overlays;
-
-    config = {
-      allowUnfree = true;
-      allowUnfreePredicate = _pkg: true;
-    };
-  };
 
   # Nicely reload system units when changing configs
   systemd.user.startServices = "sd-switch";

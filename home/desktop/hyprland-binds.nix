@@ -230,7 +230,8 @@ in {
 
         # launcher
         #"${mainMod}, SPACE, exec, ${pkgs.ulauncher}/bin/ulauncher" # this launcher sucks
-        "${mainMod}, Space, global, kando:main-menu"
+        # "${mainMod}, Space, global, kando:main-menu" # this launcher sucks too
+        "${mainMod}, SPACE, exec, ${pkgs.rofi}/bin/rofi -show"
 
         # screenshot
         ", Print, exec, ${pkgs.gscreenshot}/bin/gscreenshot -sc"
