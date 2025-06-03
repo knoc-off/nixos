@@ -1,4 +1,4 @@
-{ pkgs, upkgs, self, hostname, config, ... }:
+{ pkgs, upkgs, self, hostname, ... }:
 let
   config_dir = "/etc/nixos"; # Should relocate to /etc? and symlink?
   inherit (self.packages.${pkgs.system}) mkComplgenScript;
@@ -350,8 +350,17 @@ in {
           "''${AIDER_ARGS[@]}"
       '';
       # Corrected grammar:
+      # grammar = ''
+      #   adr [(-s | -m | -d)] [{{{${pkgs.fd}/bin/fd --type f --hidden --no-ignore --max-depth 1 . --color never}}} "File"] ... [<OTHER_ARG> "Other Argument"] ... ;'';
       grammar = ''
-        adr [(-s | -m | -d)] [{{{${pkgs.fd}/bin/fd --type f --hidden --no-ignore --max-depth 1 . --exec sh -c 'if ${pkgs.file}/bin/file -b --mime-type "$1" 2>/dev/null | ${pkgs.gnugrep}/bin/grep -q "^text/"; then echo "$1"; fi' {} \;}}} "File"] ... [<OTHER_ARG> "Other Argument"] ... ;'';
+        adr [(-s | -m | -d)]
+            [ ( {{{
+              find . -maxdepth 1 -type f -print0 | xargs -0 file -i | grep -E 'text/' | cut -d ':' -f 1 | sort -u | sed 's/^.\///'
+            }}} "File or Directory"
+              | <OTHER_ARG> "Aider Arg/Command"
+              )
+            ] ... ;
+      '';
       runtimeDeps = [
         upkgs.aider-chat
         pkgs.fd
@@ -395,7 +404,7 @@ in {
                 print arr[i]
               }
             }
-          ' "$HOME/.ssh/known_hosts" | ${pkgs.coreutils}/bin/sort -u
+          ' "$HOME/.ssh/known_hosts" | sort -u
         }}} "Target host/IP"
 
         # Allow any other host/IP not in the list
@@ -434,9 +443,39 @@ in {
         nmcli device wifi connect "$@"
       '';
       grammar = ''
-        connect {{{ ${pkgs.networkmanager}/bin/nmcli -t -f SSID dev wifi list }}} "SSID" [password: string];
+        connect {{{ ${pkgs.networkmanager}/bin/nmcli -t -f SSID dev wifi list }}} "SSID" [password "password: string"];
       '';
       runtimeDeps = [ pkgs.networkmanager ];
+    })
+
+    (mkComplgenScript {
+      name = "qr";
+      scriptContent = ''
+        #!${pkgs.bash}/bin/bash
+        set -euo pipefail
+
+        # Check for --share option
+        for arg in "$@"; do
+            if [[ "$arg" == "--share" ]]; then
+                qrencode -t UTF8 < "$0"
+                exit 0
+            fi
+        done
+
+        # Read input if no arguments provided
+        if [ $# -eq 0 ]; then
+            read -r sanitized_input
+        else
+            sanitized_input="$*"
+        fi
+
+        # Generate QR code
+        echo "$sanitized_input" | qrencode -t UTF8
+      '';
+      grammar = ''
+        qr (--share | {{{ ${pkgs.fd}/bin/fd --type directory --type file --max-depth 1 . --color never }}} <INPUT>);
+      '';
+      runtimeDeps = [ pkgs.qrencode ];
     })
 
     (mkComplgenScript {

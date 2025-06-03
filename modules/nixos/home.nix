@@ -4,11 +4,33 @@
   home-manager.backupFileExtension = "bak";
   home-manager = {
 
-    useGlobalPkgs = false;
+    useGlobalPkgs = true; # does Disabling this have any benefits?
     useUserPackages = true;
 
     # this is the single-crossover point between nixos and home-manager
-    users.${args.user} = import ../../home/${args.user}.nix;
+    users.${args.user} = {
+      imports = [
+        ../../home/${args.user}.nix
+
+        # Could uncomment this if im not using global pkgs.
+        # nixpkgs = {
+        #   overlays = builtins.attrValues outputs.overlays;
+        #   config = {
+        #     allowUnfree = true;
+        #     allowUnfreePredicate = _pkg: true;
+        #   };
+        # };
+
+        {
+
+          home = {
+            username = "${args.user}";
+            homeDirectory = "/home/${args.user}";
+          };
+
+        }
+      ];
+    };
 
     # This could end badly. recursion, etc. yet i kinda like it.
     extraSpecialArgs = removeAttrs args [
