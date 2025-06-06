@@ -22,10 +22,10 @@
   qt = {
     enable = true;
     platformTheme.name = "gtk";
-    style = {
-      name = "adwaita-dark";
-      package = pkgs.adwaita-qt;
-    };
+    # style = {
+    #   name = "materia-theme";
+    #   package = pkgs.adwaita-qt;
+    # };
   };
 
   dconf.settings = {
@@ -34,7 +34,7 @@
       cursor-size = 24;
     };
     "org/gnome/shell/extensions/user-theme" = {
-      name = "Nordic";
+      name = "adwaita-dark";
     };
   };
 

@@ -196,6 +196,10 @@
       fabric-ai # Meh. not a fan, but it works well
 
       openscad
+
+      usbutils
+      watchexec
+      quicksand
     ];
 
     stateVersion = "23.05";

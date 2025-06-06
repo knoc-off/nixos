@@ -15,24 +15,24 @@
 
     inputs.hardware.nixosModules.framework-13-7040-amd
 
-    { # VPN for work.
+    {
       services.openvpn.servers = {
-        work-production = {
-          config = ''
-            config /etc/secrets/vpn/work/staging/production.ovpn
-          '';
-          autoStart = false;
-        };
-        work-staging = {
-          config = ''
-            config /etc/secrets/vpn/work/staging/staging.ovpn
-            # cert /etc/secrets/vpn/work/staging/certificate.pem
-            # key /etc/secrets/vpn/work/staging/key.pem
-            ## If using PKCS12 instead, uncomment the line below and comment out cert/key lines
-            # pkcs12 /etc/secrets/vpn/client-identity.p12
-          '';
-          autoStart = false;
-        };
+        # work-production = {
+        #   config = ''
+        #     config /etc/secrets/vpn/work/staging/production.ovpn
+        #   '';
+        #   autoStart = false;
+        # };
+        # work-staging = {
+        #   config = ''
+        #     config /etc/secrets/vpn/work/staging/staging.ovpn
+        #     # cert /etc/secrets/vpn/work/staging/certificate.pem
+        #     # key /etc/secrets/vpn/work/staging/key.pem
+        #     ## If using PKCS12 instead, uncomment the line below and comment out cert/key lines
+        #     # pkcs12 /etc/secrets/vpn/client-identity.p12
+        #   '';
+        #   autoStart = false;
+        # };
       };
     }
 
@@ -143,7 +143,7 @@
       fonts = { enableDefaultPackages = lib.mkDefault true; };
 
       environment.systemPackages = lib.mkDefault (with pkgs; [
-        gnome.adwaita-icon-theme
+        # gnome.adwaita-icon-theme
         yubioath-flutter
         git
         wget
@@ -370,12 +370,22 @@
     libinput.enable = true;
 
     # Add udev rules for auto-mounting and launching Nemo
+    # udev.extraRules = ''
+    #   # Auto decrypt and mount when device is plugged in
+    #   ACTION=="add", SUBSYSTEM=="block", ENV{ID_FS_UUID}=="07133380-9f74-41e4-8b04-2b05fb3d94ab", \
+    #   RUN+="${pkgs.cryptsetup}/bin/cryptsetup luksOpen --key-file /etc/secrets/drives/fa6b949.key $env{DEVNAME} fa6b949", \
+    #   RUN+="${pkgs.toybox}/bin/mount /dev/mapper/fa6b949 /mnt/fa6b949"
+    # '';
+
     udev.extraRules = ''
-      # Auto decrypt and mount when device is plugged in
-      ACTION=="add", SUBSYSTEM=="block", ENV{ID_FS_UUID}=="07133380-9f74-41e4-8b04-2b05fb3d94ab", \
-      RUN+="${pkgs.cryptsetup}/bin/cryptsetup luksOpen --key-file /etc/secrets/drives/fa6b949.key $env{DEVNAME} fa6b949", \
-      RUN+="${pkgs.toybox}/bin/mount /dev/mapper/fa6b949 /mnt/fa6b949"
+      # STMicroelectronics ST-LINK/V2
+      SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="3748", MODE="0666", GROUP="users"
+      # other programmers if needed, e.g., CH340/CH341 for some Arduinos
+      SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", MODE="0666", GROUP="users"
+      KERNEL=="ttyUSB[0-9]*", MODE="0666", GROUP="users"
+      KERNEL=="ttyACM[0-9]*", MODE="0666", GROUP="users"
     '';
+
   };
 
   # Create mount point directory, this needs to be changed maybe?
