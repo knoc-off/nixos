@@ -271,7 +271,7 @@
         ];
 
         decoration = {
-          rounding = 3; # 10;
+          rounding = 0; # 10;
           inactive_opacity = 1;
           # drop_shadow = false;
           # shadow_range = 0;
