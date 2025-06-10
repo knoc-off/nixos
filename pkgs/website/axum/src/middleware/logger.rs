@@ -1,92 +1,51 @@
+// src/middleware/logger.rs
+
 use axum::{
-    body::Body,
-    extract::ConnectInfo,
-    http::{Request, HeaderMap},
+    extract::{Request, State},
     middleware::Next,
     response::Response,
 };
 use sqlx::SqlitePool;
-use std::{net::SocketAddr, time::Instant};
-
-#[derive(sqlx::FromRow)]
-struct RequestLog {
-    method: String,
-    path: String,
-    query_params: Option<String>,
-    user_agent: Option<String>,
-    ip_address: Option<String>,
-    duration_ms: i64,
-    status_code: i32,
-}
-
-impl RequestLog {
-    fn from_request(
-        request: &Request<Body>,
-        headers: &HeaderMap,
-        connect_info: Option<&ConnectInfo<SocketAddr>>,
-    ) -> Self {
-        Self {
-            method: request.method().to_string(),
-            path: request.uri().path().to_string(),
-            query_params: request.uri().query().map(String::from),
-            user_agent: headers
-                .get("user-agent")
-                .and_then(|h| h.to_str().ok())
-                .map(String::from),
-            ip_address: connect_info.map(|ci| ci.0.ip().to_string()),
-            duration_ms: 0,
-            status_code: 0,
-        }
-    }
-
-    async fn save(&self, pool: &SqlitePool) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            r#"
-            INSERT INTO request_logs (
-                method, path, query_params, user_agent,
-                ip_address, duration_ms, status_code
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            "#,
-        )
-        .bind(&self.method)
-        .bind(&self.path)
-        .bind(&self.query_params)
-        .bind(&self.user_agent)
-        .bind(&self.ip_address)
-        .bind(self.duration_ms)
-        .bind(self.status_code)
-        .execute(pool)
-        .await?;
-
-        Ok(())
-    }
-}
+use std::time::Instant;
 
 pub async fn log_request(
-    connect_info: ConnectInfo<SocketAddr>,
-    request: Request<Body>,
+    State(pool): State<SqlitePool>,
+    req: Request,
     next: Next,
 ) -> Response {
     let start = Instant::now();
-    let pool = request
-        .extensions()
-        .get::<SqlitePool>()
-        .expect("SQLite pool missing")
-        .clone();
+    let method = req.method().clone();
+    let uri = req.uri().clone();
 
-    let mut log = RequestLog::from_request(&request, request.headers(), Some(&connect_info));
+    let response = next.run(req).await;
 
-    let response = next.run(request).await;
+    let latency = start.elapsed().as_millis();
+    let status = response.status();
 
-    log.duration_ms = start.elapsed().as_millis() as i64;
-    log.status_code = response.status().as_u16() as i32;
+    // --- FIX IS HERE ---
+    // Bind the values to variables before passing them to the macro.
+    // This gives them a lifetime that is long enough.
+    let method_str = method.to_string();
+    let uri_str = uri.to_string();
+    let status_code = status.as_u16() as i64;
+    let latency_ms = latency as i64;
 
-    tokio::spawn(async move {
-        if let Err(e) = log.save(&pool).await {
-            eprintln!("Failed to save request log: {}", e);
-        }
-    });
+    let log_result = sqlx::query!(
+        r#"
+        INSERT INTO request_logs (method, uri, status_code, latency_ms)
+        VALUES (?, ?, ?, ?)
+        "#,
+        method_str, // Now we pass the variables
+        uri_str,
+        status_code,
+        latency_ms
+    )
+    .execute(&pool)
+    .await;
+
+    if let Err(e) = log_result {
+        eprintln!("Failed to log request to database: {}", e);
+    }
 
     response
 }
