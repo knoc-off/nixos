@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "bluetooth_and_notitification_changes._______________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________________________________nuci5_added";
+  system.nixos.label = "Pre-workspace_refactor______________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________________________________nuci5_added";
 }
