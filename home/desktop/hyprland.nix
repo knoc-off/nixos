@@ -56,8 +56,8 @@
         wallpaper = let
           wallpaper-img = pkgs.fetchurl {
             url =
-              "https://www.metalocus.es/sites/default/files/metalocus_piranesi_amsterdam_kunstal_01.jpg";
-            sha256 = "sha256-hRFjY/mTa4zcXs/NjZ4FJ6guhUwmlsmWr546ZvDSWX8=";
+              "https://niko.ink/content/files/desktop-landscape.jpg";
+            sha256 = "sha256-H0fwZWXPjjgk9lcMYb2LPtm19i6UeDMqhyUszQDokqY=";
           };
         in pkgs.writeText "wallpaper" ''
           preload = ${wallpaper-img}
@@ -67,7 +67,8 @@
       in {
         exec-once = [
           "hyprpaper --config ${wallpaper}"
-          "ags run widget/notifications/"
+          "ags run ~/.config/ags/widget/notifications"
+          "ags run ~/.config/ags"
           # "pypr"
           "${pkgs.wayland-pipewire-idle-inhibit}/bin/wayland-pipewire-idle-inhibit" # services.xidlehook.not-when-audio?
           # "kando"
