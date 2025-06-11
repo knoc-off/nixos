@@ -42,7 +42,7 @@
         (upkgs.writeTextDir
           "share/wireplumber/bluetooth.lua.d/99-airpods-fix.lua" ''
             -- Minimalist config for testing AirPod stability
-            bluez_monitor.properties = {
+            bluez_monitor.properties = { alegreya-sans
               -- Prioritize high-quality audio sink on connection
               ["bluez5.auto-connect"] = { "a2dp_sink", "hfp_hf" },
 

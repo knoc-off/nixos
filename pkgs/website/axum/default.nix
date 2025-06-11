@@ -145,10 +145,10 @@ in rustPlatform.buildRustPackage rec {
   cargoLock.lockFile = ./Cargo.lock;
 
   nativeBuildInputs = with pkgs; [
-    (rust-bin.stable."1.82.0".default.override {
-      extensions = [ "rust-src" ];
-      targets = [ "wasm32-unknown-unknown" ];
-    })
+      # (rust-bin.stable."1.82.0".default.override {
+      #   extensions = [ "rust-src" ];
+      #   targets = [ "wasm32-unknown-unknown" ];
+      # })
     libyaml
     pkg-config
     tailwindcss

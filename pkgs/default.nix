@@ -70,7 +70,7 @@ in rec {
 
   website = {
     portfolio = rustPkgs.callPackage ./website/portfolio { };
-    axum = rustPkgs.callPackage ./website/axum { inherit tabler-icons; };
+    axum = rustPkgs-fenix.callPackage ./website/axum { inherit rustPlatform tabler-icons; };
 
     axum-login-test =
       rustPkgs.callPackage ./website/login-test { inherit tabler-icons; };
