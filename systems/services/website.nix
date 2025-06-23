@@ -1,4 +1,4 @@
-{self, pkgs, lib, ...}:
+{self, pkgs, lib, config, ...}:
 {
   systemd.services.axum-website = {
     description = "Axum Web Server";
@@ -11,6 +11,8 @@
       # Create runtime directory for temporary files
       RuntimeDirectory = "axum-website";
       WorkingDirectory = "/var/lib/axum-website";
+
+      EnvironmentFile = config.sops.secrets."services/website/env".path;
 
       ExecStartPre = [
         # Copy static files

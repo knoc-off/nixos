@@ -1,0 +1,32 @@
+{
+  "scout_id": "159703643",
+  "status": "new",
+  "total_rent": 960,
+  "address": "Fürstendamm 66b, Frohnau, 13465 Berlin",
+  "notes": "",
+  "property_details": {
+    "cold_rent": 760,
+    "additional_costs": null,
+    "heating_costs_included": false,
+    "floor": "0 von 2",
+    "year_built": "1958",
+    "condition": "Gepflegt",
+    "equipment_quality": "Normale Qualität",
+    "heating_type": "Zentralheizung",
+    "energy_source": "Gas",
+    "pets_allowed": null
+  },
+  "source_stats": {
+    "views": null,
+    "saved": null,
+    "contacted": null
+  },
+  "contact_person": {
+    "name": "Herr Terzic"
+  },
+  "text_descriptions": {
+    "object_description": "- Mehrfamilienhaus - gepflegte Gartenanlage - Außenstellplätze - Gaszentralheizung - Garagen",
+    "equipment_details": "- Ruhige, helle Wohnung - In den Wohnräumen Parkettboden - Fliesenboden in Holzoptik in Flur, Küche und Bad - Moderne Einbauküche mit Herd, Spüle - Bad mit Dusche und Handtuchheizkörper - Balkon",
+    "location": "- viele Einkaufsmöglichkeiten fußläufig erreichbar - guten Anbindung an öffentlichen Nahverkehr - gute Wohnlage mit ruhiger Wohnatmosphäre"
+  }
+}

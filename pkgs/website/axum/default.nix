@@ -72,8 +72,8 @@ let
     });
 
   dbSetupScript = pkgs.writeScriptBin "setup-database" ''
-    DB_PATH="/opt/website_data/database.db"
-    DB_DIR="/opt/website_data"
+    DB_PATH="/var/lib/axum-website/db.sqlite"
+    DB_DIR="/var/lib/axum-website"
 
     if [ ! -d "$DB_DIR" ]; then
       echo "Database-Dir doesn't exist: " $DB_DIR
@@ -145,10 +145,10 @@ in rustPlatform.buildRustPackage rec {
   cargoLock.lockFile = ./Cargo.lock;
 
   nativeBuildInputs = with pkgs; [
-      # (rust-bin.stable."1.82.0".default.override {
-      #   extensions = [ "rust-src" ];
-      #   targets = [ "wasm32-unknown-unknown" ];
-      # })
+    # (rust-bin.stable."1.82.0".default.override {
+    #   extensions = [ "rust-src" ];
+    #   targets = [ "wasm32-unknown-unknown" ];
+    # })
     libyaml
     pkg-config
     tailwindcss
@@ -157,9 +157,11 @@ in rustPlatform.buildRustPackage rec {
     switchToDevScript
     cssBuildScript
     dbSetupScript
+    openssl
+    makeWrapper
   ];
 
-  buildInputs = with pkgs; [ openssl.dev pkg-config zlib.dev ];
+  buildInputs = with pkgs; [ openssl openssl.dev pkg-config zlib.dev ];
 
   preBuild = ''
     mkdir -p ./static/fonts ./static/css ./static/js
@@ -185,9 +187,12 @@ in rustPlatform.buildRustPackage rec {
     ${cssBuildScript}/bin/tailwind-build
     ${dbSetupScript}/bin/setup-database
 
+    alias reset_db="rm db.sqlite  && cargo sqlx database create && cargo sqlx migrate run"
   '';
 
-  postBuild = ''
+  LD_LIBRARY_PATH = lib.makeLibraryPath [ pkgs.openssl ];
+
+  postInstall = ''
 
     # Create necessary directories
     mkdir -p $out/bin
@@ -196,12 +201,24 @@ in rustPlatform.buildRustPackage rec {
     # Copy the database setup script
     cp ${dbSetupScript}/bin/setup-database $out/bin/
 
+
+
     # Copy static assets
     cp ./static $out/share/ -r
     #cp ${htmxJs} $out/share/static/js/htmx.min.js
     #cp ./static/css/styles.css $out/share/static/css/
+    # rm db.sqlite && cargo sqlx database create && cargo sqlx migrate run
 
+    # --- ROBUST WRAPPER SCRIPT ---
+    # 1. Move the original, compiled binary to a new name with a "-bin" suffix.
+    mv $out/bin/axum-website $out/bin/axum-website-bin
+
+    # 2. Use makeWrapper to create a NEW script at the original location.
+    #    This new script sets up the environment and then calls the real binary.
+    makeWrapper $out/bin/axum-website-bin $out/bin/axum-website \
+      --prefix LD_LIBRARY_PATH : ${lib.makeLibraryPath [ pkgs.openssl ]}
   '';
+
 
   meta = with lib; {
     description =

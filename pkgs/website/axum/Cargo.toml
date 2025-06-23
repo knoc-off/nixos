@@ -2,3 +2,18 @@
 members = ["app-main", "app-state", "feature-immo24"]
 resolver = "2"
 
+# Add this entire section
+[workspace.dependencies]
+#sqlx = { version = "0.8.6", features = ["chrono", "json", "postgres", "runtime-tokio-rustls"] }
+#axum = "0.8.4"
+
+app-state = { path = "./app-state" }
+openssl = { version = "0.10", features = ["vendored"] }
+sqlx = { version = "0.8.6", features = ["runtime-tokio", "sqlite"] }
+tokio = { version = "1.41.1", features = ["macros", "rt-multi-thread"] }
+serde = { version = "1.0.215", features = ["derive"] }
+serde_json = "1.0.133"
+axum = { version = "0.7.9", features = ["macros"] }
+axum-extra = { version = "0.10.0", features = ["cookie"] }
+axum_session = "0.16.0"
+reqwest = { version = "0.12", features = ["json"] }

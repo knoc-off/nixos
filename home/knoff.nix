@@ -17,6 +17,10 @@
 
     ./programs/editor/default.nix
 
+
+
+    ./desktop/astal
+
     # Desktop and widgets
     # ./modules/hyprland
 
@@ -54,52 +58,6 @@
     ./modules/thunderbird.nix
 
     ./xdg-enviroment.nix
-
-    {
-      imports = [ inputs.ags.homeManagerModules.default ];
-
-      programs.ags = {
-        enable = true;
-
-        # null or path, leave as null if you don't want hm to manage the config
-        #configDir = ./configs;
-        configDir = null;
-
-        # additional packages to add to gjs's runtime
-        extraPackages = with pkgs; [
-          gtksourceview
-          # webkitgtk
-          webkitgtk_6_0
-          accountsservice
-
-
-          # move all of the below to its own config file.
-          inputs.astal.packages.${system}.default
-
-          inputs.astal.packages.${system}.io
-          #inputs.astal.packages.${system}.astal3
-          #inputs.astal.packages.${system}.astal4
-          inputs.astal.packages.${system}.apps
-          inputs.astal.packages.${system}.auth
-          inputs.astal.packages.${system}.battery
-          inputs.astal.packages.${system}.bluetooth
-          inputs.astal.packages.${system}.cava
-          inputs.astal.packages.${system}.greet
-          inputs.astal.packages.${system}.hyprland
-          inputs.astal.packages.${system}.mpris
-          inputs.astal.packages.${system}.network
-          inputs.astal.packages.${system}.notifd
-          inputs.astal.packages.${system}.powerprofiles
-          inputs.astal.packages.${system}.river
-          inputs.astal.packages.${system}.tray
-          inputs.astal.packages.${system}.wireplumber
-
-        ];
-      };
-      #home.packages = [
-      #];
-
-    }
 
   ];
 
@@ -139,12 +97,6 @@
     home-manager.enable = true;
   };
   # TODO: move this to someplace more logical
-
-
-    # Assumes 'theme' is an attribute set available in this scope,
-  # containing attributes like theme.base00, theme.base01, ..., theme.base0F
-  # which are strings like "1e1e1e", "cd3131", etc.
-
 
 
 

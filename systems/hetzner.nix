@@ -11,12 +11,17 @@
         # This will automatically import SSH keys as age keys
         age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
 
-        secrets = if config.services.nextcloud.enable then {
-          "services/nextcloud/admin-pass" = {
-            owner = config.users.users.nextcloud.name;
+        secrets = {
+          "services/website/env" = {
           };
-        } else
-          { };
+        };
+
+        #  if config.services.nextcloud.enable then {
+        #  "services/nextcloud/admin-pass" = {
+        #    owner = config.users.users.nextcloud.name;
+        #  };
+        #}  else
+        #  { };
       };
     }
     # Disko
