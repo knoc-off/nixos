@@ -3,6 +3,7 @@
 /target
 
 database.db
+db.sqlite
 database.db*
 
 # user content files. should be unique.
