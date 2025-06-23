@@ -1,0 +1,16 @@
+# ./.cargo/config.toml
+
+# This section configures the `cargo run` command
+
+#[run]
+# Sets the default package to execute when you type `cargo run`
+# in the workspace root. No more ambiguity!
+#default = "axum-website"
+
+# This section sets environment variables for all Cargo commands
+# (run, test, build, etc.) executed within this workspace.
+[env]
+DATABASE_URL = "sqlite:db.sqlite?mode=rwc"
+
+# You can add other environment variables here too
+# RUST_LOG = "info"

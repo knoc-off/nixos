@@ -28,6 +28,8 @@
   '';
   boot.kernelModules = [ "btusb" "btbcm" "btintel" "bluetooth" ];
 
+  boot.kernelParams = [ "btusb.enable_autosuspend=0" ];
+
   # services.pipewire.wireplumber.configPackages = [
   #   (upkgs.writeTextDir "share/wireplumber/bluetooth.lua.d/99-codecs.lua" ''
   #     bluez_monitor.properties = {
@@ -36,28 +38,27 @@
   #   '')
   # ];
 
-  services.pipewire = {
-    wireplumber = {
-      configPackages = [
-        (upkgs.writeTextDir
-          "share/wireplumber/bluetooth.lua.d/99-airpods-fix.lua" ''
-            -- Minimalist config for testing AirPod stability
-            bluez_monitor.properties = { alegreya-sans
-              -- Prioritize high-quality audio sink on connection
-              ["bluez5.auto-connect"] = { "a2dp_sink", "hfp_hf" },
+  # services.pipewire = {
+  #   wireplumber = {
+  #     configPackages = [
+  #       (upkgs.writeTextDir
+  #         "share/wireplumber/bluetooth.lua.d/99-airpods-fix.lua" ''
+  #           -- Minimalist config for testing AirPod stability
+  #           bluez_monitor.properties = { alegreya-sans
+  #             -- Prioritize high-quality audio sink on connection
+  #             ["bluez5.auto-connect"] = { "a2dp_sink", "hfp_hf" },
 
-              -- Prioritize the codec AirPods actually use
-              ["bluez5.codecs"] = { "aac", "sbc" },
+  #             -- Prioritize the codec AirPods actually use
+  #             ["bluez5.codecs"] = { "aac", "sbc" },
 
-              -- Enable mSBC for better call quality if the HFP profile is used
-              ["bluez5.enable-msbc"] = true,
-            }
-          '')
-      ];
-    };
-  };
+  #             -- Enable mSBC for better call quality if the HFP profile is used
+  #             ["bluez5.enable-msbc"] = true,
+  #           }
+  #         '')
+  #     ];
+  #   };
+  # };
 
-  boot.kernelParams = [ "btusb.enable_autosuspend=0" ];
 
   # ======================
   # Device Management

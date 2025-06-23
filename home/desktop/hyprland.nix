@@ -67,8 +67,10 @@
       in {
         exec-once = [
           "hyprpaper --config ${wallpaper}"
-          "ags run ~/.config/ags/widget/notifications"
-          "ags run ~/.config/ags"
+          # "ags run ~/.config/ags/widget/notifications"
+          "astal-notify"
+
+          # "ags run ~/.config/ags"
           # "pypr"
           "${pkgs.wayland-pipewire-idle-inhibit}/bin/wayland-pipewire-idle-inhibit" # services.xidlehook.not-when-audio?
           # "kando"

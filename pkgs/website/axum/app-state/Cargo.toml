@@ -1,0 +1,8 @@
+[package]
+name = "app-state"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sqlx = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }

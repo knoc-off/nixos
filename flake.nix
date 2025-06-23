@@ -188,7 +188,10 @@
     };
 
     # add ags / Widgets, etc.
-    ags.url = "github:Aylur/ags";
+    ags = {
+      url = "github:aylur/ags";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     astal.url = "github:Aylur/astal";
     astal.inputs.nixpkgs.follows = "nixpkgs-unstable";

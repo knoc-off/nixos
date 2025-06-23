@@ -1,0 +1,7 @@
+{
+  "reasoning_context": {
+    "desired_features": ["Balcony", "Hardwood Floors", "Pets Allowed"],
+    "dealbreaker_features": ["No Elevator", "Basement Apartment"]
+  },
+  "message_template": "Hallo,\n\nich schreibe Ihnen bezüglich der Wohnung mit der Scout-ID [Scout-ID].\n\n[Generierter Teil hier]\n\nIch freue mich auf Ihre Rückmeldung.\n\nViele Grüße,\n[Ihr Name]"
+}
