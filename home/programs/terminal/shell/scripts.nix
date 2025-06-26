@@ -144,7 +144,7 @@ in {
 
       # Grammar for command-line completion
       grammar = ''
-        anti-sleep ( 30m | 1h | 6h | 18:00 | <TIME(HH:MM)> | <DURATION> ) "Duration or Time";
+        anti-sleep <WORD> "Duration or Time";
       '';
 
       # Runtime dependencies for the script
@@ -353,13 +353,7 @@ in {
       # grammar = ''
       #   adr [(-s | -m | -d)] [{{{${pkgs.fd}/bin/fd --type f --hidden --no-ignore --max-depth 1 . --color never}}} "File"] ... [<OTHER_ARG> "Other Argument"] ... ;'';
       grammar = ''
-        adr [(-s | -m | -d)]
-            [ ( {{{
-              find . -maxdepth 1 -type f -print0 | xargs -0 file -i | grep -E 'text/' | cut -d ':' -f 1 | sort -u | sed 's/^.\///'
-            }}} "File or Directory"
-              | <OTHER_ARG> "Aider Arg/Command"
-              )
-            ] ... ;
+        adr <PATH>;
       '';
       runtimeDeps = [
         upkgs.aider-chat

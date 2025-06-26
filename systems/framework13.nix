@@ -197,26 +197,27 @@
 
     # Window manager
     self.nixosModules.windowManager.hyprland
-
     {
+      services.greetd = let
+        tuigreet = "${pkgs.greetd.tuigreet}/bin/tuigreet";
+        hyprland = "${pkgs.hyprland}/bin/Hyprland";
+      in {
+        enable = true;
+        settings = {
+          default_session.command = "${tuigreet} --remember --cmd ${hyprland}";
 
-      # services = {
-      #   greetd = {
-      #     enable = true;
-      #     settings = {
-      #       default_session = {
-      #         command = "${pkgs.dwl}/bin/dwl -s kodi";
-      #         #command = "${pkgs.bash}/bin/bash";
-      #         inherit user;
-      #       };
-      #     };
-      #   };
-      #   seatd = {
-      #     enable = true;
-      #     inherit user;
-      #   };
-      # };
-
+          # default_session.command =
+          #   "./${pkgs.greetd.tuigreet}/bin/tuigreet --remember --cmd ./${
+          #     pkgs.writeScriptBin "Hyprland_start" ''
+          #       ${pkgs.hyprland}/bin/Hyprland
+          #     ''
+          #   }";
+          # default_session = {
+          #   command = "./${hyprland}";
+          #   user = "knoff";
+          # };
+        };
+      };
     }
 
     ./modules/shell/fish.nix
@@ -438,7 +439,9 @@
       mplus-outline-fonts.githubRelease
       dina-font
       proggyfonts
-      (nerdfonts.override { fonts = [ "FiraCode" ]; })
+      pkgs.nerd-fonts.fira-code
+      #pkgs.nerd-fonts.droid-sans-mono
+
     ];
     fontconfig.defaultFonts = { monospace = [ "FiraCode Nerd Font Mono" ]; };
   };

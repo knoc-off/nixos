@@ -7,5 +7,7 @@
 
   home = import ./home.nix;
 
+  nix = import ./nix.nix;
+
 
 }

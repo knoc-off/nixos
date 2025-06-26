@@ -178,7 +178,7 @@
       mplus-outline-fonts.githubRelease
       dina-font
       proggyfonts
-      (nerdfonts.override { fonts = [ "FiraCode" ]; })
+      pkgs.nerd-fonts.fira-code
     ];
     fontconfig.defaultFonts = { monospace = [ "FiraCode Nerd Font Mono" ]; };
   };

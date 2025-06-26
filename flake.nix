@@ -34,7 +34,7 @@
           inherit system;
           specialArgs = {
             inherit self inputs outputs hostname user lib system theme color-lib
-              math; # Pass theme and color-lib
+              math;
             upkgs = unstablePkgs system;
             # selfPkgs = self.packages.${system};
           } // extraConfigs;
@@ -92,7 +92,7 @@
             };
           };
           # Import custom packages defined in the ./pkgs directory
-          # i dont like pushing through my own lib as a dependency, makes it too self-reliant and less distributable. but i really value the possibilities
+          # i dont like pushing through my own lib as a dependency, makes it too self-reliant. but i really value the possibilities
         in import ./pkgs {
           inherit inputs self system pkgs upkgs lib color-lib math theme;
         };
@@ -120,9 +120,11 @@
 
     };
 
-  inputs = {
+  inputs =
+
+    {
     # Nixpkgs
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-24.11";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.05";
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
     # nix cli
@@ -142,7 +144,7 @@
 
     # Home Manager
     home-manager = {
-      url = "github:nix-community/home-manager/release-24.11";
+      url = "github:nix-community/home-manager/release-25.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -178,6 +180,8 @@
       url = "gitlab:rycee/nur-expressions?dir=pkgs/firefox-addons";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    nixgl.url = "github:nix-community/nixGL";
 
     # Hyprland
     #hyprland.url = "github:hyprwm/hyprland";

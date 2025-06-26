@@ -1,5 +1,5 @@
 {pkgs ? import <nixpkgs> {}}:
-pkgs.python3Packages.buildPythonApplication {
+pkgs.pythonPackages.buildPythonApplication {
   pname = "volumeLerp";
   version = "0.1.0";
 
