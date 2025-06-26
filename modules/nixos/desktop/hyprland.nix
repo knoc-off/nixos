@@ -1,51 +1,32 @@
 { inputs, config, lib, pkgs, self, ... }:
 
 let
-  tuigreet = "${pkgs.greetd.tuigreet}/bin/tuigreet";
-  hyprland = "${pkgs.hyprland}/bin/Hyprland";
 
 in {
   imports = [ self.nixosModules.desktop.totem ];
 
-  # Enable greetd for login
-  services.greetd = {
-    enable = true;
-    settings = {
-      default_session.command = "${tuigreet} --remember --cmd ${hyprland}";
-
-      # default_session.command =
-      #   "./${pkgs.greetd.tuigreet}/bin/tuigreet --remember --cmd ./${
-      #     pkgs.writeScriptBin "Hyprland_start" ''
-      #       ${pkgs.hyprland}/bin/Hyprland
-      #     ''
-      #   }";
-      # default_session = {
-      #   command = "./${hyprland}";
-      #   user = "knoff";
-      # };
-    };
-  };
-
   # Enable backlight control
-  programs.light.enable = lib.mkDefault true;
+  programs.light.enable = true;
 
   # Allow X compositor
   # services.xserver.displayManager.startx.enable = lib.mkDefault true;
 
   # Enable Hyprland
   programs.hyprland = {
-    enable = lib.mkDefault true;
-    package = lib.mkDefault inputs.hyprland.packages.${pkgs.system}.hyprland;
-    xwayland.enable = lib.mkDefault true;
+    enable = true;
+    xwayland.enable = true;
   };
 
   # XDG portal configuration
   xdg.portal = {
     enable = lib.mkDefault true;
     extraPortals = lib.mkDefault [
-      pkgs.xdg-desktop-portal-gtk
       pkgs.xdg-desktop-portal-hyprland
+      pkgs.xdg-desktop-portal-gtk
+      pkgs.xdg-desktop-portal-kde
     ];
+
+    config.common.default = "hyprland";
   };
 
   # System-wide packages
@@ -54,7 +35,7 @@ in {
   # Enable polkit
   security.polkit.enable = lib.mkDefault true;
 
-  # Enable Wayland for Electron apps
+  # hint Wayland for Electron apps
   environment.sessionVariables.NIXOS_OZONE_WL = lib.mkDefault "1";
 
 }

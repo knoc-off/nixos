@@ -31,13 +31,13 @@ in rec {
   blink_led = pkgs.callPackage ./blinkFW13LED { };
   triliumNext = pkgs.callPackage ./triliumNext { };
   spotify-adblock = pkgs.callPackage ./spotify-adblock { };
-  llm-cmd = pkgs.python3Packages.callPackage ./llm-cmd { };
-  ttok = pkgs.python3Packages.callPackage ./ttok { };
-  wrap = pkgs.python3Packages.callPackage ./wrap-codeblocks { };
-  nixx = pkgs.python3Packages.callPackage ./nixx-script { };
+  llm-cmd = pkgs.pythonPackages.callPackage ./llm-cmd { };
+  ttok = pkgs.pythonPackages.callPackage ./ttok { };
+  wrap = pkgs.pythonPackages.callPackage ./wrap-codeblocks { };
+  nixx = pkgs.pythonPackages.callPackage ./nixx-script { };
 
-  replicate-bridge = upkgs.python3Packages.callPackage ./replicate { };
-  marker = pkgs.python3Packages.callPackage ./marker { };
+  replicate-bridge = upkgs.pythonPackages.callPackage ./replicate { };
+  marker = pkgs.pythonPackages.callPackage ./marker { };
   texify = pkgs.callPackage ./texify { };
   gate = pkgs.callPackage ./gate { };
   ascii-silhouettify = pkgs.callPackage ./ascii { };
@@ -115,6 +115,11 @@ in rec {
     };
     nixvim = inputs.nixvim.legacyPackages.${system};
   in {
+    lazy = nixvim.makeNixvimWithModule {
+      pkgs = customPkgs;
+      extraSpecialArgs = { inherit color-lib theme; };
+      module = { imports = [ ./neovim/configurations/lazy-loading.nix ]; };
+    };
     default = nixvim.makeNixvimWithModule {
       pkgs = customPkgs;
       extraSpecialArgs = { inherit color-lib theme; };

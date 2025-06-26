@@ -157,17 +157,17 @@
           value = "{searchTerms}";
         }];
       }]; # https://annas-archive.org/favicon.ico
-      iconUpdateURL = "https://annas-archive.org/favicon.ico";
+      icon = "https://annas-archive.org/favicon.ico";
       updateInterval = 24 * 60 * 60 * 1000; # every day
       #icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/bookmark.svg";
       definedAliases = [ "!a" ];
     };
     # -------------------- Disable Defaults --------------------
 
-    "Bing".metaData.hidden = true;
-    "Google".metaData.hidden = true;
-    "Amazon.de".metaData.hidden = true;
-    "Wikipidia (en)".metaData.hidden = true;
-    "DuckDuckGo".metaData.hidden = false;
+    "bing".metaData.hidden = true;
+    "google".metaData.hidden = true;
+    "amazon.de".metaData.hidden = true;
+    "wikipidia".metaData.hidden = true;
+    "ddg".metaData.hidden = false;
   };
 }

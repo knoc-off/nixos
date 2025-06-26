@@ -7,7 +7,7 @@
 
 let
   # Define the older, open-source PySimpleGUI package
-  pysimplegui-4-60-5 = pkgs.python3Packages.buildPythonPackage rec {
+  pysimplegui-4-60-5 = pkgs.pythonPackages.buildPythonPackage rec {
     pname = "PySimpleGUI";
     version = "4.60.5";
 

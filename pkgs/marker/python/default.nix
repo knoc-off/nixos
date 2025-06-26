@@ -1,7 +1,7 @@
 { pkgs ? import <nixpkgs> {} }:
 
 let
-  pythonPackages = pkgs.python3Packages;
+  pythonPackages = pkgs.pythonPackages;
 in pkgs.mkShell {
   buildInputs = [
     pkgs.python3

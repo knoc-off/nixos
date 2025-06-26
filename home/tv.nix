@@ -1,64 +1,88 @@
-{ lib, inputs, pkgs, self, hostname, user, config, ... }@args: {
-  programs.kodi = {
+{ lib, inputs, pkgs, self, hostname, user, config, ... }@args:
 
-    enable = true;
-    #package = pkgs.kodi-wayland;
-    # package = # pkgs.kodi.withPackages (exts: [ exts.pvr-iptvsimple ]);
-    package = pkgs.kodi-wayland.withPackages (kodiPkgs:
-      with kodiPkgs; [
-        jellyfin
-        youtube
-        pvr-iptvsimple
-        steam-controller
-      ]);
-    settings = { videolibrary.showemptytvshows = "true"; };
-    sources = {
-      video = {
-        default = "movies";
-        source = [
-          # {
-          #   name = "videos";
-          #   path = "${config.home-manager.users.tv.xdg.userDirs.videos}/misc";
-          #   allowsharing = "true";
-          # }
-          {
-            name = "shows";
-            path = "${config.xdg.dataHome}/shows";
-            allowsharing = "true";
-          }
-          {
-            name = "movies";
-            path = "${config.xdg.dataHome}/movies";
-            allowsharing = "true";
-          }
-        ];
-      };
-    };
-
-  };
-
-  systemd.user.services.steam = {
+let
+  generateService = serviceName: command: {
     Unit = {
-      Description = "Steam Client";
-      After = [ "graphical-session.target" ];
-      PartOf = [ "graphical-session.target" ];
+      Description = "${serviceName} Service";
+      PartOf = [ "hyprland.target" ];
+      Requires = [ "hyprland.target" ];
+      After = [ "user-path-import.service" ];
     };
-
+    Install.WantedBy = [ "hyprland.target" ];
     Service = {
-      ExecStart =
-        "${pkgs.steam}/bin/steam -silent"; # maybe i should just run "steam" and not pkgs.steam
-      ExecStop = "${pkgs.procps}/bin/pkill -TERM steam";
+      Type = "simple";
       Restart = "on-failure";
-      RestartSec = "5s";
-      Environment =
-        "LD_PRELOAD=${pkgs.pkgsi686Linux.extest}/lib/libextest.so"; # Only if using extest
-      # Add other environment variables if needed
+      ExecStart = "/usr/bin/env ${command}";
+      RestartSec = "1";
     };
-
-    Install.WantedBy = [ "graphical-session.target" ];
   };
 
-  services.dunst = { enable = true; };
+in {
+
+  imports = [
+    ./programs/terminal/kitty
+    ./programs/terminal
+    ./desktop/hyprland.nix ];
+
+  # programs.kodi = {
+  #   enable = true;
+  #   #package = pkgs.kodi-wayland;
+  #   # package = # pkgs.kodi.withPackages (exts: [ exts.pvr-iptvsimple ]);
+  #   package = pkgs.kodi-wayland.withPackages (kodiPkgs:
+  #     with kodiPkgs; [
+  #       jellyfin
+  #       youtube
+  #       pvr-iptvsimple
+  #       steam-controller
+  #     ]);
+  #   settings = { videolibrary.showemptytvshows = "true"; };
+  #   sources = {
+  #     video = {
+  #       default = "movies";
+  #       source = [
+  #         # {
+  #         #   name = "videos";
+  #         #   path = "${config.home-manager.users.tv.xdg.userDirs.videos}/misc";
+  #         #   allowsharing = "true";
+  #         # }
+  #         {
+  #           name = "shows";
+  #           path = "${config.xdg.dataHome}/shows";
+  #           allowsharing = "true";
+  #         }
+  #         {
+  #           name = "movies";
+  #           path = "${config.xdg.dataHome}/movies";
+  #           allowsharing = "true";
+  #         }
+  #       ];
+  #     };
+  #   };
+
+  # };
+
+  # systemd.user.services.steam = {
+  #   Unit = {
+  #     Description = "Steam Client";
+  #     After = [ "graphical-session.target" ];
+  #     PartOf = [ "graphical-session.target" ];
+  #   };
+
+  #   Service = {
+  #     ExecStart =
+  #       "${pkgs.steam}/bin/steam -silent"; # maybe i should just run "steam" and not pkgs.steam
+  #     ExecStop = "${pkgs.procps}/bin/pkill -TERM steam";
+  #     Restart = "on-failure";
+  #     RestartSec = "5s";
+  #     Environment =
+  #       "LD_PRELOAD=${pkgs.pkgsi686Linux.extest}/lib/libextest.so"; # Only if using extest
+  #     # Add other environment variables if needed
+  #   };
+
+  #   Install.WantedBy = [ "graphical-session.target" ];
+  # };
+
+  # services.dunst = { enable = true; };
 
   home.sessionVariables = {
     QT_QPA_PLATFORM = "wayland";
@@ -145,9 +169,55 @@
       "s" = "screenshot video";
       "S" = "screenshot window";
       # Corrected binding:
-      "ctrl+l" = ''apply-profile "low-latency-stream"; show-text "Low Latency Stream Profile Applied"'';
+      "ctrl+l" = ''
+        apply-profile "low-latency-stream"; show-text "Low Latency Stream Profile Applied"'';
     };
   };
+
+  home.packages = with pkgs; [
+    # The core KDE Connect application suite
+    plasma5Packages.kdeconnect-kde
+    (inputs.nixgl.packages.x86_64-linux.nixGLIntel)
+  ];
+
+  # 1. Enable KDE Connect Service
+  # This starts the 'kdeconnectd' daemon for your user.
+  services.kdeconnect = {
+    enable = true;
+    indicator = true;
+  };
+
+  # 2. Enable the KDE Daemon (kded)
+  # This is the most critical step for screen mirroring.
+  # It runs the background service that hosts the screen sharing module.
+  # services.kded.enable = true;
+
+  # 3. Configure XDG Portals for Wayland Integration
+  # This ensures that applications use the KDE portal for screen sharing.
+  xdg.portal = {
+    enable = true;
+    config = {
+      common = {
+        default = [ "hyprland" ]; # Use Hyprland portal by default
+        # Explicitly route screen sharing to KDE portal for KDE Connect
+        "org.freedesktop.impl.portal.ScreenCast" = [ "kde" ];
+        "org.freedesktop.impl.portal.RemoteDesktop" = [ "kde" ];
+
+        #"org.freedesktop.impl.portal.Screenshot" = "wlr";
+      };
+    };
+    extraPortals = [
+      pkgs.xdg-desktop-portal-kde # For KDE Connect screen sharing
+      pkgs.xdg-desktop-portal-hyprland
+    ];
+  };
+
+  # 5. Ensure a notification daemon is running
+  # KDE Connect relies on this to show notifications from your phone.
+  # Mako is a popular, lightweight choice for Wayland.
+  services.mako.enable = true;
+  # Alternatively, you could use another like swaync:
+  # programs.swaync.enable = true;
 
   # nixpkgs = {
   #   config = {
@@ -169,18 +239,47 @@
   #   ];
   # };
 
+  systemd.user.services = {
+    #kdeconnect-indicator =
+    #(generateService "kdeconnect-indicator" "kdeconnect-indicator");
+
+    # Update your kded-modules service to include the KDE Connect Display module
+    kded-modules = {
+      Unit = {
+        Description = "KDED Modules";
+        After = [ "kded.service" "user-path-import.service" ];
+        PartOf = [ "kded.service" ];
+      };
+      Install.WantedBy = [ "hyprland.target" ];
+      Service = {
+        Type = "oneshot";
+        ExecStart = "${pkgs.writeScript "start-kded-modules" ''
+          #!/usr/bin/env zsh
+
+          moduleNames=(
+            "gtkconfig"
+            "bluedevil"
+            "networkmanagement"
+            "networkstatus"
+            "smbwatcher"
+            "device_automounter"
+            "kded_kdd"  # This is the KDE Connect Display module - CRITICAL for screen mirroring
+          )
+
+          for module in $moduleNames; do
+            qdbus org.kde.kded6 /kded org.kde.kded6.loadModule $module
+          done
+        ''}";
+        RemainAfterExit = true;
+      };
+    };
+  };
   # systemd.user.services.kdeconnect-indicator = {
   #   Service.Environment = lib.mkOverride 90 [
   #     "PATH=${config.home.profileDirectory}/bin:${pkgs.coreutils}/bin:${pkgs.dbus}/bin"
   #     "QT_QPA_PLATFORM=wayland"
   #     "XDG_SESSION_TYPE=wayland"
   #   ];
-  # };
-
-  # services.kdeconnect = {
-  #   enable = true;
-  #   package = pkgs.kdePackages.kdeconnect-kde;
-  #   # indicator = true;
   # };
 
   programs.firefox.enable = true;

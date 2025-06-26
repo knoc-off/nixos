@@ -23,7 +23,7 @@ in rec {
         name = "main";
 
         # Extensions for the main profile
-        extensions = with addons; [
+        extensions.packages = with addons; [
           # Essential
           ublock-origin
           bitwarden
@@ -64,7 +64,7 @@ in rec {
         name = "minimal";
 
         # Extensions for the minimal profile
-        extensions = with addons; [
+        extensions.packages = with addons; [
           # Essential
           ublock-origin
           bitwarden
@@ -83,7 +83,7 @@ in rec {
 
         settings =
           import ./settings/default.nix { inherit theme math lib color-lib; };
-        extensions = with addons; [ sidebery ];
+        extensions.packages = with addons; [ sidebery ];
         userChrome = import ./userChrome-minimal.nix {
           inherit theme color-lib firefox-csshacks;
         };
@@ -96,7 +96,7 @@ in rec {
 
         settings =
           import ./settings/default.nix { inherit theme math lib color-lib; };
-        extensions = with addons; [ sidebery ];
+        extensions.packages = with addons; [ sidebery ];
         userChrome = import ./userChrome-minimal.nix {
           inherit theme color-lib firefox-csshacks;
         };

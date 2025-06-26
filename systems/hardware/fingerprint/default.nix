@@ -17,13 +17,9 @@ let
     echo 1 > /sys/class/leds/chromeos\:white\:power/brightness
   '';
 
-  udevRule = ''
-    ACTION=="add|change",
-    SUBSYSTEM=="usb",
-    ATTRS{idVendor}=="27c6",
-    ATTRS{idProduct}=="609c",
-    RUN+="${blinkScript}/bin/blink"
-  '';
+  # udevRule = ''
+  #   RUN+="${blinkScript}/bin/blink"
+  # '';
 
 in
 {
@@ -31,7 +27,7 @@ in
     enable = true;
   };
 
-  services.udev.extraRules = udevRule;
+  #services.udev.extraRules = udevRule;
 
   security.pam.services = {
     sudo.text = mkDefault (mkBefore grosshackConfig);

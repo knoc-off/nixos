@@ -5,7 +5,7 @@ let
     pname = "spotify-adblock";
     version = "0.0.1";
 
-    cargoHash = "sha256-HpOxoHe7jbmgU2Im0JKSGISmj4im6fwFIuyJTueLmM0=";
+    cargoHash = "sha256-oGpe+kBf6kBboyx/YfbQBt1vvjtXd1n2pOH6FNcbF8M=";
 
     postPatch = ''
       substituteInPlace src/lib.rs \
@@ -20,8 +20,8 @@ let
     src = pkgs.fetchFromGitHub {
       owner = "abba23";
       repo = "spotify-adblock";
-      rev = "5a3281dee9f889afdeea7263558e7a715dcf5aab";
-      hash = "sha256-UzpHAHpQx2MlmBNKm2turjeVmgp5zXKWm3nZbEo0mYE=";
+      rev = "8e0312d6085a6e4f9afeb7c2457517a75e8b8f9d";
+      hash = "sha256-nwiX2wCZBKRTNPhmrurWQWISQdxgomdNwcIKG2kSQsE=";
     };
   };
 

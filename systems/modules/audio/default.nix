@@ -1,7 +1,7 @@
 { config, upkgs, pkgs, lib, ... }:
 
 {
-  hardware.pulseaudio.enable = false;
+  services.pulseaudio.enable = false;
   security.rtkit.enable = true;        # Realtime priority management
 
   services.pipewire = {

@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "removed_stuff_______________________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "______________________________feat:_Refactor_theme.nix_for_improved_color_palette_generation";
+  system.nixos.label = "Updated_to_25.05____________________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "____________________________________________________________________________Updated_to_25.05";
 }

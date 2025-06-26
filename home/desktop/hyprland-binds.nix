@@ -122,6 +122,7 @@ in {
           }
         '';
 
+        # i think part of this script can be fixed with: no_focus_fallback
         fancyfocusscript = import ./window-move.nix { inherit pkgs self; };
 
         fancyGroupScript = writeNuScript "fancyGroup" ''
@@ -170,27 +171,28 @@ in {
         # OBS RECORD TOGGLE
         "${mainMod},F10, pass,^(com.obsproject.Studio)$"
 
-        "${mainMod}, T, exec, ${
-          mkHdrop {
-            command = let
-              kittyConfig =
-                "~/${config.xdg.configFile."kitty/kitty.conf".target}";
-              sedRules = [
-                #"/map ctrl+t new_os_window_with_cwd/d"
-                "/map ctrl+t new_os_window_with_cwd/c\\\\map ctrl+t new_window_with_cwd\\n"
-                #''$ a\\map ctrl+q close_window''
-              ];
-              sedCommand = "sed '${builtins.concatStringsSep ";" sedRules}'";
-            in "kitty --class kitty-dropterm --config <(${sedCommand} ${kittyConfig})";
-            class = "kitty-dropterm";
-            size = {
-              width = 75;
-              height = 60;
-            };
-            gap = 25;
-            position = "top";
-          }
-        }"
+        (lib.mkIf config.programs.kitty.enable "${mainMod}, T, exec, ${
+            mkHdrop {
+              command = let
+                kittyConfig =
+                  "~/${config.xdg.configFile."kitty/kitty.conf".target}";
+                sedRules = [
+                  #"/map ctrl+t new_os_window_with_cwd/d"
+                  "/map ctrl+t new_os_window_with_cwd/c\\\\map ctrl+t new_window_with_cwd\\n"
+                  #''$ a\\map ctrl+q close_window''
+                ];
+                sedCommand = "sed '${builtins.concatStringsSep ";" sedRules}'";
+              in "kitty --class kitty-dropterm --config <(${sedCommand} ${kittyConfig})";
+              class = "kitty-dropterm";
+              size = {
+                width = 75;
+                height = 60;
+              };
+              gap = 25;
+              position = "top";
+            }
+          }")
+
         "${mainMod}, F, exec, ${
           mkHdrop {
             command = "${pkgs.nemo}/bin/nemo";
@@ -203,18 +205,21 @@ in {
             position = "bottom";
           }
         }"
-        "${mainMod}, A, exec, ${
-          mkHdrop {
-            command = "firefox --no-remote -P minimal --name firefox-minimal";
-            class = "firefox-minimal";
-            size = {
-              width = 55;
-              height = 95;
-            };
-            gap = 250;
-            position = "right";
-          }
-        }"
+
+        (lib.mkIf (config.programs.firefox.profiles ? "minimal")
+          "${mainMod}, A, exec, ${
+            mkHdrop {
+              command = "firefox --no-remote -P minimal --name firefox-minimal";
+              class = "firefox-minimal";
+              size = {
+                width = 55;
+                height = 95;
+              };
+              gap = 250;
+              position = "right";
+            }
+          }")
+
         "${mainMod}, Z, exec, ${
           mkHdrop {
             command = "${pkgs.pavucontrol}/bin/pavucontrol";
