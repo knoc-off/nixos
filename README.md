@@ -20,13 +20,20 @@ This repository contains my personal NixOS configuration for various systems, in
 - Git hook to auto update the Boot-entry with the commit message, and hash.
 
 ## Structure
-the structure is constantly changing, but something I valued was avoiding backlinks (IE: ../../../important_thing).
+the structure is constantly changing, but something I valued was avoiding backlinks (IE: ../../important_thing).
+
 I find them very distracting when reading other peoples configs, as you have the natural tree structure of files/directories, and then you mess that up with backlinks causing confusion on what is related.
 
 Most of the time when I want to use a backlink I find that I would rather create a module/package to reference in nix, using self.packages.${system}.xyz
+
+
+_________
 I also find overlays distracting when reading a Config, as most of the time you use an input for a single package/feature, and I much prefer to reference it directly, as when reading my config later i know exactly what supplied the package and how.
+
 So whenever I want to reference my own work, I use "self" to refer to my own flake. This may look a little strange but I find it to be much clearer in intention. And other people can easily take snippets from my config just by replacing the "self" with something like: "inputs.knoff-flake."
 
+
+_________
 Portability is valued, but I have made it less portable as of late, with the addition of dependencies on things like my color-lib. I might try to make this more flexible soon.
 
 ## Contributing
