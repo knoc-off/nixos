@@ -2,78 +2,32 @@
 
 This repository contains my personal NixOS configuration for various systems, including a Framework laptop, desktop, and Raspberry Pi. It includes a wide range of customizations and configurations for various programs and services.
 
-## Key Features
+## Some things
 
 - Uses Hyprland as the window manager, configured with custom keybindings and animations
 - Implements secure boot using Lanzaboote
 - Utilizes Disko for declarative disk partitioning
 - Manages secrets using sops-nix for encrypted configuration
-- Configures Pipewire for audio handling
 - Sets up a custom Neovim configuration using nixvim
-- Implements a custom Firefox configuration with specific add-ons and themes
-- Configures Steam with a scaling fix
+- Configures Steam with a UI scaling fix
 - Uses home-manager for user-specific configurations
-- Implements a custom GTK theme using a NixOS module
-- Sets up OCI containers for services like WordPress
-- Configures Nginx as a reverse proxy with automatic HTTPS using ACME
-- Implements a custom resume builder using Yew and Rust
-- Uses nix-minecraft for Minecraft server setup
-- Configures multiple systems including a desktop, laptop, and Raspberry Pi
-- Implements fingerprint authentication
-- Sets up Yubikey support
-- Uses podman for container management
-- Configures Traefik as a reverse proxy with automatic HTTPS
-- Implements a custom volume interpolation script for smooth volume changes
-- Sets up Octoprint for 3D printer management with custom plugins
-- Uses compose2nix to convert Docker Compose files to Nix configurations
-- Implements a custom portfolio website using Yew and Rust
-- Configures multiple programming languages and development environments
+- Uses a custom wrapper around nix-minecraft for Minecraft server setup w/ Port forwarding with gate
 
-## Highlights
+## things im proud of
 
-- **Sops** for secrets management
-- **Remote-Deploy/Install** script for system deployment
-- **NuShell scripting** integration
-- **Commit messages in boot menu** (Work in Progress)
-- **Git hooks** for automatic OS message updates
+- reimplemented a *lot* of math functions, and some equations, that get used for my pure-nix theme generator.
+- the theme generator itself uses a nix implementation of OkLAB/ OkHSL color space. for perceptually uniform colors.
+- Git hook to auto update the Boot-entry with the commit message, and hash.
 
 ## Structure
+the structure is constantly changing, but something I valued was avoiding backlinks (IE: ../../../important_thing).
+I find them very distracting when reading other peoples configs, as you have the natural tree structure of files/directories, and then you mess that up with backlinks causing confusion on what is related.
 
-The configuration is organized into a series of Nix files, each responsible for a specific aspect of the system. The main configuration files are located in the `systems` directory.
+Most of the time when I want to use a backlink I find that I would rather create a module/package to reference in nix, using self.packages.${system}.xyz
+I also find overlays distracting when reading a Config, as most of the time you use an input for a single package/feature, and I much prefer to reference it directly, as when reading my config later i know exactly what supplied the package and how.
+So whenever I want to reference my own work, I use "self" to refer to my own flake. This may look a little strange but I find it to be much clearer in intention. And other people can easily take snippets from my config just by replacing the "self" with something like: "inputs.knoff-flake."
 
-## Usage
-
-1. Clone this repository:
-
-   ```
-   git clone https://github.com/knoc-off/nixos.git
-   ```
-
-2. Navigate to the repository directory:
-
-   ```
-   cd nixos
-   ```
-
-3. Set up the git hooks:
-
-   ```
-   git config core.hooksPath .githooks
-   ```
-
-4. Customize the configuration files as needed.
-
-5. Build and switch to the new configuration:
-
-   ```
-   sudo nixos-rebuild switch --flake .#<hostname>
-   ```
-
-   Replace `<hostname>` with the appropriate hostname for your system.
-
-## Git Hooks
-
-This repository includes a git hook that automatically updates the OS message in the boot menu when you make a commit. The hook is located in the `.githooks` directory and can be enabled by setting the git hooks path as shown in the usage instructions above.
+Portability is valued, but I have made it less portable as of late, with the addition of dependencies on things like my color-lib. I might try to make this more flexible soon.
 
 ## Contributing
 
