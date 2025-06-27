@@ -115,15 +115,10 @@ in rec {
     };
     nixvim = inputs.nixvim.legacyPackages.${system};
   in {
-    lazy = nixvim.makeNixvimWithModule {
-      pkgs = customPkgs;
-      extraSpecialArgs = { inherit color-lib theme; };
-      module = { imports = [ ./neovim/configurations/lazy-loading.nix ]; };
-    };
     default = nixvim.makeNixvimWithModule {
       pkgs = customPkgs;
       extraSpecialArgs = { inherit color-lib theme; };
-      module = { imports = [ ./neovim/configurations ]; };
+      module = { imports = [ ./neovim/configurations/lazy-loading.nix ]; };
     };
     minimal = nixvim.makeNixvimWithModule {
       pkgs = customPkgs;

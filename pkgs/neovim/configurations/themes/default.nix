@@ -1,4 +1,10 @@
-{ pkgs, lib, color-lib, theme, ... }: {
+{
+  pkgs,
+  lib,
+  color-lib,
+  theme,
+  ...
+}: {
   colorschemes.onedark = {
     enable = true;
     settings = rec {
@@ -11,24 +17,24 @@
 
       colors = {
         # Map theme colors to the colorscheme's expected color variables
-        bg0 = "#${theme.base00}";       # Background
-        bg1 = "#${color-lib.adjustOkhslLightness 0.03 theme.base00}";  # Slightly lighter background
-        bg2 = "#${color-lib.adjustOkhslLightness 0.06 theme.base00}";  # Even lighter background
-        bg3 = "#${color-lib.adjustOkhslLightness 0.09 theme.base00}";  # Lightest background
+        bg0 = "#${theme.base00}"; # Background
+        bg1 = "#${color-lib.adjustOkhslLightness 0.03 theme.base00}"; # Slightly lighter background
+        bg2 = "#${color-lib.adjustOkhslLightness 0.06 theme.base00}"; # Even lighter background
+        bg3 = "#${color-lib.adjustOkhslLightness 0.09 theme.base00}"; # Lightest background
 
-        fg = "#${theme.base05}";        # Foreground text
+        fg = "#${theme.base05}"; # Foreground text
 
         # Core syntax colors
-        grey = "#${theme.base03}";      # Comments, subtle UI elements
+        grey = "#${theme.base03}"; # Comments, subtle UI elements
         light_grey = "#${theme.base04}"; # Lighter grey for punctuation
 
-        red = "#${theme.base08}";       # Errors, variables, deletion
-        orange = "#${theme.base09}";    # Numbers, booleans, constants
-        yellow = "#${theme.base0A}";    # Types, classes, attributes
-        green = "#${theme.base0B}";     # Strings, added lines
-        cyan = "#${theme.base0C}";      # Escape sequences, regex, markup
-        blue = "#${theme.base0D}";      # Functions, methods, headings
-        purple = "#${theme.base0E}";    # Keywords, special methods
+        red = "#${theme.base08}"; # Errors, variables, deletion
+        orange = "#${theme.base09}"; # Numbers, booleans, constants
+        yellow = "#${theme.base0A}"; # Types, classes, attributes
+        green = "#${theme.base0B}"; # Strings, added lines
+        cyan = "#${theme.base0C}"; # Escape sequences, regex, markup
+        blue = "#${theme.base0D}"; # Functions, methods, headings
+        purple = "#${theme.base0E}"; # Keywords, special methods
 
         # Create variations using color-lib
         dark_red = "#${color-lib.adjustOkhslLightness (-0.1) theme.base08}";
@@ -76,10 +82,10 @@
           fg = "$grey";
           fmt = "${code_style.comments}";
         };
-        LineNr = { fg = "$grey"; };
-        CursorLineNr = { fg = "$bright_yellow"; };
-        Visual = { bg = "$bg3"; };
-        VisualNOS = { bg = "$bg3"; };
+        LineNr = {fg = "$grey";};
+        CursorLineNr = {fg = "$bright_yellow";};
+        Visual = {bg = "$bg3";};
+        VisualNOS = {bg = "$bg3";};
         Search = {
           fg = "$bg0";
           bg = "$orange";
@@ -88,10 +94,10 @@
           fg = "$bg0";
           bg = "$orange";
         };
-        CursorLine = { bg = "$bg1"; };
-        CursorColumn = { bg = "$bg1"; };
-        ColorColumn = { bg = "$bg1"; };
-        SignColumn = { fg = "$fg"; };
+        CursorLine = {bg = "$bg1";};
+        CursorColumn = {bg = "$bg1";};
+        ColorColumn = {bg = "$bg1";};
+        SignColumn = {fg = "$fg";};
         StatusLine = {
           fg = "$fg";
           bg = "$bg2";
@@ -100,7 +106,7 @@
           fg = "$grey";
           bg = "$bg1";
         };
-        VertSplit = { fg = "$bg3"; };
+        VertSplit = {fg = "$bg3";};
         MatchParen = {
           fg = "$orange";
           fmt = "bold,underline";
@@ -115,8 +121,8 @@
           fg = "$bg0";
           bg = "$blue";
         };
-        PmenuSbar = { bg = "$bg1"; };
-        PmenuThumb = { bg = "$grey"; };
+        PmenuSbar = {bg = "$bg1";};
+        PmenuThumb = {bg = "$grey";};
 
         # Folds and Spell Checking
         Folded = {
@@ -195,18 +201,18 @@
           fg = "$purple";
           fmt = "${code_style.keywords}";
         };
-        PreProc = { fg = "$purple"; };
-        Include = { fg = "$purple"; };
-        Define = { fg = "$purple"; };
-        Macro = { fg = "$purple"; };
-        Type = { fg = "$yellow"; };
-        StorageClass = { fg = "$yellow"; };
-        Structure = { fg = "$yellow"; };
-        Typedef = { fg = "$yellow"; };
-        Special = { fg = "$orange"; };
-        SpecialChar = { fg = "$red"; };
-        Tag = { fg = "$blue"; };
-        Delimiter = { fg = "$light_grey"; };
+        PreProc = {fg = "$purple";};
+        Include = {fg = "$purple";};
+        Define = {fg = "$purple";};
+        Macro = {fg = "$purple";};
+        Type = {fg = "$yellow";};
+        StorageClass = {fg = "$yellow";};
+        Structure = {fg = "$yellow";};
+        Typedef = {fg = "$yellow";};
+        Special = {fg = "$orange";};
+        SpecialChar = {fg = "$red";};
+        Tag = {fg = "$blue";};
+        Delimiter = {fg = "$light_grey";};
         SpecialComment = {
           fg = "$grey";
           fmt = "${code_style.comments}";
@@ -223,38 +229,38 @@
           fg = "$green";
           fmt = "${code_style.strings}";
         };
-        Character = { fg = "$green"; };
-        Number = { fg = "$orange"; };
-        Boolean = { fg = "$orange"; };
-        Float = { fg = "$orange"; };
+        Character = {fg = "$green";};
+        Number = {fg = "$orange";};
+        Boolean = {fg = "$orange";};
+        Float = {fg = "$orange";};
         Constant = {
           fg = "$orange";
           fmt = "${code_style.constants}";
         };
 
         # Messages and Errors
-        Error = { fg = "$red"; };
-        ErrorMsg = { fg = "$red"; };
-        WarningMsg = { fg = "$yellow"; };
-        MoreMsg = { fg = "$blue"; };
-        Question = { fg = "$cyan"; };
+        Error = {fg = "$red";};
+        ErrorMsg = {fg = "$red";};
+        WarningMsg = {fg = "$yellow";};
+        MoreMsg = {fg = "$blue";};
+        Question = {fg = "$cyan";};
 
         # Git and Diff Highlighting
-        GitSignsAdd = { fg = "$green"; };
-        GitSignsChange = { fg = "$blue"; };
-        GitSignsDelete = { fg = "$red"; };
+        GitSignsAdd = {fg = "$green";};
+        GitSignsChange = {fg = "$blue";};
+        GitSignsDelete = {fg = "$red";};
 
         # Telescope customizations (from your original config)
-        TelescopeMatching = { fg = "$orange"; };
+        TelescopeMatching = {fg = "$orange";};
         TelescopeSelection = {
           fg = "$fg";
           bg = "$bg1";
           bold = true;
         };
-        TelescopePromptPrefix = { bg = "$bg1"; };
-        TelescopePromptNormal = { bg = "$bg1"; };
-        TelescopeResultsNormal = { bg = "$bg1"; };
-        TelescopePreviewNormal = { bg = "$bg1"; };
+        TelescopePromptPrefix = {bg = "$bg1";};
+        TelescopePromptNormal = {bg = "$bg1";};
+        TelescopeResultsNormal = {bg = "$bg1";};
+        TelescopePreviewNormal = {bg = "$bg1";};
         TelescopePromptBorder = {
           fg = "$bg1";
           bg = "$bg1";
@@ -271,7 +277,7 @@
           fg = "$bg0";
           bg = "$purple";
         };
-        TelescopeResultsTitle = { fg = "$bg0"; };
+        TelescopeResultsTitle = {fg = "$bg0";};
         TelescopePreviewTitle = {
           fg = "$bg0";
           bg = "$green";
@@ -280,12 +286,12 @@
           fg = "$bg0";
           bg = "$red";
         };
-        PMenu = { bg = "NONE"; };
+        PMenu = {bg = "NONE";};
 
         # Additional CMP styling
-        CmpItemAbbr = { fg = "$fg"; };
-        CmpItemAbbrMatch = { fg = "$blue"; };
-        CmpItemAbbrMatchFuzzy = { fg = "$blue"; };
+        CmpItemAbbr = {fg = "$fg";};
+        CmpItemAbbrMatch = {fg = "$blue";};
+        CmpItemAbbrMatchFuzzy = {fg = "$blue";};
         CmpItemKindVariable = {
           fg = "$bg0";
           bg = "$cyan";
@@ -322,7 +328,6 @@
     };
   };
 }
-
 # { theme, pkgs, lib, ... }: {
 #   colorschemes.base16 = {
 #     enable = true;
@@ -377,3 +382,4 @@
 #   # colorscheme configuration Nixvim should apply.
 #   # colorscheme = "base16";
 # }
+
