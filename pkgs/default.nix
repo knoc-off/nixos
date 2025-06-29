@@ -1,11 +1,20 @@
 # these packages can oftem be used as devshells but not always
-{ pkgs, lib, inputs, system, upkgs, color-lib, math, theme, ... }:
-let
+{
+  pkgs,
+  lib,
+  inputs,
+  system,
+  upkgs,
+  color-lib,
+  math,
+  theme,
+  ...
+}: let
   rustPkgs = pkgs.extend (import inputs.rust-overlay);
 
   rustPkgs-fenix = upkgs.extend inputs.fenix.overlays.default;
 
-  neovim-plugins = import ./neovim-plugins { inherit (pkgs) vimUtils lua; };
+  neovim-plugins = import ./neovim-plugins {inherit (pkgs) vimUtils lua;};
 
   rustPlatform = rustPkgs-fenix.makeRustPlatform {
     cargo = rustPkgs-fenix.fenix.minimal.toolchain;
@@ -16,7 +25,6 @@ let
     cargo = rustPkgs-fenix.fenix.complete.toolchain;
     rustc = rustPkgs-fenix.fenix.complete.toolchain;
   };
-
 in rec {
   materia-theme = pkgs.callPackage ./matera-theme {
     configBase16 = {
@@ -26,104 +34,108 @@ in rec {
     };
   };
 
-  rcon-cli = pkgs.callPackage ./rcon-cli { };
-  grosshack = pkgs.callPackage ./grosshack { };
-  blink_led = pkgs.callPackage ./blinkFW13LED { };
-  triliumNext = pkgs.callPackage ./triliumNext { };
-  spotify-adblock = pkgs.callPackage ./spotify-adblock { };
-  llm-cmd = pkgs.pythonPackages.callPackage ./llm-cmd { };
-  ttok = pkgs.pythonPackages.callPackage ./ttok { };
-  wrap = pkgs.pythonPackages.callPackage ./wrap-codeblocks { };
-  nixx = pkgs.pythonPackages.callPackage ./nixx-script { };
+  colorscad = pkgs.callPackage ./colorscad {};
+  rcon-cli = pkgs.callPackage ./rcon-cli {};
+  grosshack = pkgs.callPackage ./grosshack {};
+  blink_led = pkgs.callPackage ./blinkFW13LED {};
+  triliumNext = pkgs.callPackage ./triliumNext {};
+  spotify-adblock = pkgs.callPackage ./spotify-adblock {};
+  llm-cmd = pkgs.pythonPackages.callPackage ./llm-cmd {};
+  ttok = pkgs.pythonPackages.callPackage ./ttok {};
+  wrap = pkgs.pythonPackages.callPackage ./wrap-codeblocks {};
+  nixx = pkgs.pythonPackages.callPackage ./nixx-script {};
 
-  replicate-bridge = upkgs.pythonPackages.callPackage ./replicate { };
-  marker = pkgs.pythonPackages.callPackage ./marker { };
-  texify = pkgs.callPackage ./texify { };
-  gate = pkgs.callPackage ./gate { };
-  ascii-silhouettify = pkgs.callPackage ./ascii { };
+  replicate-bridge = upkgs.pythonPackages.callPackage ./replicate {};
+  marker = pkgs.pythonPackages.callPackage ./marker {};
+  texify = pkgs.callPackage ./texify {};
+  gate = pkgs.callPackage ./gate {};
+  ascii-silhouettify = pkgs.callPackage ./ascii {};
 
-  tabler-icons = pkgs.callPackage ./tabler-icons { };
+  tabler-icons = pkgs.callPackage ./tabler-icons {};
 
   # Add React Native app package
   react-native-app = pkgs.callPackage ./react-native-app {
     androidSdk = pkgs.androidenv.androidPkgs_9_0.sdk;
-    inherit (pkgs.darwin.apple_sdk.frameworks)
-      CoreServices Foundation UIKit Security;
+    inherit
+      (pkgs.darwin.apple_sdk.frameworks)
+      CoreServices
+      Foundation
+      UIKit
+      Security
+      ;
     inherit (pkgs) nodejs_20 yarn watchman cocoapods jdk17 gradle;
   };
 
-  embeddedRust = rustPkgs.callPackage ./embedded-rust { };
+  embeddedRust = rustPkgs.callPackage ./embedded-rust {};
   games = {
-    bevy = rustPkgs.callPackage ./bevy { };
-    bevy-game-of-life = rustPkgs.callPackage ./games/bevy-game-of-life { };
-    bevy-simple = rustPkgs.callPackage ./games/bevy-simple { };
+    bevy = rustPkgs.callPackage ./bevy {};
+    bevy-game-of-life = rustPkgs.callPackage ./games/bevy-game-of-life {};
+    bevy-simple = rustPkgs.callPackage ./games/bevy-simple {};
   };
 
-  spider-cli = rustPkgs.callPackage ./spider { };
-  csv-tui = rustPkgs.callPackage ./csv-tui-viewer { };
-  tabiew = rustPkgs-fenix.callPackage ./tabiew { inherit rustPlatform; };
+  spider-cli = rustPkgs.callPackage ./spider {};
+  csv-tui = rustPkgs.callPackage ./csv-tui-viewer {};
+  tabiew = rustPkgs-fenix.callPackage ./tabiew {inherit rustPlatform;};
   treeview =
-    rustPkgs-fenix.callPackage ./tree-cat { rustPlatform = rustPlatform-dev; };
+    rustPkgs-fenix.callPackage ./tree-cat {rustPlatform = rustPlatform-dev;};
 
   inherit rustPkgs-fenix;
   inherit (inputs) fenix;
 
   website = {
-    portfolio = rustPkgs.callPackage ./website/portfolio { };
+    portfolio = rustPkgs.callPackage ./website/portfolio {};
     axum = rustPkgs-fenix.callPackage ./website/axum {
       inherit rustPlatform tabler-icons;
     };
 
     axum-login-test =
-      rustPkgs.callPackage ./website/login-test { inherit tabler-icons; };
+      rustPkgs.callPackage ./website/login-test {inherit tabler-icons;};
   };
   AOC24 = {
-    day1 = rustPkgs.callPackage ./AdventOfCode2024/Day1 { };
-    day2 = rustPkgs.callPackage ./AdventOfCode2024/Day2 { };
+    day1 = rustPkgs.callPackage ./AdventOfCode2024/Day1 {};
+    day2 = rustPkgs.callPackage ./AdventOfCode2024/Day2 {};
   };
   nx = config_dir: hostname:
-    rustPkgs.callPackage ./nx-script { inherit config_dir hostname; };
+    rustPkgs.callPackage ./nx-script {inherit config_dir hostname;};
 
-  yek = rustPkgs.callPackage ./yek { };
+  yek = rustPkgs.callPackage ./yek {};
 
   neovim-nix = let
     customPkgs = import inputs.nixpkgs-unstable {
       inherit system;
-      config = { allowUnfree = true; };
+      config = {allowUnfree = true;};
       overlays = [
         inputs.nixneovimplugins.overlays.default
         neovim-plugins.overlay
 
         (final: prev: {
-          neovim-unwrapped = prev.neovim-unwrapped.overrideAttrs (old:
-            {
-              #patches = old.patches ++ [
-              #  # Fix byte index encoding bounds.
-              #  # - https://github.com/neovim/neovim/pull/30747
-              #  # - https://github.com/nix-community/nixvim/issues/2390
-              #  (final.fetchpatch {
-              #    name = "fix-lsp-str_byteindex_enc-bounds-checking-30747.patch";
-              #    url =
-              #      "https://patch-diff.githubusercontent.com/raw/neovim/neovim/pull/30747.patch";
-              #    hash = "sha256-2oNHUQozXKrHvKxt7R07T9YRIIx8W3gt8cVHLm2gYhg=";
-              #  })
-              #];
-            });
+          neovim-unwrapped = prev.neovim-unwrapped.overrideAttrs (old: {
+            #patches = old.patches ++ [
+            #  # Fix byte index encoding bounds.
+            #  # - https://github.com/neovim/neovim/pull/30747
+            #  # - https://github.com/nix-community/nixvim/issues/2390
+            #  (final.fetchpatch {
+            #    name = "fix-lsp-str_byteindex_enc-bounds-checking-30747.patch";
+            #    url =
+            #      "https://patch-diff.githubusercontent.com/raw/neovim/neovim/pull/30747.patch";
+            #    hash = "sha256-2oNHUQozXKrHvKxt7R07T9YRIIx8W3gt8cVHLm2gYhg=";
+            #  })
+            #];
+          });
         })
-
       ];
     };
     nixvim = inputs.nixvim.legacyPackages.${system};
   in {
     default = nixvim.makeNixvimWithModule {
       pkgs = customPkgs;
-      extraSpecialArgs = { inherit color-lib theme; };
-      module = { imports = [ ./neovim/configurations/lazy-loading.nix ]; };
+      extraSpecialArgs = {inherit color-lib theme;};
+      module = {imports = [./neovim/configurations/lazy-loading.nix];};
     };
     minimal = nixvim.makeNixvimWithModule {
       pkgs = customPkgs;
-      extraSpecialArgs = { inherit color-lib theme; };
-      module = { imports = [ ./neovim/configurations/minimal.nix ]; };
+      extraSpecialArgs = {inherit color-lib theme;};
+      module = {imports = [./neovim/configurations/minimal.nix];};
     };
   };
 
@@ -155,58 +167,61 @@ in rec {
   #    };
   #  in droidifyEmulator;
 
-  astal-widget-wrapper = { path, entry, name }:
-    (pkgs.stdenvNoCC.mkDerivation rec {
-      inherit name;
-      src = path;
+  astal-widget-wrapper = {
+    path,
+    entry,
+    name,
+  }: (pkgs.stdenvNoCC.mkDerivation rec {
+    inherit name;
+    src = path;
 
-      nativeBuildInputs = [
+    nativeBuildInputs = [
+      inputs.ags.packages.${system}.default
+      pkgs.wrapGAppsHook
+      pkgs.gobject-introspection
+    ];
+
+    buildInputs = with inputs.astal.packages.${system}; [
+      io
+
+      apps
+      astal3
+      astal4
+      auth
+      battery
+      bluetooth
+      cava
+      default
+      docs
+      gjs
+      greet
+      hyprland
+      mpris
+      network
+      notifd
+      powerprofiles
+      river
+      tray
+      wireplumber
+    ];
+
+    installPhase = ''
+      # Copy the source to a fixed location
+      mkdir -p $out/share/${name}
+      cp -r ./* $out/share/${name}/
+
+      # Create wrapper that runs ags with the copied source
+      mkdir -p $out/bin
+      makeWrapper ${
         inputs.ags.packages.${system}.default
-        pkgs.wrapGAppsHook
-        pkgs.gobject-introspection
-      ];
+      }/bin/ags $out/bin/${name} \
+        --add-flags "run" \
+        --add-flags "$out/share/${name}/${entry}" \
+        --argv0 "$name"
+    '';
+  });
 
-      buildInputs = with inputs.astal.packages.${system}; [
-        io
-
-        apps
-        astal3
-        astal4
-        auth
-        battery
-        bluetooth
-        cava
-        default
-        docs
-        gjs
-        greet
-        hyprland
-        mpris
-        network
-        notifd
-        powerprofiles
-        river
-        tray
-        wireplumber
-      ];
-
-      installPhase = ''
-        # Copy the source to a fixed location
-        mkdir -p $out/share/${name}
-        cp -r ./* $out/share/${name}/
-
-        # Create wrapper that runs ags with the copied source
-        mkdir -p $out/bin
-        makeWrapper ${
-          inputs.ags.packages.${system}.default
-        }/bin/ags $out/bin/${name} \
-          --add-flags "run" \
-          --add-flags "$out/share/${name}/${entry}" \
-          --argv0 "$name"
-      '';
-    });
-
-  astal-notifications-test = (pkgs.stdenvNoCC.mkDerivation rec {
+  astal-notifications-test = pkgs.stdenvNoCC.mkDerivation rec {
     name = "astal-notifications";
     src = ../home/desktop/astal/configs/notifications;
 
@@ -240,7 +255,7 @@ in rec {
       pkgs.libadwaita
 
       # GVFS fix
-      (pkgs.gvfs.override { glib = pkgs.glib; })
+      (pkgs.gvfs.override {glib = pkgs.glib;})
       pkgs.gsettings-desktop-schemas
 
       # Astal GJS environment
@@ -326,40 +341,40 @@ in rec {
         --chdir "$out/share/${name}" \
         --prefix GJS_PATH : "$out/share/${name}/node_modules" \
         --prefix GJS_PATH : "${
-          inputs.ags.packages.${system}.gjs
-        }/share/astal/gjs" \
+        inputs.ags.packages.${system}.gjs
+      }/share/astal/gjs" \
         --set GJS_DEBUG_TOPICS "JS ERROR;JS LOG;JS WARNING;MODULES" \
         --set GJS_DEBUG_OUTPUT stderr \
         --prefix GI_TYPELIB_PATH : "${
-          inputs.ags.packages.${system}.astal3
-        }/lib/girepository-1.0" \
+        inputs.ags.packages.${system}.astal3
+      }/lib/girepository-1.0" \
         --prefix GI_TYPELIB_PATH : "${
-          inputs.ags.packages.${system}.io
-        }/lib/girepository-1.0" \
+        inputs.ags.packages.${system}.io
+      }/lib/girepository-1.0" \
         --prefix GI_TYPELIB_PATH : "${
-          inputs.ags.packages.${system}.notifd
-        }/lib/girepository-1.0" \
+        inputs.ags.packages.${system}.notifd
+      }/lib/girepository-1.0" \
         --prefix GI_TYPELIB_PATH : "${
-          inputs.ags.packages.${system}.astal3
-        }/lib/girepository-1.0" \
+        inputs.ags.packages.${system}.astal3
+      }/lib/girepository-1.0" \
         --prefix GI_TYPELIB_PATH : "${
-          inputs.ags.packages.${system}.mpris
-        }/lib/girepository-1.0" \
+        inputs.ags.packages.${system}.mpris
+      }/lib/girepository-1.0" \
         --prefix GI_TYPELIB_PATH : "${
-          inputs.ags.packages.${system}.network
-        }/lib/girepository-1.0" \
+        inputs.ags.packages.${system}.network
+      }/lib/girepository-1.0" \
         --prefix GI_TYPELIB_PATH : "${
-          inputs.ags.packages.${system}.battery
-        }/lib/girepository-1.0" \
+        inputs.ags.packages.${system}.battery
+      }/lib/girepository-1.0" \
         --prefix GI_TYPELIB_PATH : "${
-          inputs.ags.packages.${system}.bluetooth
-        }/lib/girepository-1.0" \
+        inputs.ags.packages.${system}.bluetooth
+      }/lib/girepository-1.0" \
         --prefix GI_TYPELIB_PATH : "${
-          inputs.ags.packages.${system}.powerprofiles
-        }/lib/girepository-1.0" \
+        inputs.ags.packages.${system}.powerprofiles
+      }/lib/girepository-1.0" \
         --prefix GI_TYPELIB_PATH : "${
-          inputs.ags.packages.${system}.tray
-        }/lib/girepository-1.0" \
+        inputs.ags.packages.${system}.tray
+      }/lib/girepository-1.0" \
         --prefix GI_TYPELIB_PATH : "${pkgs.glib}/lib/girepository-1.0" \
         --prefix GI_TYPELIB_PATH : "${pkgs.gtk3}/lib/girepository-1.0" \
         --prefix GI_TYPELIB_PATH : "${pkgs.gtk4}/lib/girepository-1.0" \
@@ -368,8 +383,8 @@ in rec {
         --prefix GIO_MODULE_PATH : "${pkgs.gvfs}/lib/gio/modules" \
         --prefix XDG_DATA_DIRS : "$out/share:${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}" \
         --prefix PATH : "${
-          lib.makeBinPath [ inputs.astal.packages.${system}.io ]
-        }" \
+        lib.makeBinPath [inputs.astal.packages.${system}.io]
+      }" \
         --argv0 "$name"
 
       echo "--- Wrapper created successfully ---"
@@ -389,14 +404,22 @@ in rec {
       description = "Astal-based notification daemon bundled with esbuild";
       platforms = lib.platforms.linux;
     };
-  });
+  };
 
-  icon-extractor-json-mapping = { package, fontPath, prefix ? "" }:
+  icon-extractor-json-mapping = {
+    package,
+    fontPath,
+    prefix ? "",
+  }:
     import ./svg-tools/icon-extractor/json-mapping.nix {
       inherit pkgs package fontPath prefix;
     };
 
-  icon-pruner = { package, fontPath, iconList }:
+  icon-pruner = {
+    package,
+    fontPath,
+    iconList,
+  }:
     import ./svg-tools/icon-extractor/prune-font-file.nix {
       inherit pkgs package fontPath iconList;
     };
@@ -404,23 +427,27 @@ in rec {
   pruned-font = icon-pruner {
     package = pkgs.material-icons;
     fontPath = "/share/fonts/opentype/MaterialIconsOutlined-Regular.otf";
-    iconList = [ "map" "c" "d" "e" "f" "g" ];
+    iconList = ["map" "c" "d" "e" "f" "g"];
   };
 
   nerd-map = icon-extractor-json-mapping {
     package = pkgs.fira-code-nerdfont;
-    fontPath =
-      "/share/fonts/truetype/NerdFonts/FiraCodeNerdFontMono-Regular.ttf";
+    fontPath = "/share/fonts/truetype/NerdFonts/FiraCodeNerdFontMono-Regular.ttf";
     prefix = "FiraCode";
   };
 
-  mkComplgenScript = { name, scriptContent, grammar, runtimeDeps ? [ ] }:
+  mkComplgenScript = {
+    name,
+    scriptContent,
+    grammar,
+    runtimeDeps ? [],
+  }:
     pkgs.stdenv.mkDerivation {
       pname = name;
       version = "0.1.0";
 
       # Dependencies needed only during the build process
-      nativeBuildInputs = [ pkgs.complgen pkgs.makeWrapper ];
+      nativeBuildInputs = [pkgs.complgen pkgs.makeWrapper];
 
       # Dependencies needed by the script itself at runtime
       # These are made available in the Nix store
@@ -470,8 +497,7 @@ in rec {
       '';
 
       meta = {
-        description =
-          "Script '${name}' with multi-shell completions via complgen";
+        description = "Script '${name}' with multi-shell completions via complgen";
         # license = pkgs.lib.licenses.mit; # Set an appropriate license
         platforms = pkgs.lib.platforms.all;
       };

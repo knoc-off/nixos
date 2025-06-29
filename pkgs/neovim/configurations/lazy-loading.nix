@@ -22,6 +22,8 @@
       match =
         {
           TODO = "TODO";
+          FIXME = "FIXME";
+          HACK = "HACK";
           ExtraWhitespace = "\\s\\+$";
           ahhhhh = "!\\{3,\\}";
         }
@@ -37,6 +39,21 @@
             fg = "#${theme.base00}";
             bg = "#${color-lib.setOkhsvValue 0.9 theme.base0A}";
           };
+          FIXME = {
+            fg = "#${theme.base00}";
+            bg = "#${color-lib.setOkhsvValue 0.9 theme.base0E}";
+          };
+          HACK = {
+            fg = "#${theme.base00}";
+            bg = "#${color-lib.setOkhsvValue 0.9 theme.base0C}";
+          };
+
+          SnippetCursor = {
+            # Use a distinct color, like green
+            bg = "#${theme.base0B}";
+            fg = "#${theme.base00}";
+          };
+
           ExtraWhitespace.bg = "#${theme.base01}";
           ahhhhh = {
             fg = "#${theme.base07}";
@@ -66,46 +83,27 @@
     }
 
     {
-      plugins.lspkind = {
-        enable = true;
-        cmp = {
+      plugins = {
+        lspkind = {
           enable = true;
-          menu = {luasnip = "[snip]";};
+          cmp = {
+            enable = true;
+            menu = {luasnip = "[snip]";};
+          };
         };
+        cmp-nvim-lsp.enable = true;
+        cmp-buffer.enable = true;
+        cmp-path.enable = true;
+        cmp-nvim-lua.enable = true; # For nvim config editing
+
+        luasnip = {
+          enable = true;
+        };
+
+        friendly-snippets.enable = true;
       };
 
-      plugins.luasnip.enable = true;
-      plugins.friendly-snippets.enable = true;
-
       keymaps = [
-        # Tab: Jump forward in a snippet, but only if able to do so (otherwise insert a tab)
-        {
-          mode = ["i" "s"]; # Insert and select modes
-          key = "<Tab>";
-          action = helpers.mkRaw ''
-            function()
-              local ls = require("luasnip")
-              if ls.expand_or_jumpable() then
-                ls.expand_or_jump()
-              end
-            end
-          '';
-        }
-
-        # Shift-Tab: Jump backward in a snippet, otherwise insert a shift-tab
-        {
-          mode = ["i" "s"];
-          key = "<S-Tab>";
-          action = helpers.mkRaw ''
-            function()
-              local ls = require("luasnip")
-              if ls.jumpable(-1) then
-                ls.jump(-1)
-              end
-            end
-          '';
-        }
-
         # Ctrl-E: For changing choices in choiceNodes (next choice)
         {
           mode = ["i" "s"];
@@ -123,67 +121,246 @@
         }
       ];
 
-      plugins.cmp = {
-        enable = true;
-        settings = {
-          # This tells cmp to use LuaSnip for expanding snippets
-          snippet.expand = "function(args) require('luasnip').lsp_expand(args.body) end";
+      extraConfigLuaPre = ''
+        -- This global variable will track if we are in "snippet mode".
+        _G.IN_SNIPPET_MODE = false
+      '';
+      plugins = {
+        cmp = {
+          enable = true;
+          settings = {
+            # This tells cmp to use LuaSnip for expanding snippets
 
-          mapping = {
-            # <Tab>: Navigates cmp, then expands/jumps in LuaSnip, or inserts tab
-            "<Tab>" = helpers.mkRaw ''
-              cmp.mapping(function(fallback)
-                if cmp.visible() then
-                  cmp.select_next_item()
-                elseif require("luasnip").expand_or_jumpable() then
-                  require("luasnip").expand_or_jump()
-                else
-                  fallback()
-                end
-              end, {'i', 's'})
-            '';
+            snippet.expand = "function(args) require('luasnip').lsp_expand(args.body)  end";
 
-            # <S-Tab>: Navigates cmp backward, then jumps backward in LuaSnip, or inserts shift-tab
-            "<S-Tab>" = helpers.mkRaw ''
-              cmp.mapping(function(fallback)
-                if cmp.visible() then
-                  cmp.select_prev_item()
-                elseif require("luasnip").jumpable(-1) then
-                  require("luasnip").jump(-1)
-                else
-                  fallback()
-                end
-              end, {'i', 's'})
-            '';
+            # Enable ghost text for inline previews
+            experiment.ghost_text = true;
 
-            # <C-e>: Cycles LuaSnip choices, or closes cmp, or default <C-e>
-            "<C-e>" = helpers.mkRaw ''
-              cmp.mapping(function(fallback)
-                if require("luasnip").choice_active() then
-                  require("luasnip").next_choice()
-                else
-                  cmp.mapping.close()(fallback)
-                end
-              end, {'i', 's'})
-            '';
+            mapping = {
+              "<Tab>" = helpers.mkRaw ''
+                cmp.mapping(function(fallback)
+                  local ls = require("luasnip")
+                  local copilot_suggestion = require("copilot.suggestion")
 
-            "<CR>" = ''
-              cmp.mapping.confirm({
-                behavior = cmp.ConfirmBehavior.Insert,
-                select = false,
-              })
-            '';
+                  if cmp.visible() then
+                    -- Priority 1: If completion menu is open, navigate it.
+                    cmp.select_next_item()
+                  elseif _G.IN_SNIPPET_MODE then
+                    -- Priority 2: If we are in snippet mode, handle the snippet.
+                    if ls.jumpable(1) then
+                      ls.jump(1)
+                    end
+                    -- NOTE: If not jumpable (at the end), we do nothing.
+                    -- This "swallows" the Tab keypress and prevents the fallback.
+                  elseif copilot_suggestion.is_visible() then
+                    -- Priority 3: If a Copilot suggestion is visible, accept it.
+                    copilot_suggestion.accept()
+                  else
+                    -- Priority 4: If none of the above, insert a literal tab.
+                    fallback()
+                  end
+                end, { "i", "s" })
+              '';
+
+              "<S-Tab>" = helpers.mkRaw ''
+                cmp.mapping(function(fallback)
+                  local ls = require("luasnip")
+                  if cmp.visible() then
+                    cmp.select_prev_item()
+                  elseif _G.IN_SNIPPET_MODE and ls.jumpable(-1) then
+                    -- Only jump back if we are in snippet mode
+                    ls.jump(-1)
+                  else
+                    -- No fallback for Shift-Tab
+                  end
+                end, { "i", "s" })
+              '';
+
+              "<CR>" = helpers.mkRaw ''
+                cmp.mapping.confirm({
+                  behavior = cmp.ConfirmBehavior.Insert,
+                  select = false,
+                })
+              '';
+
+              "<C-e>" = helpers.mkRaw ''
+                cmp.mapping(function(fallback)
+                  if require("luasnip").choice_active() then
+                    require("luasnip").next_choice()
+                  else
+                    if cmp.visible() then
+                      cmp.close()
+                    else
+                      fallback()
+                    end
+                  end
+                end, { "i", "s" })
+              '';
+            };
+            # Make sure 'luasnip' is listed as a source for snippets
+            sources = [
+              {name = "nvim_lsp";} # Source for LSP suggestions
+              {name = "luasnip";} # Source for snippets
+              {name = "copilot";}
+              {name = "buffer";} # Source for text from the current buffer
+              {name = "path";} # Source for file system paths
+            ];
           };
-
-          # Make sure 'luasnip' is listed as a source for snippets
-          sources = [{name = "luasnip";}];
         };
       };
     }
 
+    {
+      plugins.nvim-autopairs.enable = true;
+
+      # This part is important for making <CR> work correctly with cmp and autopairs
+      extraConfigLua = ''
+        local cmp_autopairs = require('nvim-autopairs.completion.cmp')
+        local cmp = require('cmp')
+        cmp.event:on(
+          'confirm_done',
+          cmp_autopairs.on_confirm_done()
+        )
+      '';
+    }
+    {
+      autoCmd = [
+        # Launch OpenSCAD when opening .scad files
+        {
+          event = "BufWinEnter";
+          pattern = "*.scad";
+          callback = helpers.mkRaw ''
+            function(args)
+              if vim.b[args.buf].openscad_job then
+                return
+              end
+
+              local filepath = vim.fn.expand('%:p')
+              local jid = vim.fn.jobstart(
+                { "openscad", filepath },
+                {
+                  detach = true,
+                  on_stdout = function() end,
+                  on_stderr = function() end,
+                }
+              )
+
+              vim.b[args.buf].openscad_job = jid
+              vim.notify(
+                'Launched OpenSCAD for ' .. vim.fn.fnamemodify(filepath, ':t'),
+                vim.log.levels.INFO
+              )
+            end
+          '';
+        }
+
+        # Close OpenSCAD when leaving .scad files
+        {
+          event = "BufWinLeave";
+          pattern = "*.scad";
+          callback = helpers.mkRaw ''
+            function(args)
+              local jid = vim.b[args.buf].openscad_job
+              if jid then
+                vim.fn.jobstop(jid)
+                vim.b[args.buf].openscad_job = nil
+                vim.notify(
+                  'Closed OpenSCAD for ' .. vim.fn.fnamemodify(vim.fn.expand('%:p'), ':t'),
+                  vim.log.levels.INFO
+                )
+              end
+            end
+          '';
+        }
+
+        # Clean up any remaining OpenSCAD processes on Neovim exit
+        {
+          event = "VimLeavePre";
+          pattern = "*";
+          callback = helpers.mkRaw ''
+            function()
+              for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+                local ok, jid = pcall(vim.api.nvim_buf_get_var, buf, 'openscad_job')
+                if ok and jid then
+                  pcall(vim.fn.jobstop, jid)
+                end
+              end
+            end
+          '';
+        }
+      ];
+    }
+
+    # {
+    #   plugins.lsp.servers.nil_ls = {
+    #     enable = true;
+
+    #     # Configure nil settings
+    #     settings = {
+    #       nil = {
+    #         # Formatting: Let conform-nvim handle this with alejandra
+    #         # Leave this null to disable nil's built-in formatting
+    #         formatting.command = null;
+
+    #         # Diagnostics configuration
+    #         diagnostics = {
+    #           # You can ignore specific diagnostic kinds here if needed
+    #           ignored = [];
+
+    #           # Exclude generated files from diagnostics
+    #           excludedFiles = [
+    #             "Cargo.nix" # Common generated file
+    #           ];
+    #         };
+
+    #         # Nix binary configuration
+    #         nix = {
+    #           # Most systems will find this automatically
+    #           binary = "nix";
+
+    #           # Memory limit for flake evaluation (in MiB)
+    #           maxMemoryMB = 2560;
+
+    #           # Flake-specific settings
+    #           flake = {
+    #             # Auto-archive flake inputs when needed
+    #             autoArchive = false;
+
+    #             # Enable auto-evaluation of flake inputs for better completion
+    #             # This improves completion but uses more memory/time
+    #             autoEvalInputs = true;
+
+    #             # The input name for nixpkgs (for NixOS options completion)
+    #             nixpkgsInputName = "nixpkgs";
+    #           };
+    #         };
+    #       };
+    #     };
+    #   };
+    # }
+
+    # theming for cursors.
+    #{
+    #  options.guicursor = lib.concatStringsSep "," [
+    #    "n-v-c:block-Cursor/lCursor" # Normal, Visual, Cmd-line: Block cursor
+    #    "i-ci:ver25-Cursor/lCursor" # Insert, Cmd-line Insert: Vertical bar
+    #    "r-cr:hor20-Cursor/lCursor" # Replace: Horizontal bar
+    #  ];
+    #}
+
     # Open file under the cursor
     {
+      # this is for diagnostics
       keymaps = [
+        # {
+        #   mode = "n";
+        #   key = "<leader>e";
+        #   action = "vim.diagnostic.open_float";
+        #   options = {
+        #     silent = true;
+        #     desc = "Show line diagnostics";
+        #   };
+        # }
         {
           mode = "n";
           key = "<S-CR>";
@@ -383,7 +560,7 @@
       ];
       plugins.treesitter = {
         enable = true;
-        # settings.ensure_installed = [ "" ]; # Backup
+        # settings.ensure_installed = []; # Backup
         settings = {
           highlight = {
             enable = true;
@@ -417,6 +594,7 @@
           lua
           make
           markdown
+          typst
           nix
           regex
           toml
@@ -496,6 +674,51 @@
           # text = [ "vale" ];
           # gitcommit = [ "vale" ];
         };
+      };
+    }
+
+    {
+      plugins.typst-preview = {
+        lazyLoad.settings.ft = ["typst"];
+        enable = true;
+      };
+    }
+
+    {
+      plugins = {
+        lsp = {
+          lazyLoad.settings.ft = ["openscad" "typst"];
+          enable = true;
+          servers = {
+            openscad_lsp.enable = true;
+            tinymist.enable = true;
+
+            #rust_analyzer = {
+            #  enable = true;
+            #  installCargo = false;
+            #  installRustc = false;
+            #};
+          };
+          keymaps = {
+            silent = true;
+            #diagnostic = {
+            #  "<leader>j" = "goto_next";
+            #  "<leader>k" = "goto_prev";
+            #};
+            #lspBuf = {
+            #  K = "hover";
+            #  gD = "references";
+            #  gd = "definition";
+            #  gi = "implementation";
+            #  gt = "type_definition";
+            #  "<leader>ca" = "code_action";
+            #  "<leader>a" = "code_action";
+            #  "<leader>rn" = "rename";
+            #};
+          };
+        };
+
+        lsp-format.enable = false;
       };
     }
 
@@ -606,6 +829,37 @@
           };
         }
       ];
+    }
+
+    # In your imports list
+    {
+      # 1. Enable the necessary plugins
+      plugins = {
+        # The main Copilot engine
+        copilot-lua.enable = true;
+
+        # The bridge that allows nvim-cmp to see Copilot suggestions
+        copilot-cmp.enable = true;
+      };
+
+      # 2. Configure Copilot for on-demand use
+      # We disable the panel and automatic suggestions to favor the cmp workflow.
+      plugins.copilot-lua = {
+        settings = {
+          panel.enable = false; # We don't need the pop-up panel
+          suggestion = {
+            auto_trigger = false; # This is key: suggestions will not appear automatically
+            enabled = false; # Suggestions must still be enabled to be fetched
+            # Disable the default keymaps for inline ghost-text to avoid conflicts
+            keymap = {
+              accept = false;
+              next = false;
+              prev = false;
+              dismiss = false;
+            };
+          };
+        };
+      };
     }
   ];
 

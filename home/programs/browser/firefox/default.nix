@@ -1,5 +1,13 @@
-{ inputs, math, pkgs, theme, lib, color-lib, config, ... }:
-let
+{
+  inputs,
+  math,
+  pkgs,
+  theme,
+  lib,
+  color-lib,
+  config,
+  ...
+}: let
   addons = inputs.firefox-addons.packages.${pkgs.system};
 
   firefox-csshacks = pkgs.stdenv.mkDerivation {
@@ -9,14 +17,53 @@ let
       cp -r . $out
     '';
   };
-
 in rec {
-
-  home.sessionVariables = { BROWSER = "firefox"; };
+  home.sessionVariables = {BROWSER = "firefox";};
 
   programs.firefox = {
     enable = true;
     profiles = {
+      "main4" = {
+        isDefault = false;
+        id = 4;
+        name = "main4";
+
+        # Extensions for the main profile
+        extensions.packages = with addons; [
+          # Essential
+          ublock-origin
+          bitwarden
+          sidebery
+          tridactyl
+          # Privacy
+          smart-referer
+          cookie-autodelete
+          user-agent-string-switcher
+        ];
+
+        userContent = ''
+          /* Firefox profile directory/chrome/userContent.css */
+          /* Apply to all about: pages, including about:home and about:newtab */
+          @-moz-document url-prefix("about:") {
+            #root,
+            .newtab-main,
+            .outer-wrapper {
+              background-color: #${theme.base00} !important;  /* Dark background color */
+              color: #${theme.base07} !important;             /* Text color */
+            }
+
+            /* Optional: Remove background images from new tab page */
+            .wallpaper-input[style*="background-image"] {
+              background-image: none !important;
+            }
+          }
+        '';
+
+        userChrome =
+          import ./userChrome.nix {inherit theme color-lib firefox-csshacks;};
+        search = import ./searchEngines {inherit pkgs lib;};
+      };
+
       "main" = {
         isDefault = true;
         id = 0;
@@ -54,8 +101,8 @@ in rec {
         '';
 
         userChrome =
-          import ./userChrome.nix { inherit theme color-lib firefox-csshacks; };
-        search = import ./searchEngines { inherit pkgs lib; };
+          import ./userChrome.nix {inherit theme color-lib firefox-csshacks;};
+        search = import ./searchEngines {inherit pkgs lib;};
       };
 
       "minimal" = {
@@ -73,7 +120,7 @@ in rec {
         ];
 
         # Rest of minimal profile config...
-        search = import ./searchEngines { inherit pkgs lib; };
+        search = import ./searchEngines {inherit pkgs lib;};
       };
 
       "testing2" = {
@@ -82,9 +129,9 @@ in rec {
         name = "testing2";
 
         settings =
-          import ./settings/default.nix { inherit theme math lib color-lib; };
-        extensions.packages = with addons; [ sidebery ];
-        userChrome = import ./userChrome-minimal.nix {
+          import ./settings/default.nix {inherit theme math lib color-lib;};
+        extensions.packages = with addons; [sidebery];
+        userChrome = import ./userChrome.nix {
           inherit theme color-lib firefox-csshacks;
         };
       };
@@ -95,8 +142,8 @@ in rec {
         name = "projection";
 
         settings =
-          import ./settings/default.nix { inherit theme math lib color-lib; };
-        extensions.packages = with addons; [ sidebery ];
+          import ./settings/default.nix {inherit theme math lib color-lib;};
+        extensions.packages = with addons; [sidebery];
         userChrome = import ./userChrome-minimal.nix {
           inherit theme color-lib firefox-csshacks;
         };
@@ -110,27 +157,23 @@ in rec {
       name = "Firefox (${profile.name})";
       genericName = "Web Browser";
       exec = "${pkgs.firefox}/bin/firefox -P ${profile.name}";
-      icon =
-        "${pkgs.firefox}/lib/firefox/browser/chrome/icons/default/default128.png";
+      icon = "${pkgs.firefox}/lib/firefox/browser/chrome/icons/default/default128.png";
       type = "Application";
-      categories = [ "Network" "WebBrowser" ];
-      mimeType = [ "text/html" "text/xml" ];
+      categories = ["Network" "WebBrowser"];
+      mimeType = ["text/html" "text/xml"];
     };
-  in lib.mapAttrs (name: profile: mkFirefoxDesktopEntry profile)
-  programs.firefox.profiles
-
-  //
-
-  {
-    firefox-private = {
-      name = "Firefox Private";
-      genericName = "Web Browser";
-      exec = "${pkgs.firefox}/bin/firefox --private-window";
-      icon = "${pkgs.firefox}/share/icons/hicolor/128x128/apps/firefox.png";
-      type = "Application";
-      categories = [ "Network" "WebBrowser" ];
-      mimeType = [ "text/html" "text/xml" ];
+  in
+    lib.mapAttrs (name: profile: mkFirefoxDesktopEntry profile)
+    programs.firefox.profiles
+    // {
+      firefox-private = {
+        name = "Firefox Private";
+        genericName = "Web Browser";
+        exec = "${pkgs.firefox}/bin/firefox --private-window";
+        icon = "${pkgs.firefox}/share/icons/hicolor/128x128/apps/firefox.png";
+        type = "Application";
+        categories = ["Network" "WebBrowser"];
+        mimeType = ["text/html" "text/xml"];
+      };
     };
-  };
-
 }
