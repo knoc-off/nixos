@@ -1,5 +1,12 @@
-{ config, lib, theme, pkgs, inputs, ... }: {
-  imports = [ ./hyprland-binds.nix inputs.hyprland.homeManagerModules.default ];
+{
+  config,
+  lib,
+  theme,
+  pkgs,
+  inputs,
+  ...
+}: {
+  imports = [./hyprland-binds.nix inputs.hyprland.homeManagerModules.default];
 
   programs.rofi = {
     enable = true;
@@ -20,17 +27,17 @@
   };
 
   # lockscreen
-  programs.swaylock = { package = pkgs.swaylock-effects; };
+  programs.swaylock = {package = pkgs.swaylock-effects;};
 
   # wallpaper manager
-  home.packages = [ pkgs.hyprpaper ];
+  home.packages = [pkgs.hyprpaper];
 
   # Window manager
   wayland.windowManager.hyprland = {
     enable = true;
     systemd.enable = true;
     xwayland.enable = true;
-    plugins = with inputs.hyprland-plugins.packages.${pkgs.system}; [ ];
+    plugins = with inputs.hyprland-plugins.packages.${pkgs.system}; [];
 
     settings = {
       exec-once = [
@@ -38,7 +45,7 @@
         "${pkgs.wayland-pipewire-idle-inhibit}/bin/wayland-pipewire-idle-inhibit"
       ];
 
-      monitor = [ ",preferred,auto-up,1" ];
+      monitor = [",preferred,auto-up,1"];
 
       general = {
         gaps_in = -1;
@@ -56,7 +63,6 @@
 
         snap = {
           enabled = true;
-
         };
       };
 
@@ -102,7 +108,6 @@
 
         # allow windows to request focus.
         focus_on_activate = true;
-
       };
 
       cursor = {
@@ -142,7 +147,7 @@
         float_switch_override_focus = 2;
       };
 
-      binds = { allow_workspace_cycles = true; };
+      binds = {allow_workspace_cycles = true;};
 
       dwindle = {
         pseudotile = true;
@@ -152,7 +157,7 @@
       master = {
         # See https://wiki.hyprland.org/Configuring/Master-Layout/ for more
         orientation = "left";
-        always_center_master = true;
+        #always_center_master = true;
         new_on_top = true;
         #new_is_master = false;
         #no_gaps_when_only = true;
@@ -180,24 +185,19 @@
         floatTitle = titleRegex: "float, title:(${titleRegex})";
 
         # Assigns a window to a workspace based on its class regex
-        workspaceClass = regex:
-          (number: "workspace ${builtins.toString number}, class:(${regex})");
+        workspaceClass = regex: (number: "workspace ${builtins.toString number}, class:(${regex})");
 
         # Applies a generic rule to a window based on its class regex
         ruleClass = rule: regex: "${rule}, class:(${regex})";
 
         # Floats a window based on its class AND title regex
-        floatClassTitle = class:
-          (title: "float, class:(${class}), title:(${title})");
+        floatClassTitle = class: (title: "float, class:(${class}), title:(${title})");
 
         # --- Other potential helpers (can be uncommented and used if needed) ---
         fakeFullscreen = class: "fakefullscreen, class:(${class})";
-        assignWorkspace = class:
-          (title: (to: "workspace ${to}, class:(${class}), title:(${title})"));
-        setSize = class:
-          (title: (size: "size ${size}, class:(${class}), title:(${title})"));
+        assignWorkspace = class: (title: (to: "workspace ${to}, class:(${class}), title:(${title})"));
+        setSize = class: (title: (size: "size ${size}, class:(${class}), title:(${title})"));
         # idleInhibitRule = mode: class: (title: "idleinhibit ${mode}, class:(${class}), title:(${title})");
-
       in [
         (floatClass "org.gnome.Calculator")
         (floatClass "org.gnome.Nautilus")
@@ -256,7 +256,6 @@
 
         shadow = {
           enabled = true;
-
         };
 
         blur = {
@@ -296,7 +295,5 @@
         ];
       };
     };
-
   };
-
 }

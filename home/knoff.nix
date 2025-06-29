@@ -1,7 +1,16 @@
 # NixOS, home-manager, system configuration, package installation, program enablement, system options.
-{ outputs, self, pkgs, upkgs, user, inputs, system, color-lib, theme, ... }:
-
 {
+  outputs,
+  self,
+  pkgs,
+  upkgs,
+  user,
+  inputs,
+  system,
+  color-lib,
+  theme,
+  ...
+}: {
   imports = [
     ./programs/terminal # default
     ./programs/terminal/kitty
@@ -16,8 +25,6 @@
     ./programs/filemanager/yazi.nix
 
     ./programs/editor/default.nix
-
-
 
     ./desktop/astal
 
@@ -45,20 +52,19 @@
     #./desktop
     #./programs/virtualization/bottles.nix
 
-    { # bluetooth
+    {
+      # bluetooth
       #       systemd.user.services.mpris-proxy = {
       #         description = "Mpris proxy";
       #         after = [ "network.target" "sound.target" ];
       #         wantedBy = [ "default.target" ];
       #         serviceConfig.ExecStart = "${pkgs.bluez}/bin/mpris-proxy";
       #       };
-
     }
 
     ./modules/thunderbird.nix
 
     ./xdg-enviroment.nix
-
   ];
 
   services = {
@@ -71,7 +77,6 @@
 
     # never works reliably
     batsignal.enable = true;
-
   };
 
   programs = {
@@ -82,7 +87,7 @@
       lfs.enable = true;
 
       extraConfig = {
-        push = { autoSetupRemote = "true"; };
+        push = {autoSetupRemote = "true";};
         alias = {
           # Corrected slog command: reverse-sorted, last 15 commits, most recent at the bottom, with line numbers
           slog = ''
@@ -93,15 +98,12 @@
         };
       };
     };
-    nix-index = { enable = true; };
+    nix-index = {enable = true;};
     home-manager.enable = true;
   };
   # TODO: move this to someplace more logical
 
-
-
   home = {
-
     packages = with pkgs; [
       #(pkgs.python3.withPackages
       #(ps: [ ps.llm self.packages.${pkgs.system}.llm-cmd ]))
@@ -125,7 +127,6 @@
 
       ripcord
 
-
       # obsidian # notes
 
       # koodo-reader # books
@@ -136,7 +137,6 @@
       kdePackages.breeze-icons
       kdePackages.grantleetheme
       libsForQt5.grantleetheme
-
 
       # ill make my own calculator soon, with ags.
       gnome-calculator
@@ -158,7 +158,6 @@
   };
 
   fonts.fontconfig.enable = true;
-
 
   # Nicely reload system units when changing configs
   systemd.user.startServices = "sd-switch";
