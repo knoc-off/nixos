@@ -1,5 +1,6 @@
 {
   config,
+  color-lib,
   lib,
   theme,
   pkgs,
@@ -101,7 +102,7 @@
         # Any window started from kitty will be swallowed by the terminal
         swallow_regex = "kitty";
         #swallow_exception_regex = "NAN";
-        background_color = "0x99${theme.base00}";
+        background_color = "0x99${color-lib.setOkhslLightness 0.2 theme.base00}";
 
         # variable refresh rate, 3 = only for fullscreen games, 0 off.
         vrr = 3;

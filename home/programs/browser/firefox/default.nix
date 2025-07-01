@@ -23,47 +23,6 @@ in rec {
   programs.firefox = {
     enable = true;
     profiles = {
-      "main4" = {
-        isDefault = false;
-        id = 4;
-        name = "main4";
-
-        # Extensions for the main profile
-        extensions.packages = with addons; [
-          # Essential
-          ublock-origin
-          bitwarden
-          sidebery
-          tridactyl
-          # Privacy
-          smart-referer
-          cookie-autodelete
-          user-agent-string-switcher
-        ];
-
-        userContent = ''
-          /* Firefox profile directory/chrome/userContent.css */
-          /* Apply to all about: pages, including about:home and about:newtab */
-          @-moz-document url-prefix("about:") {
-            #root,
-            .newtab-main,
-            .outer-wrapper {
-              background-color: #${theme.base00} !important;  /* Dark background color */
-              color: #${theme.base07} !important;             /* Text color */
-            }
-
-            /* Optional: Remove background images from new tab page */
-            .wallpaper-input[style*="background-image"] {
-              background-image: none !important;
-            }
-          }
-        '';
-
-        userChrome =
-          import ./userChrome.nix {inherit theme color-lib firefox-csshacks;};
-        search = import ./searchEngines {inherit pkgs lib;};
-      };
-
       "main" = {
         isDefault = true;
         id = 0;
