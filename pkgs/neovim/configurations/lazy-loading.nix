@@ -630,6 +630,7 @@
           # Web/Config formats
           jsonlint = {cmd = lib.getExe pkgs.nodePackages.jsonlint;};
           yamllint = {cmd = lib.getExe pkgs.yamllint;};
+          tflint = {cmd = lib.getExe pkgs.tflint;}; # terraform
           markdownlint = {
             cmd = lib.getExe pkgs.nodePackages.markdownlint-cli;
             args = ["--disable" "MD013" "--"]; # Disable line length rule
@@ -653,6 +654,9 @@
         lintersByFt = {
           # Nix
           nix = ["statix" "deadnix"];
+
+          # terraform
+          terraform = ["tflint"];
 
           # Shell scripts
           bash = ["shellcheck"];
@@ -687,17 +691,17 @@
     {
       plugins = {
         lsp = {
-          lazyLoad.settings.ft = ["openscad" "typst"];
+          # lazyLoad.settings.ft = ["openscad" "typst" "rust"];
           enable = true;
           servers = {
             openscad_lsp.enable = true;
             tinymist.enable = true;
 
-            #rust_analyzer = {
-            #  enable = true;
-            #  installCargo = false;
-            #  installRustc = false;
-            #};
+            rust_analyzer = {
+              enable = true;
+              installCargo = false;
+              installRustc = false;
+            };
           };
           keymaps = {
             silent = true;

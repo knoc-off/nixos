@@ -2,11 +2,16 @@
   inputs,
   self,
   pkgs,
+  user,
   ...
-}: {
-  system.primaryUser = "niko";
+} @ args: {
+  imports = [
+    (self.nixosModules.home {inherit args;})
+  ];
+
+  system.primaryUser = user;
   users.users.niko = {
-    home = "/Users/niko";
+    home = "/Users/${user}";
   };
 
   nixpkgs.hostPlatform = "aarch64-darwin";
