@@ -6,7 +6,7 @@
   ...
 } @ args: {
   imports = [
-    (self.nixosModules.home {inherit args;})
+    #(self.nixosModules.home {inherit args;})
   ];
 
   system.primaryUser = user;
