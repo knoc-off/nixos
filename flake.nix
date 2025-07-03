@@ -10,8 +10,8 @@
     systems = [
       "aarch64-linux"
       "x86_64-linux"
-      #"i686-linux"
       "aarch64-darwin"
+      #"i686-linux"
       #"x86_64-darwin"
     ];
 
@@ -145,24 +145,27 @@
     #  (mkHost "Nicholass-MacBook-Pro" "nicolai" "aarch64-darwin")
     #];
 
-    darwinConfigurations."Nicholass-MacBook-Pro" = let
-      inherit (self.lib.aarch64-darwin) math color-lib;
-      theme = import ./theme.nix {inherit color-lib math lib self;};
-    in
-      inputs.nix-darwin.lib.darwinSystem rec {
-        specialArgs = {inherit self color-lib inputs theme;};
-        modules = [
-          ./systems/Nicholass-MacBook-Pro.nix
+    darwinConfigurations = listToAttrs [
+      (mkHost "Nicholass-MacBook-Pro" "niko" "aarch64-darwin")
+    ];
+    #."Nicholass-MacBook-Pro" = let
+    #   inherit (self.lib.aarch64-darwin) math color-lib;
+    #   theme = import ./theme.nix {inherit color-lib math lib self;};
+    # in
+    #   inputs.nix-darwin.lib.darwinSystem rec {
+    #     specialArgs = {inherit self color-lib inputs theme;};
+    #     modules = [
+    #       ./systems/Nicholass-MacBook-Pro.nix
 
-          inputs.home-manager.darwinModules.home-manager
-          {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            home-manager.extraSpecialArgs = specialArgs;
-            home-manager.users."niko" = import ./home/niko-darwin.nix;
-          }
-        ];
-      };
+    #       inputs.home-manager.darwinModules.home-manager
+    #       {
+    #         home-manager.useGlobalPkgs = true;
+    #         home-manager.useUserPackages = true;
+    #         home-manager.extraSpecialArgs = specialArgs;
+    #         home-manager.users."niko" = import ./home/niko-darwin.nix;
+    #       }
+    #     ];
+    #   };
 
     nixosConfigurations = listToAttrs [
       (mkHost "framework13" "knoff" "x86_64-linux")
