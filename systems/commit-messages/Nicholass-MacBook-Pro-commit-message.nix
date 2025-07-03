@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "mkSystem__nixosSystem_-_for_darwin__________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________macneovim";
+  system.nixos.label = "one_last_fix-_hopefully.____________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________macneovim";
 }
