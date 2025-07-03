@@ -36,8 +36,13 @@
       inherit (self.lib.${system}) math color-lib;
       # Pass color-lib and lib to the theme function
       theme = import ./theme.nix {inherit color-lib math lib;};
+
+      mkSystem =
+        if lib.strings.hasSuffix "darwin" system
+        then inputs.nix-darwin.lib.darwinSystem
+        else nixosSystem;
     in
-      nixosSystem {
+      mkSystem {
         inherit system;
         specialArgs =
           {
