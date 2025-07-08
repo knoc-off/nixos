@@ -1,14 +1,16 @@
-{ color-lib, theme, lib, ... }:
-let
+{
+  color-lib,
+  theme,
+  lib,
+  ...
+}: let
   inherit (color-lib) setOkhslLightness setOkhslSaturation;
   lighten = setOkhslLightness 0.7;
   saturate = setOkhslSaturation 0.9;
 
-  sa = hex: lighten ( saturate hex);
-
-in
-{
-  imports = [ ./tab_bar.nix ];
+  sa = hex: lighten (saturate hex);
+in {
+  imports = [./tab_bar.nix];
 
   home.sessionVariables = {
     TERMINAL = "kitty";
@@ -22,12 +24,16 @@ in
     };
     shellIntegration.enableZshIntegration = true;
     keybindings = {
+      "ctrl+shift+r" = "set_tab_title";
+      "cmd+r" = "set_tab_title";
+
       "ctrl+t" = "new_os_window_with_cwd";
       "ctrl+shift+t" = "new_window_with_cwd";
       "ctrl+l" = "clear_terminal to_cursor active";
     };
+    # touch_scroll_multiplier 6.5 # hardware specific
     extraConfig = ''
-      touch_scroll_multiplier 6.5
+      touch_scroll_multiplier 1
       allow_remote_control socket
       listen_on unix:/tmp/kitty-{kitty_pid}.socket
 
@@ -37,8 +43,7 @@ in
     settings = rec {
       tab_bar_style = "custom";
       tab_bar_margin_height = "0.0 0.0";
-      tab_title_template =
-        " {index}: {f'{title[:6]}-{title[-6:]}' if title.rindex(title[-1]) + 1 > 13 else title.center(7)} ";
+      tab_title_template = " {index}: {f'{title[:6]}-{title[-6:]}' if title.rindex(title[-1]) + 1 > 13 else title.center(7)} ";
       allow_remote_control = "yes";
 
       enable_audio_bell = "no";
@@ -57,8 +62,8 @@ in
       color7 = "#${theme.base06}"; # White
 
       # Bright colors adjusted for more lightness and saturation
-      color8 = "#${ theme.base03}"; # Bright Black (Gray)
-      color9 = "#${ theme.base08}"; # Bright Red
+      color8 = "#${theme.base03}"; # Bright Black (Gray)
+      color9 = "#${theme.base08}"; # Bright Red
       color10 = "#${theme.base0B}"; # Bright Green
       color11 = "#${theme.base0A}"; # Bright Yellow
       color12 = "#${theme.base0D}"; # Bright Blue
