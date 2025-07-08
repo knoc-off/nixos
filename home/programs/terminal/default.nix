@@ -1,20 +1,22 @@
-{ pkgs, theme, color-lib, ... }:
 {
+  pkgs,
+  theme,
+  color-lib,
+  ...
+}: {
   home.packages = with pkgs; [
     btop # htop but better
-    tiv # terminal image viewer
     jq # json parser
     fd # better find
     qview # image viewer
   ];
 
   programs = {
-
     zoxide.enable = true;
 
     eza = {
       enable = true;
-      extraOptions = [ "--group-directories-first" "--header" ];
+      extraOptions = ["--group-directories-first" "--header"];
       git = true;
     };
 
@@ -25,7 +27,7 @@
           compact = false;
           use_pager = true;
         };
-        updates = { auto_update = true; };
+        updates = {auto_update = true;};
       };
     };
 
@@ -35,7 +37,7 @@
 
     ripgrep = {
       enable = true;
-      arguments = [ "--hidden" "--colors=line:style:bold" ];
+      arguments = ["--hidden" "--colors=line:style:bold"];
     };
 
     # better cat

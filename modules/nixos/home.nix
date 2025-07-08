@@ -1,9 +1,15 @@
-{ args, ... }: {
-  imports = [ args.inputs.home-manager.nixosModules.home-manager ];
+{args, ...}: let
+  home-manager =
+    if args.lib.strings.hasSuffix "darwin" args.system
+    then args.inputs.home-manager.darwinModules.home-manager
+    else args.inputs.home-manager.nixosModules.home-manager;
+in {
+  imports = [
+    home-manager
+  ];
 
   home-manager.backupFileExtension = "bak";
   home-manager = {
-
     useGlobalPkgs = true; # does Disabling this have any benefits?
     useUserPackages = true;
 
@@ -21,14 +27,13 @@
         #   };
         # };
 
-        {
-
-          home = {
-            username = "${args.user}";
-            homeDirectory = "/home/${args.user}";
-          };
-
-        }
+        #{ # TODO !!!!!!! FIXME
+        # # If darwin, then User/${args.user} otherwise /home/${args.user}
+        #  home = {
+        #    username = "${args.user}";
+        #    homeDirectory = "/home/${args.user}";
+        #  };
+        #}
       ];
     };
 
