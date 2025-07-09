@@ -1,11 +1,20 @@
-{ lib, inputs, pkgs, self, hostname, user, config, ... }@args: {
+{
+  lib,
+  inputs,
+  pkgs,
+  self,
+  hostname,
+  user,
+  config,
+  ...
+} @ args: {
   imports = [
     ./modules/minecraft.nix
 
-    (self.nixosModules.home { inherit args; })
+    (self.nixosModules.home {inherit args;})
 
     inputs.disko.nixosModules.disko
-    { disko.devices.disk.vdb.device = "/dev/nvme0n1"; }
+    {disko.devices.disk.vdb.device = "/dev/nvme0n1";}
     ./hardware/disks/btrfs-luks.nix
 
     # Hardware configs
@@ -122,7 +131,7 @@
 
       console.keyMap = lib.mkDefault "us";
 
-      programs = { dconf.enable = lib.mkDefault true; };
+      programs = {dconf.enable = lib.mkDefault true;};
 
       services = {
         resolved.enable = lib.mkDefault true;
@@ -140,7 +149,7 @@
         libinput.enable = lib.mkDefault true;
       };
 
-      fonts = { enableDefaultPackages = lib.mkDefault true; };
+      fonts = {enableDefaultPackages = lib.mkDefault true;};
 
       environment.systemPackages = lib.mkDefault (with pkgs; [
         # gnome.adwaita-icon-theme
@@ -152,7 +161,6 @@
 
       time.timeZone = lib.mkDefault "Europe/Berlin";
       i18n.defaultLocale = lib.mkDefault "en_US.UTF-8";
-
     }
 
     # module to setup boot
@@ -164,8 +172,8 @@
       sops = {
         defaultSopsFile = ./secrets/${hostname}/default.yaml;
         # This will automatically import SSH keys as age keys
-        age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
-        secrets."ANTHROPIC_API_KEY" = { mode = "0644"; };
+        age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
+        secrets."ANTHROPIC_API_KEY" = {mode = "0644";};
       };
     }
 
@@ -174,8 +182,7 @@
 
     # Nix package settings
     {
-
-      nixpkgs.config.allowUnfree = true;
+      nixpkgs.config.allowUnfree = true; # TODO swap out for my nix-module.
       nix = {
         registry = {
           nixpkgs.flake = inputs.nixpkgs;
@@ -183,14 +190,14 @@
         };
         #nix.nixPath = [ "/etc/nix/path" ];
         #environment.etc."nix/path/nixpkgs".source = inputs.nixpkgs;
-        nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
+        nixPath = ["nixpkgs=${inputs.nixpkgs}"];
         settings = {
-          substituters = [ "https://hyprland.cachix.org" ];
+          substituters = ["https://hyprland.cachix.org"];
           trusted-public-keys = [
             "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc="
           ];
-          experimental-features = [ "nix-command" "flakes" "pipe-operators" ];
-          trusted-users = [ "@wheel" ];
+          experimental-features = ["nix-command" "flakes" "pipe-operators"];
+          trusted-users = ["@wheel"];
         };
       };
     }
@@ -223,7 +230,6 @@
     ./modules/shell/fish.nix
 
     #./modules/yubikey.nix
-
   ];
 
   # create a service to run at startup each boot. run wgnord c de to connect to the vpn
@@ -252,7 +258,6 @@
       enable = true;
 
       qemu.swtpm.enable = true;
-
     };
   };
 
@@ -311,22 +316,25 @@
   # };
   # ================ minecraft =============
 
-  security.sudo.extraRules = [{
-    #groups = [ "networkmanager" ];
-    users = [ user ];
-    #groups = [ 1006 ];
-    commands = [{
-      command =
-        "${pkgs.wgnord}/bin/wgnord"; # is this a security issue? its not writable
-      options = [ "NOPASSWD" ];
-    }];
-  }];
+  security.sudo.extraRules = [
+    {
+      #groups = [ "networkmanager" ];
+      users = [user];
+      #groups = [ 1006 ];
+      commands = [
+        {
+          command = "${pkgs.wgnord}/bin/wgnord"; # is this a security issue? its not writable
+          options = ["NOPASSWD"];
+        }
+      ];
+    }
+  ];
 
   programs = {
     # not super needed.
     nix-ld = {
       enable = true;
-      libraries = with pkgs; [ stdenv.cc.cc SDL2 SDL2_image libz ];
+      libraries = with pkgs; [stdenv.cc.cc SDL2 SDL2_image libz];
     };
     dconf.enable = true;
   };
@@ -360,7 +368,7 @@
 
     printing = {
       enable = true;
-      drivers = with pkgs; [ hplip gutenprint foo2zjs ];
+      drivers = with pkgs; [hplip gutenprint foo2zjs];
     };
 
     avahi = {
@@ -386,7 +394,6 @@
       KERNEL=="ttyUSB[0-9]*", MODE="0666", GROUP="users"
       KERNEL=="ttyACM[0-9]*", MODE="0666", GROUP="users"
     '';
-
   };
 
   # Create mount point directory, this needs to be changed maybe?
@@ -412,8 +419,8 @@
     hostName = hostname;
     firewall = {
       enable = true;
-      allowedTCPPorts = [ 22000 38071 21027 53317 ];
-      allowedUDPPorts = [ 22000 21027 38071 53317 ];
+      allowedTCPPorts = [22000 38071 21027 53317];
+      allowedUDPPorts = [22000 21027 38071 53317];
       #extraCommands = ''
       #  iptables -A INPUT -p tcp --dport 22000 -s niko.ink -j ACCEPT
       #  iptables -A INPUT -p udp --dport 21027 -s niko.ink -j ACCEPT
@@ -422,7 +429,7 @@
   };
 
   console = {
-    packages = with pkgs; [ terminus_font ];
+    packages = with pkgs; [terminus_font];
     font = "${pkgs.terminus_font}/share/consolefonts/ter-i22b.psf.gz";
     useXkbConfig = true;
   };
@@ -441,9 +448,8 @@
       proggyfonts
       pkgs.nerd-fonts.fira-code
       #pkgs.nerd-fonts.droid-sans-mono
-
     ];
-    fontconfig.defaultFonts = { monospace = [ "FiraCode Nerd Font Mono" ]; };
+    fontconfig.defaultFonts = {monospace = ["FiraCode Nerd Font Mono"];};
   };
 
   # Set default values for the new options
@@ -453,12 +459,11 @@
   };
 
   boot = {
-
     #kernelPackages = lib.mkDefault pkgs.linuxPackages_latest;
 
     # fingerpritn scanner does not work without this, suddenly. TODO: Try to remove this
-    kernelParams = [ "usbcore.autosuspend=-1" ];
-    kernel.sysctl = { "vm.swappiness" = 20; };
+    kernelParams = ["usbcore.autosuspend=-1"];
+    kernel.sysctl = {"vm.swappiness" = 20;};
   };
 
   users = {
@@ -466,22 +471,27 @@
       #shell = pkgs.fish;
       isNormalUser = lib.mkDefault true;
       extraGroups =
-        [ # we should automate this. if networkmanager is enabled, then add it, etc.
+        [
+          # we should automate this. if networkmanager is enabled, then add it, etc.
           "wheel"
           "audio"
           "video"
           "dialout"
           "uinput"
           "lp"
-        ] ++ (if config.virtualisation.libvirtd.enable then
-          [ "libvirtd" ]
-        else
-          [ ]) ++ (if config.networking.networkmanager.enable then
-            [ "networkmanager" ]
-          else
-            [ ]);
+        ]
+        ++ (
+          if config.virtualisation.libvirtd.enable
+          then ["libvirtd"]
+          else []
+        )
+        ++ (
+          if config.networking.networkmanager.enable
+          then ["networkmanager"]
+          else []
+        );
       initialPassword = "password";
-      openssh.authorizedKeys.keys = [ ];
+      openssh.authorizedKeys.keys = [];
     };
   };
 

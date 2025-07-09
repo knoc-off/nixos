@@ -1,11 +1,16 @@
-{ config, lib, pkgs, ... }: {
-
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}: {
   # programs.bash.enable = true;
   home = {
     file = {
       mnt = {
         recursive = true;
-        source = config.lib.file.mkOutOfStoreSymlink
+        source =
+          config.lib.file.mkOutOfStoreSymlink
           "/run/media/${config.home.username}";
       };
 
@@ -99,7 +104,6 @@
   #    };
   #  };
   #};
-
 }
 #env = GDK_BACKEND,wayland,x11
 #env = QT_QPA_PLATFORM,wayland;xcb
@@ -114,3 +118,4 @@
 #env = XCURSOR_THEME,Future-Cursors
 #env = XCURSOR_SIZE,24
 #env = QT_WAYLAND_DISABLE_WINDOWDECORATION,1
+
