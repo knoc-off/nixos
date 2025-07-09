@@ -30,6 +30,11 @@ in {
       "ctrl+t" = "new_os_window_with_cwd";
       "ctrl+shift+t" = "new_window_with_cwd";
       "ctrl+l" = "clear_terminal to_cursor active";
+
+      # swap window for master
+      "cmd+enter" = "move_window_to_top";
+      "shift+enter" = "move_window_to_top";
+      "alt+enter" = "launch --location=split";
     };
     # touch_scroll_multiplier 6.5 # hardware specific
     extraConfig = ''
@@ -38,6 +43,26 @@ in {
       listen_on unix:/tmp/kitty-{kitty_pid}.socket
 
       mouse_map right press ungrabbed mouse_select_command_output
+
+      # tall layout
+      enabled_layouts tall:bias=60;full_size=1;mirrored=false
+
+      # You may need to set macos_option_as_alt to 'yes' for this to work as expected
+      macos_option_as_alt yes
+
+      # Switch focus using Option + Arrow Keys
+      map alt+left  neighboring_window left
+      map alt+right neighboring_window right
+      map alt+up    neighboring_window up
+      map alt+down  neighboring_window down
+
+      # Switch focus using Option + hjkl
+      map alt+h neighboring_window left
+      map alt+l neighboring_window right
+      map alt+k neighboring_window up
+      map alt+j neighboring_window down
+
+
     '';
 
     settings = rec {

@@ -185,6 +185,9 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-25.05";
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
+    # Nixpkgs darwin ? TODO test
+    nixpkgs-darwin.url = "github:NixOS/nixpkgs/nixpkgs-25.05-darwin";
+
     # nix cli
     nixos-cli.url = "github:water-sucks/nixos";
 
@@ -271,7 +274,8 @@
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
 
     nix-darwin.url = "github:nix-darwin/nix-darwin/nix-darwin-25.05"; #  TODO update systems
-    nix-darwin.inputs.nixpkgs.follows = "nixpkgs"; # TODO, maybe switch over to nixpkgs-darwin?
+    #nix-darwin.inputs.nixpkgs.follows = "nixpkgs-unstable";
+    nix-darwin.inputs.nixpkgs.follows = "nixpkgs-darwin";
     # Non-Flake Inputs:
 
     firefox-csshacks = {

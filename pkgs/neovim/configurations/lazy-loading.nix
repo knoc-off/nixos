@@ -411,10 +411,15 @@
 
       autoCmd = [
         {
-          event = "BufReadPost";
+          event = "VimEnter"; # Changed from BufReadPost to VimEnter
           group = "SetCWD";
           callback = helpers.mkRaw ''
             function()
+              -- Only run if we haven't set CWD yet this session
+              if vim.g.cwd_set_this_session then
+                return
+              end
+
               local file_path = vim.api.nvim_buf_get_name(0)
               if file_path ~= "" then
                 local target_dir
@@ -428,6 +433,7 @@
                   local current_cwd = vim.fn.getcwd()
                   if target_dir ~= current_cwd then
                     vim.cmd("cd " .. vim.fn.fnameescape(target_dir))
+                    vim.g.cwd_set_this_session = true
                   end
                 end
               end
@@ -453,6 +459,76 @@
       };
       plugins.mini.mockDevIcons = true;
 
+      extraConfigLuaPre = ''
+        -- Directory stack for pushd/popd functionality
+        _G.dir_stack = {}
+
+        -- Function to push current directory and change to new one
+        _G.pushd = function(new_dir)
+          if new_dir and vim.fn.isdirectory(new_dir) == 1 then
+            table.insert(_G.dir_stack, vim.fn.getcwd())
+            vim.cmd("cd " .. vim.fn.fnameescape(new_dir))
+            vim.notify("Pushed to: " .. new_dir, vim.log.levels.INFO)
+          end
+        end
+
+        -- Function to pop directory from stack
+        _G.popd = function()
+          if #_G.dir_stack > 0 then
+            local prev_dir = table.remove(_G.dir_stack)
+            vim.cmd("cd " .. vim.fn.fnameescape(prev_dir))
+            vim.notify("Popped to: " .. prev_dir, vim.log.levels.INFO)
+          else
+            vim.notify("Directory stack is empty", vim.log.levels.WARN)
+          end
+        end
+
+        -- Function to find git root
+        _G.find_git_root = function()
+          local current_dir = vim.fn.expand('%:p:h')
+          if current_dir == "" then
+            current_dir = vim.fn.getcwd()
+          end
+
+          local git_root = vim.fn.systemlist("git -C " .. vim.fn.shellescape(current_dir) .. " rev-parse --show-toplevel")[1]
+          if vim.v.shell_error == 0 and git_root then
+            return git_root
+          end
+          return nil
+        end
+
+        -- Function to cd to git root
+        _G.cd_to_git_root = function()
+          local git_root = _G.find_git_root()
+          if git_root then
+            _G.pushd(git_root)
+          else
+            vim.notify("Not in a git repository", vim.log.levels.WARN)
+          end
+        end
+      '';
+
+      keymaps = [
+        {
+          mode = "n";
+          key = "<leader>gr";
+          action = helpers.mkRaw "_G.cd_to_git_root";
+          options = {
+            silent = true;
+            desc = "CD to git root";
+          };
+        }
+        {
+          mode = "n";
+          key = "<leader>pd";
+          action = helpers.mkRaw "_G.popd";
+          options = {
+            silent = true;
+            desc = "Pop directory (go back)";
+          };
+        }
+      ];
+
       plugins.telescope = {
         lazyLoad = {
           settings = {
@@ -470,7 +546,15 @@
           "<leader>b" = "buffers";
           "<leader>fh" = "help_tags";
           "<leader>fd" = "diagnostics";
-          "<leader>fu" = "undo"; # Added undo keymap
+          "<leader>fu" = "undo";
+
+          # LSP-specific telescope commands
+          "<leader>lr" = "lsp_references";
+          "<leader>ld" = "lsp_definitions";
+          "<leader>li" = "lsp_implementations";
+          "<leader>lt" = "lsp_type_definitions";
+          "<leader>ls" = "lsp_document_symbols";
+          "<leader>lw" = "lsp_workspace_symbols";
 
           # FZF like bindings
           "<C-p>" = "git_files";
@@ -478,16 +562,65 @@
           "<C-f>" = "live_grep";
         };
 
-        settings.defaults = {
-          file_ignore_patterns = [
-            "^.git/"
-            "^.mypy_cache/"
-            "^__pycache__/"
-            "^output/"
-            "^data/"
-            "%.ipynb"
-          ];
-          set_env.COLORTERM = "truecolor";
+        settings = {
+          #mappings = {
+          #  i = {
+          #    # Shift+< for popd (go back)
+          #    "<S-lt>" = helpers.mkRaw ''
+          #      function()
+          #        _G.popd()
+          #      end
+          #    '';
+
+          #    # Shift+> for pushd forward (currently just stays in place, but you could implement forward history)
+          #    "<S-gt>" = helpers.mkRaw ''
+          #      function()
+          #        -- Could implement forward directory history here if needed
+          #        vim.notify("Forward navigation not implemented", vim.log.levels.INFO)
+          #      end
+          #    '';
+
+          #    # Shift+/ to cd to git root
+          #    "<S-/>" = helpers.mkRaw ''
+          #      function()
+          #        _G.cd_to_git_root()
+          #      end
+          #    '';
+          #  };
+
+          #  n = {
+          #    # Same mappings for normal mode in telescope
+          #    "<S-lt>" = helpers.mkRaw ''
+          #      function()
+          #        _G.popd()
+          #      end
+          #    '';
+
+          #    "<S-gt>" = helpers.mkRaw ''
+          #      function()
+          #        vim.notify("Forward navigation not implemented", vim.log.levels.INFO)
+          #      end
+          #    '';
+
+          #    "<S-/>" = helpers.mkRaw ''
+          #      function()
+          #        _G.cd_to_git_root()
+          #      end
+          #    '';
+          #  };
+          #};
+
+          defaults = {
+            file_ignore_patterns = [
+              "^.git/"
+              "^.mypy_cache/"
+              "^__pycache__/"
+              "^output/"
+              "^data/"
+              "%.ipynb"
+            ];
+            set_env.COLORTERM = "truecolor";
+          };
         };
       };
     }
@@ -689,6 +822,74 @@
     }
 
     {
+      keymaps = [
+        {
+          mode = "n";
+          key = "gr";
+          action = helpers.mkRaw ''
+            function()
+              require('telescope.builtin').lsp_references()
+            end
+          '';
+          options = {
+            silent = true;
+            desc = "LSP References";
+          };
+        }
+        {
+          mode = "n";
+          key = "gd";
+          action = helpers.mkRaw ''
+            function()
+              require('telescope.builtin').lsp_definitions()
+            end
+          '';
+          options = {
+            silent = true;
+            desc = "LSP Definitions";
+          };
+        }
+        {
+          mode = "n";
+          key = "gD";
+          action = helpers.mkRaw ''
+            function()
+              require('telescope.builtin').lsp_definitions()
+            end
+          '';
+          options = {
+            silent = true;
+            desc = "LSP Definitions";
+          };
+        }
+        {
+          mode = "n";
+          key = "gi";
+          action = helpers.mkRaw ''
+            function()
+              require('telescope.builtin').lsp_implementations()
+            end
+          '';
+          options = {
+            silent = true;
+            desc = "LSP Implementations";
+          };
+        }
+        {
+          mode = "n";
+          key = "gt";
+          action = helpers.mkRaw ''
+            function()
+              require('telescope.builtin').lsp_type_definitions()
+            end
+          '';
+          options = {
+            silent = true;
+            desc = "LSP Type Definitions";
+          };
+        }
+      ];
+
       plugins = {
         lsp = {
           # lazyLoad.settings.ft = ["openscad" "typst" "rust"];
@@ -702,28 +903,55 @@
               installCargo = false;
               installRustc = false;
             };
+
+            ts_ls.enable = true;
           };
           keymaps = {
             silent = true;
-            #diagnostic = {
-            #  "<leader>j" = "goto_next";
-            #  "<leader>k" = "goto_prev";
-            #};
-            #lspBuf = {
-            #  K = "hover";
-            #  gD = "references";
-            #  gd = "definition";
-            #  gi = "implementation";
-            #  gt = "type_definition";
-            #  "<leader>ca" = "code_action";
-            #  "<leader>a" = "code_action";
-            #  "<leader>rn" = "rename";
-            #};
+            diagnostic = {
+              "<leader>j" = "goto_next";
+              "<leader>k" = "goto_prev";
+            };
+
+            lspBuf = {
+              K = "hover";
+              "<leader>ca" = "code_action";
+              "<leader>rn" = "rename";
+            };
           };
         };
 
         lsp-format.enable = false;
       };
+
+      # TODO remove this:
+      # autoGroups.LspKeymaps = {};
+      # autoCmd = [
+      #   {
+      #     # this needs to fire after the lsp is loaded if lazy, and when its needed.
+      #     event = "LspAttach";
+      #     group = "LspKeymaps"; # Create a group to organize our autocmd
+      #     callback = helpers.mkRaw ''
+      #       function(args)
+      #         local bufnr = args.buf
+      #         local keymap_opts = { noremap = true, silent = true, buffer = bufnr }
+      #         local map = vim.keymap.set
+
+      #         -- Standard LSP keymaps
+      #         map('n', 'K', vim.lsp.buf.hover, keymap_opts)
+      #         map('n', '<leader>rn', vim.lsp.buf.rename, keymap_opts)
+      #         map('n', '<leader>ca', vim.lsp.buf.code_action, keymap_opts)
+
+      #         -- Telescope LSP integrations
+      #         map('n', 'gr', require('telescope.builtin').lsp_references, keymap_opts)
+      #         map('n', 'gd', require('telescope.builtin').lsp_definitions, keymap_opts)
+      #         map('n', 'gD', require('telescope.builtin').lsp_definitions, keymap_opts) -- gD and gd do the same in telescope
+      #         map('n', 'gi', require('telescope.builtin').lsp_implementations, keymap_opts)
+      #         map('n', 'gt', require('telescope.builtin').lsp_type_definitions, keymap_opts)
+      #       end
+      #     '';
+      #   }
+      # ];
     }
 
     {

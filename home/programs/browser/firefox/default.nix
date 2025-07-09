@@ -110,8 +110,8 @@ in rec {
     };
   };
 
-  # auto generate the desktop entries for each profile
-  xdg.desktopEntries = let
+  # auto generate the desktop entries for each profile (Linux only)
+  xdg.desktopEntries = lib.mkIf pkgs.stdenv.isLinux (let
     mkFirefoxDesktopEntry = profile: {
       name = "Firefox (${profile.name})";
       genericName = "Web Browser";
@@ -134,5 +134,5 @@ in rec {
         categories = ["Network" "WebBrowser"];
         mimeType = ["text/html" "text/xml"];
       };
-    };
+    });
 }

@@ -3,10 +3,40 @@
   self,
   pkgs,
   user,
+  system,
+  theme,
+  color-lib,
+  lib,
   ...
-} @ args: {
+} @ args: let
+  inherit (color-lib) setOkhslLightness setOkhslSaturation;
+  lighten = setOkhslLightness 0.8;
+  saturate = setOkhslSaturation 0.9;
+
+  sa = hex: lighten (saturate hex);
+in {
   imports = [
-    (self.nixosModules.home {inherit args;}) # I should make this darwin modules probably. or make it independent
+    (self.nixosModules.home {inherit args;})
+    # need to use lib.mkIf pkgs.stdenv.isLinux / isDarwin to conditionally add logic.
+    # ./modules/shell/fish.nix
+    {
+      nixpkgs.config.allowUnfree = true; # TODO swap out for my nix-module.
+      users.users.${user}.shell = pkgs.zsh;
+      environment.variables = {
+        EDITOR = "vi";
+        VISUAL = "vi";
+      };
+      programs.zsh = {
+        #erableFzfCompletion = true;
+        enableFzfHistory = true;
+        enableCompletion = true;
+        enableSyntaxHighlighting = true;
+        #enableAutosuggestions = true;
+        interactiveShellInit = ''
+
+        '';
+      };
+    }
   ];
 
   system.primaryUser = user;
@@ -17,21 +47,26 @@
   nixpkgs.hostPlatform = "aarch64-darwin";
   system.stateVersion = 6;
 
-  # nix.extraOptions = ''
-  #   auto-optimise-store = true
-  #   experimental-features = nix-command flakes
-  #   extra-platforms = x86_64-darwin aarch64-darwin
-  # '';
+  nix.extraOptions = ''
+    auto-optimise-store = true
+    experimental-features = nix-command flakes
+    extra-platforms = x86_64-darwin aarch64-darwin
+  '';
+
+  nixpkgs.config.allowUnsupportedSystem = true;
+  # lib.mkIf pkgs.stdenv.isLinux
 
   # packages.aarch64-darwin.neovim-nix.default
   environment.systemPackages = with pkgs; [
-    (self.packages.aarch64-darwin.neovim-nix.default)
+    (self.packages.${system}.neovim-nix.default)
+
+    pkgs.nerd-fonts.fira-code
     ripgrep
     fd
     fzf
     jq
     gh # required by octo.nvim
-    shellcheck
+    shellcheck # Dont need this?
 
     # company tools
     wireguard-tools
@@ -67,10 +102,6 @@
   ];
   programs.direnv.enable = true;
 
-  environment.variables = {
-    EDITOR = "nvim";
-  };
-
   homebrew = {
     enable = true;
     casks = [
@@ -85,11 +116,10 @@
       "raycast"
       "slack" # previously directly downloaded from website, check for conflicts
       "fly" # Because we need to have r/w for the binary since it needs to match the version in our concourse instance
-      "docker"
     ];
     brews = [
       "mingw-w64" # For rust cross compilation to windows...
-      "colima"
+      "colima" # For docker
       # "nsis" # Broken on darwin nixpkgs :(
       # "llvm" # Kept just in case, was used for trying experimental tauri cross compilation to windows (also nsis above)
       # "tunneltodev/tap/tunnelto" # ngrok-like, broken on nixpkgs at the moment
