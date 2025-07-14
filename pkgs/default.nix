@@ -76,6 +76,7 @@ in rec {
   spider-cli = rustPkgs.callPackage ./spider {};
   csv-tui = rustPkgs.callPackage ./csv-tui-viewer {};
   tabiew = rustPkgs-fenix.callPackage ./tabiew {inherit rustPlatform;};
+  cli-ai = rustPkgs-fenix.callPackage ./cli-ai {inherit rustPlatform;};
   treeview =
     rustPkgs-fenix.callPackage ./tree-cat {rustPlatform = rustPlatform-dev;};
 
