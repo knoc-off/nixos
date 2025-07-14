@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "need_to_fix_home-module.____________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "____________________________________________________________________________Updated_to_25.05";
+  system.nixos.label = "cli-garbage_________________________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "____________________________________________________________________________Updated_to_25.05";
 }

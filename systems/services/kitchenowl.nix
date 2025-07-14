@@ -1,5 +1,8 @@
-{ config, pkgs, ... }:
 {
+  config,
+  pkgs,
+  ...
+}: {
   # Enable Podman
   virtualisation.podman = {
     enable = true;
@@ -16,8 +19,8 @@
   # Define the OCI container for KitchenOwl
   virtualisation.oci-containers.containers = {
     kitchenowl = {
-      image = "tombursch/kitchenowl@sha256:6a2f603f788fa2f7515f95f115e8859fea58b520fe0135231a0fb2b6455765dd";
-      ports = [ "3043:8080" ];
+      image = "tombursch/kitchenowl@sha256:5e8462c9be9b31aa9b829275a25ea17f2e5c58be891013a409355ebbac89c6d8";
+      ports = ["3043:8080"];
       environment = {
         JWT_SECRET_KEY = "PLEASE_CHANGE_ME";
       };
