@@ -780,6 +780,13 @@
           # Docker
           hadolint = {cmd = lib.getExe pkgs.hadolint;};
 
+          # eslint = {
+          #   cmd = "${pkgs.nodePackages.eslint}/bin/eslint";
+          #   args = ["--stdin" "--stdin-filename"];
+          #   stdin = true;
+          #   append_fname = false;
+          # };
+
           # Optional: Text linting (heavier)
           vale = {cmd = lib.getExe pkgs.vale;};
         };
@@ -806,6 +813,10 @@
 
           # Docker
           dockerfile = ["hadolint"];
+
+          # Optional: JavaScript/TypeScript linting
+          # javascript = ["eslint"];
+          # typescript = ["eslint"];
 
           # Text/Documentation (if you want vale)
           # text = [ "vale" ];
@@ -888,6 +899,33 @@
             desc = "LSP Type Definitions";
           };
         }
+
+        {
+          mode = "n";
+          key = "<leader>ci";
+          action = helpers.mkRaw ''
+            function()
+              print(vim.inspect(require('conform').list_formatters(0)))
+            end
+          '';
+          options = {
+            silent = false;
+            desc = "Show available formatters for current buffer";
+          };
+        }
+        {
+          mode = "n";
+          key = "<leader>cl";
+          action = helpers.mkRaw ''
+            function()
+              vim.cmd('ConformInfo')
+            end
+          '';
+          options = {
+            silent = true;
+            desc = "Show Conform info";
+          };
+        }
       ];
 
       plugins = {
@@ -923,35 +961,6 @@
 
         lsp-format.enable = false;
       };
-
-      # TODO remove this:
-      # autoGroups.LspKeymaps = {};
-      # autoCmd = [
-      #   {
-      #     # this needs to fire after the lsp is loaded if lazy, and when its needed.
-      #     event = "LspAttach";
-      #     group = "LspKeymaps"; # Create a group to organize our autocmd
-      #     callback = helpers.mkRaw ''
-      #       function(args)
-      #         local bufnr = args.buf
-      #         local keymap_opts = { noremap = true, silent = true, buffer = bufnr }
-      #         local map = vim.keymap.set
-
-      #         -- Standard LSP keymaps
-      #         map('n', 'K', vim.lsp.buf.hover, keymap_opts)
-      #         map('n', '<leader>rn', vim.lsp.buf.rename, keymap_opts)
-      #         map('n', '<leader>ca', vim.lsp.buf.code_action, keymap_opts)
-
-      #         -- Telescope LSP integrations
-      #         map('n', 'gr', require('telescope.builtin').lsp_references, keymap_opts)
-      #         map('n', 'gd', require('telescope.builtin').lsp_definitions, keymap_opts)
-      #         map('n', 'gD', require('telescope.builtin').lsp_definitions, keymap_opts) -- gD and gd do the same in telescope
-      #         map('n', 'gi', require('telescope.builtin').lsp_implementations, keymap_opts)
-      #         map('n', 'gt', require('telescope.builtin').lsp_type_definitions, keymap_opts)
-      #       end
-      #     '';
-      #   }
-      # ];
     }
 
     {
@@ -996,6 +1005,10 @@
             # Lua (for your nvim config)
             lua = ["stylua"];
 
+            javascript = ["prettier"];
+            typescript = ["prettier"];
+            typescriptreact = ["prettier"];
+
             # Universal formatters for all files
             "*" = ["trim_whitespace"];
             "_" = ["trim_newlines"];
@@ -1013,6 +1026,16 @@
                 "-sr"
               ]; # 2 spaces, indent switch cases, simplify redirect
             };
+
+            # js/ts formatter
+            # This uses prettier, which is a common choice for JS/TS
+            # You can also use eslint or other formatters if preferred
+
+            # eslint = {
+            #   command = lib.getExe pkgs.nodePackages.eslint;
+            #   args = ["--fix" "--stdin" "--stdin-filename" "$FILENAME"];
+            # };
+
             prettier = {
               command = lib.getExe pkgs.nodePackages.prettier;
               args = ["--stdin-filepath" "$FILENAME"];
@@ -1060,6 +1083,15 @@
             desc = "Format buffer";
           };
         }
+        {
+          mode = "n";
+          key = "<leader>e";
+          action = helpers.mkRaw "vim.diagnostic.open_float";
+          options = {
+            silent = true;
+            desc = "Show line diagnostics";
+          };
+        }
       ];
     }
 
@@ -1072,6 +1104,8 @@
 
         # The bridge that allows nvim-cmp to see Copilot suggestions
         copilot-cmp.enable = true;
+
+        copilot-chat.enable = true; # Optional: For Copilot chat functionality
       };
 
       # 2. Configure Copilot for on-demand use

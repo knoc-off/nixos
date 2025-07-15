@@ -1,10 +1,14 @@
-{ pkgs, upkgs, self, hostname, ... }:
-let
+{
+  pkgs,
+  upkgs,
+  self,
+  hostname,
+  ...
+}: let
   config_dir = "/etc/nixos"; # Should relocate to /etc? and symlink?
   inherit (self.packages.${pkgs.system}) mkComplgenScript;
 in {
   home.packages = [
-
     (mkComplgenScript {
       name = "csv_to_excel";
       scriptContent = ''
@@ -21,8 +25,7 @@ in {
       grammar = ''
         csv_to_excel {{{ ${pkgs.fd}/bin/fd --type f --extension csv --max-depth 1 . --color never --hidden --no-ignore }}} "Input CSV file" <PATH> "Output XLSX file";'';
       # Runtime dependency for the script itself
-      runtimeDeps =
-        [ (pkgs.python3.withPackages (ps: [ ps.pandas ps.openpyxl ])) ];
+      runtimeDeps = [(pkgs.python3.withPackages (ps: [ps.pandas ps.openpyxl]))];
     })
 
     (mkComplgenScript {
@@ -38,8 +41,7 @@ in {
         excel_to_csv {{{ ${pkgs.fd}/bin/fd --type f --extension xlsx --extension xls --max-depth 1 . --color never --hidden --no-ignore }}} "Input Excel file" <PATH> "Output CSV file";
       '';
       # Runtime dependencies
-      runtimeDeps =
-        [ (pkgs.python3.withPackages (ps: [ ps.pandas ps.openpyxl ])) ];
+      runtimeDeps = [(pkgs.python3.withPackages (ps: [ps.pandas ps.openpyxl]))];
     })
 
     (mkComplgenScript {
@@ -148,8 +150,28 @@ in {
       '';
 
       # Runtime dependencies for the script
-      runtimeDeps =
-        [ pkgs.systemd pkgs.coreutils ]; # coreutils for date and sleep
+      runtimeDeps = [pkgs.systemd pkgs.coreutils]; # coreutils for date and sleep
+    })
+
+    # cli = {
+    #   body = "fabric -p cli \"$argv\" --stream";
+    #   description = "Compress a file or directory";
+    # };
+    (mkComplgenScript {
+      name = "cli";
+      scriptContent = ''
+        #!${pkgs.bash}/bin/bash
+        set -euo pipefail
+        if [ $# -eq 0 ]; then
+          echo "Usage: cli <command> [args...]"
+          exit 1
+        fi
+        fabric -p cli "$@" --stream
+      '';
+      grammar = ''
+        cli <COMMAND> "Command to run" ...;
+      '';
+      runtimeDeps = [pkgs.fabric-ai];
     })
 
     (mkComplgenScript {
@@ -439,7 +461,7 @@ in {
       grammar = ''
         connect {{{ ${pkgs.networkmanager}/bin/nmcli -t -f SSID dev wifi list }}} "SSID" [password "password: string"];
       '';
-      runtimeDeps = [ pkgs.networkmanager ];
+      runtimeDeps = [pkgs.networkmanager];
     })
 
     (mkComplgenScript {
@@ -469,7 +491,7 @@ in {
       grammar = ''
         qr (--share | {{{ ${pkgs.fd}/bin/fd --type directory --type file --max-depth 1 . --color never }}} <INPUT>);
       '';
-      runtimeDeps = [ pkgs.qrencode ];
+      runtimeDeps = [pkgs.qrencode];
     })
 
     (mkComplgenScript {
@@ -484,7 +506,7 @@ in {
       grammar = ''
         compress {{{ ${pkgs.fd}/bin/fd --type directory --type file --max-depth 1 . --color never }}} "Source" <PATH> "Destination";
       '';
-      runtimeDeps = [ pkgs.pigz pkgs.pv ];
+      runtimeDeps = [pkgs.pigz pkgs.pv];
     })
 
     (mkComplgenScript {
@@ -500,7 +522,7 @@ in {
       grammar = ''
         rsync-compress {{{ ${pkgs.fd}/bin/fd --type directory --type file --max-depth 1 . --color never }}} "Source" <PATH> "Destination";
       '';
-      runtimeDeps = [ pkgs.rsync pkgs.pv ];
+      runtimeDeps = [pkgs.rsync pkgs.pv];
     })
   ];
 }
