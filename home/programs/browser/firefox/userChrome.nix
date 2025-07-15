@@ -1,7 +1,9 @@
-{ theme, firefox-csshacks, color-lib }:
-let
+{
+  theme,
+  firefox-csshacks,
+  color-lib,
+}: let
   sidebar = {
-
     width = "38px";
     expanded-width = "25vw";
     hide-delay = "100ms";
@@ -9,19 +11,18 @@ let
     transition-type = "ease-in-out";
 
     background-color = "#${theme.base00}";
-
   };
-
 in ''
   /* Import necessary CSS hacks */
   @import "${firefox-csshacks}/chrome/autohide_sidebar.css";
-  @import "${firefox-csshacks}/chrome/autohide_toolbox.css";
   @import "${firefox-csshacks}/chrome/autohide_bookmarks_toolbar.css";
   @import "${firefox-csshacks}/chrome/auto_devtools_theme_for_rdm.css";
 
   @import "${firefox-csshacks}/chrome/hide_tabs_toolbar_v2.css";
+  /*
   @import "${firefox-csshacks}/chrome/page_action_buttons_on_urlbar_hover.css";
-
+  @import "${firefox-csshacks}/chrome/autohide_toolbox.css";
+  */
   /* Sidebar customization */
   #sidebar-box {
     min-width: var(--uc-sidebar-width) !important;
