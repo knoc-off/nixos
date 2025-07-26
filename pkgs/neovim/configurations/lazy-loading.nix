@@ -757,6 +757,11 @@
           statix = {cmd = lib.getExe pkgs.statix;};
           deadnix = {cmd = lib.getExe pkgs.deadnix;};
 
+          #clippy = {
+          #  cmd = lib.getExe pkgs.clippy;
+          #  args = ["--message-format=json"];
+          #};
+
           # Shell
           shellcheck = {cmd = lib.getExe pkgs.shellcheck;};
 
@@ -795,6 +800,7 @@
           # Nix
           nix = ["statix" "deadnix"];
 
+          #rust = ["clippy"];
           # terraform
           terraform = ["tflint"];
 
@@ -829,6 +835,76 @@
       plugins.typst-preview = {
         lazyLoad.settings.ft = ["typst"];
         enable = true;
+      };
+    }
+
+    {
+      plugins.rustaceanvim = {
+        enable = true;
+
+        settings = {
+          server = {
+            default_settings = {
+              rust-analyzer = {
+                cargo = {
+                  allFeatures = true;
+                  buildScripts.enable = true;
+                  loadOutDirsFromCheck = true;
+                };
+
+                diagnostics = {
+                  enable = true;
+                  enableExperimental = true;
+                };
+
+                inlayHints = {
+                  enable = true;
+                  typeHints = {
+                    enable = true;
+                    hideClosureInitialization = false;
+                    hideNamedConstructor = false;
+                  };
+                  parameterHints.enable = true;
+                  chainingHints.enable = true;
+                };
+
+                completion = {
+                  addCallArgumentSnippets = true;
+                  addCallParenthesis = true;
+                  postfix.enable = true;
+                  autoimport.enable = true;
+                };
+
+                procMacro.enable = true;
+
+                checkOnSave = true;
+              };
+            };
+          };
+
+          tools = {
+            hover_actions = {
+              replace_builtin_hover = true;
+            };
+
+            code_actions = {
+              ui_select_fallback = true;
+            };
+
+            float_win_config = {
+              border = "rounded";
+            };
+          };
+
+          # (Debug Adapter Protocol)
+          # dap = {
+          #   adapter = {
+          #     type = "executable";
+          #     command = "${pkgs.lldb}/bin/lldb-vscode";
+          #     name = "lldb";
+          #   };
+          # };
+        };
       };
     }
 
@@ -936,11 +1012,61 @@
             openscad_lsp.enable = true;
             tinymist.enable = true;
 
-            rust_analyzer = {
-              enable = true;
-              installCargo = false;
-              installRustc = false;
-            };
+            # Disabled for rustations
+            # rust_analyzer = {
+            #   enable = true;
+            #   installCargo = false;
+            #   installRustc = false;
+
+            #   settings = {
+            #     # Cargo configuration
+            #     cargo = {
+            #       allFeatures = true;
+            #       loadOutDirsFromCheck = true;
+            #       buildScripts.enable = true;
+            #     };
+
+            #     # Enhanced diagnostics
+            #     diagnostics = {
+            #       enable = true;
+            #       enableExperimental = true;
+            #       disabled = [];
+            #     };
+
+            #     # Inlay hints for better code understanding
+            #     inlayHints = {
+            #       enable = true;
+            #       typeHints = {
+            #         enable = true;
+            #         hideClosureInitialization = false;
+            #         hideNamedConstructor = false;
+            #       };
+            #       parameterHints = {
+            #         enable = true;
+            #       };
+            #       chainingHints = {
+            #         enable = true;
+            #       };
+            #     };
+
+            #     # Code completion improvements
+            #     completion = {
+            #       addCallArgumentSnippets = true;
+            #       addCallParenthesis = true;
+            #       postfix.enable = true;
+            #       autoimport.enable = true;
+            #     };
+
+            #     # Proc macro support
+            #     procMacro = {
+            #       enable = true;
+            #       ignored = {};
+            #     };
+
+            #     # Check on save
+            #     checkOnSave = true;
+            #   };
+            # };
 
             ts_ls.enable = true;
           };
@@ -959,7 +1085,7 @@
           };
         };
 
-        lsp-format.enable = false;
+        lsp-format.enable = true;
       };
     }
 
@@ -1005,6 +1131,9 @@
             # Lua (for your nvim config)
             lua = ["stylua"];
 
+            # for rust use lsp
+            rust = ["rustfmt"];
+
             javascript = ["prettier"];
             typescript = ["prettier"];
             typescriptreact = ["prettier"];
@@ -1025,6 +1154,10 @@
                 "-ci"
                 "-sr"
               ]; # 2 spaces, indent switch cases, simplify redirect
+            };
+
+            rustfmt = {
+              command = lib.getExe pkgs.rustfmt;
             };
 
             # js/ts formatter
@@ -1070,7 +1203,6 @@
         };
       };
 
-      # Add keymaps for manual formatting
       keymaps = [
         {
           mode = "n";
