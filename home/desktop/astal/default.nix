@@ -1,14 +1,23 @@
 # NixOS, home-manager, system configuration, package installation, program enablement, system options.
-{ outputs, self, pkgs, upkgs, user, inputs, system, color-lib, theme, ... }:
-
 {
+  outputs,
+  self,
+  pkgs,
+  upkgs,
+  user,
+  inputs,
+  system,
+  color-lib,
+  theme,
+  ...
+}: {
   #imports = [ inputs.ags.homeManagerModules.default ];
 
   home.packages = [
     inputs.astal.packages.${system}.default
     # inputs.astal.packages.${system}.gjs
-    pkgs.gjs
     #inputs.ags.packages.${system}.default
+
     (inputs.ags.packages.${system}.default.override {
       extraPackages = with inputs.astal.packages.${system}; [
         notifd
@@ -21,13 +30,13 @@
       ];
     })
 
-    (self.packages.${pkgs.system}.astal-widget-wrapper { path = ./configs/notifications;  entry ="app.tsx"; name =  "astal-notify";} )
-
+    (self.packages.${pkgs.system}.astal-widget-wrapper {
+      path = ./configs/notifications;
+      entry = "app.tsx";
+      name = "astal-notify";
+    })
   ];
 }
-
-
-
 # this is a bit of a nightmare, but it might be worth doing...
 #     (pkgs.stdenvNoCC.mkDerivation rec {
 #       name = "astal-notifications";
@@ -160,3 +169,4 @@
 #         platforms = lib.platforms.linux;
 #       };
 #     })
+

@@ -94,16 +94,13 @@ in {
               return 1
             fi
 
-            # Construct Neovim socket path
             local nvim_socket="/tmp/nvim_''${nvim_pid}.socket"
 
-            # Check if Neovim socket exists
             if [[ ! -S "$nvim_socket" ]]; then
               echo "Neovim socket does not exist"
               return 1
             fi
 
-            # Escape single quotes in the Lua code
             local escaped_lua_code
             escaped_lua_code=$(printf '%s' "$lua_code" | sed "s/'/'''/g")
 
@@ -174,7 +171,6 @@ in {
 
           "${mainMod}, Delete, exit"
           "${mainMod}, W, killactive"
-          "${mainMod}, V, togglefloating"
           "${mainMod}, equal, fullscreen"
           # "${mainMod}, O, fakefullscreen"
 
@@ -246,6 +242,12 @@ in {
           #"${mainMod}, SPACE, exec, ${pkgs.ulauncher}/bin/ulauncher" # this launcher sucks
           # "${mainMod}, Space, global, kando:main-menu" # this launcher sucks too
           "${mainMod}, SPACE, exec, ${pkgs.rofi}/bin/rofi -show"
+
+          # mainmod + c = copy text
+          "${mainMod}, C, exec, ${pkgs.wl-clipboard}/bin/wl-paste -p | ${pkgs.wl-clipboard}/bin/wl-copy"
+
+          # "${mainMod}, V, "  paste
+          #"${mainMod}, V, exec, ${pkgs.wl-clipboard}/bin/wl-paste"
 
           # screenshot
           ", Print, exec, ${pkgs.gscreenshot}/bin/gscreenshot -sc"
