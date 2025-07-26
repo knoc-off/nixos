@@ -194,7 +194,6 @@ in rec {
       cava
       default
       docs
-      gjs
       greet
       hyprland
       mpris
