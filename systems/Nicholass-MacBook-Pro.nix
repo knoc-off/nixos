@@ -109,6 +109,9 @@ in {
         name = "middleclick";
         args = {no_quarantine = true;};
       }
+      "utm"
+      "crystalfetch"
+
       "rectangle"
       "spotify"
       "alt-tab"

@@ -13,24 +13,26 @@
       home.packages = let
         inherit (self.packages.${pkgs.system}) mkComplgenScript;
       in [
-        (mkComplgenScript {
-          name = "cli";
-          # TODO, we should instruct the model, to create a xml-tag like <clip> </clip> that we then copy to the clipboard
-          # pbcopy/wl-copy
-          scriptContent = ''
-            #!${pkgs.bash}/bin/bash
-            set -euo pipefail
-            if [ $# -eq 0 ]; then
-              echo "Usage: cli <command> [args...]"
-              exit 1
-            fi
-            fabric -p cli "$@" --stream
-          '';
-          grammar = ''
-            cli <COMMAND> "Command to run" ...;
-          '';
-          runtimeDeps = [pkgs.fabric-ai];
-        })
+        self.packages.${pkgs.system}.cli-ai
+        pkgs.television
+        #(mkComplgenScript {
+        #  name = "cli";
+        #  # TODO, we should instruct the model, to create a xml-tag like <clip> </clip> that we then copy to the clipboard
+        #  # pbcopy/wl-copy
+        #  scriptContent = ''
+        #    #!${pkgs.bash}/bin/bash
+        #    set -euo pipefail
+        #    if [ $# -eq 0 ]; then
+        #      echo "Usage: cli <command> [args...]"
+        #      exit 1
+        #    fi
+        #    fabric -p cli "$@" --stream
+        #  '';
+        #  grammar = ''
+        #    cli <COMMAND> "Command to run" ...;
+        #  '';
+        #  runtimeDeps = [pkgs.fabric-ai];
+        #})
 
         (mkComplgenScript {
           name = "adr";
