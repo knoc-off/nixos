@@ -270,6 +270,24 @@
         };
       };
 
+      #  animations {
+      #
+      # enabled = true
+      #
+      # bezier= b0,0,1,0,1.05
+      #
+      # bezier= b1,0,1.1,0,1.05
+      #
+      # animation = windows,1,4,b1,slide
+      #
+      # animation = windowsIn,1,4,b0,popin 88%
+      #
+      # animation = windowsOut,1,4,b0,slide
+      #
+      # animation = workspaces,1,3,default,slide
+      #
+      # }
+
       animations = {
         enabled = true;
 
@@ -285,7 +303,7 @@
         animation = [
           "windows, 1, 1, slowFast"
           "windowsIn, 1, 1, default"
-          "windowsOut, 0, 1, instant" # Disable
+          "windowsOut, 0, 1, instant"
           "fadeOut, 0"
           "border, 1, 10, default"
           "borderangle, 1, 8, default"
