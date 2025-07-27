@@ -150,6 +150,38 @@
       in
         helpers.keymaps.mkKeymaps {options.silent = true;} normal;
     }
+
+    {
+      plugins.treesitter-context = {
+        enable = true;
+        settings = {
+          enable = true;
+          max_lines = 0;
+          min_window_height = 0;
+          line_numbers = true;
+          multiline_threshold = 20;
+          trim_scope = "outer";
+          mode = "cursor";
+          separator = null;
+          zindex = 20;
+        };
+      };
+    }
+
+    {
+      plugins.rainbow-delimiters = {
+        enable = true;
+        highlight = [
+          "RainbowDelimiterRed"
+          "RainbowDelimiterYellow"
+          "RainbowDelimiterBlue"
+          "RainbowDelimiterOrange"
+          "RainbowDelimiterGreen"
+          "RainbowDelimiterViolet"
+          "RainbowDelimiterCyan"
+        ];
+      };
+    }
     # Very useful
     # TODO: scope highlighting
     {
@@ -171,6 +203,39 @@
             ];
           };
           indent = {char = "┊";};
+
+          scope = {
+            enabled = true;
+            char = "│";
+            show_start = true;
+            show_end = true;
+            include = {
+              node_type = {
+                "*" = [
+                  "class"
+                  "return_statement"
+                  "function"
+                  "method"
+                  "^if"
+                  "^while"
+                  "jsx_element"
+                  "^for"
+                  "^object"
+                  "^table"
+                  "block"
+                  "arguments"
+                  "if_statement"
+                  "else_clause"
+                  "jsx_element"
+                  "jsx_self_closing_element"
+                  "try_statement"
+                  "catch_clause"
+                  "import_statement"
+                  "operation_type"
+                ];
+              };
+            };
+          };
         };
       };
     }
