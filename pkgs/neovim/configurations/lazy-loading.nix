@@ -12,77 +12,15 @@
     ./settings/options.nix
     ./settings/keymappings.nix
     ./themes
+    ./modules/core.nix
 
     {
+      # Lazy loading
       plugins.lz-n.enable = true;
     }
 
-    # highlight.nix
     {
-      match =
-        {
-          TODO = "TODO";
-          FIXME = "FIXME";
-          HACK = "HACK";
-          ExtraWhitespace = "\\s\\+$";
-          ahhhhh = "!\\{3,\\}";
-        }
-        // lib.mapAttrs' (name: _: {
-          name = "theme.${name}";
-          value = "\\<theme.${name}\\>";
-        })
-        theme;
-
-      highlight =
-        {
-          TODO = {
-            fg = "#${theme.base00}";
-            bg = "#${color-lib.setOkhsvValue 0.9 theme.base0A}";
-          };
-          FIXME = {
-            fg = "#${theme.base00}";
-            bg = "#${color-lib.setOkhsvValue 0.9 theme.base0E}";
-          };
-          HACK = {
-            fg = "#${theme.base00}";
-            bg = "#${color-lib.setOkhsvValue 0.9 theme.base0C}";
-          };
-
-          SnippetCursor = {
-            # Use a distinct color, like green
-            bg = "#${theme.base0B}";
-            fg = "#${theme.base00}";
-          };
-
-          ExtraWhitespace.bg = "#${theme.base01}";
-          ahhhhh = {
-            fg = "#${theme.base07}";
-            bg = "#${theme.base08}";
-          };
-        }
-        // lib.mapAttrs' (name: color: {
-          name = "theme.${name}";
-          value = {
-            bg = "#${color}";
-
-            fg = "#${color-lib.ensureTextContrast color color 4.5}";
-          };
-        })
-        theme;
-    }
-
-    # autocmd
-    {
-      autoCmd = [
-        # Remove trailing whitespace on save
-        {
-          event = "BufWrite";
-          command = "%s/\\s\\+$//e";
-        }
-      ];
-    }
-
-    {
+      # tag:core
       plugins = {
         lspkind = {
           enable = true;
@@ -122,7 +60,6 @@
       ];
 
       extraConfigLuaPre = ''
-        -- This global variable will track if we are in "snippet mode".
         _G.IN_SNIPPET_MODE = false
       '';
       plugins = {
@@ -211,6 +148,7 @@
     }
 
     {
+      # tag:misc
       plugins.nvim-autopairs.enable = true;
 
       # This part is important for making <CR> work correctly with cmp and autopairs
@@ -224,6 +162,7 @@
       '';
     }
     {
+      # tag:file-specific
       autoCmd = [
         # Launch OpenSCAD when opening .scad files
         {
@@ -291,121 +230,7 @@
       ];
     }
 
-    # {
-    #   plugins.lsp.servers.nil_ls = {
-    #     enable = true;
-
-    #     # Configure nil settings
-    #     settings = {
-    #       nil = {
-    #         # Formatting: Let conform-nvim handle this with alejandra
-    #         # Leave this null to disable nil's built-in formatting
-    #         formatting.command = null;
-
-    #         # Diagnostics configuration
-    #         diagnostics = {
-    #           # You can ignore specific diagnostic kinds here if needed
-    #           ignored = [];
-
-    #           # Exclude generated files from diagnostics
-    #           excludedFiles = [
-    #             "Cargo.nix" # Common generated file
-    #           ];
-    #         };
-
-    #         # Nix binary configuration
-    #         nix = {
-    #           # Most systems will find this automatically
-    #           binary = "nix";
-
-    #           # Memory limit for flake evaluation (in MiB)
-    #           maxMemoryMB = 2560;
-
-    #           # Flake-specific settings
-    #           flake = {
-    #             # Auto-archive flake inputs when needed
-    #             autoArchive = false;
-
-    #             # Enable auto-evaluation of flake inputs for better completion
-    #             # This improves completion but uses more memory/time
-    #             autoEvalInputs = true;
-
-    #             # The input name for nixpkgs (for NixOS options completion)
-    #             nixpkgsInputName = "nixpkgs";
-    #           };
-    #         };
-    #       };
-    #     };
-    #   };
-    # }
-
-    # theming for cursors.
-    #{
-    #  options.guicursor = lib.concatStringsSep "," [
-    #    "n-v-c:block-Cursor/lCursor" # Normal, Visual, Cmd-line: Block cursor
-    #    "i-ci:ver25-Cursor/lCursor" # Insert, Cmd-line Insert: Vertical bar
-    #    "r-cr:hor20-Cursor/lCursor" # Replace: Horizontal bar
-    #  ];
-    #}
-
-    # Open file under the cursor
-    {
-      # this is for diagnostics
-      keymaps = [
-        # {
-        #   mode = "n";
-        #   key = "<leader>e";
-        #   action = "vim.diagnostic.open_float";
-        #   options = {
-        #     silent = true;
-        #     desc = "Show line diagnostics";
-        #   };
-        # }
-        {
-          mode = "n";
-          key = "<S-CR>";
-          action = helpers.mkRaw ''
-            function()
-              local path = vim.fn.expand('<cfile>')
-              if path ~= "" then
-                -- Get current file's directory or fallback to working directory
-                local current_file = vim.fn.expand('%:p')
-                local base_dir = current_file ~= ''' and vim.fn.fnamemodify(current_file, ':h') or vim.fn.getcwd()
-
-                -- Resolve path relative to current file's location
-                local is_absolute = path:sub(1, 1) == '/'
-                local full_path = is_absolute
-                  and path
-                  or vim.fn.resolve(base_dir .. '/' .. path)
-
-                -- Check if file/directory exists
-                local stat = vim.loop.fs_stat(full_path)
-                if stat then
-                  vim.cmd('edit '..vim.fn.fnameescape(full_path))
-                else
-                  -- Try adding common extensions if needed
-                  local extensions = { '.md', '.txt', ''' }
-                  for _, ext in ipairs(extensions) do
-                    local test_path = full_path .. ext
-                    if vim.loop.fs_stat(test_path) then
-                      vim.cmd('edit '..vim.fn.fnameescape(test_path))
-                      return
-                    end
-                  end
-                  vim.notify("Path not found: "..full_path, vim.log.levels.WARN)
-                end
-              end
-            end
-          '';
-          options = {
-            silent = true;
-            desc = "Open path under cursor (relative to file location)";
-          };
-        }
-      ];
-    }
-
-    # telescope
+    # telescope TODO: split this block up.
     {
       autoGroups.SetCWD = {};
 
@@ -520,6 +345,18 @@
         }
         {
           mode = "n";
+          key = "<leader>cd";
+          action = helpers.mkRaw "function()
+            _G.pushd(vim.fn.expand('%:p:h'))
+
+            end";
+          options = {
+            silent = true;
+            desc = "CD current file";
+          };
+        }
+        {
+          mode = "n";
           key = "<leader>pd";
           action = helpers.mkRaw "_G.popd";
           options = {
@@ -540,7 +377,6 @@
         enable = true;
 
         keymaps = {
-          # Find files using Telescope command-line sugar.
           "<leader>ff" = "find_files";
           "<leader>fg" = "live_grep";
           "<leader>b" = "buffers";
@@ -548,7 +384,6 @@
           "<leader>fd" = "diagnostics";
           "<leader>fu" = "undo";
 
-          # LSP-specific telescope commands
           "<leader>lr" = "lsp_references";
           "<leader>ld" = "lsp_definitions";
           "<leader>li" = "lsp_implementations";
@@ -556,60 +391,12 @@
           "<leader>ls" = "lsp_document_symbols";
           "<leader>lw" = "lsp_workspace_symbols";
 
-          # FZF like bindings
           "<C-p>" = "git_files";
           "<leader>p" = "oldfiles";
           "<C-f>" = "live_grep";
         };
 
         settings = {
-          #mappings = {
-          #  i = {
-          #    # Shift+< for popd (go back)
-          #    "<S-lt>" = helpers.mkRaw ''
-          #      function()
-          #        _G.popd()
-          #      end
-          #    '';
-
-          #    # Shift+> for pushd forward (currently just stays in place, but you could implement forward history)
-          #    "<S-gt>" = helpers.mkRaw ''
-          #      function()
-          #        -- Could implement forward directory history here if needed
-          #        vim.notify("Forward navigation not implemented", vim.log.levels.INFO)
-          #      end
-          #    '';
-
-          #    # Shift+/ to cd to git root
-          #    "<S-/>" = helpers.mkRaw ''
-          #      function()
-          #        _G.cd_to_git_root()
-          #      end
-          #    '';
-          #  };
-
-          #  n = {
-          #    # Same mappings for normal mode in telescope
-          #    "<S-lt>" = helpers.mkRaw ''
-          #      function()
-          #        _G.popd()
-          #      end
-          #    '';
-
-          #    "<S-gt>" = helpers.mkRaw ''
-          #      function()
-          #        vim.notify("Forward navigation not implemented", vim.log.levels.INFO)
-          #      end
-          #    '';
-
-          #    "<S-/>" = helpers.mkRaw ''
-          #      function()
-          #        _G.cd_to_git_root()
-          #      end
-          #    '';
-          #  };
-          #};
-
           defaults = {
             file_ignore_patterns = [
               "^.git/"
@@ -626,64 +413,7 @@
     }
 
     {
-      plugins.bufferline = {
-        enable = true;
-        settings.options = {
-          truncateNames = true;
-          diagnostics = "nvim_lsp";
-        };
-      };
-
-      keymaps = let
-        normal =
-          lib.mapAttrsToList (key: action: {
-            mode = "n";
-            inherit action key;
-          }) {
-            #"<leader>bp" = ":BufferLinePick<CR>";
-            #"<leader>bc" = ":bp | bd #<CR>";
-            #"<leader>bP" = ":BufferLineTogglePin<CR>";
-            #"<leader>bd" = ":BufferLineSortByDirectory<CR>";
-            #"<leader>be" = ":BufferLineSortByExtension<CR>";
-            #"<leader>bt" = ":BufferLineSortByTabs<CR>";
-            #"<leader>bL" = ":BufferLineCloseRight<CR>";
-            #"<leader>bH" = ":BufferLineCloseLeft<CR>";
-            #"<leader><S-h>" = ":BufferLineMovePrev<CR>";
-            #"<leader><S-l>" = ":BufferLineMoveNext<CR>";
-
-            "<Tab>" = ":BufferLineCycleNext<CR>";
-            "<S-Tab>" = ":BufferLineCyclePrev<CR>";
-          };
-      in
-        helpers.keymaps.mkKeymaps {options.silent = true;} normal;
-    }
-
-    # Very useful. misc.
-    {
-      plugins.indent-blankline = {
-        enable = true;
-        settings = {
-          exclude = {
-            filetypes = [
-              "dashboard"
-              "lspinfo"
-              "packer"
-              "checkhealth"
-              "help"
-              "man"
-              "gitcommit"
-              "TelescopePrompt"
-              "TelescopeResults"
-              "''"
-            ];
-          };
-          indent = {char = "┊";};
-        };
-      };
-    }
-
-    {
-      # Set indentation to 2 spaces for nix files
+      # tag:file-specific
       autoCmd = [
         {
           event = "FileType";
@@ -691,9 +421,10 @@
           command = "setlocal tabstop=2 shiftwidth=2";
         }
       ];
+
+      # tag: core
       plugins.treesitter = {
         enable = true;
-        # settings.ensure_installed = []; # Backup
         settings = {
           highlight = {
             enable = true;
@@ -719,7 +450,6 @@
               node_decremental = "grm";
             };
           };
-          # indent = { enable = true; };
         };
         grammarPackages = with pkgs.vimPlugins.nvim-treesitter.builtGrammars; [
           bash
@@ -738,6 +468,8 @@
         ];
       };
     }
+
+    # tag: linting
     {
       plugins.lint = {
         enable = true;
@@ -751,21 +483,12 @@
           '';
         };
 
-        # Define linters with their packages included
         linters = {
-          # Nix linters
           statix = {cmd = lib.getExe pkgs.statix;};
           deadnix = {cmd = lib.getExe pkgs.deadnix;};
 
-          #clippy = {
-          #  cmd = lib.getExe pkgs.clippy;
-          #  args = ["--message-format=json"];
-          #};
-
-          # Shell
           shellcheck = {cmd = lib.getExe pkgs.shellcheck;};
 
-          # Web/Config formats
           jsonlint = {cmd = lib.getExe pkgs.nodePackages.jsonlint;};
           yamllint = {cmd = lib.getExe pkgs.yamllint;};
           tflint = {cmd = lib.getExe pkgs.tflint;}; # terraform
@@ -774,7 +497,6 @@
             args = ["--disable" "MD013" "--"]; # Disable line length rule
           };
 
-          # Python
           ruff = {
             cmd = lib.getExe pkgs.ruff;
             args = ["check" "--select" "E,W,F" "--quiet" "--stdin-filename"];
@@ -782,55 +504,29 @@
             append_fname = false;
           };
 
-          # Docker
           hadolint = {cmd = lib.getExe pkgs.hadolint;};
-
-          # eslint = {
-          #   cmd = "${pkgs.nodePackages.eslint}/bin/eslint";
-          #   args = ["--stdin" "--stdin-filename"];
-          #   stdin = true;
-          #   append_fname = false;
-          # };
-
-          # Optional: Text linting (heavier)
           vale = {cmd = lib.getExe pkgs.vale;};
         };
 
         lintersByFt = {
-          # Nix
           nix = ["statix" "deadnix"];
 
-          #rust = ["clippy"];
-          # terraform
           terraform = ["tflint"];
 
-          # Shell scripts
           bash = ["shellcheck"];
           sh = ["shellcheck"];
           zsh = ["shellcheck"];
 
-          # Web/Config formats
           json = ["jsonlint"];
           yaml = ["yamllint"];
           markdown = ["markdownlint"];
-
-          # Programming languages
           python = ["ruff"];
-
-          # Docker
           dockerfile = ["hadolint"];
-
-          # Optional: JavaScript/TypeScript linting
-          # javascript = ["eslint"];
-          # typescript = ["eslint"];
-
-          # Text/Documentation (if you want vale)
-          # text = [ "vale" ];
-          # gitcommit = [ "vale" ];
         };
       };
     }
 
+    # tag: file-specific
     {
       plugins.typst-preview = {
         lazyLoad.settings.ft = ["typst"];
@@ -838,6 +534,7 @@
       };
     }
 
+    # tag: file-specific
     {
       plugins.rustaceanvim = {
         enable = true;
@@ -908,6 +605,7 @@
       };
     }
 
+    # FIXME: This is not good, needs to be consolidated
     {
       keymaps = [
         {
@@ -1005,68 +703,13 @@
       ];
 
       plugins = {
+        # tag:lsp/linter?
         lsp = {
           # lazyLoad.settings.ft = ["openscad" "typst" "rust"];
           enable = true;
           servers = {
             openscad_lsp.enable = true;
             tinymist.enable = true;
-
-            # Disabled for rustations
-            # rust_analyzer = {
-            #   enable = true;
-            #   installCargo = false;
-            #   installRustc = false;
-
-            #   settings = {
-            #     # Cargo configuration
-            #     cargo = {
-            #       allFeatures = true;
-            #       loadOutDirsFromCheck = true;
-            #       buildScripts.enable = true;
-            #     };
-
-            #     # Enhanced diagnostics
-            #     diagnostics = {
-            #       enable = true;
-            #       enableExperimental = true;
-            #       disabled = [];
-            #     };
-
-            #     # Inlay hints for better code understanding
-            #     inlayHints = {
-            #       enable = true;
-            #       typeHints = {
-            #         enable = true;
-            #         hideClosureInitialization = false;
-            #         hideNamedConstructor = false;
-            #       };
-            #       parameterHints = {
-            #         enable = true;
-            #       };
-            #       chainingHints = {
-            #         enable = true;
-            #       };
-            #     };
-
-            #     # Code completion improvements
-            #     completion = {
-            #       addCallArgumentSnippets = true;
-            #       addCallParenthesis = true;
-            #       postfix.enable = true;
-            #       autoimport.enable = true;
-            #     };
-
-            #     # Proc macro support
-            #     procMacro = {
-            #       enable = true;
-            #       ignored = {};
-            #     };
-
-            #     # Check on save
-            #     checkOnSave = true;
-            #   };
-            # };
 
             ts_ls.enable = true;
           };
@@ -1090,11 +733,11 @@
     }
 
     {
+      # tag:formatting
       plugins.conform-nvim = {
         enable = true;
 
         settings = {
-          # Format on save with reasonable timeouts
           format_on_save = {
             lsp_format = "fallback";
             timeout_ms = 2000;
@@ -1102,36 +745,28 @@
             stop_after_first = false;
           };
 
-          # Backup formatting after save for slower formatters
           format_after_save = {
             lsp_format = "fallback";
             timeout_ms = 5000;
             quiet = true;
           };
 
-          # Configure formatters by file type (matching your linters)
           formatters_by_ft = {
-            # Nix
             nix = ["alejandra"];
 
-            # Shell scripts
             bash = ["shfmt"];
             sh = ["shfmt"];
             zsh = ["shfmt"];
 
-            # Web/Config formats
             json = ["prettier"];
             yaml = ["prettier"];
             yml = ["prettier"];
             markdown = ["prettier"];
 
-            # Python
             python = ["isort" "black"];
 
-            # Lua (for your nvim config)
             lua = ["stylua"];
 
-            # for rust use lsp
             rust = ["rustfmt"];
 
             javascript = ["prettier"];
@@ -1143,7 +778,6 @@
             "_" = ["trim_newlines"];
           };
 
-          # Custom formatter configurations with proper executable paths
           formatters = {
             alejandra = {command = lib.getExe pkgs.alejandra;};
             shfmt = {
@@ -1159,15 +793,6 @@
             rustfmt = {
               command = lib.getExe pkgs.rustfmt;
             };
-
-            # js/ts formatter
-            # This uses prettier, which is a common choice for JS/TS
-            # You can also use eslint or other formatters if preferred
-
-            # eslint = {
-            #   command = lib.getExe pkgs.nodePackages.eslint;
-            #   args = ["--fix" "--stdin" "--stdin-filename" "$FILENAME"];
-            # };
 
             prettier = {
               command = lib.getExe pkgs.nodePackages.prettier;
@@ -1227,28 +852,20 @@
       ];
     }
 
-    # In your imports list
+    # tag:ai-trash/plugins
     {
-      # 1. Enable the necessary plugins
       plugins = {
-        # The main Copilot engine
         copilot-lua.enable = true;
-
-        # The bridge that allows nvim-cmp to see Copilot suggestions
         copilot-cmp.enable = true;
-
-        copilot-chat.enable = true; # Optional: For Copilot chat functionality
+        copilot-chat.enable = true;
       };
 
-      # 2. Configure Copilot for on-demand use
-      # We disable the panel and automatic suggestions to favor the cmp workflow.
       plugins.copilot-lua = {
         settings = {
-          panel.enable = false; # We don't need the pop-up panel
+          panel.enable = false;
           suggestion = {
-            auto_trigger = false; # This is key: suggestions will not appear automatically
-            enabled = false; # Suggestions must still be enabled to be fetched
-            # Disable the default keymaps for inline ghost-text to avoid conflicts
+            auto_trigger = false;
+            enabled = false;
             keymap = {
               accept = false;
               next = false;

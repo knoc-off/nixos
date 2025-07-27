@@ -2,6 +2,7 @@
   color-lib,
   theme,
   lib,
+  pkgs,
   ...
 }: let
   inherit (color-lib) setOkhslLightness setOkhslSaturation;
@@ -36,31 +37,42 @@ in {
       "shift+enter" = "move_window_to_top";
       "alt+enter" = "launch --location=split";
     };
-    # touch_scroll_multiplier 6.5 # hardware specific
     extraConfig = ''
-      touch_scroll_multiplier 1
-      allow_remote_control socket
-      listen_on unix:/tmp/kitty-{kitty_pid}.socket
 
-      mouse_map right press ungrabbed mouse_select_command_output
 
-      # tall layout
-      enabled_layouts tall:bias=60;full_size=1;mirrored=false
+        allow_remote_control socket
+        listen_on unix:/tmp/kitty-{kitty_pid}.socket
 
-      # You may need to set macos_option_as_alt to 'yes' for this to work as expected
-      macos_option_as_alt yes
+        mouse_map right press ungrabbed mouse_select_command_output
 
-      # Switch focus using Option + Arrow Keys
-      map alt+left  neighboring_window left
-      map alt+right neighboring_window right
-      map alt+up    neighboring_window up
-      map alt+down  neighboring_window down
+        # tall layout
+        enabled_layouts tall:bias=60;full_size=1;mirrored=false
 
-      # Switch focus using Option + hjkl
-      map alt+h neighboring_window left
-      map alt+l neighboring_window right
-      map alt+k neighboring_window up
-      map alt+j neighboring_window down
+        # You may need to set macos_option_as_alt to 'yes' for this to work as expected
+        macos_option_as_alt yes
+
+        # Switch focus using Option + Arrow Keys
+        map alt+left  neighboring_window left
+        map alt+right neighboring_window right
+        map alt+up    neighboring_window up
+        map alt+down  neighboring_window down
+
+        # Switch focus using Option + hjkl
+        map alt+h neighboring_window left
+        map alt+l neighboring_window right
+        map alt+k neighboring_window up
+        map alt+j neighboring_window down
+
+
+      ${ # tag:hardwarespecific
+        if pkgs.stdenv.isDarwin
+        then ''
+          touch_scroll_multiplier 1
+        ''
+        else ''
+          touch_scroll_multiplier 6.5
+        ''
+      }
 
 
     '';

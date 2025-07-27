@@ -174,6 +174,8 @@ in {
           "${mainMod}, equal, fullscreen"
           # "${mainMod}, O, fakefullscreen"
 
+          "${mainMod}, e, hyprexpo:expo, toggle"
+
           # OBS RECORD TOGGLE
           "${mainMod},F10, pass,^(com.obsproject.Studio)$"
 
