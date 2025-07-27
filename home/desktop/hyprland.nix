@@ -38,13 +38,32 @@
     enable = true;
     systemd.enable = true;
     xwayland.enable = true;
-    plugins = with inputs.hyprland-plugins.packages.${pkgs.system}; [];
+    #plugins = with inputs.hyprland-plugins.packages.${pkgs.system}; [hyprexpo];
+    plugins = with pkgs.hyprlandPlugins; [hyprexpo];
+
+    #package = inputs.hyprland.packages.${pkgs.system}.hyprland;
 
     settings = {
       exec-once = [
         "astal-notify"
         "${pkgs.wayland-pipewire-idle-inhibit}/bin/wayland-pipewire-idle-inhibit"
       ];
+
+      # plugins, might move to new file.
+      plugin = {
+        hyprexpo = {
+          columns = 2;
+          gap_size = 5;
+          bg_col = "0xff${theme.base00}";
+          skip_empty = true;
+          workspace_method = "center first"; # [center/first] [workspace] e.g. first 1 or center m+1
+
+          enable_gesture = true; # laptop touchpad
+          gesture_fingers = 3; # 3 or 4
+          gesture_distance = 300; # how far is the "max"
+          gesture_positive = false; # positive = swipe down. Negative = swipe up.
+        };
+      };
 
       monitor = [",preferred,auto-up,1"];
 
@@ -120,7 +139,7 @@
 
       input = {
         kb_layout = "us";
-        kb_options = "caps:super";
+        #kb_options = "caps:super"; # replaced by kantana
 
         # focus follows mouse
         follow_mouse = 1;

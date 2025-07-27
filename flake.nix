@@ -6,6 +6,7 @@
     nixpkgs-unstable,
     ...
   }: let
+    # thish ist fuell of tipos
     # theme is now defined inside mkConfig where color-lib is available
     systems = [
       "aarch64-linux"

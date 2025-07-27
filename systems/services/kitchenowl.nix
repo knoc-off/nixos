@@ -1,32 +1,30 @@
-{
-  config,
-  pkgs,
-  ...
-}: {
+{...}: {
   # Enable Podman
-  virtualisation.podman = {
-    enable = true;
-    autoPrune.enable = true;
-    dockerCompat = true;
-    defaultNetwork.settings = {
-      dns_enabled = true;
-    };
-  };
-
-  # Set OCI containers backend to Podman
-  virtualisation.oci-containers.backend = "podman";
-
-  # Define the OCI container for KitchenOwl
-  virtualisation.oci-containers.containers = {
-    kitchenowl = {
-      image = "tombursch/kitchenowl@sha256:5e8462c9be9b31aa9b829275a25ea17f2e5c58be891013a409355ebbac89c6d8";
-      ports = ["3043:8080"];
-      environment = {
-        JWT_SECRET_KEY = "PLEASE_CHANGE_ME";
+  virtualisation = {
+    podman = {
+      enable = true;
+      autoPrune.enable = true;
+      dockerCompat = true;
+      defaultNetwork.settings = {
+        dns_enabled = true;
       };
-      volumes = [
-        "/var/lib/kitchenowl:/data"
-      ];
+    };
+
+    # Set OCI containers backend to Podman
+    oci-containers.backend = "podman";
+
+    # Define the OCI container for KitchenOwl
+    oci-containers.containers = {
+      kitchenowl = {
+        image = "tombursch/kitchenowl@sha256:5e8462c9be9b31aa9b829275a25ea17f2e5c58be891013a409355ebbac89c6d8";
+        ports = ["3043:8080"];
+        environment = {
+          JWT_SECRET_KEY = "PLEASE_CHANGE_ME";
+        };
+        volumes = [
+          "/var/lib/kitchenowl:/data"
+        ];
+      };
     };
   };
 
