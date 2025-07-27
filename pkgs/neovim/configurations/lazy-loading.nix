@@ -2,8 +2,6 @@
   helpers,
   pkgs,
   lib,
-  color-lib,
-  theme,
   ...
 }: {
   # putting each config in a set that gets imported.
@@ -17,6 +15,11 @@
     {
       # Lazy loading
       plugins.lz-n.enable = true;
+    }
+
+    {
+      #plugins gitsigns
+      plugins.gitsigns.enable = true;
     }
 
     {
@@ -56,6 +59,26 @@
               end
             end
           '';
+        }
+        {
+          mode = "i";
+          key = "<C-g>";
+          action = helpers.mkRaw ''
+            function()
+              local cmp = require('cmp')
+              cmp.complete({
+                config = {
+                  sources = {
+                    {name = "copilot"}
+                  }
+                }
+              })
+            end
+          '';
+          options = {
+            silent = true;
+            desc = "Trigger Copilot suggestions manually";
+          };
         }
       ];
 
@@ -138,7 +161,6 @@
             sources = [
               {name = "nvim_lsp";} # Source for LSP suggestions
               {name = "luasnip";} # Source for snippets
-              {name = "copilot";}
               {name = "buffer";} # Source for text from the current buffer
               {name = "path";} # Source for file system paths
             ];
