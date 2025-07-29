@@ -23,6 +23,34 @@
     }
 
     {
+      plugins.which-key = {
+        enable = true;
+
+        settings = {
+          preset = false;
+          delay = 200;
+
+          spec = [
+            {
+              __unkeyed-1 = "<leader>b";
+              group = "Buffers";
+              icon = "󰓩 ";
+            }
+            {
+              __unkeyed-1 = "<leader>f";
+              group = "Files";
+              icon = "󰈞 ";
+            }
+          ];
+
+          win.border = "single";
+
+          notify = false;
+        };
+      };
+    }
+
+    {
       # tag:core
       plugins = {
         lspkind = {
@@ -377,6 +405,18 @@
             desc = "CD current file";
           };
         }
+        {
+          mode = "n";
+          key = "<leader>cD";
+          action = helpers.mkRaw "function()
+            _G.pushd(vim.fn.expand('%:p:h') .. '/..')
+          end";
+          options = {
+            silent = true;
+            desc = "CD parent directory";
+          };
+        }
+
         {
           mode = "n";
           key = "<leader>pd";

@@ -139,7 +139,7 @@ in {
       nrs = "sudo nixos-rebuild switch";
       ncg = "nix-collect-garbage -d";
       nr = "NIXPKGS_ALLOW_UNFREE=1 nix run --impure nixpkgs#";
-      adf = "aider --model openrouter/google/gemini-2.0-flash-001 --weak-model openrouter/google/gemini-2.0-flash-001 --no-auto-lint --no-auto-test --no-attribute-committer --no-attribute-author --dark-mode --edit-format diff --file ";
+      # adf = "aider --model openrouter/google/gemini-2.0-flash-001 --weak-model openrouter/google/gemini-2.0-flash-001 --no-auto-lint --no-auto-test --no-attribute-committer --no-attribute-author --dark-mode --edit-format diff --file ";
     };
 
     shellAliases = {

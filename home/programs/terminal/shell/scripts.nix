@@ -327,64 +327,64 @@ in {
       ];
     })
 
-    (mkComplgenScript {
-      name = "adr";
-      scriptContent = ''
-        #!${pkgs.bash}/bin/bash
-        set -euo pipefail
+    #(mkComplgenScript {
+    #  name = "adr";
+    #  scriptContent = ''
+    #    #!${pkgs.bash}/bin/bash
+    #    set -euo pipefail
 
-        SMART_MODEL="openrouter/google/gemini-2.5-pro-preview-03-25"
-        FAST_MODEL="openrouter/google/gemini-2.5-flash-preview"
-        MEDIUM_MODEL="openrouter/google/gemini-2.5-flash-preview:thinking"
-        MODEL="$FAST_MODEL"
-        WEAK_MODEL="$FAST_MODEL"
-        AIDER_ARGS=() # Renamed from ARGS to avoid confusion with shell ARGS
+    #    SMART_MODEL="openrouter/google/gemini-2.5-pro-preview-03-25"
+    #    FAST_MODEL="openrouter/google/gemini-2.5-flash-preview"
+    #    MEDIUM_MODEL="openrouter/google/gemini-2.5-flash-preview:thinking"
+    #    MODEL="$FAST_MODEL"
+    #    WEAK_MODEL="$FAST_MODEL"
+    #    AIDER_ARGS=() # Renamed from ARGS to avoid confusion with shell ARGS
 
-        # Parse flags and file/other arguments
-        while [ $# -gt 0 ]; do
-          case "$1" in
-            -s) MODEL="$SMART_MODEL"; shift ;;
-            -m) MODEL="$MEDIUM_MODEL"; shift ;;
-            -d) MODEL="$FAST_MODEL"; shift ;;
-            *) AIDER_ARGS+=("$1"); shift ;;
-          esac
-        done
+    #    # Parse flags and file/other arguments
+    #    while [ $# -gt 0 ]; do
+    #      case "$1" in
+    #        -s) MODEL="$SMART_MODEL"; shift ;;
+    #        -m) MODEL="$MEDIUM_MODEL"; shift ;;
+    #        -d) MODEL="$FAST_MODEL"; shift ;;
+    #        *) AIDER_ARGS+=("$1"); shift ;;
+    #      esac
+    #    done
 
-        if [ ''${#AIDER_ARGS[@]} -eq 0 ]; then
-          AIDER_ARGS=("--message" "/commit")
-        fi
+    #    if [ ''${#AIDER_ARGS[@]} -eq 0 ]; then
+    #      AIDER_ARGS=("--message" "/commit")
+    #    fi
 
-        ${upkgs.aider-chat}/bin/aider \
-          --alias "f:$FAST_MODEL" \
-          --alias "m:$MEDIUM_MODEL" \
-          --alias "s:$SMART_MODEL" \
-          --alias "fast:$FAST_MODEL" \
-          --alias "smart:$SMART_MODEL" \
-          --alias "medium:$MEDIUM_MODEL" \
-          --model "$MODEL" \
-          --weak-model "$WEAK_MODEL" \
-          --no-auto-lint \
-          --no-auto-test \
-          --no-attribute-committer \
-          --no-attribute-author \
-          --dark-mode \
-          --edit-format diff \
-          "''${AIDER_ARGS[@]}"
-      '';
-      # Corrected grammar:
-      # grammar = ''
-      #   adr [(-s | -m | -d)] [{{{${pkgs.fd}/bin/fd --type f --hidden --no-ignore --max-depth 1 . --color never}}} "File"] ... [<OTHER_ARG> "Other Argument"] ... ;'';
-      grammar = ''
-        adr <PATH>;
-      '';
-      runtimeDeps = [
-        upkgs.aider-chat
-        pkgs.fd
-        pkgs.file # For file type detection in completion
-        pkgs.gnugrep # For grep in completion
-        pkgs.bash # For the script itself
-      ];
-    })
+    #    ${upkgs.aider-chat}/bin/aider \
+    #      --alias "f:$FAST_MODEL" \
+    #      --alias "m:$MEDIUM_MODEL" \
+    #      --alias "s:$SMART_MODEL" \
+    #      --alias "fast:$FAST_MODEL" \
+    #      --alias "smart:$SMART_MODEL" \
+    #      --alias "medium:$MEDIUM_MODEL" \
+    #      --model "$MODEL" \
+    #      --weak-model "$WEAK_MODEL" \
+    #      --no-auto-lint \
+    #      --no-auto-test \
+    #      --no-attribute-committer \
+    #      --no-attribute-author \
+    #      --dark-mode \
+    #      --edit-format diff \
+    #      "''${AIDER_ARGS[@]}"
+    #  '';
+    #  # Corrected grammar:
+    #  # grammar = ''
+    #  #   adr [(-s | -m | -d)] [{{{${pkgs.fd}/bin/fd --type f --hidden --no-ignore --max-depth 1 . --color never}}} "File"] ... [<OTHER_ARG> "Other Argument"] ... ;'';
+    #  grammar = ''
+    #    adr <PATH>;
+    #  '';
+    #  runtimeDeps = [
+    #    upkgs.aider-chat
+    #    pkgs.fd
+    #    pkgs.file # For file type detection in completion
+    #    pkgs.gnugrep # For grep in completion
+    #    pkgs.bash # For the script itself
+    #  ];
+    #})
 
     (mkComplgenScript {
       name = "ping"; # The command name users will type
