@@ -13,6 +13,10 @@
     ./modules/core.nix
 
     {
+      plugins.fidget.enable = true;
+    }
+
+    {
       # Lazy loading
       plugins.lz-n.enable = true;
     }
