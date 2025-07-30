@@ -27,25 +27,109 @@
     }
 
     {
-      plugins.which-key = {
+      # Split this up to place the descriptors in the right spot
+      plugins.which-key = let
+        keymapAttrsToWhichKeySpec = attrs:
+          lib.mapAttrsToList (key: value: {__unkeyed-1 = key;} // value) attrs;
+      in {
         enable = true;
 
         settings = {
           preset = false;
           delay = 200;
 
-          spec = [
-            {
-              __unkeyed-1 = "<leader>b";
+          spec = keymapAttrsToWhichKeySpec {
+            "<leader>b" = {
               group = "Buffers";
               icon = "󰓩 ";
-            }
-            {
-              __unkeyed-1 = "<leader>f";
+            };
+            "<leader>f" = {
               group = "Files";
               icon = "󰈞 ";
-            }
-          ];
+            };
+            "<leader>ff" = {
+              desc = "Find Files";
+              icon = "󰱽 ";
+            };
+            "<leader>fg" = {
+              desc = "Live Grep";
+              icon = " ";
+            };
+            "<leader>fh" = {
+              desc = "Help Tags";
+              icon = "󰋖 ";
+            };
+            "<leader>fd" = {
+              desc = "Diagnostics";
+              icon = " ";
+            };
+            "<leader>fu" = {
+              desc = "Undo History";
+              icon = "⎌ ";
+            };
+            "<leader>a" = {
+              desc = "Code Action";
+              icon = " ";
+            };
+            "<leader>ca" = {
+              desc = "LSP Code Action";
+              icon = " ";
+            };
+            "<leader>rn" = {
+              desc = "LSP Rename";
+              icon = " ";
+            };
+            "<leader>j" = {
+              desc = "LSP Diagnostic Next";
+              icon = " ";
+            };
+            "<leader>k" = {
+              desc = "LSP Diagnostic Prev";
+              icon = " ";
+            };
+            "<leader>cf" = {
+              desc = "Format Buffer";
+              icon = " ";
+            };
+            "<leader>cl" = {
+              desc = "Show Conform info";
+              icon = " ";
+            };
+            "<leader>gr" = {
+              desc = "CD to git root";
+              icon = " ";
+            };
+            "<leader>cd" = {
+              desc = "CD current file";
+              icon = " ";
+            };
+            "<leader>cD" = {
+              desc = "CD parent directory";
+              icon = " ";
+            };
+            "<leader>pd" = {
+              desc = "Pop directory (go back)";
+              icon = " ";
+            };
+            "<leader>e" = {
+              desc = "Show line diagnostics";
+              icon = " ";
+            };
+            "<leader>ci" = {
+              desc = "Show available formatters";
+              icon = " ";
+            };
+            "<C-g>" = {
+              mode = "i";
+              desc = "Trigger Copilot suggestions manually";
+              icon = " ";
+            };
+            "<C-E>" = {
+              mode = ["i" "s"];
+              desc = "Next snippet choice / default <C-E>";
+              icon = " ";
+            };
+          };
 
           win.border = "single";
 
@@ -54,6 +138,117 @@
       };
     }
 
+    {
+      plugins.treesitter-textobjects = {
+        enable = true;
+
+        # Text object selection
+        select = {
+          enable = true;
+          lookahead = true;
+
+          keymaps = {
+            # Functions
+            "af" = "@function.outer";
+            "if" = "@function.inner";
+
+            # Classes
+            "ac" = "@class.outer";
+            "ic" = "@class.inner";
+
+            # Parameters/arguments
+            "ap" = "@parameter.outer";
+            "ip" = "@parameter.inner";
+
+            # Conditionals
+            "ai" = "@conditional.outer";
+            "ii" = "@conditional.inner";
+
+            # Loops
+            "al" = "@loop.outer";
+            "il" = "@loop.inner";
+
+            # Comments
+            "a/" = "@comment.outer";
+            "i/" = "@comment.inner";
+
+            # Blocks
+            "ab" = "@block.outer";
+            "ib" = "@block.inner";
+          };
+
+          selectionModes = {
+            "@parameter.outer" = "v"; # charwise
+            "@function.outer" = "V"; # linewise
+            "@class.outer" = "V"; # linewise
+          };
+
+          includeSurroundingWhitespace = false;
+        };
+
+        # Swap text objects
+        swap = {
+          enable = true;
+
+          swapNext = {
+            "<leader>a" = "@parameter.inner";
+            "<leader>f" = "@function.outer";
+          };
+
+          swapPrevious = {
+            "<leader>A" = "@parameter.inner";
+            "<leader>F" = "@function.outer";
+          };
+        };
+
+        # Movement between text objects
+        move = {
+          enable = true;
+          setJumps = true; # Set jumps in the jumplist
+
+          gotoNextStart = {
+            "]f" = "@function.outer";
+            "]c" = "@class.outer";
+            "]p" = "@parameter.inner";
+          };
+
+          gotoNextEnd = {
+            "]F" = "@function.outer";
+            "]C" = "@class.outer";
+            "]P" = "@parameter.inner";
+          };
+
+          gotoPreviousStart = {
+            "[f" = "@function.outer";
+            "[c" = "@class.outer";
+            "[p" = "@parameter.inner";
+          };
+
+          gotoPreviousEnd = {
+            "[F" = "@function.outer";
+            "[C" = "@class.outer";
+            "[P" = "@parameter.inner";
+          };
+        };
+
+        # LSP interop for peeking definitions
+        lspInterop = {
+          enable = true;
+          border = "rounded";
+
+          peekDefinitionCode = {
+            "<leader>df" = "@function.outer";
+            "<leader>dF" = "@class.outer";
+          };
+
+          floatingPreviewOpts = {
+            border = "rounded";
+            max_width = 80;
+            max_height = 20;
+          };
+        };
+      };
+    }
     {
       # tag:core
       plugins = {
@@ -78,6 +273,20 @@
 
       keymaps = [
         # Ctrl-E: For changing choices in choiceNodes (next choice)
+        {
+          mode = ["i" "s"];
+          key = "<C-E>";
+          action = helpers.mkRaw ''
+            function()
+              local ls = require("luasnip")
+              if ls.choice_active() then
+                ls.next_choice()
+              else
+                vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-E>", true, false, true), "n", true)
+              end
+            end
+          '';
+        }
         {
           mode = ["i" "s"];
           key = "<C-E>";
@@ -413,7 +622,8 @@
           mode = "n";
           key = "<leader>cD";
           action = helpers.mkRaw "function()
-            _G.pushd(vim.fn.expand('%:p:h') .. '/..')
+            _G.pushd(vim.fn.getcwd())
+            vim.cmd('cd ..')
           end";
           options = {
             silent = true;
