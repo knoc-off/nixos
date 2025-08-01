@@ -8,93 +8,6 @@
   imports = [
     ./programs/terminal/kitty
     ./programs/terminal
-    #./programs/terminal/shell/scripts.nix
-    # {
-    #   home.packages = let
-    #     inherit (self.packages.${pkgs.system}) mkComplgenScript;
-    #   in [
-    #     self.packages.${pkgs.system}.cli-ai
-    #     pkgs.television
-    #     #(mkComplgenScript {
-    #     #  name = "cli";
-    #     #  # TODO, we should instruct the model, to create a xml-tag like <clip> </clip> that we then copy to the clipboard
-    #     #  # pbcopy/wl-copy
-    #     #  scriptContent = ''
-    #     #    #!${pkgs.bash}/bin/bash
-    #     #    set -euo pipefail
-    #     #    if [ $# -eq 0 ]; then
-    #     #      echo "Usage: cli <command> [args...]"
-    #     #      exit 1
-    #     #    fi
-    #     #    fabric -p cli "$@" --stream
-    #     #  '';
-    #     #  grammar = ''
-    #     #    cli <COMMAND> "Command to run" ...;
-    #     #  '';
-    #     #  runtimeDeps = [pkgs.fabric-ai];
-    #     #})
-
-    #     (mkComplgenScript {
-    #       name = "adr";
-    #       scriptContent = ''
-    #         #!${pkgs.bash}/bin/bash
-    #         set -euo pipefail
-
-    #         SMART_MODEL="openrouter/google/gemini-2.5-pro-preview-03-25"
-    #         FAST_MODEL="openrouter/google/gemini-2.5-flash-preview"
-    #         MEDIUM_MODEL="openrouter/google/gemini-2.5-flash-preview:thinking"
-    #         MODEL="$FAST_MODEL"
-    #         WEAK_MODEL="$FAST_MODEL"
-    #         AIDER_ARGS=() # Renamed from ARGS to avoid confusion with shell ARGS
-
-    #         # Parse flags and file/other arguments
-    #         while [ $# -gt 0 ]; do
-    #           case "$1" in
-    #             -s) MODEL="$SMART_MODEL"; shift ;;
-    #             -m) MODEL="$MEDIUM_MODEL"; shift ;;
-    #             -d) MODEL="$FAST_MODEL"; shift ;;
-    #             *) AIDER_ARGS+=("$1"); shift ;;
-    #           esac
-    #         done
-
-    #         if [ ''${#AIDER_ARGS[@]} -eq 0 ]; then
-    #           AIDER_ARGS=("--message" "/commit")
-    #         fi
-
-    #         ${upkgs.aider-chat}/bin/aider \
-    #           --alias "f:$FAST_MODEL" \
-    #           --alias "m:$MEDIUM_MODEL" \
-    #           --alias "s:$SMART_MODEL" \
-    #           --alias "fast:$FAST_MODEL" \
-    #           --alias "smart:$SMART_MODEL" \
-    #           --alias "medium:$MEDIUM_MODEL" \
-    #           --model "$MODEL" \
-    #           --weak-model "$WEAK_MODEL" \
-    #           --no-auto-lint \
-    #           --no-auto-test \
-    #           --no-attribute-committer \
-    #           --no-attribute-author \
-    #           --dark-mode \
-    #           --edit-format diff \
-    #           "''${AIDER_ARGS[@]}"
-    #       '';
-    #       # Corrected grammar:
-    #       # grammar = ''
-    #       #   adr [(-s | -m | -d)] [{{{${pkgs.fd}/bin/fd --type f --hidden --no-ignore --max-depth 1 . --color never}}} "File"] ... [<OTHER_ARG> "Other Argument"] ... ;'';
-    #       grammar = ''
-    #         adr <PATH>;
-    #       '';
-    #       runtimeDeps = [
-    #         upkgs.aider-chat
-    #         pkgs.fd
-    #         pkgs.file # For file type detection in completion
-    #         pkgs.gnugrep # For grep in completion
-    #         pkgs.bash # For the script itself
-    #       ];
-    #     })
-    #   ];
-    # }
-
     ./programs/browser/firefox/default.nix
 
     #./programs/terminal/shell
@@ -103,8 +16,6 @@
       targets.darwin.defaults."com.apple.finder".ShowPathBar = true;
 
       home.packages = with pkgs; [
-        _1password-gui
-        _1password-cli
         gum
       ];
       programs.zsh = {
@@ -123,7 +34,9 @@
           add_newline = false;
 
           # Using conditional format string for line break
-          format = "(($python )($rust )$nix_shell\n)$directory( $cmd_duration)$line_break$character";
+          format = ''((($python )($rust )$nix_shell )''${custom.git_branch_short} ''\n)$directory( $cmd_duration)$line_break$character'';
+
+          #format = "(($python )($rust )$nix_shell '${custom.git_branch_short}\n)$directory( $cmd_duration)$line_break$character";
           #format = "$directory$git_branch$git_status$cmd_duration$nodejs$python$rust$nix_shell$line_break$character";
 
           scan_timeout = 10;
@@ -144,12 +57,6 @@
             repo_root_style = "underline bold cyan";
           };
 
-          git_branch = {
-            symbol = "󰘬 ";
-            style = "bold purple";
-            format = "[$symbol$branch]($style)";
-          };
-
           git_status = {
             format = "[[($staged$modified$untracked )](bold yellow) ±$ahead_behind]($style) ";
             staged = "+$count";
@@ -164,7 +71,6 @@
 
           nix_shell = {
             symbol = "*";
-            # Format with parentheses
             format = "([(\($name\))]($style))";
             style = "bold blue";
             heuristic = true;
@@ -173,7 +79,6 @@
           python = {
             symbol = "";
             version_format = "$major.$minor";
-            # Format with parentheses
             format = "([$symbol$version]($style))";
             style = "italic yellow";
             detect_extensions = ["py"];
@@ -184,7 +89,6 @@
           rust = {
             symbol = "";
             version_format = "$major.$minor";
-            # Format with parentheses
             format = "([$symbol$version]($style))";
             style = "italic red";
             detect_extensions = ["rs"];
@@ -196,6 +100,59 @@
             format = "[$duration]($style)";
             style = "bold green";
             show_milliseconds = false;
+          };
+
+          git_branch = {
+            symbol = "󰘬 ";
+            style = "bold purple";
+            format = "[$symbol$branch]($style)";
+          };
+
+          custom.git_branch_short = {
+            command = let
+              # script:
+              git_branch_short_sh = pkgs.writeShellScript "git-branch-short" ''
+                #!/usr/bin/env bash
+                git rev-parse --abbrev-ref HEAD 2> /dev/null | awk '
+                  {
+                      max_len = 25
+                      first_chars = 15
+                      first_boundary = 3
+                      last_chars = 10
+                      last_boundary = 3
+
+                      if (length($0) <= max_len) {
+                          print $0
+                      } else {
+                          # Find word boundary after first_chars (up to +first_boundary)
+                          start_idx = first_chars
+                          for (i = first_chars + 1; i <= first_chars + first_boundary && i <= length($0); i++) {
+                              if (substr($0, i, 1) ~ /[^a-zA-Z0-9]/) {
+                                  start_idx = i - 1
+                                  break
+                              }
+                          }
+                          start_part = substr($0, 1, start_idx)
+
+                          # Find word boundary before last_chars (up to -last_boundary)
+                          end_idx = length($0) - last_chars + 1
+                          for (i = end_idx - 1; i >= end_idx - last_boundary && i > 0; i--) {
+                              if (substr($0, i, 1) ~ /[^a-zA-Z0-9]/) {
+                                  end_idx = i + 1
+                                  break
+                              }
+                          }
+                          end_part = substr($0, end_idx, length($0) - end_idx + 1)
+
+                          print start_part "…" end_part
+                      }
+                  }'
+              '';
+            in "${git_branch_short_sh}";
+            when = "git rev-parse --is-inside-work-tree 2>/dev/null | grep -q true";
+            style = "bold purple";
+            symbol = "󰘬 ";
+            format = "[$symbol$output]($style)";
           };
         };
       };
