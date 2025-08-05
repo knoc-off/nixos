@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "quick_neovim_push___________________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "____________________________________________________________________________Updated_to_25.05";
+  system.nixos.label = "hyprland____________________________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "____________________________________________________________________________Updated_to_25.05";
 }
