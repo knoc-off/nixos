@@ -110,6 +110,7 @@ in {
         name = "middleclick";
         args = {no_quarantine = true;};
       }
+      "claude-code"
       "utm"
       "crystalfetch"
 

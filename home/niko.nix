@@ -17,6 +17,7 @@
 
       home.packages = with pkgs; [
         gum
+        television
       ];
       programs.zsh = {
         enable = true;
@@ -116,9 +117,9 @@
                 git rev-parse --abbrev-ref HEAD 2> /dev/null | awk '
                   {
                       max_len = 25
-                      first_chars = 15
+                      first_chars = 10
                       first_boundary = 3
-                      last_chars = 10
+                      last_chars = 9
                       last_boundary = 3
 
                       if (length($0) <= max_len) {
