@@ -7,6 +7,7 @@
   theme,
   color-lib,
   lib,
+  config,
   ...
 } @ args: let
   inherit (color-lib) setOkhslLightness setOkhslSaturation;
@@ -17,6 +18,7 @@
 in {
   imports = [
     (self.nixosModules.home {inherit args;})
+    inputs.sops-nix.darwinModules.sops
     # need to use lib.mkIf pkgs.stdenv.isLinux / isDarwin to conditionally add logic.
     # ./modules/shell/fish.nix
     {
@@ -25,6 +27,7 @@ in {
       environment.variables = {
         EDITOR = "vi";
         VISUAL = "vi";
+        ANTHROPIC_API_KEY = "$(cat ${config.sops.secrets.ANTHROPIC_API_KEY.path})";
       };
       programs.zsh = {
         #erableFzfCompletion = true;
@@ -67,6 +70,10 @@ in {
     jq
     gh # required by octo.nvim
     shellcheck # Dont need this?
+
+    # secrets management
+    sops
+    age
 
     # company tools
     wireguard-tools
@@ -147,4 +154,11 @@ in {
     remapCapsLockToControl = true;
   };
   security.pam.services.sudo_local.touchIdAuth = true;
+
+  # Sops configuration
+  sops = {
+    defaultSopsFile = ./secrets/Nicholass-MacBook-Pro/default.yaml;
+    age.sshKeyPaths = ["/Users/${user}/.ssh/id_ed25519"];
+    secrets."ANTHROPIC_API_KEY" = {mode = "0644";};
+  };
 }

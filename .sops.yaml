@@ -4,24 +4,30 @@ keys:
   - &hetzner age1kedaufmt9rah4h65gvmml0vfxdjngqsteqqy79rvs4hqs0j9rfaq858cg0
   - &rpi3A age1x203sz3zrzjrj094j5dsyrpk4vj6zkp7jgvl6dvgk32nspyjqf9qkyacjt
   - &homeserver age1yfnk76q5velf4ydxvcajm008w42nkfk3tz2euz6666j89pxe2yjqyl4g03
+  - &macbook age1a3depj56m3sy0pcp9yywv6flv4rv5n4vx2sh8qey28p8mpq9eumsyrvyc9
 creation_rules:
   - path_regex: systems/secrets/hetzner/[^/]+\.(yaml|json|env|ini)$
     key_groups:
       - age:
-        - *framework13h
-        - *hetzner
+          - *framework13h
+          - *hetzner
   - path_regex: systems/secrets/rpi3A/[^/]+\.(yaml|json|env|ini)$
     key_groups:
       - age:
-        - *framework13h
-        - *rpi3A
+          - *framework13h
+          - *rpi3A
   - path_regex: systems/secrets/framework13/[^/]+\.(yaml|json|env|ini)$
     key_groups:
       - age:
-        - *framework13h
-        - *framework13
+          - *framework13h
+          - *framework13
   - path_regex: systems/secrets/homeserver/[^/]+\.(yaml|json|env|ini)$
     key_groups:
       - age:
-        - *framework13h
-        - *homeserver
+          - *framework13h
+          - *homeserver
+  - path_regex: systems/secrets/Nicholass-MacBook-Pro/[^/]+\.(yaml|json|env|ini)$
+    key_groups:
+      - age:
+          - *framework13h
+          - *macbook
