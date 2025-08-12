@@ -2,6 +2,7 @@
   pkgs,
   upkgs,
   self,
+  config,
   ...
 }: {
   # test
@@ -161,5 +162,11 @@
 
     ./programs/filemanager/yazi.nix
   ];
+
+  # Environment variables from sops
+  # home.sessionVariables = {
+  #   ANTHROPIC_API_KEY = "$(cat ${config.sops.secrets.ANTHROPIC_API_KEY.path})";
+  # };
+
   home.stateVersion = "25.05";
 }
