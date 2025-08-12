@@ -99,6 +99,10 @@
               desc = "CD to git root";
               icon = " ";
             };
+            "<leader>gb" = {
+              desc = "Git Blame popup";
+              icon = " ";
+            };
             "<leader>cd" = {
               desc = "CD current file";
               icon = " ";
@@ -597,6 +601,15 @@
       '';
 
       keymaps = [
+        {
+          mode = "n";
+          key = "<leader>gb";
+          action = helpers.mkRaw "function() require('gitsigns').blame_line({ full = false }) end";
+          options = {
+            silent = true;
+            desc = "Git Blame (popup)";
+          };
+        }
         {
           mode = "n";
           key = "<leader>gr";
@@ -1151,6 +1164,128 @@
           };
         };
       };
+    }
+
+    # Avante.nvim - AI copilot like Cursor AI IDE
+    {
+      plugins.avante = {
+        enable = true;
+
+        lazyLoad = {
+          enable = false;
+          settings = {
+            keys = [
+              "<leader>aa"
+              "<leader>ae"
+              "<leader>ar"
+              "<leader>at"
+            ];
+          };
+        };
+
+        settings = {
+          provider = "claude";
+          behaviour = {
+            auto_suggestions = false;
+            auto_set_highlight_group = true;
+            auto_set_keymaps = true;
+            auto_apply_diff_after_generation = false;
+            support_paste_from_clipboard = false;
+          };
+
+          mappings = {
+            ask = "<leader>aa";
+            edit = "<leader>ae";
+            refresh = "<leader>ar";
+            diff = {
+              ours = "co";
+              theirs = "ct";
+              both = "cb";
+              all_theirs = "ca";
+              cursor = "cc";
+              next = "]x";
+              prev = "[x";
+            };
+            jump = {
+              next = "]]";
+              prev = "[[";
+            };
+            submit = {
+              normal = "<CR>";
+              insert = "<C-s>";
+            };
+            toggle = {
+              default = "<leader>at";
+              debug = "<leader>ad";
+              hint = "<leader>ah";
+            };
+          };
+
+          hints = {
+            enabled = true;
+          };
+
+          windows = {
+            position = "right";
+            wrap = true;
+            width = 30;
+            sidebar_header = {
+              align = "center";
+              rounded = true;
+            };
+          };
+
+          highlights = {
+            diff = {
+              current = "DiffText";
+              incoming = "DiffAdd";
+            };
+          };
+        };
+      };
+
+      extraConfigLua = ''
+        vim.opt.laststatus = 3
+      '';
+
+      keymaps = [
+        {
+          mode = "n";
+          key = "<leader>aa";
+          action = helpers.mkRaw "function() require('avante.api').ask() end";
+          options = {
+            desc = "avante: ask";
+            silent = true;
+          };
+        }
+        {
+          mode = "v";
+          key = "<leader>ae";
+          action = helpers.mkRaw "function() require('avante.api').edit() end";
+          options = {
+            desc = "avante: edit";
+            silent = true;
+          };
+        }
+        {
+          mode = "n";
+          key = "<leader>ar";
+          action = helpers.mkRaw "function() require('avante.api').refresh() end";
+          options = {
+            desc = "avante: refresh";
+            silent = true;
+          };
+        }
+        {
+          mode = "n";
+          key = "<leader>at";
+          action = helpers.mkRaw "function() require('avante').toggle() end";
+          options = {
+            desc = "avante: toggle";
+            silent = true;
+          };
+        }
+      ];
     }
   ];
 
