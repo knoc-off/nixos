@@ -12,6 +12,7 @@
       "aarch64-linux"
       "x86_64-linux"
       "aarch64-darwin"
+      "aarch64-linux"
       #"i686-linux"
       #"x86_64-darwin"
     ];
@@ -91,11 +92,32 @@
       value =
         (mkConfig {
           inherit hostname user system;
-          extraModules = [
-            ./systems/modules/live-iso.nix # {inherit user;}
-            {isoImage = {isoName = lib.mkForce name;};}
-          ];
-        }).config.system.build.isoImage;
+          extraModules =
+            [
+            ]
+            ++ (
+              if imageType == "isoImage"
+              then [
+                ./systems/modules/${imageType}.nix
+                {isoImage = {isoName = lib.mkForce name;};}
+              ]
+              else if imageType == "sdImage"
+              then [
+                ./systems/modules/${imageType}.nix
+                {
+                  nixpkgs.hostPlatform.system = system;
+                  nixpkgs.buildPlatform.system = "x86_64-linux";
+                }
+                #{sdImage = {sdName = lib.mkForce name;};}
+              ]
+              else [
+                ./systems/modules/${imageType}.nix
+                #{"${imageType}" = {name = lib.mkForce name;};}
+              ]
+            );
+        }).config.system.build.${
+          imageType
+        };
     };
 
     # Import packages from the unstable Nixpkgs channel
@@ -146,7 +168,10 @@
 
     images =
       listToAttrs
-      [(mkImage "framework13" "knoff" "x86_64-linux" "isoImage")];
+      [
+        (mkImage "framework13" "knoff" "x86_64-linux" "isoImage")
+        (mkImage "raspberry-3b" "knoff" "aarch64-linux" "sdImage")
+      ];
 
     #darwinConfigurations = listToAttrs [
     #  (mkHost "Nicholass-MacBook-Pro" "nicolai" "aarch64-darwin")
