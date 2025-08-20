@@ -123,6 +123,50 @@
               desc = "Show available formatters";
               icon = " ";
             };
+            "<leader>l" = {
+              group = "LSP";
+              icon = " ";
+            };
+            "<leader>ld" = {
+              desc = "Go to Definition";
+              icon = " ";
+            };
+            "<leader>lD" = {
+              desc = "Go to Declaration";
+              icon = " ";
+            };
+            "<leader>li" = {
+              desc = "List Implementations";
+              icon = " ";
+            };
+            "<leader>lr" = {
+              desc = "Show References";
+              icon = " ";
+            };
+            "<leader>lh" = {
+              desc = "Show Hover";
+              icon = "󰋖 ";
+            };
+            "<leader>ls" = {
+              desc = "Document Symbols";
+              icon = " ";
+            };
+            "<leader>lS" = {
+              desc = "Signature Help";
+              icon = " ";
+            };
+            "<leader>ln" = {
+              desc = "Rename Symbol";
+              icon = " ";
+            };
+            "<leader>lf" = {
+              desc = "Format Code";
+              icon = " ";
+            };
+            "<leader>lt" = {
+              desc = "Type Definition";
+              icon = " ";
+            };
             "<C-g>" = {
               mode = "i";
               desc = "Trigger Copilot suggestions manually";
