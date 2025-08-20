@@ -29,6 +29,10 @@
         '';
       };
       programs.bash.enable = true;
+      # I want to add the ability to see the git-stash, and if there is uncommitted changes.
+      # it would be pretty cool to show each stash based on its hash condensed into a single letter.
+      # we would want to then make sure they dont repeat.
+      # maybe just A-Z. and show them in a queue, next to git data. <git_branch_short> <untracked_files_status> A B C D
       programs.starship = {
         enable = true;
         enableZshIntegration = true;
