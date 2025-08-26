@@ -14,20 +14,7 @@
   #    openssh.authorizedKeys.keys = lib.mkForce SSHKeys;
   #  };
 in {
-  imports =
-    if system == "x86_64-linux"
-    then [
-      "${modulesPath}/installer/cd-dvd/installation-cd-minimal.nix"
-    ]
-    else if system == "aarch64-linux"
-    then [
-      "${modulesPath}/installer/sd-card/sd-image-aarch64.nix"
-      {
-        nixpkgs.config.allowUnsupportedSystem = true;
-        nixpkgs.hostPlatform.system = "aarch64-linux";
-      }
-    ]
-    else [];
+  imports = ["${modulesPath}/installer/cd-dvd/installation-cd-minimal.nix"];
 
   config =
     {
@@ -44,7 +31,7 @@ in {
         initrd.systemd.dbus.enable = true;
         loader = {
           systemd-boot.enable =
-            if config.boot.lanzaboote.enable
+            if lib.hasAttr "lanzaboote" config.boot && config.boot.lanzaboote.enable
             then lib.mkForce false
             else true;
           efi.canTouchEfiVariables = true;

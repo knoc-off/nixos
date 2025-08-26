@@ -1,13 +1,16 @@
-{ modulesPath, inputs, outputs, config, lib, pkgs, self, ... }: {
+{
+  modulesPath,
+  inputs,
+  outputs,
+  config,
+  lib,
+  pkgs,
+  self,
+  ...
+}: {
   imports = [
-    "${modulesPath}/installer/sd-card/sd-image-aarch64.nix"
-    {
-      nixpkgs.config.allowUnsupportedSystem = true;
-      nixpkgs.hostPlatform.system = "aarch64-linux";
-    }
-    ./modules/nix.nix
-    ./commit-messages/raspberry3B-commit-message.nix
-    ./services/octoprint.nix
+    ./commit-messages/raspberry-3b-commit-message.nix
+    #./services/octoprint.nix
   ];
 
   boot = {
@@ -16,15 +19,6 @@
       grub = {
         efiSupport = true;
         efiInstallAsRemovable = true;
-      };
-      raspberryPi = {
-        enable = true;
-        version = 3;
-        uboot.enable = true;
-        firmwareConfig = ''
-          start_x=1
-          gpu_mem=256
-        '';
       };
     };
   };
@@ -35,13 +29,15 @@
     hostName = "rpi3B";
     networkmanager.enable = true;
     wireless.enable = true;
-    firewall = { enable = false; };
+    firewall = {enable = false;};
   };
 
-  swapDevices = [{
-    device = "/var/lib/swapfile";
-    size = 2 * 1024; # 2 GB
-  }];
+  swapDevices = [
+    {
+      device = "/var/lib/swapfile";
+      size = 2 * 1024; # 2 GB
+    }
+  ];
 
   services.openssh = {
     enable = true;
@@ -49,7 +45,7 @@
   };
 
   environment.systemPackages =
-    map lib.lowPrio [ pkgs.curl pkgs.gitMinimal pkgs.libraspberrypi ];
+    map lib.lowPrio [pkgs.curl pkgs.gitMinimal pkgs.libraspberrypi];
 
   users.users = {
     root = {
