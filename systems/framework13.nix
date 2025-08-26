@@ -60,6 +60,9 @@
         hardware.uinput.enable = true;
 
         services.kanata = {
+          # kinda makes sense to migrate this to my home-manager.
+          # i want to have some dynamic way to build this for things like firefox, etc.
+          # so in my home-manager next to my firefox config we would also define its keymaps.
           enable = true;
           package = pkgs.kanata;
 
