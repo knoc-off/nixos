@@ -56,7 +56,7 @@
           gap_size = 5;
           bg_col = "0xff${theme.base00}";
           skip_empty = true;
-          workspace_method = "center first"; # [center/first] [workspace] e.g. first 1 or center m+1
+          workspace_method = "first 1"; # [center/first] [workspace] e.g. first 1 or center m+1
 
           enable_gesture = true; # laptop touchpad
           gesture_fingers = 3; # 3 or 4
