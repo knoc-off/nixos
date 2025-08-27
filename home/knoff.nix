@@ -112,9 +112,11 @@
       #self.packages.${pkgs.system}.spider-cli
       #self.packages.${pkgs.system}.tabiew
 
-      upkgs.aider-chat
+      upkgs.claude-code
+      upkgs.gemini-cli
+      upkgs.litellm
+      upkgs.prismlauncher
       upkgs.gimp3
-      #upkgs.claude-code
       #upkgs.astal.hyprland
 
       lazysql
