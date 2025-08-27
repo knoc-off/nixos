@@ -1,5 +1,9 @@
-{pkgs, self, ...}: {
+{
+  pkgs,
+  self,
+  ...
+}: {
   home.packages = [
-    self.packages.${pkgs.system}.spotify-adblock
+    # self.packages.${pkgs.system}.spotify-adblock
   ];
 }
