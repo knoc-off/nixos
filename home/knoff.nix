@@ -48,6 +48,92 @@
     self.homeModules.gtk
     # self.homeModules.hyprland
 
+    self.homeModules.kanata
+    self.homeModules.hyprkan
+    {
+      programs.hyprkan = {
+        package = self.packages.${pkgs.system}.hyprkan;
+        enable = true;
+        service.enable = true;
+
+        service.extraArgs = ["--port" "52545"];
+
+        rules = [
+          # Terminal apps use special layer (caps = right meta)
+          {
+            class = "kitty";
+            layer = "special";
+          }
+          {
+            class = "foot";
+            layer = "special";
+          }
+
+          # Default fallback (caps = control)
+          {
+            class = "*";
+            title = "*";
+            layer = "base";
+          }
+        ];
+      };
+    }
+
+    # Kanata keyboard remapping via home module
+    {
+      services.kanata = {
+        enable = true;
+        package = pkgs.kanata-with-cmd;
+
+        keyboards.main = {
+          devices = []; # Auto-detect keyboards
+          excludeDevices = [
+            "Logitech USB Receiver"
+          ];
+          port = 52545;
+          extraDefCfg = "danger-enable-cmd yes";
+          config = ''
+            (deffakekeys
+              met lmet
+              ctl lctl
+            )
+
+            (defalias
+              caps-double (tap-dance-eager 250 (XX (cmd ${pkgs.rofi}/bin/rofi -show drun)))
+              caps-meta (multi (on-press-fakekey met press) @caps-double (on-release-fakekey met release))
+              caps-ctrl (multi (on-press-fakekey ctl press) @caps-double (on-release-fakekey ctl release))
+              test-f12 (cmd ${pkgs.rofi}/bin/rofi -show drun)
+            )
+
+            (defsrc caps f12)
+
+            (deflayer base @caps-ctrl @test-f12)
+            (deflayer special @caps-meta @test-f12)
+          '';
+        };
+
+        # keyboards.mx-master = {
+        #   devices = ["/dev/input/by-id/usb-Logitech_USB_Receiver-if01-event-mouse"];
+        #   extraDefCfg = "danger-enable-cmd yes";
+        #   config = ''
+        #     (defalias
+        #       rofi-launch (cmd ${pkgs.rofi}/bin/rofi -show drun)
+        #       scroll-slow (cmd ${pkgs.libratbag}/bin/ratbagctl wheel set multiplier 0.3)
+        #       scroll-fast (cmd ${pkgs.libratbag}/bin/ratbagctl wheel set multiplier 2.0)
+        #       wheel-smooth (cmd ${pkgs.libratbag}/bin/ratbagctl wheel set mode smooth)
+        #       wheel-ratchet (cmd ${pkgs.libratbag}/bin/ratbagctl wheel set mode ratchet)
+        #     )
+
+        #     (defsrc
+        #       mbck mfwd mwu mwd)
+
+        #     (deflayer base
+        #       @rofi-launch mmid mwu mwd)
+        #   '';
+        # };
+      };
+    }
+
     #./programs
     #./desktop
     #./programs/virtualization/bottles.nix
@@ -154,6 +240,10 @@
       usbutils
       watchexec
       quicksand
+
+      # Mouse configuration tools
+      libratbag
+      piper
     ];
 
     stateVersion = "23.05";
