@@ -24,55 +24,70 @@ in {
       size = 15;
     };
     shellIntegration.enableZshIntegration = true;
-    keybindings = {
-      "ctrl+shift+r" = "set_tab_title";
-      "cmd+r" = "set_tab_title";
+    keybindings =
+      {
+        "ctrl+shift+r" = "set_tab_title";
+        "ctrl+t" = "new_os_window_with_cwd";
+        "ctrl+shift+t" = "new_window_with_cwd";
+        "ctrl+l" = "clear_terminal to_cursor active";
 
-      "ctrl+t" = "new_os_window_with_cwd";
-      "ctrl+shift+t" = "new_window_with_cwd";
-      "ctrl+l" = "clear_terminal to_cursor active";
+        # swap window for master
+        "shift+enter" = "move_window_to_top";
+        "alt+enter" = "launch --location=split";
 
-      # swap window for master
-      "cmd+enter" = "move_window_to_top";
-      "shift+enter" = "move_window_to_top";
-      "alt+enter" = "launch --location=split";
-    };
+        "super+c" = "copy_to_clipboard";
+        "super+v" = "paste_from_clipboard";
+        "super+a" = "select_all";
+        "super+f" = "show_scrollback";
+        "super+t" = "new_tab_with_cwd";
+        "super+w" = "close_tab";
+        "super+n" = "new_os_window";
+        "super+z" = "undo";
+        "super+shift+z" = "redo";
+      }
+      // lib.optionalAttrs pkgs.stdenv.isDarwin {
+        "cmd+r" = "set_tab_title";
+        "cmd+enter" = "move_window_to_top";
+      };
     extraConfig = ''
 
-
+        # this is so that hyprland can control kitty:
         allow_remote_control socket
         listen_on unix:/tmp/kitty-{kitty_pid}.socket
 
+
+        # this may be interesting to map to a keybind?
         mouse_map right press ungrabbed mouse_select_command_output
+
+        # add a keybind to open last output in nvim/bat?
 
         # tall layout
         enabled_layouts tall:bias=60;full_size=1;mirrored=false
 
-        # You may need to set macos_option_as_alt to 'yes' for this to work as expected
-        macos_option_as_alt yes
-
-        # Switch focus using Option + Arrow Keys
-        map alt+left  neighboring_window left
-        map alt+right neighboring_window right
-        map alt+up    neighboring_window up
-        map alt+down  neighboring_window down
-
-        # Switch focus using Option + hjkl
-        map alt+h neighboring_window left
-        map alt+l neighboring_window right
-        map alt+k neighboring_window up
-        map alt+j neighboring_window down
-
-
-      ${ # tag:hardwarespecific
+      ${ # Darwin-specific config
         if pkgs.stdenv.isDarwin
         then ''
+          macos_option_as_alt yes
+
+          # Switch focus using Option + Arrow Keys
+          map alt+left  neighboring_window left
+          map alt+right neighboring_window right
+          map alt+up    neighboring_window up
+          map alt+down  neighboring_window down
+
+          # Switch focus using Option + hjkl
+          map alt+h neighboring_window left
+          map alt+l neighboring_window right
+          map alt+k neighboring_window up
+          map alt+j neighboring_window down
+
           touch_scroll_multiplier 1
         ''
         else ''
           touch_scroll_multiplier 6.5
         ''
       }
+
 
 
     '';

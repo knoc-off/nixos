@@ -46,34 +46,101 @@
       };
     }
 
-    (
-      let
-        kanataConfig = pkgs.writeText "kanata-config.kdb" ''
+    # Enable uinput for kanata and logiops for mouse
+    {
+      hardware.uinput.enable = true;
+      #services.ratbagd.enable = true;
+    }
 
-          (defsrc)
-          (deflayermap (base-layer)
-            caps rmet)
-
-
-        '';
-      in {
-        hardware.uinput.enable = true;
-
-        services.kanata = {
-          # kinda makes sense to migrate this to my home-manager.
-          # i want to have some dynamic way to build this for things like firefox, etc.
-          # so in my home-manager next to my firefox config we would also define its keymaps.
-          enable = true;
-          package = pkgs.kanata;
-
-          keyboards = {
-            main_config = {
-              configFile = kanataConfig;
+    # Logiops for MX Master 3S mouse configuration
+    self.nixosModules.services.logiops
+    {
+      services.logiops = {
+        enable = true;
+        devices = [
+          {
+            name = "MX Master 3S";
+            buttons = [
+              {
+                cid = "0x50"; # Left Mouse Button
+                action = {
+                  type = "Keypress";
+                  keys = ["KEY_F13"];
+                };
+              }
+              {
+                cid = "0x51"; # Right Mouse Button
+                action = {
+                  type = "Keypress";
+                  keys = ["KEY_F14"];
+                };
+              }
+              {
+                cid = "0x52"; # Middle Mouse Button
+                action = {
+                  type = "Keypress";
+                  keys = ["KEY_F15"];
+                };
+              }
+              {
+                cid = "0x53"; # Back Button
+                action = {
+                  type = "Keypress";
+                  keys = ["KEY_F16"];
+                };
+              }
+              {
+                cid = "0x56"; # Forward Button
+                action = {
+                  type = "Keypress";
+                  keys = ["KEY_F17"];
+                };
+              }
+              {
+                cid = "0x5b"; # Left Scroll Wheel
+                action = {
+                  type = "Keypress";
+                  keys = ["KEY_F18"];
+                };
+              }
+              {
+                cid = "0x5d"; # Right Scroll Wheel
+                action = {
+                  type = "Keypress";
+                  keys = ["KEY_F19"];
+                };
+              }
+              {
+                cid = "0xc3"; # Gesture Button
+                action = {
+                  type = "Keypress";
+                  keys = ["KEY_F20"];
+                };
+              }
+              {
+                cid = "0xc4"; # Toggle SmartShift
+                action = {
+                  type = "Keypress";
+                  keys = ["KEY_F21"];
+                };
+              }
+              {
+                cid = "0xd7"; # Switch Receivers
+                action = {
+                  type = "Keypress";
+                  keys = ["KEY_F22"];
+                };
+              }
+            ];
+            scroll = {
+              hires = true;
+              invert = false;
+              target = false;
             };
-          };
-        };
-      }
-    )
+          }
+        ];
+      };
+    }
 
     {
       networking.networkmanager.enable = lib.mkDefault true;
@@ -334,6 +401,10 @@
       SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", MODE="0666", GROUP="users"
       KERNEL=="ttyUSB[0-9]*", MODE="0666", GROUP="users"
       KERNEL=="ttyACM[0-9]*", MODE="0666", GROUP="users"
+
+      # Allow users in input group to access input devices for kanata
+      KERNEL=="event[0-9]*", GROUP="input", MODE="0660"
+      KERNEL=="uinput", GROUP="uinput", MODE="0660"
     '';
   };
 
@@ -419,6 +490,7 @@
           "video"
           "dialout"
           "uinput"
+          "input"
           "lp"
         ]
         ++ (

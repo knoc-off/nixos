@@ -34,6 +34,7 @@ in rec {
     };
   };
 
+  hyprkan = pkgs.python3Packages.callPackage ./hyprkan {};
   colorscad = pkgs.callPackage ./colorscad {};
   rcon-cli = pkgs.callPackage ./rcon-cli {};
   grosshack = pkgs.callPackage ./grosshack {};
@@ -41,7 +42,7 @@ in rec {
   triliumNext = pkgs.callPackage ./triliumNext {};
   spotify-adblock = pkgs.callPackage ./spotify-adblock {};
   llm-cmd = pkgs.pythonPackages.callPackage ./llm-cmd {};
-  ttok = pkgs.pythonPackages.callPackage ./ttok {};
+  ttok = pkgs.pythonPackages.callpackage ./ttok {};
   wrap = pkgs.pythonPackages.callPackage ./wrap-codeblocks {};
   nixx = pkgs.pythonPackages.callPackage ./nixx-script {};
 
