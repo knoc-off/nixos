@@ -1,6 +1,5 @@
 {
   inputs,
-  math,
   pkgs,
   theme,
   lib,
@@ -88,7 +87,7 @@ in rec {
         name = "testing2";
 
         settings =
-          import ./settings/default.nix {inherit theme math lib color-lib;};
+          import ./settings/default.nix {inherit theme lib color-lib;};
         extensions.packages = with addons; [sidebery];
         userChrome = import ./userChrome.nix {
           inherit theme color-lib firefox-csshacks;
@@ -101,7 +100,7 @@ in rec {
         name = "projection";
 
         settings =
-          import ./settings/default.nix {inherit theme math lib color-lib;};
+          import ./settings/default.nix {inherit theme lib color-lib;};
         extensions.packages = with addons; [sidebery];
         userChrome = import ./userChrome-minimal.nix {
           inherit theme color-lib firefox-csshacks;

@@ -20,7 +20,7 @@ in {
 
   imports = [
     inputs.nix-minecraft.nixosModules.minecraft-servers
-    ./minecraft-gate-reverse-proxy.nix
+    ./gate-reverse-proxy.nix
   ];
 
   options.services.minecraft-server-suite = {

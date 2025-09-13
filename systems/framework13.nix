@@ -9,10 +9,10 @@
   ...
 } @ args: {
   imports = [
-    ./modules/minecraft.nix
-
-    (self.nixosModules.home {inherit args;})
+    (self.nixosModules.home args)
     (self.nixosModules.nix {inherit inputs;})
+    self.nixosModules.minecraft.server-suite
+    (self.nixosModules.audio.pipewire args)
 
     inputs.disko.nixosModules.disko
     {disko.devices.disk.vdb.device = "/dev/nvme0n1";}
@@ -25,122 +25,124 @@
 
     inputs.hardware.nixosModules.framework-13-7040-amd
 
-    {
-      services.openvpn.servers = {
-        # work-production = {
-        #   config = ''
-        #     config /etc/secrets/vpn/work/staging/production.ovpn
-        #   '';
-        #   autoStart = false;
-        # };
-        # work-staging = {
-        #   config = ''
-        #     config /etc/secrets/vpn/work/staging/staging.ovpn
-        #     # cert /etc/secrets/vpn/work/staging/certificate.pem
-        #     # key /etc/secrets/vpn/work/staging/key.pem
-        #     ## If using PKCS12 instead, uncomment the line below and comment out cert/key lines
-        #     # pkcs12 /etc/secrets/vpn/client-identity.p12
-        #   '';
-        #   autoStart = false;
-        # };
-      };
-    }
-
     # Enable uinput for kanata and logiops for mouse
     {
       hardware.uinput.enable = true;
-      #services.ratbagd.enable = true;
+      # services.ratbagd.enable = true;
     }
 
     # Logiops for MX Master 3S mouse configuration
-    self.nixosModules.services.logiops
-    {
-      services.logiops = {
-        enable = true;
-        devices = [
-          {
-            name = "MX Master 3S";
-            buttons = [
-              {
-                cid = "0x50"; # Left Mouse Button
-                action = {
-                  type = "Keypress";
-                  keys = ["KEY_F13"];
-                };
-              }
-              {
-                cid = "0x51"; # Right Mouse Button
-                action = {
-                  type = "Keypress";
-                  keys = ["KEY_F14"];
-                };
-              }
-              {
-                cid = "0x52"; # Middle Mouse Button
-                action = {
-                  type = "Keypress";
-                  keys = ["KEY_F15"];
-                };
-              }
-              {
-                cid = "0x53"; # Back Button
-                action = {
-                  type = "Keypress";
-                  keys = ["KEY_F16"];
-                };
-              }
-              {
-                cid = "0x56"; # Forward Button
-                action = {
-                  type = "Keypress";
-                  keys = ["KEY_F17"];
-                };
-              }
-              {
-                cid = "0x5b"; # Left Scroll Wheel
-                action = {
-                  type = "Keypress";
-                  keys = ["KEY_F18"];
-                };
-              }
-              {
-                cid = "0x5d"; # Right Scroll Wheel
-                action = {
-                  type = "Keypress";
-                  keys = ["KEY_F19"];
-                };
-              }
-              {
-                cid = "0xc3"; # Gesture Button
-                action = {
-                  type = "Keypress";
-                  keys = ["KEY_F20"];
-                };
-              }
-              {
-                cid = "0xc4"; # Toggle SmartShift
-                action = {
-                  type = "Keypress";
-                  keys = ["KEY_F21"];
-                };
-              }
-              {
-                cid = "0xd7"; # Switch Receivers
-                action = {
-                  type = "Keypress";
-                  keys = ["KEY_F22"];
-                };
-              }
-            ];
-            scroll = {
-              hires = true;
-              invert = false;
-              target = false;
-            };
-          }
-        ];
-      };
-    }
+    # self.nixosModules.services.logiops
+    # {
+    #   services.logiops = {
+    #     enable = true;
+    #     config = ''
+    #       io_timeout: 60000.0;
+
+    #       devices:
+    #       (
+    #           {
+    #               name: "MX Master 3S";
+    #               buttons:
+    #               (
+    #                   {
+    #                       cid: 0x52;
+    #                       action:
+    #                       {
+    #                           type: "Keypress";
+    #                           keys: ["KEY_F13"];
+    #                       };
+    #                   },
+    #                   {
+    #                       cid: 0x53;
+    #                       action:
+    #                       {
+    #                           type: "Keypress";
+    #                           keys: ["KEY_F14"];
+    #                       };
+    #                   },
+    #                   {
+    #                       cid: 0x56;
+    #                       action:
+    #                       {
+    #                           type: "Keypress";
+    #                           keys: ["KEY_F15"];
+    #                       };
+    #                   },
+    #                   {
+    #                       cid: 0xc3;
+    #                       action:
+    #                       {
+    #                           type: "Keypress";
+    #                           keys: ["KEY_F16"];
+    #                       };
+    #                   },
+    #                   {
+    #                       cid: 0xc4;
+    #                       action:
+    #                       {
+    #                           type: "Keypress";
+    #                           keys: ["KEY_F17"];
+    #                       };
+    #                   },
+    #                   {
+    #                       cid: 0xd7;
+    #                       action:
+    #                       {
+    #                           type: "Keypress";
+    #                           keys: ["KEY_F18"];
+    #                       };
+    #                   }
+    #               );
+    #               scroll:
+    #               (
+    #                   {
+    #                       hires: true;
+    #                       invert: false;
+    #                       target: false;
+    #                   }
+    #               );
+    #               thumbwheel:
+    #               {
+    #                   divert: true;
+    #                   invert: false;
+    #                   left:
+    #                   {
+    #                       action:
+    #                       {
+    #                           type: "Keypress";
+    #                           keys: ["KEY_F19"];
+    #                       };
+    #                   };
+    #                   right:
+    #                   {
+    #                       action:
+    #                       {
+    #                           type: "Keypress";
+    #                           keys: ["KEY_F20"];
+    #                       };
+    #                   };
+    #                   proxy:
+    #                   {
+    #                       type: "Keypress";
+    #                       keys: ["KEY_F21"];
+    #                   };
+    #                   touch:
+    #                   {
+    #                       type: "Keypress";
+    #                       keys: ["KEY_F22"];
+    #                   };
+    #                   tap:
+    #                   {
+    #                       type: "Keypress";
+    #                       keys: ["KEY_F23"];
+    #                   };
+    #               };
+    #           }
+    #       );
+    #     '';
+    #   };
+    # }
 
     {
       networking.networkmanager.enable = lib.mkDefault true;
@@ -192,9 +194,6 @@
         secrets."ANTHROPIC_API_KEY" = {mode = "0644";};
       };
     }
-
-    # Pipewire / Audio
-    ./modules/audio
 
     # Nix package settings
     {

@@ -1,12 +1,9 @@
-{ theme, color-lib, math, lib, ... }:
-let
-  # Generate the zoom values list
-  zoomValuesList = math.arange 0.30 2.00 0.02;
-
-  # Format each value as a string and join with commas
-  zoomValuesString = lib.concatStringsSep "," (lib.map builtins.toString zoomValuesList);
-in
 {
+  theme,
+  color-lib,
+  lib,
+  ...
+}: {
   # =========================================================================
   # Core Functionality & Performance
   # =========================================================================
@@ -163,7 +160,6 @@ in
   "userContent.page.dark_mode" = true;
   "userContent.page.proton" = true;
 
-
   # --- colors ---
   "browser.active_color" = "#${theme.base0E}"; # Active link color (light) - Using Magenta/Purple
   "browser.active_color.dark" = "#${theme.base0E}"; # Active link color (dark) - Using Magenta/Purple
@@ -174,14 +170,12 @@ in
   "browser.display.foreground_color" = "#${theme.base06}"; # Page text (light)
   "browser.display.foreground_color.dark" = "#${theme.base07}"; # Page text (dark)
   # New Tab Page accent colors - using a sequence of base colors
-  "browser.newtabpage.activity-stream.newNewtabExperience.colors" =
-    "#${theme.base08},#${theme.base09},#${theme.base0A},#${theme.base0B},#${theme.base0C},#${theme.base0D},#${theme.base0E}";
+  "browser.newtabpage.activity-stream.newNewtabExperience.colors" = "#${theme.base08},#${theme.base09},#${theme.base0A},#${theme.base0B},#${theme.base0C},#${theme.base0D},#${theme.base0E}";
   "browser.visited_color" = "#${theme.base0E}"; # Visited link color (light) - Using Magenta/Purple
   "browser.visited_color.dark" = "#${theme.base0F}"; # Visited link color (dark) - Using Brown/Lighter Purple
   "editor.background_color" = "#${theme.base01}"; # Text input background (light)
   # PDF.js highlight colors mapped to theme accents
-  "pdfjs.highlightEditorColors" =
-    "yellow=#${theme.base0A},green=#${theme.base0B},blue=#${theme.base0D},pink=#${theme.base0E},red=#${theme.base08}";
+  "pdfjs.highlightEditorColors" = "yellow=#${theme.base0A},green=#${theme.base0B},blue=#${theme.base0D},pink=#${theme.base0E},red=#${theme.base08}";
 
   # =========================================================================
   # UI Customization (Behavior, Tabs, URL Bar)
@@ -210,7 +204,7 @@ in
 
   # --- Zoom ---
   # Define custom zoom levels for finer control
-  "toolkit.zoomManager.zoomValues" = zoomValuesString;
+  # "toolkit.zoomManager.zoomValues" = zoomValuesString;
 
   # --- Smooth Scrolling ---
   "general.autoScroll" = true; # Enable middle-mouse button scrolling
@@ -300,5 +294,4 @@ in
   # "webgl.disabled" = true;
   # "webgl.renderer-string-override" = " ";
   # "webgl.vendor-string-override" = " ";
-
 }
