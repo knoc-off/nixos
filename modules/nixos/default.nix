@@ -3,6 +3,10 @@
   windowManager.gnome = import ./desktop/gnome.nix;
   desktop.totem = import ./desktop/media/totem.nix;
 
+  audio.pipewire = import ./audio/pipewire.nix;
+
+  minecraft.server-suite = import ./minecraft;
+
   services.axum-webserver = import ./services/axum-webserver.nix;
   services.logiops = import ./services/logiops.nix;
 

@@ -6,13 +6,11 @@
     nixpkgs-unstable,
     ...
   }: let
-    # thish ist fuell of tipos
     # theme is now defined inside mkConfig where color-lib is available
     systems = [
       "aarch64-linux"
       "x86_64-linux"
       "aarch64-darwin"
-      "aarch64-linux"
       #"i686-linux"
       #"x86_64-darwin"
     ];
@@ -40,6 +38,7 @@
       theme = import ./theme.nix {inherit color-lib math lib;};
 
       mkSystem =
+        # move this to inputs, override-able
         if lib.strings.hasSuffix "darwin" system
         then inputs.nix-darwin.lib.darwinSystem
         else nixosSystem;
@@ -50,11 +49,9 @@
           {
             inherit
               self
-              inputs # these are made somewhat redundant by 'self'
-              outputs # ^
+              inputs
               hostname
               user
-              lib
               system
               theme
               color-lib
@@ -172,10 +169,6 @@
         (mkImage "framework13" "knoff" "x86_64-linux" "isoImage")
         (mkImage "raspberry-3b" "knoff" "aarch64-linux" "sdImage")
       ];
-
-    #darwinConfigurations = listToAttrs [
-    #  (mkHost "Nicholass-MacBook-Pro" "nicolai" "aarch64-darwin")
-    #];
 
     darwinConfigurations = listToAttrs [
       (mkHost "Nicholass-MacBook-Pro" "niko" "aarch64-darwin")

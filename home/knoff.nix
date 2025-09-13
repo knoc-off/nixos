@@ -34,10 +34,6 @@
     # Firefox
     ./programs/browser/firefox
 
-    # music
-    ./programs/media/audio/spotify.nix
-    ./programs/media/audio/framework13-easyeffects.nix
-
     #./modules/firefox.nix
 
     ./programs/gaming/lutris.nix
