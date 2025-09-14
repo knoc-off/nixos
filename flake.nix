@@ -17,9 +17,6 @@
 
     forAllSystems = nixpkgs.lib.genAttrs systems;
 
-    inherit (self) outputs;
-
-    #lib = nixpkgs.lib.extend (final: prev: home-manager.lib);
     inherit (nixpkgs) lib;
 
     inherit (lib) nixosSystem listToAttrs;
@@ -33,7 +30,7 @@
       extraConfigs ? {},
     }: let
       # Define color-lib and theme here where lib and system are known
-      inherit (self.lib.${system}) math color-lib;
+      inherit (self.lib) math color-lib;
       # Pass color-lib and lib to the theme function
       theme = import ./theme.nix {inherit color-lib math lib;};
 
@@ -58,7 +55,6 @@
               math
               ;
             upkgs = unstablePkgs system;
-            # selfPkgs = self.packages.${system};
           }
           // extraConfigs;
         modules =
@@ -77,10 +73,6 @@
       name = hostname;
       value = mkConfig {
         inherit hostname user system;
-        # if darwin, add darwin modules.
-        # extraModules = lib.mkIf (system == "aarch64-darwin" || system == "x86_64-darwin") [
-        #   ./systems/modules/darwin.nix
-        # ];
       };
     };
 
@@ -131,7 +123,7 @@
     mkPkgs = system: let
       upkgs = unstablePkgs system;
 
-      inherit (self.lib.${system}) math color-lib;
+      inherit (self.lib) math color-lib;
 
       # Pass color-lib and lib to the theme function
       theme = import ./theme.nix {inherit color-lib math lib self;};
@@ -159,9 +151,7 @@
 
     overlays = import ./overlays {inherit inputs;};
 
-    lib =
-      forAllSystems (system:
-        import ./lib {inherit (import nixpkgs {inherit system;}) lib;});
+    lib = import ./lib {inherit lib;};
 
     images =
       listToAttrs
