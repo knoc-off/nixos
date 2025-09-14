@@ -6,7 +6,6 @@
   system,
   upkgs,
   color-lib,
-  math,
   theme,
   ...
 }: let
