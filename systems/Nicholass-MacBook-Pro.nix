@@ -17,10 +17,13 @@
   sa = hex: lighten (saturate hex);
 in {
   imports = [
-    (self.nixosModules.home {inherit args;})
+    (self.nixosModules.home args)
     inputs.sops-nix.darwinModules.sops
-    # need to use lib.mkIf pkgs.stdenv.isLinux / isDarwin to conditionally add logic.
+    # resistance is futile. zsh it is for now.
     # ./modules/shell/fish.nix
+    # {
+    #   programs.fish.enable = true;
+    # }
     {
       nixpkgs.config.allowUnfree = true; # TODO swap out for my nix-module.
       users.users.${user}.shell = pkgs.zsh;
@@ -61,7 +64,9 @@ in {
 
   # packages.aarch64-darwin.neovim-nix.default
   environment.systemPackages = with pkgs; [
-    (self.packages.${system}.neovim-nix.default)
+    self.packages.${system}.neovim-nix.default
+
+    taskwarrior3
 
     pkgs.nerd-fonts.fira-code
     ripgrep
@@ -110,19 +115,25 @@ in {
   ];
   programs.direnv.enable = true;
 
+  programs.direnv.nix-direnv.enable = true;
+
   homebrew = {
     enable = true;
+    taps = [
+      "dimentium/autoraise"
+    ];
     casks = [
       {
         name = "middleclick";
         args = {no_quarantine = true;};
       }
+
       "claude-code"
       "utm"
       "crystalfetch"
 
       "rectangle"
-      "spotify"
+      # "spotify"
       "alt-tab"
       "tableplus"
       "raycast"
@@ -133,6 +144,16 @@ in {
       "mingw-w64" # For rust cross compilation to windows...
       "colima" # For docker
       "openssl"
+
+      {
+        name = "autoraise";
+        args = [
+          "--with-dexperimental_focus_first"
+          "--with-dold_activation_method"
+        ];
+        start_service = false;
+      }
+
       #"nsis" # Broken on darwin nixpkgs :(
       # "llvm" # Kept just in case, was used for trying experimental tauri cross compilation to windows (also nsis above)
       # "tunneltodev/tap/tunnelto" # ngrok-like, broken on nixpkgs at the moment
@@ -148,12 +169,24 @@ in {
       orientation = "bottom";
     };
     finder.AppleShowAllExtensions = true;
+
+    dock.autohide-time-modifier = 0.1;
+    dock.expose-animation-duration = 0.1;
   };
   system.keyboard = {
     enableKeyMapping = true;
     remapCapsLockToControl = true;
   };
   security.pam.services.sudo_local.touchIdAuth = true;
+
+  # Custom autoraise service with delay 0 to prevent raising
+  launchd.user.agents.autoraise = {
+    command = "/opt/homebrew/bin/autoraise -delay 0";
+    serviceConfig = {
+      KeepAlive = true;
+      RunAtLoad = true;
+    };
+  };
 
   # Sops configuration
   sops = {

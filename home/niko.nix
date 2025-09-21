@@ -19,6 +19,8 @@
       home.packages = with pkgs; [
         gum
         television
+
+        upkgs.tsx
       ];
       programs.zsh = {
         enable = true;

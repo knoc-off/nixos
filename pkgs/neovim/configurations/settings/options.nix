@@ -1,4 +1,4 @@
-{
+{pkgs, ...}: {
   config = {
     globals = {
       # Disable useless providers
@@ -11,7 +11,9 @@
       # clipboard
       register = "unnamed"; # is the selection register
 
-      providers.wl-copy.enable = true;
+      providers.wl-copy.enable = pkgs.stdenv.isLinux;
+      # darwin?
+      # providers.
     };
 
     opts = {

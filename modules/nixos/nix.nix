@@ -15,6 +15,7 @@
       # ];
       experimental-features = ["nix-command" "flakes" "pipe-operators"];
       trusted-users = ["@wheel"];
+      download-buffer-size = 2147483648; # 2GB
     };
   };
 }
