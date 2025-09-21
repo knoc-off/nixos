@@ -14,11 +14,6 @@
 
   sa = hex: lighten (saturate hex);
 in {
-  imports = [./starship.nix];
-
-  users.defaultUserShell = pkgs.fish;
-  users.users.${user}.shell = pkgs.fish;
-
   environment.variables = {
     EDITOR = "vi";
     VISUAL = "vi";
@@ -130,31 +125,5 @@ in {
 
 
     '';
-
-    shellAbbrs = {
-      l = "eza -l --group-directories-first --git";
-      la = "eza -la --group-directories-first --git";
-      lt = "eza --tree --level=2";
-      g = "git";
-      nrs = "sudo nixos-rebuild switch";
-      ncg = "nix-collect-garbage -d";
-      nr = "NIXPKGS_ALLOW_UNFREE=1 nix run --impure nixpkgs#";
-      # adf = "aider --model openrouter/google/gemini-2.0-flash-001 --weak-model openrouter/google/gemini-2.0-flash-001 --no-auto-lint --no-auto-test --no-attribute-committer --no-attribute-author --dark-mode --edit-format diff --file ";
-    };
-
-    shellAliases = {
-      wgnord = "sudo ${pkgs.wgnord}/bin/wgnord";
-      cat = "bat";
-    };
   };
-
-  # These packages are required for the Fish configuration to work properly
-  environment.systemPackages = with pkgs; [
-    eza # Modern replacement for ls with more features and better defaults
-    bat # Cat clone with syntax highlighting
-    zoxide # Smarter cd command that learns your habits
-    fzf # Command-line fuzzy finder
-    ripgrep # Fast grep alternative
-    fd # User-friendly alternative to find
-  ];
 }

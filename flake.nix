@@ -53,6 +53,7 @@
               theme
               color-lib
               math
+              lib
               ;
             upkgs = unstablePkgs system;
           }

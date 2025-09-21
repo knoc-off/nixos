@@ -1,4 +1,4 @@
-args: let
+{...} @ args: let
   home-manager =
     if args.lib.strings.hasSuffix "darwin" args.system
     then args.inputs.home-manager.darwinModules.home-manager
