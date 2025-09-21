@@ -20,8 +20,19 @@
       "keep-open" = "yes";
       "ytdl-format" = "bestvideo[height<=?1080]+bestaudio/best";
       cache = "yes";
-      "demuxer-max-bytes" = 4000000;
+      "demuxer-max-bytes" = 16777216;
       osc = "no";
+      
+      # Audio configuration to prevent popping
+      "audio-buffer" = 2.0;
+      "audio-stream-silence" = "yes";
+      "audio-wait-open" = 2.0;
+      "gapless-audio" = "no";
+      "audio-exclusive" = "no";
+      ao = "pulse";
+      "audio-samplerate" = 48000;
+      "audio-channels" = "stereo";
+      "volume-max" = 100;
     };
 
     profiles = let
