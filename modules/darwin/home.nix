@@ -1,11 +1,12 @@
-{user, ...} @ args: {
+{user, ...} @ args: let
+in {
   imports = [
-    args.inputs.home-manager.nixosModules.home-manager
+    args.inputs.home-manager.darwinModules.home-manager
   ];
 
   home-manager.backupFileExtension = "bak";
   home-manager = {
-    useGlobalPkgs = true; # does Disabling this have any benefits?
+    useGlobalPkgs = true;
     useUserPackages = true;
 
     # this is the single-crossover point between nixos and home-manager
@@ -13,25 +14,18 @@
       imports = [
         ../../home/${user}.nix
 
-        # Could uncomment this if im not using global pkgs.
-        # nixpkgs = {
-        #   overlays = builtins.attrValues outputs.overlays;
-        #   config = {
-        #     allowUnfree = true;
-        #     allowUnfreePredicate = _pkg: true;
-        #   };
-        # };
-
         {
           home = {
             username = "${user}";
-            homeDirectory = "/home/${user}";
+            # homeDirectory = "/Users/${user}"; # might not need to be specified?
           };
         }
       ];
     };
 
     # This could end badly. recursion, etc. yet i kinda like it.
+    # Basically, this passes All arguments passed to this function into home-manager.
+    # this is kinda a foot-gun, but if in doubt add below to filter out.
     extraSpecialArgs = removeAttrs args [
       "config" # NixOS system config
       "lib" # NixOS lib

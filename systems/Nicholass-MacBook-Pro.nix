@@ -17,7 +17,7 @@
   sa = hex: lighten (saturate hex);
 in {
   imports = [
-    (self.nixosModules.home args)
+    (self.darwinModules.home args)
     inputs.sops-nix.darwinModules.sops
     # resistance is futile. zsh it is for now.
     # ./modules/shell/fish.nix
@@ -46,7 +46,8 @@ in {
   ];
 
   system.primaryUser = user;
-  users.users."${user}" = {
+
+  users.users.${user} = {
     home = "/Users/${user}";
   };
 

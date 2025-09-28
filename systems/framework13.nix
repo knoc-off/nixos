@@ -181,6 +181,35 @@
       i18n.defaultLocale = lib.mkDefault "en_US.UTF-8";
     }
 
+    {
+      programs.git = {
+        enable = true;
+        config = {
+          init.defaultBranch = "main";
+          pull.rebase = true;
+          push.autoSetupRemote = true;
+
+          alias = {
+            # Commit aliases
+            ca = "commit --amend";
+            caa = "commit -a --amend";
+            c = "commit -a";
+
+            # Push aliases
+            pf = "push --force-with-lease";
+
+            # Other useful aliases
+            st = "status";
+            co = "checkout";
+            br = "branch";
+            l = "log --oneline --graph --decorate";
+            unstage = "reset HEAD --";
+            last = "log -1 HEAD";
+          };
+        };
+      };
+    }
+
     # module to setup boot
     ./hardware/boot.nix
 
