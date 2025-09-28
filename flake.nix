@@ -44,16 +44,16 @@
         inherit system;
         specialArgs =
           {
-            inherit
-              self
-              inputs
-              hostname
-              user
-              system
-              theme
-              color-lib
-              math
-              lib
+            inherit # i want to phase out all of these. its a mess
+              self # needed
+              inputs # needed
+              hostname # needed
+              user # needed
+              system # not needed
+              theme # not here
+              color-lib # not here/not needed
+              math # not here/not needed
+              lib # this is redundant
               ;
             upkgs = unstablePkgs system;
           }
@@ -149,6 +149,7 @@
 
     nixosModules = import ./modules/nixos/default.nix;
     homeModules = import ./modules/home/default.nix;
+    darwinModules = import ./modules/darwin/default.nix;
 
     overlays = import ./overlays {inherit inputs;};
 

@@ -11,6 +11,8 @@
     ./programs/terminal
     ./programs/browser/firefox/default.nix
 
+    self.homeModules.git
+
     #./programs/terminal/shell
     ./programs/terminal/shell/fish.nix
     {
@@ -29,6 +31,10 @@
           zle -N edit-command-line
           bindkey '^[[101;9u' edit-command-line
         '';
+        shellAliases = {
+          g = "git";
+          nxrb = "sudo darwin-rebuild switch --flake /Users/niko/projects/nixos/";
+        };
       };
       programs.bash.enable = true;
       # I want to add the ability to see the git-stash, and if there is uncommitted changes.
@@ -168,11 +174,6 @@
 
     ./programs/filemanager/yazi.nix
   ];
-
-  # Environment variables from sops
-  # home.sessionVariables = {
-  #   ANTHROPIC_API_KEY = "$(cat ${config.sops.secrets.ANTHROPIC_API_KEY.path})";
-  # };
 
   home.stateVersion = "25.05";
 }
