@@ -1,18 +1,21 @@
-{ config, lib, pkgs, ... }:
-
-with lib;
-
-let
-  cfg = config.services.logiops;
-  
-  configFile = if cfg.configFile != null then cfg.configFile else pkgs.writeText "logid.cfg" cfg.config;
-
-in
 {
+  lib,
+  config,
+  pkgs,
+  ...
+}:
+with lib; let
+  cfg = config.services.logiops;
+
+  configFile =
+    if cfg.configFile != null
+    then cfg.configFile
+    else pkgs.writeText "logid.cfg" cfg.config;
+in {
   options.services.logiops = {
     enable = mkEnableOption "logiops, Logitech Options on Linux";
 
-    package = mkPackageOption pkgs "logiops" { };
+    package = mkPackageOption pkgs "logiops" {};
 
     config = mkOption {
       type = types.lines;
@@ -20,7 +23,7 @@ in
       description = "Raw logiops configuration";
       example = ''
         io_timeout: 60000.0;
-        
+
         devices:
         (
           {
@@ -49,7 +52,7 @@ in
   };
 
   config = mkIf cfg.enable {
-    environment.systemPackages = [ cfg.package ];
+    environment.systemPackages = [cfg.package];
 
     services.udev.extraRules = ''
       # Ensure hidraw and uinput devices have proper permissions
@@ -61,8 +64,8 @@ in
 
     systemd.services.logiops = {
       description = "Logiops daemon for Logitech devices";
-      wantedBy = [ "multi-user.target" ];
-      after = [ "systemd-udev-settle.service" ];
+      wantedBy = ["multi-user.target"];
+      after = ["systemd-udev-settle.service"];
 
       serviceConfig = {
         Type = "simple";
@@ -75,3 +78,4 @@ in
     };
   };
 }
+

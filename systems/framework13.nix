@@ -10,12 +10,16 @@
 } @ args: {
   imports = [
     (self.nixosModules.home args)
-    (self.nixosModules.nix {inherit inputs;})
-    self.nixosModules.minecraft.server-suite
+    (self.nixosModules.nix inputs)
     (self.nixosModules.audio.pipewire args)
+
+    self.nixosModules.misc
+    self.nixosModules.minecraft.server-suite
 
     inputs.disko.nixosModules.disko
     {disko.devices.disk.vdb.device = "/dev/nvme0n1";}
+
+    # make this a hardware module?
     ./hardware/disks/btrfs-luks.nix
 
     # Hardware configs
@@ -28,7 +32,6 @@
     # Enable uinput for kanata and logiops for mouse
     {
       hardware.uinput.enable = true;
-      # services.ratbagd.enable = true;
     }
 
     # Logiops for MX Master 3S mouse configuration
@@ -145,43 +148,6 @@
     # }
 
     {
-      networking.networkmanager.enable = lib.mkDefault true;
-
-      console.keyMap = lib.mkDefault "us";
-
-      programs = {dconf.enable = lib.mkDefault true;};
-
-      services = {
-        resolved.enable = lib.mkDefault true;
-        fwupd.enable = lib.mkDefault true;
-        openssh = {
-          enable = lib.mkDefault true;
-          settings.PermitRootLogin = lib.mkDefault "no";
-        };
-        xserver.xkb.layout = lib.mkDefault "us";
-        printing.enable = lib.mkDefault true;
-        avahi = {
-          enable = lib.mkDefault true;
-          nssmdns4 = lib.mkDefault true;
-        };
-        libinput.enable = lib.mkDefault true;
-      };
-
-      fonts = {enableDefaultPackages = lib.mkDefault true;};
-
-      environment.systemPackages = lib.mkDefault (with pkgs; [
-        # gnome.adwaita-icon-theme
-        yubioath-flutter
-        git
-        wget
-        libinput
-      ]);
-
-      time.timeZone = lib.mkDefault "Europe/Berlin";
-      i18n.defaultLocale = lib.mkDefault "en_US.UTF-8";
-    }
-
-    {
       programs.git = {
         enable = true;
         config = {
@@ -213,7 +179,7 @@
     # module to setup boot
     ./hardware/boot.nix
 
-    # Sops. I think this could be some kind of module. to abstract the annoying parts of it.
+    # Sops. I think this could be some kind of module. to abstract the setup.
     inputs.sops-nix.nixosModules.sops
     {
       sops = {
