@@ -1,9 +1,13 @@
-{ pkgs, self, lib, ... }:
-let
+{
+  pkgs,
+  self,
+  lib,
+  ...
+}: let
   renamedMinimal = pkgs.symlinkJoin {
     name = "nvim-minimal";
-    paths = [ self.packages.${pkgs.system}.neovim-nix.minimal ];
-    buildInputs = [ pkgs.makeWrapper ];
+    paths = [self.packages.${pkgs.system}.neovim-nix.minimal];
+    buildInputs = [pkgs.makeWrapper];
     postBuild = ''
       # Wrap the nvim binary as nvim-minimal.
       wrapProgram $out/bin/nvim \
@@ -22,23 +26,19 @@ let
   };
 in {
   home.packages = [
-    self.packages.${pkgs.system}.neovim-nix.default
     renamedMinimal
-
   ];
-  #home.packages = [  ];
-  home.sessionVariables = { EDITOR = lib.mkForce "nvim"; };
+  home.sessionVariables = {EDITOR = lib.mkForce "nvim";};
 
   xdg.desktopEntries = {
     term-neovim = {
-      name = "Kitty Neovim";
+      name = "Neovim Standalone";
       genericName = "Text Editor";
-      exec =
-        "${pkgs.foot}/bin/foot -T Neovim nvim %U"; # this "nvim" can be replace by an explicit link to a binary
+      exec = "${pkgs.foot}/bin/foot -T Neovim nvim %U"; # this "nvim" can be replace by an explicit link to a binary
       icon = "${pkgs.neovim}/share/icons/hicolor/128x128/apps/nvim.png";
       terminal = false;
-      categories = [ "Application" "Development" "IDE" ];
-      mimeType = [ "text/plain" ];
+      categories = ["Application" "Development" "IDE"];
+      mimeType = ["text/plain"];
     };
   };
 }

@@ -1,4 +1,3 @@
-# NixOS, home-manager, system configuration, package installation, program enablement, system options.
 {
   outputs,
   self,
@@ -26,15 +25,8 @@
 
     ./programs/editor/default.nix
 
-    ./desktop/astal
-
-    # Desktop and widgets
-    # ./modules/hyprland
-
     # Firefox
     ./programs/browser/firefox
-
-    #./modules/firefox.nix
 
     ./programs/gaming/lutris.nix
     ./enviroment.nix
@@ -42,6 +34,15 @@
     ./desktop/hyprland.nix
 
     self.homeModules.gtk
+    self.homeModules.git
+    {
+      programs.git = {
+        enable = true;
+        userName = "${user}";
+        userEmail = "selby@niko.ink";
+      };
+    }
+    self.homeModules.starship
     # self.homeModules.hyprland
 
     self.homeModules.kanata
@@ -130,20 +131,6 @@
       };
     }
 
-    #./programs
-    #./desktop
-    #./programs/virtualization/bottles.nix
-
-    {
-      # bluetooth
-      #       systemd.user.services.mpris-proxy = {
-      #         description = "Mpris proxy";
-      #         after = [ "network.target" "sound.target" ];
-      #         wantedBy = [ "default.target" ];
-      #         serviceConfig.ExecStart = "${pkgs.bluez}/bin/mpris-proxy";
-      #       };
-    }
-
     ./modules/thunderbird.nix
 
     ./xdg-enviroment.nix
@@ -162,24 +149,6 @@
   };
 
   programs = {
-    git = {
-      enable = true;
-      userName = "${user}";
-      userEmail = "selby@niko.ink";
-      lfs.enable = true;
-
-      extraConfig = {
-        push = {autoSetupRemote = "true";};
-        alias = {
-          # Corrected slog command: reverse-sorted, last 15 commits, most recent at the bottom, with line numbers
-          slog = ''
-            !git log --all --reverse --pretty=format:'%C(auto)%h %Cgreen%ad %Creset%s%C(auto)%d %C(bold blue)(%an)' --date=short | tail -n 15 | tac | nl -ba -nln -w2 | tac && printf "\n\n"'';
-
-          # Squash alias: interactive rebase for squashing commits
-          rebase = "!f() { git rebase -i HEAD~$1; }; f";
-        };
-      };
-    };
     nix-index = {enable = true;};
     home-manager.enable = true;
   };
@@ -187,6 +156,8 @@
 
   home = {
     packages = with pkgs; [
+      self.packages.${pkgs.system}.neovim-nix.default
+
       #(pkgs.python3.withPackages
       #(ps: [ ps.llm self.packages.${pkgs.system}.llm-cmd ]))
 

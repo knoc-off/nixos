@@ -29,8 +29,7 @@
     {
       # Split this up to place the descriptors in the right spot
       plugins.which-key = let
-        keymapAttrsToWhichKeySpec = attrs:
-          lib.mapAttrsToList (key: value: {__unkeyed-1 = key;} // value) attrs;
+        keymapAttrsToWhichKeySpec = attrs: lib.mapAttrsToList (key: value: {__unkeyed-1 = key;} // value) attrs;
       in {
         enable = true;
 
@@ -167,13 +166,11 @@
               desc = "Type Definition";
               icon = " ";
             };
-            "<C-g>" = {
-              mode = "i";
-              desc = "Trigger Copilot suggestions manually";
-              icon = " ";
-            };
             "<C-E>" = {
-              mode = ["i" "s"];
+              mode = [
+                "i"
+                "s"
+              ];
               desc = "Next snippet choice / default <C-E>";
               icon = " ";
             };
@@ -302,9 +299,11 @@
       plugins = {
         lspkind = {
           enable = true;
-          cmp = {
+          settings.cmp = {
             enable = true;
-            menu = {luasnip = "[snip]";};
+            menu = {
+              luasnip = "[snip]";
+            };
           };
         };
         cmp-nvim-lsp.enable = true;
@@ -322,7 +321,10 @@
       keymaps = [
         # Ctrl-E: For changing choices in choiceNodes (next choice)
         {
-          mode = ["i" "s"];
+          mode = [
+            "i"
+            "s"
+          ];
           key = "<C-E>";
           action = helpers.mkRaw ''
             function()
@@ -336,7 +338,10 @@
           '';
         }
         {
-          mode = ["i" "s"];
+          mode = [
+            "i"
+            "s"
+          ];
           key = "<C-E>";
           action = helpers.mkRaw ''
             function()
@@ -348,26 +353,6 @@
               end
             end
           '';
-        }
-        {
-          mode = "i";
-          key = "<C-g>";
-          action = helpers.mkRaw ''
-            function()
-              local cmp = require('cmp')
-              cmp.complete({
-                config = {
-                  sources = {
-                    {name = "copilot"}
-                  }
-                }
-              })
-            end
-          '';
-          options = {
-            silent = true;
-            desc = "Trigger Copilot suggestions manually";
-          };
         }
       ];
 
@@ -389,7 +374,6 @@
               "<Tab>" = helpers.mkRaw ''
                 cmp.mapping(function(fallback)
                   local ls = require("luasnip")
-                  local copilot_suggestion = require("copilot.suggestion")
 
                   if cmp.visible() then
                     -- Priority 1: If completion menu is open, navigate it.
@@ -399,13 +383,8 @@
                     if ls.jumpable(1) then
                       ls.jump(1)
                     end
-                    -- NOTE: If not jumpable (at the end), we do nothing.
-                    -- This "swallows" the Tab keypress and prevents the fallback.
-                  elseif copilot_suggestion.is_visible() then
-                    -- Priority 3: If a Copilot suggestion is visible, accept it.
-                    copilot_suggestion.accept()
                   else
-                    -- Priority 4: If none of the above, insert a literal tab.
+                    -- Priority 3: If none of the above, insert a literal tab.
                     fallback()
                   end
                 end, { "i", "s" })
@@ -588,8 +567,7 @@
         lsp = {};
         os = {};
 
-        use_file_extension =
-          helpers.mkRaw "function(ext, file) return true end";
+        use_file_extension = helpers.mkRaw "function(ext, file) return true end";
 
         style = "glyph";
       };
@@ -807,7 +785,10 @@
       plugins.lint = {
         enable = true;
         autoCmd = {
-          event = ["BufWritePost" "InsertLeave"];
+          event = [
+            "BufWritePost"
+            "InsertLeave" # too often?
+          ];
           callback = helpers.mkRaw ''
             function()
               require('lint').try_lint()
@@ -817,32 +798,61 @@
         };
 
         linters = {
-          statix = {cmd = lib.getExe pkgs.statix;};
-          deadnix = {cmd = lib.getExe pkgs.deadnix;};
+          # statix = {
+          #   cmd = lib.getExe pkgs.statix;
+          # };
+          deadnix = {
+            cmd = lib.getExe pkgs.deadnix;
+          };
 
-          shellcheck = {cmd = lib.getExe pkgs.shellcheck;};
+          shellcheck = {
+            cmd = lib.getExe pkgs.shellcheck;
+          };
 
-          jsonlint = {cmd = lib.getExe pkgs.nodePackages.jsonlint;};
-          yamllint = {cmd = lib.getExe pkgs.yamllint;};
-          tflint = {cmd = lib.getExe pkgs.tflint;}; # terraform
+          jsonlint = {
+            cmd = lib.getExe pkgs.nodePackages.jsonlint;
+          };
+          yamllint = {
+            cmd = lib.getExe pkgs.yamllint;
+          };
+          tflint = {
+            cmd = lib.getExe pkgs.tflint;
+          }; # terraform
           markdownlint = {
             cmd = lib.getExe pkgs.nodePackages.markdownlint-cli;
-            args = ["--disable" "MD013" "--"]; # Disable line length rule
+            args = [
+              "--disable"
+              "MD013"
+              "--"
+            ]; # Disable line length rule
           };
 
           ruff = {
             cmd = lib.getExe pkgs.ruff;
-            args = ["check" "--select" "E,W,F" "--quiet" "--stdin-filename"];
+            args = [
+              "check"
+              "--select"
+              "E,W,F"
+              "--quiet"
+              "--stdin-filename"
+            ];
             stdin = true;
             append_fname = false;
           };
 
-          hadolint = {cmd = lib.getExe pkgs.hadolint;};
-          vale = {cmd = lib.getExe pkgs.vale;};
+          hadolint = {
+            cmd = lib.getExe pkgs.hadolint;
+          };
+          vale = {
+            cmd = lib.getExe pkgs.vale;
+          };
         };
 
         lintersByFt = {
-          nix = ["statix" "deadnix"];
+          nix = [
+            #"statix"
+            "deadnix"
+          ];
 
           terraform = ["tflint"];
 
@@ -1041,6 +1051,7 @@
           # lazyLoad.settings.ft = ["openscad" "typst" "rust"];
           enable = true;
           servers = {
+            nil_ls.enable = true;
             openscad_lsp.enable = true;
             tinymist.enable = true;
 
@@ -1096,7 +1107,10 @@
             yml = ["prettier"];
             markdown = ["prettier"];
 
-            python = ["isort" "black"];
+            python = [
+              "isort"
+              "black"
+            ];
 
             lua = ["stylua"];
 
@@ -1112,7 +1126,9 @@
           };
 
           formatters = {
-            alejandra = {command = lib.getExe pkgs.alejandra;};
+            alejandra = {
+              command = lib.getExe pkgs.alejandra;
+            };
             shfmt = {
               command = lib.getExe pkgs.shfmt;
               args = [
@@ -1129,19 +1145,36 @@
 
             prettier = {
               command = lib.getExe pkgs.nodePackages.prettier;
-              args = ["--stdin-filepath" "$FILENAME"];
+              args = [
+                "--stdin-filepath"
+                "$FILENAME"
+              ];
             };
             black = {
               command = lib.getExe pkgs.black;
-              args = ["--quiet" "-"];
+              args = [
+                "--quiet"
+                "-"
+              ];
             };
             isort = {
               command = lib.getExe pkgs.isort;
-              args = ["--profile" "black" "--quiet" "-"];
+              args = [
+                "--profile"
+                "black"
+                "--quiet"
+                "-"
+              ];
             };
             stylua = {
               command = lib.getExe pkgs.stylua;
-              args = ["--indent-type" "Spaces" "--indent-width" "2" "-"];
+              args = [
+                "--indent-type"
+                "Spaces"
+                "--indent-width"
+                "2"
+                "-"
+              ];
             };
             trim_whitespace = {
               command = lib.getExe' pkgs.coreutils "sed";
@@ -1156,8 +1189,7 @@
           # Logging and notifications
           log_level = "warn";
           notify_on_error = true;
-          notify_no_formatters =
-            false; # Don't spam for files without formatters
+          notify_no_formatters = false; # Don't spam for files without formatters
         };
       };
 
@@ -1165,9 +1197,7 @@
         {
           mode = "n";
           key = "<leader>cf";
-          action =
-            helpers.mkRaw
-            "function() require('conform').format({ async = true, lsp_format = 'fallback' }) end";
+          action = helpers.mkRaw "function() require('conform').format({ async = true, lsp_format = 'fallback' }) end";
           options = {
             silent = true;
             desc = "Format buffer";
@@ -1186,30 +1216,6 @@
     }
 
     # tag:ai-trash/plugins
-    {
-      plugins = {
-        copilot-lua.enable = true;
-        copilot-cmp.enable = true;
-        copilot-chat.enable = true;
-      };
-
-      plugins.copilot-lua = {
-        settings = {
-          panel.enable = false;
-          suggestion = {
-            auto_trigger = false;
-            enabled = false;
-            keymap = {
-              accept = false;
-              next = false;
-              prev = false;
-              dismiss = false;
-            };
-          };
-        };
-      };
-    }
-
     # Avante.nvim - AI copilot like Cursor AI IDE
     {
       plugins.avante = {
@@ -1266,7 +1272,7 @@
           };
 
           hints = {
-            enabled = true;
+            enabled = false;
           };
 
           windows = {
@@ -1277,12 +1283,13 @@
               align = "center";
               rounded = true;
             };
-          };
 
-          highlights = {
-            diff = {
-              current = "DiffText";
-              incoming = "DiffAdd";
+            edit = {
+              border = "rounded";
+              start_insert = false;
+            };
+            ask = {
+              start_insert = false;
             };
           };
         };
@@ -1296,7 +1303,7 @@
         {
           mode = "n";
           key = "<leader>aa";
-          action = helpers.mkRaw "function() require('avante.api').ask() end";
+          action = helpers.mkRaw "function() require('avante.api').ask({ new_chat = true }) end";
           options = {
             desc = "avante: ask";
             silent = true;

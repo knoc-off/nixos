@@ -14,5 +14,5 @@
 
   nix = import ./nix.nix;
 
-
+  misc = import ./misc.nix;
 }

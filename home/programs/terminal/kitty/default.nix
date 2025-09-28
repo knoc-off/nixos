@@ -33,7 +33,8 @@ in {
 
         # swap window for master
         "shift+enter" = "move_window_to_top";
-        "alt+enter" = "launch --location=split";
+        # Spawn new split, with cwd.
+        "alt+enter" = "launch --location=split --cwd=current";
 
         "super+c" = "copy_to_clipboard";
         "super+v" = "paste_from_clipboard";
@@ -46,7 +47,7 @@ in {
         "super+shift+z" = "redo";
       }
       // lib.optionalAttrs pkgs.stdenv.isDarwin {
-        "cmd+r" = "set_tab_title";
+        # "cmd+r" = "set_tab_title";
         "cmd+enter" = "move_window_to_top";
       };
     extraConfig = ''
