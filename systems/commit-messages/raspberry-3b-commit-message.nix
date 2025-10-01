@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "refactor_and_more___________________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________iso_stuff";
+  system.nixos.label = "logiops_overhaul____________________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "___________________________________________________________________________________iso_stuff";
 }

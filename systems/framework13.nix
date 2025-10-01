@@ -35,117 +35,123 @@
     }
 
     # Logiops for MX Master 3S mouse configuration
-    # self.nixosModules.services.logiops
-    # {
-    #   services.logiops = {
-    #     enable = true;
-    #     config = ''
-    #       io_timeout: 60000.0;
+    self.nixosModules.services.logiops
+    {
+      services.logiops = {
+        enable = true;
+        config = ''
+          io_timeout: 60000.0;
 
-    #       devices:
-    #       (
-    #           {
-    #               name: "MX Master 3S";
-    #               buttons:
-    #               (
-    #                   {
-    #                       cid: 0x52;
-    #                       action:
-    #                       {
-    #                           type: "Keypress";
-    #                           keys: ["KEY_F13"];
-    #                       };
-    #                   },
-    #                   {
-    #                       cid: 0x53;
-    #                       action:
-    #                       {
-    #                           type: "Keypress";
-    #                           keys: ["KEY_F14"];
-    #                       };
-    #                   },
-    #                   {
-    #                       cid: 0x56;
-    #                       action:
-    #                       {
-    #                           type: "Keypress";
-    #                           keys: ["KEY_F15"];
-    #                       };
-    #                   },
-    #                   {
-    #                       cid: 0xc3;
-    #                       action:
-    #                       {
-    #                           type: "Keypress";
-    #                           keys: ["KEY_F16"];
-    #                       };
-    #                   },
-    #                   {
-    #                       cid: 0xc4;
-    #                       action:
-    #                       {
-    #                           type: "Keypress";
-    #                           keys: ["KEY_F17"];
-    #                       };
-    #                   },
-    #                   {
-    #                       cid: 0xd7;
-    #                       action:
-    #                       {
-    #                           type: "Keypress";
-    #                           keys: ["KEY_F18"];
-    #                       };
-    #                   }
-    #               );
-    #               scroll:
-    #               (
-    #                   {
-    #                       hires: true;
-    #                       invert: false;
-    #                       target: false;
-    #                   }
-    #               );
-    #               thumbwheel:
-    #               {
-    #                   divert: true;
-    #                   invert: false;
-    #                   left:
-    #                   {
-    #                       action:
-    #                       {
-    #                           type: "Keypress";
-    #                           keys: ["KEY_F19"];
-    #                       };
-    #                   };
-    #                   right:
-    #                   {
-    #                       action:
-    #                       {
-    #                           type: "Keypress";
-    #                           keys: ["KEY_F20"];
-    #                       };
-    #                   };
-    #                   proxy:
-    #                   {
-    #                       type: "Keypress";
-    #                       keys: ["KEY_F21"];
-    #                   };
-    #                   touch:
-    #                   {
-    #                       type: "Keypress";
-    #                       keys: ["KEY_F22"];
-    #                   };
-    #                   tap:
-    #                   {
-    #                       type: "Keypress";
-    #                       keys: ["KEY_F23"];
-    #                   };
-    #               };
-    #           }
-    #       );
-    #     '';
-    #   };
-    # }
+          devices: (
+          {
+              name: "MX Master 3S";
+              smartshift: // when scrolling fast it goes to different mode.
+              {
+                  on: false;
+                  threshold: 30;
+                  torque: 50;
+              };
+              dpi: 1000;
+              scroll:
+              {
+                  hires: true;
+                  invert: false;
+                  target: false;
+              };
+              thumbwheel:
+              {
+                  divert: true;
+                  invert: false;
+                  left:
+                  {
+                      action:
+                      {
+                          type: "Axis";
+                          axis: "REL_HWHEEL_HI_RES";
+                          axis_multiplier: -1;
+                      };
+                  };
+                  right:
+                  {
+                      action:
+                      {
+                          type: "Axis";
+                          axis: "REL_HWHEEL_HI_RES";
+                          axis_multiplier: 1;
+                      };
+                  };
+                  proxy:
+                  {
+                      type: "Keypress";
+                      keys: ["KEY_F21"];
+                  };
+                  touch:
+                  {
+                      type: "Keypress";
+                      keys: ["KEY_F22"];
+                  };
+                  tap:
+                  {
+                      type: "Keypress";
+                      keys: ["KEY_F23"];
+                  };
+              };
+              buttons: (
+                  {
+                      cid: 0x52;
+                      action:
+                      {
+                          type: "Keypress";
+                          keys: ["KEY_F13"];
+                      };
+                  },
+                  {
+                      cid: 0x53;
+                      action:
+                      {
+                          type: "Keypress";
+                          keys: ["KEY_F14"];
+                      };
+                  },
+                  {
+                      cid: 0x56;
+                      action:
+                      {
+                          type: "Keypress";
+                          keys: ["KEY_F15"];
+                      };
+                  },
+                  {
+                      cid: 0xc3;
+                      action:
+                      {
+                          type: "Keypress";
+                          keys: ["KEY_F16"];
+                      };
+                  },
+                  {
+                      cid: 0xc4;
+                      action:
+                      {
+                          type: "Keypress";
+                          keys: ["KEY_F17"];
+                      };
+                  },
+                  {
+                      cid: 0xd7;
+                      action:
+                      {
+                          type: "Keypress";
+                          keys: ["KEY_F18"];
+                      };
+                  }
+              );
+          }
+          );
+
+        '';
+      };
+    }
 
     {
       programs.git = {
@@ -186,7 +192,9 @@
         defaultSopsFile = ./secrets/${hostname}/default.yaml;
         # This will automatically import SSH keys as age keys
         age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
-        secrets."ANTHROPIC_API_KEY" = {mode = "0644";};
+        secrets."ANTHROPIC_API_KEY" = {
+          mode = "0644";
+        };
       };
     }
 
@@ -336,7 +344,12 @@
     # not super needed.
     nix-ld = {
       enable = true;
-      libraries = with pkgs; [stdenv.cc.cc SDL2 SDL2_image libz];
+      libraries = with pkgs; [
+        stdenv.cc.cc
+        SDL2
+        SDL2_image
+        libz
+      ];
     };
     dconf.enable = true;
   };
@@ -370,7 +383,11 @@
 
     printing = {
       enable = true;
-      drivers = with pkgs; [hplip gutenprint foo2zjs];
+      drivers = with pkgs; [
+        hplip
+        gutenprint
+        foo2zjs
+      ];
     };
 
     avahi = {
@@ -425,8 +442,18 @@
     hostName = hostname;
     firewall = {
       enable = true;
-      allowedTCPPorts = [22000 38071 21027 53317];
-      allowedUDPPorts = [22000 21027 38071 53317];
+      allowedTCPPorts = [
+        22000
+        38071
+        21027
+        53317
+      ];
+      allowedUDPPorts = [
+        22000
+        21027
+        38071
+        53317
+      ];
       #extraCommands = ''
       #  iptables -A INPUT -p tcp --dport 22000 -s niko.ink -j ACCEPT
       #  iptables -A INPUT -p udp --dport 21027 -s niko.ink -j ACCEPT
@@ -455,7 +482,9 @@
       pkgs.nerd-fonts.fira-code
       #pkgs.nerd-fonts.droid-sans-mono
     ];
-    fontconfig.defaultFonts = {monospace = ["FiraCode Nerd Font Mono"];};
+    fontconfig.defaultFonts = {
+      monospace = ["FiraCode Nerd Font Mono"];
+    };
   };
 
   # Set default values for the new options
@@ -469,7 +498,9 @@
 
     # fingerpritn scanner does not work without this, suddenly. TODO: Try to remove this
     kernelParams = ["usbcore.autosuspend=-1"];
-    kernel.sysctl = {"vm.swappiness" = 20;};
+    kernel.sysctl = {
+      "vm.swappiness" = 20;
+    };
   };
 
   users = {
