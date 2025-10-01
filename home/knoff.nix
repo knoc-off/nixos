@@ -53,7 +53,10 @@
         enable = true;
         service.enable = true;
 
-        service.extraArgs = ["--port" "52545"];
+        service.extraArgs = [
+          "--port"
+          "52545"
+        ];
 
         rules = [
           # Terminal apps use special layer (caps = right meta)
@@ -149,7 +152,9 @@
   };
 
   programs = {
-    nix-index = {enable = true;};
+    nix-index = {
+      enable = true;
+    };
     home-manager.enable = true;
   };
   # TODO: move this to someplace more logical
@@ -165,7 +170,13 @@
       #self.packages.${pkgs.system}.spider-cli
       #self.packages.${pkgs.system}.tabiew
 
-      upkgs.claude-code
+      (upkgs.claude-code.overrideAttrs (oldAttrs: rec {
+        version = "2.0.1";
+        src = pkgs.fetchzip {
+          url = "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-${version}.tgz";
+          hash = "sha256-LUbDPFa0lY74MBU4hvmYVntt6hVZy6UUZFN0iB4Eno8=";
+        };
+      }))
       upkgs.gemini-cli
       upkgs.litellm
       upkgs.prismlauncher
