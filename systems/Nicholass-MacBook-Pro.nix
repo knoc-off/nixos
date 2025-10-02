@@ -126,7 +126,9 @@ in {
     casks = [
       {
         name = "middleclick";
-        args = {no_quarantine = true;};
+        args = {
+          no_quarantine = true;
+        };
       }
 
       "claude-code"
@@ -134,7 +136,7 @@ in {
       "crystalfetch"
 
       "rectangle"
-      # "spotify"
+      "spotify"
       "alt-tab"
       "tableplus"
       "raycast"
@@ -193,6 +195,8 @@ in {
   sops = {
     defaultSopsFile = ./secrets/Nicholass-MacBook-Pro/default.yaml;
     age.sshKeyPaths = ["/Users/${user}/.ssh/id_ed25519"];
-    secrets."ANTHROPIC_API_KEY" = {mode = "0644";};
+    secrets."ANTHROPIC_API_KEY" = {
+      mode = "0644";
+    };
   };
 }

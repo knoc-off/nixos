@@ -21,7 +21,7 @@
       st = "status";
       co = "checkout";
       br = "branch";
-      l = "log --oneline --graph --decorate";
+      l = "log --oneline --graph --decorate -5";
       unstage = "reset HEAD --";
       last = "log -1 HEAD";
       # See changes since branching off of main branch

@@ -24,6 +24,46 @@
     {
       #plugins gitsigns
       plugins.gitsigns.enable = true;
+
+      # Initialize gitsigns base state tracking
+      extraConfigLuaPre = ''
+        -- Track gitsigns base state: 'HEAD' or 'merge-base'
+        _G.gitsigns_base_state = 'HEAD'
+      '';
+
+      keymaps = [
+        {
+          mode = "n";
+          key = "<leader>gm"; # or whatever key you prefer
+          action = helpers.mkRaw ''
+            function()
+              local gs = require('gitsigns')
+
+              if _G.gitsigns_base_state == 'HEAD' then
+                -- Switch to merge-base
+                local merge_base = vim.fn.system('git merge-base HEAD origin/main'):gsub('\n', ''')
+
+                if vim.v.shell_error == 0 and merge_base ~= "" then
+                  gs.change_base(merge_base, true)
+                  _G.gitsigns_base_state = 'merge-base'
+                  vim.notify('Gitsigns base set to merge-base with origin/main (' .. merge_base:sub(1,8) .. ')', vim.log.levels.INFO)
+                else
+                  vim.notify('Failed to get merge-base with origin/main. Are you in a git repo with origin/main?', vim.log.levels.WARN)
+                end
+              else
+                -- Switch back to HEAD
+                gs.change_base(nil, true)
+                _G.gitsigns_base_state = 'HEAD'
+                vim.notify('Gitsigns base reset to HEAD', vim.log.levels.INFO)
+              end
+            end
+          '';
+          options = {
+            silent = true;
+            desc = "Toggle Gitsigns base (HEAD ↔ merge-base with origin/main)";
+          };
+        }
+      ];
     }
 
     {
@@ -38,6 +78,11 @@
           delay = 200;
 
           spec = keymapAttrsToWhichKeySpec {
+            # Gitsigns
+            "<leader>gm" = {
+              desc = "Toggle merge-base diff";
+              icon = " ";
+            };
             "<leader>b" = {
               group = "Buffers";
               icon = "󰓩 ";
@@ -1244,7 +1289,7 @@
           };
 
           mappings = {
-            ask = "<leader>aa";
+            # ask = "<leader>aa";
             edit = "<leader>ae";
             refresh = "<leader>ar";
             diff = {
@@ -1301,11 +1346,32 @@
 
       keymaps = [
         {
-          mode = "n";
+          mode = [
+            "n"
+            "v"
+          ];
           key = "<leader>aa";
-          action = helpers.mkRaw "function() require('avante.api').ask({ new_chat = true }) end";
+          action = helpers.mkRaw ''
+            function()
+              -- Check if we're in visual mode or have a selection
+              local mode = vim.fn.mode()
+              local has_selection = mode == 'v' or mode == 'V' or mode == '\22' -- \22 is visual block mode
+
+              if mode == 'n' and not has_selection then
+                -- In normal mode with no selection, check if avante panel is open
+                local avante = require('avante')
+                if avante.is_sidebar_open() then
+                  avante.close_sidebar()
+                  return
+                end
+              end
+
+              -- Otherwise, proceed with ask functionality
+              require('avante.api').ask({ new_chat = true })
+            end
+          '';
           options = {
-            desc = "avante: ask";
+            desc = "avante: ask (or close if panel open)";
             silent = true;
           };
         }
