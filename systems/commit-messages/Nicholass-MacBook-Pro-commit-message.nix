@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "logiops_overhaul____________________________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "______________________________________________________________________restructure_added_git.";
+  system.nixos.label = "Working_marki_markdown_to_anki______________________________________________________________" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "_________________________________________________________________________________quick_fixes";
 }
