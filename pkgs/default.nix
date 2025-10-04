@@ -63,7 +63,15 @@ in rec {
       UIKit
       Security
       ;
-    inherit (pkgs) nodejs_20 yarn watchman cocoapods jdk17 gradle;
+    inherit
+      (pkgs)
+      nodejs_20
+      yarn
+      watchman
+      cocoapods
+      jdk17
+      gradle
+      ;
   };
 
   embeddedRust = rustPkgs.callPackage ./embedded-rust {};
@@ -77,8 +85,8 @@ in rec {
   csv-tui = rustPkgs.callPackage ./csv-tui-viewer {};
   tabiew = rustPkgs-fenix.callPackage ./tabiew {inherit rustPlatform;};
   cli-ai = rustPkgs-fenix.callPackage ./cli-ai {inherit rustPlatform;};
-  treeview =
-    rustPkgs-fenix.callPackage ./tree-cat {rustPlatform = rustPlatform-dev;};
+  marki = rustPkgs-fenix.callPackage ./marki {inherit rustPlatform;};
+  treeview = rustPkgs-fenix.callPackage ./tree-cat {rustPlatform = rustPlatform-dev;};
 
   inherit rustPkgs-fenix;
   inherit (inputs) fenix;
@@ -89,22 +97,22 @@ in rec {
       inherit rustPlatform tabler-icons;
     };
 
-    axum-login-test =
-      rustPkgs.callPackage ./website/login-test {inherit tabler-icons;};
+    axum-login-test = rustPkgs.callPackage ./website/login-test {inherit tabler-icons;};
   };
   AOC24 = {
     day1 = rustPkgs.callPackage ./AdventOfCode2024/Day1 {};
     day2 = rustPkgs.callPackage ./AdventOfCode2024/Day2 {};
   };
-  nx = config_dir: hostname:
-    rustPkgs.callPackage ./nx-script {inherit config_dir hostname;};
+  nx = config_dir: hostname: rustPkgs.callPackage ./nx-script {inherit config_dir hostname;};
 
   yek = rustPkgs.callPackage ./yek {};
 
   neovim-nix = let
     customPkgs = import inputs.nixpkgs-unstable {
       inherit system;
-      config = {allowUnfree = true;};
+      config = {
+        allowUnfree = true;
+      };
       overlays = [
         inputs.nixneovimplugins.overlays.default
         neovim-plugins.overlay
@@ -131,12 +139,16 @@ in rec {
     default = nixvim.makeNixvimWithModule {
       pkgs = customPkgs;
       extraSpecialArgs = {inherit color-lib theme;};
-      module = {imports = [./neovim/configurations/lazy-loading.nix];};
+      module = {
+        imports = [./neovim/configurations/lazy-loading.nix];
+      };
     };
     minimal = nixvim.makeNixvimWithModule {
       pkgs = customPkgs;
       extraSpecialArgs = {inherit color-lib theme;};
-      module = {imports = [./neovim/configurations/minimal.nix];};
+      module = {
+        imports = [./neovim/configurations/minimal.nix];
+      };
     };
   };
 
@@ -212,9 +224,7 @@ in rec {
 
       # Create wrapper that runs ags with the copied source
       mkdir -p $out/bin
-      makeWrapper ${
-        inputs.ags.packages.${system}.default
-      }/bin/ags $out/bin/${name} \
+      makeWrapper ${inputs.ags.packages.${system}.default}/bin/ags $out/bin/${name} \
         --add-flags "run" \
         --add-flags "$out/share/${name}/${entry}" \
         --argv0 "$name"
@@ -325,9 +335,7 @@ in rec {
 
       # Create symlink to astal modules for runtime resolution
       mkdir -p $out/share/${name}/node_modules
-      ln -sf ${
-        inputs.ags.packages.${system}.gjs
-      }/share/astal/gjs $out/share/${name}/node_modules/astal
+      ln -sf ${inputs.ags.packages.${system}.gjs}/share/astal/gjs $out/share/${name}/node_modules/astal
 
       # Copy any other assets
       cp -r ./* $out/share/${name}/ || true
@@ -340,41 +348,19 @@ in rec {
         --add-flags "$out/share/${name}/app.mjs" \
         --chdir "$out/share/${name}" \
         --prefix GJS_PATH : "$out/share/${name}/node_modules" \
-        --prefix GJS_PATH : "${
-        inputs.ags.packages.${system}.gjs
-      }/share/astal/gjs" \
+        --prefix GJS_PATH : "${inputs.ags.packages.${system}.gjs}/share/astal/gjs" \
         --set GJS_DEBUG_TOPICS "JS ERROR;JS LOG;JS WARNING;MODULES" \
         --set GJS_DEBUG_OUTPUT stderr \
-        --prefix GI_TYPELIB_PATH : "${
-        inputs.ags.packages.${system}.astal3
-      }/lib/girepository-1.0" \
-        --prefix GI_TYPELIB_PATH : "${
-        inputs.ags.packages.${system}.io
-      }/lib/girepository-1.0" \
-        --prefix GI_TYPELIB_PATH : "${
-        inputs.ags.packages.${system}.notifd
-      }/lib/girepository-1.0" \
-        --prefix GI_TYPELIB_PATH : "${
-        inputs.ags.packages.${system}.astal3
-      }/lib/girepository-1.0" \
-        --prefix GI_TYPELIB_PATH : "${
-        inputs.ags.packages.${system}.mpris
-      }/lib/girepository-1.0" \
-        --prefix GI_TYPELIB_PATH : "${
-        inputs.ags.packages.${system}.network
-      }/lib/girepository-1.0" \
-        --prefix GI_TYPELIB_PATH : "${
-        inputs.ags.packages.${system}.battery
-      }/lib/girepository-1.0" \
-        --prefix GI_TYPELIB_PATH : "${
-        inputs.ags.packages.${system}.bluetooth
-      }/lib/girepository-1.0" \
-        --prefix GI_TYPELIB_PATH : "${
-        inputs.ags.packages.${system}.powerprofiles
-      }/lib/girepository-1.0" \
-        --prefix GI_TYPELIB_PATH : "${
-        inputs.ags.packages.${system}.tray
-      }/lib/girepository-1.0" \
+        --prefix GI_TYPELIB_PATH : "${inputs.ags.packages.${system}.astal3}/lib/girepository-1.0" \
+        --prefix GI_TYPELIB_PATH : "${inputs.ags.packages.${system}.io}/lib/girepository-1.0" \
+        --prefix GI_TYPELIB_PATH : "${inputs.ags.packages.${system}.notifd}/lib/girepository-1.0" \
+        --prefix GI_TYPELIB_PATH : "${inputs.ags.packages.${system}.astal3}/lib/girepository-1.0" \
+        --prefix GI_TYPELIB_PATH : "${inputs.ags.packages.${system}.mpris}/lib/girepository-1.0" \
+        --prefix GI_TYPELIB_PATH : "${inputs.ags.packages.${system}.network}/lib/girepository-1.0" \
+        --prefix GI_TYPELIB_PATH : "${inputs.ags.packages.${system}.battery}/lib/girepository-1.0" \
+        --prefix GI_TYPELIB_PATH : "${inputs.ags.packages.${system}.bluetooth}/lib/girepository-1.0" \
+        --prefix GI_TYPELIB_PATH : "${inputs.ags.packages.${system}.powerprofiles}/lib/girepository-1.0" \
+        --prefix GI_TYPELIB_PATH : "${inputs.ags.packages.${system}.tray}/lib/girepository-1.0" \
         --prefix GI_TYPELIB_PATH : "${pkgs.glib}/lib/girepository-1.0" \
         --prefix GI_TYPELIB_PATH : "${pkgs.gtk3}/lib/girepository-1.0" \
         --prefix GI_TYPELIB_PATH : "${pkgs.gtk4}/lib/girepository-1.0" \
@@ -382,9 +368,7 @@ in rec {
         --prefix GI_TYPELIB_PATH : "${pkgs.gobject-introspection}/lib/girepository-1.0" \
         --prefix GIO_MODULE_PATH : "${pkgs.gvfs}/lib/gio/modules" \
         --prefix XDG_DATA_DIRS : "$out/share:${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}" \
-        --prefix PATH : "${
-        lib.makeBinPath [inputs.astal.packages.${system}.io]
-      }" \
+        --prefix PATH : "${lib.makeBinPath [inputs.astal.packages.${system}.io]}" \
         --argv0 "$name"
 
       echo "--- Wrapper created successfully ---"
@@ -412,7 +396,12 @@ in rec {
     prefix ? "",
   }:
     import ./svg-tools/icon-extractor/json-mapping.nix {
-      inherit pkgs package fontPath prefix;
+      inherit
+        pkgs
+        package
+        fontPath
+        prefix
+        ;
     };
 
   icon-pruner = {
@@ -421,13 +410,25 @@ in rec {
     iconList,
   }:
     import ./svg-tools/icon-extractor/prune-font-file.nix {
-      inherit pkgs package fontPath iconList;
+      inherit
+        pkgs
+        package
+        fontPath
+        iconList
+        ;
     };
 
   pruned-font = icon-pruner {
     package = pkgs.material-icons;
     fontPath = "/share/fonts/opentype/MaterialIconsOutlined-Regular.otf";
-    iconList = ["map" "c" "d" "e" "f" "g"];
+    iconList = [
+      "map"
+      "c"
+      "d"
+      "e"
+      "f"
+      "g"
+    ];
   };
 
   nerd-map = icon-extractor-json-mapping {
@@ -447,7 +448,10 @@ in rec {
       version = "0.1.0";
 
       # Dependencies needed only during the build process
-      nativeBuildInputs = [pkgs.complgen pkgs.makeWrapper];
+      nativeBuildInputs = [
+        pkgs.complgen
+        pkgs.makeWrapper
+      ];
 
       # Dependencies needed by the script itself at runtime
       # These are made available in the Nix store
