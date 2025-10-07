@@ -79,32 +79,58 @@ fn main() -> Result<()> {
 
     // Parse all files (one file = one card)
     let mut all_cards = Vec::new();
+    let mut all_media_files = Vec::new();
+
     for file in &files {
         dbg!("Reading file", file);
         let content = fs::read_to_string(file)
             .context(format!("Failed to read {}", file.display()))?;
 
         dbg!("Parsing card from file", file);
-        let card = parser::parse_card(&content);
+        let mut card = parser::parse_card(&content);
+        card.file_path = Some(file.to_string_lossy().to_string());
 
         dbg!("Parsed card", &card.note_type, &card.tags);
+
+        // Extract media file references and resolve paths
+        let media_files = parser::extract_media_files(&card, file.parent());
+        dbg!("Found media files", &media_files);
+        all_media_files.extend(media_files);
+
         all_cards.push(card);
     }
 
     // Determine deck name
     let deck_name = args.deck_name.unwrap_or_else(|| {
-        args.input
-            .file_stem()
-            .unwrap()
-            .to_string_lossy()
-            .to_string()
+        if args.input.is_file() {
+            // Single file: use parent directory name
+            args.input
+                .parent()
+                .and_then(|p| p.file_name())
+                .and_then(|n| n.to_str())
+                .unwrap_or("default")
+                .to_string()
+        } else {
+            // Directory: use directory name
+            args.input
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("default")
+                .to_string()
+        }
     });
 
     dbg!("Deck name", &deck_name);
 
+    // Deduplicate media files
+    all_media_files.sort();
+    all_media_files.dedup();
+
+    dbg!("Total unique media files", all_media_files.len(), &all_media_files);
+
     // Generate deck
     dbg!("Generating deck with cards", all_cards.len());
-    generator::generate_deck(all_cards, &deck_name, &args.output)?;
+    generator::generate_deck(all_cards, &deck_name, &args.output, all_media_files)?;
 
     println!("✓ Successfully generated deck: {}", args.output.display());
 

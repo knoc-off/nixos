@@ -12,6 +12,8 @@ pub struct Card {
     pub back: String,
     pub note_type: NoteType,
     pub tags: Vec<String>,
+    pub source_markdown: String,  // Original markdown source
+    pub file_path: Option<String>, // File path for stable ID generation
 }
 
 impl Card {
@@ -22,6 +24,8 @@ impl Card {
             back: String::new(),
             note_type: NoteType::Basic,
             tags: Vec::new(),
+            source_markdown: String::new(),
+            file_path: None,
         }
     }
 }
