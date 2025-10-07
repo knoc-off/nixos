@@ -1,8 +1,32 @@
-/// Note type for Anki cards
+use marki_macros::ParseTag;
+use strum::{Display, EnumString};
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum NoteType {
     Basic,
     Cloze,
+}
+
+#[derive(Debug, Clone, Default, EnumString, Display)]
+#[strum(serialize_all = "lowercase")]
+pub enum ClozeAlgorithm {
+    /// Auto-increment each cloze deletion (c1, c2, c3...)
+    Increment,
+    Duo,
+    #[default]
+    Auto,
+}
+
+#[derive(Debug, Clone, ParseTag)]
+pub enum Tag {
+    Cloze {
+        algo: ClozeAlgorithm,
+    },
+
+    Basic,
+
+    #[tag("*")]
+    Generic(String),
 }
 
 #[derive(Debug, Clone)]
@@ -18,7 +42,6 @@ pub struct Card {
 
 impl Card {
     pub fn new() -> Self {
-        // dbg!("Creating new card");
         Self {
             front: String::new(),
             back: String::new(),

@@ -1,7 +1,7 @@
 use crate::card::{Card, NoteType};
 use crate::highlighter;
 use anyhow::{Context, Result};
-use genanki_rs::{Deck, Field, Model, ModelType, Note, Package, Template, cloze_model};
+use genanki_rs::{Deck, Field, Model, ModelType, Note, Package, Template};
 use std::collections::HashMap;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
