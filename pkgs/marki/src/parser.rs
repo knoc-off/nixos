@@ -2,15 +2,17 @@ use crate::card::{Card, NoteType};
 use crate::highlighter;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Parser, Tag, TagEnd};
 use regex::Regex;
+use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 static TAG_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"#(\w+)").unwrap());
+static IMG_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"<img src="([^"]+)""#).unwrap());
 
 #[derive(Debug, Clone)]
 enum ParserState {
     Normal,
-    InStrong,     // Bold text - cloze c1
-    InEmphasis,   // Italic text - cloze c2
+    InStrong,            // Bold text - cloze c1
+    InEmphasis,          // Italic text - cloze c2
     InCodeBlock(String), // Code block with language
 }
 
@@ -31,6 +33,26 @@ fn extract_tags(text: &str) -> Vec<String> {
 /// Remove tag markers from text
 fn remove_tag_markers(text: &str) -> String {
     TAG_REGEX.replace_all(text, "").to_string()
+}
+
+/// Detect which formatting types exist in the markdown (for cloze numbering)
+fn detect_formatting(markdown: &str) -> (bool, bool) {
+    let parser = Parser::new(markdown);
+    let mut has_bold = false;
+    let mut has_italic = false;
+
+    for event in parser {
+        match event {
+            Event::Start(Tag::Strong) => has_bold = true,
+            Event::Start(Tag::Emphasis) => has_italic = true,
+            _ => {}
+        }
+        if has_bold && has_italic {
+            break; // Found both, no need to continue
+        }
+    }
+
+    (has_bold, has_italic)
 }
 
 /// Parse markdown content into a single card (one file = one card)
@@ -57,6 +79,32 @@ pub fn parse_card(markdown: &str) -> Card {
         .collect();
     dbg!("Final tags", &tags);
 
+    // Detect formatting types for cloze numbering
+    let (has_bold, has_italic) = if note_type == NoteType::Cloze {
+        detect_formatting(markdown)
+    } else {
+        (false, false)
+    };
+
+    // Determine cloze numbers based on what exists:
+    // - If only italic: italic → c1
+    // - If only bold: bold → c1
+    // - If both: bold → c1, italic → c2
+    let (cloze_bold, cloze_italic) = match (has_bold, has_italic) {
+        (true, true) => (1, 2),   // Both exist: bold=c1, italic=c2
+        (true, false) => (1, 0),  // Only bold: bold=c1
+        (false, true) => (0, 1),  // Only italic: italic=c1
+        (false, false) => (0, 0), // Neither (shouldn't happen for cloze cards)
+    };
+
+    dbg!(
+        "Cloze mapping",
+        has_bold,
+        has_italic,
+        cloze_bold,
+        cloze_italic
+    );
+
     let mut card = Card::new();
     card.note_type = note_type.clone();
     card.tags = tags;
@@ -66,7 +114,6 @@ pub fn parse_card(markdown: &str) -> Card {
     let mut current_section = Section::Front;
     let mut state = ParserState::Normal;
     let mut code_content = String::new();
-    let mut cloze_counter = 0;
 
     let parser = Parser::new(markdown);
 
@@ -85,16 +132,16 @@ pub fn parse_card(markdown: &str) -> Card {
             Event::Start(Tag::Strong) => {
                 dbg!("Starting bold text");
                 state = ParserState::InStrong;
-                if note_type == NoteType::Cloze {
-                    cloze_counter += 1;
-                    content.push_str(&format!("{{{{c{}::", cloze_counter));
+                if note_type == NoteType::Cloze && cloze_bold > 0 {
+                    // All bold text uses assigned cloze number
+                    content.push_str(&format!("{{{{c{}::", cloze_bold));
                 } else {
                     content.push_str("<strong>");
                 }
             }
             Event::End(TagEnd::Strong) => {
                 dbg!("Ending bold text");
-                if note_type == NoteType::Cloze {
+                if note_type == NoteType::Cloze && cloze_bold > 0 {
                     match current_section {
                         Section::Front => front_content.push_str("}}"),
                         Section::Back => back_content.push_str("}}"),
@@ -107,16 +154,16 @@ pub fn parse_card(markdown: &str) -> Card {
             Event::Start(Tag::Emphasis) => {
                 dbg!("Starting italic text");
                 state = ParserState::InEmphasis;
-                if note_type == NoteType::Cloze {
-                    cloze_counter += 1;
-                    content.push_str(&format!("{{{{c{}::", cloze_counter));
+                if note_type == NoteType::Cloze && cloze_italic > 0 {
+                    // All italic text uses assigned cloze number
+                    content.push_str(&format!("{{{{c{}::", cloze_italic));
                 } else {
                     content.push_str("<em>");
                 }
             }
             Event::End(TagEnd::Emphasis) => {
                 dbg!("Ending italic text");
-                if note_type == NoteType::Cloze {
+                if note_type == NoteType::Cloze && cloze_italic > 0 {
                     match current_section {
                         Section::Front => front_content.push_str("}}"),
                         Section::Back => back_content.push_str("}}"),
@@ -136,7 +183,10 @@ pub fn parse_card(markdown: &str) -> Card {
                 if let ParserState::InCodeBlock(lang) = &state {
                     dbg!("Ending code block, highlighting");
                     let highlighted = highlighter::highlight_code(&code_content, lang);
-                    content.push_str(&format!("<pre class=\"code\"><code>{}</code></pre>", highlighted));
+                    content.push_str(&format!(
+                        "<pre class=\"code\"><code>{}</code></pre>",
+                        highlighted
+                    ));
                     code_content.clear();
                     state = ParserState::Normal;
                 }
@@ -153,16 +203,14 @@ pub fn parse_card(markdown: &str) -> Card {
                     }
                 }
             }
-            Event::SoftBreak | Event::HardBreak => {
-                match &state {
-                    ParserState::InCodeBlock(_) => {
-                        code_content.push('\n');
-                    }
-                    _ => {
-                        content.push_str("<br>");
-                    }
+            Event::SoftBreak | Event::HardBreak => match &state {
+                ParserState::InCodeBlock(_) => {
+                    code_content.push('\n');
                 }
-            }
+                _ => {
+                    content.push_str("<br>");
+                }
+            },
             Event::Start(Tag::Paragraph) => {
                 content.push_str("<p>");
             }
@@ -238,11 +286,61 @@ pub fn parse_card(markdown: &str) -> Card {
         }
     }
 
+    // Store original markdown source (convert newlines to <br> for Anki display)
+    card.source_markdown = markdown.replace('\n', "<br>");
+
     card.front = front_content.trim().to_string();
     card.back = back_content.trim().to_string();
 
-    dbg!("Parsed card", &card.note_type, &card.tags, card.front.len(), card.back.len());
+    dbg!(
+        "Parsed card",
+        &card.note_type,
+        &card.tags,
+        card.front.len(),
+        card.back.len()
+    );
+
+    // DEBUG: Show HTML for image testing
+    if std::env::var("MARKI_DEBUG").is_ok() {
+        eprintln!("\n=== FRONT HTML ===");
+        eprintln!("{}", &card.front);
+        eprintln!("\n=== BACK HTML ===");
+        eprintln!("{}", &card.back);
+        eprintln!("==================\n");
+    }
+
     card
+}
+
+/// Extract media file references from a card's HTML and resolve to full paths
+pub fn extract_media_files(card: &Card, markdown_dir: Option<&Path>) -> Vec<String> {
+    let mut media_files = Vec::new();
+
+    // Search both front and back for image references
+    for html in [&card.front, &card.back] {
+        for capture in IMG_REGEX.captures_iter(html) {
+            if let Some(src) = capture.get(1) {
+                let filename = src.as_str();
+                dbg!("Found image reference", filename);
+
+                // Resolve relative to markdown file's directory
+                let full_path = if let Some(dir) = markdown_dir {
+                    dir.join(filename)
+                } else {
+                    PathBuf::from(filename)
+                };
+
+                if full_path.exists() {
+                    dbg!("Media file exists", &full_path);
+                    media_files.push(full_path.to_string_lossy().to_string());
+                } else {
+                    eprintln!("Warning: Media file not found: {}", full_path.display());
+                }
+            }
+        }
+    }
+
+    media_files
 }
 
 #[cfg(test)]

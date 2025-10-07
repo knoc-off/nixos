@@ -1,7 +1,7 @@
 use crate::card::{Card, NoteType};
 use crate::highlighter;
 use anyhow::{Context, Result};
-use genanki_rs::{Deck, Field, Model, Note, Template};
+use genanki_rs::{Deck, Field, Model, ModelType, Note, Package, Template};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
@@ -11,6 +11,35 @@ fn generate_id(name: &str) -> i64 {
     let mut hasher = DefaultHasher::new();
     name.hash(&mut hasher);
     (hasher.finish() & 0x7FFFFFFF) as i64
+}
+
+/// Generate a stable GUID string for a card based on parent dir + filename
+fn generate_card_guid(file_path: &str) -> String {
+    let path = Path::new(file_path);
+
+    // Get filename (e.g., "basic1.md")
+    let filename = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown");
+
+    // Get parent directory name (e.g., "test_cards")
+    let parent_dir = path
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|n| n.to_str())
+        .unwrap_or("default");
+
+    // Combine without path separators: "test_cards" + "basic1.md"
+    let combined = format!("{}{}", parent_dir, filename);
+
+    // Hash to create stable GUID
+    let mut hasher = DefaultHasher::new();
+    combined.hash(&mut hasher);
+    let hash = hasher.finish();
+
+    // Format as hex string (Anki-compatible GUID)
+    format!("{:016x}", hash)
 }
 
 /// Create a basic card model (front/back)
@@ -43,10 +72,16 @@ fn create_basic_model() -> Model {
     Model::new(
         generate_id("marki-basic-model"),
         "Marki Basic",
-        vec![Field::new("Front"), Field::new("Back")],
-        vec![Template::new("Card 1")
-            .qfmt("{{Front}}")
-            .afmt(r#"{{FrontSide}}<hr id="answer">{{Back}}"#)],
+        vec![
+            Field::new("Front"),
+            Field::new("Back"),
+            Field::new("Source"),
+        ],
+        vec![
+            Template::new("Card 1")
+                .qfmt("{{Front}}")
+                .afmt(r#"{{FrontSide}}<hr id="answer">{{Back}}"#),
+        ],
     )
     .css(&css)
 }
@@ -83,20 +118,26 @@ fn create_cloze_model() -> Model {
         highlighter::generate_css()
     );
 
-    // Create a cloze model using new_with_options
-    // Parameters: id, name, fields, templates, css, latex_pre, latex_post, sort_field, req
+    // Create a cloze model with proper ModelType::Cloze
+    // This allows Anki to automatically generate multiple cards from cloze deletions
     Model::new_with_options(
         generate_id("marki-cloze-model"),
         "Marki Cloze",
-        vec![Field::new("Text"), Field::new("Extra")],
-        vec![Template::new("Cloze")
-            .qfmt("{{cloze:Text}}")
-            .afmt("{{cloze:Text}}<br>{{Extra}}")],
-        Some(&css),
-        None,        // latex_pre
-        None,        // latex_post
-        None,        // sort_field
-        None,        // req
+        vec![
+            Field::new("Text"),
+            Field::new("Extra"),
+            Field::new("Source"),
+        ],
+        vec![
+            Template::new("Cloze")
+                .qfmt("{{cloze:Text}}")
+                .afmt("{{cloze:Text}}<br>{{Extra}}"),
+        ],
+        Some(&css),             // css
+        Some(ModelType::Cloze), // model_type - THIS IS CRITICAL!
+        None,                   // latex_pre
+        None,                   // latex_post
+        None,                   // sort_field_index
     )
 }
 
@@ -105,6 +146,7 @@ pub fn generate_deck(
     cards: Vec<Card>,
     deck_name: &str,
     output_path: &Path,
+    media_files: Vec<String>,
 ) -> Result<()> {
     dbg!("Generating deck", deck_name, cards.len());
 
@@ -121,11 +163,21 @@ pub fn generate_deck(
             NoteType::Cloze => {
                 // Cloze card - front contains cloze deletions, back is extra context
                 dbg!("Creating cloze note", card.front.len(), card.back.len());
+
+                // Generate stable GUID from file path
+                let guid = card
+                    .file_path
+                    .as_ref()
+                    .map(|p| generate_card_guid(p))
+                    .unwrap_or_else(|| format!("{:016x}", idx));
+                dbg!("Generated GUID for cloze card", &guid, &card.file_path);
+
                 let note = Note::new(
                     cloze_model.clone(),
-                    vec![&card.front, &card.back],
+                    vec![&card.front, &card.back, &card.source_markdown],
                 )
-                .context(format!("Failed to create cloze note for card {}", idx))?;
+                .context(format!("Failed to create cloze note for card {}", idx))?
+                .guid(&guid);
 
                 // TODO: Add tag support when genanki-rs supports it
                 // Tags: {:?}
@@ -136,11 +188,21 @@ pub fn generate_deck(
             NoteType::Basic => {
                 // Basic card - front/back split by first ---
                 dbg!("Creating basic note", card.front.len(), card.back.len());
+
+                // Generate stable GUID from file path
+                let guid = card
+                    .file_path
+                    .as_ref()
+                    .map(|p| generate_card_guid(p))
+                    .unwrap_or_else(|| format!("{:016x}", idx));
+                dbg!("Generated GUID for basic card", &guid, &card.file_path);
+
                 let note = Note::new(
                     basic_model.clone(),
-                    vec![&card.front, &card.back],
+                    vec![&card.front, &card.back, &card.source_markdown],
                 )
-                .context(format!("Failed to create basic note for card {}", idx))?;
+                .context(format!("Failed to create basic note for card {}", idx))?
+                .guid(&guid);
 
                 // TODO: Add tag support when genanki-rs supports it
                 // Tags: {:?}
@@ -152,8 +214,21 @@ pub fn generate_deck(
     }
 
     dbg!("Writing deck to file", output_path);
-    deck.write_to_file(output_path.to_str().unwrap())
-        .context("Failed to write deck to file")?;
+
+    // Use Package if we have media files, otherwise just write deck
+    if media_files.is_empty() {
+        dbg!("No media files, writing deck directly");
+        deck.write_to_file(output_path.to_str().unwrap())
+            .context("Failed to write deck to file")?;
+    } else {
+        dbg!("Creating package with media files", media_files.len());
+        let media_refs: Vec<&str> = media_files.iter().map(|s| s.as_str()).collect();
+        let mut package = Package::new(vec![deck], media_refs)
+            .context("Failed to create package with media files")?;
+        package
+            .write_to_file(output_path.to_str().unwrap())
+            .context("Failed to write package to file")?;
+    }
 
     dbg!("Successfully wrote deck");
     Ok(())
