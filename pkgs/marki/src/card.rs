@@ -5,20 +5,20 @@ pub enum NoteType {
     Cloze,
 }
 
-/// Represents a single flashcard (one file = one card)
 #[derive(Debug, Clone)]
 pub struct Card {
     pub front: String,
     pub back: String,
     pub note_type: NoteType,
     pub tags: Vec<String>,
-    pub source_markdown: String,  // Original markdown source
-    pub file_path: Option<String>, // File path for stable ID generation
+    pub source_markdown: String,
+    pub file_path: Option<String>,
+    pub deck_name: String,
 }
 
 impl Card {
     pub fn new() -> Self {
-        dbg!("Creating new card");
+        // dbg!("Creating new card");
         Self {
             front: String::new(),
             back: String::new(),
@@ -26,6 +26,7 @@ impl Card {
             tags: Vec::new(),
             source_markdown: String::new(),
             file_path: None,
+            deck_name: String::from("default"),
         }
     }
 }

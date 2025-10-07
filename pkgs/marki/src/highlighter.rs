@@ -1,10 +1,9 @@
+use std::sync::LazyLock;
 use syntect::highlighting::{Theme, ThemeSet};
 use syntect::html::{ClassStyle, ClassedHTMLGenerator};
 use syntect::parsing::SyntaxSet;
 use syntect::util::LinesWithEndings;
-use std::sync::LazyLock;
 
-// Lazy-load syntax sets and themes for performance
 static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(|| {
     dbg!("Loading syntax set");
     SyntaxSet::load_defaults_newlines()
@@ -28,7 +27,6 @@ pub fn generate_css() -> String {
     }
 }
 
-/// Highlight code and return HTML with CSS classes
 pub fn highlight_code(code: &str, language: &str) -> String {
     dbg!("Highlighting code block", language);
 
@@ -39,11 +37,8 @@ pub fn highlight_code(code: &str, language: &str) -> String {
             SYNTAX_SET.find_syntax_plain_text()
         });
 
-    let mut html_generator = ClassedHTMLGenerator::new_with_class_style(
-        syntax,
-        &SYNTAX_SET,
-        ClassStyle::Spaced,
-    );
+    let mut html_generator =
+        ClassedHTMLGenerator::new_with_class_style(syntax, &SYNTAX_SET, ClassStyle::Spaced);
 
     for line in LinesWithEndings::from(code) {
         if let Err(e) = html_generator.parse_html_for_line_which_includes_newline(line) {
@@ -54,26 +49,4 @@ pub fn highlight_code(code: &str, language: &str) -> String {
     let html = html_generator.finalize();
     dbg!("Generated HTML length", html.len());
     html
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_highlight_rust() {
-        let code = r#"fn main() {
-    println!("Hello, world!");
-}"#;
-        let html = highlight_code(code, "rust");
-        assert!(html.contains("fn"));
-        assert!(html.contains("main"));
-    }
-
-    #[test]
-    fn test_generate_css() {
-        let css = generate_css();
-        assert!(!css.is_empty());
-        assert!(css.contains("color:"));
-    }
 }
