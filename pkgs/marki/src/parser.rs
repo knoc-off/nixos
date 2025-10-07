@@ -1,6 +1,6 @@
 use crate::card::{Card, NoteType};
 use crate::highlighter;
-use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
+use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Parser, Tag, TagEnd};
 use regex::Regex;
 use std::sync::LazyLock;
 
@@ -168,6 +168,71 @@ pub fn parse_card(markdown: &str) -> Card {
             }
             Event::End(TagEnd::Paragraph) => {
                 content.push_str("</p>");
+            }
+            Event::Start(Tag::Heading { level, .. }) => {
+                let tag = match level {
+                    HeadingLevel::H1 => "h1",
+                    HeadingLevel::H2 => "h2",
+                    HeadingLevel::H3 => "h3",
+                    HeadingLevel::H4 => "h4",
+                    HeadingLevel::H5 => "h5",
+                    HeadingLevel::H6 => "h6",
+                };
+                content.push_str(&format!("<{}>", tag));
+            }
+            Event::End(TagEnd::Heading(level)) => {
+                let tag = match level {
+                    HeadingLevel::H1 => "h1",
+                    HeadingLevel::H2 => "h2",
+                    HeadingLevel::H3 => "h3",
+                    HeadingLevel::H4 => "h4",
+                    HeadingLevel::H5 => "h5",
+                    HeadingLevel::H6 => "h6",
+                };
+                content.push_str(&format!("</{}>", tag));
+            }
+            Event::Start(Tag::List(None)) => {
+                // Unordered list
+                content.push_str("<ul>");
+            }
+            Event::Start(Tag::List(Some(_))) => {
+                // Ordered list
+                content.push_str("<ol>");
+            }
+            Event::End(TagEnd::List(false)) => {
+                content.push_str("</ul>");
+            }
+            Event::End(TagEnd::List(true)) => {
+                content.push_str("</ol>");
+            }
+            Event::Start(Tag::Item) => {
+                content.push_str("<li>");
+            }
+            Event::End(TagEnd::Item) => {
+                content.push_str("</li>");
+            }
+            Event::Start(Tag::BlockQuote(_)) => {
+                content.push_str("<blockquote>");
+            }
+            Event::End(TagEnd::BlockQuote(_)) => {
+                content.push_str("</blockquote>");
+            }
+            Event::Start(Tag::Link { dest_url, .. }) => {
+                content.push_str(&format!("<a href=\"{}\">", dest_url));
+            }
+            Event::End(TagEnd::Link) => {
+                content.push_str("</a>");
+            }
+            Event::Start(Tag::Image { dest_url, .. }) => {
+                content.push_str(&format!("<img src=\"{}\" alt=\"", dest_url));
+            }
+            Event::End(TagEnd::Image) => {
+                content.push_str("\">");
+            }
+            Event::Code(code) => {
+                // Inline code
+                let cleaned = remove_tag_markers(&code);
+                content.push_str(&format!("<code>{}</code>", cleaned));
             }
             _ => {}
         }

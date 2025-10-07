@@ -60,26 +60,8 @@
               };
               thumbwheel:
               {
-                  divert: true;
+                  divert: false;
                   invert: false;
-                  left:
-                  {
-                      action:
-                      {
-                          type: "Axis";
-                          axis: "REL_HWHEEL_HI_RES";
-                          axis_multiplier: -1;
-                      };
-                  };
-                  right:
-                  {
-                      action:
-                      {
-                          type: "Axis";
-                          axis: "REL_HWHEEL_HI_RES";
-                          axis_multiplier: 1;
-                      };
-                  };
                   proxy:
                   {
                       type: "Keypress";
@@ -505,7 +487,7 @@
 
   users = {
     users.${user} = {
-      #shell = pkgs.fish;
+      shell = pkgs.fish;
       isNormalUser = lib.mkDefault true;
       extraGroups =
         [
