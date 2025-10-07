@@ -8,7 +8,7 @@ rustPlatform.buildRustPackage rec {
   version = "0.8.5";
   src = ./.;
   useFetchCargoVendor = true;
-  cargoHash = "sha256-STbg3Notr+X31zBQjQt6OVDiMV2F055NxFZV/3hqb10=";
+  cargoHash = "sha256-XB+MvsF9SUOkVKe1pOGIcsJGA7hYkx0FWfrH1dTGZvA=";
   cargoAuditable = null;
 
   nativeBuildInputs = [

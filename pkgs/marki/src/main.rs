@@ -116,15 +116,13 @@ fn main() -> Result<()> {
         let content =
             fs::read_to_string(file).context(format!("Failed to read {}", file.display()))?;
 
-        let mut card = parser::parse_card(&content);
+        let (mut card, media_files) = parser::parse_card(&content, file.parent());
         card.file_path = Some(file.to_string_lossy().to_string());
 
         card.deck_name = deck_name_from_dir(&args.input, file);
         // dbg!("Card deck name", &card.deck_name);
 
         // dbg!("Parsed card", &card.note_type, &card.tags);
-
-        let media_files = parser::extract_media_files(&card, file.parent());
         // dbg!("Found media files", &media_files);
         all_media_files.extend(media_files);
 

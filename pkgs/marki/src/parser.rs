@@ -5,17 +5,12 @@ use regex::Regex;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
-<<<<<<< HEAD
-static TAG_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"#(\w+)").unwrap());
-static IMG_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"<img src="([^"]+)""#).unwrap());
-=======
 static TAG_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"#([\w:]+)").unwrap());
->>>>>>> 3e039de (quick sync)
 
 #[derive(Debug, Clone)]
 enum ParserState {
     Normal,
-    InCodeBlock(String, String), // (language, accumulated content)
+    InCodeBlock(String, String),
 }
 
 #[derive(Debug)]
@@ -24,7 +19,6 @@ enum Section {
     Back,
 }
 
-/// Extract and parse structured tags from markdown text
 fn extract_tags(text: &str) -> Vec<CardTag> {
     TAG_REGEX
         .captures_iter(text)
@@ -32,21 +26,14 @@ fn extract_tags(text: &str) -> Vec<CardTag> {
         .collect()
 }
 
-/// Remove tag markers from text
 fn remove_tag_markers(text: &str) -> String {
     TAG_REGEX.replace_all(text, "").to_string()
 }
 
-<<<<<<< HEAD
-=======
-/// Render math expression in MathJax format for Anki
-/// Returns display math wrapped in \[...\]
 fn render_math(content: &str, _display: bool) -> String {
     format!("<p>\\[{}\\]</p>", content.trim())
 }
 
-/// Render math expression using KaTeX (feature-gated)
-/// Pre-renders to styled HTML
 #[cfg(feature = "katex")]
 fn render_katex(content: &str) -> String {
     katex::render_with_opts(
@@ -60,8 +47,6 @@ fn render_katex(content: &str) -> String {
     })
 }
 
->>>>>>> 3e039de (quick sync)
-/// Detect which formatting types exist in the markdown (for cloze numbering)
 fn detect_formatting(markdown: &str) -> (bool, bool) {
     let parser = Parser::new(markdown);
     let mut has_bold = false;
@@ -74,18 +59,16 @@ fn detect_formatting(markdown: &str) -> (bool, bool) {
             _ => {}
         }
         if has_bold && has_italic {
-            break; // Found both, no need to continue
+            break;
         }
     }
 
     (has_bold, has_italic)
 }
 
-/// Parse markdown content into a single card (one file = one card)
-pub fn parse_card(markdown: &str) -> Card {
+pub fn parse_card(markdown: &str, markdown_dir: Option<&Path>) -> (Card, Vec<String>) {
     let tags = extract_tags(markdown);
 
-    // Determine note type and cloze algorithm from structured tags
     let mut cloze_algorithm = None;
     let mut note_type = NoteType::Basic;
 
@@ -102,10 +85,8 @@ pub fn parse_card(markdown: &str) -> Card {
         }
     }
 
-    // Default to Increment if cloze but no algorithm specified
     let cloze_algorithm = cloze_algorithm.unwrap_or(ClozeAlgorithm::Increment);
 
-    // For Auto mode, detect what formatting exists
     let cloze_algorithm = if matches!(cloze_algorithm, ClozeAlgorithm::Auto) {
         let (has_bold, has_italic) = detect_formatting(markdown);
         if has_bold && has_italic {
@@ -117,7 +98,6 @@ pub fn parse_card(markdown: &str) -> Card {
         cloze_algorithm
     };
 
-    // Extract generic tags for Anki
     let generic_tags: Vec<String> = tags
         .iter()
         .filter_map(|t| match t {
@@ -126,38 +106,17 @@ pub fn parse_card(markdown: &str) -> Card {
         })
         .collect();
 
-<<<<<<< HEAD
-    // Detect formatting types for cloze numbering
-    let (has_bold, has_italic) = if note_type == NoteType::Cloze {
-        detect_formatting(markdown)
-    } else {
-        (false, false)
-    };
-
-    // Determine cloze numbers based on what exists:
-    // - If only italic: italic → c1
-    // - If only bold: bold → c1
-    // - If both: bold → c1, italic → c2
-    let (cloze_bold, cloze_italic) = match (has_bold, has_italic) {
-        (true, true) => (1, 2),
-        (true, false) => (1, 0),
-        (false, true) => (0, 1),
-        (false, false) => (0, 0), // error? cloze without cloze...
-    };
-
-=======
->>>>>>> 3e039de (quick sync)
     let mut card = Card::new();
     card.note_type = note_type.clone();
     card.tags = generic_tags;
 
-    // Cloze counter for Increment mode
     let mut cloze_counter = 0;
 
     let mut front_content = String::new();
     let mut back_content = String::new();
     let mut current_section = Section::Front;
     let mut state = ParserState::Normal;
+    let mut media_files = Vec::new();
 
     let parser = Parser::new(markdown);
 
@@ -169,7 +128,6 @@ pub fn parse_card(markdown: &str) -> Card {
 
         match event {
             Event::Rule => {
-                // First --- divides front from back
                 current_section = Section::Back;
             }
             Event::Start(Tag::Strong) => {
@@ -179,8 +137,8 @@ pub fn parse_card(markdown: &str) -> Card {
                             cloze_counter += 1;
                             cloze_counter
                         }
-                        ClozeAlgorithm::Duo => 1, // Bold is always c1
-                        ClozeAlgorithm::Auto => unreachable!(), // Resolved earlier
+                        ClozeAlgorithm::Duo => 1,
+                        ClozeAlgorithm::Auto => unreachable!(),
                     };
                     content.push_str(&format!("{{{{c{}::", cloze_num));
                 } else {
@@ -201,8 +159,8 @@ pub fn parse_card(markdown: &str) -> Card {
                             cloze_counter += 1;
                             cloze_counter
                         }
-                        ClozeAlgorithm::Duo => 2, // Italic is always c2
-                        ClozeAlgorithm::Auto => unreachable!(), // Resolved earlier
+                        ClozeAlgorithm::Duo => 2,
+                        ClozeAlgorithm::Auto => unreachable!(),
                     };
                     content.push_str(&format!("{{{{c{}::", cloze_num));
                 } else {
@@ -221,13 +179,6 @@ pub fn parse_card(markdown: &str) -> Card {
             }
             Event::End(TagEnd::CodeBlock) => {
                 if let ParserState::InCodeBlock(lang, code) = &state {
-<<<<<<< HEAD
-                    let highlighted = highlighter::highlight_code(code, lang);
-                    content.push_str(&format!(
-                        "<pre class=\"code\"><code>{}</code></pre>",
-                        highlighted
-                    ));
-=======
                     let output = if lang.starts_with('_') {
                         let actual_lang = &lang[1..];
                         let highlighted = highlighter::highlight_code(code, actual_lang);
@@ -244,22 +195,18 @@ pub fn parse_card(markdown: &str) -> Card {
                         }
                     };
                     content.push_str(&output);
->>>>>>> 3e039de (quick sync)
                     state = ParserState::Normal;
                 }
             }
-            Event::Text(text) => {
-                match &mut state {
-                    ParserState::InCodeBlock(_, code) => {
-                        code.push_str(&text);
-                    }
-                    ParserState::Normal => {
-                        // Remove tag markers from text
-                        let cleaned = remove_tag_markers(&text);
-                        content.push_str(&cleaned);
-                    }
+            Event::Text(text) => match &mut state {
+                ParserState::InCodeBlock(_, code) => {
+                    code.push_str(&text);
                 }
-            }
+                ParserState::Normal => {
+                    let cleaned = remove_tag_markers(&text);
+                    content.push_str(&cleaned);
+                }
+            },
             Event::SoftBreak | Event::HardBreak => match &mut state {
                 ParserState::InCodeBlock(_, code) => {
                     code.push('\n');
@@ -329,8 +276,7 @@ pub fn parse_card(markdown: &str) -> Card {
                 content.push_str("</a>");
             }
             Event::Start(Tag::Image { dest_url, .. }) => {
-<<<<<<< HEAD
-=======
+                // Resolve and collect media file path
                 let full_path = if let Some(dir) = markdown_dir {
                     dir.join(dest_url.as_ref())
                 } else {
@@ -338,13 +284,11 @@ pub fn parse_card(markdown: &str) -> Card {
                 };
 
                 if full_path.exists() {
-                    card.media_files
-                        .push(full_path.to_string_lossy().to_string());
+                    media_files.push(full_path.to_string_lossy().to_string());
                 } else {
                     eprintln!("Warning: Media file not found: {}", full_path.display());
                 }
 
->>>>>>> 3e039de (quick sync)
                 content.push_str(&format!("<img src=\"{}\" alt=\"", dest_url));
             }
             Event::End(TagEnd::Image) => {
@@ -366,40 +310,9 @@ pub fn parse_card(markdown: &str) -> Card {
         "Parsed card",
         &card.note_type,
         &card.tags,
-        card.front.len(),
-        card.back.len()
+        &card.front,
+        &card.back,
     );
 
-    card
-}
-
-/// Extract media file references from a card's HTML and resolve to full paths
-pub fn extract_media_files(card: &Card, markdown_dir: Option<&Path>) -> Vec<String> {
-    let mut media_files = Vec::new();
-
-    // Search both front and back for image references
-    for html in [&card.front, &card.back] {
-        for capture in IMG_REGEX.captures_iter(html) {
-            if let Some(src) = capture.get(1) {
-                let filename = src.as_str();
-                // dbg!("Found image reference", filename);
-
-                // Resolve relative to markdown file's directory
-                let full_path = if let Some(dir) = markdown_dir {
-                    dir.join(filename)
-                } else {
-                    PathBuf::from(filename)
-                };
-
-                if full_path.exists() {
-                    // dbg!("Media file exists", &full_path);
-                    media_files.push(full_path.to_string_lossy().to_string());
-                } else {
-                    eprintln!("Warning: Media file not found: {}", full_path.display());
-                }
-            }
-        }
-    }
-
-    media_files
+    (card, media_files)
 }

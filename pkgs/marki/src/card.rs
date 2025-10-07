@@ -20,6 +20,7 @@ pub enum ClozeAlgorithm {
 #[derive(Debug, Clone, ParseTag)]
 pub enum Tag {
     Cloze {
+        // #[default] //this should make this optional/required
         algo: ClozeAlgorithm,
     },
 
