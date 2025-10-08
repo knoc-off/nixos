@@ -11,21 +11,22 @@
     aliases = {
       # Commit aliases
       ca = "commit --amend";
-      caa = "commit -a --amend";
-      c = "commit -a";
+      caa = "commit --all --amend";
+      c = "commit --all";
 
-      # Push aliases
-      pf = "push --force-with-lease";
+      s = "status --short";
 
-      # Other useful aliases
-      st = "status";
+      force = "push --force-with-lease";
+      p = "push";
+
       co = "checkout";
       br = "branch";
-      l = "log --oneline --graph --decorate -5";
+      l = "log --oneline --graph --decorate -10";
       unstage = "reset HEAD --";
       last = "log -1 HEAD";
+      lb = ''!f() { for i in $(seq 1 $1); do git name-rev --name-only --exclude=refs/tags/\* @{-$i}; done; }; f'';
       # See changes since branching off of main branch
-      changes = ''diff --merge-base origin/main'';
+      ch = ''diff --merge-base origin/HEAD'';
     };
     # signing = {
     #   key = "your-key-id";
@@ -35,10 +36,6 @@
 
     delta = {
       enable = true;
-
-      # Optional: specify a different delta package
-      # package = pkgs.delta;
-
       options = {
         # Navigation
         navigate = true; # Use n/N to jump between files Amazing
@@ -46,39 +43,21 @@
         file-regex = "^(?!.*lock$).*"; # maybe?
 
         # Display
-        side-by-side = true; # Show diffs side by side
-        line-numbers = true; # Show line numbers
+        side-by-side = true;
+        line-numbers = true;
 
-        # Syntax highlighting
-        syntax-theme = "Visual Studio Dark+"; # Or "GitHub", "Monokai Extended", etc.
+        syntax-theme = "Visual Studio Dark+";
 
-        # Better file headers
         file-style = "bold yellow ul";
         file-decoration-style = "none";
 
-        # Hunk headers
         hunk-header-decoration-style = "blue box";
         hunk-header-file-style = "red";
         hunk-header-line-number-style = "#067a00";
         hunk-header-style = "file line-number syntax";
 
-        # Line styles
-        #minus-style = "red bold";
-        #plus-style = "green bold";
-
-        # Whitespace
         whitespace-error-style = "22 reverse";
       };
-      # options = {
-      #   # Example delta options - customize as needed
-      #   features = "decorations";
-      #   whitespace-error-style = "22 reverse";
-      #   decorations = {
-      #     commit-decoration-style = "bold yellow box ul";
-      #     file-style = "bold yellow ul";
-      #     file-decoration-style = "none";
-      #   };
-      # };
     };
   };
 }
