@@ -1,78 +1,38 @@
 #!/usr/bin/env bash
-# Script to update Nix system configuration labels based on commit messages.
+# Generate NixOS labels from commit messages
 
-SDIR="systems"                   # Directory containing Nix files
-CDIR="$SDIR/commit-messages"     # Directory for commit messages
-MAXLEN=200                       # Maximum total length for the label
+set -euo pipefail
 
-mkdir -p "$CDIR"                 # Ensure commit message directory exists
+readonly SYSTEMS_DIR="systems"
+readonly COMMIT_DIR="$SYSTEMS_DIR/commit-messages"
+readonly MAX_LEN=92  # 200 - 15 (REV_) - padding = ~92 per message
 
-# Function to process commit messages
-process_msg() {
-    local msg="$1" pad="$2" side="$3"
-    msg="${msg#"${msg%%[![:space:]]*}"}"          # Trim leading whitespace
-    msg="${msg%"${msg##*[![:space:]]}"}"          # Trim trailing whitespace
-    msg="${msg// /_}"                             # Replace spaces with underscores
-    msg=$(echo "$msg" | tr -cd 'a-zA-Z0-9:_\.-')  # Remove disallowed characters
-    [ ${#msg} -gt "$pad" ] && msg="${msg:0:$pad}" # Truncate if necessary
-    if [ "$side" = "right" ]; then
-        # Pad on the right
-        printf "%-${pad}s" "$msg" | tr ' ' '_'
-    else
-        # Pad on the left
-        printf "%${pad}s" "$msg" | tr ' ' '_'
-    fi
+mkdir -p "$COMMIT_DIR"
+
+# Clean and truncate message: trim, replace spaces, remove bad chars, truncate
+clean_msg() {
+    echo "$1" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s/ /_/g' | \
+    tr -cd 'a-zA-Z0-9:_.-' | cut -c1-${MAX_LEN}
 }
 
-# Get and process the global commit message
-gmsg=$(git log -1 --pretty=%s)                    # Fetch global commit message
+global_msg=$(clean_msg "$(git log -1 --pretty=%s)")
 
-# Assume a placeholder length for the Nix revision expression
-# Let's assume the revision expression will evaluate to a string of 7 characters (typical short git hash)
-# plus the length of "REV_" prefix and padding
-revision_placeholder_length=15  # adjust as necessary
-
-# Remaining length after accounting for the revision placeholder
-remaining_len=$((MAXLEN - revision_placeholder_length))
-
-# Allocate half length to MSG1 and half to MSG2
-half_len=$((remaining_len / 2))
-
-# Adjust lengths if necessary
-gmsg_len=${#gmsg}
-[ "$gmsg_len" -gt "$half_len" ] && gmsg_len=$half_len
-
-# Process the global commit message (MSG1) with padding on the right
-gmsg_processed=$(process_msg "$gmsg" "$half_len" "right")
-
-# Process each Nix file in the systems directory
-for f in "$SDIR"/*.nix; do
-    [ -e "$f" ] || continue                       # Skip if no files match
-    cmsg=$(git log -1 --pretty=%s -- "$f")        # Fetch file-specific commit message
-
-    cmsg_len=${#cmsg}
-    [ "$cmsg_len" -gt "$half_len" ] && cmsg_len=$half_len
-
-    # Process file-specific message (MSG2) with padding on the left
-    cmsg_processed=$(process_msg "$cmsg" "$half_len" "left")
-
-    # The Nix expression for the revision code remains as is
-    # Combine messages
-    fname="${f##*/}"                              # Extract filename
-    cfile="$CDIR/${fname%.*}-commit-message.nix"  # Commit message file path
-
-    # Write the label into the Nix file
-    cat > "$cfile" << EOF
+for nix_file in "$SYSTEMS_DIR"/*.nix; do
+    [[ -f "$nix_file" ]] || continue
+    
+    file_msg=$(clean_msg "$(git log -1 --pretty=%s -- "$nix_file")")
+    base_name="${nix_file##*/}"
+    output_file="$COMMIT_DIR/${base_name%.*}-commit-message.nix"
+    
+    cat > "$output_file" << EOF
 { self, ... }:
 {
-  system.nixos.label = "${gmsg_processed}" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "${cmsg_processed}";
+  system.nixos.label = "${global_msg}" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "${file_msg}";
 }
 EOF
-
-    # Stage the file if it has changes
-    git diff --quiet "$cfile" || git add "$cfile"
+    
+    git diff --quiet "$output_file" || git add "$output_file"
 done
 
-# Amend the current commit to include staged changes if any
 git diff --cached --quiet || git commit --amend --no-edit
 
