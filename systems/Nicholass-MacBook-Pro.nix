@@ -4,9 +4,8 @@
   pkgs,
   user,
   system,
-  theme,
   color-lib,
-  lib,
+  theme,
   config,
   ...
 } @ args: let
@@ -39,14 +38,21 @@ in {
         enableSyntaxHighlighting = true;
         #enableAutosuggestions = true;
         interactiveShellInit = ''
-
+          cl() {
+              printf '\x1b]1337;SetUserVar=in_claude=MQ==\007'
+              command claude "$@"
+              local exit_code=$?
+              printf '\x1b]1337;SetUserVar=in_claude\007'
+              return $exit_code
+          }
         '';
       };
     }
 
     {
+      # borked
       services.yabai = {
-        enable = true;
+        enable = false;
         config = {
           focus_follows_mouse = "autoraise";
           mouse_follows_focus = "off";
@@ -78,9 +84,7 @@ in {
   '';
 
   nixpkgs.config.allowUnsupportedSystem = true;
-  # lib.mkIf pkgs.stdenv.isLinux
 
-  # packages.aarch64-darwin.neovim-nix.default
   environment.systemPackages = with pkgs; [
     self.packages.${system}.neovim-nix.default
 
@@ -107,11 +111,8 @@ in {
     docker
     docker-compose
 
-    # Programming deps/LSPs/etc
-    ## for Rust
-    rustup # accidentally installed from the script, but should use the nix one instead...
-    # cargo etc, installed via rustup directly for now
-    cargo-nextest # trying it out, useful for running tests quickly
+    rustup
+    cargo-nextest
 
     # Add these to my nix-vim.
     # # Lua LSP
@@ -154,18 +155,19 @@ in {
 
       "rectangle"
       "spotify"
-      "alt-tab"
+      # "alt-tab"
       "tableplus"
       "raycast"
-      "slack" # previously directly downloaded from website, check for conflicts
-      "fly" # Because we need to have r/w for the binary since it needs to match the version in our concourse instance
+      "slack"
+      # "fly"
     ];
     brews = [
-      "mingw-w64" # For rust cross compilation to windows...
+      "mingw-w64" # For rust cross compilation to windows.
       "colima" # For docker
       "openssl"
 
       {
+        # focus follows mouse
         name = "autoraise";
         args = [
           "--with-dexperimental_focus_first"
@@ -173,10 +175,6 @@ in {
         ];
         start_service = false;
       }
-
-      #"nsis" # Broken on darwin nixpkgs :(
-      # "llvm" # Kept just in case, was used for trying experimental tauri cross compilation to windows (also nsis above)
-      # "tunneltodev/tap/tunnelto" # ngrok-like, broken on nixpkgs at the moment
     ];
     onActivation.cleanup = "uninstall";
   };

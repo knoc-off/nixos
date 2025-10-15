@@ -27,7 +27,6 @@ in {
     keybindings =
       {
         "ctrl+shift+r" = "set_tab_title";
-        "ctrl+t" = "new_os_window_with_cwd";
         "ctrl+shift+t" = "new_window_with_cwd";
         "ctrl+l" = "clear_terminal to_cursor active";
 
@@ -42,13 +41,18 @@ in {
         "super+f" = "show_scrollback";
         "super+t" = "new_tab_with_cwd";
         "super+w" = "close_tab";
-        "super+n" = "new_os_window";
+        # "super+n" = "new_os_window";
         "super+z" = "undo";
         "super+shift+z" = "redo";
       }
       // lib.optionalAttrs pkgs.stdenv.isDarwin {
         # "cmd+r" = "set_tab_title";
-        "cmd+enter" = "move_window_to_top";
+        # "ctrl+t" = "launch --type=os-window --cwd=current";
+        # "super+n" = "launch --type=os-window";
+        # "cmd+enter" = "move_window_to_top";
+      }
+      // lib.optionalAttrs (!pkgs.stdenv.isDarwin) {
+        "ctrl+t" = "new_os_window_with_cwd";
       };
     extraConfig = ''
 
@@ -65,7 +69,8 @@ in {
         # tall layout
         enabled_layouts tall:bias=60;full_size=1;mirrored=false
 
-      ${ # Darwin-specific config
+      ${
+        # Darwin-specific config
         if pkgs.stdenv.isDarwin
         then ''
           macos_option_as_alt yes
@@ -83,7 +88,16 @@ in {
           map alt+j neighboring_window down
 
           touch_scroll_multiplier 1
+
+          macos_quit_when_last_window_closed yes
+
+          # map --when-focus-on "title:claude" enter send_text all \x0a
+          # map --when-focus-on "title:claude" cmd+enter send_key enter
+
+          map --when-focus-on "var:in_claude" enter send_text all \x0a
+          map --when-focus-on "var:in_claude" cmd+enter send_key enter
         ''
+        # linux specific (some of this is system/hardware specific.)
         else ''
           touch_scroll_multiplier 6.5
         ''
