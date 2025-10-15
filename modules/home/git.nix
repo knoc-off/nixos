@@ -12,7 +12,7 @@
       # Commit aliases
       ca = "commit --amend";
       caa = "commit --all --amend";
-      c = "commit --all";
+      c = "commit";
 
       s = "status --short";
 
@@ -24,7 +24,7 @@
       l = "log --oneline --graph --decorate -10";
       unstage = "reset HEAD --";
       last = "log -1 HEAD";
-      lb = ''!f() { for i in $(seq 1 $1); do git name-rev --name-only --exclude=refs/tags/\* @{-$i}; done; }; f'';
+      # lb = ''!f() { for i in $(seq 1 $1); do git name-rev --name-only --exclude=refs/tags/\* @{-$i}; done; }; f'';
       # See changes since branching off of main branch
       ch = ''diff --merge-base origin/HEAD'';
     };

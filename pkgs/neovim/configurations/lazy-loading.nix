@@ -23,7 +23,14 @@
 
     {
       #plugins gitsigns
-      plugins.gitsigns.enable = true;
+      plugins.gitsigns = {
+        enable = true;
+        settings = {
+          diff_opts = {
+            vertical = true;
+          };
+        };
+      };
 
       # Initialize gitsigns base state tracking
       extraConfigLuaPre = ''
@@ -922,7 +929,6 @@
       };
     }
 
-    # tag: file-specific
     {
       plugins.rustaceanvim = {
         enable = true;
@@ -939,7 +945,8 @@
 
                 diagnostics = {
                   enable = true;
-                  enableExperimental = true;
+                  # Disabled experimental - can cause slowness
+                  enableExperimental = false;
                 };
 
                 inlayHints = {
@@ -963,6 +970,10 @@
                 procMacro.enable = true;
 
                 checkOnSave = true;
+
+                typing = {
+                  continueCommentsOnNewline = false;
+                };
               };
             };
           };
@@ -1409,6 +1420,5 @@
   viAlias = true;
   vimAlias = true;
 
-  # plugin manager, that loads plugin with lua code
   luaLoader.enable = true;
 }

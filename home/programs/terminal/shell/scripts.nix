@@ -22,10 +22,14 @@ in {
         echo "Converted '$input_csv' to '$output_xlsx'"
       '';
       # Grammar using external command 'fd'
-      grammar = ''
-        csv_to_excel {{{ ${pkgs.fd}/bin/fd --type f --extension csv --max-depth 1 . --color never --hidden --no-ignore }}} "Input CSV file" <PATH> "Output XLSX file";'';
+      grammar = ''csv_to_excel {{{ ${pkgs.fd}/bin/fd --type f --extension csv --max-depth 1 . --color never --hidden --no-ignore }}} "Input CSV file" <PATH> "Output XLSX file";'';
       # Runtime dependency for the script itself
-      runtimeDeps = [(pkgs.python3.withPackages (ps: [ps.pandas ps.openpyxl]))];
+      runtimeDeps = [
+        (pkgs.python3.withPackages (ps: [
+          ps.pandas
+          ps.openpyxl
+        ]))
+      ];
     })
 
     (mkComplgenScript {
@@ -41,7 +45,12 @@ in {
         excel_to_csv {{{ ${pkgs.fd}/bin/fd --type f --extension xlsx --extension xls --max-depth 1 . --color never --hidden --no-ignore }}} "Input Excel file" <PATH> "Output CSV file";
       '';
       # Runtime dependencies
-      runtimeDeps = [(pkgs.python3.withPackages (ps: [ps.pandas ps.openpyxl]))];
+      runtimeDeps = [
+        (pkgs.python3.withPackages (ps: [
+          ps.pandas
+          ps.openpyxl
+        ]))
+      ];
     })
 
     (mkComplgenScript {
@@ -150,7 +159,10 @@ in {
       '';
 
       # Runtime dependencies for the script
-      runtimeDeps = [pkgs.systemd pkgs.coreutils]; # coreutils for date and sleep
+      runtimeDeps = [
+        pkgs.systemd
+        pkgs.coreutils
+      ]; # coreutils for date and sleep
     })
 
     # cli = {
@@ -506,7 +518,10 @@ in {
       grammar = ''
         compress {{{ ${pkgs.fd}/bin/fd --type directory --type file --max-depth 1 . --color never }}} "Source" <PATH> "Destination";
       '';
-      runtimeDeps = [pkgs.pigz pkgs.pv];
+      runtimeDeps = [
+        pkgs.pigz
+        pkgs.pv
+      ];
     })
 
     (mkComplgenScript {
@@ -522,7 +537,34 @@ in {
       grammar = ''
         rsync-compress {{{ ${pkgs.fd}/bin/fd --type directory --type file --max-depth 1 . --color never }}} "Source" <PATH> "Destination";
       '';
-      runtimeDeps = [pkgs.rsync pkgs.pv];
+      runtimeDeps = [
+        pkgs.rsync
+        pkgs.pv
+      ];
+    })
+
+    (mkComplgenScript {
+      name = "cl";
+      scriptContent = ''
+        #!${pkgs.bash}/bin/bash
+        set -euo pipefail
+
+        # Set kitty user variable to indicate we're in claude
+        printf '\x1b]1337;SetUserVar=in_claude=MQ==\007'
+
+        # Run claude command with all arguments, preserving exit code
+        command claude "$@"
+        local exit_code=$?
+
+        # Clear kitty user variable when claude exits
+        printf '\x1b]1337;SetUserVar=in_claude\007'
+
+        return $exit_code
+      '';
+      grammar = ''
+        cl <COMMAND> "Claude command" ...;
+      '';
+      runtimeDeps = [pkgs.bash];
     })
   ];
 }
