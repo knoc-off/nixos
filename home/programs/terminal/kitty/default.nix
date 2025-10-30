@@ -31,7 +31,8 @@ in {
         "ctrl+l" = "clear_terminal to_cursor active";
 
         # swap window for master
-        "shift+enter" = "move_window_to_top";
+        "super+backslash" = "move_window_to_top"; # overrides
+
         # Spawn new split, with cwd.
         "alt+enter" = "launch --location=split --cwd=current";
 
