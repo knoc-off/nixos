@@ -82,10 +82,18 @@
           fg = "$grey";
           fmt = "${code_style.comments}";
         };
-        LineNr = {fg = "$grey";};
-        CursorLineNr = {fg = "$bright_yellow";};
-        Visual = {bg = "$bg3";};
-        VisualNOS = {bg = "$bg3";};
+        LineNr = {
+          fg = "$grey";
+        };
+        CursorLineNr = {
+          fg = "$bright_yellow";
+        };
+        Visual = {
+          bg = "$bg3";
+        };
+        VisualNOS = {
+          bg = "$bg3";
+        };
         Search = {
           fg = "$bg0";
           bg = "$orange";
@@ -94,10 +102,18 @@
           fg = "$bg0";
           bg = "$orange";
         };
-        CursorLine = {bg = "$bg1";};
-        CursorColumn = {bg = "$bg1";};
-        ColorColumn = {bg = "$bg1";};
-        SignColumn = {fg = "$fg";};
+        CursorLine = {
+          bg = "$bg1";
+        };
+        CursorColumn = {
+          bg = "$bg1";
+        };
+        ColorColumn = {
+          bg = "$bg1";
+        };
+        SignColumn = {
+          fg = "$fg";
+        };
         StatusLine = {
           fg = "$fg";
           bg = "$bg2";
@@ -106,7 +122,9 @@
           fg = "$grey";
           bg = "$bg1";
         };
-        VertSplit = {fg = "$bg3";};
+        VertSplit = {
+          fg = "$bg3";
+        };
         MatchParen = {
           fg = "$orange";
           fmt = "bold,underline";
@@ -121,8 +139,12 @@
           fg = "$bg0";
           bg = "$blue";
         };
-        PmenuSbar = {bg = "$bg1";};
-        PmenuThumb = {bg = "$grey";};
+        PmenuSbar = {
+          bg = "$bg1";
+        };
+        PmenuThumb = {
+          bg = "$grey";
+        };
 
         # Folds and Spell Checking
         Folded = {
@@ -201,18 +223,42 @@
           fg = "$purple";
           fmt = "${code_style.keywords}";
         };
-        PreProc = {fg = "$purple";};
-        Include = {fg = "$purple";};
-        Define = {fg = "$purple";};
-        Macro = {fg = "$purple";};
-        Type = {fg = "$yellow";};
-        StorageClass = {fg = "$yellow";};
-        Structure = {fg = "$yellow";};
-        Typedef = {fg = "$yellow";};
-        Special = {fg = "$orange";};
-        SpecialChar = {fg = "$red";};
-        Tag = {fg = "$blue";};
-        Delimiter = {fg = "$light_grey";};
+        PreProc = {
+          fg = "$purple";
+        };
+        Include = {
+          fg = "$purple";
+        };
+        Define = {
+          fg = "$purple";
+        };
+        Macro = {
+          fg = "$purple";
+        };
+        Type = {
+          fg = "$yellow";
+        };
+        StorageClass = {
+          fg = "$yellow";
+        };
+        Structure = {
+          fg = "$yellow";
+        };
+        Typedef = {
+          fg = "$yellow";
+        };
+        Special = {
+          fg = "$orange";
+        };
+        SpecialChar = {
+          fg = "$red";
+        };
+        Tag = {
+          fg = "$blue";
+        };
+        Delimiter = {
+          fg = "$light_grey";
+        };
         SpecialComment = {
           fg = "$grey";
           fmt = "${code_style.comments}";
@@ -229,38 +275,72 @@
           fg = "$green";
           fmt = "${code_style.strings}";
         };
-        Character = {fg = "$green";};
-        Number = {fg = "$orange";};
-        Boolean = {fg = "$orange";};
-        Float = {fg = "$orange";};
+        Character = {
+          fg = "$green";
+        };
+        Number = {
+          fg = "$orange";
+        };
+        Boolean = {
+          fg = "$orange";
+        };
+        Float = {
+          fg = "$orange";
+        };
         Constant = {
           fg = "$orange";
           fmt = "${code_style.constants}";
         };
 
         # Messages and Errors
-        Error = {fg = "$red";};
-        ErrorMsg = {fg = "$red";};
-        WarningMsg = {fg = "$yellow";};
-        MoreMsg = {fg = "$blue";};
-        Question = {fg = "$cyan";};
+        Error = {
+          fg = "$red";
+        };
+        ErrorMsg = {
+          fg = "$red";
+        };
+        WarningMsg = {
+          fg = "$yellow";
+        };
+        MoreMsg = {
+          fg = "$blue";
+        };
+        Question = {
+          fg = "$cyan";
+        };
 
         # Git and Diff Highlighting
-        GitSignsAdd = {fg = "$green";};
-        GitSignsChange = {fg = "$blue";};
-        GitSignsDelete = {fg = "$red";};
+        GitSignsAdd = {
+          fg = "$green";
+        };
+        GitSignsChange = {
+          fg = "$blue";
+        };
+        GitSignsDelete = {
+          fg = "$red";
+        };
 
         # Telescope customizations (from your original config)
-        TelescopeMatching = {fg = "$orange";};
+        TelescopeMatching = {
+          fg = "$orange";
+        };
         TelescopeSelection = {
           fg = "$fg";
           bg = "$bg1";
           bold = true;
         };
-        TelescopePromptPrefix = {bg = "$bg1";};
-        TelescopePromptNormal = {bg = "$bg1";};
-        TelescopeResultsNormal = {bg = "$bg1";};
-        TelescopePreviewNormal = {bg = "$bg1";};
+        TelescopePromptPrefix = {
+          bg = "$bg1";
+        };
+        TelescopePromptNormal = {
+          bg = "$bg1";
+        };
+        TelescopeResultsNormal = {
+          bg = "$bg1";
+        };
+        TelescopePreviewNormal = {
+          bg = "$bg1";
+        };
         TelescopePromptBorder = {
           fg = "$bg1";
           bg = "$bg1";
@@ -277,7 +357,9 @@
           fg = "$bg0";
           bg = "$purple";
         };
-        TelescopeResultsTitle = {fg = "$bg0";};
+        TelescopeResultsTitle = {
+          fg = "$bg0";
+        };
         TelescopePreviewTitle = {
           fg = "$bg0";
           bg = "$green";
@@ -286,12 +368,20 @@
           fg = "$bg0";
           bg = "$red";
         };
-        PMenu = {bg = "NONE";};
+        PMenu = {
+          bg = "NONE";
+        };
 
         # Additional CMP styling
-        CmpItemAbbr = {fg = "$fg";};
-        CmpItemAbbrMatch = {fg = "$blue";};
-        CmpItemAbbrMatchFuzzy = {fg = "$blue";};
+        CmpItemAbbr = {
+          fg = "$fg";
+        };
+        CmpItemAbbrMatch = {
+          fg = "$blue";
+        };
+        CmpItemAbbrMatchFuzzy = {
+          fg = "$blue";
+        };
         CmpItemKindVariable = {
           fg = "$bg0";
           bg = "$cyan";
@@ -324,6 +414,22 @@
           fg = "$bg0";
           bg = "$purple";
         };
+
+        # Indent-blankline plugin highlights
+        IblIndent = {
+          fg = "$bg3";
+        };
+        IblScope = {
+          fg = "$red";
+        };
+
+        # RainbowDelimiterRed
+        # RainbowDelimiterYellow
+        # RainbowDelimiterBlue
+        # RainbowDelimiterOrange
+        # RainbowDelimiterGreen
+        # RainbowDelimiterViolet
+        # RainbowDelimiterCyan
       };
     };
   };

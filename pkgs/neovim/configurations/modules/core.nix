@@ -129,10 +129,12 @@
 
       keymaps = let
         normal =
-          lib.mapAttrsToList (key: action: {
+          lib.mapAttrsToList
+          (key: action: {
             mode = "n";
             inherit action key;
-          }) {
+          })
+          {
             #"<leader>bp" = ":BufferLinePick<CR>";
             #"<leader>bc" = ":bp | bd #<CR>";
             #"<leader>bP" = ":BufferLineTogglePin<CR>";
@@ -202,11 +204,13 @@
               "''"
             ];
           };
-          indent = {char = "┊";};
+          indent = {
+            char = "┋";
+          };
 
           scope = {
             enabled = true;
-            char = "│";
+            char = "▎";
             show_start = true;
             show_end = true;
             include = {

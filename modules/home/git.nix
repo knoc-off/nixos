@@ -6,25 +6,30 @@
       init.defaultBranch = "main";
       pull.rebase = true;
       push.autoSetupRemote = true;
+      core.excludesfile = "~/.gitignore_global";
     };
 
     aliases = {
-      # Commit aliases
       ca = "commit --amend";
       caa = "commit --all --amend";
       c = "commit";
 
-      s = "status --short";
+      s = "status --short --branch";
 
-      force = "push --force-with-lease";
+      pf = "push --force-with-lease";
       p = "push";
+      a = "add";
+      d = ''!f() { git diff HEAD~''${1:-0} --; }; f'';
 
       co = "checkout";
       br = "branch";
       l = "log --oneline --graph --decorate -10";
       unstage = "reset HEAD --";
       last = "log -1 HEAD";
-      # lb = ''!f() { for i in $(seq 1 $1); do git name-rev --name-only --exclude=refs/tags/\* @{-$i}; done; }; f'';
+
+      # list last 10 branches checked out.
+      lb = "!git reflog | grep -o 'checkout: moving from .* to .*' | sed 's/checkout: moving from .* to //' | awk '!seen[$0]++' | head -10";
+
       # See changes since branching off of main branch
       ch = ''diff --merge-base origin/HEAD'';
     };
