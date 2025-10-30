@@ -3,12 +3,10 @@
   color-lib,
   lib,
   theme,
-  pkgs,
   helpers,
   ...
 }: {
   imports = [
-    # highlight.nix
     {
       match =
         {
@@ -19,59 +17,68 @@
           ahhhhh = "!\\{3,\\}";
         }
         // lib.mapAttrs' (name: _: {
-          name = "theme.${name}";
-          value = "\\<theme.${name}\\>";
+          name = "theme.dark.${name}";
+          value = "\\<theme\\.dark\\.${name}\\>";
         })
-        theme;
+        theme.dark
+        // lib.mapAttrs' (name: _: {
+          name = "theme.light.${name}";
+          value = "\\<theme\\.light\\.${name}\\>";
+        })
+        theme.light;
 
       highlight =
         {
           TODO = {
-            fg = "#${theme.base00}";
-            bg = "#${color-lib.setOkhsvValue 0.9 theme.base0A}";
+            fg = "#${theme.dark.base00}";
+            bg = "#${color-lib.setOkhsvValue 0.9 theme.dark.base0A}";
           };
           FIXME = {
-            fg = "#${theme.base00}";
-            bg = "#${color-lib.setOkhsvValue 0.9 theme.base0E}";
+            fg = "#${theme.dark.base00}";
+            bg = "#${color-lib.setOkhsvValue 0.9 theme.dark.base0E}";
           };
           HACK = {
-            fg = "#${theme.base00}";
-            bg = "#${color-lib.setOkhsvValue 0.9 theme.base0C}";
+            fg = "#${theme.dark.base00}";
+            bg = "#${color-lib.setOkhsvValue 0.9 theme.dark.base0C}";
           };
 
           SnippetCursor = {
             # Use a distinct color, like green
-            bg = "#${theme.base0B}";
-            fg = "#${theme.base00}";
+            bg = "#${theme.dark.base0B}";
+            fg = "#${theme.dark.base00}";
           };
 
-          ExtraWhitespace.bg = "#${theme.base01}";
+          ExtraWhitespace.bg = "#${theme.dark.base01}";
           ahhhhh = {
-            fg = "#${theme.base07}";
-            bg = "#${theme.base08}";
+            fg = "#${theme.dark.base07}";
+            bg = "#${theme.dark.base08}";
           };
         }
         // lib.mapAttrs' (name: color: {
-          name = "theme.${name}";
+          name = "theme.dark.${name}";
           value = {
             bg = "#${color}";
-
             fg = "#${color-lib.ensureTextContrast color color 4.5}";
           };
         })
-        theme;
+        theme.dark
+        // lib.mapAttrs' (name: color: {
+          name = "theme.light.${name}";
+          value = {
+            bg = "#${color}";
+            fg = "#${color-lib.ensureTextContrast color color 4.5}";
+          };
+        })
+        theme.light;
     }
-    # autocmd
     {
       autoCmd = [
-        # Remove trailing whitespace on save
         {
           event = "BufWrite";
           command = "%s/\\s\\+$//e";
         }
       ];
     }
-    # open path under cursor
     {
       keymaps = [
         {
@@ -173,7 +180,7 @@
     {
       plugins.rainbow-delimiters = {
         enable = true;
-        highlight = [
+        settings.highlight = [
           "RainbowDelimiterRed"
           "RainbowDelimiterYellow"
           "RainbowDelimiterBlue"
