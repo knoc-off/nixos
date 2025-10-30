@@ -149,6 +149,8 @@ in {
         };
       }
 
+      "obs"
+
       "claude-code"
       "utm"
       "crystalfetch"
@@ -160,6 +162,7 @@ in {
       "raycast"
       "slack"
       # "fly"
+      "zen"
     ];
     brews = [
       "mingw-w64" # For rust cross compilation to windows.

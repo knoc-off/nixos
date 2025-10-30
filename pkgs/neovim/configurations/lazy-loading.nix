@@ -490,18 +490,7 @@
     }
 
     {
-      # tag:misc
-      plugins.nvim-autopairs.enable = true;
-
-      # This part is important for making <CR> work correctly with cmp and autopairs
-      extraConfigLua = ''
-        local cmp_autopairs = require('nvim-autopairs.completion.cmp')
-        local cmp = require('cmp')
-        cmp.event:on(
-          'confirm_done',
-          cmp_autopairs.on_confirm_done()
-        )
-      '';
+      plugins.nvim-surround.enable = true;
     }
     {
       # tag:file-specific
@@ -835,17 +824,29 @@
     # tag: linting
     {
       plugins.lint = {
+        lazyLoad = {
+          enable = true;
+          settings.ft = [
+            "openscad"
+            "typst"
+          ];
+        };
+
         enable = true;
+
         autoCmd = {
           event = [
             "BufWritePost"
-            "InsertLeave" # too often?
+            "InsertLeave"
           ];
           callback = helpers.mkRaw ''
             function()
-              require('lint').try_lint()
+              -- Only run if lint is loaded (for lazy-loaded filetypes)
+              local lint_ok, lint = pcall(require, 'lint')
+              if lint_ok then
+                lint.try_lint()
+              end
             end
-
           '';
         };
 
@@ -937,6 +938,13 @@
           server = {
             default_settings = {
               rust-analyzer = {
+                imports = {
+                  granularity = {
+                    group = "module";
+                  };
+                  prefix = "self";
+                };
+
                 cargo = {
                   allFeatures = true;
                   buildScripts.enable = true;
@@ -1128,7 +1136,8 @@
           };
         };
 
-        lsp-format.enable = true;
+        # Disabled: conform-nvim handles all formatting to avoid conflicts
+        # lsp-format.enable = true;
       };
     }
 
@@ -1142,7 +1151,6 @@
             lsp_format = "fallback";
             timeout_ms = 2000;
             quiet = false;
-            stop_after_first = false;
           };
 
           format_after_save = {

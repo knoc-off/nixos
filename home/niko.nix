@@ -14,14 +14,15 @@
     self.homeModules.git
     self.homeModules.starship
 
-    #./programs/terminal/shell
-    ./programs/terminal/shell/fish.nix
+    ./programs/terminal/shell
     {
       targets.darwin.defaults."com.apple.finder".ShowPathBar = true; # ? what does this do?
 
       home.packages = with pkgs; [
         gum
         television
+
+        watchexec
 
         upkgs.tsx
       ];
@@ -31,6 +32,8 @@
           autoload -Uz edit-command-line
           zle -N edit-command-line
           bindkey '^[[101;9u' edit-command-line
+
+          export SQLX_OFFLINE=true
         '';
         shellAliases = {
           g = "git";
