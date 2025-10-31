@@ -28,17 +28,67 @@ in rec {
         name = "main";
 
         # Extensions for the main profile
-        extensions.packages = with addons; [
-          # Essential
-          ublock-origin
-          bitwarden
-          sidebery
-          tridactyl
-          # Privacy
-          smart-referer
-          cookie-autodelete
-          user-agent-string-switcher
-        ];
+        extensions = {
+          force = true;
+          packages = with addons; [
+            # Essential
+            ublock-origin
+            bitwarden
+            #onepassword-password-manager
+            sidebery
+            tridactyl
+            # Privacy
+            smart-referer
+            cookie-autodelete
+            user-agent-string-switcher
+
+            firefox-color
+          ];
+          settings."FirefoxColor@mozilla.com".settings = {
+            firstRunDone = true;
+            theme = {
+              title = "ASFASF";
+              # images.additional_backgrounds = ["./bg-000.svg"];
+              colors = {
+                toolbar = "#${theme.dark.base00}";
+                toolbar_text = "#${theme.dark.base05}";
+                frame = "#${theme.dark.base01}";
+                tab_background_text = "#${theme.dark.base05}";
+                toolbar_field = "#${theme.dark.base02}";
+                toolbar_field_text = "#${theme.dark.base05}";
+                tab_line = "#${theme.dark.base0D}";
+                popup = "#${theme.dark.base00}";
+                popup_text = "#${theme.dark.base05}";
+                button_background_active = "#${theme.dark.base04}";
+                frame_inactive = "#${theme.dark.base00}";
+                icons_attention = "#${theme.dark.base0D}";
+                icons = "#${theme.dark.base05}";
+                ntp_background = "#${theme.dark.base00}";
+                ntp_text = "#${theme.dark.base05}";
+                popup_border = "#${theme.dark.base0D}";
+                popup_highlight_text = "#${theme.dark.base05}";
+                popup_highlight = "#${theme.dark.base04}";
+                sidebar_border = "#${theme.dark.base0D}";
+                sidebar_highlight_text = "#${theme.dark.base05}";
+                sidebar_highlight = "#${theme.dark.base0D}";
+                sidebar_text = "#${theme.dark.base05}";
+                sidebar = "#${theme.dark.base00}";
+                tab_background_separator = "#${theme.dark.base0D}";
+                tab_loading = "#${theme.dark.base05}";
+                tab_selected = "#${theme.dark.base00}";
+                tab_text = "#${theme.dark.base05}";
+                toolbar_bottom_separator = "#${theme.dark.base00}";
+                toolbar_field_border_focus = "#${theme.dark.base0D}";
+                toolbar_field_border = "#${theme.dark.base00}";
+                toolbar_field_focus = "#${theme.dark.base00}";
+                toolbar_field_highlight_text = "#${theme.dark.base00}";
+                toolbar_field_highlight = "#${theme.dark.base0D}";
+                toolbar_field_separator = "#${theme.dark.base0D}";
+                toolbar_vertical_separator = "#${theme.dark.base0D}";
+              };
+            };
+          };
+        };
 
         userContent = ''
           /* Firefox profile directory/chrome/userContent.css */

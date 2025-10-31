@@ -68,7 +68,7 @@ in {
         # add a keybind to open last output in nvim/bat?
 
         # tall layout
-        enabled_layouts tall:bias=60;full_size=1;mirrored=false
+        enabled_layouts tall:bias=30;full_size=1;mirrored=false
 
       ${
         # Darwin-specific config
