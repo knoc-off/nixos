@@ -35,38 +35,19 @@
 
   flattenThemeToMatches = prefix: attrs:
     flattenThemeToMatchesHelper prefix prefix attrs;
-
-  # Recursively flatten theme tree to create highlight groups
-  # Creates highlights like "theme_dark_base00" with bg = color value
-  flattenThemeToHighlightsHelper = attrPrefix: attrs:
-    lib.foldl' (
-      acc: name: let
-        value = attrs.${name};
-        # Use underscores for attribute names
-        attrPath =
-          if attrPrefix == ""
-          then name
-          else "${attrPrefix}_${name}";
-      in
-        if builtins.isString value
-        then
-          acc
-          // {
-            ${attrPath} = {
-              bg = "#${value}";
-              fg = "#${color-lib.ensureTextContrast value value 4.5}";
-            };
-          }
-        else acc // flattenThemeToHighlightsHelper attrPath value
-    ) {} (builtins.attrNames attrs);
-
-  flattenThemeToHighlights = prefix: attrs:
-    flattenThemeToHighlightsHelper prefix attrs;
 in {
   imports = [
     {
       match =
         {
+          # these are defined in the theme files.
+          # ../themes/default.nix
+          # for example:
+          # highlights.ahhhhh = {
+          #   fg = "$bg0";
+          #   bg = "$red";
+          # };
+
           TODO = "TODO";
           FIXME = "FIXME";
           HACK = "HACK";
@@ -74,8 +55,6 @@ in {
           ahhhhh = "!\\{3,\\}";
         }
         // flattenThemeToMatches "theme" theme;
-
-      highlight = flattenThemeToHighlights "theme" theme;
     }
     {
       autoCmd = [
@@ -86,6 +65,8 @@ in {
       ];
     }
     {
+      # can this be made into a format of like code-action highlights or something?
+      # maybe a plugin, something that will highlight the links that can be followed?
       keymaps = [
         {
           mode = "n";
