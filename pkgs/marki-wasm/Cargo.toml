@@ -1,0 +1,38 @@
+[workspace]
+members = [".", "marki-macros"]
+
+[package]
+name = "marki"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "marki"
+path = "src/main.rs"
+
+[dependencies]
+pulldown-cmark = "0.13.0"
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["console"] }
+
+# Binary-only dependencies (not used in WASM lib)
+anyhow = { version = "1.0.100", optional = true }
+clap = { version = "4.5.48", features = ["derive"], optional = true }
+genanki-rs = { version = "0.4.0", optional = true }
+katex = { version = "0.4.6", optional = true }
+marki-macros = { path = "marki-macros", optional = true }
+regex = { version = "1.11.3", optional = true }
+strum = { version = "0.26", features = ["derive"], optional = true }
+syntect = { version = "5.3.0", default-features = false, features = ["default-fancy", "html"], optional = true }
+walkdir = { version = "2.5.0", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1"
+wee_alloc = "0.4"
+
+[features]
+default = ["cli"]
+cli = ["anyhow", "clap", "genanki-rs", "marki-macros", "regex", "strum", "syntect", "walkdir"]
