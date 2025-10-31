@@ -16,7 +16,7 @@
       toggle_style_key = "<leader>ts";
 
       colors = {
-        # Map theme colors to the colorscheme's expected color variables
+        # Map theme colors to the colorscheme's expected color variables <theme.light.base00>
         bg0 = "#${theme.light.base00}"; # Background
         bg1 = "#${color-lib.adjustOkhslLightness (-0.03) theme.light.base00}"; # Slightly darker background for light mode
         bg2 = "#${color-lib.adjustOkhslLightness (-0.06) theme.light.base00}"; # Even darker background

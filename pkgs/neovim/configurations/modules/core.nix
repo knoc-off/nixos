@@ -5,7 +5,64 @@
   theme,
   helpers,
   ...
-}: {
+}: let
+  # Recursively flatten theme tree to create match patterns
+  # Creates patterns like "theme_dark_base00" matching text "theme.dark.base00"
+  # Takes both attrPrefix (with underscores) and textPrefix (with dots)
+  flattenThemeToMatchesHelper = attrPrefix: textPrefix: attrs:
+    lib.foldl' (
+      acc: name: let
+        value = attrs.${name};
+        # Path with underscores for attribute names (valid Nix identifiers)
+        attrPath =
+          if attrPrefix == ""
+          then name
+          else "${attrPrefix}_${name}";
+        # Original path with dots for matching text in files
+        textPath =
+          if textPrefix == ""
+          then name
+          else "${textPrefix}.${name}";
+      in
+        if builtins.isString value
+        then
+          acc
+          // {
+            ${attrPath} = textPath;
+          }
+        else acc // flattenThemeToMatchesHelper attrPath textPath value
+    ) {} (builtins.attrNames attrs);
+
+  flattenThemeToMatches = prefix: attrs:
+    flattenThemeToMatchesHelper prefix prefix attrs;
+
+  # Recursively flatten theme tree to create highlight groups
+  # Creates highlights like "theme_dark_base00" with bg = color value
+  flattenThemeToHighlightsHelper = attrPrefix: attrs:
+    lib.foldl' (
+      acc: name: let
+        value = attrs.${name};
+        # Use underscores for attribute names
+        attrPath =
+          if attrPrefix == ""
+          then name
+          else "${attrPrefix}_${name}";
+      in
+        if builtins.isString value
+        then
+          acc
+          // {
+            ${attrPath} = {
+              bg = "#${value}";
+              fg = "#${color-lib.ensureTextContrast value value 4.5}";
+            };
+          }
+        else acc // flattenThemeToHighlightsHelper attrPath value
+    ) {} (builtins.attrNames attrs);
+
+  flattenThemeToHighlights = prefix: attrs:
+    flattenThemeToHighlightsHelper prefix attrs;
+in {
   imports = [
     {
       match =
@@ -16,60 +73,9 @@
           ExtraWhitespace = "\\s\\+$";
           ahhhhh = "!\\{3,\\}";
         }
-        // lib.mapAttrs' (name: _: {
-          name = "theme.dark.${name}";
-          value = "\\<theme\\.dark\\.${name}\\>";
-        })
-        theme.dark
-        // lib.mapAttrs' (name: _: {
-          name = "theme.light.${name}";
-          value = "\\<theme\\.light\\.${name}\\>";
-        })
-        theme.light;
+        // flattenThemeToMatches "theme" theme;
 
-      highlight =
-        {
-          TODO = {
-            fg = "#${theme.dark.base00}";
-            bg = "#${color-lib.setOkhsvValue 0.9 theme.dark.base0A}";
-          };
-          FIXME = {
-            fg = "#${theme.dark.base00}";
-            bg = "#${color-lib.setOkhsvValue 0.9 theme.dark.base0E}";
-          };
-          HACK = {
-            fg = "#${theme.dark.base00}";
-            bg = "#${color-lib.setOkhsvValue 0.9 theme.dark.base0C}";
-          };
-
-          SnippetCursor = {
-            # Use a distinct color, like green
-            bg = "#${theme.dark.base0B}";
-            fg = "#${theme.dark.base00}";
-          };
-
-          ExtraWhitespace.bg = "#${theme.dark.base01}";
-          ahhhhh = {
-            fg = "#${theme.dark.base07}";
-            bg = "#${theme.dark.base08}";
-          };
-        }
-        // lib.mapAttrs' (name: color: {
-          name = "theme.dark.${name}";
-          value = {
-            bg = "#${color}";
-            fg = "#${color-lib.ensureTextContrast color color 4.5}";
-          };
-        })
-        theme.dark
-        // lib.mapAttrs' (name: color: {
-          name = "theme.light.${name}";
-          value = {
-            bg = "#${color}";
-            fg = "#${color-lib.ensureTextContrast color color 4.5}";
-          };
-        })
-        theme.light;
+      highlight = flattenThemeToHighlights "theme" theme;
     }
     {
       autoCmd = [
