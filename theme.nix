@@ -144,22 +144,22 @@ let
     #type = themeType;
 
     # Expose Generated Base16 Palette (removing '#' prefix)
-    base00 = lib.removePrefix "#" base00; # theme.base00 # Default Background
-    base01 = lib.removePrefix "#" base01; # theme.base01 # Lighter Background (e.g., UI elements)
-    base02 = lib.removePrefix "#" base02; # theme.base02 # Selection Background
-    base03 = lib.removePrefix "#" base03; # theme.base03 # Comments, Invisibles, Line Highlighting
-    base04 = lib.removePrefix "#" base04; # theme.base04 # Dark Foreground (Used for status bars)
-    base05 = lib.removePrefix "#" base05; # theme.base05 # Default Foreground (Used for text)
-    base06 = lib.removePrefix "#" base06; # theme.base06 # Light Foreground (Not often used)
-    base07 = lib.removePrefix "#" base07; # theme.base07 # Light Background (e.g., UI elements)
-    base08 = lib.removePrefix "#" base08; # theme.base08 # Red
-    base09 = lib.removePrefix "#" base09; # theme.base09 # Orange
-    base0A = lib.removePrefix "#" base0A; # theme.base0A # Yellow
-    base0B = lib.removePrefix "#" base0B; # theme.base0B # green
-    base0C = lib.removePrefix "#" base0C; # theme.base0C # Blue
-    base0D = lib.removePrefix "#" base0D; # theme.base0D # cyan
-    base0E = lib.removePrefix "#" base0E; # theme.base0E # purple
-    base0F = lib.removePrefix "#" base0F; # theme.base0F # violet
+    base00 = lib.removePrefix "#" base00; # theme.dark.base00 # Default Background
+    base01 = lib.removePrefix "#" base01; # theme.dark.base01 # Lighter Background (e.g., UI elements)
+    base02 = lib.removePrefix "#" base02; # theme.dark.base02 # Selection Background
+    base03 = lib.removePrefix "#" base03; # theme.dark.base03 # Comments, Invisibles, Line Highlighting
+    base04 = lib.removePrefix "#" base04; # theme.dark.base04 # Dark Foreground (Used for status bars)
+    base05 = lib.removePrefix "#" base05; # theme.dark.base05 # Default Foreground (Used for text)
+    base06 = lib.removePrefix "#" base06; # theme.dark.base06 # Light Foreground (Not often used)
+    base07 = lib.removePrefix "#" base07; # theme.dark.base07 # Light Background (e.g., UI elements)
+    base08 = lib.removePrefix "#" base08; # theme.dark.base08 # Red
+    base09 = lib.removePrefix "#" base09; # theme.dark.base09 # Orange
+    base0A = lib.removePrefix "#" base0A; # theme.dark.base0A # Yellow
+    base0B = lib.removePrefix "#" base0B; # theme.dark.base0B # green
+    base0C = lib.removePrefix "#" base0C; # theme.dark.base0C # Blue
+    base0D = lib.removePrefix "#" base0D; # theme.dark.base0D # cyan
+    base0E = lib.removePrefix "#" base0E; # theme.dark.base0E # purple
+    base0F = lib.removePrefix "#" base0F; # theme.dark.base0F # violet
   };
 
 in {

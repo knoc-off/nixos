@@ -1,7 +1,7 @@
 { bc, cantarell-fonts, fetchFromGitHub, lib, makeFontsConf, optipng, resvg
 , runCommandLocal, sassc, stdenv
 
-# A base16 theme configuration as defined in the `theme.base16` module.
+# A base16 theme configuration as defined in the `theme.dark.base16` module.
 , configBase16 ? {
   name = "Replace-Me";
   kind = "dark";

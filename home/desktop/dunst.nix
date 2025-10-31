@@ -14,19 +14,19 @@ in
         origin = "top-right";
         corner_radius = 5;
         progress_bar_corner_radius = 5;
-        frame_color = theme.base03;
+        frame_color = theme.dark.base03;
         font = "Droid Sans 9";
       };
       urgency_normal = {
-        background = theme.base01;
-        foreground = theme.base05;
-        highlight = theme.base0B;
+        background = theme.dark.base01;
+        foreground = theme.dark.base05;
+        highlight = theme.dark.base0B;
         timeout = 10;
       };
       urgency_critical = {
-        background = theme.base08;
-        foreground = theme.base07;
-        highlight = theme.base0E;
+        background = theme.dark.base08;
+        foreground = theme.dark.base07;
+        highlight = theme.dark.base0E;
         timeout = 0;
       };
     };
