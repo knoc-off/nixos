@@ -47,8 +47,8 @@ in rec {
             #root,
             .newtab-main,
             .outer-wrapper {
-              background-color: #${theme.base00} !important;  /* Dark background color */
-              color: #${theme.base07} !important;             /* Text color */
+              background-color: #${theme.dark.base00} !important;  /* Dark background color */
+              color: #${theme.dark.base07} !important;             /* Text color */
             }
 
             /* Optional: Remove background images from new tab page */

@@ -54,7 +54,7 @@
       #  hyprexpo = {
       #    columns = 2;
       #    gap_size = 5;
-      #    bg_col = "0xff${theme.base00}";
+      #    bg_col = "0xff${theme.dark.base00}";
       #    skip_empty = true;
       #    workspace_method = "first 1"; # [center/first] [workspace] e.g. first 1 or center m+1
 
@@ -71,10 +71,10 @@
         gaps_in = -1;
         gaps_out = -4;
         border_size = 4;
-        "col.active_border" = "0xff${theme.base0B}";
-        "col.inactive_border" = "0xff${theme.base0D}";
-        "col.nogroup_border_active" = "0x00${theme.base0D}"; # transparent
-        "col.nogroup_border" = "0x99${theme.base0D}";
+        "col.active_border" = "0xff${theme.dark.base0B}";
+        "col.inactive_border" = "0xff${theme.dark.base0D}";
+        "col.nogroup_border_active" = "0x00${theme.dark.base0D}"; # transparent
+        "col.nogroup_border" = "0x99${theme.dark.base0D}";
 
         layout = "master";
         resize_on_border = true;
@@ -89,21 +89,21 @@
       group = {
         insert_after_current = true;
         focus_removed_window = true;
-        "col.border_active" = "0xff${theme.base0B}";
-        "col.border_inactive" = "0x99${theme.base0D}";
-        "col.border_locked_active" = "0xff${theme.base0F}";
-        "col.border_locked_inactive" = "0x99${theme.base0F}";
+        "col.border_active" = "0xff${theme.dark.base0B}";
+        "col.border_inactive" = "0x99${theme.dark.base0D}";
+        "col.border_locked_active" = "0xff${theme.dark.base0F}";
+        "col.border_locked_inactive" = "0x99${theme.dark.base0F}";
 
         groupbar = {
           font_size = 10;
           gradients = false;
           render_titles = false;
           scrolling = false;
-          text_color = "0xff${theme.base0D}";
-          "col.active" = "0xff${theme.base0A}";
-          "col.inactive" = "0x99${theme.base0A}";
-          "col.locked_active" = "0xff${theme.base0F}";
-          "col.locked_inactive" = "0x99${theme.base0F}";
+          text_color = "0xff${theme.dark.base0D}";
+          "col.active" = "0xff${theme.dark.base0A}";
+          "col.inactive" = "0x99${theme.dark.base0A}";
+          "col.locked_active" = "0xff${theme.dark.base0F}";
+          "col.locked_inactive" = "0x99${theme.dark.base0F}";
         };
       };
 
@@ -121,7 +121,7 @@
         # Any window started from kitty will be swallowed by the terminal
         swallow_regex = "kitty";
         #swallow_exception_regex = "NAN";
-        background_color = "0x99${color-lib.setOkhslLightness 0.2 theme.base00}";
+        background_color = "0x99${color-lib.setOkhslLightness 0.2 theme.dark.base00}";
 
         # variable refresh rate, 3 = only for fullscreen games, 0 off.
         vrr = 3;

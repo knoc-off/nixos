@@ -17,38 +17,38 @@ in
       };
 
       colors = {
-        background = theme.base00;
-        foreground = theme.base06;
+        background = theme.dark.base00;
+        foreground = theme.dark.base06;
 
         # Regular ANSI colors
-        regular0 = theme.base00;
-        regular1 = theme.base08;
-        regular2 = theme.base0B;
-        regular3 = theme.base0A;
-        regular4 = theme.base0D;
-        regular5 = theme.base0E;
-        regular6 = theme.base0C;
-        regular7 = theme.base06;
+        regular0 = theme.dark.base00;
+        regular1 = theme.dark.base08;
+        regular2 = theme.dark.base0B;
+        regular3 = theme.dark.base0A;
+        regular4 = theme.dark.base0D;
+        regular5 = theme.dark.base0E;
+        regular6 = theme.dark.base0C;
+        regular7 = theme.dark.base06;
 
         # Bright ANSI colors
-        bright0 = theme.base03;
-        bright1 = sa theme.base08;
-        bright2 = sa theme.base0B;
-        bright3 = sa theme.base0A;
-        bright4 = sa theme.base0D;
-        bright5 = sa theme.base0E;
-        bright6 = sa theme.base0C;
-        bright7 = theme.base07;
+        bright0 = theme.dark.base03;
+        bright1 = sa theme.dark.base08;
+        bright2 = sa theme.dark.base0B;
+        bright3 = sa theme.dark.base0A;
+        bright4 = sa theme.dark.base0D;
+        bright5 = sa theme.dark.base0E;
+        bright6 = sa theme.dark.base0C;
+        bright7 = theme.dark.base07;
 
-        selection-background = theme.base02;
-        selection-foreground = theme.base06; # Matching main foreground
-        urls = theme.base0C;
-        flash = theme.base08;
+        selection-background = theme.dark.base02;
+        selection-foreground = theme.dark.base06; # Matching main foreground
+        urls = theme.dark.base0C;
+        flash = theme.dark.base08;
       };
 
       cursor = {
         # Format: "foreground-on-cursor-block cursor-block-background"
-        color = "${theme.base00} ${theme.base05}";
+        color = "${theme.dark.base00} ${theme.dark.base05}";
       };
 
       bell = {
