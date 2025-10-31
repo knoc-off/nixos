@@ -16,6 +16,8 @@ rustPlatform.buildRustPackage rec {
     pkgs.gcc
     pkgs.pkg-config
     pkgs.openssl
+    pkgs.wasm-pack
+    pkgs.wasm-bindgen-cli
   ];
 
   buildInputs = with pkgs; [
