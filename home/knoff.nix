@@ -26,7 +26,7 @@
     ./programs/editor/default.nix
 
     # Firefox
-    ./programs/browser/firefox
+    self.homeModules.firefox
 
     ./programs/gaming/lutris.nix
     ./enviroment.nix

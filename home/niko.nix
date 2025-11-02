@@ -9,7 +9,7 @@
   imports = [
     ./programs/terminal/kitty
     ./programs/terminal
-    ./programs/browser/firefox/default.nix
+    self.homeModules.firefox
 
     self.homeModules.git
     self.homeModules.starship
