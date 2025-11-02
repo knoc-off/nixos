@@ -1,4 +1,5 @@
 {
+  firefox = import ./firefox.nix;
   git = import ./git.nix;
   gtk = import ./gtk.nix;
   hyprkan = import ./hyprkan;
