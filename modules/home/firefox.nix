@@ -159,17 +159,19 @@ in {
         id = 0;
         name = "main";
 
-        extensions.packages = with addons; [
-          # Essential
-          ublock-origin
-          bitwarden
-          sidebery
-          tridactyl
-          
-          # Privacy
-          smart-referer
-          cookie-autodelete
-        ];
+        extensions = {
+          packages = with addons; [
+            # Essential
+            ublock-origin
+            bitwarden
+            sidebery
+            tridactyl
+            
+            # Privacy
+            smart-referer
+            cookie-autodelete
+          ];
+        };
 
         inherit userChrome userContent settings;
         search = searchConfig;
@@ -193,7 +195,7 @@ in {
       name = "Firefox Private";
       genericName = "Web Browser";
       exec = "${pkgs.firefox}/bin/firefox --private-window";
-      icon = "${pkgs.firefox}/share/icons/hicolor/128x128/apps/firefox.png";
+      icon = "${pkgs.firefox}/lib/firefox/browser/chrome/icons/default/default128.png";
       type = "Application";
       categories = ["Network" "WebBrowser"];
       mimeType = ["text/html" "text/xml"];
