@@ -27,6 +27,13 @@ in {
 
   services.nginx.enable = true;
 
+  # Default catch-all for unmatched requests
+  services.nginx.virtualHosts."_" = {
+    default = true;
+    rejectSSL = true;
+    locations."/".return = "444";
+  };
+
   #services.nginx.virtualHosts."niko.ink" = {
   #  forceSSL = true;
   #  enableACME = true;

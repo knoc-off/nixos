@@ -101,6 +101,9 @@ in {
         # linux specific (some of this is system/hardware specific.)
         else ''
           touch_scroll_multiplier 6.5
+
+          map --when-focus-on "var:in_claude" enter send_text all \x0a
+          map --when-focus-on "var:in_claude" super+enter send_key enter
         ''
       }
 

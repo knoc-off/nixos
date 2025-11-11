@@ -364,109 +364,111 @@
       plugins.treesitter-textobjects = {
         enable = true;
 
-        # Text object selection
-        select = {
-          enable = true;
-          lookahead = true;
+        settings = {
+          # Text object selection
+          select = {
+            enable = true;
+            lookahead = true;
 
-          keymaps = {
-            # Functions
-            "af" = "@function.outer";
-            "if" = "@function.inner";
+            keymaps = {
+              # Functions
+              af = "@function.outer";
+              "if" = "@function.inner";
 
-            # Classes
-            "ac" = "@class.outer";
-            "ic" = "@class.inner";
+              # Classes
+              ac = "@class.outer";
+              ic = "@class.inner";
 
-            # Parameters/arguments
-            "ap" = "@parameter.outer";
-            "ip" = "@parameter.inner";
+              # Parameters/arguments
+              ap = "@parameter.outer";
+              ip = "@parameter.inner";
 
-            # Conditionals
-            "ai" = "@conditional.outer";
-            "ii" = "@conditional.inner";
+              # Conditionals
+              ai = "@conditional.outer";
+              ii = "@conditional.inner";
 
-            # Loops
-            "al" = "@loop.outer";
-            "il" = "@loop.inner";
+              # Loops
+              al = "@loop.outer";
+              il = "@loop.inner";
 
-            # Comments
-            "a/" = "@comment.outer";
-            "i/" = "@comment.inner";
+              # Comments
+              "a/" = "@comment.outer";
+              "i/" = "@comment.inner";
 
-            # Blocks
-            "ab" = "@block.outer";
-            "ib" = "@block.inner";
+              # Blocks
+              ab = "@block.outer";
+              ib = "@block.inner";
+            };
+
+            selection_modes = {
+              "@parameter.outer" = "v"; # charwise
+              "@function.outer" = "V"; # linewise
+              "@class.outer" = "V"; # linewise
+            };
+
+            include_surrounding_whitespace = false;
           };
 
-          selectionModes = {
-            "@parameter.outer" = "v"; # charwise
-            "@function.outer" = "V"; # linewise
-            "@class.outer" = "V"; # linewise
+          # Swap text objects
+          swap = {
+            enable = true;
+
+            swap_next = {
+              "<leader>a" = "@parameter.inner";
+              "<leader>f" = "@function.outer";
+            };
+
+            swap_previous = {
+              "<leader>A" = "@parameter.inner";
+              "<leader>F" = "@function.outer";
+            };
           };
 
-          includeSurroundingWhitespace = false;
-        };
+          # Movement between text objects
+          move = {
+            enable = true;
+            set_jumps = true; # Set jumps in the jumplist
 
-        # Swap text objects
-        swap = {
-          enable = true;
+            goto_next_start = {
+              "]f" = "@function.outer";
+              "]c" = "@class.outer";
+              "]p" = "@parameter.inner";
+            };
 
-          swapNext = {
-            "<leader>a" = "@parameter.inner";
-            "<leader>f" = "@function.outer";
+            goto_next_end = {
+              "]F" = "@function.outer";
+              "]C" = "@class.outer";
+              "]P" = "@parameter.inner";
+            };
+
+            goto_previous_start = {
+              "[f" = "@function.outer";
+              "[c" = "@class.outer";
+              "[p" = "@parameter.inner";
+            };
+
+            goto_previous_end = {
+              "[F" = "@function.outer";
+              "[C" = "@class.outer";
+              "[P" = "@parameter.inner";
+            };
           };
 
-          swapPrevious = {
-            "<leader>A" = "@parameter.inner";
-            "<leader>F" = "@function.outer";
-          };
-        };
-
-        # Movement between text objects
-        move = {
-          enable = true;
-          setJumps = true; # Set jumps in the jumplist
-
-          gotoNextStart = {
-            "]f" = "@function.outer";
-            "]c" = "@class.outer";
-            "]p" = "@parameter.inner";
-          };
-
-          gotoNextEnd = {
-            "]F" = "@function.outer";
-            "]C" = "@class.outer";
-            "]P" = "@parameter.inner";
-          };
-
-          gotoPreviousStart = {
-            "[f" = "@function.outer";
-            "[c" = "@class.outer";
-            "[p" = "@parameter.inner";
-          };
-
-          gotoPreviousEnd = {
-            "[F" = "@function.outer";
-            "[C" = "@class.outer";
-            "[P" = "@parameter.inner";
-          };
-        };
-
-        # LSP interop for peeking definitions
-        lspInterop = {
-          enable = true;
-          border = "rounded";
-
-          peekDefinitionCode = {
-            "<leader>df" = "@function.outer";
-            "<leader>dF" = "@class.outer";
-          };
-
-          floatingPreviewOpts = {
+          # LSP interop for peeking definitions
+          lsp_interop = {
+            enable = true;
             border = "rounded";
-            max_width = 80;
-            max_height = 20;
+
+            peek_definition_code = {
+              "<leader>df" = "@function.outer";
+              "<leader>dF" = "@class.outer";
+            };
+
+            floating_preview_opts = {
+              border = "rounded";
+              max_width = 80;
+              max_height = 20;
+            };
           };
         };
       };

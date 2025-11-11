@@ -1,7 +1,7 @@
 {pkgs, ...}: {
   imports = [
     #./steam.nix
-    ./lutris.nix
+    #./lutris.nix
   ];
   home.packages = with pkgs; [
     # Minecraft Launcher

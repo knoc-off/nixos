@@ -73,7 +73,7 @@
 
   hardware.firmware = with upkgs;
     [
-      firmwareLinuxNonfree # Broadcom/Qualcomm adapters
+      linux-firmware # Broadcom/Qualcomm adapters
     ];
 
   # ======================

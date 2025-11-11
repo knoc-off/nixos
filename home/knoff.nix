@@ -28,7 +28,7 @@
     # Firefox
     ./programs/browser/firefox
 
-    ./programs/gaming/lutris.nix
+    # ./programs/gaming/lutris.nix
     ./enviroment.nix
 
     ./desktop/hyprland.nix
@@ -135,12 +135,12 @@
     }
 
     ./modules/thunderbird.nix
+    ./services/rclone.nix
 
     ./xdg-enviroment.nix
   ];
 
   services = {
-    syncthing.enable = true;
     playerctld.enable = true;
     emailManager = {
       enable = true;
@@ -170,13 +170,16 @@
       #self.packages.${pkgs.system}.spider-cli
       #self.packages.${pkgs.system}.tabiew
 
-      (upkgs.claude-code.overrideAttrs (oldAttrs: rec {
-        version = "2.0.27";
-        src = pkgs.fetchzip {
-          url = "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-${version}.tgz";
-          hash = "sha256-LUbDPFa0lY74MBU4hvmYVntt6hVZy6UUZFN0iB4Eno8=";
-        };
-      }))
+      upkgs.claude-code
+      # (upkgs.claude-code.overrideAttrs (oldAttrs: rec {
+      #   version = "2.0.27";
+      #   src = pkgs.fetchzip {
+      #     url = "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-${version}.tgz";
+      #     hash = "sha256-LUbDPFa0lY74MBU4hvmYVntt6hVZy6UUZFN0iB4Eno8=";
+      #   };
+      # }))
+      # ai tools
+      fabric-ai # Meh. not a fan, but it works well
       upkgs.gemini-cli
       upkgs.litellm
       upkgs.prismlauncher
@@ -185,15 +188,12 @@
 
       lazysql
 
-      #skypeforlinux # skype phone
-      # audio-recorder
-
       evince # Move this to xdg ...
-      slack
+      # slack
 
       ripcord
 
-      # obsidian # notes
+      upkgs.obsidian
 
       # koodo-reader # books
 
@@ -209,9 +209,6 @@
 
       # it would be cool to make prusa-slicer declaritive. might work on a module for it. #TODO
       prusa-slicer
-
-      # ai tools
-      fabric-ai # Meh. not a fan, but it works well
 
       openscad
 
