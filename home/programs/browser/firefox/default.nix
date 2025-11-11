@@ -48,7 +48,7 @@ in rec {
             firstRunDone = true;
             theme = {
               title = "ASFASF";
-              # images.additional_backgrounds = ["./bg-000.svg"];
+              images.additional_backgrounds = ["./bg-000.svg"];
               colors = {
                 toolbar = "#${theme.dark.base00}";
                 toolbar_text = "#${theme.dark.base05}";
@@ -90,23 +90,23 @@ in rec {
           };
         };
 
-        userContent = ''
-          /* Firefox profile directory/chrome/userContent.css */
-          /* Apply to all about: pages, including about:home and about:newtab */
-          @-moz-document url-prefix("about:") {
-            #root,
-            .newtab-main,
-            .outer-wrapper {
-              background-color: #${theme.dark.base00} !important;  /* Dark background color */
-              color: #${theme.dark.base07} !important;             /* Text color */
-            }
+        # userContent = ''
+        #   /* Firefox profile directory/chrome/userContent.css */
+        #   /* Apply to all about: pages, including about:home and about:newtab */
+        #   @-moz-document url-prefix("about:") {
+        #     #root,
+        #     .newtab-main,
+        #     .outer-wrapper {
+        #       background-color: #${theme.dark.base00} !important;  /* Dark background color */
+        #       color: #${theme.dark.base07} !important;             /* Text color */
+        #     }
 
-            /* Optional: Remove background images from new tab page */
-            .wallpaper-input[style*="background-image"] {
-              background-image: none !important;
-            }
-          }
-        '';
+        #     /* Optional: Remove background images from new tab page */
+        #     .wallpaper-input[style*="background-image"] {
+        #       background-image: none !important;
+        #     }
+        #   }
+        # '';
 
         userChrome =
           import ./userChrome.nix {inherit theme color-lib firefox-csshacks;};

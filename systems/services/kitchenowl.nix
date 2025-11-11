@@ -1,4 +1,4 @@
-{...}: {
+{config, ...}: {
   # Enable Podman
   virtualisation = {
     podman = {
@@ -16,11 +16,11 @@
     # Define the OCI container for KitchenOwl
     oci-containers.containers = {
       kitchenowl = {
-        image = "tombursch/kitchenowl@sha256:5e8462c9be9b31aa9b829275a25ea17f2e5c58be891013a409355ebbac89c6d8";
+        image = "tombursch/kitchenowl@sha256:9d5e4402c2abc734e1536586caa103840a7ebe961fdce1570e31b956abeba70b";
         ports = ["3043:8080"];
-        environment = {
-          JWT_SECRET_KEY = "PLEASE_CHANGE_ME";
-        };
+        environmentFiles = [
+          config.sops.secrets."services/kitchenowl/jwt-secret".path
+        ];
         volumes = [
           "/var/lib/kitchenowl:/data"
         ];
@@ -41,6 +41,11 @@
       locations."/" = {
         proxyPass = "http://127.0.0.1:3043";
         proxyWebsockets = true; # Enable WebSocket support if needed
+
+        extraConfig = ''
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "upgrade";
+        '';
       };
     };
   };

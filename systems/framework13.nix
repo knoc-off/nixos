@@ -26,12 +26,24 @@
     ./hardware/hardware-configuration.nix
     ./hardware/bluetooth.nix
     ./hardware/fingerprint
+    #./services/rclone-client.nix
+    {
+      sops.secrets."services/rclone/webdav-pass" = {
+        mode = "0444"; # World-readable so home-manager can access it
+        path = "/etc/rclone-webdav-pass";
+      };
+    }
 
     inputs.hardware.nixosModules.framework-13-7040-amd
 
     # Enable uinput for kanata and logiops for mouse
     {
       hardware.uinput.enable = true;
+    }
+
+    {
+      # ivpn
+      services.ivpn.enable = true;
     }
 
     # Logiops for MX Master 3S mouse configuration

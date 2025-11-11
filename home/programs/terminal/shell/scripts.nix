@@ -16,6 +16,7 @@
   lighten = setOkhslLightness 0.7;
   saturate = setOkhslSaturation 0.9;
   sa = hex: lib.removePrefix "#" (lighten (saturate "#${hex}"));
+  sal = hex: lib.removePrefix "#" (setOkhslLightness 0.5 (saturate "#${hex}"));
 in {
   home.packages =
     [
@@ -101,12 +102,12 @@ in {
         set -euo pipefail
         ${pkgs.kitty}/bin/kitty @ set-colors -a \
           color0=#${theme.light.base00} \
-          color1=#${sa theme.light.base08} \
-          color2=#${sa theme.light.base0B} \
-          color3=#${sa theme.light.base0A} \
-          color4=#${sa theme.light.base0D} \
-          color5=#${sa theme.light.base0E} \
-          color6=#${sa theme.light.base0C} \
+          color1=#${sal theme.light.base08} \
+          color2=#${sal theme.light.base0B} \
+          color3=#${sal theme.light.base0A} \
+          color4=#${sal theme.light.base0D} \
+          color5=#${sal theme.light.base0E} \
+          color6=#${sal theme.light.base0C} \
           color7=#${theme.light.base06} \
           color8=#${theme.light.base03} \
           color9=#${theme.light.base08} \
@@ -245,10 +246,6 @@ in {
         ]; # coreutils for date and sleep
       })
 
-      # cli = {
-      #   body = "fabric -p cli \"$argv\" --stream";
-      #   description = "Compress a file or directory";
-      # };
       (mkComplgenScript {
         name = "cli";
         scriptContent = ''
@@ -418,65 +415,6 @@ in {
           pkgs.coreutils
         ];
       })
-
-      #(mkComplgenScript {
-      #  name = "adr";
-      #  scriptContent = ''
-      #    #!${pkgs.bash}/bin/bash
-      #    set -euo pipefail
-
-      #    SMART_MODEL="openrouter/google/gemini-2.5-pro-preview-03-25"
-      #    FAST_MODEL="openrouter/google/gemini-2.5-flash-preview"
-      #    MEDIUM_MODEL="openrouter/google/gemini-2.5-flash-preview:thinking"
-      #    MODEL="$FAST_MODEL"
-      #    WEAK_MODEL="$FAST_MODEL"
-      #    AIDER_ARGS=() # Renamed from ARGS to avoid confusion with shell ARGS
-
-      #    # Parse flags and file/other arguments
-      #    while [ $# -gt 0 ]; do
-      #      case "$1" in
-      #        -s) MODEL="$SMART_MODEL"; shift ;;
-      #        -m) MODEL="$MEDIUM_MODEL"; shift ;;
-      #        -d) MODEL="$FAST_MODEL"; shift ;;
-      #        *) AIDER_ARGS+=("$1"); shift ;;
-      #      esac
-      #    done
-
-      #    if [ ''${#AIDER_ARGS[@]} -eq 0 ]; then
-      #      AIDER_ARGS=("--message" "/commit")
-      #    fi
-
-      #    ${upkgs.aider-chat}/bin/aider \
-      #      --alias "f:$FAST_MODEL" \
-      #      --alias "m:$MEDIUM_MODEL" \
-      #      --alias "s:$SMART_MODEL" \
-      #      --alias "fast:$FAST_MODEL" \
-      #      --alias "smart:$SMART_MODEL" \
-      #      --alias "medium:$MEDIUM_MODEL" \
-      #      --model "$MODEL" \
-      #      --weak-model "$WEAK_MODEL" \
-      #      --no-auto-lint \
-      #      --no-auto-test \
-      #      --no-attribute-committer \
-      #      --no-attribute-author \
-      #      --dark-mode \
-      #      --edit-format diff \
-      #      "''${AIDER_ARGS[@]}"
-      #  '';
-      #  # Corrected grammar:
-      #  # grammar = ''
-      #  #   adr [(-s | -m | -d)] [{{{${pkgs.fd}/bin/fd --type f --hidden --no-ignore --max-depth 1 . --color never}}} "File"] ... [<OTHER_ARG> "Other Argument"] ... ;'';
-      #  grammar = ''
-      #    adr <PATH>;
-      #  '';
-      #  runtimeDeps = [
-      #    upkgs.aider-chat
-      #    pkgs.fd
-      #    pkgs.file # For file type detection in completion
-      #    pkgs.gnugrep # For grep in completion
-      #    pkgs.bash # For the script itself
-      #  ];
-      #})
 
       (mkComplgenScript {
         name = "ping"; # The command name users will type

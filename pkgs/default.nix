@@ -39,7 +39,7 @@ in rec {
     configBase16 = {
       name = "materia-theme";
       kind = "dark";
-      colors = theme;
+      colors = theme.dark;
     };
   };
 
