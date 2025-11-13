@@ -64,6 +64,13 @@ in {
         ];
       })
 
+      (pkgs.writeShellScriptBin "text-serch" ''
+        sk --ansi -i -c 'rg --color=always --line-number "{}"' \
+           --preview 'f=$(echo {} | cut -d: -f1); l=$(echo {} | cut -d: -f2); bat --color=always --style=numbers --highlight-line $l "$f"' \
+           --preview-window '+{2}-/2' \
+           --delimiter ':'
+      '')
+
       (pkgs.writeShellScriptBin "kittydark" ''
         set -euo pipefail
         ${pkgs.kitty}/bin/kitty @ set-colors -a \

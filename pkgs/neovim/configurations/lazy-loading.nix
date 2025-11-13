@@ -287,6 +287,10 @@
               desc = "Pop directory (go back)";
               icon = " ";
             };
+            "<leader>cp" = {
+              desc = "Copy current file path";
+              icon = " ";
+            };
             "<leader>e" = {
               desc = "Show line diagnostics";
               icon = " ";
@@ -841,6 +845,25 @@
           options = {
             silent = true;
             desc = "Pop directory (go back)";
+          };
+        }
+        {
+          mode = "n";
+          key = "<leader>cp";
+          action = helpers.mkRaw ''
+            function()
+              local path = vim.fn.expand('%:p')
+              if path ~= "" then
+                vim.fn.setreg('+', path)
+                vim.notify("Copied to clipboard: " .. path, vim.log.levels.INFO)
+              else
+                vim.notify("No file in current buffer", vim.log.levels.WARN)
+              end
+            end
+          '';
+          options = {
+            silent = true;
+            desc = "Copy current file path";
           };
         }
       ];

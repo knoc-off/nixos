@@ -86,7 +86,6 @@
 
       custom.git_branch_short = {
         command = let
-          # script:
           git_branch_short_sh = pkgs.writeShellScript "git-branch-short" ''
             #!/usr/bin/env bash
             git rev-parse --abbrev-ref HEAD 2> /dev/null | awk '
