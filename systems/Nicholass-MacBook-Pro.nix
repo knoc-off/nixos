@@ -169,14 +169,17 @@ in {
       "colima" # For docker
       "openssl"
 
+      "SergioBenitez/osxct/x86_64-unknown-linux-gnu"
+
+      # Install autoraise without starting service (managed by custom launchd service below)
       {
-        # focus follows mouse
         name = "autoraise";
         args = [
           "--with-dexperimental_focus_first"
           "--with-dold_activation_method"
         ];
         start_service = false;
+        restart_service = false;
       }
     ];
     onActivation.cleanup = "uninstall";
@@ -206,6 +209,8 @@ in {
     serviceConfig = {
       KeepAlive = true;
       RunAtLoad = true;
+      # Ensure we don't conflict with homebrew's default service
+      Label = "org.nixos.autoraise";
     };
   };
 

@@ -20,7 +20,8 @@
 
       home.packages = with pkgs; [
         gum
-        television
+
+        skim
 
         watchexec
 
