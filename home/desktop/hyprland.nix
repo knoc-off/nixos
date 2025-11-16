@@ -44,6 +44,7 @@
     #package = inputs.hyprland.packages.${pkgs.system}.hyprland;
 
     settings = {
+      ecosystem.no_update_news = true;
       exec-once = [
         "astal-notify"
         "${pkgs.wayland-pipewire-idle-inhibit}/bin/wayland-pipewire-idle-inhibit"

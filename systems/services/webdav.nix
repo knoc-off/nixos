@@ -8,7 +8,7 @@
     enable = true;
 
     # Enable DAV module
-    additionalModules = [ pkgs.nginxModules.dav ];
+    additionalModules = [pkgs.nginxModules.dav];
 
     virtualHosts."sync.niko.ink" = {
       forceSSL = true;
@@ -20,7 +20,7 @@
           # WebDAV support
           dav_methods PUT DELETE MKCOL COPY MOVE;
           dav_ext_methods PROPFIND OPTIONS;
-          dav_access user:rw group:r;
+          dav_access user:rw group:rw;
 
           # Create intermediate directories
           create_full_put_path on;
@@ -37,14 +37,26 @@
           sendfile on;
           tcp_nopush on;
           tcp_nodelay on;
+
+          # Reduce latency
+          keepalive_timeout 65;
+          keepalive_requests 100;
+
+          # Suppress "File exists" error logs
+          error_page 405 =200 $uri;
         '';
       };
     };
   };
 
+  # Allow nginx to write to WebDAV directory despite ProtectSystem=strict
+  systemd.services.nginx.serviceConfig = {
+    ReadWritePaths = ["/var/lib/webdav"];
+  };
+
   systemd.tmpfiles.rules = [
-    "d /var/lib/webdav 0750 nginx nginx -"
-    "d /var/lib/webdav/tmp 0750 nginx nginx -"
+    "d /var/lib/webdav 0777 nginx nginx -"
+    "d /var/lib/webdav/tmp 0777 nginx nginx -"
   ];
 
   sops.secrets."services/webdav/htpasswd" = {

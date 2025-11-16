@@ -23,7 +23,6 @@
     };
   };
 
-  # Systemd user service for auto-sync
   systemd.user.services.rclone-sync = {
     Unit = {
       Description = "Rclone bidirectional sync";
@@ -32,11 +31,21 @@
 
     Service = {
       Type = "oneshot";
-      ExecStart = "${pkgs.rclone}/bin/rclone bisync %h/Sync webdav: --size-only --verbose --create-empty-src-dirs --resilient --recover --max-delete 10 --conflict-loser delete";
+      ExecStart = let
+        syncScript = pkgs.writeShellScript "rclone-sync" ''
+          LISTING_PATH="$HOME/.cache/rclone/bisync/home_knoff_Sync..webdav_.path1.lst"
+
+          if [ ! -f "$LISTING_PATH" ]; then
+            echo "First run detected, performing initial --resync"
+            ${pkgs.rclone}/bin/rclone bisync $HOME/Sync webdav: --resync --size-only --verbose --create-empty-src-dirs --max-delete 10 --conflict-loser delete
+          else
+            ${pkgs.rclone}/bin/rclone bisync $HOME/Sync webdav: --size-only --verbose --create-empty-src-dirs --resilient --recover --max-delete 10 --conflict-loser delete
+          fi
+        '';
+      in "${syncScript}";
     };
   };
 
-  # Timer to run sync every 15 minutes
   systemd.user.timers.rclone-sync = {
     Unit = {
       Description = "Rclone sync timer";
@@ -44,7 +53,7 @@
 
     Timer = {
       OnBootSec = "2min";
-      OnUnitActiveSec = "15min";
+      OnUnitActiveSec = "5min";
       Persistent = true;
     };
 
@@ -55,6 +64,6 @@
 
   # Create sync directory
   home.activation.createSyncDir = lib.hm.dag.entryAfter ["writeBoundary"] ''
-    mkdir -p ~/Sync/{Documents,Photos,Books,Obsidian}
+    mkdir -p ~/Sync/{Books,Obsidian}
   '';
 }

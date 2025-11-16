@@ -1,18 +1,26 @@
-{ inputs, hostname, lib, pkgs, self, user, config, ... }@args: {
+{
+  inputs,
+  hostname,
+  lib,
+  pkgs,
+  self,
+  user,
+  config,
+  ...
+} @ args: {
   imports = [
-
     # Disko
     inputs.disko.nixosModules.disko
     ./hardware/disks/simple-disk.nix
-    ./modules/audio/default.nix
     ./services/kdeconnect.nix
 
-    (self.nixosModules.home { inherit args; })
+    (self.nixosModules.audio.pipewire pkgs)
+    (self.nixosModules.home args)
+    (self.nixosModules.nix inputs)
 
     # need some kind of WM
     self.nixosModules.windowManager.hyprland
     {
-
       hardware.graphics = {
         enable = true;
         enable32Bit = true;
@@ -83,7 +91,7 @@
       hardware.bluetooth = {
         enable = true;
         powerOnBoot = true;
-        package = pkgs.bluez.override { enableExperimental = true; };
+        package = pkgs.bluez.override {enableExperimental = true;};
         settings = {
           General = {
             ControllerMode = "dual"; # BR/EDR + LE
@@ -93,10 +101,9 @@
             ReconnectAttempts = 7;
           };
         };
-        disabledPlugins = [ "sap" ]; # Disable SIM Access Profile
+        disabledPlugins = ["sap"]; # Disable SIM Access Profile
       };
       services.blueman.enable = true; # GUI manager
-
     }
 
     {
@@ -111,7 +118,6 @@
       # Sound support (choose one)
       services.pipewire.alsa.support32Bit = true; # For PipeWire
     }
-    (self.nixosModules.nix { inherit inputs; })
   ];
 
   services.dbus.enable = true;
@@ -122,14 +128,23 @@
 
   # Firewall
   networking.firewall = {
-
-      enable = true; # Ensure firewall is active
-      allowedTCPPorts = [ 1714 1764 ];
-      allowedUDPPorts = [ 1714 1764 ];
+    enable = false; # Ensure firewall is active
+    allowedTCPPortRanges = [
+      {
+        from = 1714;
+        to = 1764;
+      }
+    ];
+    allowedUDPPortRanges = [
+      {
+        from = 1714;
+        to = 1764;
+      }
+    ];
   };
 
   boot = {
-    kernelModules = [ "i915" ];
+    kernelModules = ["i915"];
     kernelParams = [
       # Ensure Intel graphics are properly initialized
       "i915.modeset=1"
@@ -137,7 +152,6 @@
     ];
   };
   boot.loader.grub = {
-
     efiSupport = true;
     efiInstallAsRemovable = true;
   };
