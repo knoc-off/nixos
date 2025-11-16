@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "quick_sync" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "quick_sync";
+  system.nixos.label = "TV_box_updated" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "quick_sync";
 }

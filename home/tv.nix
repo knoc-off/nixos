@@ -1,14 +1,21 @@
-{ lib, inputs, pkgs, self, hostname, user, config, ... }@args:
-
-let
+{
+  lib,
+  inputs,
+  pkgs,
+  self,
+  hostname,
+  user,
+  config,
+  ...
+} @ args: let
   generateService = serviceName: command: {
     Unit = {
       Description = "${serviceName} Service";
-      PartOf = [ "hyprland.target" ];
-      Requires = [ "hyprland.target" ];
-      After = [ "user-path-import.service" ];
+      PartOf = ["hyprland.target"];
+      Requires = ["hyprland.target"];
+      After = ["user-path-import.service"];
     };
-    Install.WantedBy = [ "hyprland.target" ];
+    Install.WantedBy = ["hyprland.target"];
     Service = {
       Type = "simple";
       Restart = "on-failure";
@@ -16,13 +23,13 @@ let
       RestartSec = "1";
     };
   };
-
 in {
-
   imports = [
     ./programs/terminal/kitty
     ./programs/terminal
-    ./desktop/hyprland.nix ];
+    ./desktop/hyprland.nix
+    ./tv-xdg-env.nix
+  ];
 
   # programs.kodi = {
   #   enable = true;
@@ -84,15 +91,55 @@ in {
 
   # services.dunst = { enable = true; };
 
+  # GTK Configuration
+  gtk = {
+    enable = true;
+    theme = {
+      name = "Breeze-Dark";
+      package = pkgs.kdePackages.breeze-gtk;
+    };
+    iconTheme = {
+      name = "breeze-dark";
+      package = pkgs.kdePackages.breeze-icons;
+    };
+    cursorTheme = {
+      name = "breeze_cursors";
+      package = pkgs.kdePackages.breeze;
+      size = 24;
+    };
+    font = {
+      name = "Noto Sans";
+      size = 10;
+    };
+    gtk3.extraConfig.gtk-application-prefer-dark-theme = true;
+    gtk4.extraConfig.gtk-application-prefer-dark-theme = true;
+  };
+
+  # Qt Configuration
+  qt = {
+    enable = true;
+    platformTheme.name = "kde";
+    style = {
+      name = "breeze";
+      package = pkgs.kdePackages.breeze;
+    };
+  };
+
   home.sessionVariables = {
     QT_QPA_PLATFORM = "wayland";
     # MOZ_ENABLE_WAYLAND = "1"; # For Firefox, if not already set elsewhere
     XDG_SESSION_TYPE = "wayland";
+    QT_QPA_PLATFORMTHEME = "kde";
+    QT_STYLE_OVERRIDE = "breeze";
+
+    # KDE/Dolphin integration
+    KDE_SESSION_VERSION = "6";
+    KDE_FULL_SESSION = "true";
   };
 
   programs.mpv = {
     enable = true;
-    scripts = [ pkgs.mpvScripts.mpris ];
+    scripts = [pkgs.mpvScripts.mpris];
     scriptOpts = {
       osc = {
         seekbarstyle = "bar";
@@ -142,7 +189,8 @@ in {
         "vd-lavc-threads" = 1;
         "framedrop" = "vo";
       };
-      "protocol.udp" = { # Corrected typo here
+      "protocol.udp" = {
+        # Corrected typo here
         "profile-desc" = "Settings for UDP streams";
         "profile" = "low-latency-stream"; # Inherit
         "demuxer-max-bytes" = "10M";
@@ -154,7 +202,7 @@ in {
       };
     };
 
-    defaultProfiles = [ "gpu-hq" ];
+    defaultProfiles = ["gpu-hq"];
 
     bindings = {
       "WHEEL_UP" = "seek 5";
@@ -175,9 +223,21 @@ in {
   };
 
   home.packages = with pkgs; [
-    # The core KDE Connect application suite
-    plasma5Packages.kdeconnect-kde
     (inputs.nixgl.packages.x86_64-linux.nixGLIntel)
+
+    # KDE Applications for TV box
+    kdePackages.dolphin # File manager (includes kio as dependency)
+    kdePackages.ark # Archive manager
+    kdePackages.okular # PDF/document viewer
+    kdePackages.gwenview # Alternative image viewer (optional, qview is lighter)
+
+    # Theming packages
+    kdePackages.breeze
+    kdePackages.breeze-gtk
+    kdePackages.breeze-icons
+    kdePackages.qqc2-breeze-style
+    noto-fonts
+    noto-fonts-emoji
   ];
 
   # 1. Enable KDE Connect Service
@@ -198,17 +258,19 @@ in {
     enable = true;
     config = {
       common = {
-        default = [ "hyprland" ]; # Use Hyprland portal by default
+        default = ["hyprland"]; # Use Hyprland portal by default
         # Explicitly route screen sharing to KDE portal for KDE Connect
-        "org.freedesktop.impl.portal.ScreenCast" = [ "kde" ];
-        "org.freedesktop.impl.portal.RemoteDesktop" = [ "kde" ];
+        "org.freedesktop.impl.portal.ScreenCast" = ["kde"];
+        "org.freedesktop.impl.portal.RemoteDesktop" = ["kde"];
 
         #"org.freedesktop.impl.portal.Screenshot" = "wlr";
       };
     };
     extraPortals = [
-      pkgs.xdg-desktop-portal-kde # For KDE Connect screen sharing
-      pkgs.xdg-desktop-portal-hyprland
+      # pkgs.xdg-desktop-portal-kde # For KDE Connect screen sharing
+      pkgs.kdePackages.xdg-desktop-portal-kde
+
+      # pkgs.xdg-desktop-portal-hyprland
     ];
   };
 
@@ -247,10 +309,10 @@ in {
     kded-modules = {
       Unit = {
         Description = "KDED Modules";
-        After = [ "kded.service" "user-path-import.service" ];
-        PartOf = [ "kded.service" ];
+        After = ["kded.service" "user-path-import.service"];
+        PartOf = ["kded.service"];
       };
-      Install.WantedBy = [ "hyprland.target" ];
+      Install.WantedBy = ["hyprland.target"];
       Service = {
         Type = "oneshot";
         ExecStart = "${pkgs.writeScript "start-kded-modules" ''
