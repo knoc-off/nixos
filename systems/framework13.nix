@@ -7,11 +7,11 @@
   user,
   config,
   ...
-} @ args: {
+}: {
   imports = [
-    (self.nixosModules.home args)
-    (self.nixosModules.nix inputs)
-    (self.nixosModules.audio.pipewire args)
+    self.nixosModules.home
+    self.nixosModules.nix
+    self.nixosModules.audio.pipewire
 
     self.nixosModules.misc
     self.nixosModules.minecraft.server-suite
@@ -45,6 +45,25 @@
       # ivpn
       services.ivpn.enable = true;
     }
+
+    # {
+    #   systemd.services.esphome.serviceConfig = {
+    #     MemoryDenyWriteExecute = lib.mkForce false;
+    #   };
+    #   # esp32
+    #   nixpkgs.config.permittedInsecurePackages = [
+    #     "python3.12-ecdsa-0.19.1"
+    #   ];
+
+    #   services.esphome = {
+    #     enable = true;
+    #     openFirewall = true; # if you want to access dashboard from other devices
+    #     allowedDevices = [
+    #       "char-ttyUSB" # for flashing via USB
+    #       "char-ttyACM" # ESP32-C3 often shows up as ACM
+    #     ];
+    #   };
+    # }
 
     # Logiops for MX Master 3S mouse configuration
     self.nixosModules.services.logiops

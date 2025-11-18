@@ -20,11 +20,6 @@
     rustc = rustPkgs-fenix.fenix.minimal.toolchain;
   };
 
-  rustPlatform-dev = rustPkgs-fenix.makeRustPlatform {
-    cargo = rustPkgs-fenix.fenix.complete.toolchain;
-    rustc = rustPkgs-fenix.fenix.complete.toolchain;
-  };
-
   rustToolchain-wasm = rustPkgs-fenix.fenix.combine [
     rustPkgs-fenix.fenix.complete.toolchain
     rustPkgs-fenix.fenix.targets.wasm32-unknown-unknown.latest.rust-std
@@ -97,7 +92,9 @@ in rec {
   cli-ai = rustPkgs-fenix.callPackage ./cli-ai {inherit rustPlatform;};
   marki = rustPkgs-fenix.callPackage ./marki {inherit rustPlatform;};
   marki-wasm = rustPkgs-fenix.callPackage ./marki-wasm {rustPlatform = rustPlatform-wasm;};
-  treeview = rustPkgs-fenix.callPackage ./tree-cat {rustPlatform = rustPlatform-dev;};
+  esp32-train-time = rustPkgs-fenix.callPackage ./esp32-train-time {
+    fenix = rustPkgs-fenix.fenix;
+  };
 
   inherit rustPkgs-fenix;
   inherit (inputs) fenix;

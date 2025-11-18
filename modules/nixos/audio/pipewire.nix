@@ -1,4 +1,4 @@
-pkgs: {
+{pkgs, ...}: {
   services.pulseaudio.enable = false;
   security.rtkit.enable = true; # Realtime priority management
 
