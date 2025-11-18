@@ -213,11 +213,9 @@
 
         # Floats a window based on its class AND title regex
         floatClassTitle = class: (title: "float, class:(${class}), title:(${title})");
-
-        # --- Other potential helpers (can be uncommented and used if needed) ---
-        fakeFullscreen = class: "fakefullscreen, class:(${class})";
-        assignWorkspace = class: (title: (to: "workspace ${to}, class:(${class}), title:(${title})"));
-        setSize = class: (title: (size: "size ${size}, class:(${class}), title:(${title})"));
+        # fakeFullscreen = class: "fakefullscreen, class:(${class})";
+        # assignWorkspace = class: (title: (to: "workspace ${to}, class:(${class}), title:(${title})"));
+        # setSize = class: (title: (size: "size ${size}, class:(${class}), title:(${title})"));
         # idleInhibitRule = mode: class: (title: "idleinhibit ${mode}, class:(${class}), title:(${title})");
       in [
         (floatClass "org.gnome.Calculator")

@@ -86,6 +86,9 @@
         bluez-tools
         bluez-alsa
         wireshark
+
+        # HDMI-CEC for controlling TV
+        libcec # Provides cec-client for sending CEC commands
       ];
 
       hardware.bluetooth = {
@@ -122,6 +125,9 @@
 
   services.dbus.enable = true;
 
+  # Enable uinput for KDE Connect remote input (mouse/keyboard from phone)
+  hardware.uinput.enable = true;
+
   nix.settings.auto-optimise-store = true;
 
   networking.hostName = hostname;
@@ -144,7 +150,11 @@
   };
 
   boot = {
-    kernelModules = ["i915"];
+    kernelModules = [
+      "i915"
+      "cec" # HDMI-CEC support
+      "drm" # DRM subsystem for CEC
+    ];
     kernelParams = [
       # Ensure Intel graphics are properly initialized
       "i915.modeset=1"

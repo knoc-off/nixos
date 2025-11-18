@@ -230,6 +230,16 @@ in {
     kdePackages.ark # Archive manager
     kdePackages.okular # PDF/document viewer
     kdePackages.gwenview # Alternative image viewer (optional, qview is lighter)
+    kdePackages.plasma-workspace # Provides keditfiletype for editing file associations in Dolphin
+    kdePackages.kservice # Provides kbuildsycoca6 for rebuilding KDE service cache
+
+    # HDMI-CEC control scripts
+    (writeShellScriptBin "tv-wakeup" ''
+      echo 'on 0' | ${libcec}/bin/cec-client -s -d 1
+    '')
+    (writeShellScriptBin "tv-shutdown" ''
+      echo 'standby 0' | ${libcec}/bin/cec-client -s -d 1
+    '')
 
     # Theming packages
     kdePackages.breeze
@@ -280,6 +290,21 @@ in {
   services.mako.enable = true;
   # Alternatively, you could use another like swaync:
   # programs.swaync.enable = true;
+
+  # Create XDG menu file for Dolphin to discover applications
+  # Without Plasma desktop, this file doesn't exist and Dolphin can't find apps
+  # We symlink directly from plasma-workspace package to get the real, complete menu
+  xdg.configFile."menus/applications.menu".source = "${pkgs.kdePackages.plasma-workspace}/etc/xdg/menus/plasma-applications.menu";
+
+  # Symlink the directory definitions from plasma-workspace
+  # This scales automatically as the package updates
+  xdg.dataFile."desktop-directories".source = "${pkgs.kdePackages.plasma-workspace}/share/desktop-directories";
+
+  # Rebuild KDE service cache so Dolphin can find applications
+  home.activation.rebuildKdeCache = lib.hm.dag.entryAfter ["writeBoundary"] ''
+    export PATH="${pkgs.kdePackages.kservice}/bin:$PATH"
+    kbuildsycoca6 --noincremental || echo "Warning: kbuildsycoca6 failed, but continuing..."
+  '';
 
   # nixpkgs = {
   #   config = {
