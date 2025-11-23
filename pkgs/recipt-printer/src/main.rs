@@ -5,7 +5,7 @@ use escpos::utils::*;
 use escpos::{driver::*, errors::Result};
 use std::io::{self, IsTerminal, Read};
 
-mod parse_markdown;
+mod markdown;
 
 #[derive(Parser, Debug)]
 #[command(about = "Print to thermal receipt printer")]
@@ -171,7 +171,7 @@ fn main() -> Result<()> {
     };
 
     if args.markdown {
-        parse_markdown::print_markdown(&mut printer, &text)?;
+        markdown::print_markdown(&mut printer, &text)?;
         printer.feed()?.print()?;
     } else {
         printer.init()?.writeln(&text)?.feed()?.print()?;
