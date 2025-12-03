@@ -111,40 +111,107 @@ in {
         }
       ];
     }
-    # Tab-Bar
+    # Tab-Bar (shows vim tabs as layouts, not individual buffers)
     {
       plugins.bufferline = {
         enable = true;
         settings.options = {
+          mode = "tabs";
           truncateNames = true;
           diagnostics = "nvim_lsp";
+          show_duplicate_prefix = false;
+          tab_size = 24;
+          max_name_length = 24;
+          separator_style = "slope";
+          name_formatter = helpers.mkRaw ''
+            function(buf)
+              local tabnr = buf.tabnr
+              local wins = vim.api.nvim_tabpage_list_wins(tabnr)
+              local names = {}
+              for _, win in ipairs(wins) do
+                local bufnr = vim.api.nvim_win_get_buf(win)
+                local name = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(bufnr), ':t')
+                if name ~= "" and not vim.tbl_contains(names, name) then
+                  table.insert(names, name)
+                end
+              end
+              if #names == 0 then
+                return "[New]"
+              elseif #names == 1 then
+                return names[1]
+              else
+                return table.concat(names, " | ")
+              end
+            end
+          '';
         };
       };
 
-      keymaps = let
-        normal =
-          lib.mapAttrsToList
-          (key: action: {
-            mode = "n";
-            inherit action key;
-          })
-          {
-            #"<leader>bp" = ":BufferLinePick<CR>";
-            #"<leader>bc" = ":bp | bd #<CR>";
-            #"<leader>bP" = ":BufferLineTogglePin<CR>";
-            #"<leader>bd" = ":BufferLineSortByDirectory<CR>";
-            #"<leader>be" = ":BufferLineSortByExtension<CR>";
-            #"<leader>bt" = ":BufferLineSortByTabs<CR>";
-            #"<leader>bL" = ":BufferLineCloseRight<CR>";
-            #"<leader>bH" = ":BufferLineCloseLeft<CR>";
-            #"<leader><S-h>" = ":BufferLineMovePrev<CR>";
-            #"<leader><S-l>" = ":BufferLineMoveNext<CR>";
-
-            "<Tab>" = ":BufferLineCycleNext<CR>";
-            "<S-Tab>" = ":BufferLineCyclePrev<CR>";
+      keymaps = [
+        {
+          mode = "n";
+          key = "<Tab>";
+          action = helpers.mkRaw ''
+            function()
+              if vim.fn.tabpagenr('$') > 1 then
+                vim.cmd('tabnext')
+              end
+            end
+          '';
+          options = {
+            silent = true;
+            desc = "Next tab";
           };
-      in
-        helpers.keymaps.mkKeymaps {options.silent = true;} normal;
+        }
+        {
+          mode = "n";
+          key = "<S-Tab>";
+          action = helpers.mkRaw ''
+            function()
+              if vim.fn.tabpagenr('$') > 1 then
+                vim.cmd('tabprev')
+              end
+            end
+          '';
+          options = {
+            silent = true;
+            desc = "Previous tab";
+          };
+        }
+        {
+          mode = "n";
+          key = "<leader>tn";
+          action = helpers.mkRaw ''
+            function()
+              vim.cmd('tabnew')
+              vim.schedule(function()
+                require('telescope.builtin').find_files()
+              end)
+            end
+          '';
+          options = {
+            silent = true;
+            desc = "New tab + find file";
+          };
+        }
+        {
+          mode = "n";
+          key = "<leader>tc";
+          action = helpers.mkRaw ''
+            function()
+              if vim.fn.tabpagenr('$') > 1 then
+                vim.cmd('tabclose')
+              else
+                vim.notify("Cannot close last tab", vim.log.levels.WARN)
+              end
+            end
+          '';
+          options = {
+            silent = true;
+            desc = "Close tab";
+          };
+        }
+      ];
     }
 
     {

@@ -1,8 +1,9 @@
-{...}: {
+{pkgs, ...}: {
   programs.git = {
     enable = true;
 
     extraConfig = {
+      advice.detachedHead = false;
       init.defaultBranch = "main";
       pull.rebase = true;
       push.autoSetupRemote = true;
@@ -19,7 +20,7 @@
       pf = "push --force-with-lease";
       p = "push";
       a = "add";
-      d = ''!f() { git diff HEAD~''${1:-0} --; }; f'';
+      d = ''!f() { git diff HEAD~''${1:-0} "''${@:2}"; }; f'';
       r = ''!f() { git rebase -i HEAD~''${1:-0} --; }; f'';
       l = ''!f() { git log --oneline --graph --decorate -''${1:-10}; }; f'';
       #l = "log --oneline --graph --decorate -10";
@@ -36,52 +37,53 @@
       # See changes since branching off of main branch
       ch = ''diff --merge-base origin/HEAD'';
 
-      # Comprehensive overview of changes without showing diff content
-      changes = ''!f() {
-        echo "=== Repository Overview ===";
-        echo "";
-        git status --short --branch;
-        echo "";
+      changes = let
+        changesScript = pkgs.writeShellScriptBin "git-changes" ''
+          echo "=== Repository Overview ===";
+          echo "";
+          ${pkgs.git}/bin/git status --short --branch;
+          echo "";
 
-        # Find merge base with main/origin/main
-        current_branch=$(git branch --show-current);
-        merge_base="";
-        if git show-ref --verify --quiet refs/remotes/origin/main; then
-          merge_base=$(git merge-base HEAD origin/main 2>/dev/null);
-        elif git show-ref --verify --quiet refs/heads/main; then
-          merge_base=$(git merge-base HEAD main 2>/dev/null);
-        fi;
-
-        if [ -n "$merge_base" ] && [ "$current_branch" != "main" ]; then
-          commit_count=$(git rev-list --count $merge_base..HEAD);
-          if [ "$commit_count" -gt 0 ]; then
-            echo "=== Changes Since Split From Main ($commit_count commits) ===";
-            echo "";
-            git log --graph --pretty=format:"%h - %ad - %an: %s" --date=short --stat --color=always $merge_base..HEAD | sed "s/^/ /";
-          else
-            echo "=== No Changes Since Split From Main ===";
+          # Find merge base with main/origin/main
+          current_branch=$(${pkgs.git}/bin/git branch --show-current);
+          merge_base="";
+          if ${pkgs.git}/bin/git show-ref --verify --quiet refs/remotes/origin/main; then
+            merge_base=$(${pkgs.git}/bin/git merge-base HEAD origin/main 2>/dev/null);
+          elif ${pkgs.git}/bin/git show-ref --verify --quiet refs/heads/main; then
+            merge_base=$(${pkgs.git}/bin/git merge-base HEAD main 2>/dev/null);
           fi;
-        else
-          echo "=== Recent Changes (last ''${1:-10} commits) ===";
-          echo "";
-          git log --graph --pretty=format:"%h - %ad - %an: %s" --date=short --stat --color=always -''${1:-10} | sed "s/^/ /";
-        fi;
 
-        echo "";
-        if [ -n "$(git status --porcelain)" ]; then
-          echo "=== Uncommitted Changes ===";
+          if [ -n "$merge_base" ] && [ "$current_branch" != "main" ]; then
+            commit_count=$(${pkgs.git}/bin/git rev-list --count $merge_base..HEAD);
+            if [ "$commit_count" -gt 0 ]; then
+              echo "=== Changes Since Split From Main ($commit_count commits) ===";
+              echo "";
+              ${pkgs.git}/bin/git log --graph --pretty=format:"%h - %ad - %an: %s" --date=short --stat --color=always $merge_base..HEAD | sed "s/^/ /";
+            else
+              echo "=== No Changes Since Split From Main ===";
+            fi;
+          else
+            echo "=== Recent Changes (last ''${1:-10} commits) ===";
+            echo "";
+            ${pkgs.git}/bin/git log --graph --pretty=format:"%h - %ad - %an: %s" --date=short --stat --color=always -''${1:-10} | sed "s/^/ /";
+          fi;
+
           echo "";
-          git status --short | sed "s/^/  /";
+          if [ -n "$(${pkgs.git}/bin/git status --porcelain)" ]; then
+            echo "=== Uncommitted Changes ===";
+            echo "";
+            ${pkgs.git}/bin/git status --short | sed "s/^/  /";
+            echo "";
+          fi;
+          echo "=== Branch Information ===";
+          echo "Current: $(${pkgs.git}/bin/git branch --show-current)";
+          echo "Tracking: $(${pkgs.git}/bin/git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo 'No upstream')";
+          if [ -n "$merge_base" ] && [ "$current_branch" != "main" ]; then
+            echo "Merge base: $(${pkgs.git}/bin/git log --oneline -1 $merge_base)";
+          fi;
           echo "";
-        fi;
-        echo "=== Branch Information ===";
-        echo "Current: $(git branch --show-current)";
-        echo "Tracking: $(git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null || echo 'No upstream')";
-        if [ -n "$merge_base" ] && [ "$current_branch" != "main" ]; then
-          echo "Merge base: $(git log --oneline -1 $merge_base)";
-        fi;
-        echo "";
-      }; f'';
+        '';
+      in "!${changesScript}/bin/git-changes";
     };
     # signing = {
     #   key = "your-key-id";
