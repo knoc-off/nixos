@@ -86,6 +86,14 @@ in {
   nixpkgs.config.allowUnsupportedSystem = true;
 
   environment.systemPackages = with pkgs; [
+    (pkgs.claude-code.overrideAttrs (oldAttrs: rec {
+      version = "2.0.52";
+      src = pkgs.fetchzip {
+        url = "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-${version}.tgz";
+        hash = "sha256-lYVuWP9ekI+xeUXNCXVqcq8OIzZwfdgBpk0PhSIStFs=";
+      };
+    }))
+
     self.packages.${system}.neovim-nix.default
 
     taskwarrior3
@@ -101,6 +109,7 @@ in {
     # secrets management
     sops
     age
+    cmake
 
     # company tools
     wireguard-tools
@@ -151,7 +160,6 @@ in {
 
       "obs"
 
-      "claude-code"
       "utm"
       "crystalfetch"
 

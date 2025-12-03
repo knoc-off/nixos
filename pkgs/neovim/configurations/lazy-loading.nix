@@ -870,10 +870,7 @@
 
       plugins.telescope = {
         lazyLoad = {
-          settings = {
-            cmd = "Telescope";
-            keys = ["<leader>ff"];
-          };
+          enable = false;
         };
 
         enable = true;
