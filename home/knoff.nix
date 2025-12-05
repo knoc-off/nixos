@@ -162,6 +162,7 @@
   home = {
     packages = with pkgs; [
       self.packages.${pkgs.system}.neovim-nix.default
+      spotify
 
       #(pkgs.python3.withPackages
       #(ps: [ ps.llm self.packages.${pkgs.system}.llm-cmd ]))
@@ -172,10 +173,10 @@
 
       upkgs.claude-code
       # (upkgs.claude-code.overrideAttrs (oldAttrs: rec {
-      #   version = "2.0.27";
+      #   version = "2.0.52";
       #   src = pkgs.fetchzip {
       #     url = "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-${version}.tgz";
-      #     hash = "sha256-LUbDPFa0lY74MBU4hvmYVntt6hVZy6UUZFN0iB4Eno8=";
+      #     hash = "sha256-lYVuWP9ekI+xeUXNCXVqcq8OIzZwfdgBpk0PhSIStFs=";
       #   };
       # }))
       # ai tools

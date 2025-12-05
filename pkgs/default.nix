@@ -92,6 +92,9 @@ in rec {
   cli-ai = rustPkgs-fenix.callPackage ./cli-ai {inherit rustPlatform;};
   marki = rustPkgs-fenix.callPackage ./marki {inherit rustPlatform;};
   marki-wasm = rustPkgs-fenix.callPackage ./marki-wasm {rustPlatform = rustPlatform-wasm;};
+  recipt-printer = rustPkgs-fenix.callPackage ./recipt-printer {
+    fenix = rustPkgs-fenix.fenix;
+  };
   esp32-train-time = rustPkgs-fenix.callPackage ./esp32-train-time {
     fenix = rustPkgs-fenix.fenix;
   };
