@@ -304,5 +304,19 @@ in {
         };
       };
     }
+    # Smooth animations
+    {
+      plugins.mini.modules.animate = {
+        cursor.enable = false;
+        scroll = {
+          enable = true;
+          timing = helpers.mkRaw "require('mini.animate').gen_timing.linear({ duration = 80, unit = 'total' })";
+        };
+        resize.enable = false;
+        open.enable = false;
+        close.enable = false;
+      };
+      opts.mousescroll = "ver:1,hor:1";
+    }
   ];
 }
