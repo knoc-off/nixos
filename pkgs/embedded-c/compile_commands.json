@@ -1,7 +1,0 @@
-[
-  {
-    "directory": "/etc/nixos/pkgs/embedded-c",
-    "command": "/nix/store/bwzq5byrzj0xscxl47f9aicsbbffr6j6-avr-gcc-wrapper-13.2.0/bin/avr-g++ -c -g -Os -w -std=gnu++11 -fpermissive -fno-exceptions -ffunction-sections -fdata-sections -fno-threadsafe-statics -Wno-error=narrowing -mmcu=atmega328p -DF_CPU=16000000L -DARDUINO=10813 -I/nix/store/6kz9k34v3f0rbb9wf47qk36cc970qgwc-arduino-core-1.8.19/share/arduino/hardware/arduino/avr/cores/arduino -I/nix/store/6kz9k34v3f0rbb9wf47qk36cc970qgwc-arduino-core-1.8.19/share/arduino/hardware/arduino/avr/variants/standard -I/nix/store/6kz9k34v3f0rbb9wf47qk36cc970qgwc-arduino-core-1.8.19/share/arduino/libraries -I/nix/store/fpzxm14c7ia0crajiyivk8qh490gpawm-source/src -I/nix/store/fpzxm14c7ia0crajiyivk8qh490gpawm-source/interface main.cpp -o main.o",
-    "file": "main.cpp"
-  }
-]
