@@ -208,6 +208,8 @@ in {
   system.keyboard = {
     enableKeyMapping = true;
     remapCapsLockToControl = true;
+
+    nonUS.remapTilde = true;
   };
   security.pam.services.sudo_local.touchIdAuth = true;
 

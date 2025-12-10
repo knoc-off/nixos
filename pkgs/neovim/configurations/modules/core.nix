@@ -109,6 +109,11 @@ in {
             desc = "Open path under cursor (relative to file location)";
           };
         }
+        {
+          mode = "n";
+          key = "q:";
+          action = "<Nop>";
+        }
       ];
     }
     # Tab-Bar (shows vim tabs as layouts, not individual buffers)
@@ -180,7 +185,7 @@ in {
         }
         {
           mode = "n";
-          key = "<leader>tn";
+          key = "<leader>n";
           action = helpers.mkRaw ''
             function()
               vim.cmd('tabnew')
@@ -196,19 +201,28 @@ in {
         }
         {
           mode = "n";
-          key = "<leader>tc";
+          key = "<leader>c";
           action = helpers.mkRaw ''
             function()
-              if vim.fn.tabpagenr('$') > 1 then
-                vim.cmd('tabclose')
-              else
-                vim.notify("Cannot close last tab", vim.log.levels.WARN)
-              end
+              vim.cmd('tabclose')
             end
           '';
           options = {
             silent = true;
             desc = "Close tab";
+          };
+        }
+        {
+          mode = "n";
+          key = "<leader>q";
+          action = helpers.mkRaw ''
+            function()
+              vim.cmd('qall')
+            end
+          '';
+          options = {
+            silent = true;
+            desc = "quit";
           };
         }
       ];

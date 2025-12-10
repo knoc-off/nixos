@@ -18,6 +18,9 @@
       caa = "commit --all --amend";
       c = "commit";
 
+      # wide, not split 2 panel
+      diffw = "!git -c delta.side-by-side=false diff";
+
       s = "status --short --branch";
 
       pf = "push --force-with-lease";
@@ -26,11 +29,9 @@
       d = ''!f() { git diff HEAD~''${1:-0} "''${@:2}"; }; f'';
       r = ''!f() { git rebase -i HEAD~''${1:-0} --; }; f'';
       l = ''!f() { git log --oneline --graph --decorate -''${1:-10}; }; f'';
-      #l = "log --oneline --graph --decorate -10";
 
       co = "checkout";
       br = "branch";
-      #l = "log --oneline --graph --decorate -10";
       unstage = "reset HEAD --";
       last = "log -1 HEAD";
 
