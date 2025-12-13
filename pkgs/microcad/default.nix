@@ -51,6 +51,11 @@ in
       ninja
       git
       pkgs.cacert
+      pkgs.autoPatchelfHook
+    ];
+
+    buildInputs = [
+      pkgs.stdenv.cc.cc.lib
     ];
 
     # Disable ninja hook - we want ninja available but not used for building
