@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "cleanup" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "iso_stuff";
+  system.nixos.label = "impure_unsandboxed_build_for_microcad" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "iso_stuff";
 }
