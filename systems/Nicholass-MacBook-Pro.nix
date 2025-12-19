@@ -2,6 +2,7 @@
   inputs,
   self,
   pkgs,
+  lib,
   user,
   system,
   color-lib,
@@ -65,6 +66,15 @@ in {
           window_gap = 10;
         };
       };
+    }
+
+    {
+      system.keyboard.userKeyMapping = [
+        {
+          HIDKeyboardModifierMappingSrc = lib.fromHexString "0x700000064";
+          HIDKeyboardModifierMappingDst = lib.fromHexString "0x700000035";
+        }
+      ];
     }
   ];
 
@@ -209,7 +219,7 @@ in {
     enableKeyMapping = true;
     remapCapsLockToControl = true;
 
-    nonUS.remapTilde = true;
+    # nonUS.remapTilde = true;
   };
   security.pam.services.sudo_local.touchIdAuth = true;
 

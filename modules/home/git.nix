@@ -8,9 +8,10 @@
     extraConfig = {
       advice.detachedHead = false;
       init.defaultBranch = "main";
-      pull.rebase = true;
+      pull.fastforward = true;
       push.autoSetupRemote = true;
       core.excludesfile = "~/.gitignore_global";
+      rerere.enabled = true;
     };
 
     aliases = {

@@ -67,6 +67,9 @@
 
       # Folding
       foldlevel = 99; # Folds with a level higher than this number will be closed
+
+      # Tab behavior - open buffers in new tabs by default
+      switchbuf = "usetab,newtab"; # Jump to existing tab if buffer is open, otherwise open new tab
     };
   };
 }
