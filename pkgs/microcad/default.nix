@@ -5,6 +5,8 @@
   cmake,
   ninja,
   git,
+  clipper2,
+  pkg-config,
   fenix,
 }: let
   rustPlatform = pkgs.makeRustPlatform {
@@ -25,10 +27,6 @@ in
       fetchSubmodules = true;
     };
 
-    # Allow network access during build to fetch clipper2
-    # This is impure but keeps full functionality (MANIFOLD_CROSS_SECTION)
-    __noChroot = true;
-
     cargoLock = {
       lockFile = ./Cargo.lock;
       outputHashes = {
@@ -36,26 +34,38 @@ in
       };
     };
 
-    preConfigure = ''
+    preBuild = ''
       # Patch the vendored manifold-rs to respect CMAKE_GENERATOR env var
+      # and use system clipper2 instead of downloading it
+      echo "Looking for manifold-rs build.rs files in cargo-vendor-dir..."
+      ls -la cargo-vendor-dir/ | head -20 || true
+
       for f in cargo-vendor-dir/manifold-rs-*/build.rs; do
         if [ -f "$f" ]; then
-          echo "Patching $f to respect CMAKE_GENERATOR"
+          echo "Found and patching $f"
+          echo "Before patch:"
+          grep -n "CMAKE_GENERATOR\|BUILTIN_CLIPPER2" "$f" || true
+
           sed -i 's/env::set_var("CMAKE_GENERATOR", "Ninja");/if env::var("CMAKE_GENERATOR").is_err() { env::set_var("CMAKE_GENERATOR", "Ninja"); }/' "$f"
+          sed -i 's/\.define("MANIFOLD_USE_BUILTIN_CLIPPER2", "ON")/\.define("MANIFOLD_USE_BUILTIN_CLIPPER2", "OFF")/' "$f"
+
+          echo "After patch:"
+          grep -n "CMAKE_GENERATOR\|BUILTIN_CLIPPER2" "$f" || true
         fi
       done
+      echo "Done patching."
     '';
 
     nativeBuildInputs = [
       cmake
       ninja
-      git
-      pkgs.cacert
+      pkg-config
       pkgs.autoPatchelfHook
     ];
 
     buildInputs = [
       pkgs.stdenv.cc.cc.lib
+      clipper2
     ];
 
     # Disable ninja hook - we want ninja available but not used for building
@@ -66,8 +76,10 @@ in
     # The patch allows this environment variable to be respected
     CMAKE_GENERATOR = "Unix Makefiles";
 
-    # Set SSL certificates for git during cmake FetchContent
-    SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+    # Help cmake find clipper2
+    CMAKE_PREFIX_PATH = "${clipper2}";
+    Clipper2_DIR = "${clipper2}/lib/cmake/clipper2";
+    PKG_CONFIG_PATH = "${clipper2}/lib/pkgconfig";
 
     meta = {
       description = "Modern programming language for CAD";
