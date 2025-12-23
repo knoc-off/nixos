@@ -11,7 +11,7 @@
 
   programs.rofi = {
     enable = true;
-    package = pkgs.rofi-wayland;
+    package = pkgs.rofi;
     font = "Droid Sans 9";
     location = "center";
     xoffset = 0;

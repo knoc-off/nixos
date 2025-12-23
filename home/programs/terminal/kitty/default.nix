@@ -92,18 +92,15 @@ in {
 
           macos_quit_when_last_window_closed yes
 
-          # map --when-focus-on "title:claude" enter send_text all \x0a
-          # map --when-focus-on "title:claude" cmd+enter send_key enter
-
-          map --when-focus-on "var:in_claude" enter send_text all \x0a
-          map --when-focus-on "var:in_claude" cmd+enter send_key enter
+          map --when-focus-on "cmdline:claude-code" enter send_text all \x0a
+          map --when-focus-on "cmdline:claude-code" cmd+enter send_key enter
         ''
         # linux specific (some of this is system/hardware specific.)
         else ''
           touch_scroll_multiplier 6.5
 
-          map --when-focus-on "var:in_claude" enter send_text all \x0a
-          map --when-focus-on "var:in_claude" super+enter send_key enter
+          map --when-focus-on "cmdline:claude-code" enter send_text all \x0a
+          map --when-focus-on "cmdline:claude-code" super+enter send_key enter
         ''
       }
 

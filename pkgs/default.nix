@@ -103,7 +103,7 @@ in rec {
 
   neovim-nix = let
     customPkgs = import inputs.nixpkgs-unstable {
-      inherit system;
+      system = pkgs.stdenv.hostPlatform.system;
       config = {
         allowUnfree = true;
       };
@@ -112,7 +112,7 @@ in rec {
         neovim-plugins.overlay
       ];
     };
-    nixvim = inputs.nixvim.legacyPackages.${system};
+    nixvim = inputs.nixvim.legacyPackages.${pkgs.stdenv.hostPlatform.system};
   in {
     default = nixvim.makeNixvimWithModule {
       pkgs = customPkgs;
@@ -199,11 +199,11 @@ in rec {
         # Write the grammar from the environment variable to a temporary file
         echo -n "$grammar" > grammar.usage
 
-        # Generate completions using complgen aot
+        # Generate completions using complgen
         echo "Generating completions for ${name}..."
-        ${pkgs.complgen}/bin/complgen aot grammar.usage --bash-script $out/share/bash-completion/completions/${name}
-        ${pkgs.complgen}/bin/complgen aot grammar.usage --fish-script $out/share/fish/vendor_completions.d/${name}.fish
-        ${pkgs.complgen}/bin/complgen aot grammar.usage --zsh-script $out/share/zsh/site-functions/_${name}
+        ${pkgs.complgen}/bin/complgen grammar.usage --bash $out/share/bash-completion/completions/${name}
+        ${pkgs.complgen}/bin/complgen grammar.usage --fish $out/share/fish/vendor_completions.d/${name}.fish
+        ${pkgs.complgen}/bin/complgen grammar.usage --zsh $out/share/zsh/site-functions/_${name}
 
         if [ ! -s "$out/share/fish/vendor_completions.d/${name}.fish" ]; then
             echo "Error: Fish completion generation likely failed for ${name} (output file empty or missing)."

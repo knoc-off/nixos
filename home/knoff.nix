@@ -38,8 +38,10 @@
     {
       programs.git = {
         enable = true;
-        userName = "${user}";
-        userEmail = "selby@niko.ink";
+        settings.user = {
+          name = "${user}";
+          email = "selby@niko.ink";
+        };
       };
     }
     self.homeModules.starship
@@ -201,9 +203,7 @@
       # prismlauncher # Minecraft
 
       # not sure if i need any of these:
-      kdePackages.breeze-icons
-      kdePackages.grantleetheme
-      libsForQt5.grantleetheme
+      # kdePackages.breeze-icons
 
       # ill make my own calculator soon, with ags.
       gnome-calculator

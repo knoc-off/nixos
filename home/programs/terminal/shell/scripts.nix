@@ -567,30 +567,6 @@ in {
           pkgs.pv
         ];
       })
-
-      (mkComplgenScript {
-        name = "cl";
-        scriptContent = ''
-          #!${pkgs.bash}/bin/bash
-          set -euo pipefail
-
-          # Set kitty user variable to indicate we're in claude
-          printf '\x1b]1337;SetUserVar=in_claude=MQ==\007'
-
-          # Run claude command with all arguments, preserving exit code
-          command claude "$@"
-          local exit_code=$?
-
-          # Clear kitty user variable when claude exits
-          printf '\x1b]1337;SetUserVar=in_claude\007'
-
-          return $exit_code
-        '';
-        grammar = ''
-          cl <COMMAND> "Claude command" ...;
-        '';
-        runtimeDeps = [pkgs.bash];
-      })
     ]
     ++ [
       (mkComplgenScript {

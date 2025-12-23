@@ -5,16 +5,15 @@
   programs.git = {
     enable = true;
 
-    extraConfig = {
+    settings = {
       advice.detachedHead = false;
       init.defaultBranch = "main";
       pull.fastforward = true;
       push.autoSetupRemote = true;
       core.excludesfile = "~/.gitignore_global";
       rerere.enabled = true;
-    };
 
-    aliases = {
+      alias = {
       ca = "commit --amend";
       caa = "commit --all --amend";
       c = "commit";
@@ -89,16 +88,19 @@
           echo "";
         '';
       in "!${changesScript}/bin/git-changes";
+      };
     };
     # signing = {
     #   key = "your-key-id";
     #   format = "ssh";
     #   signByDefault = true;
     # };
+  };
 
-    delta = {
-      enable = true;
-      options = {
+  programs.delta = {
+    enable = true;
+    enableGitIntegration = true;
+    options = {
         # Navigation
         navigate = true; # Use n/N to jump between files Amazing
 
@@ -119,7 +121,6 @@
         hunk-header-style = "file line-number syntax";
 
         whitespace-error-style = "22 reverse";
-      };
     };
   };
 }

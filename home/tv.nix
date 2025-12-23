@@ -247,7 +247,7 @@ in {
     kdePackages.breeze-icons
     kdePackages.qqc2-breeze-style
     noto-fonts
-    noto-fonts-emoji
+    noto-fonts-color-emoji
   ];
 
   # 1. Enable KDE Connect Service

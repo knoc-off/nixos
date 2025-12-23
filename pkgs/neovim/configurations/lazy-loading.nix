@@ -1371,9 +1371,9 @@
             cmd = lib.getExe pkgs.shellcheck;
           };
 
-          jsonlint = {
-            cmd = lib.getExe pkgs.nodePackages.jsonlint;
-          };
+          # jsonlint = {
+          #   cmd = lib.getExe pkgs.nodePackages.jsonlint;
+          # };
           yamllint = {
             cmd = lib.getExe pkgs.yamllint;
           };
@@ -1422,7 +1422,7 @@
           sh = ["shellcheck"];
           zsh = ["shellcheck"];
 
-          json = ["jsonlint"];
+          # json = ["jsonlint"];
           yaml = ["yamllint"];
           markdown = ["markdownlint"];
           python = ["ruff"];

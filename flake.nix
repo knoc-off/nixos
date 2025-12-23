@@ -175,11 +175,11 @@
 
   inputs = {
     # Nixpkgs
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.05";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
     # Nixpkgs darwin ? TODO test
-    nixpkgs-darwin.url = "github:NixOS/nixpkgs/nixpkgs-25.05-darwin";
+    nixpkgs-darwin.url = "github:NixOS/nixpkgs/nixpkgs-25.11-darwin";
 
     # nix cli
     nixos-cli.url = "github:water-sucks/nixos";
@@ -194,16 +194,16 @@
     };
 
     # my custom website
-    mywebsite.url = "github:knoc-off/Website";
+    # mywebsite.url = "github:knoc-off/Website";
 
     # Home Manager
     home-manager = {
-      url = "github:nix-community/home-manager/release-25.05";
+      url = "github:nix-community/home-manager/release-25.11";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
     nixvim.url = "github:nix-community/nixvim";
-    nixneovimplugins.url = "github:NixNeovim/nixpkgs-vim-extra-plugins";
+    nixneovimplugins.url = "github:NixNeovim/NixNeovimPlugins";
 
     # Hardware-specific configurations
     hardware.url = "github:nixos/nixos-hardware";
@@ -258,15 +258,15 @@
     sops-nix.url = "github:Mic92/sops-nix";
 
     # poetry2nix
-    poetry2nix = {
-      url = "github:nix-community/poetry2nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    # poetry2nix = {
+    #   url = "github:nix-community/poetry2nix";
+    #   inputs.nixpkgs.follows = "nixpkgs";
+    # };
 
     # Minecraft servers and packages
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
 
-    nix-darwin.url = "github:nix-darwin/nix-darwin/nix-darwin-25.05"; # TODO update systems
+    nix-darwin.url = "github:nix-darwin/nix-darwin/nix-darwin-25.11";
     #nix-darwin.inputs.nixpkgs.follows = "nixpkgs-unstable";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs-darwin";
     # Non-Flake Inputs:

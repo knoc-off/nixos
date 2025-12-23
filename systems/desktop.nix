@@ -1,8 +1,20 @@
-{ lib, inputs, outputs, color-lib, theme, config, pkgs, self, hostName, system, ... }: {
+{
+  lib,
+  inputs,
+  outputs,
+  color-lib,
+  theme,
+  config,
+  pkgs,
+  self,
+  hostName,
+  system,
+  ...
+}: {
   imports = [
-
-    { # Home-Manager
-      imports = [ inputs.home-manager.nixosModules.home-manager ];
+    {
+      # Home-Manager
+      imports = [inputs.home-manager.nixosModules.home-manager];
 
       home-manager = {
         useGlobalPkgs = false;
@@ -18,10 +30,10 @@
     inputs.hardware.nixosModules.common-gpu-amd
     inputs.hardware.nixosModules.common-pc-ssd
 
-    { boot.binfmt.emulatedSystems = [ "aarch64-linux" ]; }
+    {boot.binfmt.emulatedSystems = ["aarch64-linux"];}
 
     inputs.disko.nixosModules.disko
-    { disko.devices.disk.main.device = "/dev/nvme0n1"; }
+    {disko.devices.disk.main.device = "/dev/nvme0n1";}
     ./hardware/disks/bcachefs.nix
 
     # Hardware configs
@@ -46,12 +58,11 @@
     ./modules/shell/bash.nix
   ];
 
-
   programs = {
     # allows running of arbitrary programs.
     nix-ld = {
       enable = true;
-      libraries = with pkgs; [ stdenv.cc.cc SDL2 SDL2_image libz ];
+      libraries = with pkgs; [stdenv.cc.cc SDL2 SDL2_image libz];
     };
     dconf.enable = true;
   };
@@ -60,7 +71,7 @@
     # Yubikey
     yubikey-agent.enable = true;
     pcscd.enable = true;
-    udev.packages = [ pkgs.yubikey-personalization ];
+    udev.packages = [pkgs.yubikey-personalization];
 
     # Pretty much just needed this for Steam
     #flatpak.enable = true;
@@ -140,7 +151,9 @@
     initrd.systemd.dbus.enable = true;
     loader = {
       systemd-boot.enable =
-        if config.boot.lanzaboote.enable then lib.mkForce false else true;
+        if config.boot.lanzaboote.enable
+        then lib.mkForce false
+        else true;
       efi.canTouchEfiVariables = true;
     };
   };
@@ -160,7 +173,7 @@
   i18n.defaultLocale = "en_US.UTF-8";
 
   console = {
-    packages = with pkgs; [ terminus_font ];
+    packages = with pkgs; [terminus_font];
     font = "${pkgs.terminus_font}/share/consolefonts/ter-i22b.psf.gz";
     keyMap = lib.mkDefault "us";
     useXkbConfig = true;
@@ -171,7 +184,7 @@
     packages = with pkgs; [
       noto-fonts
       noto-fonts-cjk-sans
-      noto-fonts-emoji
+      noto-fonts-color-emoji
       liberation_ttf
       fira-code
       fira-code-symbols
@@ -180,7 +193,7 @@
       proggyfonts
       pkgs.nerd-fonts.fira-code
     ];
-    fontconfig.defaultFonts = { monospace = [ "FiraCode Nerd Font Mono" ]; };
+    fontconfig.defaultFonts = {monospace = ["FiraCode Nerd Font Mono"];};
   };
 
   programs.zsh.enable = false;
@@ -189,11 +202,11 @@
     initialPassword = "password";
     isNormalUser = true;
     shell = pkgs.bash;
-    extraGroups = [ "wheel" "networkmanager" "audio" "video" "dialout" ];
-    openssh.authorizedKeys.keys = [ ];
+    extraGroups = ["wheel" "networkmanager" "audio" "video" "dialout"];
+    openssh.authorizedKeys.keys = [];
   };
 
-  users.users.root.openssh.authorizedKeys.keys = [ ];
+  users.users.root.openssh.authorizedKeys.keys = [];
 
   system.stateVersion = "23.11";
 }
