@@ -38,10 +38,10 @@
     enable = true;
     systemd.enable = true;
     xwayland.enable = true;
-    #plugins = with inputs.hyprland-plugins.packages.${pkgs.system}; [hyprexpo];
+    #plugins = with inputs.hyprland-plugins.packages.${pkgs.stdenv.hostPlatform.system}; [hyprexpo];
     # plugins = with pkgs.hyprlandPlugins; [hyprexpo];
 
-    #package = inputs.hyprland.packages.${pkgs.system}.hyprland;
+    #package = inputs.hyprland.packages.${pkgs.stdenv.hostPlatform.system}.hyprland;
 
     settings = {
       ecosystem.no_update_news = true;
@@ -189,12 +189,12 @@
       };
 
       gestures = {
-        workspace_swipe = true;
+        # workspace_swipe = true;
         workspace_swipe_direction_lock = false;
         workspace_swipe_forever = false;
         # dont go to the next populated window. go to the next window
         workspace_swipe_distance = 300;
-        workspace_swipe_fingers = 3;
+        # workspace_swipe_fingers = 3;
         # this doesent skip empty workspaces
         #workspace_swipe_numbered = true;
       };

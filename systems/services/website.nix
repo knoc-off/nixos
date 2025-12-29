@@ -16,13 +16,13 @@
 
       ExecStartPre = [
         # Copy static files
-        "+${pkgs.coreutils}/bin/cp -r ${self.packages.${pkgs.system}.website.axum}/share/static /run/axum-website/"
+        "+${pkgs.coreutils}/bin/cp -r ${self.packages.${pkgs.stdenv.hostPlatform.system}.website.axum}/share/static /run/axum-website/"
         # result/share/static/{css,fonts,icons,js}
 
         "+${pkgs.coreutils}/bin/mkdir -p /var/lib/axum-website/user-content"
         "+${pkgs.coreutils}/bin/chown -R axum:axum /var/lib/axum-website"
       ];
-      ExecStart = "${self.packages.${pkgs.system}.website.axum}/bin/axum-website";
+      ExecStart = "${self.packages.${pkgs.stdenv.hostPlatform.system}.website.axum}/bin/axum-website";
       Restart = "always";
       RestartSec = "10";
       User = "axum";

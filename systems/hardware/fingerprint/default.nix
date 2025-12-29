@@ -1,7 +1,7 @@
 { lib, self, pkgs, ...}:
 let
   inherit (lib) mkDefault mkBefore;
-  inherit (self.packages.${pkgs.system}) grosshack;
+  inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) grosshack;
 
   pam_fprintd_grosshackSo = "${grosshack}/lib/security/pam_fprintd_grosshack.so";
 

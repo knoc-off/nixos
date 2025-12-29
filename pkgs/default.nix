@@ -64,6 +64,8 @@ in rec {
 
   # Anki card decks generator
   marki = rustPkgs-fenix.callPackage ./marki {inherit rustPlatform;};
+  layer-shika = rustPkgs-fenix.callPackage ./layer-shika {inherit rustPlatform;};
+  relm4-layershell = rustPkgs-fenix.callPackage ./relm4-layershell {inherit rustPlatform;};
   marki-wasm = rustPkgs-fenix.callPackage ./marki-wasm {rustPlatform = rustPlatform-wasm;};
 
   # rust fuse fileSystem that integrates with taskwarrior sql db

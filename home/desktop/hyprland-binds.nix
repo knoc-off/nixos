@@ -5,7 +5,7 @@
   config,
   ...
 }: let
-  inherit (self.packages.${pkgs.system}) writeNuScript;
+  inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) writeNuScript;
 
   mainMod = "SUPER";
 in {
@@ -23,6 +23,12 @@ in {
     }/bin/notify-bar";
   in {
     settings = {
+      gesture = [
+        "3, horizontal, workspace"
+        "3, down, mod: ALT, close"
+        "3, up, mod: SUPER, scale: 1.5, fullscreen"
+        #"3, left, scale: 1.5, float"
+      ];
       bind = let
         mkHdrop = {
           command, # The command to run (required)

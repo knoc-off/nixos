@@ -51,7 +51,7 @@
     self.homeModules.hyprkan
     {
       programs.hyprkan = {
-        package = self.packages.${pkgs.system}.hyprkan;
+        package = self.packages.${pkgs.stdenv.hostPlatform.system}.hyprkan;
         enable = true;
         service.enable = true;
 
@@ -163,15 +163,15 @@
 
   home = {
     packages = with pkgs; [
-      self.packages.${pkgs.system}.neovim-nix.default
+      self.packages.${pkgs.stdenv.hostPlatform.system}.neovim-nix.default
       spotify
 
       #(pkgs.python3.withPackages
-      #(ps: [ ps.llm self.packages.${pkgs.system}.llm-cmd ]))
+      #(ps: [ ps.llm self.packages.${pkgs.stdenv.hostPlatform.system}.llm-cmd ]))
 
-      #self.packages.${pkgs.system}.ttok
-      #self.packages.${pkgs.system}.spider-cli
-      #self.packages.${pkgs.system}.tabiew
+      #self.packages.${pkgs.stdenv.hostPlatform.system}.ttok
+      #self.packages.${pkgs.stdenv.hostPlatform.system}.spider-cli
+      #self.packages.${pkgs.stdenv.hostPlatform.system}.tabiew
 
       upkgs.claude-code
       # (upkgs.claude-code.overrideAttrs (oldAttrs: rec {

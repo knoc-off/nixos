@@ -9,7 +9,7 @@
   ...
 }: let
   config_dir = "/etc/nixos"; # Should relocate to /etc? and symlink?
-  inherit (self.packages.${pkgs.system}) mkComplgenScript;
+  inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) mkComplgenScript;
   inherit (color-lib) setOkhslLightness setOkhslSaturation;
 
   # Helper to transform colors like in kitty config
@@ -480,7 +480,7 @@ in {
         ];
       })
 
-      (self.packages.${pkgs.system}.nx config_dir hostname)
+      (self.packages.${pkgs.stdenv.hostPlatform.system}.nx config_dir hostname)
 
       (pkgs.writeShellScriptBin "chrome" ''
         nix shell nixpkgs#ungoogled-chromium --command chromium $1 &>/dev/null &

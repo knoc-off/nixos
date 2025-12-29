@@ -71,7 +71,7 @@
 
   #nixpkgs.overlays = [
   #  (final: prev: {
-  #    trilium-server = self.packages.${pkgs.system}.triliumNext;
+  #    trilium-server = self.packages.${pkgs.stdenv.hostPlatform.system}.triliumNext;
   #  })
   #] ++ builtins.attrValues outputs.overlays;
 

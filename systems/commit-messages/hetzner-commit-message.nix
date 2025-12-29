@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "update" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "quick_sync";
+  system.nixos.label = "relm_layershell" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "relm_layershell";
 }

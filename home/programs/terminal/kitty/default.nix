@@ -16,6 +16,12 @@ in {
   home.sessionVariables = {
     TERMINAL = "kitty";
   };
+  home.packages = [
+    (pkgs.writeShellScriptBin "kitty-debug-window" ''
+      ${pkgs.kitty}/bin/kitten @ ls | ${pkgs.jq}/bin/jq
+      read -n 1
+    '')
+  ];
 
   programs.kitty = {
     enable = true;
@@ -92,15 +98,19 @@ in {
 
           macos_quit_when_last_window_closed yes
 
-          map --when-focus-on "cmdline:claude-code" enter send_text all \x0a
-          map --when-focus-on "cmdline:claude-code" cmd+enter send_key enter
+          map cmd+shift+d launch --type=overlay --hold kitty-debug-window
+
+          map --when-focus-on "title:.*✳.*" enter send_text all \x0a
+          map --when-focus-on "title:.*✳.*" cmd+enter send_key enter
         ''
         # linux specific (some of this is system/hardware specific.)
         else ''
           touch_scroll_multiplier 6.5
 
-          map --when-focus-on "cmdline:claude-code" enter send_text all \x0a
-          map --when-focus-on "cmdline:claude-code" super+enter send_key enter
+          map super+shift+d launch --type=overlay --hold kitty-debug-window
+
+          map --when-focus-on "title:.*✳.*" enter send_text all \x0a
+          map --when-focus-on "title:.*✳.*" super+enter send_key enter
         ''
       }
 

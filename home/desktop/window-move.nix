@@ -2,7 +2,7 @@
 
 let
 
-  inherit (self.packages.${pkgs.system}) writeNuScript;
+  inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) writeNuScript;
   # Neovim module
   neovimModule = "${pkgs.writeShellScriptBin "module-neovim" ''
     set -euo pipefail

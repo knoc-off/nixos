@@ -1,5 +1,4 @@
 {
-  helpers,
   pkgs,
   lib,
   color-lib,
@@ -124,7 +123,7 @@
         {
           mode = "n";
           key = "<leader>tt";
-          action = helpers.mkRaw "_G.toggle_theme";
+          action = lib.nixvim.mkRaw "_G.toggle_theme";
           options = {
             silent = true;
             desc = "Toggle between light and dark theme";
@@ -338,7 +337,7 @@
         {
           mode = "n";
           key = "<leader>gB";
-          action = helpers.mkRaw "_G.gitsigns_base_picker";
+          action = lib.nixvim.mkRaw "_G.gitsigns_base_picker";
           options = {
             silent = true;
             desc = "Pick gitsigns diff base";
@@ -347,7 +346,7 @@
         {
           mode = "n";
           key = "<leader>gm";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               local gs = require('gitsigns')
 
@@ -699,7 +698,7 @@
             "s"
           ];
           key = "<C-E>";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               local ls = require("luasnip")
               if ls.choice_active() then
@@ -716,7 +715,7 @@
             "s"
           ];
           key = "<C-E>";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               local ls = require("luasnip")
               if ls.choice_active() then
@@ -744,7 +743,7 @@
             experiment.ghost_text = true;
 
             mapping = {
-              "<Tab>" = helpers.mkRaw ''
+              "<Tab>" = lib.nixvim.mkRaw ''
                 cmp.mapping(function(fallback)
                   local ls = require("luasnip")
 
@@ -763,7 +762,7 @@
                 end, { "i", "s" })
               '';
 
-              "<S-Tab>" = helpers.mkRaw ''
+              "<S-Tab>" = lib.nixvim.mkRaw ''
                 cmp.mapping(function(fallback)
                   local ls = require("luasnip")
                   if cmp.visible() then
@@ -777,14 +776,14 @@
                 end, { "i", "s" })
               '';
 
-              "<CR>" = helpers.mkRaw ''
+              "<CR>" = lib.nixvim.mkRaw ''
                 cmp.mapping.confirm({
                   behavior = cmp.ConfirmBehavior.Insert,
                   select = false,
                 })
               '';
 
-              "<C-e>" = helpers.mkRaw ''
+              "<C-e>" = lib.nixvim.mkRaw ''
                 cmp.mapping(function(fallback)
                   if require("luasnip").choice_active() then
                     require("luasnip").next_choice()
@@ -820,7 +819,7 @@
         {
           event = "BufWinEnter";
           pattern = "*.scad";
-          callback = helpers.mkRaw ''
+          callback = lib.nixvim.mkRaw ''
             function(args)
               if vim.b[args.buf].openscad_job then
                 return
@@ -849,7 +848,7 @@
         {
           event = "BufWinLeave";
           pattern = "*.scad";
-          callback = helpers.mkRaw ''
+          callback = lib.nixvim.mkRaw ''
             function(args)
               local jid = vim.b[args.buf].openscad_job
               if jid then
@@ -868,7 +867,7 @@
         {
           event = "VimLeavePre";
           pattern = "*";
-          callback = helpers.mkRaw ''
+          callback = lib.nixvim.mkRaw ''
             function()
               for _, buf in ipairs(vim.api.nvim_list_bufs()) do
                 local ok, jid = pcall(vim.api.nvim_buf_get_var, buf, 'openscad_job')
@@ -890,7 +889,7 @@
         settings = {
           autoread = false;
           autowrite = false;
-          directory = helpers.mkRaw "vim.fn.stdpath('data') .. '/sessions'";
+          directory = lib.nixvim.mkRaw "vim.fn.stdpath('data') .. '/sessions'";
           file = "";
           force = {
             read = false;
@@ -971,7 +970,7 @@
         {
           mode = "n";
           key = "<leader>ss";
-          action = helpers.mkRaw "_G.save_session_named";
+          action = lib.nixvim.mkRaw "_G.save_session_named";
           options = {
             silent = true;
             desc = "Save session (named)";
@@ -980,7 +979,7 @@
         {
           mode = "n";
           key = "<leader>s1";
-          action = helpers.mkRaw "function() _G.save_session_slot(1) end";
+          action = lib.nixvim.mkRaw "function() _G.save_session_slot(1) end";
           options = {
             silent = true;
             desc = "Save session slot 1";
@@ -989,7 +988,7 @@
         {
           mode = "n";
           key = "<leader>s2";
-          action = helpers.mkRaw "function() _G.save_session_slot(2) end";
+          action = lib.nixvim.mkRaw "function() _G.save_session_slot(2) end";
           options = {
             silent = true;
             desc = "Save session slot 2";
@@ -998,7 +997,7 @@
         {
           mode = "n";
           key = "<leader>s3";
-          action = helpers.mkRaw "function() _G.save_session_slot(3) end";
+          action = lib.nixvim.mkRaw "function() _G.save_session_slot(3) end";
           options = {
             silent = true;
             desc = "Save session slot 3";
@@ -1008,7 +1007,7 @@
         {
           mode = "n";
           key = "<leader>sl";
-          action = helpers.mkRaw "_G.load_session_picker";
+          action = lib.nixvim.mkRaw "_G.load_session_picker";
           options = {
             silent = true;
             desc = "Load session (pick)";
@@ -1017,7 +1016,7 @@
         {
           mode = "n";
           key = "<leader>S1";
-          action = helpers.mkRaw "function() _G.load_session_slot(1) end";
+          action = lib.nixvim.mkRaw "function() _G.load_session_slot(1) end";
           options = {
             silent = true;
             desc = "Load session slot 1";
@@ -1026,7 +1025,7 @@
         {
           mode = "n";
           key = "<leader>S2";
-          action = helpers.mkRaw "function() _G.load_session_slot(2) end";
+          action = lib.nixvim.mkRaw "function() _G.load_session_slot(2) end";
           options = {
             silent = true;
             desc = "Load session slot 2";
@@ -1035,7 +1034,7 @@
         {
           mode = "n";
           key = "<leader>S3";
-          action = helpers.mkRaw "function() _G.load_session_slot(3) end";
+          action = lib.nixvim.mkRaw "function() _G.load_session_slot(3) end";
           options = {
             silent = true;
             desc = "Load session slot 3";
@@ -1045,7 +1044,7 @@
         {
           mode = "n";
           key = "<leader>sd";
-          action = helpers.mkRaw "_G.delete_session_picker";
+          action = lib.nixvim.mkRaw "_G.delete_session_picker";
           options = {
             silent = true;
             desc = "Delete session";
@@ -1062,7 +1061,7 @@
         {
           event = "VimEnter"; # Changed from BufReadPost to VimEnter
           group = "SetCWD";
-          callback = helpers.mkRaw ''
+          callback = lib.nixvim.mkRaw ''
             function()
               -- Only run if we haven't set CWD yet this session
               if vim.g.cwd_set_this_session then
@@ -1101,7 +1100,7 @@
         lsp = {};
         os = {};
 
-        use_file_extension = helpers.mkRaw "function(ext, file) return true end";
+        use_file_extension = lib.nixvim.mkRaw "function(ext, file) return true end";
 
         style = "glyph";
       };
@@ -1160,7 +1159,7 @@
         {
           mode = "n";
           key = "<leader>gb";
-          action = helpers.mkRaw "function() require('gitsigns').blame_line({ full = false }) end";
+          action = lib.nixvim.mkRaw "function() require('gitsigns').blame_line({ full = false }) end";
           options = {
             silent = true;
             desc = "Git Blame (popup)";
@@ -1169,7 +1168,7 @@
         {
           mode = "n";
           key = "<leader>gr";
-          action = helpers.mkRaw "_G.cd_to_git_root";
+          action = lib.nixvim.mkRaw "_G.cd_to_git_root";
           options = {
             silent = true;
             desc = "CD to git root";
@@ -1178,7 +1177,7 @@
         {
           mode = "n";
           key = "<leader>cd";
-          action = helpers.mkRaw "function()
+          action = lib.nixvim.mkRaw "function()
             _G.pushd(vim.fn.expand('%:p:h'))
 
             end";
@@ -1190,7 +1189,7 @@
         {
           mode = "n";
           key = "<leader>cD";
-          action = helpers.mkRaw "function()
+          action = lib.nixvim.mkRaw "function()
             _G.pushd(vim.fn.getcwd())
             vim.cmd('cd ..')
           end";
@@ -1203,7 +1202,7 @@
         {
           mode = "n";
           key = "<leader>pd";
-          action = helpers.mkRaw "_G.popd";
+          action = lib.nixvim.mkRaw "_G.popd";
           options = {
             silent = true;
             desc = "Pop directory (go back)";
@@ -1212,7 +1211,7 @@
         {
           mode = "n";
           key = "<leader>cp";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               local path = vim.fn.expand('%:p')
               if path ~= "" then
@@ -1290,7 +1289,7 @@
           highlight = {
             enable = true;
 
-            disable = helpers.mkRaw ''
+            disable = lib.nixvim.mkRaw ''
               function(lang, buf)
                   local max_filesize = 100 * 1024 -- 100 KB
                   local ok, stats = pcall(vim.loop.fs_stat, vim.api.nvim_buf_get_name(buf))
@@ -1348,7 +1347,7 @@
             "BufWritePost"
             "InsertLeave"
           ];
-          callback = helpers.mkRaw ''
+          callback = lib.nixvim.mkRaw ''
             function()
               -- Only run if lint is loaded (for lazy-loaded filetypes)
               local lint_ok, lint = pcall(require, 'lint')
@@ -1527,7 +1526,7 @@
         {
           mode = "n";
           key = "gr";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               require('telescope.builtin').lsp_references()
             end
@@ -1540,7 +1539,7 @@
         {
           mode = "n";
           key = "gd";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               require('telescope.builtin').lsp_definitions()
             end
@@ -1553,7 +1552,7 @@
         {
           mode = "n";
           key = "gD";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               require('telescope.builtin').lsp_definitions()
             end
@@ -1566,7 +1565,7 @@
         {
           mode = "n";
           key = "gi";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               require('telescope.builtin').lsp_implementations()
             end
@@ -1579,7 +1578,7 @@
         {
           mode = "n";
           key = "gt";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               require('telescope.builtin').lsp_type_definitions()
             end
@@ -1593,7 +1592,7 @@
         {
           mode = "n";
           key = "<leader>ci";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               print(vim.inspect(require('conform').list_formatters(0)))
             end
@@ -1606,7 +1605,7 @@
         {
           mode = "n";
           key = "<leader>cl";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               vim.cmd('ConformInfo')
             end
@@ -1770,7 +1769,7 @@
         {
           mode = "n";
           key = "<leader>cf";
-          action = helpers.mkRaw "function() require('conform').format({ async = true, lsp_format = 'fallback' }) end";
+          action = lib.nixvim.mkRaw "function() require('conform').format({ async = true, lsp_format = 'fallback' }) end";
           options = {
             silent = true;
             desc = "Format buffer";
@@ -1779,7 +1778,7 @@
         {
           mode = "n";
           key = "<leader>e";
-          action = helpers.mkRaw "vim.diagnostic.open_float";
+          action = lib.nixvim.mkRaw "vim.diagnostic.open_float";
           options = {
             silent = true;
             desc = "Show line diagnostics";
@@ -1879,7 +1878,7 @@
             "v"
           ];
           key = "<leader>aa";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               -- Check if we're in visual mode or have a selection
               local mode = vim.fn.mode()
@@ -1906,7 +1905,7 @@
         {
           mode = "v";
           key = "<leader>ae";
-          action = helpers.mkRaw "function() require('avante.api').edit() end";
+          action = lib.nixvim.mkRaw "function() require('avante.api').edit() end";
           options = {
             desc = "avante: edit";
             silent = true;
@@ -1915,7 +1914,7 @@
         {
           mode = "n";
           key = "<leader>ar";
-          action = helpers.mkRaw "function() require('avante.api').refresh() end";
+          action = lib.nixvim.mkRaw "function() require('avante.api').refresh() end";
           options = {
             desc = "avante: refresh";
             silent = true;
@@ -1924,7 +1923,7 @@
         {
           mode = "n";
           key = "<leader>at";
-          action = helpers.mkRaw "function() require('avante').toggle() end";
+          action = lib.nixvim.mkRaw "function() require('avante').toggle() end";
           options = {
             desc = "avante: toggle";
             silent = true;

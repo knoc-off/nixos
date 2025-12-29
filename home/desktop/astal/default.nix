@@ -30,7 +30,7 @@
       ];
     })
 
-    (self.packages.${pkgs.system}.astal-widget-wrapper {
+    (self.packages.${pkgs.stdenv.hostPlatform.system}.astal-widget-wrapper {
       path = ./configs/notifications;
       entry = "app.tsx";
       name = "astal-notify";
