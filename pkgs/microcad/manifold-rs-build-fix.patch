@@ -1,0 +1,15 @@
+--- a/build.rs
++++ b/build.rs
+@@ -38,7 +38,10 @@
+
+     let out_dir = std::env::var("OUT_DIR").unwrap();
+
+     env::set_var("CMAKE_PREFIX_PATH", format!("{out_dir}/build/glm"));
+-    env::set_var("CMAKE_GENERATOR", "Ninja");
++    // Respect CMAKE_GENERATOR from environment, default to Ninja
++    if env::var("CMAKE_GENERATOR").is_err() {
++        env::set_var("CMAKE_GENERATOR", "Ninja");
++    }
+     env::set_var("CMAKE_BUILD_TYPE", "Release");
+
+     let cxxflags = if cfg!(windows) { "/EHsc" } else { "" };

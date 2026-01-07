@@ -81,6 +81,11 @@ in rec {
     fenix = rustPkgs-fenix.fenix;
   };
 
+  # Modern programming language for CAD
+  microcad = rustPkgs-fenix.callPackage ./microcad {
+    fenix = rustPkgs-fenix.fenix;
+  };
+
   inherit rustPkgs-fenix;
   inherit (inputs) fenix;
 
