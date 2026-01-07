@@ -9,9 +9,18 @@
     hide-delay = "100ms";
     animation-duration = "200ms";
     transition-type = "ease-in-out";
-
-    # background-color = "#${theme.dark.base00}";
   };
+  # TODO:
+  # The css hacks should be automated. this is not ideal.
+  # then we can do compile time checks if the file exists, etc.
+  # idea:
+  #   { chrome.autohide_sidebar.enable = true }
+  #     - could also provide patches to apply per file. etc.
+  # OR:
+  #   chrome = [ autohide_sidebar autohide_bookmarks_toolbar auto_devtools_theme_for_rdm ...]
+  #     - less flexible?
+  #     - unless, we make each a file. IE:
+  #       chrome with (function-to-extract-as-files); = [ (autohide file_modifications) autohide_2]
 in ''
   /* Import necessary CSS hacks */
   @import "${firefox-csshacks}/chrome/autohide_sidebar.css";

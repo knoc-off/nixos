@@ -39,6 +39,8 @@ in {
         enableSyntaxHighlighting = true;
         #enableAutosuggestions = true;
         interactiveShellInit = ''
+          export PATH="$(realpath ~/.cargo/bin):$PATH"
+
           cl() {
               printf '\x1b]1337;SetUserVar=in_claude=MQ==\007'
               command claude "$@"
