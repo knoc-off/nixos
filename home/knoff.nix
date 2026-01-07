@@ -16,6 +16,8 @@
     ./programs/terminal/foot
     ./programs/terminal/programs/pueue.nix
 
+    ./desktop/dunst.nix
+
     ./programs/terminal/shell
     ./programs/terminal/shell/fish.nix
 

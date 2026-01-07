@@ -62,7 +62,6 @@ in {
         "ctrl+t" = "new_os_window_with_cwd";
       };
     extraConfig = ''
-
         # this is so that hyprland can control kitty:
         allow_remote_control socket
         listen_on unix:/tmp/kitty-{kitty_pid}.socket
@@ -76,8 +75,10 @@ in {
         # tall layout
         enabled_layouts tall:bias=30;full_size=1;mirrored=false
 
+        map --when-focus-on "title:.*✳.*" enter send_text all \x0a
+        map --when-focus-on "title:.*✳.*" super+enter send_key enter
+
       ${
-        # Darwin-specific config
         if pkgs.stdenv.isDarwin
         then ''
           macos_option_as_alt yes
@@ -100,25 +101,19 @@ in {
 
           map cmd+shift+d launch --type=overlay --hold kitty-debug-window
 
-          map --when-focus-on "title:.*✳.*" enter send_text all \x0a
-          map --when-focus-on "title:.*✳.*" cmd+enter send_key enter
         ''
         # linux specific (some of this is system/hardware specific.)
+        # would be neat if we have a hardware module,
+        # where we could say, isLinux/Darwin/isFramework13/isMacbookPro/etc
         else ''
-          touch_scroll_multiplier 6.5
+          touch_scroll_multiplier 16
 
           map super+shift+d launch --type=overlay --hold kitty-debug-window
-
-          map --when-focus-on "title:.*✳.*" enter send_text all \x0a
-          map --when-focus-on "title:.*✳.*" super+enter send_key enter
         ''
       }
-
-
-
     '';
 
-    settings = rec {
+    settings = {
       tab_bar_style = "custom";
       tab_bar_margin_height = "0.0 0.0";
       tab_title_template = " {index}: {f'{title[:6]}-{title[-6:]}' if title.rindex(title[-1]) + 1 > 13 else title.center(7)} ";
