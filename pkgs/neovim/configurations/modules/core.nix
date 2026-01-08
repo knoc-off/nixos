@@ -330,7 +330,6 @@ in {
         open.enable = false;
         close.enable = false;
       };
-      opts.mousescroll = "ver:1,hor:1";
     }
   ];
 }

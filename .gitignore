@@ -7,3 +7,30 @@ target
 .direnv
 .aider*
 *.qcow2
+
+*.db
+*.sqlite
+*.sqlite3
+*.o
+*.elf
+*.exe
+*.dll
+*.so
+*.dylib
+*.jar
+*.apkg
+*.keystore
+*.jks
+*.idx
+
+# Font files
+*.otf
+*.ttf
+*.woff
+*.woff2
+
+*.pdf
+
+# Temporary/cache files
+*-cache.bin
+.cache/

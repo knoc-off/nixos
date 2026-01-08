@@ -34,7 +34,7 @@ in rec {
             # Essential
             ublock-origin
             bitwarden
-            #onepassword-password-manager
+            # onepassword-password-manager
             sidebery
             tridactyl
             # Privacy
@@ -50,7 +50,7 @@ in rec {
           # 3. Go to Storage tab -> Extension Storage
 
           # sidebery:
-          settings."3c078156-979c-498b-8990-85f7987dd929" = {
+          settings."{3c078156-979c-498b-8990-85f7987dd929}" = {
             force = true;
             settings = {
               sidebarCSS = ''
@@ -434,145 +434,180 @@ in rec {
           # https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/theme#colors
           settings."FirefoxColor@mozilla.com".settings = {
             firstRunDone = true;
-            colors = {
-              # TODO: hexToRgb, format needs to change alpha to a. in a let-in function
-              # color-lib.hexToRgb theme.dark.base00
+            theme = let
+              c = theme.dark;
 
-              # background
-              toolbar = {
-                r = 7;
-                g = 50;
-                b = 84;
+              hexToRgba = hex: let
+                round = x: builtins.floor (x + 0.5);
+                rgb = color-lib.hexToRgb hex;
+              in {
+                r = round (rgb.r * 256);
+                g = round (rgb.g * 256);
+                b = round (rgb.b * 256); # int
+                a = rgb.alpha; # 0-1
               };
-              toolbar_text = {
-                r = 67;
-                g = 194;
-                b = 218;
-              };
+            in {
+              colors = {
+                # ═══════════════════════════════════════════════════════════════════
+                # FRAME / HEADER AREA
+                # ═══════════════════════════════════════════════════════════════════
 
-              frame = {
-                r = 14;
-                g = 41;
-                b = 65;
-              };
-              frame_inactive = {
-                r = 250;
-                g = 255;
-                b = 0;
-              };
+                # Main browser frame background (header area behind tabs)
+                frame = hexToRgba c.base00;
 
-              tab_background_text = {
-                r = 24;
-                g = 156;
-                b = 180;
-              };
-              toolbar_field = {
-                r = 38;
-                g = 72;
-                b = 102;
-              };
-              toolbar_field_text = {
-                r = 67;
-                g = 194;
-                b = 218;
-              };
-              tab_line = {
-                r = 67;
-                g = 194;
-                b = 218;
-              };
+                # Frame color when window is inactive/unfocused
+                # Using base01 for subtle differentiation
+                frame_inactive = hexToRgba c.base01;
 
-              # background
-              popup = {
-                r = 7;
-                g = 50;
-                b = 84;
-              };
-              popup_text = {
-                r = 24;
-                g = 156;
-                b = 180;
-              };
-              popup_border = {
-                r = 149;
-                g = 0;
-                b = 40;
-              };
-              popup_highlight_text = {
-                r = 153;
-                g = 91;
-                b = 0;
-              };
-              popup_highlight = {
-                r = 27;
-                g = 164;
-                b = 0;
-              };
+                # ═══════════════════════════════════════════════════════════════════
+                # TABS
+                # ═══════════════════════════════════════════════════════════════════
 
-              # toggle color
-              button_background_active = {
-                r = 255;
-                g = 0;
-                b = 0;
-              };
-              # hover color
-              button_background_hover = {
-                r = 255;
-                g = 147;
-                b = 0;
-              };
+                # Text color for inactive/background tabs
+                tab_background_text = hexToRgba c.base04;
 
-              # visual download-ed indication/ interaction indication that something changed.
-              icons_attention = {
-                r = 20;
-                g = 255;
-                b = 0;
-              };
-              # top bar buttons color; reload; etc.
-              icons = {
-                r = 0;
-                g = 255;
-                b = 250;
-              };
-              # not sure:
-              ntp_background = {
-                r = 44;
-                g = 0;
-                b = 255;
-              };
-              ntp_text = {
-                r = 250;
-                g = 0;
-                b = 255;
-              };
+                # Background color of the selected/active tab
+                # Using base01 to lift it from frame
+                tab_selected = hexToRgba c.base01;
 
-              # sideberry / treeStyle tabs panel
-              sidebar_border = {
-                r = 0;
-                g = 155;
-                b = 146;
+                # Text color for the selected/active tab
+                tab_text = hexToRgba c.base05;
+
+                # Accent line on selected tab (the colored strip)
+                # Using accent color (blue) for visual pop
+                tab_line = hexToRgba c.base0D;
+
+                # Tab loading indicator color
+                tab_loading = hexToRgba c.base0C; # cyan for loading animation
+
+                # ═══════════════════════════════════════════════════════════════════
+                # TOOLBAR (Navigation bar, bookmarks bar)
+                # ═══════════════════════════════════════════════════════════════════
+
+                # Toolbar background color
+                toolbar = hexToRgba c.base01;
+
+                # Toolbar text and bookmark text color
+                # Also affects toolbar icons if 'icons' not set
+                toolbar_text = hexToRgba c.base05;
+
+                # Separator line above toolbar
+                toolbar_top_separator = hexToRgba c.base02;
+
+                # Separator line below toolbar (between toolbar and content)
+                toolbar_bottom_separator = hexToRgba c.base02;
+
+                # Vertical separators in toolbar/bookmarks bar
+                toolbar_vertical_separator = hexToRgba c.base03;
+
+                # ═══════════════════════════════════════════════════════════════════
+                # URL BAR / INPUT FIELDS
+                # ═══════════════════════════════════════════════════════════════════
+
+                # URL bar background (unfocused)
+                toolbar_field = hexToRgba c.base02;
+
+                # URL bar text (unfocused)
+                toolbar_field_text = hexToRgba c.base05;
+
+                # URL bar border (unfocused)
+                toolbar_field_border = hexToRgba c.base03;
+
+                # URL bar background (focused)
+                # Slightly lighter than unfocused for visual feedback
+                toolbar_field_focus = hexToRgba c.base01;
+
+                # URL bar text (focused)
+                toolbar_field_text_focus = hexToRgba c.base06;
+
+                # URL bar border (focused) - accent color for clear focus indication
+                toolbar_field_border_focus = hexToRgba c.base0D;
+
+                # Selected/highlighted text background in URL bar
+                # DERIVED: Consider using base0D at ~30% opacity for better selection visibility
+                toolbar_field_highlight = hexToRgba c.base02;
+
+                # Selected/highlighted text color in URL bar
+                toolbar_field_highlight_text = hexToRgba c.base07;
+
+                # ═══════════════════════════════════════════════════════════════════
+                # BUTTONS
+                # ═══════════════════════════════════════════════════════════════════
+
+                # Toolbar button background on hover
+                button_background_hover = hexToRgba c.base02;
+
+                # Toolbar button background when pressed/active
+                button_background_active = hexToRgba c.base03;
+
+                # ═══════════════════════════════════════════════════════════════════
+                # ICONS
+                # ═══════════════════════════════════════════════════════════════════
+
+                # Toolbar icons color (reload, home, menu, ethexToRgba c.)
+                icons = hexToRgba c.base05;
+
+                # Icons in attention state (starred bookmark, download complete)
+                # Using warm accent for attention-grabbing
+                icons_attention = hexToRgba c.base09; # orange for attention
+
+                # ═══════════════════════════════════════════════════════════════════
+                # POPUPS (URL bar dropdown, menus, panels)
+                # ═══════════════════════════════════════════════════════════════════
+
+                # Popup background
+                popup = hexToRgba c.base01;
+
+                # Popup text color
+                popup_text = hexToRgba c.base05;
+
+                # Popup border color
+                popup_border = hexToRgba c.base03;
+
+                # Background of highlighted/selected item in popup
+                popup_highlight = hexToRgba c.base02;
+
+                # Text color of highlighted/selected item in popup
+                popup_highlight_text = hexToRgba c.base06;
+
+                # ═══════════════════════════════════════════════════════════════════
+                # SIDEBAR (Bookmarks, History, Synced tabs)
+                # ═══════════════════════════════════════════════════════════════════
+
+                # Sidebar background
+                sidebar = hexToRgba c.base00;
+
+                # Sidebar text color
+                sidebar_text = hexToRgba c.base05;
+
+                # Sidebar border/splitter color
+                sidebar_border = hexToRgba c.base03;
+
+                # Sidebar highlighted row background
+                sidebar_highlight = hexToRgba c.base02;
+
+                # Sidebar highlighted row text
+                sidebar_highlight_text = hexToRgba c.base06;
+
+                # ═══════════════════════════════════════════════════════════════════
+                # NEW TAB PAGE
+                # ═══════════════════════════════════════════════════════════════════
+
+                # New tab page background
+                ntp_background = hexToRgba c.base00;
+
+                # New tab page card backgrounds (search box, shortcuts)
+                ntp_card_background = hexToRgba c.base01;
+
+                # New tab page text color
+                ntp_text = hexToRgba c.base05;
               };
-              sidebar_highlight_text = {
-                r = 13;
-                g = 0;
-                b = 166;
+              images = {
+                additional_backgrounds = [];
+                custom_backgrounds = [];
               };
-              sidebar_highlight = {
-                r = 152;
-                g = 0;
-                b = 170;
-              };
-              sidebar_text = {
-                r = 122;
-                g = 0;
-                b = 2;
-              };
+              title = "002";
             };
-            images = {
-              additional_backgrounds = [];
-              custom_backgrounds = [];
-            };
-            title = "002";
           };
         };
 
@@ -587,13 +622,18 @@ in rec {
         name = "minimal";
 
         # Extensions for the minimal profile
-        extensions.packages = with addons; [
-          # Essential
-          ublock-origin
-          bitwarden
-          sidebery
-          tridactyl
-        ];
+        extensions = {
+          force = true;
+          packages = with addons; [
+            # Essential
+            ublock-origin
+            bitwarden
+            sidebery
+            tridactyl
+
+            firefox-color
+          ];
+        };
 
         # Rest of minimal profile config...
         search = import ./searchEngines {inherit pkgs lib;};

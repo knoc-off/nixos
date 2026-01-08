@@ -26,6 +26,7 @@
       mouse = "a"; # Enable mouse control
       #mouse = ""; # Disable mouse control
       mousemodel = "extend"; # Mouse right-click extends the current selection
+      mousescroll = "ver:6,hor:2"; # Faster vertical (6 lines), slower horizontal (2 columns) scrolling
       splitbelow = true; # A new window is put below the current one
       splitright = true; # A new window is put right of the current one
 

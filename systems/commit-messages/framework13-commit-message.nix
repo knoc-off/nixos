@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "temp" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "update";
+  system.nixos.label = "firefox_extension_style" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "update";
 }
