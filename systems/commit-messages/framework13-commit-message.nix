@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "firefox_sync" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "update";
+  system.nixos.label = "ghostty" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "update";
 }
