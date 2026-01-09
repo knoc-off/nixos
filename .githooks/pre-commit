@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Pre-commit hook to warn about binary files
+
+# ANSI color codes
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Patterns for sensitive binary files
+SENSITIVE_PATTERNS=(
+    '\.(db|sqlite|sqlite3)$'
+    '\.(keystore|jks)$'
+    '\.(jar|apkg)$'
+    '\.(o|elf|exe|dll|so|dylib)$'
+    '\.(idx)$'
+    '\.cache/'
+)
+
+# Patterns for binary files that might be okay but need review
+REVIEW_PATTERNS=(
+    '\.(pdf)$'
+    '\.(otf|ttf|woff|woff2)$'
+)
+
+found_sensitive=false
+found_review=false
+sensitive_files=()
+review_files=()
+
+# Check staged files
+while IFS= read -r file; do
+    # Check if file is binary
+    if git diff --cached --numstat "$file" | grep -q '^-[[:space:]]*-[[:space:]]*'; then
+        # Check against sensitive patterns
+        for pattern in "${SENSITIVE_PATTERNS[@]}"; do
+            if echo "$file" | grep -qE "$pattern"; then
+                found_sensitive=true
+                sensitive_files+=("$file")
+                break
+            fi
+        done
+
+        # Check against review patterns
+        for pattern in "${REVIEW_PATTERNS[@]}"; do
+            if echo "$file" | grep -qE "$pattern"; then
+                found_review=true
+                review_files+=("$file")
+                break
+            fi
+        done
+    fi
+done < <(git diff --cached --name-only)
+
+# Handle sensitive files (block commit)
+if [ "$found_sensitive" = true ]; then
+    echo -e "${RED}ERROR: Attempting to commit sensitive binary files!${NC}"
+    echo -e "${RED}These files should NOT be committed:${NC}"
+    for file in "${sensitive_files[@]}"; do
+        echo -e "  ${RED}- $file${NC}"
+    done
+    echo ""
+    echo "To fix this:"
+    echo "  1. Remove files from staging: git reset HEAD <file>"
+    echo "  2. Add to .gitignore if needed"
+    echo "  3. Store sensitive files elsewhere"
+    echo ""
+    echo "To override this check (NOT RECOMMENDED):"
+    echo "  git commit --no-verify"
+    exit 1
+fi
+
+# Handle review files (warn but allow)
+if [ "$found_review" = true ]; then
+    echo -e "${YELLOW}WARNING: Committing binary files that may not belong in git:${NC}"
+    for file in "${review_files[@]}"; do
+        echo -e "  ${YELLOW}- $file${NC}"
+    done
+    echo ""
+    echo "Consider:"
+    echo "  - PDFs: Store in external documentation system"
+    echo "  - Fonts: Use system fonts or package manager"
+    echo ""
+    read -p "Continue with commit? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Commit cancelled."
+        exit 1
+    fi
+fi
+
+exit 0

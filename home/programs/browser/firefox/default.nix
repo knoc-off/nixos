@@ -448,10 +448,7 @@ in rec {
               };
             in {
               colors = {
-                # ═══════════════════════════════════════════════════════════════════
-                # FRAME / HEADER AREA
-                # ═══════════════════════════════════════════════════════════════════
-
+                ### FRAME / HEADER AREA
                 # Main browser frame background (header area behind tabs)
                 frame = hexToRgba c.base00;
 
@@ -459,10 +456,7 @@ in rec {
                 # Using base01 for subtle differentiation
                 frame_inactive = hexToRgba c.base01;
 
-                # ═══════════════════════════════════════════════════════════════════
-                # TABS
-                # ═══════════════════════════════════════════════════════════════════
-
+                ### TABS
                 # Text color for inactive/background tabs
                 tab_background_text = hexToRgba c.base04;
 
@@ -480,9 +474,7 @@ in rec {
                 # Tab loading indicator color
                 tab_loading = hexToRgba c.base0C; # cyan for loading animation
 
-                # ═══════════════════════════════════════════════════════════════════
-                # TOOLBAR (Navigation bar, bookmarks bar)
-                # ═══════════════════════════════════════════════════════════════════
+                ### TOOLBAR (Navigation bar, bookmarks bar)
 
                 # Toolbar background color
                 toolbar = hexToRgba c.base01;
@@ -500,9 +492,7 @@ in rec {
                 # Vertical separators in toolbar/bookmarks bar
                 toolbar_vertical_separator = hexToRgba c.base03;
 
-                # ═══════════════════════════════════════════════════════════════════
-                # URL BAR / INPUT FIELDS
-                # ═══════════════════════════════════════════════════════════════════
+                ### URL BAR / INPUT FIELDS
 
                 # URL bar background (unfocused)
                 toolbar_field = hexToRgba c.base02;
@@ -530,9 +520,7 @@ in rec {
                 # Selected/highlighted text color in URL bar
                 toolbar_field_highlight_text = hexToRgba c.base07;
 
-                # ═══════════════════════════════════════════════════════════════════
-                # BUTTONS
-                # ═══════════════════════════════════════════════════════════════════
+                ### BUTTONS
 
                 # Toolbar button background on hover
                 button_background_hover = hexToRgba c.base02;
@@ -540,9 +528,7 @@ in rec {
                 # Toolbar button background when pressed/active
                 button_background_active = hexToRgba c.base03;
 
-                # ═══════════════════════════════════════════════════════════════════
-                # ICONS
-                # ═══════════════════════════════════════════════════════════════════
+                ### ICONS
 
                 # Toolbar icons color (reload, home, menu, ethexToRgba c.)
                 icons = hexToRgba c.base05;
@@ -551,9 +537,7 @@ in rec {
                 # Using warm accent for attention-grabbing
                 icons_attention = hexToRgba c.base09; # orange for attention
 
-                # ═══════════════════════════════════════════════════════════════════
-                # POPUPS (URL bar dropdown, menus, panels)
-                # ═══════════════════════════════════════════════════════════════════
+                ### POPUPS (URL bar dropdown, menus, panels)
 
                 # Popup background
                 popup = hexToRgba c.base01;
@@ -570,9 +554,7 @@ in rec {
                 # Text color of highlighted/selected item in popup
                 popup_highlight_text = hexToRgba c.base06;
 
-                # ═══════════════════════════════════════════════════════════════════
-                # SIDEBAR (Bookmarks, History, Synced tabs)
-                # ═══════════════════════════════════════════════════════════════════
+                ### SIDEBAR (Bookmarks, History, Synced tabs)
 
                 # Sidebar background
                 sidebar = hexToRgba c.base00;
@@ -589,9 +571,7 @@ in rec {
                 # Sidebar highlighted row text
                 sidebar_highlight_text = hexToRgba c.base06;
 
-                # ═══════════════════════════════════════════════════════════════════
-                # NEW TAB PAGE
-                # ═══════════════════════════════════════════════════════════════════
+                ### NEW TAB PAGE
 
                 # New tab page background
                 ntp_background = hexToRgba c.base00;
@@ -611,8 +591,43 @@ in rec {
           };
         };
 
-        userChrome =
-          import ./userChrome.nix {inherit theme color-lib firefox-csshacks;};
+        userChrome = let
+          chrome = import ./chrome.nix {inherit pkgs lib;} {inherit firefox-csshacks;};
+        in
+          chrome.mkUserChrome [
+            (chrome.autohide_sidebar.overrideAttrs (old: {
+              postPatch = ''
+                substituteInPlace source.css \
+                  --replace-fail "--uc-sidebar-hover-width: 210px" "--uc-sidebar-hover-width: 25vw" \
+                  --replace-fail "--uc-autohide-sidebar-delay: 600ms" "--uc-autohide-sidebar-delay: 100ms" \
+                  --replace-fail "--uc-autohide-transition-duration: 115ms" "--uc-autohide-transition-duration: 200ms" \
+                  --replace-fail "--uc-autohide-transition-type: linear" "--uc-autohide-transition-type: ease-in-out"
+                  # --replace-fail "--uc-sidebar-width: 40px" "--uc-sidebar-width: 38px" \
+              '';
+              postInstall = ''
+                cat >> $out << 'EOF'
+                #sidebar-box { z-index: 3 !important; }
+                #sidebar-header { display: none; }
+                EOF
+              '';
+            }))
+
+            chrome.autohide_bookmarks_toolbar
+            chrome.auto_devtools_theme_for_rdm
+            chrome.hide_tabs_toolbar_v2
+
+            (chrome.mkCustom ''
+              :root {
+                --panel-width: 100vw;
+                --panel-hide-offset: -30px;
+                --opacity-when-hidden: 0.0;
+              }
+
+              #TabsToolbar { visibility: collapse; }
+              .titlebar-buttonbox-container,
+              .titlebar-spacer[type="post-tabs"] { display: none; }
+            '')
+          ];
         search = import ./searchEngines {inherit pkgs lib;};
       };
 
@@ -647,9 +662,43 @@ in rec {
         settings =
           import ./settings/default.nix {inherit theme lib color-lib;};
         extensions.packages = with addons; [sidebery];
-        userChrome = import ./userChrome.nix {
-          inherit theme color-lib firefox-csshacks;
-        };
+        userChrome = let
+          chrome = import ./chrome.nix {inherit pkgs lib;} {inherit firefox-csshacks;};
+        in
+          chrome.mkUserChrome [
+            (chrome.autohide_sidebar.overrideAttrs (old: {
+              postPatch = ''
+                substituteInPlace source.css \
+                  --replace-fail "--uc-sidebar-width: 40px" "--uc-sidebar-width: 38px" \
+                  --replace-fail "--uc-sidebar-hover-width: 210px" "--uc-sidebar-hover-width: 25vw" \
+                  --replace-fail "--uc-autohide-sidebar-delay: 600ms" "--uc-autohide-sidebar-delay: 100ms" \
+                  --replace-fail "--uc-autohide-transition-duration: 115ms" "--uc-autohide-transition-duration: 200ms" \
+                  --replace-fail "--uc-autohide-transition-type: linear" "--uc-autohide-transition-type: ease-in-out"
+              '';
+              postInstall = ''
+                cat >> $out << 'EOF'
+                #sidebar-box { z-index: 3 !important; }
+                #sidebar-header { display: none; }
+                EOF
+              '';
+            }))
+
+            chrome.autohide_bookmarks_toolbar
+            chrome.auto_devtools_theme_for_rdm
+            chrome.hide_tabs_toolbar_v2
+
+            (chrome.mkCustom ''
+              :root {
+                --panel-width: 100vw;
+                --panel-hide-offset: -30px;
+                --opacity-when-hidden: 0.0;
+              }
+
+              #TabsToolbar { visibility: collapse; }
+              .titlebar-buttonbox-container,
+              .titlebar-spacer[type="post-tabs"] { display: none; }
+            '')
+          ];
       };
 
       "projection" = {

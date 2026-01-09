@@ -106,7 +106,7 @@ in {
         # would be neat if we have a hardware module,
         # where we could say, isLinux/Darwin/isFramework13/isMacbookPro/etc
         else ''
-          touch_scroll_multiplier 16
+          touch_scroll_multiplier 1
 
           map super+shift+d launch --type=overlay --hold kitty-debug-window
         ''

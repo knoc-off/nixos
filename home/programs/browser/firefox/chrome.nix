@@ -8,10 +8,15 @@ let
     version = "0.1.0";
     src = cssFile;
 
-    dontUnpack = true;
+    unpackPhase = ''
+      cp $src ./source.css
+      chmod +w ./source.css
+    '';
+
+    dontBuild = true;
 
     installPhase = ''
-      cp $src $out
+      cp source.css $out
     '';
   };
 

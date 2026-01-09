@@ -9,7 +9,7 @@
 
     clipboard = {
       # clipboard
-      register = "unnamed"; # is the selection register
+      register = "unnamedplus"; # is the selection register
 
       providers.wl-copy.enable = pkgs.stdenv.isLinux;
       # darwin?
@@ -26,7 +26,7 @@
       mouse = "a"; # Enable mouse control
       #mouse = ""; # Disable mouse control
       mousemodel = "extend"; # Mouse right-click extends the current selection
-      mousescroll = "ver:6,hor:2"; # Faster vertical (6 lines), slower horizontal (2 columns) scrolling
+      mousescroll = "ver:1,hor:1"; # Smooth 1-line-at-a-time scrolling, no horizontal
       splitbelow = true; # A new window is put below the current one
       splitright = true; # A new window is put right of the current one
 

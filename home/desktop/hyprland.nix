@@ -258,6 +258,8 @@
         "stayfocused, class:^(FreeCAD)$, title:^(Formula editor)$"
         # any window that is floating, and contains specific words in the title, will have a size of 45%x45%
         "size 45% 45%, floating:1, title:(.*Open.*|.*Upload.*|.*Save.*|.*Select.*|.*Choose.*)"
+
+        "scrolltouchpad 2.5, class:^(kitty)$" # neovim scrolling is painful without
         # "opacity 0.5 0.5, floating:1"
         # "stayfocused, class:^(pinentry-)" # fix pinentry losing focus
         # "workspace special:firefox, class:(firefox), title:(.*)"
