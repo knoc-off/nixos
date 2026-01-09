@@ -25,7 +25,7 @@
   };
 in {
   imports = [
-    ./programs/terminal/kitty
+    ./programs/terminal/ghostty
     ./programs/terminal
     ./desktop/hyprland.nix
     ./tv-xdg-env.nix

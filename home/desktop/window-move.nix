@@ -74,43 +74,10 @@ let
     exit 0
   ''}/bin/module-neovim";
 
-  # Placeholder for the Kitty module
-  # Replace this with actual logic when available
-  kittyModule = "${pkgs.writeShellScriptBin "module-kitty" ''
-    set -euo pipefail
-
-    # Get pid of active window
-    active_window_pid=$(hyprctl activewindow -j | jq -r '.pid')
-
-    # Construct Kitty socket path
-    kitty_socket="/tmp/kitty-$active_window_pid.socket"
-
-    # Check if Kitty socket exists
-    if [[ ! -S "$kitty_socket" ]]; then
-        exit 1
-    fi
-
-    # Execute Kitty command to move focus in the given direction
-    # direction map to turn l > left, r > right, u > up, d > down
-    case "''${1:-}" in
-      l) direction="left" ;;
-      r) direction="right" ;;
-      u) direction="top" ;;
-      d) direction="bottom" ;;
-      *) exit 1 ;;
-    esac
-
-    kitten @ --to "unix:$kitty_socket" focus-window --match neighbor:"$direction"
-
-    # return last command status
-    #return $?
-
-    if [[ $? -eq 0 ]]; then
-        exit 0
-    fi
-
-    exit 1  # Currently always fails; replace with actual logic
-  ''}/bin/module-kitty";
+  # Note: Removed kittyModule
+  # Kitty had: Remote control socket at /tmp/kitty-{pid}.socket
+  # Used for: Window focus navigation within terminal splits/windows
+  # Alternative: Use Hyprland's native window navigation for ghostty
 
   # This script defines a function `focusShiftContained` that moves the focus of the active window
   # in a specified direction (left, right, up, or down) while ensuring that the window does not move
@@ -185,7 +152,8 @@ let
   ''}/bin/focusShiftContained";
 
   # Default modules list if none provided
-  modus = [ neovimModule kittyModule focusShiftContained ];
+  # Note: Removed kittyModule - ghostty doesn't support remote control
+  modus = [ neovimModule focusShiftContained ];
 
   # if modules is not null, use it instead
   module = if modules != null then modules else modus;

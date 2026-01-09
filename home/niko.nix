@@ -7,7 +7,7 @@
 }: {
   # test
   imports = [
-    ./programs/terminal/kitty
+    ./programs/terminal/ghostty
     ./programs/terminal
     ./programs/browser/firefox/default.nix
 

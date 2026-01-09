@@ -12,7 +12,7 @@
 }: {
   imports = [
     ./programs/terminal # default
-    ./programs/terminal/kitty
+    ./programs/terminal/ghostty
     ./programs/terminal/foot
     ./programs/terminal/programs/pueue.nix
 
@@ -65,7 +65,7 @@
         rules = [
           # Terminal apps use special layer (caps = right meta)
           {
-            class = "kitty";
+            class = "ghostty";
             layer = "special";
           }
           {

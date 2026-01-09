@@ -185,26 +185,9 @@ in {
           # OBS RECORD TOGGLE
           "${mainMod},F10, pass,^(com.obsproject.Studio)$"
 
-          (lib.mkIf config.programs.kitty.enable "${mainMod}, T, exec, ${
-            mkHdrop {
-              command = let
-                kittyConfig = "~/${config.xdg.configFile."kitty/kitty.conf".target}";
-                sedRules = [
-                  #"/map ctrl+t new_os_window_with_cwd/d"
-                  "/map ctrl+t new_os_window_with_cwd/c\\\\map ctrl+t new_window_with_cwd\\n"
-                  #''$ a\\map ctrl+q close_window''
-                ];
-                sedCommand = "sed '${builtins.concatStringsSep ";" sedRules}'";
-              in "kitty --class kitty-dropterm --config <(${sedCommand} ${kittyConfig})";
-              class = "kitty-dropterm";
-              size = {
-                width = 75;
-                height = 60;
-              };
-              gap = 25;
-              position = "top";
-            }
-          }")
+          # Note: Removed kitty dropdown terminal (SUPER+T)
+          # Was: mkHdrop with kitty-dropterm class
+          # Can be recreated with ghostty if needed
 
           "${mainMod}, F, exec, ${
             mkHdrop {

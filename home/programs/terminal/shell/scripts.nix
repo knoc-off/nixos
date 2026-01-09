@@ -71,73 +71,9 @@ in {
            --delimiter ':'
       '')
 
-      (pkgs.writeShellScriptBin "kittydark" ''
-        set -euo pipefail
-        ${pkgs.kitty}/bin/kitty @ set-colors -a \
-          color0=#${theme.dark.base00} \
-          color1=#${sa theme.dark.base08} \
-          color2=#${sa theme.dark.base0B} \
-          color3=#${sa theme.dark.base0A} \
-          color4=#${sa theme.dark.base0D} \
-          color5=#${sa theme.dark.base0E} \
-          color6=#${sa theme.dark.base0C} \
-          color7=#${theme.dark.base06} \
-          color8=#${theme.dark.base03} \
-          color9=#${theme.dark.base08} \
-          color10=#${theme.dark.base0B} \
-          color11=#${theme.dark.base0A} \
-          color12=#${theme.dark.base0D} \
-          color13=#${theme.dark.base0E} \
-          color14=#${theme.dark.base0C} \
-          color15=#${theme.dark.base07} \
-          foreground=#${theme.dark.base06} \
-          background=#${theme.dark.base00} \
-          selection_background=#${theme.dark.base02} \
-          selection_foreground=none \
-          url_color=#${theme.dark.base0C} \
-          cursor=#${theme.dark.base05} \
-          active_border_color=#${theme.dark.base0D} \
-          inactive_border_color=#${theme.dark.base03} \
-          active_tab_background=#${theme.dark.base01} \
-          active_tab_foreground=#${theme.dark.base07} \
-          inactive_tab_background=#${theme.dark.base00} \
-          inactive_tab_foreground=#${theme.dark.base05} \
-          tab_bar_background=#${theme.dark.base00}
-      '')
-
-      (pkgs.writeShellScriptBin "kittylight" ''
-        set -euo pipefail
-        ${pkgs.kitty}/bin/kitty @ set-colors -a \
-          color0=#${theme.light.base00} \
-          color1=#${sal theme.light.base08} \
-          color2=#${sal theme.light.base0B} \
-          color3=#${sal theme.light.base0A} \
-          color4=#${sal theme.light.base0D} \
-          color5=#${sal theme.light.base0E} \
-          color6=#${sal theme.light.base0C} \
-          color7=#${theme.light.base06} \
-          color8=#${theme.light.base03} \
-          color9=#${theme.light.base08} \
-          color10=#${theme.light.base0B} \
-          color11=#${theme.light.base0A} \
-          color12=#${theme.light.base0D} \
-          color13=#${theme.light.base0E} \
-          color14=#${theme.light.base0C} \
-          color15=#${theme.light.base07} \
-          foreground=#${theme.light.base06} \
-          background=#${theme.light.base00} \
-          selection_background=#${theme.light.base02} \
-          selection_foreground=none \
-          url_color=#${theme.light.base0C} \
-          cursor=#${theme.light.base05} \
-          active_border_color=#${theme.light.base0D} \
-          inactive_border_color=#${theme.light.base03} \
-          active_tab_background=#${theme.light.base01} \
-          active_tab_foreground=#${theme.light.base07} \
-          inactive_tab_background=#${theme.light.base00} \
-          inactive_tab_foreground=#${theme.light.base05} \
-          tab_bar_background=#${theme.light.base00}
-      '')
+      # Note: Removed kittydark and kittylight scripts
+      # These used kitty's remote control to switch themes at runtime
+      # Ghostty does not support runtime theme switching
     ]
     ++ lib.optionals pkgs.stdenv.isLinux [
       # Linux-specific scripts

@@ -25,8 +25,9 @@
         # Set the prompt to show the current directory:
         PS1=" %F{3}%3~ %f%# "
 
-        # If ssh is executed from kitty it will auto copy the term info.
-        [ "$TERM" = "xterm-kitty" ] && alias ssh="kitty +kitten ssh"
+        # Note: Removed kitty SSH kitten integration
+        # Kitty had: automatic terminfo copying via `kitty +kitten ssh`
+        # Ghostty: uses standard SSH, manual terminfo setup if needed
 
         zstyle ':completion:*:*:nix:*' completer _complete _ignored
         zstyle ':completion:*:*:nix:*' matcher-list 'm:{[:lower:][:upper:]}={[:upper:][:lower:]}' 'r:|[._-]=* r:|=*'
