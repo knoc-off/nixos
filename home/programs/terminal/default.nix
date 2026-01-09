@@ -8,7 +8,7 @@
     btop # htop but better
     jq # json parser
     fd # better find
-    qview # image viewer
+    #qview # image viewer
   ];
 
   programs = {
