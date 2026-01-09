@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "fiefox_css_changes_added_pre-commit_hooks_for_accidentally_commiting_binary_data." + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "big_restructure";
+  system.nixos.label = "firefox_sync" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "big_restructure";
 }

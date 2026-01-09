@@ -31,16 +31,22 @@ in rec {
         extensions = {
           force = true;
           packages = with addons; [
-            # Essential
+            sidebery
+
             ublock-origin
             bitwarden
             # onepassword-password-manager
-            sidebery
-            tridactyl
+            # tridactyl
             # Privacy
             smart-referer
-            cookie-autodelete
-            user-agent-string-switcher
+            # cookie-autodelete
+            # user-agent-string-switcher
+
+            dearrow
+            fake-filler
+            imagus-mod
+            sponsorblock
+            violentmonkey
 
             firefox-color
           ];
