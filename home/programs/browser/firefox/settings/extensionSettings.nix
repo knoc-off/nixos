@@ -11,7 +11,40 @@
   "{3c078156-979c-498b-8990-85f7987dd929}" = {
     force = true;
     settings = {
-      sidebarCSS = ''
+      sidebarCSS = let
+        tabDepthStyle = depth: hueRot: saturation: lightness: ''
+          .Tab[data-lvl="${toString depth}"][data-colorized="true"][data-parent="true"] .color-layer {
+            background-image: linear-gradient(to right,
+              hsl(calc(var(--tab-hue, 0) + ${toString hueRot}), ${toString saturation}%, ${toString lightness}%) 0%,
+              hsl(calc(var(--tab-hue, 0) + ${toString hueRot}), ${toString saturation}%, ${toString lightness}%) 100%);
+            background-size: 3px 100%;
+            background-position: 0 0;
+          }
+          .Tab[data-lvl="${toString depth}"][data-colorized="true"]:not([data-parent="true"]) .color-layer {
+            background-image: linear-gradient(to right,
+              hsl(calc(var(--tab-hue, 0) + ${toString hueRot}), ${toString saturation}%, ${toString lightness}%) 0%,
+              hsl(calc(var(--tab-hue, 0) + ${toString hueRot}), ${toString saturation}%, ${toString lightness}%) 100%);
+            background-size: 3px 50%;
+            background-position: 0 0;
+          }
+        '';
+
+        depthStyles = builtins.concatStringsSep "\n" (
+          builtins.genList (i: tabDepthStyle i (i * 40) (50 + i * 5) 50) 10
+        );
+        # { depth = 0; hue = 0;   sat = 80; light = 50; }
+        # tabDepthStyle = depth: satMult: brightMult: hueRot: ''
+        #   .Tab[data-lvl="${toString depth}"][data-colorized="true"] .color-layer {
+        #     background-image: linear-gradient(to right, var(--tab-color, rgba(0, 0, 0, 1)) 0%, var(--tab-color, rgba(0, 0, 0, 1)) 100%);
+        #     background-size: 3px 100%;
+        #     background-position: 0 0;
+        #     filter: saturate(${toString satMult}) brightness(${toString brightMult}) hue-rotate(${toString hueRot}deg);
+        #   }
+        # '';
+        # depthStyles = builtins.concatStringsSep "\n" (
+        #   builtins.genList (i: tabDepthStyle i (3 + i * 0.2) (1.3 + i * 0.2) (i * 40)) 10
+        # );
+      in ''
         #root.root {
           --nav-btn-width: 37px;
           --nav-btn-height: 37px;
@@ -60,7 +93,6 @@
           font-weight: 400;
         }
 
-        /* Rest of your CSS stays the same... */
         .TabsPanel,
         .bookmarks-tree {
           padding-left: 5px;
@@ -165,13 +197,43 @@
 
         .Tab[data-colorized="true"] .color-layer {
           background-color: transparent !important;
-          background-image: radial-gradient(
-            circle 10px at 15px center,
-            var(--tab-color, rgba(0, 0, 0, 1)) 80%,
-            rgba(0, 0, 0, 0) 100%
+          background-image: linear-gradient(
+            to right,
+            var(--tab-color, rgba(0, 0, 0, 1)) 0%,
+            var(--tab-color, rgba(0, 0, 0, 1)) 100%
           );
           background-repeat: no-repeat;
+          background-size: 3px 100%;
+          background-position: 0 0;
+          filter: saturate(3) brightness(1.3);
         }
+
+        /* Non-parent tabs: color bar only in upper half */
+        .Tab[data-colorized="true"]:not([data-parent="true"]) .color-layer {
+          background-size: 3px 50%;
+          background-position: 0 0;
+        }
+
+        /* Highlight unread tabs */
+        .Tab[data-unread="true"] .title {
+          font-weight: 600;
+          opacity: 1;
+        }
+
+        .Tab[data-unread="true"]::after {
+          content: "";
+          position: absolute;
+          top: 50%;
+          right: 8px;
+          transform: translateY(-50%);
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background-color: var(--tab-color, #4a9eff);
+          filter: saturate(2) brightness(1.5);
+        }
+
+        ${depthStyles}
       '';
       settings = {
         nativeScrollbars = false;
@@ -232,7 +294,7 @@
         activateAfterClosingNoDiscarded = true;
         askNewBookmarkPlace = true;
         tabsRmUndoNote = false;
-        tabsUnreadMark = false;
+        tabsUnreadMark = true;
         tabsUpdateMark = "all";
         tabsUpdateMarkFirst = true;
         tabsReloadLimit = 10;
@@ -278,7 +340,7 @@
         sortGroupsFirst = true;
         colorizeTabs = true;
         colorizeTabsSrc = "domain";
-        colorizeTabsBranches = false;
+        colorizeTabsBranches = true;
         colorizeTabsBranchesSrc = "domain";
         inheritCustomColor = true;
         previewTabs = false;

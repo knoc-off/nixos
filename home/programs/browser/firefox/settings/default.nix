@@ -54,7 +54,8 @@
 
   # --- General Theme Settings ---
   "extensions.activeThemeID" = "firefox-compact-dark@mozilla.org";
-  "layout.css.devPixelsPerPx" = "1.3"; # UI Scale
+  #"layout.css.devPixelsPerPx" = "1.3"; # UI Scale
+  #"layout.css.devPixelsPerPx" = "2"; # MacOs
   # # Also related to UI Customization
   # "layout.css.devPixelsPerPx" = "1.3";
 
@@ -197,6 +198,7 @@
 
   # # UI Scale (Primary category: Theme & Appearance)
   # "layout.css.devPixelsPerPx" = "1.3";
+  # layout.css.devPixelsPerPx = 2 # MacOs
 
   # =========================================================================
   # Zoom & Scrolling
