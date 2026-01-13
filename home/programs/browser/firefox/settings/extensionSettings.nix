@@ -12,25 +12,19 @@
     force = true;
     settings = {
       sidebarCSS = let
-        tabDepthStyle = depth: hueRot: saturation: lightness: ''
-          .Tab[data-lvl="${toString depth}"][data-colorized="true"][data-parent="true"] .color-layer {
-            background-image: linear-gradient(to right,
-              hsl(calc(var(--tab-hue, 0) + ${toString hueRot}), ${toString saturation}%, ${toString lightness}%) 0%,
-              hsl(calc(var(--tab-hue, 0) + ${toString hueRot}), ${toString saturation}%, ${toString lightness}%) 100%);
-            background-size: 3px 100%;
-            background-position: 0 0;
+        tabDepthStyle = depth: hueRot: ''
+          .Tab[data-lvl="${toString depth}"][data-colorized="true"][data-parent="true"]::before {
+            background: oklch(70% 0.2 calc(var(--tab-hue, 0) + ${toString hueRot}));
+            height: 100%;
           }
-          .Tab[data-lvl="${toString depth}"][data-colorized="true"]:not([data-parent="true"]) .color-layer {
-            background-image: linear-gradient(to right,
-              hsl(calc(var(--tab-hue, 0) + ${toString hueRot}), ${toString saturation}%, ${toString lightness}%) 0%,
-              hsl(calc(var(--tab-hue, 0) + ${toString hueRot}), ${toString saturation}%, ${toString lightness}%) 100%);
-            background-size: 3px 50%;
-            background-position: 0 0;
+          .Tab[data-lvl="${toString depth}"][data-colorized="true"]:not([data-parent="true"])::before {
+            background: oklch(70% 0.2 calc(var(--tab-hue, 0) + ${toString hueRot}));
+            height: 50%;
           }
         '';
 
         depthStyles = builtins.concatStringsSep "\n" (
-          builtins.genList (i: tabDepthStyle i (i * 40) (50 + i * 5) 50) 10
+          builtins.genList (i: tabDepthStyle i (i * 40)) 10
         );
         # { depth = 0; hue = 0;   sat = 80; light = 50; }
         # tabDepthStyle = depth: satMult: brightMult: hueRot: ''
@@ -195,23 +189,22 @@
           }
         }
 
+        /* Hide the original color layer */
         .Tab[data-colorized="true"] .color-layer {
-          background-color: transparent !important;
-          background-image: linear-gradient(
-            to right,
-            var(--tab-color, rgba(0, 0, 0, 1)) 0%,
-            var(--tab-color, rgba(0, 0, 0, 1)) 100%
-          );
-          background-repeat: no-repeat;
-          background-size: 3px 100%;
-          background-position: 0 0;
-          filter: saturate(3) brightness(1.3);
+          display: none !important;
         }
 
-        /* Non-parent tabs: color bar only in upper half */
-        .Tab[data-colorized="true"]:not([data-parent="true"]) .color-layer {
-          background-size: 3px 50%;
-          background-position: 0 0;
+        /* Custom color indicator using ::before */
+        .Tab[data-colorized="true"]::before {
+          content: "";
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 3px;
+          height: 100%;
+          background: oklch(70% 0.2 var(--tab-hue, 0));
+          z-index: 10;
+          border-radius: 2px;
         }
 
         /* Highlight unread tabs */
