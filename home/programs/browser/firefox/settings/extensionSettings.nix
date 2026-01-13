@@ -13,12 +13,12 @@
     settings = {
       sidebarCSS = let
         tabDepthStyle = depth: hueRot: ''
-          .Tab[data-lvl="${toString depth}"][data-colorized="true"][data-parent="true"]::before {
-            background: oklch(70% 0.2 calc(var(--tab-hue, 0) + ${toString hueRot}));
+          .Tab[data-lvl="${toString depth}"][data-colorized="true"][data-parent="true"] .color-layer {
+            filter: saturate(3) brightness(1.4) hue-rotate(${toString hueRot}deg);
             height: 100%;
           }
-          .Tab[data-lvl="${toString depth}"][data-colorized="true"]:not([data-parent="true"])::before {
-            background: oklch(70% 0.2 calc(var(--tab-hue, 0) + ${toString hueRot}));
+          .Tab[data-lvl="${toString depth}"][data-colorized="true"]:not([data-parent="true"]) .color-layer {
+            filter: saturate(3) brightness(1.4) hue-rotate(${toString hueRot}deg);
             height: 50%;
           }
         '';
@@ -189,22 +189,19 @@
           }
         }
 
-        /* Hide the original color layer */
+        /* Restyle the color layer as a left-side bar */
         .Tab[data-colorized="true"] .color-layer {
-          display: none !important;
+          width: 3px !important;
+          height: 100%;
+          border-radius: 2px 0 0 2px !important;
+          background-color: var(--tab-color) !important;
+          opacity: 1 !important;
+          filter: saturate(3) brightness(1.4);
         }
 
-        /* Custom color indicator using ::before */
-        .Tab[data-colorized="true"]::before {
-          content: "";
-          position: absolute;
-          left: 0;
-          top: 0;
-          width: 3px;
-          height: 100%;
-          background: oklch(70% 0.2 var(--tab-hue, 0));
-          z-index: 10;
-          border-radius: 2px;
+        /* Non-parent tabs: half height */
+        .Tab[data-colorized="true"]:not([data-parent="true"]) .color-layer {
+          height: 50%;
         }
 
         /* Highlight unread tabs */
