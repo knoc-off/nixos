@@ -14,11 +14,14 @@
       sidebarCSS = let
         tabDepthStyle = depth: hueRot: ''
           .Tab[data-lvl="${toString depth}"][data-colorized="true"][data-parent="true"] .color-layer {
-            filter: saturate(3) brightness(1.4) hue-rotate(${toString hueRot}deg);
+            background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + ${toString hueRot})) !important;
             height: 100%;
           }
+          .Tab[data-lvl="${toString depth}"][data-colorized="true"][data-parent="true"][data-folded="true"] .color-layer {
+            background-color: oklch(from var(--tab-color) 45% 0.12 calc(h + ${toString hueRot})) !important;
+          }
           .Tab[data-lvl="${toString depth}"][data-colorized="true"]:not([data-parent="true"]) .color-layer {
-            filter: saturate(3) brightness(1.4) hue-rotate(${toString hueRot}deg);
+            background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + ${toString hueRot})) !important;
             height: 50%;
           }
         '';
@@ -189,14 +192,20 @@
           }
         }
 
+        /* \/ These are semi redundant styles. \/ */
+
         /* Restyle the color layer as a left-side bar */
         .Tab[data-colorized="true"] .color-layer {
           width: 3px !important;
           height: 100%;
           border-radius: 2px 0 0 2px !important;
-          background-color: var(--tab-color) !important;
+          background-color: oklch(from var(--tab-color) 70% 0.25 h) !important;
           opacity: 1 !important;
-          filter: saturate(3) brightness(1.4);
+        }
+
+        /* Collapsed/folded trees: dimmer color */
+        .Tab[data-colorized="true"][data-folded="true"] .color-layer {
+          background-color: oklch(from var(--tab-color) 45% 0.12 h) !important;
         }
 
         /* Non-parent tabs: half height */
@@ -225,6 +234,140 @@
 
         ${depthStyles}
       '';
+
+      # Context menu configuration (matches Sidebery defaults from src/defaults/menu.ts)
+      # Available tab options: undoRmTab, moveToNewWin, moveToWin, moveToPanel, moveToNewPanel,
+      #   reopenInNewWin, reopenInWin, reopenInCtr, reopenInNewCtr, pin, reload, duplicate,
+      #   bookmark, mute, discard, group, flatten, clearCookies, close, closeBranch,
+      #   closeDescendants, closeTabsAbove, closeTabsBelow, closeOtherTabs, copyTabsUrls,
+      #   copyTabsTitles, colorizeTab, editTabTitle, sortTabsByTitleAscending, etc.
+      # Use "---" for separator
+      contextMenu = {
+        tabs = [
+          {opts = ["undoRmTab" "mute" "reload" "bookmark"];}
+          "separator-1"
+          {
+            name = "%menu.tab.move_to_sub_menu_name";
+            opts = ["moveToNewWin" "moveToWin" "separator-5" "moveToPanel" "moveToNewPanel"];
+          }
+          {
+            name = "%menu.tab.reopen_in_sub_menu_name";
+            opts = ["reopenInNewWin" "reopenInWin" "separator-6" "reopenInCtr" "reopenInNewCtr"];
+          }
+          {
+            name = "%menu.tab.colorize_";
+            opts = ["colorizeTab"];
+          }
+          {
+            name = "%menu.tab.sort_sub_menu_name";
+            opts = [
+              "sortTabsTreeByTitleAscending"
+              "sortTabsTreeByTitleDescending"
+              "sortTabsTreeByUrlAscending"
+              "sortTabsTreeByUrlDescending"
+              "sortTabsTreeByAccessTimeAscending"
+              "sortTabsTreeByAccessTimeDescending"
+              "separator-45654"
+              "sortTabsByTitleAscending"
+              "sortTabsByTitleDescending"
+              "sortTabsByUrlAscending"
+              "sortTabsByUrlDescending"
+              "sortTabsByAccessTimeAscending"
+              "sortTabsByAccessTimeDescending"
+            ];
+          }
+          "separator-2"
+          "pin"
+          "duplicate"
+          "discard"
+          "copyTabsUrls"
+          "copyTabsTitles"
+          "editTabTitle"
+          "separator-3"
+          "group"
+          "flatten"
+          "separator-4"
+          "urlConf"
+          "close"
+        ];
+        tabsPanel = [
+          {opts = ["undoRmTab" "muteAllAudibleTabs" "reloadTabs" "discardTabs"];}
+          "separator-1224"
+          {
+            name = "%menu.tabs_panel.sort_all_sub_menu_name";
+            opts = [
+              "sortAllTabsByTitleAscending"
+              "sortAllTabsByTitleDescending"
+              "sortAllTabsByUrlAscending"
+              "sortAllTabsByUrlDescending"
+              "sortAllTabsByAccessTimeAscending"
+              "sortAllTabsByAccessTimeDescending"
+            ];
+          }
+          "separator-7"
+          "selectAllTabs"
+          "collapseInactiveBranches"
+          "closeTabsDuplicates"
+          "closeTabs"
+          "separator-8"
+          "bookmarkTabsPanel"
+          "restoreFromBookmarks"
+          "convertToBookmarksPanel"
+          "separator-9"
+          "openPanelConfig"
+          "hidePanel"
+          "removePanel"
+        ];
+        bookmarks = [
+          {
+            name = "%menu.bookmark.open_in_sub_menu_name";
+            opts = [
+              "openInNewWin"
+              "openInNewPrivWin"
+              "separator-9"
+              "openInPanel"
+              "openInNewPanel"
+              "separator-10"
+              "openInCtr"
+            ];
+          }
+          {
+            name = "%menu.bookmark.sort_sub_menu_name";
+            opts = [
+              "sortByNameAscending"
+              "sortByNameDescending"
+              "sortByLinkAscending"
+              "sortByLinkDescending"
+              "sortByTimeAscending"
+              "sortByTimeDescending"
+            ];
+          }
+          "separator-5"
+          "createBookmark"
+          "createFolder"
+          "createSeparator"
+          "separator-8"
+          "openAsBookmarksPanel"
+          "openAsTabsPanel"
+          "separator-7"
+          "copyBookmarksUrls"
+          "copyBookmarksTitles"
+          "moveBookmarksTo"
+          "edit"
+          "delete"
+        ];
+        bookmarksPanel = [
+          "collapseAllFolders"
+          "switchViewMode"
+          "convertToTabsPanel"
+          "separator-9"
+          "unloadPanelType"
+          "openPanelConfig"
+          "hidePanel"
+          "removePanel"
+        ];
+      };
+
       settings = {
         nativeScrollbars = false;
         nativeScrollbarsThin = false;
@@ -311,7 +454,7 @@
         tabsTree = true;
         groupOnOpen = true;
         tabsTreeLimit = "none";
-        autoFoldTabs = true;
+        autoFoldTabs = false;
         autoFoldTabsExcept = 2;
         autoExpandTabs = true;
         autoExpandTabsOnNew = true;
