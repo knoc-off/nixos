@@ -86,8 +86,7 @@ in {
       command = ""; # Disable bell command
 
       # Focus behavior
-      # Note: Kitty had focus_follows_mouse = yes
-      # Check if ghostty supports this - may need to verify
+      focus-follows-mouse = true;
 
       # Base16 color scheme (ported from kitty)
       # Terminal colors (0-15)
@@ -121,33 +120,54 @@ in {
       selection-background = "${theme.dark.base02}";
       selection-foreground = "${theme.dark.base06}";
 
-      # Basic keybindings (ported from kitty)
+      # Keybindings using super as main modifier
+      # Note: Kanata maps caps→super when ghostty is focused (via hyprkan)
       keybind = [
-        # Clear keybinds
-        "clear"
+        "clear" # Clear default keybinds first
 
-        # Copy/Paste/Select (kitty: super+c/v/a)
+        # Core actions
         "super+c=copy_to_clipboard"
         "super+v=paste_from_clipboard"
-        # Note: select_all may not exist in ghostty, need to verify
+        "super+a=select_all"
+        "super+q=quit"
 
-        # Tab management (kitty: super+t/w)
-        "super+t=new_tab"
-        "super+w=close_surface"
+        # Windows & Tabs
+        "super+t=new_window"       # New window (inherits CWD)
+        "super+shift+t=new_tab"    # New tab
+        "super+w=close_surface"    # Close tab
 
-        # Split window (kitty: alt+enter for split)
-        # Note: ghostty may use different split commands
-        # "alt+enter=???" # TODO: Find ghostty equivalent for split
+        # Tab navigation (1-9)
+        "super+one=goto_tab:1"
+        "super+two=goto_tab:2"
+        "super+three=goto_tab:3"
+        "super+four=goto_tab:4"
+        "super+five=goto_tab:5"
+        "super+six=goto_tab:6"
+        "super+seven=goto_tab:7"
+        "super+eight=goto_tab:8"
+        "super+nine=goto_tab:9"
 
-        # Clear terminal (kitty: ctrl+l)
-        # Note: This was for clearing to cursor
-        # May not have exact equivalent
+        # Font size
+        "super+equal=increase_font_size:1"
+        "super+minus=decrease_font_size:1"
+        "super+zero=reset_font_size"
 
-        # Search scrollback (kitty: super+f for show_scrollback)
-        # Note: ghostty may have different scrollback search
+        # Splits (master-stack layout)
+        "super+enter=new_split:right"   # New split to the right (stack layout)
+        "super+shift+enter=new_split:down"  # Force split downward (for stacking)
+        "super+shift+w=close_surface"   # Close split
 
-        # Platform-specific keybindings would go here
-        # Kitty had different bindings for macOS vs Linux
+        # Split navigation (vim-style, focus-follows-mouse enabled)
+        "super+h=goto_split:left"
+        "super+j=goto_split:bottom"
+        "super+k=goto_split:top"
+        "super+l=goto_split:right"
+
+        # Split resizing (for 60/40 master-stack ratio)
+        "super+ctrl+h=resize_split:left,10"
+        "super+ctrl+j=resize_split:down,10"
+        "super+ctrl+k=resize_split:up,10"
+        "super+ctrl+l=resize_split:right,10"
       ];
     };
   };

@@ -1,4 +1,4 @@
 { self, ... }:
 {
-  system.nixos.label = "switch_to_ghostty" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "iso_stuff";
+  system.nixos.label = "Kanata_restart_trigger_ghostty_optimizations" + "REV_" + toString (self.shortRev or self.dirtyShortRev or self.lastModified or "unknown") + "iso_stuff";
 }

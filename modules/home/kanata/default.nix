@@ -148,6 +148,8 @@ with lib; let
         Description = "Kanata keyboard remapper for ${name}";
         After = ["graphical-session.target"];
         PartOf = ["graphical-session.target"];
+        # Restart service when config file changes (on home-manager rebuild)
+        X-Restart-Triggers = ["${keyboard.configFile}"];
       };
 
       Service = {
@@ -213,4 +215,3 @@ in {
 
   meta.maintainers = with maintainers; [];
 }
-

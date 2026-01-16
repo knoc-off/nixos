@@ -120,7 +120,7 @@
         animate_manual_resizes = true;
         enable_swallow = false;
         # Any window started from ghostty will be swallowed by the terminal
-        swallow_regex = "ghostty";
+        swallow_regex = "com.mitchellh.ghostty";
         #swallow_exception_regex = "NAN";
         background_color = "0x99${color-lib.setOkhslLightness 0.2 theme.dark.base00}";
 
@@ -156,7 +156,7 @@
           disable_while_typing = false;
 
           natural_scroll = true;
-          scroll_factor = 0.2;
+          scroll_factor = 0.4;
           middle_button_emulation = true;
           tap-and-drag = true;
           drag_lock = false;
@@ -259,7 +259,9 @@
         # any window that is floating, and contains specific words in the title, will have a size of 45%x45%
         "size 45% 45%, floating:1, title:(.*Open.*|.*Upload.*|.*Save.*|.*Select.*|.*Choose.*)"
 
-        "scrolltouchpad 2.5, class:^(ghostty)$" # neovim scrolling is painful without
+        # "scrolltouchpad 8.0, class:^(com.mitchellh.ghostty)$" # neovim scrolling is painful without
+        # "scrolltouchpad 1.5, class:^(com.mitchellh.ghostty)$"
+
         # "opacity 0.5 0.5, floating:1"
         # "stayfocused, class:^(pinentry-)" # fix pinentry losing focus
         # "workspace special:firefox, class:(firefox), title:(.*)"

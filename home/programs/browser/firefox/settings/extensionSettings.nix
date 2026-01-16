@@ -149,16 +149,39 @@
         }
 
         @media screen and (max-width: 50px) {
-          .Tab .t-box {
-            display: none;
-          }
-
-          .Tab .body::after {
+          /* Hide all text elements */
+          .Tab .t-box,
+          .Tab .title,
+          .Tab .close,
+          .BookmarkNode .title,
+          .nav-item .label {
             display: none !important;
           }
 
-          .Tab[data-parent="true"][data-folded="true"] .exp {
-            display: none !important;
+          /* Center the favicon/icon */
+          .Tab .body {
+            justify-content: center;
+          }
+
+          .Tab .fav {
+            margin: 0 auto;
+          }
+
+          /* Remove indentation completely */
+          #root {
+            --tabs-indent: 0px !important;
+            --bookmarks-indent: 0px !important;
+          }
+
+          /* Minimal padding */
+          .TabsPanel {
+            padding-left: 2px;
+            padding-right: 2px;
+          }
+
+          /* Maybe shrink the color bar too */
+          .Tab[data-colorized="true"] .color-layer {
+            width: 2px !important;
           }
         }
 

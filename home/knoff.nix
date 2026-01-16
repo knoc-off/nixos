@@ -65,7 +65,7 @@
         rules = [
           # Terminal apps use special layer (caps = right meta)
           {
-            class = "ghostty";
+            class = "com.mitchellh.ghostty";
             layer = "special";
           }
           {

@@ -44,7 +44,7 @@
         inherit system;
         specialArgs =
           {
-            inherit # i want to phase out all of these. its a mess
+            inherit # TODO: i want to phase out all of these. its a mess
               self # needed
               inputs # needed
               hostname # needed
@@ -141,6 +141,9 @@
       # i dont like pushing through my own lib as a dependency, makes it too self-reliant. but i really value the possibilities
     in
       import ./pkgs {
+        # TODO:
+        # I want to get rid of color-lib, math, theme ( ? )
+        # this could be a single module that provides just the color themeing for apps in a sperate file.
         inherit inputs self system pkgs upkgs lib color-lib math theme;
       };
   in {
@@ -178,7 +181,7 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
-    # Nixpkgs darwin ? TODO test
+    # Nixpkgs darwin
     nixpkgs-darwin.url = "github:NixOS/nixpkgs/nixpkgs-25.11-darwin";
 
     # nix cli
