@@ -68,7 +68,7 @@
 
       # monitor = [",preferred,auto-up,1"];
       monitor = [
-        "desc:BOE 0x0BCA, preferred, 0x0, 1.6"
+        "desc:BOE 0x0BCA, preferred, 0x0, 1.333334"
         "desc:Samsung Electric Company S27F350, preferred, auto-up, 1"
         #"eDP-1, preferred, 0x0, 1.25"
         #"DP-1, 3840x2160@60, 1920x0, 1.5"
