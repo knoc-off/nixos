@@ -66,14 +66,14 @@
           # Terminal apps use special layer (caps = right meta)
           {
             class = "com.mitchellh.ghostty";
-            layer = "special";
+            layer = "terminal";
           }
           {
             class = "foot";
-            layer = "special";
+            layer = "terminal";
           }
 
-          # Default fallback (caps = control)
+          # Default fallback provides mappings for common ctrl shortcuts
           {
             class = "*";
             title = "*";
@@ -97,22 +97,46 @@
           port = 52545;
           extraDefCfg = "danger-enable-cmd yes";
           config = ''
-            (deffakekeys
-              met lmet
-              ctl lctl
-            )
-
-            (defalias
-              caps-double (tap-dance-eager 250 (XX (cmd ${pkgs.rofi}/bin/rofi -show drun)))
-              caps-meta (multi (on-press-fakekey met press) @caps-double (on-release-fakekey met release))
-              caps-ctrl (multi (on-press-fakekey ctl press) @caps-double (on-release-fakekey ctl release))
-              test-f12 (cmd ${pkgs.rofi}/bin/rofi -show drun)
+            (defcfg
+              process-unmapped-keys yes
+              danger-enable-cmd yes
             )
 
             (defsrc caps f12)
 
-            (deflayer base @caps-ctrl @test-f12)
-            (deflayer special @caps-meta @test-f12)
+            (defvar tt 200 ht 200)
+
+            (defalias
+              rofi (cmd ${pkgs.rofi}/bin/rofi -show drun)
+              dbl  (tap-dance-eager 250 (XX @rofi))
+
+              ;; GUI: caps activates shortcuts layer
+              cap-gui (multi @dbl (layer-while-held shortcuts))
+              ;; Terminal: caps = ctrl
+              cap-trm (tap-hold $tt $ht @dbl lctl)
+
+              ;; Mode switching (double-tap F12)
+              →trm (layer-switch terminal)
+              →gui (layer-switch base)
+              f12  (tap-dance 300 (@rofi @→trm))
+              f12t (tap-dance 300 (@rofi @→gui))
+            )
+
+            (deflayer base     @cap-gui @f12)
+            (deflayer terminal @cap-trm @f12t)
+
+            ;; Only define what changes - much cleaner!
+            (deflayermap (shortcuts)
+              ;; Cmd+key → Ctrl+key (editing)
+              a C-a  c C-c  v C-v  x C-x  z C-z  y C-y
+              s C-s  o C-o  n C-n  p C-p  w C-w  q C-q
+              t C-t  f C-f  r C-r  l C-l  b C-b  i C-i
+              ;; Window management → Meta+key
+              tab M-tab  grv M-grv
+              ;; Workspaces/tabs
+              1 M-1  2 M-2  3 M-3  4 M-4  5 M-5
+              6 M-6  7 M-7  8 M-8  9 M-9  0 M-0
+            )
           '';
         };
 

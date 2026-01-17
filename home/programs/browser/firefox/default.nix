@@ -52,6 +52,10 @@
         #TabsToolbar { visibility: collapse; }
         .titlebar-buttonbox-container,
         .titlebar-spacer[type="post-tabs"] { display: none; }
+
+        #sidebar-header {
+          display: none !important;
+        }
       '')
     ];
 in rec {
@@ -114,7 +118,10 @@ in rec {
 
             firefox-color
           ];
+          settings = import ./settings/extensionSettings.nix {inherit color-lib theme;};
         };
+
+        inherit userChrome;
 
         settings = import ./settings/default.nix {inherit theme lib color-lib;};
         search = import ./searchEngines {inherit pkgs lib;};

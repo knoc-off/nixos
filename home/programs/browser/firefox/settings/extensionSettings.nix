@@ -151,11 +151,18 @@
         @media screen and (max-width: 50px) {
           /* Hide all text elements */
           .Tab .t-box,
-          .Tab .title,
           .Tab .close,
+          .Tab .exp,
+          .Tab .body::after,
           .BookmarkNode .title,
+          .static-btns,
           .nav-item .label {
             display: none !important;
+          }
+
+          .main-items > .nav-item[data-active="true"] {
+            opacity: 1 !important;
+            transform: none !important;
           }
 
           /* Center the favicon/icon */
@@ -183,6 +190,57 @@
           .Tab[data-colorized="true"] .color-layer {
             width: 2px !important;
           }
+
+          /* Search bar: icon only, centered */
+          .SearchBar .placeholder,
+          .SearchBar .input {
+            display: none !important;
+          }
+
+          .SearchBar {
+            justify-content: center;
+          }
+
+          .SearchBar .search-icon {
+            margin: 0 auto;
+          }
+
+          /* Notifications: icon only, centered */
+          .notification .title,
+          .notification .ctrls {
+            display: none !important;
+          }
+
+          .notification {
+            min-width: 32px;
+            min-height: 32px;
+            padding: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          .notification .header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+          }
+
+          .notification .icon {
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          }
+
+          .notification .icon svg {
+            width: 18px;
+            height: 18px;
+          }
+
+
         }
 
         @media screen and (max-width: 55px) {

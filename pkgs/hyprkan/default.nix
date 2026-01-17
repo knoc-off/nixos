@@ -14,7 +14,7 @@ buildPythonApplication rec {
     owner = "mdSlash";
     repo = "hyprkan";
     rev = "v${version}";
-    hash = "sha256-4J0yQSkFTbHTDFBXECbCs/43xTDbeB/f3J7tZIbjbwM=";
+    hash = "";
   };
 
   propagatedBuildInputs = [

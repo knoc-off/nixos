@@ -132,9 +132,9 @@ in {
         "super+q=quit"
 
         # Windows & Tabs
-        "super+t=new_window"       # New window (inherits CWD)
-        "super+shift+t=new_tab"    # New tab
-        "super+w=close_surface"    # Close tab
+        "super+t=new_window" # New window (inherits CWD)
+        "super+shift+t=new_tab" # New tab
+        "super+w=close_surface" # Close tab
 
         # Tab navigation (1-9)
         "super+one=goto_tab:1"
@@ -152,10 +152,9 @@ in {
         "super+minus=decrease_font_size:1"
         "super+zero=reset_font_size"
 
-        # Splits (master-stack layout)
-        "super+enter=new_split:right"   # New split to the right (stack layout)
-        "super+shift+enter=new_split:down"  # Force split downward (for stacking)
-        "super+shift+w=close_surface"   # Close split
+        "super+enter=new_split:right" # New split to the right (stack layout)
+        "super+shift+enter=new_split:down" # Force split downward (for stacking)
+        "super+shift+w=close_surface" # Close split
 
         # Split navigation (vim-style, focus-follows-mouse enabled)
         "super+h=goto_split:left"
