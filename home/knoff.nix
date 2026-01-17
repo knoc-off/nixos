@@ -95,48 +95,66 @@
             "Logitech USB Receiver"
           ];
           port = 52545;
-          extraDefCfg = "danger-enable-cmd yes";
+          # extraDefCfg = "danger-enable-cmd yes";
+          extraDefCfg = "danger-enable-cmd yes process-unmapped-keys yes";
+
           config = ''
-            (defcfg
-              process-unmapped-keys yes
-              danger-enable-cmd yes
-            )
-
-            (defsrc caps f12)
-
-            (defvar tt 200 ht 200)
-
             (defalias
               rofi (cmd ${pkgs.rofi}/bin/rofi -show drun)
               dbl  (tap-dance-eager 250 (XX @rofi))
 
-              ;; GUI: caps activates shortcuts layer
-              cap-gui (multi @dbl (layer-while-held shortcuts))
-              ;; Terminal: caps = ctrl
-              cap-trm (tap-hold $tt $ht @dbl lctl)
+              ;; GUI: Caps = Meta + shortcuts layer
+              cap-gui (multi lmet @dbl (layer-while-held shortcuts))
 
-              ;; Mode switching (double-tap F12)
+              ;; Terminal: Caps = just Meta
+              cap-trm (multi lmet @dbl)
+
               →trm (layer-switch terminal)
               →gui (layer-switch base)
               f12  (tap-dance 300 (@rofi @→trm))
               f12t (tap-dance 300 (@rofi @→gui))
+
+              ;; Shortcuts: release meta, send Ctrl+key
+              sca (multi (release-key lmet) C-a)
+              scc (multi (release-key lmet) C-c)
+              scv (multi (release-key lmet) C-v)
+              scx (multi (release-key lmet) C-x)
+              scz (multi (release-key lmet) C-z)
+              scy (multi (release-key lmet) C-y)
+              scs (multi (release-key lmet) C-s)
+              sco (multi (release-key lmet) C-o)
+              scn (multi (release-key lmet) C-n)
+              scp (multi (release-key lmet) C-p)
+              scw (multi (release-key lmet) C-w)
+              scq (multi (release-key lmet) C-q)
+              sct (multi (release-key lmet) C-t)
+              scf (multi (release-key lmet) C-f)
+              scr (multi (release-key lmet) C-r)
+              scl (multi (release-key lmet) C-l)
+              scb (multi (release-key lmet) C-b)
+              sci (multi (release-key lmet) C-i)
             )
 
+            (defsrc caps f12)
             (deflayer base     @cap-gui @f12)
             (deflayer terminal @cap-trm @f12t)
 
-            ;; Only define what changes - much cleaner!
             (deflayermap (shortcuts)
-              ;; Cmd+key → Ctrl+key (editing)
-              a C-a  c C-c  v C-v  x C-x  z C-z  y C-y
-              s C-s  o C-o  n C-n  p C-p  w C-w  q C-q
-              t C-t  f C-f  r C-r  l C-l  b C-b  i C-i
-              ;; Window management → Meta+key
-              tab M-tab  grv M-grv
-              ;; Workspaces/tabs
-              1 M-1  2 M-2  3 M-3  4 M-4  5 M-5
-              6 M-6  7 M-7  8 M-8  9 M-9  0 M-0
+              a @sca  c @scc  v @scv  x @scx  z @scz  y @scy
+              s @scs  o @sco  n @scn  p @scp  w @scw  q @scq
+              t @sct  f @scf  r @scr  l @scl  b @scb  i @sci
+
             )
+
+
+
+
+
+
+
+
+
+
           '';
         };
 
