@@ -1454,10 +1454,29 @@
                 };
 
                 cargo = {
-                  allFeatures = true;
+                  allFeatures = false;
+                  allTargets = false;
                   buildScripts.enable = true;
                   loadOutDirsFromCheck = true;
+                  # Separate target directory prevents cargo build from invalidating RA cache
+                  targetDir = "target/rust-analyzer";
                 };
+
+                # Exclude non-Rust directories from analysis
+                # does this do anything?
+                # files = {
+                #   excludeDirs = [
+                #     ".git"
+                #     "target"
+                #     "node_modules"
+                #     ".direnv"
+                #     # Large non-Rust submodules
+                #     "nelly-mono"
+                #   ];
+                # };
+
+                # Increase LRU cache for large workspaces (default 128)
+                lru.capacity = 256;
 
                 diagnostics = {
                   enable = true;

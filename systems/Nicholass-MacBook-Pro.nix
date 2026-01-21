@@ -2,6 +2,7 @@
   inputs,
   self,
   pkgs,
+  upkgs,
   lib,
   user,
   system,
@@ -99,10 +100,10 @@ in {
 
   environment.systemPackages = with pkgs; [
     (pkgs.claude-code.overrideAttrs (oldAttrs: rec {
-      version = "2.0.52";
+      version = "2.1.7";
       src = pkgs.fetchzip {
         url = "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-${version}.tgz";
-        hash = "sha256-lYVuWP9ekI+xeUXNCXVqcq8OIzZwfdgBpk0PhSIStFs=";
+        hash = "sha256-s/XPemwJYPUNFBgWo00VQ6W6eFIy44y9lFoRN0Duk9I=";
       };
     }))
 
@@ -174,6 +175,8 @@ in {
 
       "utm"
       "crystalfetch"
+
+      "ghostty"
 
       "rectangle"
       "spotify"

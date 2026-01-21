@@ -20,6 +20,15 @@
 in {
   home.packages =
     [
+      # Skim Environment variables
+      # python3 -c 'import os,sys; sys.stdout.write("\0".join(sorted(os.environ)) + "\0")' |
+      #   sk --read0 --no-mouse --no-multi \
+      #      --preview 'python3 -c "import os,sys; v=os.environ.get(sys.argv[1],\"\"); sys.stdout.write(v)" {}' \
+      #      --preview-window=right:70%:wrap
+
+      # Git Branches
+      # gid diff with specific branches, show preview-window
+
       (mkComplgenScript {
         name = "csv_to_excel";
         scriptContent = ''
