@@ -15,6 +15,7 @@
     ./programs/terminal/ghostty
     ./programs/terminal/foot
     ./programs/terminal/programs/pueue.nix
+    ./programs/terminal/programs/opencode.nix
 
     ./desktop/dunst.nix
 
