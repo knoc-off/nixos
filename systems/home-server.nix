@@ -32,7 +32,6 @@ in {
     (modulesPath + "/installer/scan/not-detected.nix")
     (modulesPath + "/profiles/qemu-guest.nix")
 
-
     # Disko
     inputs.disko.nixosModules.disko
     #./systems/hardware/disks/simple-disk.nix
@@ -46,8 +45,6 @@ in {
       #disko.devices.disk.vdb.device = "/dev/disk/by-id/wwn-0x502b2a201d1c1b1a";
     }
 
-
-
     ./modules/nix.nix
 
     #inputs.sops-nix.nixosModules.sops {
@@ -59,8 +56,6 @@ in {
     #  sops.secrets."services/acme/namecheap-key-env" = {};
     #  sops.secrets."services/acme/envfile" = {};
     #}
-
-    ./commit-messages/home-server-commit-message.nix
 
     inputs.nix-minecraft.nixosModules.minecraft-servers
 

@@ -9,7 +9,6 @@
   ...
 }: {
   imports = [
-    ./commit-messages/raspberry-3b-commit-message.nix
     #./services/octoprint.nix
   ];
 
