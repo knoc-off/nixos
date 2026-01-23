@@ -30,9 +30,11 @@
         base06 = "#${theme.dark.base06}";
         base07 = "#${theme.dark.base07}";
         base08 = "#${sa theme.dark.base08}";
+        diffremoved = "#${color-lib.mixColors (color-lib.adjustOkhslLightness 0.03 theme.dark.base00) theme.dark.base08 0.3}";
         base09 = "#${sa theme.dark.base09}";
         base0A = "#${sa theme.dark.base0A}";
         base0B = "#${sa theme.dark.base0B}";
+        diffadded = "#${color-lib.mixColors (color-lib.adjustOkhslLightness 0.03 theme.dark.base00) theme.dark.base0B 0.3}";
         base0C = "#${sa theme.dark.base0C}";
         base0D = "#${sa theme.dark.base0D}";
         base0E = "#${sa theme.dark.base0E}";
@@ -81,7 +83,7 @@
           light = "base07";
         };
         backgroundPanel = {
-          dark = "base00-1"; # its this fucker.
+          dark = "base00-1";
           light = "base06";
         };
         backgroundElement = {
@@ -111,7 +113,7 @@
           light = "base08";
         };
         diffContext = {
-          dark = "base0B"; #!!!
+          dark = "base07";
           light = "base03";
         };
         diffHunkHeader = {
@@ -127,15 +129,15 @@
           light = "base08";
         };
         diffAddedBg = {
-          dark = "base0D"; #!!!
+          dark = "diffadded";
           light = "base06";
         };
         diffRemovedBg = {
-          dark = "base0E"; #!!!
+          dark = "diffremoved";
           light = "base06";
         };
         diffContextBg = {
-          dark = "base0F"; #!!!
+          dark = "base00-2";
           light = "base06";
         };
         diffLineNumber = {
@@ -143,11 +145,11 @@
           light = "base05";
         };
         diffAddedLineNumberBg = {
-          dark = "base0A"; #!!!
+          dark = "base00-2"; # TODO
           light = "base06";
         };
         diffRemovedLineNumberBg = {
-          dark = "base0B"; #!!!
+          dark = "base00-2"; # TODO
           light = "base06";
         };
 
@@ -172,7 +174,7 @@
           light = "base0B";
         };
         markdownBlockQuote = {
-          dark = "base0C"; #!!!
+          dark = "base00-2";
           light = "base03";
         };
         markdownEmph = {
@@ -184,7 +186,7 @@
           light = "base0A";
         };
         markdownHorizontalRule = {
-          dark = "base0D"; #!!!
+          dark = "base0D";
           light = "base03";
         };
         markdownListItem = {

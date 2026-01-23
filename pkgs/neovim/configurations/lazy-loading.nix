@@ -1692,7 +1692,7 @@
     # Avante.nvim - AI copilot like Cursor AI IDE
     {
       plugins.avante = {
-        enable = true;
+        enable = false;
 
         lazyLoad = {
           enable = false;

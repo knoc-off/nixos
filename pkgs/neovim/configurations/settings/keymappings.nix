@@ -53,9 +53,29 @@
         "<M-k>" = ":move-2<CR>";
         "<M-j>" = ":move+<CR>";
 
-        # scroll by 5 lines with Shift + Up/Down
-        "<S-Up>" = '':execute "normal! " . v:count1 * 5 . "k"<CR>'';
-        "<S-Down>" = '':execute "normal! " . v:count1 * 5 . "j"<CR>'';
+        # scroll by 5 lines with Shift + Up/Down (no animation)
+        "<S-Up>" = helpers.mkRaw ''
+          function()
+            local animate = require('mini.animate')
+            local original_scroll = animate.config.scroll
+            animate.config.scroll = { enable = false }
+            vim.cmd('normal! ' .. vim.v.count1 * 5 .. 'k')
+            vim.schedule(function()
+              animate.config.scroll = original_scroll
+            end)
+          end
+        '';
+        "<S-Down>" = helpers.mkRaw ''
+          function()
+            local animate = require('mini.animate')
+            local original_scroll = animate.config.scroll
+            animate.config.scroll = { enable = false }
+            vim.cmd('normal! ' .. vim.v.count1 * 5 .. 'j')
+            vim.schedule(function()
+              animate.config.scroll = original_scroll
+            end)
+          end
+        '';
 
         # Always search forward using the current @/ pattern.
         "n" = ":<C-U>call search(@/, 'W')<CR>";

@@ -323,7 +323,7 @@ in {
       plugins.mini.modules.animate = {
         cursor.enable = false;
         scroll = {
-          enable = false;
+          enable = true;
           timing = helpers.mkRaw "require('mini.animate').gen_timing.linear({ duration = 80, unit = 'total' })";
         };
         resize.enable = false;
