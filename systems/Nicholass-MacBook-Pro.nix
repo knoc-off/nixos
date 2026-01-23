@@ -161,6 +161,7 @@ in {
       "mingw-w64" # For rust cross compilation to windows.
       "colima" # For docker
       "openssl"
+      "cliclick"
 
       "SergioBenitez/osxct/x86_64-unknown-linux-gnu"
 
