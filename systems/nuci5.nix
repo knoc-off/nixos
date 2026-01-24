@@ -13,10 +13,11 @@
     inputs.disko.nixosModules.disko
     ./hardware/disks/simple-disk.nix
     ./services/kdeconnect.nix
+    ./services/home-assistant.nix
 
-    (self.nixosModules.audio.pipewire pkgs)
-    (self.nixosModules.home args)
-    (self.nixosModules.nix inputs)
+    self.nixosModules.audio.pipewire
+    self.nixosModules.home
+    self.nixosModules.nix
 
     # need some kind of WM
     self.nixosModules.windowManager.hyprland
@@ -28,7 +29,7 @@
         extraPackages = with pkgs; [
           mesa
           intel-media-driver
-          vaapiIntel
+          intel-vaapi-driver
           libdrm
         ];
       };
