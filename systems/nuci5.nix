@@ -168,6 +168,8 @@
   };
   services.openssh.enable = true;
 
+  time.timeZone = "Europe/Berlin";
+
   environment.systemPackages = [
     pkgs.curl
     pkgs.gitMinimal

@@ -1,4 +1,4 @@
-use clap::{App, Arg, ArgMatches, SubCommand, AppSettings};
+use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use dirs;
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -7,7 +7,7 @@ use std::env;
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::process::{Command, exit};
+use std::process::{exit, Command};
 
 // Constants for environment variables and config paths
 const CONFIG_DIR_ENV: &str = "config_dir";
@@ -50,18 +50,16 @@ fn build_cli<'a, 'b>() -> App<'a, 'b> {
                 ),
         )
         .subcommand(
-            SubCommand::with_name("rr")
-                .about("Rebuild remote")
-                .arg(
-                    Arg::with_name("update")
-                        .short("u")
-                        .long("update")
-                        .help("Update the target host"),
-                ),
+            SubCommand::with_name("rr").about("Rebuild remote").arg(
+                Arg::with_name("update")
+                    .short("u")
+                    .long("update")
+                    .help("Update the target host"),
+            ),
         )
         .subcommand(
             SubCommand::with_name("nix-completions")
-                .about("Generate nix command completions for flake configurations (experimental)")
+                .about("Generate nix command completions for flake configurations (experimental)"),
         )
         // Define a positional 'query' argument for default action (file search)
         .arg(
@@ -80,7 +78,10 @@ fn main() {
         Ok(val) => val,
         Err(_) => {
             eprintln!("Error: Environment variable {} not set.", CONFIG_DIR_ENV);
-            eprintln!("Please set {} to the path of your NixOS configuration flake.", CONFIG_DIR_ENV);
+            eprintln!(
+                "Please set {} to the path of your NixOS configuration flake.",
+                CONFIG_DIR_ENV
+            );
             exit(1);
         }
     };
@@ -105,32 +106,33 @@ fn main() {
                 exit(1);
             }
             handle_rb(&config_dir, &hostname, force_flag)
-        },
+        }
         ("rt", _) => {
             if hostname.is_empty() {
                 eprintln!("Error: Hostname is required for 'rt' command. Set the {} environment variable.", HOSTNAME_ENV);
                 exit(1);
             }
             handle_rt(&config_dir, &hostname)
-        },
+        }
         ("cr", _) => {
             if hostname.is_empty() {
                 eprintln!("Error: Hostname is required for 'cr' command. Set the {} environment variable.", HOSTNAME_ENV);
                 exit(1);
             }
             handle_cr(&config_dir, &hostname)
-        },
+        }
         ("vm", _) => {
             if hostname.is_empty() {
                 eprintln!("Error: Hostname is required for 'vm' command. Set the {} environment variable.", HOSTNAME_ENV);
                 exit(1);
             }
             handle_vm(&config_dir, &hostname)
-        },
+        }
         ("cd", Some(sub_matches)) => handle_cd(&config_dir, sub_matches),
         ("rr", Some(sub_matches)) => handle_rr(&config_dir, sub_matches),
         ("nix-completions", _) => handle_nix_completions(&config_dir),
-        (_, _) => { // No recognized subcommand given; handle default (file search) or show help
+        (_, _) => {
+            // No recognized subcommand given; handle default (file search) or show help
             if let Some(query_values) = matches.values_of("query") {
                 let query = query_values.collect::<Vec<&str>>().join(" ");
                 handle_default(&config_dir, &query);
@@ -197,7 +199,7 @@ fn handle_rt(config_dir: &str, hostname: &str) {
             "test",
             "--flake",
             &format!("{}#{}", config_dir, hostname),
-            "--use-remote-sudo",
+            "--sudo",
         ])
         .status()
         .expect("Failed to execute nixos-rebuild command");
@@ -243,7 +245,7 @@ fn handle_vm(config_dir: &str, hostname: &str) {
             "build-vm",
             "--flake",
             &format!("{}#{}", config_dir, hostname),
-            "--use-remote-sudo",
+            "--sudo",
         ])
         .status()
         .expect("Failed to execute nixos-rebuild command");
@@ -270,7 +272,10 @@ fn handle_rr(config_dir: &str, matches: &ArgMatches) {
     println!("Fetching available systems from flake '{}'...", config_dir);
     let systems = get_available_systems(config_dir);
     if systems.is_empty() {
-        eprintln!("No available NixOS configurations found in flake '{}'.", config_dir);
+        eprintln!(
+            "No available NixOS configurations found in flake '{}'.",
+            config_dir
+        );
         eprintln!("Ensure your flake exposes an attribute set named 'nixosConfigurations'.");
         exit(1);
     }
@@ -291,41 +296,48 @@ fn handle_rr(config_dir: &str, matches: &ArgMatches) {
     }
 
     let domain = match saved_domain {
-         Some(d) if !update => {
-             println!("Using saved target for {}: {}", selected_host, d);
-             d
-         }
-         _ => { // Either update is true or no saved domain found
-             if update {
-                 println!("Updating target host for '{}'.", selected_host);
-             } else {
-                 println!("No saved target found for '{}'. Please provide one.", selected_host);
-             }
+        Some(d) if !update => {
+            println!("Using saved target for {}: {}", selected_host, d);
+            d
+        }
+        _ => {
+            // Either update is true or no saved domain found
+            if update {
+                println!("Updating target host for '{}'.", selected_host);
+            } else {
+                println!(
+                    "No saved target found for '{}'. Please provide one.",
+                    selected_host
+                );
+            }
 
-             print!("<user>@<domain/IP> for {}: ", selected_host);
-             io::stdout().flush().unwrap();
-             let mut domain_input = String::new();
-             io::stdin()
-                 .read_line(&mut domain_input)
-                 .expect("Failed to read domain/IP");
-             let domain = domain_input.trim().to_string();
+            print!("<user>@<domain/IP> for {}: ", selected_host);
+            io::stdout().flush().unwrap();
+            let mut domain_input = String::new();
+            io::stdin()
+                .read_line(&mut domain_input)
+                .expect("Failed to read domain/IP");
+            let domain = domain_input.trim().to_string();
 
-             if domain.is_empty() {
-                 eprintln!("Error: Target host cannot be empty.");
-                 exit(1);
-             }
-             if !domain.contains('@') || domain.split('@').nth(1).map_or(true, |s| s.is_empty()) {
-                 eprintln!("Error: Invalid format. Please use user@domain/IP format.");
-                 exit(1);
-             }
+            if domain.is_empty() {
+                eprintln!("Error: Target host cannot be empty.");
+                exit(1);
+            }
+            if !domain.contains('@') || domain.split('@').nth(1).map_or(true, |s| s.is_empty()) {
+                eprintln!("Error: Invalid format. Please use user@domain/IP format.");
+                exit(1);
+            }
 
-             // Save the new domain/IP
-             println!("Saving target {} for host '{}' to {:?}...", domain, selected_host, config_path);
-             save_target_host(&config_path, &selected_host, &domain)
-                 .expect("Failed to save target host configuration");
+            // Save the new domain/IP
+            println!(
+                "Saving target {} for host '{}' to {:?}...",
+                domain, selected_host, config_path
+            );
+            save_target_host(&config_path, &selected_host, &domain)
+                .expect("Failed to save target host configuration");
 
-             domain
-         }
+            domain
+        }
     };
 
     println!(
@@ -341,7 +353,7 @@ fn handle_rr(config_dir: &str, matches: &ArgMatches) {
             &format!("{}#{}", config_dir, selected_host),
             "--target-host",
             &domain,
-            "--use-remote-sudo",
+            "--sudo",
         ])
         .status()
         .expect("Failed to execute nixos-rebuild command");
@@ -355,7 +367,10 @@ fn handle_rr(config_dir: &str, matches: &ArgMatches) {
 
 fn handle_default(config_dir: &str, query: &str) {
     // Default action: search for a file matching the query and open with nvim
-    println!("Searching for files matching '{}' in '{}'...", query, config_dir);
+    println!(
+        "Searching for files matching '{}' in '{}'...",
+        query, config_dir
+    );
 
     // Execute fd to find nix files
     let fd_output = Command::new("fd")
@@ -375,10 +390,7 @@ fn handle_default(config_dir: &str, query: &str) {
         .expect("Failed to execute fd command. Is 'fd' installed and in PATH?");
 
     if !fd_output.status.success() {
-        eprintln!(
-            "fd command failed with status: {}",
-            fd_output.status
-        );
+        eprintln!("fd command failed with status: {}", fd_output.status);
         eprintln!("Stderr: {}", String::from_utf8_lossy(&fd_output.stderr));
         exit(fd_output.status.code().unwrap_or(1));
     }
@@ -443,14 +455,24 @@ fn handle_default(config_dir: &str, query: &str) {
         }
     } else {
         // fzf returns non-zero status if user cancels (e.g., Esc)
-        eprintln!("fzf selection canceled or failed (exit code: {}).", fzf_output.status);
+        eprintln!(
+            "fzf selection canceled or failed (exit code: {}).",
+            fzf_output.status
+        );
         // Exit normally on cancellation, non-normally on other errors
-        exit(if fzf_output.status.code() == Some(130) { 0 } else { fzf_output.status.code().unwrap_or(1) });
+        exit(if fzf_output.status.code() == Some(130) {
+            0
+        } else {
+            fzf_output.status.code().unwrap_or(1)
+        });
     }
 }
 
 fn search_and_change_directory(config_dir: &str, query: &str) {
-    println!("Searching for directories matching '{}' in '{}'...", query, config_dir);
+    println!(
+        "Searching for directories matching '{}' in '{}'...",
+        query, config_dir
+    );
     // Execute fd to find directories
     let fd_output = Command::new("fd")
         .args(&[
@@ -467,10 +489,7 @@ fn search_and_change_directory(config_dir: &str, query: &str) {
         .expect("Failed to execute fd command. Is 'fd' installed and in PATH?");
 
     if !fd_output.status.success() {
-        eprintln!(
-            "fd command failed with status: {}",
-            fd_output.status
-        );
+        eprintln!("fd command failed with status: {}", fd_output.status);
         eprintln!("Stderr: {}", String::from_utf8_lossy(&fd_output.stderr));
         exit(fd_output.status.code().unwrap_or(1));
     }
@@ -527,9 +546,16 @@ fn search_and_change_directory(config_dir: &str, query: &str) {
             exit(1); // Exit with error if nothing selected
         }
     } else {
-        eprintln!("fzf selection canceled or failed (exit code: {}).", fzf_output.status);
+        eprintln!(
+            "fzf selection canceled or failed (exit code: {}).",
+            fzf_output.status
+        );
         // Exit normally on cancellation (130), non-normally on other errors
-        exit(if fzf_output.status.code() == Some(130) { 0 } else { fzf_output.status.code().unwrap_or(1) });
+        exit(if fzf_output.status.code() == Some(130) {
+            0
+        } else {
+            fzf_output.status.code().unwrap_or(1)
+        });
     }
 }
 
@@ -539,15 +565,22 @@ fn get_available_systems(config_dir: &str) -> Vec<String> {
     // Ensure config_dir is a valid path
     let flake_path = PathBuf::from(config_dir);
     if !flake_path.exists() {
-        eprintln!("Error: Configuration directory '{}' does not exist.", config_dir);
+        eprintln!(
+            "Error: Configuration directory '{}' does not exist.",
+            config_dir
+        );
         exit(1);
     }
 
     // Use canonical path if possible for better reliability
-    let canonical_path = flake_path.canonicalize()
+    let canonical_path = flake_path
+        .canonicalize()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|e| {
-            eprintln!("Warning: Could not get canonical path for '{}': {}", config_dir, e);
+            eprintln!(
+                "Warning: Could not get canonical path for '{}': {}",
+                config_dir, e
+            );
             config_dir.to_string() // Fallback to original path
         });
 
@@ -618,33 +651,27 @@ fn select_with_fzf(options: &[String], prompt: &str) -> Option<String> {
 
     {
         // Use a block to ensure stdin is closed after writing
-        let stdin = child
-            .stdin
-            .as_mut()
-            .expect("Failed to open fzf stdin");
+        let stdin = child.stdin.as_mut().expect("Failed to open fzf stdin");
         for option in options {
             // Write each option followed by a newline
             if let Err(e) = writeln!(stdin, "{}", option) {
-                 // Handle potential broken pipe errors if fzf exits early
-                 eprintln!("Warning: Failed to write to fzf stdin: {}", e);
-                 break; // Stop writing if pipe is broken
-             }
+                // Handle potential broken pipe errors if fzf exits early
+                eprintln!("Warning: Failed to write to fzf stdin: {}", e);
+                break; // Stop writing if pipe is broken
+            }
         }
     } // stdin is dropped here, closing the pipe
 
     let output = match child.wait_with_output() {
-         Ok(out) => out,
-         Err(e) => {
-             eprintln!("Failed to wait on fzf child process: {}", e);
-             return None;
-         }
-     };
-
+        Ok(out) => out,
+        Err(e) => {
+            eprintln!("Failed to wait on fzf child process: {}", e);
+            return None;
+        }
+    };
 
     if output.status.success() {
-        let selection = String::from_utf8_lossy(&output.stdout)
-            .trim()
-            .to_string();
+        let selection = String::from_utf8_lossy(&output.stdout).trim().to_string();
         if !selection.is_empty() {
             Some(selection)
         } else {
@@ -654,7 +681,10 @@ fn select_with_fzf(options: &[String], prompt: &str) -> Option<String> {
     } else {
         // fzf returns non-zero status on cancellation (e.g., Esc key)
         // We consider cancellation as "no selection made" -> None
-        eprintln!("fzf selection canceled or failed (exit code: {}).", output.status);
+        eprintln!(
+            "fzf selection canceled or failed (exit code: {}).",
+            output.status
+        );
         None
     }
 }
@@ -664,7 +694,10 @@ fn get_config_file_path() -> PathBuf {
     let config_dir = home_dir.join(NX_CONFIG_DIR);
     // Create the directory if it doesn't exist before returning the file path
     if let Err(e) = fs::create_dir_all(&config_dir) {
-        eprintln!("Warning: Could not create config directory {:?}: {}", config_dir, e);
+        eprintln!(
+            "Warning: Could not create config directory {:?}: {}",
+            config_dir, e
+        );
     }
     config_dir.join(TARGET_HOST_FILE)
 }
@@ -673,11 +706,17 @@ fn save_target_host(path: &PathBuf, host: &str, domain: &str) -> io::Result<()> 
     let mut hosts: HashMap<String, HostConfig> = if path.exists() {
         match fs::read_to_string(path) {
             Ok(content) => serde_json::from_str(&content).unwrap_or_else(|e| {
-                eprintln!("Warning: Could not parse existing config file {:?}: {}. Starting fresh.", path, e);
+                eprintln!(
+                    "Warning: Could not parse existing config file {:?}: {}. Starting fresh.",
+                    path, e
+                );
                 HashMap::new()
             }),
             Err(e) => {
-                eprintln!("Warning: Could not read existing config file {:?}: {}. Starting fresh.", path, e);
+                eprintln!(
+                    "Warning: Could not read existing config file {:?}: {}. Starting fresh.",
+                    path, e
+                );
                 HashMap::new()
             }
         }
@@ -696,8 +735,12 @@ fn save_target_host(path: &PathBuf, host: &str, domain: &str) -> io::Result<()> 
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?; // Propagate IO error if creation fails here
     }
-    let content = serde_json::to_string_pretty(&hosts)
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("JSON serialization failed: {}", e)))?;
+    let content = serde_json::to_string_pretty(&hosts).map_err(|e| {
+        io::Error::new(
+            io::ErrorKind::Other,
+            format!("JSON serialization failed: {}", e),
+        )
+    })?;
     fs::write(path, content)
 }
 
@@ -723,14 +766,21 @@ fn handle_nix_completions(config_dir: &str) {
     // Ensure config_dir is a valid path before passing to nix
     let flake_path = PathBuf::from(config_dir);
     if !flake_path.exists() {
-        eprintln!("Error: Configuration directory '{}' does not exist.", config_dir);
+        eprintln!(
+            "Error: Configuration directory '{}' does not exist.",
+            config_dir
+        );
         exit(1);
     }
     // Use canonical path if possible
-    let canonical_path = flake_path.canonicalize()
+    let canonical_path = flake_path
+        .canonicalize()
         .map(|p| p.to_string_lossy().to_string())
         .unwrap_or_else(|e| {
-            eprintln!("Warning: Could not get canonical path for '{}': {}", config_dir, e);
+            eprintln!(
+                "Warning: Could not get canonical path for '{}': {}",
+                config_dir, e
+            );
             config_dir.to_string() // Fallback to original path
         });
 
@@ -746,7 +796,9 @@ fn handle_nix_completions(config_dir: &str) {
             "nix-command flakes",
         ])
         .output()
-        .expect("Failed to execute nix shell command for completions. Is 'nix' installed and in PATH?");
+        .expect(
+            "Failed to execute nix shell command for completions. Is 'nix' installed and in PATH?",
+        );
 
     if !output.status.success() {
         eprintln!(
@@ -756,26 +808,27 @@ fn handle_nix_completions(config_dir: &str) {
         eprintln!("Stderr: {}", String::from_utf8_lossy(&output.stderr));
         // Provide hints based on common errors
         if String::from_utf8_lossy(&output.stderr).contains("experimental Nix feature") {
-             eprintln!("Hint: Ensure flakes and nix-command are enabled in your nix configuration or use --extra-experimental-features 'nix-command flakes'.");
+            eprintln!("Hint: Ensure flakes and nix-command are enabled in your nix configuration or use --extra-experimental-features 'nix-command flakes'.");
         }
         if String::from_utf8_lossy(&output.stderr).contains("cannot find flake") {
-             eprintln!("Hint: Ensure '{}' is a valid flake path.", canonical_path);
+            eprintln!("Hint: Ensure '{}' is a valid flake path.", canonical_path);
         }
-         if String::from_utf8_lossy(&output.stderr).contains("does not provide attribute 'nixosConfigurations'") {
-             eprintln!("Hint: Ensure your flake.nix file defines the output 'nixosConfigurations'.");
-         }
+        if String::from_utf8_lossy(&output.stderr)
+            .contains("does not provide attribute 'nixosConfigurations'")
+        {
+            eprintln!("Hint: Ensure your flake.nix file defines the output 'nixosConfigurations'.");
+        }
         exit(output.status.code().unwrap_or(1));
     }
 
     // Print the completion script directly to stdout
     if let Err(e) = io::stdout().write_all(&output.stdout) {
-         eprintln!("Error writing completion script to stdout: {}", e);
-         exit(1);
-     }
-     // No newline needed usually, as the script should be complete
-     io::stdout().flush().unwrap(); // Ensure output is flushed
+        eprintln!("Error writing completion script to stdout: {}", e);
+        exit(1);
+    }
+    // No newline needed usually, as the script should be complete
+    io::stdout().flush().unwrap(); // Ensure output is flushed
 
-     // Exit successfully
-     exit(0);
+    // Exit successfully
+    exit(0);
 }
-
