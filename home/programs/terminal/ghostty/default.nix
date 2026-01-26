@@ -152,8 +152,8 @@ in {
         "super+minus=decrease_font_size:1"
         "super+zero=reset_font_size"
 
-        "super+enter=new_split:right" # New split to the right (stack layout)
-        "super+shift+enter=new_split:down" # Force split downward (for stacking)
+        "super+shift+enter=new_split:right" # New split to the right (stack layout)
+        #"super+shift+enter=new_split:down" # Force split downward (for stacking)
         "super+shift+w=close_surface" # Close split
 
         # Split navigation (vim-style, focus-follows-mouse enabled)
