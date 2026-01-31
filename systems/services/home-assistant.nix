@@ -8,6 +8,7 @@ in {
   imports = [
     # ./home-automations/dnd.nix
     ./home-automations/bedroom.nix
+    ./home-automations/motion-doorbell.nix
   ];
 
   services.mosquitto = {
@@ -54,11 +55,10 @@ in {
   services.home-assistant = {
     enable = true;
 
-    # Only add things you really need here
     extraComponents = [
       "default_config"
       "met"
-      "mqtt" # optional, default_config already includes it
+      "mqtt"
     ];
 
     config = {
