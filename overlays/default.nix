@@ -1,10 +1,4 @@
 {inputs, ...}: {
-  #additions = final: prev:
-  #  import ../pkgs {
-  #    inherit inputs;
-  #    pkgs = final;
-  #  };
-
   modifications = _final: prev: {
 
     steam-scaling = prev.steamPackages.steam-fhsenv.override (old: {

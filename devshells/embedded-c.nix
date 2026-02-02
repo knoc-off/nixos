@@ -4,7 +4,6 @@ let
   avrTools = with pkgs.pkgsCross.avr; [
     buildPackages.gcc
     buildPackages.binutils
-    #buildPackages.avrlibcCross
   ];
 
   arduinoTools = with pkgs; [

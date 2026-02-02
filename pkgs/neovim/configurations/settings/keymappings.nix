@@ -1,8 +1,4 @@
-{
-  helpers,
-  lib,
-  ...
-}: {
+{lib, ...}: {
   globals = {
     mapleader = " ";
     maplocalleader = " ";
@@ -24,7 +20,7 @@
 
         # Accept LSP code action for the current line
         "<leader>a" = ":lua vim.lsp.buf.code_action()<CR>";
-        
+
         # LSP functions without telescope equivalents
         "<leader>lh" = ":lua vim.lsp.buf.hover()<CR>";
         "<leader>lS" = ":lua vim.lsp.buf.signature_help()<CR>";
@@ -54,7 +50,7 @@
         "<M-j>" = ":move+<CR>";
 
         # scroll by 5 lines with Shift + Up/Down (no animation)
-        "<S-Up>" = helpers.mkRaw ''
+        "<S-Up>" = lib.nixvim.mkRaw ''
           function()
             local animate = require('mini.animate')
             local original_scroll = animate.config.scroll
@@ -65,7 +61,7 @@
             end)
           end
         '';
-        "<S-Down>" = helpers.mkRaw ''
+        "<S-Down>" = lib.nixvim.mkRaw ''
           function()
             local animate = require('mini.animate')
             local original_scroll = animate.config.scroll
@@ -92,12 +88,12 @@
 
         # No-jump search forward
         "/" =
-          helpers.mkRaw
+          lib.nixvim.mkRaw
           "function() local query = vim.fn.input('/'); if query ~= '' then vim.fn.setreg('/', query); vim.fn.search(query, 'n'); vim.opt.hlsearch = true; end end";
 
         # No-jump search backward
         "?" =
-          helpers.mkRaw
+          lib.nixvim.mkRaw
           "function() local query = vim.fn.input('?'); if query ~= '' then vim.fn.setreg('/', query); vim.fn.search(query, 'bn'); vim.opt.hlsearch = true; end end";
       };
 
@@ -145,6 +141,6 @@
         "<S-Down>" = "5j";
       };
   in
-    helpers.keymaps.mkKeymaps {options.silent = true;}
+    lib.nixvim.keymaps.mkKeymaps {options.silent = true;}
     (normal ++ visual ++ insert);
 }

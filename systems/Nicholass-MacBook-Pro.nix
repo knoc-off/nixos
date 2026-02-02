@@ -20,13 +20,8 @@ in {
   imports = [
     (self.darwinModules.home args)
     inputs.sops-nix.darwinModules.sops
-    # resistance is futile. zsh it is for now.
-    # ./modules/shell/fish.nix
-    # {
-    #   programs.fish.enable = true;
-    # }
     {
-      nixpkgs.config.allowUnfree = true; # TODO swap out for my nix-module.
+      nixpkgs.config.allowUnfree = true;
       users.users.${user}.shell = pkgs.zsh;
       environment.variables = {
         EDITOR = "vi";
@@ -34,11 +29,9 @@ in {
         ANTHROPIC_API_KEY = "$(cat ${config.sops.secrets.ANTHROPIC_API_KEY.path})";
       };
       programs.zsh = {
-        #erableFzfCompletion = true;
         enableFzfHistory = true;
         enableCompletion = true;
         enableSyntaxHighlighting = true;
-        #enableAutosuggestions = true;
         interactiveShellInit = ''
           export PATH="$(realpath ~/.cargo/bin):$PATH"
 
@@ -54,7 +47,6 @@ in {
     }
 
     {
-      # borked
       services.yabai = {
         enable = false;
         config = {
@@ -116,15 +108,13 @@ in {
     fd
     fzf
     jq
-    gh # required by octo.nvim
-    shellcheck # Dont need this?
+    gh
+    shellcheck
 
-    # secrets management
     sops
     age
     cmake
 
-    # company tools
     wireguard-tools
     awscli2
 
@@ -135,24 +125,6 @@ in {
 
     rustup
     cargo-nextest
-
-    # Add these to my nix-vim.
-    # # Lua LSP
-    # lua-language-server
-    # # Nix LSP
-    # nil
-    # # Terraform LSP
-    # terraform-ls
-    # # jsonnet LSP from grafana
-    # jsonnet-language-server
-
-    # # node-related for LSP
-    # # for vscode-eslint-language-server, vscode-json-language-server
-    # vscode-langservers-extracted
-    # nodePackages_latest.typescript-language-server # typescript-language-server
-    # typescript # tsserver is actually here?
-    # svelte-language-server
-    # emmet-language-server
   ];
   programs.direnv.enable = true;
 
@@ -180,11 +152,9 @@ in {
 
       "rectangle"
       "spotify"
-      # "alt-tab"
       "tableplus"
       "raycast"
       "slack"
-      # "fly"
       "zen"
     ];
     brews = [
@@ -194,7 +164,6 @@ in {
 
       "SergioBenitez/osxct/x86_64-unknown-linux-gnu"
 
-      # Install autoraise without starting service (managed by custom launchd service below)
       {
         name = "autoraise";
         args = [
@@ -234,12 +203,10 @@ in {
     serviceConfig = {
       KeepAlive = true;
       RunAtLoad = true;
-      # Ensure we don't conflict with homebrew's default service
       Label = "org.nixos.autoraise";
     };
   };
 
-  # Sops configuration
   sops = {
     defaultSopsFile = ./secrets/Nicholass-MacBook-Pro/default.yaml;
     age.sshKeyPaths = ["/Users/${user}/.ssh/id_ed25519"];

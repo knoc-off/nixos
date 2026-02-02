@@ -7,7 +7,6 @@
   # 2. find extension -> click "Inspect"
   # 3. Go to Storage tab -> Extension Storage
 
-  # sidebery:
   "{3c078156-979c-498b-8990-85f7987dd929}" = {
     force = true;
     settings = {
@@ -29,18 +28,6 @@
         depthStyles = builtins.concatStringsSep "\n" (
           builtins.genList (i: tabDepthStyle i (i * 40)) 10
         );
-        # { depth = 0; hue = 0;   sat = 80; light = 50; }
-        # tabDepthStyle = depth: satMult: brightMult: hueRot: ''
-        #   .Tab[data-lvl="${toString depth}"][data-colorized="true"] .color-layer {
-        #     background-image: linear-gradient(to right, var(--tab-color, rgba(0, 0, 0, 1)) 0%, var(--tab-color, rgba(0, 0, 0, 1)) 100%);
-        #     background-size: 3px 100%;
-        #     background-position: 0 0;
-        #     filter: saturate(${toString satMult}) brightness(${toString brightMult}) hue-rotate(${toString hueRot}deg);
-        #   }
-        # '';
-        # depthStyles = builtins.concatStringsSep "\n" (
-        #   builtins.genList (i: tabDepthStyle i (3 + i * 0.2) (1.3 + i * 0.2) (i * 40)) 10
-        # );
       in ''
         #root.root {
           --nav-btn-width: 37px;

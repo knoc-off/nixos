@@ -341,6 +341,14 @@
         bash = "ask";
       };
       mcp = {
+        context7 = {
+          type = "remote";
+          url = "https://mcp.context7.com/mcp";
+          headers = {
+            CONTEXT7_API_KEY = "ctx7sk-aa86d2c2-ca7e-489c-a0ee-65733a066c8b";
+          };
+          enabled = true;
+        };
         ddog = {
           type = "remote";
           url = "https://mcp.datadoghq.eu/api/unstable/mcp-server/mcp";

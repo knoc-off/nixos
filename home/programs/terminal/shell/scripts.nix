@@ -20,15 +20,6 @@
 in {
   home.packages =
     [
-      # Skim Environment variables
-      # python3 -c 'import os,sys; sys.stdout.write("\0".join(sorted(os.environ)) + "\0")' |
-      #   sk --read0 --no-mouse --no-multi \
-      #      --preview 'python3 -c "import os,sys; v=os.environ.get(sys.argv[1],\"\"); sys.stdout.write(v)" {}' \
-      #      --preview-window=right:70%:wrap
-
-      # Git Branches
-      # gid diff with specific branches, show preview-window
-
       (mkComplgenScript {
         name = "csv_to_excel";
         scriptContent = ''
@@ -37,13 +28,10 @@ in {
           if [ "$#" -ne 2 ]; then echo "Usage: csv_to_excel <input.csv> <output.xlsx>"; exit 1; fi
           input_csv="$1"; output_xlsx="$2"
           if [ ! -f "$input_csv" ]; then echo "Error: Input CSV file not found: '$input_csv'"; exit 1; fi
-          # Note: Python path comes from runtimeDeps via wrapper
           python -c "import pandas as pd; import sys; df = pd.read_csv(sys.argv[1], encoding='utf-8'); df.to_excel(sys.argv[2], index=False)" "$input_csv" "$output_xlsx"
           echo "Converted '$input_csv' to '$output_xlsx'"
         '';
-        # Grammar using external command 'fd'
         grammar = ''csv_to_excel {{{ ${pkgs.fd}/bin/fd --type f --extension csv --max-depth 1 . --color never --hidden --no-ignore }}} "Input CSV file" <PATH> "Output XLSX file";'';
-        # Runtime dependency for the script itself
         runtimeDeps = [
           (pkgs.python3.withPackages (ps: [
             ps.pandas
@@ -54,17 +42,13 @@ in {
 
       (mkComplgenScript {
         name = "excel_to_csv";
-        # Minimal script content, relies on Python/pandas for error handling
         scriptContent = ''
           #!${pkgs.bash}/bin/bash
-          # Python path comes from runtimeDeps via wrapper
           python -c "import pandas as pd; import sys; pd.read_excel(sys.argv[1]).to_csv(sys.argv[2], index=False, encoding='utf-8')" "$1" "$2"
         '';
-        # Grammar for completion
         grammar = ''
           excel_to_csv {{{ ${pkgs.fd}/bin/fd --type f --extension xlsx --extension xls --max-depth 1 . --color never --hidden --no-ignore }}} "Input Excel file" <PATH> "Output CSV file";
         '';
-        # Runtime dependencies
         runtimeDeps = [
           (pkgs.python3.withPackages (ps: [
             ps.pandas
@@ -79,26 +63,18 @@ in {
            --preview-window '+{2}-/2' \
            --delimiter ':'
       '')
-
-      # Note: Removed kittydark and kittylight scripts
-      # These used kitty's remote control to switch themes at runtime
-      # Ghostty does not support runtime theme switching
     ]
     ++ lib.optionals pkgs.stdenv.isLinux [
-      # Linux-specific scripts
       (mkComplgenScript {
         name = "anti-sleep";
         scriptContent = ''
           #!${pkgs.bash}/bin/bash
           set -euo pipefail
 
-          # --- Configuration ---
-          # systemd-inhibit arguments
           INHIBIT_WHAT="sleep:idle:handle-lid-switch"
-          INHIBIT_WHO="$USER" # Use the current user
+          INHIBIT_WHO="$USER"
           INHIBIT_MODE="block"
 
-          # --- Argument Parsing & Duration Calculation ---
           usage() {
             echo "Usage: anti-sleep <duration | HH:MM>"
             echo "  duration: e.g., 30m, 1h, 6h, or any value accepted by 'sleep' (like 90s, 2h30m)"

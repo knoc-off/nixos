@@ -16,8 +16,6 @@ in
       avrdude
 
       pkgsCross.avr.buildPackages.gcc
-      #pkgsCross.avr.buildPackages.avrlibcCross
-      #avrlibcCross
     ];
 
 

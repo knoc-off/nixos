@@ -3,7 +3,6 @@
   color-lib,
   lib,
   theme,
-  helpers,
   ...
 }: let
   # Recursively flatten theme tree to create match patterns
@@ -71,7 +70,7 @@ in {
         {
           mode = "n";
           key = "<S-CR>";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               local path = vim.fn.expand('<cfile>')
               if path ~= "" then
@@ -128,7 +127,7 @@ in {
           tab_size = 24;
           max_name_length = 24;
           separator_style = "slope";
-          name_formatter = helpers.mkRaw ''
+          name_formatter = lib.nixvim.mkRaw ''
             function(buf)
               local tabnr = buf.tabnr
               local wins = vim.api.nvim_tabpage_list_wins(tabnr)
@@ -156,7 +155,7 @@ in {
         {
           mode = "n";
           key = "<Tab>";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               if vim.fn.tabpagenr('$') > 1 then
                 vim.cmd('tabnext')
@@ -171,7 +170,7 @@ in {
         {
           mode = "n";
           key = "<S-Tab>";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               if vim.fn.tabpagenr('$') > 1 then
                 vim.cmd('tabprev')
@@ -186,7 +185,7 @@ in {
         {
           mode = "n";
           key = "<leader>n";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               vim.cmd('tabnew')
               vim.schedule(function()
@@ -202,7 +201,7 @@ in {
         {
           mode = "n";
           key = "<leader>c";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               vim.cmd('tabclose')
             end
@@ -215,7 +214,7 @@ in {
         {
           mode = "n";
           key = "<leader>q";
-          action = helpers.mkRaw ''
+          action = lib.nixvim.mkRaw ''
             function()
               vim.cmd('qall')
             end
@@ -324,7 +323,7 @@ in {
         cursor.enable = false;
         scroll = {
           enable = true;
-          timing = helpers.mkRaw "require('mini.animate').gen_timing.linear({ duration = 80, unit = 'total' })";
+          timing = lib.nixvim.mkRaw "require('mini.animate').gen_timing.linear({ duration = 80, unit = 'total' })";
         };
         resize.enable = false;
         open.enable = false;

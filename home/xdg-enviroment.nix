@@ -27,19 +27,13 @@ in {
   };
 
   home.packages = with pkgs; [
-    # move to desktop module?
     gnome-disk-utility
 
-    #gedit
     f3d
-
-    #(gimp-with-plugins.override { plugins = with gimpPlugins; [ resynthesizer ]; })
-    #gimp
 
     feh
   ];
 
-  # XDG settings
   xdg.mimeApps = {
     enable = true;
 
@@ -47,7 +41,6 @@ in {
       toMimeApps
       {
         application = {
-          # Existing entries
           pdf = ["org.gnome.Evince.desktop"];
           json = ["term-neovim.desktop"];
           xml = ["term-neovim.desktop"];
@@ -64,33 +57,12 @@ in {
           "x-tar" = ["org.gnome.FileRoller.desktop"];
           "x-gzip" = ["org.gnome.FileRoller.desktop"];
           "x-bzip2" = ["org.gnome.FileRoller.desktop"];
-
-          # Example: Use term-neovim for markdown
-          # "markdown" = [ "term-neovim.desktop" ];
-
-          # Example: Use term-neovim for LaTeX
-          # "x-tex" = [ "term-neovim.desktop" ];
-
-          # Example: Use term-neovim for Rust
-          # "x-rust" = [ "term-neovim.desktop" ];
-
-          # Example: Use LibreOffice for .doc or .docx
-          # "msword"        = [ "libreoffice-writer.desktop" ];
-          # "vnd.openxmlformats-officedocument.wordprocessingml.document" = [ "libreoffice-writer.desktop" ];
-
-          # Example: Conditionally enable Go file type
-          # "x-golang" = lib.mkIf (lib.elem pkgs.go config.environment.systemPackages) {
-          #   [ "term-neovim.desktop" ];
-          # };
         };
 
         video = {
           mp4 = ["mpv.desktop"];
           "x-matroska" = ["mpv.desktop"];
           webm = ["mpv.desktop"];
-
-          # "x-msvideo" = [ "mpv.desktop" ];
-          # "ogg"       = [ "mpv.desktop" ];
         };
 
         audio = {
@@ -98,9 +70,6 @@ in {
           ogg = ["mpv.desktop"];
           wav = ["mpv.desktop"];
           flac = ["mpv.desktop"];
-
-          # "x-ms-wma" = [ "mpv.desktop" ];
-          # "aac"      = [ "mpv.desktop" ];
         };
 
         image = {
@@ -110,24 +79,11 @@ in {
           png = ["qview.desktop"];
           "svg+xml" = ["qview.desktop"];
           tiff = ["qview.desktop"];
-
-          # "x-icns" = [ "qview.desktop" ];
-          # "x-portable-pixmap" = [ "qview.desktop" ];
         };
 
         inode = {
           directory = ["org.gnome.Nautilus.desktop"];
-          # lib.mkIf (lib.elem pkgs.<pkg> config.environment.systemPackages)
-
-          # # Possible custom handling for certain directories
-          # # "mount-point" = [ "org.gnome.DiskUtility.desktop" ];
         };
       };
-    #defaultApplications =
-    # mkMimeMap { prefix = "application"; entries = mimeDefaults.application; }
-    # mkMimeMap { prefix = "text";        entries = mimeDefaults.text; }
-    # mkMimeMap { prefix = "video";       entries = mimeDefaults.video; }
-    # mkMimeMap { prefix = "audio";       entries = mimeDefaults.audio; }
-    # mkMimeMap { prefix = "image";       entries = mimeDefaults.image; };
   };
 }

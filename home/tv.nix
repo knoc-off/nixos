@@ -31,67 +31,6 @@ in {
     ./tv-xdg-env.nix
   ];
 
-  # programs.kodi = {
-  #   enable = true;
-  #   #package = pkgs.kodi-wayland;
-  #   # package = # pkgs.kodi.withPackages (exts: [ exts.pvr-iptvsimple ]);
-  #   package = pkgs.kodi-wayland.withPackages (kodiPkgs:
-  #     with kodiPkgs; [
-  #       jellyfin
-  #       youtube
-  #       pvr-iptvsimple
-  #       steam-controller
-  #     ]);
-  #   settings = { videolibrary.showemptytvshows = "true"; };
-  #   sources = {
-  #     video = {
-  #       default = "movies";
-  #       source = [
-  #         # {
-  #         #   name = "videos";
-  #         #   path = "${config.home-manager.users.tv.xdg.userDirs.videos}/misc";
-  #         #   allowsharing = "true";
-  #         # }
-  #         {
-  #           name = "shows";
-  #           path = "${config.xdg.dataHome}/shows";
-  #           allowsharing = "true";
-  #         }
-  #         {
-  #           name = "movies";
-  #           path = "${config.xdg.dataHome}/movies";
-  #           allowsharing = "true";
-  #         }
-  #       ];
-  #     };
-  #   };
-
-  # };
-
-  # systemd.user.services.steam = {
-  #   Unit = {
-  #     Description = "Steam Client";
-  #     After = [ "graphical-session.target" ];
-  #     PartOf = [ "graphical-session.target" ];
-  #   };
-
-  #   Service = {
-  #     ExecStart =
-  #       "${pkgs.steam}/bin/steam -silent"; # maybe i should just run "steam" and not pkgs.steam
-  #     ExecStop = "${pkgs.procps}/bin/pkill -TERM steam";
-  #     Restart = "on-failure";
-  #     RestartSec = "5s";
-  #     Environment =
-  #       "LD_PRELOAD=${pkgs.pkgsi686Linux.extest}/lib/libextest.so"; # Only if using extest
-  #     # Add other environment variables if needed
-  #   };
-
-  #   Install.WantedBy = [ "graphical-session.target" ];
-  # };
-
-  # services.dunst = { enable = true; };
-
-  # GTK Configuration
   gtk = {
     enable = true;
     theme = {
@@ -115,7 +54,6 @@ in {
     gtk4.extraConfig.gtk-application-prefer-dark-theme = true;
   };
 
-  # Qt Configuration
   qt = {
     enable = true;
     platformTheme.name = "kde";
@@ -127,12 +65,10 @@ in {
 
   home.sessionVariables = {
     QT_QPA_PLATFORM = "wayland";
-    # MOZ_ENABLE_WAYLAND = "1"; # For Firefox, if not already set elsewhere
     XDG_SESSION_TYPE = "wayland";
     QT_QPA_PLATFORMTHEME = "kde";
     QT_STYLE_OVERRIDE = "breeze";
 
-    # KDE/Dolphin integration
     KDE_SESSION_VERSION = "6";
     KDE_FULL_SESSION = "true";
   };
@@ -216,7 +152,6 @@ in {
       "<" = "playlist-prev";
       "s" = "screenshot video";
       "S" = "screenshot window";
-      # Corrected binding:
       "ctrl+l" = ''
         apply-profile "low-latency-stream"; show-text "Low Latency Stream Profile Applied"'';
     };
@@ -225,15 +160,12 @@ in {
   home.packages = with pkgs; [
     (inputs.nixgl.packages.x86_64-linux.nixGLIntel)
 
-    # KDE Applications for TV box
-    kdePackages.dolphin # File manager (includes kio as dependency)
-    kdePackages.ark # Archive manager
-    kdePackages.okular # PDF/document viewer
-    kdePackages.gwenview # Alternative image viewer (optional, qview is lighter)
-    kdePackages.plasma-workspace # Provides keditfiletype for editing file associations in Dolphin
-    kdePackages.kservice # Provides kbuildsycoca6 for rebuilding KDE service cache
-
-    # HDMI-CEC control scripts
+    kdePackages.dolphin
+    kdePackages.ark
+    kdePackages.okular
+    kdePackages.gwenview
+    kdePackages.plasma-workspace
+    kdePackages.kservice
     (writeShellScriptBin "tv-wakeup" ''
       echo 'on 0' | ${libcec}/bin/cec-client -s -d 1
     '')
@@ -241,7 +173,6 @@ in {
       echo 'standby 0' | ${libcec}/bin/cec-client -s -d 1
     '')
 
-    # Theming packages
     kdePackages.breeze
     kdePackages.breeze-gtk
     kdePackages.breeze-icons
@@ -250,68 +181,34 @@ in {
     noto-fonts-color-emoji
   ];
 
-  # 1. Enable KDE Connect Service
-  # This starts the 'kdeconnectd' daemon for your user.
   services.kdeconnect = {
     enable = true;
     indicator = true;
   };
 
-  # 2. Enable the KDE Daemon (kded)
-  # This is the most critical step for screen mirroring.
-  # It runs the background service that hosts the screen sharing module.
-  # services.kded.enable = true;
-
-  # 3. Configure XDG Portals for Wayland Integration
-  # This ensures that applications use the KDE portal for screen sharing.
   xdg.portal = {
     enable = true;
     config = {
       common = {
-        default = ["hyprland"]; # Use Hyprland portal by default
-        # Explicitly route screen sharing to KDE portal for KDE Connect
+        default = ["hyprland"];
         "org.freedesktop.impl.portal.ScreenCast" = ["kde"];
         "org.freedesktop.impl.portal.RemoteDesktop" = ["kde"];
-
-        #"org.freedesktop.impl.portal.Screenshot" = "wlr";
       };
     };
     extraPortals = [
-      # pkgs.xdg-desktop-portal-kde # For KDE Connect screen sharing
       pkgs.kdePackages.xdg-desktop-portal-kde
-
-      # pkgs.xdg-desktop-portal-hyprland
     ];
   };
 
-  # 5. Ensure a notification daemon is running
-  # KDE Connect relies on this to show notifications from your phone.
-  # Mako is a popular, lightweight choice for Wayland.
   services.mako.enable = true;
-  # Alternatively, you could use another like swaync:
-  # programs.swaync.enable = true;
 
-  # Create XDG menu file for Dolphin to discover applications
-  # Without Plasma desktop, this file doesn't exist and Dolphin can't find apps
-  # We symlink directly from plasma-workspace package to get the real, complete menu
   xdg.configFile."menus/applications.menu".source = "${pkgs.kdePackages.plasma-workspace}/etc/xdg/menus/plasma-applications.menu";
 
-  # Symlink the directory definitions from plasma-workspace
-  # This scales automatically as the package updates
   xdg.dataFile."desktop-directories".source = "${pkgs.kdePackages.plasma-workspace}/share/desktop-directories";
-
-  # Rebuild KDE service cache so Dolphin can find applications
   home.activation.rebuildKdeCache = lib.hm.dag.entryAfter ["writeBoundary"] ''
     export PATH="${pkgs.kdePackages.kservice}/bin:$PATH"
     kbuildsycoca6 --noincremental || echo "Warning: kbuildsycoca6 failed, but continuing..."
   '';
-
-  # nixpkgs = {
-  #   config = {
-  #     allowUnfree = true;
-  #     allowUnfreePredicate = _pkg: true;
-  #   };
-  # };
 
   # # Override the generated systemd user services to ensure they use Wayland
   # systemd.user.services.kdeconnect = { # This targets the service for kdeconnectd

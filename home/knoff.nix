@@ -28,10 +28,8 @@
 
     ./programs/editor/default.nix
 
-    # Firefox
     ./programs/browser/firefox
 
-    # ./programs/gaming/lutris.nix
     ./enviroment.nix
 
     ./desktop/hyprland.nix
@@ -48,7 +46,6 @@
       };
     }
     self.homeModules.starship
-    # self.homeModules.hyprland
 
     self.homeModules.kanata
     self.homeModules.hyprkan
@@ -64,7 +61,6 @@
         ];
 
         rules = [
-          # Terminal apps use special layer (caps = right meta)
           {
             class = "com.mitchellh.ghostty";
             layer = "terminal";
@@ -74,7 +70,6 @@
             layer = "terminal";
           }
 
-          # Default fallback provides mappings for common ctrl shortcuts
           {
             class = "*";
             title = "*";
@@ -84,7 +79,6 @@
       };
     }
 
-    # Kanata keyboard remapping via home module
     {
       services.kanata = {
         enable = true;
@@ -131,26 +125,6 @@
             )
           '';
         };
-
-        # keyboards.mx-master = {
-        #   devices = ["/dev/input/by-id/usb-Logitech_USB_Receiver-if01-event-mouse"];
-        #   extraDefCfg = "danger-enable-cmd yes";
-        #   config = ''
-        #     (defalias
-        #       rofi-launch (cmd ${pkgs.rofi}/bin/rofi -show drun)
-        #       scroll-slow (cmd ${pkgs.libratbag}/bin/ratbagctl wheel set multiplier 0.3)
-        #       scroll-fast (cmd ${pkgs.libratbag}/bin/ratbagctl wheel set multiplier 2.0)
-        #       wheel-smooth (cmd ${pkgs.libratbag}/bin/ratbagctl wheel set mode smooth)
-        #       wheel-ratchet (cmd ${pkgs.libratbag}/bin/ratbagctl wheel set mode ratchet)
-        #     )
-
-        #     (defsrc
-        #       mbck mfwd mwu mwd)
-
-        #     (deflayer base
-        #       @rofi-launch mmid mwu mwd)
-        #   '';
-        # };
       };
     }
 
@@ -167,7 +141,6 @@
       profile = "${user}";
     };
 
-    # never works reliably
     batsignal.enable = true;
   };
 
@@ -177,58 +150,20 @@
     };
     home-manager.enable = true;
   };
-  # TODO: move this to someplace more logical
 
   home = {
     packages = with pkgs; [
       self.packages.${pkgs.stdenv.hostPlatform.system}.neovim-nix.default
       spotify
 
-      #(pkgs.python3.withPackages
-      #(ps: [ ps.llm self.packages.${pkgs.stdenv.hostPlatform.system}.llm-cmd ]))
-
-      #self.packages.${pkgs.stdenv.hostPlatform.system}.ttok
-      #self.packages.${pkgs.stdenv.hostPlatform.system}.spider-cli
-      #self.packages.${pkgs.stdenv.hostPlatform.system}.tabiew
-
       upkgs.opencode
 
       upkgs.claude-code
-      # (upkgs.claude-code.overrideAttrs (oldAttrs: rec {
-      #   version = "2.0.52";
-      #   src = pkgs.fetchzip {
-      #     url = "https://registry.npmjs.org/@anthropic-ai/claude-code/-/claude-code-${version}.tgz";
-      #     hash = "sha256-lYVuWP9ekI+xeUXNCXVqcq8OIzZwfdgBpk0PhSIStFs=";
-      #   };
-      # }))
-      # ai tools
-      fabric-ai # Meh. not a fan, but it works well
+      fabric-ai
       upkgs.gemini-cli
-      upkgs.litellm
-      upkgs.prismlauncher
-      upkgs.gimp3
-      #upkgs.astal.hyprland
 
-      lazysql
-
-      evince # Move this to xdg ...
-      # slack
-
-      ripcord
-
-      upkgs.obsidian
-
-      # koodo-reader # books
-
-      # prismlauncher # Minecraft
-
-      # not sure if i need any of these:
-      # kdePackages.breeze-icons
-
-      # ill make my own calculator soon, with ags.
       gnome-calculator
 
-      # it would be cool to make prusa-slicer declaritive. might work on a module for it. #TODO
       prusa-slicer
 
       openscad
@@ -237,7 +172,6 @@
       watchexec
       quicksand
 
-      # Mouse configuration tools
       libratbag
       piper
     ];
@@ -247,6 +181,5 @@
 
   fonts.fontconfig.enable = true;
 
-  # Nicely reload system units when changing configs
   systemd.user.startServices = "sd-switch";
 }

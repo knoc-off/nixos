@@ -39,7 +39,6 @@ in
     };
 
     shellHook = ''
-      #cd nix/pkgs/portfolio
       clear
       echo "create new symbolic links? (y/n)"
       read confirmation

@@ -6,13 +6,10 @@
     nixpkgs-unstable,
     ...
   }: let
-    # theme is now defined inside mkConfig where color-lib is available
     systems = [
       "aarch64-linux"
       "x86_64-linux"
       "aarch64-darwin"
-      #"i686-linux"
-      #"x86_64-darwin"
     ];
 
     forAllSystems = nixpkgs.lib.genAttrs systems;
@@ -21,7 +18,6 @@
 
     inherit (lib) nixosSystem listToAttrs;
 
-    # Unified configuration generator for hosts and images
     mkConfig = {
       hostname,
       user,
@@ -29,9 +25,7 @@
       extraModules ? [],
       extraConfigs ? {},
     }: let
-      # Define color-lib and theme here where lib and system are known
       inherit (self.lib) math color-lib;
-      # Pass color-lib and lib to the theme function
       theme = import ./theme.nix {inherit color-lib math lib;};
 
       mkSystem =
@@ -97,11 +91,9 @@
                   nixpkgs.hostPlatform.system = system;
                   nixpkgs.buildPlatform.system = "x86_64-linux";
                 }
-                #{sdImage = {sdName = lib.mkForce name;};}
               ]
               else [
                 ./systems/modules/${imageType}.nix
-                #{"${imageType}" = {name = lib.mkForce name;};}
               ]
             );
         }).config.system.build.${
@@ -109,7 +101,6 @@
         };
     };
 
-    # Import packages from the unstable Nixpkgs channel
     unstablePkgs = system:
       import nixpkgs-unstable {
         inherit system;
@@ -119,16 +110,13 @@
         };
       };
 
-    # Function to create package sets for a given system
     mkPkgs = system: let
       upkgs = unstablePkgs system;
 
       inherit (self.lib) math color-lib;
 
-      # Pass color-lib and lib to the theme function
       theme = import ./theme.nix {inherit color-lib math lib self;};
 
-      # Import packages from the stable Nixpkgs channel
       pkgs = import nixpkgs {
         inherit system;
         config = {
@@ -136,13 +124,9 @@
           android_sdk.accept_license = true;
         };
       };
-      # Import custom packages defined in the ./pkgs directory
-      # i dont like pushing through my own lib as a dependency, makes it too self-reliant. but i really value the possibilities
     in
       import ./pkgs {
-        # TODO:
-        # I want to get rid of color-lib, math, theme ( ? )
-        # this could be a single module that provides just the color themeing for apps in a sperate file.
+        # TODO: I want to get rid of color-lib, math, theme - this could be a single module that provides just the color themeing for apps in a sperate file.
         inherit inputs self system pkgs upkgs lib color-lib math theme;
       };
   in {
@@ -176,29 +160,20 @@
   };
 
   inputs = {
-    # Nixpkgs
     nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
-    # Nixpkgs darwin
     nixpkgs-darwin.url = "github:NixOS/nixpkgs/nixpkgs-25.11-darwin";
 
-    # nix cli
     nixos-cli.url = "github:water-sucks/nixos";
 
-    # Rust overlay
     rust-overlay.url = "github:oxalica/rust-overlay";
 
-    # fenix
     fenix = {
       url = "github:nix-community/fenix";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
-    # my custom website
-    # mywebsite.url = "github:knoc-off/Website";
-
-    # Home Manager
     home-manager = {
       url = "github:nix-community/home-manager/release-25.11";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -207,31 +182,25 @@
     nixvim.url = "github:nix-community/nixvim";
     nixneovimplugins.url = "github:NixNeovim/NixNeovimPlugins";
 
-    # Hardware-specific configurations
     hardware.url = "github:nixos/nixos-hardware";
 
-    # Disko - declarative disk partitioning
     disko = {
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Secure boot
     lanzaboote.url = "github:nix-community/lanzaboote";
 
-    # NixOS generators
     nixos-generators = {
       url = "github:nix-community/nixos-generators";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Neovim config
     neovim = {
       url = "github:knoc-off/neovim-config";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
-    # Firefox add-ons
     firefox-addons = {
       url = "gitlab:rycee/nur-expressions?dir=pkgs/firefox-addons";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -239,15 +208,12 @@
 
     nixgl.url = "github:nix-community/nixGL";
 
-    # Hyprland
-    #hyprland.url = "github:hyprwm/hyprland";
     hyprland.url = "github:hyprwm/Hyprland";
     hyprland-plugins = {
       url = "github:hyprwm/hyprland-plugins";
       inputs.hyprland.follows = "hyprland";
     };
 
-    # add ags / Widgets, etc.
     ags = {
       url = "github:aylur/ags";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -256,22 +222,12 @@
     astal.url = "github:Aylur/astal";
     astal.inputs.nixpkgs.follows = "nixpkgs-unstable";
 
-    # Secrets management
     sops-nix.url = "github:Mic92/sops-nix";
 
-    # poetry2nix
-    # poetry2nix = {
-    #   url = "github:nix-community/poetry2nix";
-    #   inputs.nixpkgs.follows = "nixpkgs";
-    # };
-
-    # Minecraft servers and packages
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
 
     nix-darwin.url = "github:nix-darwin/nix-darwin/nix-darwin-25.11";
-    #nix-darwin.inputs.nixpkgs.follows = "nixpkgs-unstable";
     nix-darwin.inputs.nixpkgs.follows = "nixpkgs-darwin";
-    # Non-Flake Inputs:
 
     firefox-csshacks = {
       url = "github:MrOtherGuy/firefox-csshacks";

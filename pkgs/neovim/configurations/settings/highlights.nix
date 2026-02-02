@@ -1,8 +1,4 @@
-{
-  helpers,
-  lib,
-  ...
-}: {
+{lib, ...}: {
   # Highlight and remove extra white spaces
   match.ExtraWhitespace = "\\s\\+$";
   highlight.ExtraWhitespace.bg = "#242628";
@@ -18,7 +14,7 @@
     {
       mode = "n";
       key = "<C-t>";
-      action = helpers.mkRaw ''
+      action = lib.nixvim.mkRaw ''
         function()
           require('telescope.builtin').live_grep({
             default_text="TODO",

@@ -9,7 +9,6 @@
   ...
 } @ args: {
   imports = [
-    # Disko
     inputs.disko.nixosModules.disko
     ./hardware/disks/simple-disk.nix
     ./services/kdeconnect.nix
@@ -19,13 +18,11 @@
     self.nixosModules.home
     self.nixosModules.nix
 
-    # need some kind of WM
     self.nixosModules.windowManager.hyprland
     {
       hardware.graphics = {
         enable = true;
         enable32Bit = true;
-        # Only the essential packages
         extraPackages = with pkgs; [
           mesa
           intel-media-driver
@@ -34,7 +31,6 @@
         ];
       };
 
-      # doesnt need to be super secure here
       services = {
         xserver.displayManager.startx.enable = false;
         getty.autologinUser = user;
@@ -68,28 +64,23 @@
         ];
       };
 
-      # System-wide packages
       environment.systemPackages = with pkgs; [
-        # DRM/Graphics debugging tools
         libdrm
-        mesa-demos # Contains glxinfo for debugging
+        mesa-demos
         vulkan-tools
 
-        # Your existing packages
         wl-clipboard
         xdg-utils
         dwl
         firefox
         mpv
 
-        # Bluetooth
         bluetuith
         bluez-tools
         bluez-alsa
         wireshark
 
-        # HDMI-CEC for controlling TV
-        libcec # Provides cec-client for sending CEC commands
+        libcec
       ];
 
       hardware.bluetooth = {
@@ -111,7 +102,6 @@
     }
 
     {
-      # Hardware support for Steam devices
       hardware.steam-hardware.enable = true;
 
       hardware.graphics = {
@@ -119,23 +109,20 @@
         enable32Bit = true;
       };
 
-      # Sound support (choose one)
-      services.pipewire.alsa.support32Bit = true; # For PipeWire
+      services.pipewire.alsa.support32Bit = true;
     }
   ];
 
   services.dbus.enable = true;
 
-  # Enable uinput for KDE Connect remote input (mouse/keyboard from phone)
   hardware.uinput.enable = true;
 
   nix.settings.auto-optimise-store = true;
 
   networking.hostName = hostname;
 
-  # Firewall
   networking.firewall = {
-    enable = false; # Ensure firewall is active
+    enable = false;
     allowedTCPPortRanges = [
       {
         from = 1714;
@@ -157,7 +144,6 @@
       "drm" # DRM subsystem for CEC
     ];
     kernelParams = [
-      # Ensure Intel graphics are properly initialized
       "i915.modeset=1"
       "i915.preliminary_hw_support=1"
     ];
