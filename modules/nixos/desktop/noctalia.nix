@@ -10,6 +10,7 @@
     enable = lib.mkDefault true;
     package = lib.mkForce (inputs.noctalia.packages.${pkgs.stdenv.hostPlatform.system}.default.override {
       calendarSupport = true;
+      python3 = true;
     });
   };
 

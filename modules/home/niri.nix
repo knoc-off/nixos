@@ -35,6 +35,9 @@ in {
           tap = true;
           natural-scroll = true;
         };
+        focus-follows-mouse = {
+          enable = true;
+        };
       };
 
       # Spawn ghostty on startup

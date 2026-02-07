@@ -1,13 +1,8 @@
 {
-  outputs,
   self,
   pkgs,
   upkgs,
   user,
-  inputs,
-  system,
-  color-lib,
-  theme,
   ...
 }: {
   imports = [
@@ -16,8 +11,6 @@
     ./programs/terminal/foot
     ./programs/terminal/programs/pueue.nix
     ./programs/terminal/programs/opencode.nix
-
-    ./desktop/dunst.nix
 
     ./programs/terminal/shell
     ./programs/terminal/shell/fish.nix
@@ -32,11 +25,9 @@
 
     ./enviroment.nix
 
-
     self.homeModules.niri
     self.homeModules.noctalia
 
-    self.homeModules.gtk
     self.homeModules.git
     {
       programs.git = {

@@ -26,6 +26,7 @@ in {
     terminal = false;
   };
 
+
   home.packages = with pkgs; [
     gnome-disk-utility
 
