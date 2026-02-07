@@ -122,52 +122,63 @@ in {
 
       # Keybindings using super as main modifier
       # Note: Kanata maps caps→super when ghostty is focused (via hyprkan)
-      keybind = [
-        "clear" # Clear default keybinds first
+      keybind = let
+        isLinux = pkgs.stdenv.isLinux;
+        isDarwin = pkgs.stdenv.isDarwin;
+      in
+        [
+          "clear" # Clear default keybinds first
 
-        # Core actions
-        "super+c=copy_to_clipboard"
-        "super+v=paste_from_clipboard"
-        "super+a=select_all"
-        "super+q=quit"
+          # Core actions
+          "super+c=copy_to_clipboard"
+          "super+v=paste_from_clipboard"
+          "super+a=select_all"
+          "super+q=quit"
+        ]
+        # Windows & Tabs (platform-specific)
+        ++ lib.optionals isLinux [
+          "super+t=new_window" # New window (inherits CWD)
+          "super+shift+t=new_tab" # New tab
+        ]
+        ++ lib.optionals isDarwin [
+          "super+t=new_tab" # New tab
+          "super+shift+t=new_window" # New window
+        ]
+        ++ [
+          "super+w=close_surface" # Close tab
 
-        # Windows & Tabs
-        "super+t=new_window" # New window (inherits CWD)
-        "super+shift+t=new_tab" # New tab
-        "super+w=close_surface" # Close tab
+          # Tab navigation (1-9)
+          "super+one=goto_tab:1"
+          "super+two=goto_tab:2"
+          "super+three=goto_tab:3"
+          "super+four=goto_tab:4"
+          "super+five=goto_tab:5"
+          "super+six=goto_tab:6"
+          "super+seven=goto_tab:7"
+          "super+eight=goto_tab:8"
+          "super+nine=goto_tab:9"
 
-        # Tab navigation (1-9)
-        "super+one=goto_tab:1"
-        "super+two=goto_tab:2"
-        "super+three=goto_tab:3"
-        "super+four=goto_tab:4"
-        "super+five=goto_tab:5"
-        "super+six=goto_tab:6"
-        "super+seven=goto_tab:7"
-        "super+eight=goto_tab:8"
-        "super+nine=goto_tab:9"
+          # Font size
+          "super+equal=increase_font_size:1"
+          "super+minus=decrease_font_size:1"
+          "super+zero=reset_font_size"
 
-        # Font size
-        "super+equal=increase_font_size:1"
-        "super+minus=decrease_font_size:1"
-        "super+zero=reset_font_size"
+          "super+shift+enter=new_split:right" # New split to the right (stack layout)
+          #"super+shift+enter=new_split:down" # Force split downward (for stacking)
+          "super+shift+w=close_surface" # Close split
 
-        "super+shift+enter=new_split:right" # New split to the right (stack layout)
-        #"super+shift+enter=new_split:down" # Force split downward (for stacking)
-        "super+shift+w=close_surface" # Close split
+          # Split navigation (vim-style, focus-follows-mouse enabled)
+          "super+h=goto_split:left"
+          "super+j=goto_split:bottom"
+          "super+k=goto_split:top"
+          "super+l=goto_split:right"
 
-        # Split navigation (vim-style, focus-follows-mouse enabled)
-        "super+h=goto_split:left"
-        "super+j=goto_split:bottom"
-        "super+k=goto_split:top"
-        "super+l=goto_split:right"
-
-        # Split resizing (for 60/40 master-stack ratio)
-        "super+ctrl+h=resize_split:left,10"
-        "super+ctrl+j=resize_split:down,10"
-        "super+ctrl+k=resize_split:up,10"
-        "super+ctrl+l=resize_split:right,10"
-      ];
+          # Split resizing (for 60/40 master-stack ratio)
+          "super+ctrl+h=resize_split:left,10"
+          "super+ctrl+j=resize_split:down,10"
+          "super+ctrl+k=resize_split:up,10"
+          "super+ctrl+l=resize_split:right,10"
+        ];
     };
   };
 }

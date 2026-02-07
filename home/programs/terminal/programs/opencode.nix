@@ -30,11 +30,14 @@
         base06 = "#${theme.dark.base06}";
         base07 = "#${theme.dark.base07}";
         base08 = "#${sa theme.dark.base08}";
-        diffremoved = "#${color-lib.mixColors (color-lib.adjustOkhslLightness 0.03 theme.dark.base00) theme.dark.base08 0.3}";
+        diffremoved = "#${color-lib.mixColors (color-lib.setOkhslLightness 0.2 theme.dark.base08) theme.dark.base00 0.1}";
+        #diffremoved = "#${color-lib.mixColors (color-lib.adjustOkhslLightness 0.03 theme.dark.base00) theme.dark.base08 0.3}";
         base09 = "#${sa theme.dark.base09}";
         base0A = "#${sa theme.dark.base0A}";
         base0B = "#${sa theme.dark.base0B}";
-        diffadded = "#${color-lib.mixColors (color-lib.adjustOkhslLightness 0.03 theme.dark.base00) theme.dark.base0B 0.3}";
+        #diffadded = "#${color-lib.mixColors (color-lib.adjustOkhslLightness 0.03 theme.dark.base00) theme.dark.base0B 0.3}";
+        #diffadded = "#${color-lib.setOkhslLightness 0.2 theme.dark.base0B}";
+        diffadded = "#${color-lib.mixColors (color-lib.setOkhslLightness 0.2 theme.dark.base0B) theme.dark.base00 0.1}";
         base0C = "#${sa theme.dark.base0C}";
         base0D = "#${sa theme.dark.base0D}";
         base0E = "#${sa theme.dark.base0E}";

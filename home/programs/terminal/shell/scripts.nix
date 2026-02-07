@@ -20,6 +20,91 @@
 in {
   home.packages =
     [
+      # Skim Environment variables
+      # python3 -c 'import os,sys; sys.stdout.write("\0".join(sorted(os.environ)) + "\0")' |
+      #   sk --read0 --no-mouse --no-multi \
+      #      --preview 'python3 -c "import os,sys; v=os.environ.get(sys.argv[1],\"\"); sys.stdout.write(v)" {}' \
+      #      --preview-window=right:70%:wrap
+
+      # Git Branches
+      # gid diff with specific branches, show preview-window
+
+      (
+        pkgs.writeShellScriptBin "git-branch-view" ''
+          set -euo pipefail
+
+          export GIT="${pkgs.git}/bin/git"
+          export SK="${pkgs.skim}/bin/sk"
+          export DELTA="${pkgs.delta}/bin/delta"
+          export BASH="${pkgs.bash}/bin/bash"
+          export TPUT="${pkgs.ncurses}/bin/tput"
+
+          # Pick a default BASE if not provided
+          if [ -z "''${BASE:-}" ]; then
+            if "$GIT" show-ref --verify --quiet refs/remotes/origin/main; then
+              BASE="origin/main"
+            elif "$GIT" show-ref --verify --quiet refs/heads/main; then
+              BASE="main"
+            elif "$GIT" show-ref --verify --quiet refs/remotes/origin/master; then
+              BASE="origin/master"
+            elif "$GIT" show-ref --verify --quiet refs/heads/master; then
+              BASE="master"
+            else
+              BASE=""
+            fi
+            export BASE
+          fi
+
+          # Delta enabled by default (set SHOW_DELTA=0 to disable)
+          export SHOW_DELTA="''${SHOW_DELTA: -1}"
+
+          "$GIT" for-each-ref --format='%(refname:short)' refs/heads \
+          | "$SK" \
+              --prompt="branch> " \
+              --height=100% \
+              --layout=reverse \
+              --preview-window='right:70%' \
+              --bind="ctrl-u:preview-page-up,ctrl-d:preview-page-down" \
+              --preview 'bash -lc '"'"'
+                b="''${1-}"
+                [ -n "$b" ] || exit 0
+
+                base="''${BASE:-}"
+                show="''${SHOW_DELTA:-1}"
+
+                mb=""
+                if [ -n "$base" ]; then
+                  mb="$("$GIT" merge-base "$b" "$base" 2>/dev/null || true)"
+                fi
+
+                cols="''${FZF_PREVIEW_COLUMNS:-}"
+                if [ -z "$cols" ]; then
+                  cols="$("$TPUT" cols 2>/dev/null || echo 120)"
+                fi
+
+                if [ -n "$mb" ]; then
+                  "$GIT" diff --name-status "$mb..$b"
+                  echo
+                  "$GIT" log --oneline --no-merges "$mb..$b" | head -200
+
+                  if [ "$show" = "1" ]; then
+                    echo
+                    "$GIT" diff --color=always "$mb..$b" | "$DELTA" --paging=never --width="$cols"
+                  fi
+                else
+                  "$GIT" show --name-status --oneline -n 1 "$b"
+                  echo
+                  "$GIT" log --oneline -n 30 "$b"
+
+                  if [ "$show" = "1" ]; then
+                    echo
+                    "$GIT" show --color=always -n 1 "$b" | "$DELTA" --paging=never --width="$cols"
+                  fi
+                fi
+              '"'"' _ {}'
+        ''
+      )
+
       (mkComplgenScript {
         name = "csv_to_excel";
         scriptContent = ''

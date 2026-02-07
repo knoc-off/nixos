@@ -28,12 +28,27 @@ in {
         VISUAL = "vi";
         ANTHROPIC_API_KEY = "$(cat ${config.sops.secrets.ANTHROPIC_API_KEY.path})";
       };
-      programs.zsh = {
+      programs.zsh = let
+        coffeeScript = pkgs.writeShellScriptBin "coffee" ''
+          while true; do
+            /opt/homebrew/bin/cliclick m:+0,+1
+            sleep 60
+            /opt/homebrew/bin/cliclick m:-0,-1
+            sleep 60
+          done
+        '';
+      in {
         enableFzfHistory = true;
         enableCompletion = true;
         enableSyntaxHighlighting = true;
         interactiveShellInit = ''
-          export PATH="$(realpath ~/.cargo/bin):$PATH"
+
+          if ! pgrep -f "coffee" > /dev/null; then
+            nohup ${coffeeScript}/bin/coffee > /tmp/coffee.log 2>&1 &
+            disown
+          fi
+
+          export PATH="$(realpath ~/.cargo/bin):$(realpath ~/.local/bin/nelly-rds):$PATH"
 
           cl() {
               printf '\x1b]1337;SetUserVar=in_claude=MQ==\007'
@@ -133,7 +148,9 @@ in {
   homebrew = {
     enable = true;
     taps = [
-      "dimentium/autoraise"
+      {
+        name = "dimentium/autoraise";
+      }
     ];
     casks = [
       {
@@ -171,8 +188,8 @@ in {
           "--with-dexperimental_focus_first"
           "--with-dold_activation_method"
         ];
-        start_service = false;
-        restart_service = false;
+        # start_service = false;
+        # restart_service = null;
       }
     ];
     onActivation.cleanup = "uninstall";

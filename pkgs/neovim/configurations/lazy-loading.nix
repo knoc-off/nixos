@@ -1328,7 +1328,6 @@
           server = {
             default_settings = {
               rust-analyzer = {
-                standalone = true;
                 imports = {
                   granularity = {
                     group = "module";
