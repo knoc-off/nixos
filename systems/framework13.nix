@@ -35,7 +35,7 @@
     inputs.niri.nixosModules.niri
     {
       nixpkgs.overlays = [inputs.niri.overlays.niri];
-      programs.niri.package = pkgs.niri-unstable;
+      # programs.niri.package = pkgs.niri-unstable;
     }
 
     self.nixosModules.desktop.noctalia
@@ -173,7 +173,6 @@
       };
     }
 
-    self.nixosModules.desktop.noctalia
     {
       services.greetd = let
         tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
@@ -253,7 +252,7 @@
     upower.enable = true;
     accounts-daemon.enable = true;
 
-    flatpak.enable = true;
+    # flatpak.enable = true;
 
     resolved.enable = true;
 

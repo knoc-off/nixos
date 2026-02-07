@@ -8,7 +8,7 @@
 
   services.noctalia-shell = {
     enable = lib.mkDefault true;
-    package = lib.mkDefault (inputs.noctalia.packages.${pkgs.stdenv.hostPlatform.system}.default.override {
+    package = lib.mkForce (inputs.noctalia.packages.${pkgs.stdenv.hostPlatform.system}.default.override {
       calendarSupport = true;
     });
   };

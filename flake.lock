@@ -1623,6 +1623,26 @@
         "type": "github"
       }
     },
+    "noctalia": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1770458444,
+        "narHash": "sha256-ZUh8eoJSkA/NVj451Y4onrRjv0XRfNyTMZhfrY71FoU=",
+        "owner": "noctalia-dev",
+        "repo": "noctalia-shell",
+        "rev": "b56f3bd363e5a582bf0cfab4d00faaf0e5fc5d0b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "noctalia-dev",
+        "repo": "noctalia-shell",
+        "type": "github"
+      }
+    },
     "optnix": {
       "inputs": {
         "flake-compat": "flake-compat_7",
@@ -1797,6 +1817,7 @@
         "nixpkgs-darwin": "nixpkgs-darwin",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "nixvim": "nixvim_2",
+        "noctalia": "noctalia",
         "rust-overlay": "rust-overlay_2",
         "sops-nix": "sops-nix",
         "zen-browser": "zen-browser"
