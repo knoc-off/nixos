@@ -35,7 +35,10 @@
     inputs.niri.nixosModules.niri
     {
       nixpkgs.overlays = [inputs.niri.overlays.niri];
-      # programs.niri.package = pkgs.niri-unstable;
+      programs.niri = {
+        enable = true;
+        package = pkgs.niri-unstable;
+      };
     }
 
     self.nixosModules.desktop.noctalia
@@ -175,12 +178,15 @@
 
     {
       services.greetd = let
-        tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
-        niri = "${pkgs.niri-unstable}/bin/niri";
+        tuigreet = "${pkgs.greetd.tuigreet}/bin/tuigreet";
+        niri-session = "${pkgs.niri-unstable}/bin/niri-session";
       in {
         enable = true;
         settings = {
-          default_session.command = "${tuigreet} --remember --cmd ${niri}";
+          default_session = {
+            command = "${tuigreet} --time --remember --cmd ${niri-session}";
+            user = "greeter";
+          };
         };
       };
     }

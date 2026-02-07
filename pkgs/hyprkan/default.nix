@@ -11,7 +11,7 @@ buildPythonApplication rec {
   format = "other";
 
   src = fetchFromGitHub {
-    owner = "mdSlash";
+    owner = "haithium";
     repo = "hyprkan";
     rev = "v${version}";
     hash = "sha256-4J0yQSkFTbHTDFBXECbCs/43xTDbeB/f3J7tZIbjbwM=";
@@ -33,7 +33,7 @@ buildPythonApplication rec {
 
   meta = {
     description = "App-aware Kanata layer switcher for Linux";
-    homepage = "https://github.com/mdSlash/hyprkan.git";
+    homepage = "https://github.com/haithium/hyprkan";
     license = lib.licenses.mit;
     maintainers = with lib.maintainers; [];
     mainProgram = "hyprkan";
