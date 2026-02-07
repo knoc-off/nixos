@@ -32,7 +32,10 @@
 
     ./enviroment.nix
 
-    ./desktop/hyprland.nix
+    # ./desktop/hyprland.nix
+
+    self.homeModules.niri
+    self.homeModules.noctalia
 
     self.homeModules.gtk
     self.homeModules.git

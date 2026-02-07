@@ -1,6 +1,7 @@
 {
   windowManager.hyprland = import ./desktop/hyprland.nix;
   windowManager.gnome = import ./desktop/gnome.nix;
+  desktop.noctalia = import ./desktop/noctalia.nix;
   desktop.totem = import ./desktop/media/totem.nix;
 
   audio.pipewire = import ./audio/pipewire.nix;

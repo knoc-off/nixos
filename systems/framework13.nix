@@ -31,8 +31,16 @@
       };
     }
 
-    inputs.hardware.nixosModules.framework-13-7040-amd
+    # niri configs
+    inputs.niri.nixosModules.niri
+    {
+      nixpkgs.overlays = [inputs.niri.overlays.niri];
+      programs.niri.package = pkgs.niri-unstable;
+    }
 
+    self.nixosModules.desktop.noctalia
+
+    inputs.hardware.nixosModules.framework-13-7040-amd
     {
       hardware.uinput.enable = true;
     }

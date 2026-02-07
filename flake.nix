@@ -238,6 +238,21 @@
       };
     };
 
+    noctalia = {
+      url = "github/noctalia-dev/noctalia-shell";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
+
+    niri = {
+      url = "github:sodiboo/niri-flake";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        home-manager.follows = "home-manager";
+      };
+    };
+
     firefox-csshacks = {
       url = "github:MrOtherGuy/firefox-csshacks";
       flake = false;
