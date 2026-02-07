@@ -173,26 +173,15 @@
       };
     }
 
-    self.nixosModules.windowManager.hyprland
+    self.nixosModules.desktop.noctalia
     {
       services.greetd = let
         tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
-        hyprland = "${pkgs.hyprland}/bin/Hyprland";
+        niri = "${pkgs.niri-unstable}/bin/niri";
       in {
         enable = true;
         settings = {
-          default_session.command = "${tuigreet} --remember --cmd ${hyprland}";
-
-          # default_session.command =
-          #   "./${pkgs.greetd.tuigreet}/bin/tuigreet --remember --cmd ./${
-          #     pkgs.writeScriptBin "Hyprland_start" ''
-          #       ${pkgs.hyprland}/bin/Hyprland
-          #     ''
-          #   }";
-          # default_session = {
-          #   command = "./${hyprland}";
-          #   user = "knoff";
-          # };
+          default_session.command = "${tuigreet} --remember --cmd ${niri}";
         };
       };
     }

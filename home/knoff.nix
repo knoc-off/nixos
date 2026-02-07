@@ -32,7 +32,6 @@
 
     ./enviroment.nix
 
-    # ./desktop/hyprland.nix
 
     self.homeModules.niri
     self.homeModules.noctalia
