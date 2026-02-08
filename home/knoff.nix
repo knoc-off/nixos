@@ -28,6 +28,7 @@
 
     self.homeModules.niri
     self.homeModules.noctalia
+    self.homeModules.stylix
 
     self.homeModules.git
     {

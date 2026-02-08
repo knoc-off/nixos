@@ -2,6 +2,7 @@
   inputs,
   lib,
   pkgs,
+  theme,
   ...
 }: {
   imports = [inputs.noctalia.homeModules.default];
@@ -15,18 +16,39 @@
     package = lib.mkForce (inputs.noctalia.packages.${pkgs.stdenv.hostPlatform.system}.default.override {
       calendarSupport = true;
     });
+
+    # Material 3 colors derived from your base16 theme
+    colors = {
+      mSurface = "#${theme.dark.base00}";          # Background
+      mSurfaceVariant = "#${theme.dark.base01}";   # Alt background
+      mHover = "#${theme.dark.base02}";            # Hover state bg
+      mOutline = "#${theme.dark.base03}";          # Borders
+      mOnSurfaceVariant = "#${theme.dark.base04}"; # Dim text
+      mOnSurface = "#${theme.dark.base05}";        # Main text
+      mOnHover = "#${theme.dark.base06}";          # Hover text
+      mPrimary = "#${theme.dark.base0C}";          # Blue - primary accent
+      mSecondary = "#${theme.dark.base0D}";        # Cyan - secondary accent
+      mTertiary = "#${theme.dark.base0E}";         # Purple - tertiary accent
+      mError = "#${theme.dark.base08}";            # Red - errors
+      mOnPrimary = "#${theme.dark.base00}";        # Text on primary
+      mOnSecondary = "#${theme.dark.base00}";      # Text on secondary
+      mOnTertiary = "#${theme.dark.base00}";       # Text on tertiary
+      mOnError = "#${theme.dark.base00}";          # Text on error
+      mShadow = "#000000";                         # Shadow color
+    };
+
     settings = lib.mkDefault {
       settingsVersion = 0;
       bar = {
         position = "left";
         barType = "simple";
         monitors = [];
-        density = "default";
+        density = "spacious";
         showOutline = false;
         showCapsule = true;
         capsuleOpacity = 1;
         capsuleColorKey = "none";
-        backgroundOpacity = 0.93;
+        backgroundOpacity = 0.80;
         useSeparateOpacity = false;
         floating = false;
         marginVertical = 4;
