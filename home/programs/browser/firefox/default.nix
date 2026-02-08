@@ -7,7 +7,7 @@
   config,
   ...
 }: let
-  addons = inputs.firefox-addons.packages.${pkgs.system};
+  addons = inputs.firefox-addons.packages.${pkgs.stdenv.hostPlatform.system};
 
   firefox-csshacks = pkgs.stdenv.mkDerivation {
     name = "patched-firefox-csshacks";

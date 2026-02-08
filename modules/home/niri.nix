@@ -35,14 +35,16 @@ in {
           tap = true;
           natural-scroll = true;
         };
+
         focus-follows-mouse = {
+          max-scroll-amount = "30%";
           enable = true;
         };
       };
 
       # Spawn ghostty on startup
       spawn-at-startup = [
-        { argv = [ ghostty ]; }
+        {argv = [ghostty];}
       ];
 
       binds = lib.mkDefault {

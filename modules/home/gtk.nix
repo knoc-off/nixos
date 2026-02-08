@@ -5,7 +5,7 @@
 
     theme = {
     	name = "materia-theme";
-      package = self.packages.${pkgs.system}.materia-theme;
+      package = self.packages.${pkgs.stdenv.hostPlatform.system}.materia-theme;
     };
     iconTheme = {
       name = "Nordzy";

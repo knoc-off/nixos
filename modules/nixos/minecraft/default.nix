@@ -57,7 +57,7 @@ in {
 
       package = mkOption {
         type = types.package;
-        default = self.packages.${pkgs.system}.rcon-cli;
+        default = self.packages.${pkgs.stdenv.hostPlatform.system}.rcon-cli;
         description = "RCON client package";
       };
     };

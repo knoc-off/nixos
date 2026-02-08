@@ -178,7 +178,7 @@
 
     {
       services.greetd = let
-        tuigreet = "${pkgs.greetd.tuigreet}/bin/tuigreet";
+        tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
         niri-session = "${pkgs.niri-unstable}/bin/niri-session";
       in {
         enable = true;

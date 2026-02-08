@@ -148,8 +148,7 @@ with lib; let
         Description = "Kanata keyboard remapper for ${name}";
         After = ["graphical-session.target"];
         PartOf = ["graphical-session.target"];
-        # Restart service when config file changes (on home-manager rebuild)
-        X-Restart-Triggers = ["${keyboard.configFile}"];
+        # Live reload is handled via TCP in home.activation.reloadKanata
       };
 
       Service = {
@@ -211,6 +210,18 @@ in {
     home.packages = [cfg.package];
 
     systemd.user.services = mapAttrs' mkService cfg.keyboards;
+
+    # Reload kanata configs via TCP instead of restarting the service
+    home.activation.reloadKanata = lib.hm.dag.entryAfter ["linkGeneration"] ''
+      ${concatStringsSep "\n" (mapAttrsToList (name: keyboard:
+        optionalString (keyboard.port != null) ''
+          if ${pkgs.netcat}/bin/nc -z 127.0.0.1 ${toString keyboard.port} 2>/dev/null; then
+            printf '{"Reload":{}}\n' | ${pkgs.netcat}/bin/nc -w1 127.0.0.1 ${toString keyboard.port} || true
+            echo "Reloaded kanata-${name} via TCP"
+          fi
+        ''
+      ) cfg.keyboards)}
+    '';
   };
 
   meta.maintainers = with maintainers; [];
