@@ -4,12 +4,50 @@
   pkgs,
   theme,
   ...
-}: {
+}:
+let
+  # Reusable function to link Noctalia plugins from flake inputs
+  linkNoctaliaPlugin = {name, src}:
+    let
+      pluginSrc = "${src}/${name}";
+      pluginFiles = builtins.readDir pluginSrc;
+    in
+    lib.mapAttrs' (fileName: _: {
+      name = "noctalia/plugins/${name}/${fileName}";
+      value.source = "${pluginSrc}/${fileName}";
+    }) pluginFiles;
+in
+{
   imports = [inputs.noctalia.homeModules.default];
   home.packages = with pkgs; [
     hicolor-icon-theme
     papirus-icon-theme
+    gpu-screen-recorder
   ];
+
+  # Create a systemd drop-in to pass theme environment variables to the service
+  # This fixes missing icons by ensuring noctalia can find icon themes
+  xdg.configFile =
+    {
+      "systemd/user/noctalia-shell.service.d/override.conf".text = ''
+        [Service]
+        PassEnvironment=XDG_DATA_DIRS XDG_CURRENT_DESKTOP QT_QPA_PLATFORMTHEME QT_PLUGIN_PATH QT_STYLE_OVERRIDE XCURSOR_PATH XCURSOR_SIZE XCURSOR_THEME GTK_PATH
+      '';
+    }
+    // linkNoctaliaPlugin {
+      name = "screen-recorder";
+      src = inputs.noctalia-plugins;
+    };
+
+  # Provide fallback icon for ActiveWindow when no app is focused
+  xdg.dataFile."icons/hicolor/scalable/apps/user-desktop.svg".text = ''
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="16" rx="2" ry="2" />
+      <line x1="3" y1="8" x2="21" y2="8" />
+      <line x1="7" y1="6" x2="7.01" y2="6" />
+      <line x1="11" y1="6" x2="11.01" y2="6" />
+    </svg>
+  '';
 
   programs.noctalia-shell = {
     enable = lib.mkDefault true;
@@ -19,22 +57,43 @@
 
     # Material 3 colors derived from your base16 theme
     colors = {
-      mSurface = "#${theme.dark.base00}";          # Background
-      mSurfaceVariant = "#${theme.dark.base01}";   # Alt background
-      mHover = "#${theme.dark.base02}";            # Hover state bg
-      mOutline = "#${theme.dark.base03}";          # Borders
+      mSurface = "#${theme.dark.base00}"; # Background
+      mSurfaceVariant = "#${theme.dark.base01}"; # Alt background
+      mHover = "#${theme.dark.base02}"; # Hover state bg
+      mOutline = "#${theme.dark.base03}"; # Borders
       mOnSurfaceVariant = "#${theme.dark.base04}"; # Dim text
-      mOnSurface = "#${theme.dark.base05}";        # Main text
-      mOnHover = "#${theme.dark.base06}";          # Hover text
-      mPrimary = "#${theme.dark.base0C}";          # Blue - primary accent
-      mSecondary = "#${theme.dark.base0D}";        # Cyan - secondary accent
-      mTertiary = "#${theme.dark.base0E}";         # Purple - tertiary accent
-      mError = "#${theme.dark.base08}";            # Red - errors
-      mOnPrimary = "#${theme.dark.base00}";        # Text on primary
-      mOnSecondary = "#${theme.dark.base00}";      # Text on secondary
-      mOnTertiary = "#${theme.dark.base00}";       # Text on tertiary
-      mOnError = "#${theme.dark.base00}";          # Text on error
-      mShadow = "#000000";                         # Shadow color
+      mOnSurface = "#${theme.dark.base05}"; # Main text
+      mOnHover = "#${theme.dark.base06}"; # Hover text
+      mPrimary = "#${theme.dark.base0C}"; # Blue - primary accent
+      mSecondary = "#${theme.dark.base0D}"; # Cyan - secondary accent
+      mTertiary = "#${theme.dark.base0E}"; # Purple - tertiary accent
+      mError = "#${theme.dark.base08}"; # Red - errors
+      mOnPrimary = "#${theme.dark.base00}"; # Text on primary
+      mOnSecondary = "#${theme.dark.base00}"; # Text on secondary
+      mOnTertiary = "#${theme.dark.base00}"; # Text on tertiary
+      mOnError = "#${theme.dark.base00}"; # Text on error
+      mShadow = "#000000"; # Shadow color
+    };
+
+    plugins = {
+      sources = [
+        {
+          enabled = true;
+          name = "Noctalia Plugins";
+          url = "https://example.com"; # Not used - plugin installed via Nix
+        }
+      ];
+      states = {
+        screen-recorder = {
+          enabled = true;
+          sourceUrl = "https://example.com"; # Not used - plugin installed via Nix
+        };
+      };
+      version = 2;
+    };
+
+    pluginSettings = {
+      screen-recorder = {};
     };
 
     settings = lib.mkDefault {
@@ -86,6 +145,9 @@
           right = [
             {
               id = "Tray";
+            }
+            {
+              id = "screen-recorder";
             }
             {
               id = "NotificationHistory";
@@ -154,7 +216,7 @@
         boxBorderEnabled = false;
       };
       location = {
-        name = "Tokyo";
+        name = "Berlin";
         weatherEnabled = true;
         weatherShowEffects = true;
         useFahrenheit = false;

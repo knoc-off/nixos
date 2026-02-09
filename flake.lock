@@ -1783,6 +1783,22 @@
         "type": "github"
       }
     },
+    "noctalia-plugins": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1770587158,
+        "narHash": "sha256-tTUl4GLa13juqY+ipTW98bsX7NOnPLnZSRmxUqu1cEI=",
+        "owner": "noctalia-dev",
+        "repo": "noctalia-plugins",
+        "rev": "06015f0841a658593d23fb9d61bb0732a14bcf3f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "noctalia-dev",
+        "repo": "noctalia-plugins",
+        "type": "github"
+      }
+    },
     "nur": {
       "inputs": {
         "flake-parts": [
@@ -1983,6 +1999,7 @@
         "nixpkgs-unstable": "nixpkgs-unstable",
         "nixvim": "nixvim_2",
         "noctalia": "noctalia",
+        "noctalia-plugins": "noctalia-plugins",
         "rust-overlay": "rust-overlay_2",
         "sops-nix": "sops-nix",
         "stylix": "stylix",

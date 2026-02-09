@@ -19,7 +19,9 @@ in {
         ]
         ++ (lib.splitString " " cmd);
     in {
-      # Rounded corners for all windows
+      # Request clients to not use client-side decorations (no GTK title bars)
+      prefer-no-csd = true;
+
       window-rules = [
         {
           # Empty matches = match all windows
