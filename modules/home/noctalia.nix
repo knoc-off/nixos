@@ -4,20 +4,65 @@
   pkgs,
   theme,
   ...
-}:
-let
-  # Reusable function to link Noctalia plugins from flake inputs
-  linkNoctaliaPlugin = {name, src}:
-    let
-      pluginSrc = "${src}/${name}";
-      pluginFiles = builtins.readDir pluginSrc;
-    in
-    lib.mapAttrs' (fileName: _: {
-      name = "noctalia/plugins/${name}/${fileName}";
-      value.source = "${pluginSrc}/${fileName}";
-    }) pluginFiles;
-in
-{
+}: let
+  # Unified function to configure Noctalia plugins from flake inputs
+  # Returns: { configFiles, settings } - derived from a single plugin list
+  mkNoctaliaPlugins = plugins: {
+    # xdg.configFile entries (symlinks for all plugin files)
+    configFiles = lib.foldl' (acc: plugin:
+      acc
+      // (let
+        pluginSrc = "${plugin.src}/${plugin.name}";
+        pluginFiles = builtins.readDir pluginSrc;
+      in
+        lib.mapAttrs' (fileName: _: {
+          name = "noctalia/plugins/${plugin.name}/${fileName}";
+          value.source = "${pluginSrc}/${fileName}";
+        })
+        pluginFiles)) {}
+    plugins;
+
+    # pluginSettings entries
+    settings = lib.listToAttrs (map (plugin: {
+        name = plugin.name;
+        value = plugin.settings or {};
+      })
+      plugins);
+  };
+
+  # Define all Noctalia plugins in ONE place
+  noctaliaPlugins = mkNoctaliaPlugins [
+    {
+      name = "screen-recorder";
+      src = inputs.noctalia-plugins;
+      settings = {
+        hideInactive = false;
+        iconColor = "none";
+        directory = "";
+        filenamePattern = "recording_yyyyMMdd_HHmmss";
+        frameRate = "60";
+        audioCodec = "opus";
+        videoCodec = "h264";
+        quality = "medium";
+        colorRange = "limited";
+        showCursor = true;
+        copyToClipboard = false;
+        audioSource = "default_output";
+        videoSource = "portal";
+        resolution = "1280x720";
+      };
+    }
+    {
+      name = "coffee";
+      src = pkgs.callPackage ../../pkgs/noctalia/coffee-widget/default.nix {};
+      settings = {
+        lockOnActivate = true;
+      };
+    }
+    # Add more plugins here:
+    # { name = "catwalk"; src = inputs.noctalia-plugins; settings = { hideBackground = true; }; }
+  ];
+in {
   imports = [inputs.noctalia.homeModules.default];
   home.packages = with pkgs; [
     hicolor-icon-theme
@@ -34,10 +79,7 @@ in
         PassEnvironment=XDG_DATA_DIRS XDG_CURRENT_DESKTOP QT_QPA_PLATFORMTHEME QT_PLUGIN_PATH QT_STYLE_OVERRIDE XCURSOR_PATH XCURSOR_SIZE XCURSOR_THEME GTK_PATH
       '';
     }
-    // linkNoctaliaPlugin {
-      name = "screen-recorder";
-      src = inputs.noctalia-plugins;
-    };
+    // noctaliaPlugins.configFiles;
 
   # Provide fallback icon for ActiveWindow when no app is focused
   xdg.dataFile."icons/hicolor/scalable/apps/user-desktop.svg".text = ''
@@ -75,26 +117,7 @@ in
       mShadow = "#000000"; # Shadow color
     };
 
-    plugins = {
-      sources = [
-        {
-          enabled = true;
-          name = "Noctalia Plugins";
-          url = "https://example.com"; # Not used - plugin installed via Nix
-        }
-      ];
-      states = {
-        screen-recorder = {
-          enabled = true;
-          sourceUrl = "https://example.com"; # Not used - plugin installed via Nix
-        };
-      };
-      version = 2;
-    };
-
-    pluginSettings = {
-      screen-recorder = {};
-    };
+    pluginSettings = noctaliaPlugins.settings;
 
     settings = lib.mkDefault {
       settingsVersion = 0;
@@ -107,8 +130,8 @@ in
         showCapsule = true;
         capsuleOpacity = 1;
         capsuleColorKey = "none";
-        backgroundOpacity = 0.80;
-        useSeparateOpacity = false;
+        backgroundOpacity = 1.0;
+        useSeparateOpacity = true;
         floating = false;
         marginVertical = 4;
         marginHorizontal = 4;
@@ -147,7 +170,10 @@ in
               id = "Tray";
             }
             {
-              id = "screen-recorder";
+              id = "plugin:screen-recorder";
+            }
+            {
+              id = "plugin:coffee";
             }
             {
               id = "NotificationHistory";
@@ -186,7 +212,7 @@ in
         showSessionButtonsOnLockScreen = true;
         showHibernateOnLockScreen = false;
         enableShadows = true;
-        shadowDirection = "bottom_right";
+        shadowDirection = "left";
         shadowOffsetX = 2;
         shadowOffsetY = 3;
         language = "";
@@ -196,7 +222,7 @@ in
         enableLockScreenCountdown = true;
         lockScreenCountdownDuration = 10000;
         autoStartAuth = false;
-        allowPasswordWithFprintd = false;
+        allowPasswordWithFprintd = true;
         clockStyle = "custom";
         clockFormat = "hh\nmm";
       };
@@ -392,7 +418,7 @@ in
         externalMonitor = "resources || missioncenter || jdsystemmonitor || corestats || system-monitoring-center || gnome-system-monitor || plasma-systemmonitor || mate-system-monitor || ukui-system-monitor || deepin-system-monitor || pantheon-system-monitor";
       };
       dock = {
-        enabled = true;
+        enabled = false;
         position = "bottom";
         displayMode = "auto_hide";
         backgroundOpacity = 1;

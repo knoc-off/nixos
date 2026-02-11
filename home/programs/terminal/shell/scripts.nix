@@ -159,19 +159,31 @@ in {
           INHIBIT_WHAT="sleep:idle:handle-lid-switch"
           INHIBIT_WHO="$USER"
           INHIBIT_MODE="block"
+          LOCK_SCREEN=false
 
           usage() {
-            echo "Usage: anti-sleep <duration | HH:MM>"
+            echo "Usage: anti-sleep [-l] <duration | HH:MM>"
+            echo "  -l:       Lock the screen immediately but keep system awake"
             echo "  duration: e.g., 30m, 1h, 6h, or any value accepted by 'sleep' (like 90s, 2h30m)"
             echo "  HH:MM:    Target time (24-hour format), e.g., 13:00. Inhibits sleep until that time today (or tomorrow if the time has passed)."
             exit 1
           }
 
-          if [ "$#" -ne 1 ]; then
-            usage
+          # Parse arguments
+          while [[ "$#" -gt 0 ]]; do
+            case $1 in
+              -l|--lock) LOCK_SCREEN=true; shift ;;
+              -h|--help) usage ;;
+              -*) echo "Unknown option: $1"; usage ;;
+              *) input="$1"; shift; break ;;
+            esac
+          done
+
+          if [ -z "${input:-}" ]; then
+             echo "Error: Missing duration argument"
+             usage
           fi
 
-          input="$1"
           duration_sec=""
           why_message="Manual sleep prevention" # Default reason
 
@@ -228,6 +240,11 @@ in {
           if [ -z "$duration_sec" ]; then
              echo "Error: Could not determine sleep duration from input '$input'"
              usage
+          fi
+
+          if [ "$LOCK_SCREEN" = true ]; then
+            echo "Locking screen..."
+            loginctl lock-session
           fi
 
           # --- Execute systemd-inhibit ---

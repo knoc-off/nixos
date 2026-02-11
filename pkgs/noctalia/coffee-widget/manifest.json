@@ -1,0 +1,20 @@
+{
+  "id": "coffee",
+  "name": "Coffee",
+  "version": "1.0.1",
+  "author": "Niko",
+  "license": "MIT",
+  "minNoctaliaVersion": "3.6.0",
+  "description": "Prevent sleep and screen lock",
+  "entryPoints": {
+    "main": "Main.qml",
+    "barWidget": "BarWidget.qml",
+    "settings": "Settings.qml"
+  },
+  "metadata": {
+    "defaultSettings": {
+      "iconColor": "none",
+      "lockOnActivate": true
+    }
+  }
+}

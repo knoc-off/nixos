@@ -35,6 +35,8 @@ in
     polkit-1.text = mkDefault (mkBefore grosshackConfig);
     ags.text = mkDefault (mkBefore grosshackConfig);
     swaylock.text = mkDefault (mkBefore grosshackConfig);
+    noctalia.text = mkDefault (mkBefore grosshackConfig);
+    noctalia-shell.text = mkDefault (mkBefore grosshackConfig);
   };
 }
 

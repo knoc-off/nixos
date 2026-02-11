@@ -2,9 +2,11 @@
   inputs,
   lib,
   pkgs,
+  config,
   ...
 }: let
   ghostty = lib.getExe pkgs.ghostty;
+  noctaliaCmd = lib.getExe config.programs.noctalia-shell.package;
 in {
   programs.niri = {
     #enable = lib.mkDefault true;
@@ -13,7 +15,7 @@ in {
     settings = let
       noctalia = cmd:
         [
-          "noctalia-shell"
+          noctaliaCmd
           "ipc"
           "call"
         ]
@@ -22,13 +24,16 @@ in {
       # Request clients to not use client-side decorations (no GTK title bars)
       prefer-no-csd = true;
 
+      layout = {
+        gaps = 6;
+      };
+
       window-rules = [
         {
-          # Empty matches = match all windows
           geometry-corner-radius = {
-            top-left = 8.0;
+            top-left = 12.0;
             top-right = 8.0;
-            bottom-left = 8.0;
+            bottom-left = 12.0;
             bottom-right = 8.0;
           };
           clip-to-geometry = true;
@@ -37,7 +42,7 @@ in {
 
       outputs = lib.mkDefault {
         "desc:BOE 0x0BCA" = {
-          scale = 1.333334;
+          scale = 1.1;
         };
         "desc:Samsung Electric Company S27F350" = {
           scale = 1;
@@ -80,7 +85,7 @@ in {
           # Program launchers
           # "Mod+T".action.spawn = "alacritty";
           "Mod+D".action.spawn = "fuzzel";
-          "Super+Alt+L".action.spawn = "swaylock";
+          "Super+Alt+L".action.spawn = noctalia "lockScreen lock";
 
           # Screen reader toggle
           "Super+Alt+S" = locked (spawnSh "pkill orca || exec orca");
@@ -261,5 +266,29 @@ in {
           "Mod+Shift+P".action.power-off-monitors = [];
         };
     };
+  };
+
+  services.swayidle = {
+    enable = true;
+    events = [
+      {
+        event = "before-sleep";
+        command = "${noctaliaCmd} ipc call lockScreen lock";
+      }
+      {
+        event = "lock";
+        command = "${noctaliaCmd} ipc call lockScreen lock";
+      }
+    ];
+    timeouts = [
+      {
+        timeout = 300;
+        command = "${noctaliaCmd} ipc call lockScreen lock";
+      }
+      {
+        timeout = 600;
+        command = "niri msg action power-off-monitors";
+      }
+    ];
   };
 }

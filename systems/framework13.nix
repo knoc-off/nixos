@@ -258,6 +258,11 @@
     upower.enable = true;
     accounts-daemon.enable = true;
 
+    logind = {
+      lidSwitch = "suspend";
+      powerKey = "suspend";
+    };
+
     # flatpak.enable = true;
 
     resolved.enable = true;

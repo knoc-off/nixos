@@ -246,4 +246,6 @@ in rec {
       executable = true;
       destination = "/bin/${name}";
     };
+
+  coffee-widget = pkgs.callPackage ./noctalia/coffee-widget {};
 }
