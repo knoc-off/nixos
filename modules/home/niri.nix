@@ -289,6 +289,10 @@ in {
         timeout = 600;
         command = "niri msg action power-off-monitors";
       }
+      {
+        timeout = 1800; # 30 minutes
+        command = "${pkgs.systemd}/bin/systemctl suspend";
+      }
     ];
   };
 }

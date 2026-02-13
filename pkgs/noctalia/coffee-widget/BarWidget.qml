@@ -13,7 +13,7 @@ NIconButton {
     property string widgetId: ""
     property string section: ""
 
-    // Bar positioning properties (required for some bar logic)
+
     readonly property string screenName: screen ? screen.name : ""
     readonly property string barPosition: Settings.getBarPositionForScreen(screenName)
     readonly property bool isVertical: barPosition === "left" || barPosition === "right"
@@ -26,23 +26,23 @@ NIconButton {
     property var defaults: pluginApi?.manifest?.metadata?.defaultSettings || ({})
     readonly property string iconColorKey: cfg.iconColor ?? defaults.iconColor ?? "none"
     readonly property color iconColor: Color.resolveColorKey(iconColorKey)
-    
+
     icon: "coffee"
-    
-    // Style
+
+
     baseSize: root.capsuleHeight
     customRadius: Style.radiusL
-    
-    // Color logic: Primary when active, configured color (or default capsule color) when inactive
+
+
     colorBg: mainInstance?.isActive ? Color.mPrimary : Style.capsuleColor
     colorFg: mainInstance?.isActive ? Color.mOnPrimary : (iconColorKey === "none" ? Color.mOnSurfaceVariant : root.iconColor)
-    
+
     border.color: Style.capsuleBorderColor
     border.width: Style.capsuleBorderWidth
 
     onClicked: mainInstance?.toggle()
     onRightClicked: PanelService.showContextMenu(contextMenu, root, screen)
-    
+
     tooltipText: mainInstance?.isActive ? "Disable Coffee Mode" : "Enable Coffee Mode"
 
     NPopupContextMenu {

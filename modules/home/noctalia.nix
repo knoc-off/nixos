@@ -59,12 +59,18 @@
         lockOnActivate = true;
       };
     }
+    {
+      name = "audio-recorder";
+      src = pkgs.callPackage ../../pkgs/noctalia/audio-recorder/default.nix {};
+      settings = {};
+    }
     # Add more plugins here:
     # { name = "catwalk"; src = inputs.noctalia-plugins; settings = { hideBackground = true; }; }
   ];
 in {
   imports = [inputs.noctalia.homeModules.default];
   home.packages = with pkgs; [
+    ffmpeg-full
     hicolor-icon-theme
     papirus-icon-theme
     gpu-screen-recorder
@@ -176,6 +182,9 @@ in {
               id = "plugin:coffee";
             }
             {
+              id = "plugin:audio-recorder";
+            }
+            {
               id = "NotificationHistory";
             }
             {
@@ -213,8 +222,8 @@ in {
         showHibernateOnLockScreen = false;
         enableShadows = true;
         shadowDirection = "left";
-        shadowOffsetX = 2;
-        shadowOffsetY = 3;
+        shadowOffsetX = 0;
+        shadowOffsetY = -3;
         language = "";
         allowPanelsOnScreenWithoutBar = true;
         showChangelogOnStartup = true;
@@ -565,9 +574,25 @@ in {
         startup = "";
         session = "";
       };
-      plugins = {
-        autoUpdate = false;
-      };
+      # This MUST be imperitive
+      # plugins = {
+      #   version = 1;
+      #   sources = [];
+      #   states = {
+      #     screen-recorder = {
+      #       enabled = true;
+      #       sourceUrl = "";
+      #     };
+      #     coffee = {
+      #       enabled = true;
+      #       sourceUrl = "";
+      #     };
+      #     audio-recorder = {
+      #       enabled = true;
+      #       sourceUrl = "";
+      #     };
+      #   };
+      # };
       desktopWidgets = {
         enabled = false;
         gridSnap = false;

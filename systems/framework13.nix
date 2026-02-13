@@ -49,7 +49,8 @@
     }
 
     {
-      services.ivpn.enable = true;
+      # services.ivpn.enable = true;
+      services.mullvad-vpn.enable = true;
     }
 
     self.nixosModules.services.logiops

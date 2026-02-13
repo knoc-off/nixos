@@ -248,4 +248,6 @@ in rec {
     };
 
   coffee-widget = pkgs.callPackage ./noctalia/coffee-widget {};
+  
+  audio-recorder = pkgs.callPackage ./noctalia/audio-recorder {};
 }

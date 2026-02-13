@@ -1,0 +1,26 @@
+{
+  "id": "audio-recorder",
+  "name": "Audio Recorder",
+  "version": "2.0.0",
+  "author": "Niko",
+  "license": "MIT",
+  "minNoctaliaVersion": "3.6.0",
+  "description": "Record system audio and microphone",
+  "tags": ["Bar", "Utility", "Audio"],
+  "entryPoints": {
+    "main": "Main.qml",
+    "barWidget": "BarWidget.qml",
+    "settings": "Settings.qml"
+  },
+  "metadata": {
+    "defaultSettings": {
+      "iconColor": "none",
+      "hideInactive": false,
+      "audioSource": "both",
+      "codec": "opus",
+      "bitrate": "128k",
+      "directory": "",
+      "filenamePattern": "audio_yyyyMMdd_HHmmss"
+    }
+  }
+}

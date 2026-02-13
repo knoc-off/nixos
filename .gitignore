@@ -4,6 +4,7 @@ systems/hardware/fingerprint/calib-data.bin
 result
 target
 
+niri-docs.md
 .direnv
 .aider*
 *.qcow2
