@@ -255,6 +255,10 @@
     settings = {
       theme = "customtheme";
 
+      tui = {
+        scroll_speed = 1;
+      };
+
       keybinds = {
         leader = "ctrl+x";
         app_exit = "ctrl+c,ctrl+d,<leader>q";
@@ -348,6 +352,7 @@
           type = "remote";
           url = "https://mcp.context7.com/mcp";
           headers = {
+            CONTEXT7_API_KEY = "{env:CONTEXT7_API_KEY}";
           };
           enabled = true;
         };
