@@ -61,11 +61,41 @@ in {
           event = "BufWrite";
           command = "%s/\\s\\+$//e";
         }
+        {
+          event = "VimEnter";
+          group = "AutoCd";
+          callback = lib.nixvim.mkRaw ''
+            function()
+              -- Only run once per session
+              if vim.g.cwd_set_this_session then
+                return
+              end
+
+              local file_path = vim.api.nvim_buf_get_name(0)
+              if file_path ~= "" then
+                local target_dir
+                if vim.fn.isdirectory(file_path) == 1 then
+                  target_dir = file_path
+                elseif vim.fn.filereadable(file_path) == 1 then
+                  target_dir = vim.fn.fnamemodify(file_path, ":h")
+                end
+
+                if target_dir and vim.fn.isdirectory(target_dir) == 1 then
+                  local current_cwd = vim.fn.getcwd()
+                  if target_dir ~= current_cwd then
+                    vim.cmd("cd " .. vim.fn.fnameescape(target_dir))
+                    vim.g.cwd_set_this_session = true
+                  end
+                end
+              end
+            end
+          '';
+        }
       ];
+
+      autoGroups.AutoCd.clear = true;
     }
     {
-      # can this be made into a format of like code-action highlights or something?
-      # maybe a plugin, something that will highlight the links that can be followed?
       keymaps = [
         {
           mode = "n";
@@ -115,102 +145,8 @@ in {
         }
       ];
     }
-    # Tab-Bar (shows vim tabs as layouts, not individual buffers)
     {
-      plugins.bufferline = {
-        enable = true;
-        settings.options = {
-          mode = "tabs";
-          truncateNames = true;
-          diagnostics = "nvim_lsp";
-          show_duplicate_prefix = false;
-          tab_size = 24;
-          max_name_length = 24;
-          separator_style = "slope";
-          name_formatter = lib.nixvim.mkRaw ''
-            function(buf)
-              local tabnr = buf.tabnr
-              local wins = vim.api.nvim_tabpage_list_wins(tabnr)
-              local names = {}
-              for _, win in ipairs(wins) do
-                local bufnr = vim.api.nvim_win_get_buf(win)
-                local name = vim.fn.fnamemodify(vim.api.nvim_buf_get_name(bufnr), ':t')
-                if name ~= "" and not vim.tbl_contains(names, name) then
-                  table.insert(names, name)
-                end
-              end
-              if #names == 0 then
-                return "[New]"
-              elseif #names == 1 then
-                return names[1]
-              else
-                return table.concat(names, " | ")
-              end
-            end
-          '';
-        };
-      };
-
       keymaps = [
-        {
-          mode = "n";
-          key = "<Tab>";
-          action = lib.nixvim.mkRaw ''
-            function()
-              if vim.fn.tabpagenr('$') > 1 then
-                vim.cmd('tabnext')
-              end
-            end
-          '';
-          options = {
-            silent = true;
-            desc = "Next tab";
-          };
-        }
-        {
-          mode = "n";
-          key = "<S-Tab>";
-          action = lib.nixvim.mkRaw ''
-            function()
-              if vim.fn.tabpagenr('$') > 1 then
-                vim.cmd('tabprev')
-              end
-            end
-          '';
-          options = {
-            silent = true;
-            desc = "Previous tab";
-          };
-        }
-        {
-          mode = "n";
-          key = "<leader>n";
-          action = lib.nixvim.mkRaw ''
-            function()
-              vim.cmd('tabnew')
-              vim.schedule(function()
-                require('telescope.builtin').find_files()
-              end)
-            end
-          '';
-          options = {
-            silent = true;
-            desc = "New tab + find file";
-          };
-        }
-        {
-          mode = "n";
-          key = "<leader>c";
-          action = lib.nixvim.mkRaw ''
-            function()
-              vim.cmd('tabclose')
-            end
-          '';
-          options = {
-            silent = true;
-            desc = "Close tab";
-          };
-        }
         {
           mode = "n";
           key = "<leader>q";
@@ -244,91 +180,6 @@ in {
       };
     }
 
-    {
-      plugins.rainbow-delimiters = {
-        enable = true;
-        settings.highlight = [
-          "RainbowDelimiterRed"
-          "RainbowDelimiterYellow"
-          "RainbowDelimiterBlue"
-          "RainbowDelimiterOrange"
-          "RainbowDelimiterGreen"
-          "RainbowDelimiterViolet"
-          "RainbowDelimiterCyan"
-        ];
-      };
-    }
-    # Very useful
-    # TODO: scope highlighting
-    {
-      plugins.indent-blankline = {
-        enable = true;
-        settings = {
-          exclude = {
-            filetypes = [
-              "dashboard"
-              "lspinfo"
-              "packer"
-              "checkhealth"
-              "help"
-              "man"
-              "gitcommit"
-              "TelescopePrompt"
-              "TelescopeResults"
-              "''"
-            ];
-          };
-          indent = {
-            char = "┋";
-          };
-
-          scope = {
-            enabled = true;
-            char = "▎";
-            show_start = true;
-            show_end = true;
-            include = {
-              node_type = {
-                "*" = [
-                  "class"
-                  "return_statement"
-                  "function"
-                  "method"
-                  "^if"
-                  "^while"
-                  "jsx_element"
-                  "^for"
-                  "^object"
-                  "^table"
-                  "block"
-                  "arguments"
-                  "if_statement"
-                  "else_clause"
-                  "jsx_element"
-                  "jsx_self_closing_element"
-                  "try_statement"
-                  "catch_clause"
-                  "import_statement"
-                  "operation_type"
-                ];
-              };
-            };
-          };
-        };
-      };
-    }
-    # Smooth animations
-    {
-      plugins.mini.modules.animate = {
-        cursor.enable = false;
-        scroll = {
-          enable = true;
-          timing = lib.nixvim.mkRaw "require('mini.animate').gen_timing.linear({ duration = 80, unit = 'total' })";
-        };
-        resize.enable = false;
-        open.enable = false;
-        close.enable = false;
-      };
-    }
+    # NOTE: rainbow-delimiters, indent-blankline, and vim-matchup moved to ./scope.nix
   ];
 }

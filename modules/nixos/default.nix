@@ -10,6 +10,7 @@
 
   services.axum-webserver = import ./services/axum-webserver.nix;
   services.logiops = import ./services/logiops.nix;
+  services.lspmux = import ./services/lspmux.nix;
 
   home = import ./home.nix;
 

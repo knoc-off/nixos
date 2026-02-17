@@ -78,6 +78,11 @@ in rec {
     fenix = rustPkgs-fenix.fenix;
   };
 
+  # LSP multiplexer - share language servers between editor instances
+  lspmux = rustPkgs-fenix.callPackage ./lspmux {
+    fenix = rustPkgs-fenix.fenix;
+  };
+
   # Attempt at embedded esp32.
   esp32-train-time = rustPkgs-fenix.callPackage ./esp32-train-time {
     fenix = rustPkgs-fenix.fenix;

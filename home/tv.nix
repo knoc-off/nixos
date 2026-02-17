@@ -97,14 +97,6 @@ in {
       volume = 70;
       "audio-file-auto" = "fuzzy";
 
-      # Temporarily comment these out or remove if they cause "option not found"
-      # due to the module's rendering. Test if mpv works without them first.
-      # "cache-default" = 81920;
-      # "cache-backbuffer" = 20480;
-      # If the above are problematic, you might need to set them via command line
-      # or wait for a module fix. For testing UDP streaming, they might not be
-      # strictly necessary if your local network is fast.
-
       "network-timeout" = 5;
       "ytdl-format" = "bestvideo[height<=?1080]+bestaudio/best";
 
@@ -226,8 +218,6 @@ in {
   systemd.user.services = {
     #kdeconnect-indicator =
     #(generateService "kdeconnect-indicator" "kdeconnect-indicator");
-
-    # Update your kded-modules service to include the KDE Connect Display module
     kded-modules = {
       Unit = {
         Description = "KDED Modules";

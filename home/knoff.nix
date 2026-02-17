@@ -108,10 +108,10 @@
               dbl  (tap-dance-eager 250 (XX @launcher))
 
               ;; GUI: Caps = Meta + shortcuts layer
-              cap-gui (multi lmet @dbl (layer-while-held shortcuts))
+              cap-gui (multi rmet @dbl (layer-while-held shortcuts))
 
               ;; Terminal: Caps = just Meta
-              cap-trm (multi lmet @dbl)
+              cap-trm (multi rmet @dbl)
 
               ;; rofi (cmd ${pkgs.rofi}/bin/rofi -show drun)
               ;; example for a toggle bind. not super clean...
@@ -121,7 +121,7 @@
               ;; f12t (tap-dance 300 (@rofi @to-gui))
 
               ;; Shortcuts: release meta, send Ctrl+key Press meta again
-              ${builtins.concatStringsSep "\n" (map (k: "sc${k} (multi (release-key lmet) C-${k})") passthroughSuperToCtrlMorph)}
+              ${builtins.concatStringsSep "\n" (map (k: "sc${k} (multi (release-key rmet) C-${k})") passthroughSuperToCtrlMorph)}
             )
 
             (defsrc caps)
@@ -165,6 +165,9 @@
 
   home = {
     packages = with pkgs; [
+      upkgs.foliate
+      upkgs.readest
+
       self.packages.${pkgs.stdenv.hostPlatform.system}.neovim-nix.default
       spotify
 

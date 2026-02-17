@@ -442,10 +442,21 @@ in {
 
           # Indent-blankline plugin highlights
           IblIndent = {
-            fg = "$bg3";
+            fg = "$bg2"; # subtle indent guides
           };
-          IblScope = {
-            fg = "$red";
+
+          # vim-matchup - bright active pair highlighting
+          MatchWord = {
+            fg = "$bright_cyan";
+            fmt = "bold,underline";
+          };
+          MatchWordCur = {
+            fg = "$bright_cyan";
+            fmt = "bold,underline";
+          };
+          MatchParenCur = {
+            fg = "$bright_orange";
+            fmt = "bold";
           };
 
           # Custom highlights from core.nix

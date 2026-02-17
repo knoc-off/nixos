@@ -18,6 +18,20 @@
     self.nixosModules.home
     self.nixosModules.nix
 
+    {
+      services.udisks2.enable = true;
+    }
+
+    {
+      services.sabnzbd = {
+        enable = true;
+      };
+
+      services.jellyfin = {
+        enable = true;
+      };
+    }
+
     self.nixosModules.windowManager.hyprland
     {
       hardware.graphics = {

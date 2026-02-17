@@ -177,7 +177,7 @@
           light = "base0B";
         };
         markdownBlockQuote = {
-          dark = "base00-2";
+          dark = "base04";
           light = "base03";
         };
         markdownEmph = {

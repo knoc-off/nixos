@@ -53,6 +53,9 @@
       services.mullvad-vpn.enable = true;
     }
 
+    self.nixosModules.services.lspmux
+    {services.lspmux.enable = true;}
+
     self.nixosModules.services.logiops
     {
       services.logiops = {
@@ -372,6 +375,9 @@
     kernelParams = ["usbcore.autosuspend=-1"];
     kernel.sysctl = {
       "vm.swappiness" = 20;
+      # Increase inotify limits for rust-analyzer and other file watchers
+      "fs.inotify.max_user_watches" = 524288;
+      "fs.inotify.max_user_instances" = 1024;
     };
   };
 

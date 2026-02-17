@@ -1,9 +1,10 @@
 {
   config,
+  lib,
   pkgs,
   ...
 }: let
-  slzb06Ip = "192.168.178.32";
+  slzb06Ip = "slzb-06";
 in {
   imports = [
     # ./home-automations/dnd.nix
@@ -19,7 +20,6 @@ in {
         address = "127.0.0.1";
         port = 1883;
 
-        # Allow local anonymous clients (Z2M + HA)
         settings = {
           allow_anonymous = true;
         };
@@ -79,6 +79,45 @@ in {
 
   networking.firewall.allowedTCPPorts = [
     8123 # Home Assistant
-    7768 # Zigbee2MQTT frontend
+    7768 # Zigbee2MQTT
   ];
+
+  systemd.services.mosquitto = {
+    serviceConfig = {
+      Restart = lib.mkForce "always";
+      RestartSec = lib.mkForce "2s";
+    };
+    unitConfig = {
+      StartLimitIntervalSec = 300;
+      StartLimitBurst = 100;
+    };
+  };
+
+  systemd.services.zigbee2mqtt = {
+    after = ["mosquitto.service" "network-online.target"];
+    wants = ["network-online.target"];
+    bindsTo = ["mosquitto.service"];
+    serviceConfig = {
+      Restart = lib.mkForce "always";
+      RestartSec = lib.mkForce "5s";
+    };
+    unitConfig = {
+      StartLimitIntervalSec = 300;
+      StartLimitBurst = 100;
+    };
+  };
+
+  systemd.services.home-assistant = {
+    after = ["mosquitto.service" "network-online.target"];
+    wants = ["mosquitto.service" "network-online.target"];
+    bindsTo = ["mosquitto.service"];
+    serviceConfig = {
+      Restart = lib.mkForce "always";
+      RestartSec = lib.mkForce "5s";
+    };
+    unitConfig = {
+      StartLimitIntervalSec = 300;
+      StartLimitBurst = 100;
+    };
+  };
 }
