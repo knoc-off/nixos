@@ -14,7 +14,7 @@
     self.nixosModules.audio.pipewire
 
     self.nixosModules.misc
-    self.nixosModules.minecraft.server-suite
+    self.nixosModules.minecraft
 
     inputs.disko.nixosModules.disko
     {disko.devices.disk.vdb.device = "/dev/nvme0n1";}

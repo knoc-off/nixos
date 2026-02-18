@@ -18,6 +18,30 @@
 
     self.homeModules.git
     self.homeModules.lspmux
+    {
+      services.lspmux.settings = {
+        pass_environment = [
+          "*"
+          "!STARSHIP_SESSION_KEY"
+          "!DIRENV_DIFF"
+          "!DIRENV_WATCHES"
+          "!SHLVL"
+          "!LaunchInstanceID"
+          "!SECURITYSESSIONID"
+          "!XPC_SERVICE_NAME"
+          "!XPC_FLAGS"
+          "!OLDPWD"
+          "!NVIM"
+          "!NVIM_LOG_FILE"
+          "!NVIM_SYSTEM_RPLUGIN_MANIFEST"
+          "!OSLogRateLimit"
+          "!TERM_PROGRAM_VERSION"
+          "!__CFBundleIdentifier"
+        ];
+        # Allowlist alternative — only pass vars that matter for language servers:
+        # pass_environment = ["PATH" "HOME" "RUST_SRC_PATH" "CARGO_HOME" "RUSTUP_HOME"];
+      };
+    }
     self.homeModules.starship
 
     ./programs/terminal/shell

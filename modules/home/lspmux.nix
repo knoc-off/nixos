@@ -1,5 +1,6 @@
 # lspmux - LSP multiplexer config file generation
-# Writes settings to ~/.config/lspmux/config.toml
+# macOS: ~/Library/Application Support/lspmux/config.toml
+# Linux: ~/.config/lspmux/config.toml
 {
   config,
   lib,
@@ -8,6 +9,7 @@
 }: let
   cfg = config.services.lspmux;
   tomlFormat = pkgs.formats.toml {};
+  configFile = tomlFormat.generate "lspmux-config" cfg.settings;
 in {
   options.services.lspmux = {
     settings = lib.mkOption {
@@ -30,8 +32,12 @@ in {
   };
 
   config = lib.mkIf (cfg.settings != {}) {
-    xdg.configFile."lspmux/config.toml" = {
-      source = tomlFormat.generate "lspmux-config" cfg.settings;
+    # The `directories` crate uses platform-native config paths
+    home.file = lib.mkIf pkgs.stdenv.isDarwin {
+      "Library/Application Support/lspmux/config.toml".source = configFile;
+    };
+    xdg.configFile = lib.mkIf (!pkgs.stdenv.isDarwin) {
+      "lspmux/config.toml".source = configFile;
     };
   };
 }

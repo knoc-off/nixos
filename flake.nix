@@ -18,6 +18,8 @@
 
     inherit (lib) nixosSystem listToAttrs;
 
+    inherit (import ./lib {inherit lib;}) discoverModules;
+
     mkConfig = {
       hostname,
       user,
@@ -133,9 +135,9 @@
     packages = forAllSystems mkPkgs;
     devShells = forAllSystems mkPkgs;
 
-    nixosModules = import ./modules/nixos/default.nix;
-    homeModules = import ./modules/home/default.nix;
-    darwinModules = import ./modules/darwin/default.nix;
+    nixosModules = discoverModules ./modules/nixos;
+    homeModules = discoverModules ./modules/home;
+    darwinModules = discoverModules ./modules/darwin;
 
     overlays = import ./overlays {inherit inputs;};
 
