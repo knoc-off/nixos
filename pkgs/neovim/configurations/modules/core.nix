@@ -164,6 +164,13 @@ in {
     }
 
     {
+      plugins.treesitter = {
+        enable = true;
+        settings.highlight.enable = true;
+      };
+    }
+
+    {
       plugins.treesitter-context = {
         enable = true;
         settings = {

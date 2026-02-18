@@ -117,6 +117,9 @@ in rec {
       overlays = [
         inputs.nixneovimplugins.overlays.default
         neovim-plugins.overlay
+        (_final: _prev: {
+          inherit gh-actions-language-server;
+        })
       ];
     };
     nixvim = inputs.nixvim.legacyPackages.${pkgs.stdenv.hostPlatform.system};
@@ -251,6 +254,8 @@ in rec {
       executable = true;
       destination = "/bin/${name}";
     };
+
+  gh-actions-language-server = upkgs.callPackage ./gh-actions-language-server {};
 
   coffee-widget = pkgs.callPackage ./noctalia/coffee-widget {};
 

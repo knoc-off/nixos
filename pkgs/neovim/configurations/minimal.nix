@@ -10,12 +10,16 @@
     ./modules/telescope.nix
     ./modules/completion.nix
 
+    ./modules/gitsigns.nix
+    ./modules/sessions.nix
+
     # Languages (explicit opt-in)
     ./modules/languages/default.nix # shared LSP base
     ./modules/languages/formatters.nix # biome + prettier
     ./modules/languages/rust.nix
     ./modules/languages/nix.nix
     ./modules/languages/typescript.nix
+    ./modules/languages/github-actions.nix
 
     ./themes
   ];
