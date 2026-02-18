@@ -17,6 +17,7 @@
     ./programs/browser/firefox/default.nix
 
     self.homeModules.git
+    self.homeModules.lspmux
     self.homeModules.starship
 
     ./programs/terminal/shell

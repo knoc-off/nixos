@@ -19,6 +19,8 @@
 in {
   imports = [
     (self.darwinModules.home args)
+    self.darwinModules.services.lspmux
+    {services.lspmux.enable = true;}
     inputs.sops-nix.darwinModules.sops
     {
       nixpkgs.config.allowUnfree = true;

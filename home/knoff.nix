@@ -30,6 +30,7 @@
     self.homeModules.noctalia
     self.homeModules.stylix
 
+    self.homeModules.lspmux
     self.homeModules.git
     {
       programs.git = {

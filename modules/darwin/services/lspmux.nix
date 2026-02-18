@@ -1,6 +1,5 @@
-# lspmux - LSP multiplexer service (NixOS/systemd)
+# lspmux - LSP multiplexer service (macOS/launchd)
 # Allows multiple neovim instances to share a single language server
-# Config file generation is handled by the home module (homeModules.lspmux)
 {
   config,
   lib,
@@ -21,15 +20,14 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    systemd.user.services.lspmux = {
-      description = "Language server multiplexer";
-      wantedBy = ["default.target"];
-
+    launchd.user.agents.lspmux = {
       serviceConfig = {
-        Type = "simple";
-        ExecStart = "${cfg.package}/bin/lspmux server";
-        Restart = "on-failure";
-        RestartSec = 5;
+        Label = "org.codeberg.p2502.lspmux";
+        ProgramArguments = ["${cfg.package}/bin/lspmux" "server"];
+        KeepAlive = true;
+        RunAtLoad = true;
+        StandardOutPath = "/tmp/lspmux.log";
+        StandardErrorPath = "/tmp/lspmux.log";
       };
     };
 
