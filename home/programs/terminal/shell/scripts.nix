@@ -1,33 +1,58 @@
 {
   pkgs,
   lib,
-  upkgs,
   self,
   hostname,
-  color-lib,
-  theme,
   ...
 }: let
-  config_dir = "/etc/nixos"; # Should relocate to /etc? and symlink?
+  config_dir = "/etc/nixos";
   inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) mkComplgenScript;
-  inherit (color-lib) setOkhslLightness setOkhslSaturation;
-
+  # inherit (color-lib) setOkhslLightness setOkhslSaturation;
   # Helper to transform colors like in kitty config
-  lighten = setOkhslLightness 0.7;
-  saturate = setOkhslSaturation 0.9;
-  sa = hex: lib.removePrefix "#" (lighten (saturate "#${hex}"));
-  sal = hex: lib.removePrefix "#" (setOkhslLightness 0.5 (saturate "#${hex}"));
+  # lighten = setOkhslLightness 0.7;
+  # saturate = setOkhslSaturation 0.9;
+  # sa = hex: lib.removePrefix "#" (lighten (saturate "#${hex}"));
+  # sal = hex: lib.removePrefix "#" (setOkhslLightness 0.5 (saturate "#${hex}"));
 in {
   home.packages =
     [
-      # Skim Environment variables
-      # python3 -c 'import os,sys; sys.stdout.write("\0".join(sorted(os.environ)) + "\0")' |
-      #   sk --read0 --no-mouse --no-multi \
-      #      --preview 'python3 -c "import os,sys; v=os.environ.get(sys.argv[1],\"\"); sys.stdout.write(v)" {}' \
-      #      --preview-window=right:70%:wrap
+      (
+        pkgs.writeShellApplication {
+          name = "env-vars";
 
-      # Git Branches
-      # gid diff with specific branches, show preview-window
+          runtimeInputs = [
+            pkgs.python3
+            pkgs.skim
+          ];
+
+          text = ''
+            python3 - <<'PY'
+            import os
+            for k in sorted(os.environ):
+                v = os.environ[k]
+                print(f"{k}={v}")
+            PY
+          '';
+        }
+      )
+
+      (
+        pkgs.writeShellApplication {
+          name = "skim-env-vars";
+
+          runtimeInputs = [
+            pkgs.python3
+            pkgs.skim
+          ];
+
+          text = ''
+            python3 -c 'import os,sys; sys.stdout.write("\0".join(sorted(os.environ)) + "\0")' \
+              | sk --read0 --no-mouse --no-multi \
+                  --preview 'python3 -c "import os,sys; k=sys.argv[1]; sys.stdout.write(os.environ.get(k, \"\"))" {}' \
+                  --preview-window=right:70%:wrap
+          '';
+        }
+      )
 
       (
         pkgs.writeShellScriptBin "git-branch-view" ''
@@ -179,7 +204,7 @@ in {
             esac
           done
 
-          if [ -z "${input:-}" ]; then
+          if [ -z "${"input:-"}" ]; then
              echo "Error: Missing duration argument"
              usage
           fi
