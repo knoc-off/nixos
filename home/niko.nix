@@ -36,6 +36,7 @@
           "!NVIM_SYSTEM_RPLUGIN_MANIFEST"
           "!OSLogRateLimit"
           "!TERM_PROGRAM_VERSION"
+          "!TMPDIR"
           "!__CFBundleIdentifier"
         ];
         # Allowlist alternative — only pass vars that matter for language servers:

@@ -125,7 +125,7 @@ in rec {
       pkgs = customPkgs;
       extraSpecialArgs = {inherit color-lib theme;};
       module = {
-        imports = [./neovim/configurations/lazy-loading.nix];
+        imports = [./neovim/configurations/minimal.nix];
       };
     };
     minimal = nixvim.makeNixvimWithModule {
@@ -253,6 +253,6 @@ in rec {
     };
 
   coffee-widget = pkgs.callPackage ./noctalia/coffee-widget {};
-  
+
   audio-recorder = pkgs.callPackage ./noctalia/audio-recorder {};
 }

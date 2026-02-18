@@ -116,7 +116,7 @@ in {
       };
     }))
 
-    self.packages.${system}.neovim-nix.default
+    self.packages.${system}.neovim-nix.minimal
 
     taskwarrior3
 

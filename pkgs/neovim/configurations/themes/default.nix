@@ -367,15 +367,15 @@ in {
             bg = "$bg1";
           };
           TelescopePromptBorder = {
-            fg = "$bg1";
+            fg = "$bg3";
             bg = "$bg1";
           };
           TelescopeResultsBorder = {
-            fg = "$bg1";
+            fg = "$bg3";
             bg = "$bg1";
           };
           TelescopePreviewBorder = {
-            fg = "$bg1";
+            fg = "$bg3";
             bg = "$bg1";
           };
           TelescopePromptTitle = {
@@ -383,7 +383,8 @@ in {
             bg = "$purple";
           };
           TelescopeResultsTitle = {
-            fg = "$bg0";
+            fg = "$purple";
+            bg = "$bg1";
           };
           TelescopePreviewTitle = {
             fg = "$bg0";
