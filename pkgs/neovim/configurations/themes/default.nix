@@ -478,7 +478,7 @@ in {
             bg = "$green";
           };
           ExtraWhitespace = {
-            bg = "$bg1";
+            bg = "$bg2";
           };
           ahhhhh = {
             fg = "$bg0";

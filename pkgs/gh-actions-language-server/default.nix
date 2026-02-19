@@ -1,4 +1,5 @@
 {
+  pkgs,
   lib,
   stdenv,
   fetchFromGitHub,
@@ -44,6 +45,7 @@
 
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
+
     outputHash = "sha256-WXMIUvdiels1NimJCYZiPA9M7NO64jVi6Ifw5HjDc3o=";
   };
 in

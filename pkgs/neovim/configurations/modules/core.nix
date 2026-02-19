@@ -58,10 +58,6 @@ in {
     {
       autoCmd = [
         {
-          event = "BufWrite";
-          command = "%s/\\s\\+$//e";
-        }
-        {
           event = "VimEnter";
           group = "AutoCd";
           callback = lib.nixvim.mkRaw ''

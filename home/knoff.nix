@@ -166,6 +166,49 @@
           "!*TOKEN*"
           "!*SECRET*"
           "!*PASSWORD*"
+
+          # locale + pager + terminal capability noise
+          "!LANG"
+          "!LC_*"
+          "!PAGER"
+          "!MANPATH"
+          "!INFOPATH"
+          "!PATH_LOCALE"
+          "!TERM"
+          "!TERMINAL"
+          "!TERMINFO"
+          "!TERMINFO_DIRS"
+
+          # user identity / prefs
+          "!USER"
+          "!LOGNAME"
+          "!EDITOR"
+          "!VISUAL"
+          "!BROWSER"
+          "!RIPGREP_CONFIG_PATH"
+
+          # ambient language runtime paths
+          "!PYTHONPATH"
+          "!PYTHONNOUSERSITE"
+          "!PYTHONHASHSEED"
+          "!LUA_PATH"
+          "!LUA_CPATH"
+          "!NODE_PATH"
+          "!GEM_HOME"
+
+          # deterministic-build knobs + parallelism
+          "!SOURCE_DATE_EPOCH"
+          "!DETERMINISTIC_BUILD"
+          "!ZERO_AR_DATE"
+          "!NIX_BUILD_CORES"
+
+          # nix structured/env bookkeeping that churns
+          "!__structuredAttrs"
+          "!__impureHostDeps"
+          "!__propagatedImpureHostDeps"
+          "!__sandboxProfile"
+          "!__darwinAllowLocalNetworking"
+          "!__NIX_DARWIN_SET_ENVIRONMENT_DONE"
         ];
         # Allowlist alternative — only pass vars that matter for language servers:
         # pass_environment = ["PATH" "HOME" "RUST_SRC_PATH" "CARGO_HOME" "RUSTUP_HOME"];
