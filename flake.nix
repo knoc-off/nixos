@@ -259,11 +259,6 @@
 
     niri = {
       url = "github:sodiboo/niri-flake";
-
-      # this may make the cachix fail.
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-      };
     };
 
     firefox-csshacks = {

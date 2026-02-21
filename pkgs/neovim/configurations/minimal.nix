@@ -3,15 +3,18 @@
     ./settings/options.nix
     ./settings/keymappings.nix
 
-    ./modules/core.nix
+    ./modules/treesitter.nix
     ./modules/bufferline.nix
     ./modules/focus.nix
     ./modules/scope.nix
     ./modules/textobjects.nix
     ./modules/telescope.nix
     ./modules/completion.nix
+    ./modules/mini-files.nix
+    # ./modules/dashboard.nix # disabled: snacks dashboard requires lazy.nvim
 
-    ./modules/gitsigns.nix
+    ./modules/trainingwheels.nix
+    ./modules/git.nix
     ./modules/sessions.nix
 
     ./modules/languages/default.nix # shared LSP base
@@ -22,6 +25,15 @@
     ./modules/languages/github-actions.nix
 
     ./themes
+
+    # Custom plugins
+    ../plugins/smart-paste/module.nix
+    {
+      # Smart paste: auto-indent pasted code
+      plugins.smart-paste = {
+        enable = true;
+      };
+    }
   ];
 
   viAlias = true;

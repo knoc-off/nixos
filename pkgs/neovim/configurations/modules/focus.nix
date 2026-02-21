@@ -13,6 +13,8 @@
       pattern = "*";
       callback = lib.nixvim.mkRaw ''
         function()
+          -- Skip mini.files buffers
+          if vim.bo.filetype == "minifiles" then return end
           vim.wo.cursorline = true
           vim.wo.winhighlight = ""
         end
@@ -24,6 +26,8 @@
       pattern = "*";
       callback = lib.nixvim.mkRaw ''
         function()
+          -- Skip mini.files buffers
+          if vim.bo.filetype == "minifiles" then return end
           vim.wo.cursorline = false
           vim.wo.winhighlight = "Normal:DimInactive,NormalNC:DimInactive,CursorLineNr:DimInactive,SignColumn:DimInactive,EndOfBuffer:DimInactive"
         end

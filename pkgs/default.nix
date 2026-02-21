@@ -13,7 +13,7 @@
 
   rustPkgs-fenix = upkgs.extend inputs.fenix.overlays.default;
 
-  neovim-plugins = import ./neovim-plugins {inherit (pkgs) vimUtils lua;};
+  neovim-plugins = import ./neovim-plugins {inherit (pkgs) vimUtils lua fetchFromGitHub;};
 
   rustPlatform = rustPkgs-fenix.makeRustPlatform {
     cargo = rustPkgs-fenix.fenix.minimal.toolchain;
