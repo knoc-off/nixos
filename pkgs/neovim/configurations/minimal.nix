@@ -14,6 +14,7 @@
     # ./modules/dashboard.nix # disabled: snacks dashboard requires lazy.nvim
 
     ./modules/trainingwheels.nix
+    ./modules/git-state.nix # shared git comparison state (source of truth)
     ./modules/git.nix
     ./modules/sessions.nix
 
