@@ -20,6 +20,7 @@
 
     ./modules/languages/default.nix # shared LSP base
     ./modules/languages/formatters.nix # biome + prettier
+    ./modules/languages/c.nix
     ./modules/languages/rust.nix
     ./modules/languages/nix.nix
     ./modules/languages/typescript.nix

@@ -246,8 +246,8 @@ in {
           # "Mod+Shift+Equal".action.set-window-height = "+10%";
 
           # Floating windows
-          # "Mod+V".action.toggle-window-floating = [];
-          "Mod+Shift+V".action.switch-focus-between-floating-and-tiling = [];
+          "Mod+Shift+V".action.toggle-window-floating = [];
+          #"Mod+Shift+V".action.switch-focus-between-floating-and-tiling = [];
 
           # Tabbed display
           # "Mod+W".action.toggle-column-tabbed-display = [];
