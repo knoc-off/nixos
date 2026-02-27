@@ -31,8 +31,10 @@ pkgs.stdenv.mkDerivation {
 
   installPhase = ''
     mkdir -p $out
-    cp pkg/marki.js $out/
-    cp pkg/marki_bg.wasm $out/
+    cp pkg/marki.js $out/_marki.js
+    cp pkg/marki_bg.wasm $out/_marki_bg.wasm
+    cp -r ${./templates} $out/templates
+    cp ${./install.sh} $out/install.sh
   '';
 
   meta = {

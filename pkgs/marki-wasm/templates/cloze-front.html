@@ -1,0 +1,29 @@
+<pre id="marki-cloze-data" style="display:none;">{{cloze:Text}}</pre>
+<div id="marki-cloze"></div>
+<script>
+function renderCloze() {
+    var md = document.getElementById('marki-cloze-data').textContent;
+    document.getElementById('marki-cloze').innerHTML = wasm_bindgen.render_markdown(md);
+}
+
+if (!window.wasm_bindgen) {
+    var s = document.createElement('script');
+    s.src = '_marki.js';
+    s.onload = function() {
+        wasm_bindgen('_marki_bg.wasm').then(function() {
+            wasm_bindgen.init_panic_hook();
+            window._marki_ready = true;
+            renderCloze();
+        });
+    };
+    document.head.appendChild(s);
+} else if (!window._marki_ready) {
+    wasm_bindgen('_marki_bg.wasm').then(function() {
+        wasm_bindgen.init_panic_hook();
+        window._marki_ready = true;
+        renderCloze();
+    });
+} else {
+    renderCloze();
+}
+</script>
