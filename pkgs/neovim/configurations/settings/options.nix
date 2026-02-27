@@ -39,7 +39,8 @@
       #   patterns
       smartcase = true; # Override the 'ignorecase' option if the search pattern contains upper
       #   case characters
-      scrolloff = 5; # Bottom scrolloff (top scrolloff of 15 handled via autoCmd)
+      scrolloff = 5; # Number of screen lines to show around the cursor
+      scroll = 8; # ctrl U/D ammount
       # cursorline = false; # Highlight the screen line of the cursor
       cursorcolumn = false; # Highlight the screen column of the cursor
       signcolumn = "yes"; # Whether to show the signcolumn

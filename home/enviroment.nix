@@ -20,7 +20,7 @@
     };
 
     sessionVariables = {
-      ANTHROPIC_API_KEY = "$(cat /run/secrets/ANTHROPIC_API_KEY)";
+      # ANTHROPIC_API_KEY = "$(cat /run/secrets/ANTHROPIC_API_KEY)";
       OPENROUTER_API_KEY = "$(cat /etc/secrets/gpt/openrouter )";
 
       XDG_CURRENT_DESKTOP = "niri";
@@ -34,4 +34,3 @@
     };
   };
 }
-

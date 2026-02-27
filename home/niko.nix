@@ -153,6 +153,72 @@
           "!*TOKEN*"
           "!*SECRET*"
           "!*PASSWORD*"
+
+          # locale / terminal / user prefs
+          "!LANG"
+          "!LC_*"
+          "!TERM*"
+          "!TERMINAL"
+          "!TERMINFO*"
+          "!PAGER"
+          "!USER"
+          "!LOGNAME"
+          "!SHELL"
+          "!EDITOR"
+          "!VISUAL"
+          "!BROWSER"
+
+          # xdg
+          "!XDG_CONFIG_DIRS"
+          "!XDG_DATA_DIRS"
+
+          # homebrew
+          "!HOMEBREW_*"
+
+          # ambient runtimes (you don't use them)
+          "!PYTHON*"
+          "!NODE*"
+          "!LUA*"
+          "!GEM_*"
+
+          # ripgrep config
+          "!RIPGREP_CONFIG_PATH"
+
+          # deterministic build knobs
+          "!SOURCE_DATE_EPOCH"
+          "!DETERMINISTIC_BUILD"
+          "!ZERO_AR_DATE"
+
+          # nix derivation bookkeeping / structured attrs
+          "!build*"
+          "!nativeBuild*"
+          "!propagated*"
+          "!deps*"
+          "!doCheck"
+          "!doInstallCheck"
+          "!dontAddDisableDepTrack"
+          "!builder"
+          "!buildPhase"
+          "!phases"
+          "!patches"
+          "!outputs"
+          "!out"
+          "!cmakeFlags"
+          "!configureFlags"
+          "!mesonFlags"
+          "!name"
+          "!preferLocalBuild"
+          "!shellHook"
+          "!stdenv"
+          "!strictDeps"
+          "!system"
+          "!__structuredAttrs"
+          "!__impureHostDeps"
+          "!__propagatedImpureHostDeps"
+          "!__propagatedSandboxProfile"
+          "!__sandboxProfile"
+          "!__darwinAllowLocalNetworking"
+          "!__NIX_DARWIN_SET_ENVIRONMENT_DONE"
         ];
         # Allowlist alternative — only pass vars that matter for language servers:
         # pass_environment = ["PATH" "HOME" "RUST_SRC_PATH" "CARGO_HOME" "RUSTUP_HOME"];

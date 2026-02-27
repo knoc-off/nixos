@@ -28,7 +28,7 @@ in {
       environment.variables = {
         EDITOR = "vi";
         VISUAL = "vi";
-        ANTHROPIC_API_KEY = "$(cat ${config.sops.secrets.ANTHROPIC_API_KEY.path})";
+        #ANTHROPIC_API_KEY = "$(cat ${config.sops.secrets.ANTHROPIC_API_KEY.path})";
       };
       programs.zsh = let
         coffeeScript = pkgs.writeShellScriptBin "coffee" ''
