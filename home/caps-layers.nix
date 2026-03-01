@@ -1,56 +1,133 @@
-# Declarative per-window caps behavior.
-# When caps (rmet via kanata) is held, listed keys send the specified
-# modifier instead of Super_R. Unlisted keys pass through as Super_R+key
-# (triggering Hyprland WM binds).
+# Declarative per-window caps remapping.
+#
+# When caps (rmet via kanata) is held, keys can be remapped to send
+# different modifiers, different keys, commands, or raw kanata actions.
+# Unlisted keys pass through as Super_R+key (triggering Hyprland WM binds).
 #
 # "base" is the wildcard fallback for windows not matching any other class.
-# Supports: ctrl, shift, alt as target modifiers.
 #
-# Usage:
-#   capsLayers = {
+# Each layer supports two forms that merge together (keys takes priority):
+#
+#   Bulk shorthand:  ctrl = ["a" "b" "c"];   alt = ["1" "2" "3"];
+#   Per-key actions: keys = { a = "ctrl"; b = { mod = "shift"; key = "z"; }; };
+#
+# Per-key action values:
+#   "ctrl" / "shift" / "alt"        → modifier + same key  (shorthand string)
+#   { mod = "ctrl"; }               → modifier + same key  (explicit)
+#   { key = "z"; }                  → bare key, no modifier
+#   { mod = "shift"; key = "z"; }   → modifier + different key
+#   { cmd = "some-command"; }       → run a command
+#   { raw = "(tap-hold 200 ...)"; } → raw kanata action (escape hatch)
+#
+# Example:
+#   result = mkCapsLayers {
+#     base = {
+#       ctrl = ["a" "b" "c" "h" "j" "k" "l"];
+#       keys = {
+#         F5  = { cmd = "notify-send hello"; };
+#         x   = { raw = "(tap-hold 200 200 C-x C-S-x)"; };
+#       };
+#     };
+#     browser = {
+#       classes = ["firefox" "chromium-browser"];
+#       ctrl = ["a" "c" "f" "h" "j" "k" "l" "t" "v" "w"];
+#       alt = ["1" "2" "3" "4" "5"];
+#     };
 #     terminal = {
 #       classes = ["com.mitchellh.ghostty" "foot"];
 #       ctrl = ["h" "j" "k"];
 #     };
-#     browser = {
-#       classes = ["firefox" "chromium-browser"];
-#       ctrl = ["a" "b" "c" "f" "h" "i" "j" "k" "l"];
-#       alt = ["1" "2" "3"];  # caps+1 → Alt+1 in browsers
-#     };
-#     base = {
-#       ctrl = ["a" "b" "c" "f" "h" "i" "j" "k" "l"];
-#     };
 #   };
 #
-#   result = mkCapsLayers { inherit lib; layers = capsLayers; };
 #   result.hyprkanRules   -- list of hyprkan rule attrsets
-#   result.kanataConfig   -- kanata config string
+#   result.kanataConfig   -- function: extraAliases string → kanata config string
 { lib }:
 let
   modPrefix = { ctrl = "C"; shift = "S"; alt = "A"; };
   modNames = builtins.attrNames modPrefix;
+
+  # Normalize a per-key action value into a canonical attrset
+  normalizeAction = keyName: action:
+    if builtins.isString action then
+      # String shorthand: "ctrl" → { mod = "ctrl"; }
+      { mod = action; }
+    else if action ? raw then
+      action
+    else if action ? cmd then
+      action
+    else
+      # Attrset with mod and/or key
+      action;
+
+  # Compile a normalized action into a kanata expression
+  compileAction = keyName: action:
+    if action ? raw then
+      action.raw
+    else if action ? cmd then
+      "(cmd ${action.cmd})"
+    else let
+      targetKey = action.key or keyName;
+      modded = if action ? mod then "${modPrefix.${action.mod}}-${targetKey}" else targetKey;
+    in
+      "(multi (release-key rmet) ${modded})";
+
+  # Expand a layer's bulk lists + per-key overrides into a flat { key = action; } map
+  normalizeLayer = layer: let
+    # Expand bulk modifier lists: ctrl = ["a" "b"] → { a = { mod = "ctrl"; }; b = { mod = "ctrl"; }; }
+    bulkEntries = lib.foldl' (acc: mod:
+      if layer ? ${mod} then
+        acc // lib.genAttrs layer.${mod} (_: { inherit mod; })
+      else
+        acc
+    ) {} modNames;
+
+    # Per-key overrides (normalized)
+    keyEntries = lib.mapAttrs normalizeAction (layer.keys or {});
+  in
+    # keys takes priority over bulk
+    bulkEntries // keyEntries;
+
 in
 layers:
 let
   layerNames = builtins.attrNames layers;
 
-  # Extract only modifier attrs from a layer (filter out "classes")
-  layerMods = layer: lib.filterAttrs (n: _: builtins.elem n modNames) layer;
+  # Normalize all layers into { layerName = { key = canonicalAction; }; }
+  normalized = lib.mapAttrs (_: normalizeLayer) layers;
 
-  # Collect every unique (mod, key) pair across all layers for alias generation
-  allPairs = lib.unique (lib.concatLists (lib.mapAttrsToList (_: layer:
-    lib.concatLists (lib.mapAttrsToList (mod: keys:
-      map (k: { inherit mod k; }) keys
-    ) (layerMods layer))
-  ) layers));
+  # Collect all unique compiled actions for alias generation
+  # Each alias is a unique (keyName, compiledAction) pair
+  allAliases = let
+    pairs = lib.concatLists (lib.mapAttrsToList (_: keyMap:
+      lib.mapAttrsToList (keyName: action: {
+        inherit keyName action;
+        compiled = compileAction keyName action;
+      }) keyMap
+    ) normalized);
+  in
+    lib.foldl' (acc: pair:
+      let name = "caps-${pair.keyName}-${builtins.hashString "md5" pair.compiled}";
+      in if acc ? ${name} then acc
+         else acc // { ${name} = pair; }
+    ) {} pairs;
 
-  aliasName = mod: k: "r${modPrefix.${mod}}-${k}";
-  mkAlias = { mod, k }: "${aliasName mod k} (multi (release-key rmet) ${modPrefix.${mod}}-${k})";
-  mkLayermap = layer: lib.concatStringsSep "  " (
-    lib.concatLists (lib.mapAttrsToList (mod: keys:
-      map (k: "${k} @${aliasName mod k}") keys
-    ) (layerMods layer))
+  # Look up the alias name for a (keyName, action) pair
+  getAliasName = keyName: action: let
+    compiled = compileAction keyName action;
+  in "caps-${keyName}-${builtins.hashString "md5" compiled}";
+
+  # Generate alias definitions
+  aliasLines = lib.concatStringsSep "\n      " (
+    lib.mapAttrsToList (name: pair: "${name} ${pair.compiled}") allAliases
   );
+
+  # Generate deflayermap entries for a normalized layer
+  mkLayermap = keyMap: lib.concatStringsSep "  " (
+    lib.mapAttrsToList (keyName: action:
+      "${keyName} @${getAliasName keyName action}"
+    ) keyMap
+  );
+
 in {
   hyprkanRules =
     (lib.concatLists (lib.mapAttrsToList (name: layer:
@@ -64,12 +141,12 @@ in {
 
       ${lib.concatStringsSep "\n      " (map (n: "cap-${n} (multi rmet @dbl (layer-while-held shortcuts-${n}))") layerNames)}
 
-      ${lib.concatStringsSep "\n      " (map mkAlias allPairs)}
+      ${aliasLines}
     )
 
     (defsrc caps)
     ${lib.concatStringsSep "\n    " (map (n: "(deflayer ${n} @cap-${n})") layerNames)}
 
-    ${lib.concatStringsSep "\n    " (map (n: "(deflayermap (shortcuts-${n})\n      ${mkLayermap layers.${n}}\n    )") layerNames)}
+    ${lib.concatStringsSep "\n    " (map (n: "(deflayermap (shortcuts-${n})\n      ${mkLayermap normalized.${n}}\n    )") layerNames)}
   '';
 }
