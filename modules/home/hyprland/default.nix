@@ -28,7 +28,10 @@ in {
     settings = {
       ecosystem.no_update_news = true;
 
-      monitor = ", preferred, auto, 1.17";
+      monitor = [
+        "eDP-1, preferred, 0x0, 1.171339564"
+        ", preferred, auto-center-up, 1"
+      ];
 
       general.layout = "scrolling";
 

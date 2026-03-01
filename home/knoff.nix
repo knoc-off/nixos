@@ -20,11 +20,40 @@
     browser = {
       classes = ["firefox" "chromium-browser"];
       ctrl = ["a" "b" "c" "f" "h" "i" "j" "k" "l" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
+      #keys.t = {raw = "(tap-dance 300 (C-c C-S-c))";};
     };
     terminal = {
       classes = ["com.mitchellh.ghostty" "foot"];
       ctrl = ["h" "j" "k" "l"];
       alt = ["e"];
+      keys.d = {
+        mod = "shift";
+        key = "z";
+      };
+
+      # keys = {
+      #   # String shorthand: "ctrl" / "shift" / "alt"
+      #   # Same as putting the key in the bulk list above.
+      #   # d = "ctrl";                           # caps+d → Ctrl+D
+      #
+      #   # Modifier + same key (explicit form of the shorthand):
+      #   # d = { mod = "ctrl"; };                # caps+d → Ctrl+D
+      #
+      #   # Modifier + DIFFERENT key:
+      #   # d = { mod = "shift"; key = "z"; };    # caps+d → Shift+Z
+      #
+      #   # Bare key, no modifier:
+      #   # d = { key = "esc"; };                 # caps+d → Escape
+      #
+      #   # Run a command:
+      #   # e = {cmd = "${pkgs.libnotify}/bin/notify-send hi";};
+      #
+      #   # Raw kanata:
+      #   # F6 = { raw = "(tap-hold 200 200 C-z C-S-z)"; };
+      #   #
+      #   # F7 = { raw = "(tap-dance 300 (C-c C-S-c))"; };
+      #   #    caps+F7: single tap → Ctrl+C, double tap → Ctrl+Shift+C
+      # };
     };
   };
 in {
