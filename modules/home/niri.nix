@@ -24,6 +24,12 @@ in {
       # Request clients to not use client-side decorations (no GTK title bars)
       prefer-no-csd = true;
 
+      # Enable xwayland-satellite for X11 app compatibility
+      xwayland-satellite = {
+        enable = true;
+        path = lib.getExe pkgs.xwayland-satellite-unstable;
+      };
+
       layout = {
         gaps = 6;
       };
