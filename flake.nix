@@ -210,11 +210,9 @@
 
     nixgl.url = "github:nix-community/nixGL";
 
-    hyprland.url = "github:hyprwm/Hyprland";
-    hyprland-plugins = {
-      url = "github:hyprwm/hyprland-plugins";
-      inputs.hyprland.follows = "hyprland";
-    };
+    hyprnix.url = "github:hyprwm/hyprnix";
+    hyprland.follows = "hyprnix/hyprland";
+    hyprland-plugins.follows = "hyprnix/hyprland-plugins";
 
     ags = {
       url = "github:aylur/ags";

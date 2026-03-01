@@ -4,6 +4,9 @@ systems/hardware/fingerprint/calib-data.bin
 result
 target
 
+Hyprland/
+pkgs/neovim/nixvim.external.git.repo.do.not.modify/
+
 niri-docs.md
 .direnv
 .aider*
