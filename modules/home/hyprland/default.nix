@@ -40,8 +40,8 @@ in {
 
       gestures.gesture = [
         "3, vertical, workspace"
-        "3, left, dispatcher, layoutmsg, focus r"
-        "3, right, dispatcher, layoutmsg, focus l"
+        "3, left, dispatcher, layoutmsg, move +col"
+        "3, right, dispatcher, layoutmsg, move -col"
       ];
 
       animations = {
@@ -91,8 +91,8 @@ in {
           "${mainMod}, down, movefocus, d"
 
           # Focus (vim - caps/rsuper sends Ctrl+hjkl via kanata, so these only fire from physical super)
-          "${mainMod}, h, layoutmsg, focus l"
-          "${mainMod}, l, layoutmsg, focus r"
+          "${mainMod}, h, layoutmsg, move -col"
+          "${mainMod}, l, layoutmsg, move +col"
           "${mainMod}, k, movefocus, u"
           "${mainMod}, j, movefocus, d"
 
