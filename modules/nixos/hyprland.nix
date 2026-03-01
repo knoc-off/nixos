@@ -6,6 +6,7 @@ in {
     enable = true;
     package = inputs.hyprnix.packages.${system}.hyprland;
     portalPackage = inputs.hyprnix.packages.${system}.xdg-desktop-portal-hyprland;
+    withUWSM = true;
   };
 
   security.polkit.enable = true;

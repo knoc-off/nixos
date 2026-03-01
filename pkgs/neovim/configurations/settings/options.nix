@@ -39,7 +39,7 @@
       #   patterns
       smartcase = true; # Override the 'ignorecase' option if the search pattern contains upper
       #   case characters
-      scrolloff = 5; # Number of screen lines to show around the cursor
+      scrolloff = 5; # Bottom scrolloff (top scrolloff of 15 handled via autoCmd)
       # cursorline = false; # Highlight the screen line of the cursor
       cursorcolumn = false; # Highlight the screen column of the cursor
       signcolumn = "yes"; # Whether to show the signcolumn
@@ -72,5 +72,25 @@
       # Tab behavior - open buffers in new tabs by default
       switchbuf = "usetab,newtab"; # Jump to existing tab if buffer is open, otherwise open new tab
     };
+
+    autoCmd = [
+      {
+        event = ["CursorMoved" "CursorMovedI"];
+        desc = "Asymmetric scrolloff: 15 from top, 5 from bottom";
+        callback.__raw = ''
+          function()
+            local top_scrolloff = 15
+            local topline = vim.fn.line("w0")
+            local curline = vim.fn.line(".")
+            if curline - topline < top_scrolloff then
+              local new_top = math.max(1, curline - top_scrolloff)
+              if new_top ~= topline then
+                vim.fn.winrestview({topline = new_top})
+              end
+            end
+          end
+        '';
+      }
+    ];
   };
 }

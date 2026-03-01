@@ -212,7 +212,14 @@
 
     hyprnix.url = "github:hyprwm/hyprnix";
     hyprland.follows = "hyprnix/hyprland";
-    hyprland-plugins.follows = "hyprnix/hyprland-plugins";
+    hyprland-plugins = {
+      url = "github:hyprwm/hyprland-plugins";
+      inputs.hyprland.follows = "hyprland";
+    };
+    Hyprspace = {
+      url = "github:KZDKM/Hyprspace";
+      inputs.hyprland.follows = "hyprland";
+    };
 
     ags = {
       url = "github:aylur/ags";

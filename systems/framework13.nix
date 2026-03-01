@@ -174,12 +174,11 @@
     {
       services.greetd = let
         tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
-        hyprland = "${inputs.hyprnix.packages.${pkgs.stdenv.hostPlatform.system}.hyprland}/bin/Hyprland";
       in {
         enable = true;
         settings = {
           default_session = {
-            command = "${tuigreet} --time --remember --cmd ${hyprland}";
+            command = "${tuigreet} --time --remember --cmd 'uwsm start hyprland-uwsm.desktop'";
             user = "greeter";
           };
         };

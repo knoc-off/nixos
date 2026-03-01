@@ -5,7 +5,29 @@
   user,
   lib,
   ...
-}: {
+}: let
+  mkCapsLayers = import ./caps-layers.nix {inherit lib;};
+
+  noctalia' = cmd:
+    lib.concatStringsSep " " (
+      ["noctalia-shell" "ipc" "call"] ++ (lib.splitString " " cmd)
+    );
+
+  caps = mkCapsLayers {
+    base = {
+      ctrl = ["a" "b" "c" "f" "h" "i" "j" "k" "l" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
+    };
+    browser = {
+      classes = ["firefox" "chromium-browser"];
+      ctrl = ["a" "b" "c" "f" "h" "i" "j" "k" "l" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
+    };
+    terminal = {
+      classes = ["com.mitchellh.ghostty" "foot"];
+      ctrl = ["h" "j" "k" "l"];
+      alt = ["e"];
+    };
+  };
+in {
   imports = [
     ./programs/terminal # default
     ./programs/terminal/ghostty
@@ -241,22 +263,7 @@
           "52545"
         ];
 
-        rules = [
-          {
-            class = "com.mitchellh.ghostty";
-            layer = "terminal";
-          }
-          {
-            class = "foot";
-            layer = "terminal";
-          }
-
-          {
-            class = "*";
-            title = "*";
-            layer = "base";
-          }
-        ];
+        rules = caps.hyprkanRules;
       };
     }
 
@@ -273,54 +280,9 @@
           port = 52545;
           extraDefCfg = "danger-enable-cmd yes process-unmapped-keys yes";
 
-          config = let
-            # These keys exit super, and send it as if it were control.
-            passthroughSuperToCtrlMorph = ["a" "b" "c" "f" "i" "l" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
-
-            # dumb but eh..
-            noctalia = cmd:
-              lib.concatStringsSep " " (
-                [
-                  "noctalia-shell"
-                  "ipc"
-                  "call"
-                ]
-                ++ (lib.splitString " " cmd)
-              );
-          in ''
-            (defalias
-
-              launcher (cmd ${noctalia "launcher toggle"})
-              dbl  (tap-dance-eager 250 (XX @launcher))
-
-              ;; GUI: Caps = Meta + shortcuts layer
-              cap-gui (multi rmet @dbl (layer-while-held shortcuts))
-
-              ;; Terminal: Caps = just Meta
-              cap-trm (multi rmet @dbl)
-
-              ;; rofi (cmd ${pkgs.rofi}/bin/rofi -show drun)
-              ;; example for a toggle bind. not super clean...
-              ;; to-trm (layer-switch terminal)
-              ;; to-gui (layer-switch base)
-              ;; f12  (tap-dance 300 (@rofi @to-trm))
-              ;; f12t (tap-dance 300 (@rofi @to-gui))
-
-              ;; Shortcuts: release meta, send Ctrl+key Press meta again
-              ${builtins.concatStringsSep "\n" (map (k: "sc${k} (multi (release-key rmet) C-${k})") passthroughSuperToCtrlMorph)}
-            )
-
-            (defsrc caps)
-            (deflayer base     @cap-gui )
-            (deflayer terminal @cap-trm )
-            ;;
-            ;; (defsrc caps f12)
-            ;; (deflayer base     @cap-gui @f12)
-            ;; (deflayer terminal @cap-trm @f12t)
-
-            (deflayermap (shortcuts)
-              ${builtins.concatStringsSep "  " (map (k: "${k} @sc${k}") passthroughSuperToCtrlMorph)}
-            )
+          config = caps.kanataConfig ''
+            launcher (cmd ${noctalia' "launcher toggle"})
+            dbl (tap-dance-eager 250 (XX @launcher))
           '';
         };
       };

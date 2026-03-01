@@ -45,6 +45,11 @@
         bindkey "^[[1;5C" forward-word   # Ctrl+Right
         bindkey "^[[1;5D" backward-word  # Ctrl+Left
 
+        # Ctrl+E: edit current command line in $EDITOR
+        autoload -Uz edit-command-line
+        zle -N edit-command-line
+        bindkey '^E' edit-command-line
+
 
         cl() {
             printf '\x1b]1337;SetUserVar=in_claude=MQ==\007'
