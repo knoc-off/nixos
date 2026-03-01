@@ -31,16 +31,7 @@
       };
     }
 
-    # niri configs
-    inputs.niri.nixosModules.niri
-    {
-      nixpkgs.overlays = [inputs.niri.overlays.niri];
-      programs.niri = {
-        enable = true;
-        package = pkgs.niri-unstable;
-      };
-    }
-
+    self.nixosModules.hyprland
     self.nixosModules.desktop.noctalia
 
     inputs.hardware.nixosModules.framework-13-7040-amd
@@ -183,12 +174,12 @@
     {
       services.greetd = let
         tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
-        niri-session = "${pkgs.niri-unstable}/bin/niri-session";
+        hyprland = "${inputs.hyprnix.packages.${pkgs.stdenv.hostPlatform.system}.hyprland}/bin/Hyprland";
       in {
         enable = true;
         settings = {
           default_session = {
-            command = "${tuigreet} --time --remember --cmd ${niri-session}";
+            command = "${tuigreet} --time --remember --cmd ${hyprland}";
             user = "greeter";
           };
         };

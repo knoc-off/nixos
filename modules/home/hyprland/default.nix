@@ -124,6 +124,11 @@ in {
           "${mainMod}, f, layoutmsg, fit visible"
           "${mainMod} SHIFT, f, layoutmsg, fit all"
 
+          # Runtime layout switching (per-workspace)
+          "${mainMod} ALT, s, layoutmsg, setlayout scrolling"
+          "${mainMod} ALT, d, layoutmsg, setlayout dwindle"
+          "${mainMod} ALT, m, layoutmsg, setlayout master"
+
           # Tab through group
           "${mainMod}, Tab, changegroupactive, f"
 

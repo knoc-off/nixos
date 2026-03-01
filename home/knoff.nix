@@ -26,7 +26,7 @@
 
     ./enviroment.nix
 
-    self.homeModules.niri
+    self.homeModules.hyprland
     self.homeModules.noctalia
     self.homeModules.stylix
 
