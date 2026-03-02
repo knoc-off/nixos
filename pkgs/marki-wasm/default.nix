@@ -33,8 +33,10 @@ pkgs.stdenv.mkDerivation {
     mkdir -p $out
     cp pkg/marki.js $out/_marki.js
     cp pkg/marki_bg.wasm $out/_marki_bg.wasm
+    cp vendor/highlight.min.js $out/_hljs.js
     cp -r ${./templates} $out/templates
     cp ${./install.sh} $out/install.sh
+    chmod +x $out/install.sh
   '';
 
   meta = {

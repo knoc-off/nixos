@@ -1,29 +1,38 @@
 <pre id="marki-front-data" style="display:none;">{{Front}}</pre>
 <div id="marki-front"></div>
 <script>
-function renderFront() {
+function _marki_renderFront() {
     var md = document.getElementById('marki-front-data').textContent;
     document.getElementById('marki-front').innerHTML = wasm_bindgen.render_markdown(md);
+    if (window.hljs) hljs.highlightAll();
 }
 
-if (!window.wasm_bindgen) {
+function _marki_loadScript(src, cb) {
     var s = document.createElement('script');
-    s.src = '_marki.js';
-    s.onload = function() {
+    s.src = src;
+    s.onload = cb;
+    document.head.appendChild(s);
+}
+
+function _marki_initAndRender(renderFn) {
+    if (!window.hljs) {
+        _marki_loadScript('_hljs.js', function() { _marki_initAndRender(renderFn); });
+        return;
+    }
+    if (!window.wasm_bindgen) {
+        _marki_loadScript('_marki.js', function() { _marki_initAndRender(renderFn); });
+        return;
+    }
+    if (!window._marki_ready) {
         wasm_bindgen('_marki_bg.wasm').then(function() {
             wasm_bindgen.init_panic_hook();
             window._marki_ready = true;
-            renderFront();
+            renderFn();
         });
-    };
-    document.head.appendChild(s);
-} else if (!window._marki_ready) {
-    wasm_bindgen('_marki_bg.wasm').then(function() {
-        wasm_bindgen.init_panic_hook();
-        window._marki_ready = true;
-        renderFront();
-    });
-} else {
-    renderFront();
+    } else {
+        renderFn();
+    }
 }
+
+_marki_initAndRender(_marki_renderFront);
 </script>

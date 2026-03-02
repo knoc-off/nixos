@@ -17,6 +17,11 @@ pub fn init_panic_hook() {
     console_error_panic_hook::set_once();
 }
 
+#[wasm_bindgen]
+pub fn version() -> String {
+    env!("CARGO_PKG_VERSION").to_string()
+}
+
 fn html_escape(text: &str) -> String {
     text.replace('&', "&amp;")
         .replace('<', "&lt;")
@@ -174,6 +179,12 @@ pub fn render_markdown(markdown: &str) -> String {
             _ => {}
         }
     }
+
+    // Version watermark for debugging — rendered into every card
+    output.push_str(&format!(
+        "<div class=\"marki-version\">marki v{}</div>",
+        env!("CARGO_PKG_VERSION")
+    ));
 
     #[cfg(debug_assertions)]
     console::log_1(&format!("[MARKI-WASM] render done, len={}", output.len()).into());

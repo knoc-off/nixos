@@ -1,31 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Resolve the directory this script lives in (works from nix build output or repo)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Find WASM artifacts — either alongside this script (nix build) or in pkg/ (local build)
+# --- Locate artifacts ---
+
+# nix build output: files are alongside this script
+# local build: files are in pkg/ and vendor/
 if [[ -f "$SCRIPT_DIR/_marki.js" ]]; then
     WASM_JS="$SCRIPT_DIR/_marki.js"
     WASM_BG="$SCRIPT_DIR/_marki_bg.wasm"
+    HLJS="$SCRIPT_DIR/_hljs.js"
 elif [[ -f "$SCRIPT_DIR/pkg/marki.js" ]]; then
     WASM_JS="$SCRIPT_DIR/pkg/marki.js"
     WASM_BG="$SCRIPT_DIR/pkg/marki_bg.wasm"
+    HLJS="$SCRIPT_DIR/vendor/highlight.min.js"
 else
     echo "Error: Cannot find WASM artifacts."
     echo "Run 'wasm-pack build --target no-modules' or 'nix build' first."
     exit 1
 fi
 
-# Find templates directory
-if [[ -d "$SCRIPT_DIR/templates" ]]; then
-    TEMPLATES_DIR="$SCRIPT_DIR/templates"
-else
-    echo "Warning: templates/ directory not found. Skipping template display."
-    TEMPLATES_DIR=""
+if [[ ! -f "$HLJS" ]]; then
+    echo "Error: Cannot find highlight.js at: $HLJS"
+    exit 1
 fi
 
-# Detect Anki data directory
+TEMPLATES_DIR=""
+if [[ -d "$SCRIPT_DIR/templates" ]]; then
+    TEMPLATES_DIR="$SCRIPT_DIR/templates"
+fi
+
+# --- Detect Anki ---
+
 if [[ "$(uname)" == "Darwin" ]]; then
     ANKI_BASE="$HOME/Library/Application Support/Anki2"
 else
@@ -38,11 +45,11 @@ if [[ ! -d "$ANKI_BASE" ]]; then
     exit 1
 fi
 
-# List profiles
+# --- Select profile ---
+
 PROFILES=()
 while IFS= read -r dir; do
     name="$(basename "$dir")"
-    # Skip non-profile directories
     [[ "$name" == "addons21" || "$name" == "crash.log" || "$name" == "prefs21.db" ]] && continue
     [[ -d "$dir/collection.media" ]] && PROFILES+=("$name")
 done < <(find "$ANKI_BASE" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
@@ -53,7 +60,6 @@ if [[ ${#PROFILES[@]} -eq 0 ]]; then
     exit 1
 fi
 
-# Select profile
 if [[ ${#PROFILES[@]} -eq 1 ]]; then
     PROFILE="${PROFILES[0]}"
     echo "Using Anki profile: $PROFILE"
@@ -75,43 +81,50 @@ fi
 
 MEDIA_DIR="$ANKI_BASE/$PROFILE/collection.media"
 
-echo ""
-echo "Installing WASM files to: $MEDIA_DIR"
+# --- Install files ---
 
-# Copy with underscore prefix
+echo ""
+echo "Installing to: $MEDIA_DIR"
+
 cp "$WASM_JS" "$MEDIA_DIR/_marki.js"
 cp "$WASM_BG" "$MEDIA_DIR/_marki_bg.wasm"
+cp "$HLJS"    "$MEDIA_DIR/_hljs.js"
 
-echo "  _marki.js      OK"
-echo "  _marki_bg.wasm OK"
+# Anki needs read/write access to media files
+chmod 644 "$MEDIA_DIR/_marki.js"
+chmod 644 "$MEDIA_DIR/_marki_bg.wasm"
+chmod 644 "$MEDIA_DIR/_hljs.js"
+
+echo "  _marki.js       OK"
+echo "  _marki_bg.wasm  OK"
+echo "  _hljs.js        OK"
+
+# --- Print setup instructions ---
 
 echo ""
-echo "=== Next Steps ==="
+echo "=== Note Type Setup ==="
 echo ""
-echo "1. Open Anki"
-echo "2. Go to: Tools -> Manage Note Types -> Add"
+echo "In Anki: Tools -> Manage Note Types -> Add"
 echo ""
 echo "--- Marki Basic ---"
+echo "  Clone from: Basic"
 echo "  Fields: Front, Back"
-echo "  Copy the template HTML from:"
 if [[ -n "$TEMPLATES_DIR" ]]; then
-    echo "    Front template:  $TEMPLATES_DIR/basic-front.html"
-    echo "    Back template:   $TEMPLATES_DIR/basic-back.html"
-    echo "    Styling (CSS):   $TEMPLATES_DIR/basic-style.css"
-else
-    echo "    (templates directory not found — see the repo's templates/ folder)"
+    echo "  Front template:  $TEMPLATES_DIR/basic-front.html"
+    echo "  Back template:   $TEMPLATES_DIR/basic-back.html"
+    echo "  Styling (CSS):   $TEMPLATES_DIR/basic-style.css"
 fi
 echo ""
 echo "--- Marki Cloze ---"
-echo "  Fields: Text, Extra"
-echo "  Note type: must be Cloze type (select 'Clone: Cloze' when adding)"
-echo "  Copy the template HTML from:"
+echo "  Clone from: Cloze"
+echo "  Fields: Text, Back Extra"
 if [[ -n "$TEMPLATES_DIR" ]]; then
-    echo "    Front template:  $TEMPLATES_DIR/cloze-front.html"
-    echo "    Back template:   $TEMPLATES_DIR/cloze-back.html"
-    echo "    Styling (CSS):   $TEMPLATES_DIR/cloze-style.css"
-else
-    echo "    (templates directory not found — see the repo's templates/ folder)"
+    echo "  Front template:  $TEMPLATES_DIR/cloze-front.html"
+    echo "  Back template:   $TEMPLATES_DIR/cloze-back.html"
+    echo "  Styling (CSS):   $TEMPLATES_DIR/cloze-style.css"
 fi
 echo ""
-echo "Done! Write markdown in your card fields and it will render live."
+echo "Copy the contents of each file into the corresponding"
+echo "section in Anki's card template editor."
+echo ""
+echo "Done!"
