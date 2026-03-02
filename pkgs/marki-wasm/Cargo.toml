@@ -11,6 +11,10 @@ pulldown-cmark = "0.13.0"
 wasm-bindgen = "=0.2.108"
 web-sys = { version = "=0.3.85", features = ["console"] }
 
+syntastica = { version = "0.6.1", default-features = false, features = ["runtime-c2rust"] }
+syntastica-parsers-git = { version = "0.6.1", default-features = false, features = ["runtime-c2rust", "most"] }
+syntastica-themes = { version = "0.6.1", default-features = false, features = ["runtime-c2rust"] }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1"
 wee_alloc = "0.4"

@@ -1,38 +1,29 @@
 <pre id="marki-cloze-data" style="display:none;">{{cloze:Text}}</pre>
 <div id="marki-cloze"></div>
 <script>
-function _marki_renderCloze() {
+function renderCloze() {
     var md = document.getElementById('marki-cloze-data').textContent;
     document.getElementById('marki-cloze').innerHTML = wasm_bindgen.render_markdown(md);
-    if (window.hljs) hljs.highlightAll();
 }
 
-function _marki_loadScript(src, cb) {
+if (!window.wasm_bindgen) {
     var s = document.createElement('script');
-    s.src = src;
-    s.onload = cb;
-    document.head.appendChild(s);
-}
-
-function _marki_initAndRender(renderFn) {
-    if (!window.hljs) {
-        _marki_loadScript('_hljs.js', function() { _marki_initAndRender(renderFn); });
-        return;
-    }
-    if (!window.wasm_bindgen) {
-        _marki_loadScript('_marki.js', function() { _marki_initAndRender(renderFn); });
-        return;
-    }
-    if (!window._marki_ready) {
+    s.src = '_marki.js';
+    s.onload = function() {
         wasm_bindgen('_marki_bg.wasm').then(function() {
             wasm_bindgen.init_panic_hook();
             window._marki_ready = true;
-            renderFn();
+            renderCloze();
         });
-    } else {
-        renderFn();
-    }
+    };
+    document.head.appendChild(s);
+} else if (!window._marki_ready) {
+    wasm_bindgen('_marki_bg.wasm').then(function() {
+        wasm_bindgen.init_panic_hook();
+        window._marki_ready = true;
+        renderCloze();
+    });
+} else {
+    renderCloze();
 }
-
-_marki_initAndRender(_marki_renderCloze);
 </script>

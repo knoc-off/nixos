@@ -1,4 +1,6 @@
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
+use syntastica::renderer::HtmlRenderer;
+use syntastica_parsers_git::{Lang, LanguageSetImpl};
 use wasm_bindgen::prelude::*;
 
 #[cfg(debug_assertions)]
@@ -11,6 +13,8 @@ use wee_alloc::WeeAlloc;
 #[global_allocator]
 static ALLOC: WeeAlloc = WeeAlloc::INIT;
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[wasm_bindgen]
 pub fn init_panic_hook() {
     #[cfg(target_arch = "wasm32")]
@@ -19,7 +23,7 @@ pub fn init_panic_hook() {
 
 #[wasm_bindgen]
 pub fn version() -> String {
-    env!("CARGO_PKG_VERSION").to_string()
+    VERSION.to_string()
 }
 
 fn html_escape(text: &str) -> String {
@@ -41,11 +45,21 @@ fn heading_tag(level: HeadingLevel) -> &'static str {
     }
 }
 
+fn highlight_code(code: &str, lang_name: &str) -> Option<String> {
+    let lang = Lang::for_name(lang_name, &()).ok()?;
+    let set = LanguageSetImpl::new();
+    syntastica::highlight(code, lang, &set, &mut HtmlRenderer, syntastica_themes::one::dark()).ok()
+}
+
 /// Render markdown to HTML.
 ///
 /// Inline HTML is passed through untouched so that Anki's cloze engine
 /// (which injects `<span class="cloze">...</span>` before our JS runs)
 /// survives the markdown rendering pass.
+///
+/// Fenced code blocks with a language tag get syntax-highlighted via
+/// tree-sitter (syntastica). Unrecognized languages fall back to plain
+/// escaped code.
 #[wasm_bindgen]
 pub fn render_markdown(markdown: &str) -> String {
     #[cfg(debug_assertions)]
@@ -78,17 +92,33 @@ pub fn render_markdown(markdown: &str) -> String {
             }
             Event::End(TagEnd::CodeBlock) => {
                 if in_code_block {
-                    let escaped = html_escape(&code_buffer);
-                    if code_lang.is_empty() {
-                        output.push_str(&format!(
-                            "<pre class=\"code\"><code>{}</code></pre>",
-                            escaped
-                        ));
+                    let highlighted = if !code_lang.is_empty() {
+                        highlight_code(&code_buffer, &code_lang)
                     } else {
-                        output.push_str(&format!(
-                            "<pre class=\"code\"><code class=\"language-{}\">{}</code></pre>",
-                            code_lang, escaped
-                        ));
+                        None
+                    };
+
+                    match highlighted {
+                        Some(html) => {
+                            output.push_str(&format!(
+                                "<pre class=\"code\"><code class=\"language-{}\">{}</code></pre>",
+                                code_lang, html
+                            ));
+                        }
+                        None => {
+                            let escaped = html_escape(&code_buffer);
+                            if code_lang.is_empty() {
+                                output.push_str(&format!(
+                                    "<pre class=\"code\"><code>{}</code></pre>",
+                                    escaped
+                                ));
+                            } else {
+                                output.push_str(&format!(
+                                    "<pre class=\"code\"><code class=\"language-{}\">{}</code></pre>",
+                                    code_lang, escaped
+                                ));
+                            }
+                        }
                     }
                     in_code_block = false;
                 }
@@ -155,7 +185,6 @@ pub fn render_markdown(markdown: &str) -> String {
                 if !title.is_empty() {
                     output.push_str(&format!(" title=\"{}\"", title));
                 }
-                // alt text comes as child Text events, but for <img> we close in End
                 output.push_str(" alt=\"");
             }
             Event::End(TagEnd::Image) => output.push_str("\">"),
@@ -180,11 +209,8 @@ pub fn render_markdown(markdown: &str) -> String {
         }
     }
 
-    // Version watermark for debugging — rendered into every card
-    output.push_str(&format!(
-        "<div class=\"marki-version\">marki v{}</div>",
-        env!("CARGO_PKG_VERSION")
-    ));
+    // Version tag — invisible in rendered output, inspectable in DevTools
+    output.push_str(&format!("<!-- marki v{} -->", VERSION));
 
     #[cfg(debug_assertions)]
     console::log_1(&format!("[MARKI-WASM] render done, len={}", output.len()).into());
