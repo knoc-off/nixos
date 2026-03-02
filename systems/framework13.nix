@@ -24,12 +24,6 @@
     ./hardware/hardware-configuration.nix
     ./hardware/bluetooth.nix
     ./hardware/fingerprint
-    {
-      sops.secrets."services/rclone/webdav-pass" = {
-        mode = "0444"; # World-readable so home-manager can access it
-        path = "/etc/rclone-webdav-pass";
-      };
-    }
 
     self.nixosModules.hyprland
     self.nixosModules.desktop.noctalia
@@ -190,17 +184,6 @@
     #./modules/yubikey.nix
   ];
 
-  # create a service to run at startup each boot. run wgnord c de to connect to the vpn
-  # systemd.services.wgnord = {
-  #   description = "WireGuard NordVPN";
-  #   after = [ "network.target" ];
-  #   wantedBy = [ "multi-user.target" ];
-  #   serviceConfig = {
-  #     Type = "oneshot";
-  #     ExecStart = "${pkgs.wgnord}/bin/wgnord c de";
-  #   };
-  # };
-
   programs = {
     virt-manager.enable = true;
     direnv = {
@@ -297,14 +280,6 @@
 
       KERNEL=="uinput", MODE="0660", GROUP="uinput", OPTIONS+="static_node=uinput"
     '';
-  };
-
-  system.activationScripts = {
-    createMountPoint = {
-      text = ''
-        mkdir -p /mnt/fa6b949
-      '';
-    };
   };
 
   programs.localsend.enable = true;

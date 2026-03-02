@@ -84,7 +84,7 @@
               if imageType == "isoImage"
               then [
                 ./systems/modules/${imageType}.nix
-                {isoImage = {isoName = lib.mkForce name;};}
+                {image = {fileName = lib.mkForce name;};}
               ]
               else if imageType == "sdImage"
               then [
@@ -146,6 +146,7 @@
     images =
       listToAttrs
       [
+        (mkImage "minimal" "default" "x86_64-linux" "isoImage")
         (mkImage "framework13" "knoff" "x86_64-linux" "isoImage")
         (mkImage "raspberry-3b" "knoff" "aarch64-linux" "sdImage")
       ];
