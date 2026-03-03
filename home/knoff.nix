@@ -31,7 +31,6 @@
     browser = {
       classes = ["firefox" "chromium-browser"];
       ctrl = ["a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
-      #keys.t = {raw = "(tap-dance 300 (C-c C-S-c))";};
       keys = navKeys;
     };
     terminal = {

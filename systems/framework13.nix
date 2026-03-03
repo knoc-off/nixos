@@ -14,6 +14,7 @@
     self.nixosModules.audio.pipewire
 
     self.nixosModules.misc
+    self.nixosModules.console
     self.nixosModules.minecraft
 
     inputs.disko.nixosModules.disko
