@@ -15,12 +15,12 @@
 
   # Vim-style navigation: caps+hjkl → arrows, caps+d/u → scroll
   navKeys = {
-    h = { key = "left"; };
-    j = { key = "down"; };
-    k = { key = "up"; };
-    l = { key = "right"; };
-    d = { raw = "(multi (release-key rmet) (mwheel-down 120 50))"; };
-    u = { raw = "(multi (release-key rmet) (mwheel-up 120 50))"; };
+    h = {key = "left";};
+    j = {key = "down";};
+    k = {key = "up";};
+    l = {key = "right";};
+    d = {raw = "(multi (release-key rmet) (mwheel-accel-down 50 150 1.05 0.80))";};
+    u = {raw = "(multi (release-key rmet) (mwheel-accel-up 50 150 1.05 0.80))";};
   };
 
   caps = mkCapsLayers {
@@ -37,7 +37,12 @@
     terminal = {
       classes = ["com.mitchellh.ghostty" "foot"];
       alt = ["e"];
-      keys = navKeys;
+      keys =
+        navKeys
+        // {
+          d = {raw = "(multi (release-key rmet) (mwheel-down 50 1 ))";};
+          u = {raw = "(multi (release-key rmet) (mwheel-up 50 1 ))";};
+        };
     };
   };
 in {
