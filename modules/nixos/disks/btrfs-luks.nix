@@ -109,6 +109,17 @@ in {
       description = "Base mount options applied to all subvolumes (in addition to compression).";
     };
 
+    luksPasswordFile = mkOption {
+      type = types.nullOr types.str;
+      default = "/tmp/secret.key";
+      description = ''
+        Path on the target machine where the LUKS passphrase file is located during install.
+        Used by nixos-anywhere with --disk-encryption-keys to provide the passphrase.
+        After install, the file is gone and the system prompts interactively on boot.
+        Set to null to always prompt interactively (won't work with nixos-anywhere).
+      '';
+    };
+
     extraSubvolumes = mkOption {
       type = types.attrsOf subvolumeType;
       default = {};
@@ -152,6 +163,7 @@ in {
             content = {
               type = "luks";
               name = cfg.luksName;
+              passwordFile = cfg.luksPasswordFile;
               settings = {
                 allowDiscards = cfg.allowDiscards;
               };

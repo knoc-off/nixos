@@ -17,7 +17,7 @@
 
     self.nixosModules.disks."btrfs-luks"
 
-    ./hardware/hardware-configuration.nix
+    ./hardware/hardware-configuration-thinkpad-work.nix
     ./hardware/bluetooth.nix
     ./hardware/fingerprint
 
@@ -34,16 +34,17 @@
 
     self.nixosModules.boot
 
-    inputs.sops-nix.nixosModules.sops
-    {
-      sops = {
-        defaultSopsFile = ./secrets/${hostname}/default.yaml;
-        age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
-        secrets."ANTHROPIC_API_KEY" = {
-          mode = "0644";
-        };
-      };
-    }
+    # TODO: re-enable after first install when SSH host keys exist for sops/age
+    # inputs.sops-nix.nixosModules.sops
+    # {
+    #   sops = {
+    #     defaultSopsFile = ./secrets/${hostname}/default.yaml;
+    #     age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
+    #     secrets."ANTHROPIC_API_KEY" = {
+    #       mode = "0644";
+    #     };
+    #   };
+    # }
 
     {
       nixpkgs.config.allowUnfree = true;
@@ -148,7 +149,8 @@
       settings = {
         PasswordAuthentication = false;
         KbdInteractiveAuthentication = false;
-        PermitRootLogin = lib.mkDefault "no";
+        # TODO: set to "no" after first install
+        PermitRootLogin = lib.mkDefault "yes";
       };
     };
 
@@ -271,9 +273,17 @@
           else []
         );
       initialPassword = "password";
-      openssh.authorizedKeys.keys = [];
+      openssh.authorizedKeys.keys = [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID7HocV04erAJfAT9swZ/PBsrVkwySxkX5b6rGRaTXAh niko@mac"
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"
+      ];
     };
   };
+
+  users.users.root.openssh.authorizedKeys.keys = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID7HocV04erAJfAT9swZ/PBsrVkwySxkX5b6rGRaTXAh niko@mac"
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"
+  ];
 
   system.stateVersion = "23.11";
 }
