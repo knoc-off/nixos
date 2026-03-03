@@ -109,7 +109,7 @@
         enable = true;
         settings = {
           default_session = {
-            command = "${tuigreet} --time --remember --cmd 'uwsm start hyprland-uwsm.desktop'";
+            command = "${tuigreet} --time --remember --cmd 'fish'";
             user = "greeter";
           };
         };
@@ -132,11 +132,28 @@
   #   type = "lanzaboote";
   #   efiSupport = true;
   # };
-  networking.hostName = "minimal-nix";
+  networking = {
+    hostName = "minimal-nix";
+    networkmanager = {
+      enable = true;
+      wifi.powersave = false;
+    };
+    wireless.enable = lib.mkForce false; # conflicts with NetworkManager
+  };
+
+  # Wireless firmware for common chipsets (Intel, Broadcom, etc.)
+  hardware.enableAllFirmware = true;
 
   environment.systemPackages = map lib.lowPrio [
     pkgs.curl
     pkgs.gitMinimal
+
+    # Networking diagnostics
+    pkgs.iw # wireless info/config
+    pkgs.ethtool # ethernet diagnostics
+    pkgs.dnsutils # dig, nslookup
+    pkgs.nmap # network scanning
+    pkgs.networkmanager # nmcli, nmtui
   ];
 
   users = {

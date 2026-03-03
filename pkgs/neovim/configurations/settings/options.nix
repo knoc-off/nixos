@@ -73,25 +73,5 @@
       # Tab behavior - open buffers in new tabs by default
       switchbuf = "usetab,newtab"; # Jump to existing tab if buffer is open, otherwise open new tab
     };
-
-    autoCmd = [
-      {
-        event = ["CursorMoved" "CursorMovedI"];
-        desc = "Asymmetric scrolloff: 15 from top, 5 from bottom";
-        callback.__raw = ''
-          function()
-            local top_scrolloff = 15
-            local topline = vim.fn.line("w0")
-            local curline = vim.fn.line(".")
-            if curline - topline < top_scrolloff then
-              local new_top = math.max(1, curline - top_scrolloff)
-              if new_top ~= topline then
-                vim.fn.winrestview({topline = new_top})
-              end
-            end
-          end
-        '';
-      }
-    ];
   };
 }
