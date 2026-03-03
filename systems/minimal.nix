@@ -10,7 +10,6 @@
 }: {
   imports = [
     ./hardware/hardware-configuration.nix
-    # ./hardware/boot.nix
 
     ./modules/shell/fish.nix
     {
@@ -116,7 +115,6 @@
       };
     }
 
-    # does this work?
     inputs.hardware.nixosModules.common-cpu-amd
     inputs.hardware.nixosModules.common-cpu-intel
 
@@ -128,17 +126,12 @@
     efiInstallAsRemovable = true;
   };
 
-  # bootloader = {
-  #   type = "lanzaboote";
-  #   efiSupport = true;
-  # };
   networking = {
     hostName = "minimal-nix";
     networkmanager = {
       enable = true;
       wifi.powersave = false;
     };
-    wireless.enable = lib.mkForce false; # conflicts with NetworkManager
   };
 
   # Wireless firmware for common chipsets (Intel, Broadcom, etc.)
@@ -148,12 +141,11 @@
     pkgs.curl
     pkgs.gitMinimal
 
-    # Networking diagnostics
-    pkgs.iw # wireless info/config
-    pkgs.ethtool # ethernet diagnostics
-    pkgs.dnsutils # dig, nslookup
-    pkgs.nmap # network scanning
-    pkgs.networkmanager # nmcli, nmtui
+    pkgs.iw
+    pkgs.ethtool
+    pkgs.dnsutils
+    pkgs.nmap
+    pkgs.networkmanager
   ];
 
   users = {
@@ -186,11 +178,6 @@
   };
 
   users.users.root.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID7HocV04erAJfAT9swZ/PBsrVkwySxkX5b6rGRaTXAh niko@mac" # Delete this tbh
-
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"
   ];
-
-  # needed?
-  # system.stateVersion = "23.11";
 }

@@ -23,8 +23,8 @@
       # ANTHROPIC_API_KEY = "$(cat /run/secrets/ANTHROPIC_API_KEY)";
       OPENROUTER_API_KEY = "$(cat /etc/secrets/gpt/openrouter )";
 
-      XDG_CURRENT_DESKTOP = "niri";
-      XDG_SESSION_DESKTOP = "niri";
+      XDG_CURRENT_DESKTOP = "Hyprland";
+      XDG_SESSION_DESKTOP = "Hyprland";
       XDG_SESSION_TYPE = "wayland";
 
       XDG_CACHE_HOME = "\${HOME}/.cache";

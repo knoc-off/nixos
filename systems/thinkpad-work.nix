@@ -149,8 +149,6 @@
       settings = {
         PasswordAuthentication = false;
         KbdInteractiveAuthentication = false;
-        # TODO: set to "no" after first install
-        PermitRootLogin = lib.mkDefault "yes";
       };
     };
 

@@ -39,7 +39,7 @@ in {
     enable = true;
 
     defaultApplications =
-      toMimeApps
+      (toMimeApps
       {
         application = {
           pdf = ["org.gnome.Evince.desktop"];
@@ -85,6 +85,11 @@ in {
         inode = {
           directory = ["org.gnome.Nautilus.desktop"];
         };
+      })
+      // {
+        "x-scheme-handler/http" = ["firefox.desktop"];
+        "x-scheme-handler/https" = ["firefox.desktop"];
+        "x-scheme-handler/spotify" = ["spotify.desktop"];
       };
   };
 }
