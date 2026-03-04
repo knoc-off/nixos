@@ -13,7 +13,6 @@
       ["noctalia-shell" "ipc" "call"] ++ (lib.splitString " " cmd)
     );
 
-  # Vim-style navigation: caps+hjkl → arrows, caps+d/u → scroll
   navKeys = {
     h = {key = "left";};
     j = {key = "down";};
