@@ -101,10 +101,11 @@
     enable = true;
     enableGitIntegration = true;
     options = {
-      # Navigation
       navigate = true; # Use n/N to jump between files Amazing
 
       file-regex = "^(?!.*lock$).*"; # maybe?
+
+      pager = "less -RF --mouse";
 
       # Display
       side-by-side = true;

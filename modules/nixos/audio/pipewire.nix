@@ -52,7 +52,6 @@
 
   boot.kernelParams = [
     "snd_hda_intel.power_save=0" # Prevent audio crackling
-    "snd_hda_intel.dmic_detect=0" # Fix internal mic issues
   ];
 
   # services.udev.extraRules = ''

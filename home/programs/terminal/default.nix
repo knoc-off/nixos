@@ -44,7 +44,7 @@
     bat = {
       enable = true;
       config = {
-        pager = "less -FR";
+        pager = "less -FR --mouse";
         theme = "TwoDark";
       };
     };

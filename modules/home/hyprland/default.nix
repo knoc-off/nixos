@@ -16,8 +16,8 @@ in {
     # all plugins are fucked
     # ./plugins/hyprspace.nix        # needs upstream update for 0.54
     # ./plugins/xtra-dispatchers.nix  # hyprland-plugins lagging behind 0.54 API
-    # ./plugins/hyprglass.nix         # OpenGL internals changed in 0.54
-    # ./plugins/kinetic-scroll.nix    # needs Event::bus() migration for 0.54
+    # ./plugins/hyprglass.nix
+    ./plugins/kinetic-scroll.nix
   ];
 
   wayland.windowManager.hyprland = {

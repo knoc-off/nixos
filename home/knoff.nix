@@ -34,6 +34,7 @@
       keys =
         navKeys
         // {
+          g = {raw = "(tap-dance 200 ((multi (release-key rmet) C-end) (multi (release-key rmet) C-home)))";};
         };
     };
     terminal = {
