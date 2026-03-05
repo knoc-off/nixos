@@ -13,6 +13,7 @@
       ["noctalia-shell" "ipc" "call"] ++ (lib.splitString " " cmd)
     );
 
+  # Not ideal with how its handled because it will act like caps is being clicked, and not held.
   navKeys = {
     h = {key = "left";};
     j = {key = "down";};
@@ -29,8 +30,11 @@
     };
     browser = {
       classes = ["firefox" "chromium-browser"];
-      ctrl = ["a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
-      keys = navKeys;
+      ctrl = ["enter" "tab" "a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
+      keys =
+        navKeys
+        // {
+        };
     };
     terminal = {
       classes = ["com.mitchellh.ghostty" "foot"];

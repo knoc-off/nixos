@@ -108,6 +108,8 @@ in {
           "${mainMod}, bracketleft, layoutmsg, colresize -conf"
           "${mainMod}, f, layoutmsg, fit visible"
           "${mainMod} SHIFT, f, layoutmsg, fit all"
+          # promote,
+          # "${mainMod} "
 
           # Runtime layout switching
           "${mainMod} ALT, s, layoutmsg, setlayout, scrolling"

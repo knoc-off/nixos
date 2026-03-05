@@ -1,19 +1,81 @@
-{pkgs, ...}: {
-  # I want to add the ability to see the git-stash, and if there is uncommitted changes.
-  # it would be pretty cool to show each stash based on its hash condensed into a single letter.
-  # we would want to then make sure they dont repeat.
-  # maybe just A-Z. and show them in a queue, next to git data. <git_branch_short> <untracked_files_status> A B C D
+{
+  pkgs,
+  lib,
+  ...
+}: let
+  # Palette: one color per repo, derived by hashing the remote URL.
+  branchColors = [
+    "#e06c75" # soft red
+    "#98c379" # green
+    "#e5c07b" # warm yellow
+    "#61afef" # blue
+    "#c678dd" # purple
+    "#56b6c2" # teal
+    "#d19a66" # orange
+    "#be5046" # brick
+    "#7ec8e3" # sky blue
+    "#c3e88d" # lime
+    "#ffcb6b" # gold
+    "#f78c6c" # coral
+    "#bb80b3" # mauve
+    "#89ddff" # cyan
+    "#f07178" # pink
+    "#82aaff" # periwinkle
+  ];
+
+  # Inline the palette as a Perl array literal: ("#rrggbb", "#rrggbb", ...)
+  colorArrayPerl = "(${builtins.concatStringsSep ", " (map (c: "\"${c}\"") branchColors)})";
+
+  # Single self-contained script: reads .git files directly (one git subprocess
+  # to find the git dir, then pure file I/O) → hashes remote URL → prints
+  # colored branch name with ANSI codes. No env vars, no extra processes.
+  gitBranchColored = pkgs.writers.writePerlBin "git-branch-colored" {} ''
+    use utf8;
+    binmode STDOUT, ':utf8';
+
+    my @colors = ${colorArrayPerl};
+
+    my $gitdir = `git rev-parse --git-dir 2>/dev/null`;
+    chomp $gitdir;
+    exit 1 unless length $gitdir;
+
+    open my $fh, '<', "$gitdir/HEAD" or exit 1;
+    my $head = <$fh>; close $fh; chomp $head;
+    my ($branch) = $head =~ m{^ref: refs/heads/(.+)$};
+    $branch //= substr($head, 0, 8);
+
+    my $url = 'local';
+    if (open my $cfg, '<', "$gitdir/config") {
+      my $in_origin = 0;
+      while (<$cfg>) {
+        $in_origin = 1 if /^\[remote "origin"\]/;
+        $in_origin = 0 if $in_origin && /^\[/ && !/origin/;
+        if ($in_origin && /url\s*=\s*(.+)/) { $url = $1; last }
+      }
+    }
+
+    my $h = 5381;
+    $h = (($h << 5) + $h + ord($_)) & 0xFFFFFFFF for split //, $url;
+    my $idx = $h % scalar @colors;
+
+    if (length($branch) > 25) {
+      my $start = substr($branch, 0, 10);
+      my $end   = substr($branch, -9);
+      $branch = "$start\x{2026}$end";
+    }
+
+    my ($r, $g, $b) = map { hex } ($colors[$idx] =~ /^#(..)(..)(..)$/);
+
+    printf "\e[1;38;2;%d;%d;%dm\x{f062c} %s\e[0m", $r, $g, $b, $branch;
+  '';
+in {
   programs.starship = {
     enable = true;
-    enableZshIntegration = true;
+    enableFishIntegration = true;
     settings = {
       add_newline = false;
 
-      # Using conditional format string for line break
-      format = ''((($python )($rust )$nix_shell )''${custom.git_branch_short} ''\n)$directory( $cmd_duration)$line_break$character'';
-
-      #format = "(($python )($rust )$nix_shell '${custom.git_branch_short}\n)$directory( $cmd_duration)$line_break$character";
-      #format = "$directory$git_branch$git_status$cmd_duration$nodejs$python$rust$nix_shell$line_break$character";
+      format = "((($python )($rust )$nix_shell )(\${custom.git_branch} )\n)$directory( $cmd_duration)$line_break$character";
 
       scan_timeout = 10;
       command_timeout = 500;
@@ -84,50 +146,14 @@
         format = "[$symbol$branch]($style)";
       };
 
-      custom.git_branch_short = {
-        command = let
-          git_branch_short_sh = pkgs.writeShellScript "git-branch-short" ''
-            #!/usr/bin/env bash
-            git rev-parse --abbrev-ref HEAD 2> /dev/null | awk '
-              {
-                  max_len = 25
-                  first_chars = 10
-                  first_boundary = 3
-                  last_chars = 9
-                  last_boundary = 3
-
-                  if (length($0) <= max_len) {
-                      print $0
-                  } else {
-                      # Find word boundary after first_chars (up to +first_boundary)
-                      start_idx = first_chars
-                      for (i = first_chars + 1; i <= first_chars + first_boundary && i <= length($0); i++) {
-                          if (substr($0, i, 1) ~ /[^a-zA-Z0-9]/) {
-                              start_idx = i - 1
-                              break
-                          }
-                      }
-                      start_part = substr($0, 1, start_idx)
-
-                      # Find word boundary before last_chars (up to -last_boundary)
-                      end_idx = length($0) - last_chars + 1
-                      for (i = end_idx - 1; i >= end_idx - last_boundary && i > 0; i--) {
-                          if (substr($0, i, 1) ~ /[^a-zA-Z0-9]/) {
-                              end_idx = i + 1
-                              break
-                          }
-                      }
-                      end_part = substr($0, end_idx, length($0) - end_idx + 1)
-
-                      print start_part "…" end_part
-                  }
-              }'
-          '';
-        in "${git_branch_short_sh}";
-        when = "git rev-parse --is-inside-work-tree 2>/dev/null | grep -q true";
-        style = "bold purple";
-        symbol = "󰘬 ";
-        format = "[$symbol$output]($style)";
+      custom.git_branch = {
+        command = "";
+        shell = ["${gitBranchColored}/bin/git-branch-colored"];
+        detect_folders = [".git"];
+        when = "true";
+        style = "";
+        symbol = "";
+        format = "$output";
       };
     };
   };

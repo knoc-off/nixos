@@ -77,6 +77,8 @@
     #./modules/yubikey.nix
   ];
 
+  services.power-profiles-daemon.enable = true;
+
   disks.btrfsLuks = {
     enable = true;
     device = "/dev/nvme0n1";
@@ -192,6 +194,7 @@
         53317
       ];
       allowedUDPPorts = [
+        54321
         22000
         21027
         38071
@@ -227,6 +230,12 @@
     fontconfig.defaultFonts = {
       monospace = ["FiraCode Nerd Font Mono"];
     };
+  };
+
+  systemd.tmpfiles.rules = ["d /var/secrets 0750 root root -"];
+
+  networking.wg-quick.interfaces.wg0 = {
+    configFile = "/var/secrets/wg0-tunnel-work.conf";
   };
 
   boot.custom = {
@@ -282,6 +291,20 @@
   users.users.root.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID7HocV04erAJfAT9swZ/PBsrVkwySxkX5b6rGRaTXAh niko@mac"
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"
+  ];
+
+  virtualisation = {
+    containers.enable = true;
+    podman = {
+      enable = true;
+      defaultNetwork.settings.dns_enabled = true;
+    };
+  };
+
+  environment.systemPackages = with pkgs; [
+    awscli2
+    podman-compose
+    postgresql
   ];
 
   system.stateVersion = "23.11";
