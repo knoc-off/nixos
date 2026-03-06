@@ -42,6 +42,9 @@ in rec {
   # hyprland integration for kanata
   hyprkan = pkgs.python3Packages.callPackage ./hyprkan {};
 
+  # Unofficial Notion desktop client
+  notion-electron = pkgs.callPackage ./notion-electron {};
+
   # openscad colors are outputted for 3mf
   colorscad = pkgs.callPackage ./colorscad {};
 

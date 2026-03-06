@@ -25,8 +25,16 @@
     self.nixosModules.hyprland
     self.nixosModules.desktop.noctalia
 
-    inputs.hardware.nixosModules.lenovo-thinkpad-p14s-intel-gen5 # this is not fully correct. gen9
+    inputs.hardware.nixosModules.lenovo-thinkpad
+    inputs.hardware.nixosModules.common-cpu-intel
+    inputs.hardware.nixosModules.common-gpu-intel
+    inputs.hardware.nixosModules.common-pc-laptop
+    inputs.hardware.nixosModules.common-pc-ssd
+
     {
+      # hardware.intelgpu.driver = "xe";
+      # boot.kernelModules = ["xe"];
+      # boot.blacklistedKernelModules = ["i915"];
       hardware.uinput.enable = true;
     }
 

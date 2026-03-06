@@ -13,12 +13,26 @@
   workspaces = builtins.genList (i: i + 1) 9;
 in {
   imports = [
-    # all plugins are fucked
     # ./plugins/hyprspace.nix        # needs upstream update for 0.54
     # ./plugins/xtra-dispatchers.nix  # hyprland-plugins lagging behind 0.54 API
-    # ./plugins/hyprglass.nix
+    # ./plugins/hyprglass.nix # works, but not for layershell :(
     ./plugins/kinetic-scroll.nix
   ];
+
+  # Theme config for hyprqt6engine (used by hyprland-share-picker via XDPH service).
+  # Matches Stylix font/icon settings so the screen-share picker looks consistent.
+  xdg.configFile."hypr/hyprqt6engine.conf".text = let
+    fonts = config.stylix.fonts;
+  in ''
+    theme {
+        style = Fusion
+        icon_theme = ${config.gtk.iconTheme.name}
+        font = ${fonts.sansSerif.name}
+        font_size = ${toString fonts.sizes.applications}
+        font_fixed = ${fonts.monospace.name}
+        font_fixed_size = ${toString fonts.sizes.terminal}
+    }
+  '';
 
   wayland.windowManager.hyprland = {
     enable = true;
@@ -60,12 +74,18 @@ in {
 
       input = {
         follow_mouse = 1;
+
         repeat_rate = 25;
         repeat_delay = 200;
         touchpad = {
           natural_scroll = true;
           tap-to-click = true;
           middle_button_emulation = true;
+
+          # maybe
+          # disable_while_typing = true;
+
+          scroll_factor = 0.25;
         };
       };
 

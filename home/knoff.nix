@@ -28,6 +28,15 @@
       ctrl = ["a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
       keys = navKeys;
     };
+    slack = {
+      classes = ["Slack"];
+      ctrl = ["enter" "tab" "a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
+      keys =
+        navKeys
+        // {
+          g = {raw = "(tap-dance 200 ((multi (release-key rmet) C-end) (multi (release-key rmet) C-home)))";};
+        };
+    };
     browser = {
       classes = ["firefox" "chromium-browser"];
       ctrl = ["enter" "tab" "a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
@@ -66,6 +75,8 @@ in {
     ./programs/editor/default.nix
 
     ./programs/browser/firefox
+    # ./programs/browser/firefox/pwa/notion.nix
+    # ./programs/browser/slack-pwa.nix
 
     ./enviroment.nix
 
@@ -152,6 +163,9 @@ in {
     packages = with pkgs; [
       upkgs.foliate
       upkgs.readest
+
+      upkgs.slack
+      upkgs.notion-app-enhanced
 
       self.packages.${pkgs.stdenv.hostPlatform.system}.neovim-nix.default
       spotify

@@ -1570,6 +1570,39 @@
         "type": "github"
       }
     },
+    "hyprqt6engine": {
+      "inputs": {
+        "hyprlang": [
+          "hyprnix",
+          "hyprlang"
+        ],
+        "hyprutils": [
+          "hyprnix",
+          "hyprutils"
+        ],
+        "nixpkgs": [
+          "hyprnix",
+          "nixpkgs"
+        ],
+        "systems": [
+          "hyprnix",
+          "systems"
+        ]
+      },
+      "locked": {
+        "lastModified": 1772475652,
+        "narHash": "sha256-8cHSu0jqs2QaMwrI/Owq8mFsmFe64yT41rtP/6sv/o8=",
+        "owner": "hyprwm",
+        "repo": "hyprqt6engine",
+        "rev": "c003dfead2eea1374aa04c8d1fb909a7cec647e4",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hyprwm",
+        "repo": "hyprqt6engine",
+        "type": "github"
+      }
+    },
     "hyprshutdown": {
       "inputs": {
         "aquamarine": "aquamarine_3",
@@ -2716,6 +2749,7 @@
         ],
         "hyprland-plugins": "hyprland-plugins",
         "hyprnix": "hyprnix",
+        "hyprqt6engine": "hyprqt6engine",
         "lanzaboote": "lanzaboote",
         "neovim": "neovim",
         "niri": "niri",

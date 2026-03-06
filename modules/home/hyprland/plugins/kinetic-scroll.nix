@@ -51,21 +51,22 @@ in {
 
     settings."plugin:kinetic-scroll" = {
       enabled = 1;
+
+      friction = 0.004;
       decel = 0.99;
-      friction = 0.002;
-      min_velocity = 0.6;
+      min_velocity = 0.45;
       interval_ms = 8;
-      delta_multiplier = 1.25;
-      velocity_relevance_ms = 100;
-      min_sample_ms = 5;
-      max_velocity_samples = 5;
+      delta_multiplier = 1.0;
+      velocity_relevance_ms = 70;
+      min_sample_ms = 6;
+      max_velocity_samples = 6;
+
       disable_in_browser = 1;
       stop_on_target_change = 1;
+      stop_on_click = 1;
+      stop_on_focus = 1;
 
-      # Debug
       debug = 0;
-      stop_on_click = 0;
-      stop_on_focus = 0;
     };
   };
 }

@@ -222,6 +222,13 @@
       url = "github:KZDKM/Hyprspace";
       inputs.hyprland.follows = "hyprland";
     };
+    hyprqt6engine = {
+      url = "github:hyprwm/hyprqt6engine";
+      inputs.nixpkgs.follows = "hyprnix/nixpkgs";
+      inputs.hyprutils.follows = "hyprnix/hyprutils";
+      inputs.hyprlang.follows = "hyprnix/hyprlang";
+      inputs.systems.follows = "hyprnix/systems";
+    };
 
     ags = {
       url = "github:aylur/ags";
