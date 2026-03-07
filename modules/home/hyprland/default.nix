@@ -100,6 +100,13 @@ in {
         "match:class xdg-desktop-portal-hyprland, float on"
         "match:class org.gnome.Nautilus, float on"
         "match:float 1, match:title (.*Open.*|.*Upload.*|.*Save.*|.*Select.*|.*Choose.*), size 45% 45%"
+
+        # Frecad fixes issue: https://github.com/hyprwm/Hyprland/discussions/13060
+        "match:class org\\.freecad\\.FreeCAD, force_rgbx on"
+        "match:class org\\.freecad\\.FreeCAD, opaque on"
+        "match:class org\\.freecad\\.FreeCAD, opacity 1.0 override 1.0 override"
+        "match:class org\\.freecad\\.FreeCAD, no_blur on"
+        "match:class org\\.freecad\\.FreeCAD, match:title Expression editor, stay_focused on"
       ];
 
       bind =
@@ -107,13 +114,11 @@ in {
           "${mainMod}, W, killactive"
           "${mainMod} SHIFT, L, exec, ${noctalia "lockScreen lock"}"
 
-          # Focus (arrows - either super)
           "${mainMod}, left, layoutmsg, focus l"
           "${mainMod}, right, layoutmsg, focus r"
           "${mainMod}, up, movefocus, u"
           "${mainMod}, down, movefocus, d"
 
-          # Focus (vim - caps/rsuper sends Ctrl+hjkl via kanata, so these only fire from physical super)
           "${mainMod}, h, layoutmsg, move -col"
           "${mainMod}, l, layoutmsg, move +col"
           "${mainMod}, k, movefocus, u"
