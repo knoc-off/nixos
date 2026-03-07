@@ -52,7 +52,7 @@ in {
     settings."plugin:kinetic-scroll" = {
       enabled = 1;
 
-      friction = 0.004;
+      friction = 0.009;
       decel = 0.99;
       min_velocity = 0.45;
       interval_ms = 8;

@@ -6,7 +6,7 @@
   lib,
   ...
 }: let
-  mkCapsLayers = import ./caps-layers.nix {inherit lib;};
+  mkKeyLayers = import ./key-layers.nix {inherit lib;};
 
   noctalia' = cmd:
     lib.concatStringsSep " " (
@@ -23,38 +23,46 @@
     u = {raw = "(multi (release-key rmet) (mwheel-accel-up 50 150 1.05 0.80))";};
   };
 
-  caps = mkCapsLayers {
+  keyLayers = mkKeyLayers {
     base = {
-      ctrl = ["a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
-      keys = navKeys;
+      capsbinds = {
+        ctrl = ["a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
+        keys = navKeys;
+      };
     };
     slack = {
       classes = ["Slack"];
-      ctrl = ["enter" "tab" "a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
-      keys =
-        navKeys
-        // {
-          g = {raw = "(tap-dance 200 ((multi (release-key rmet) C-end) (multi (release-key rmet) C-home)))";};
-        };
+      capsbinds = {
+        ctrl = ["enter" "tab" "a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
+        keys =
+          navKeys
+          // {
+            g = {raw = "(tap-dance 200 ((multi (release-key rmet) C-end) (multi (release-key rmet) C-home)))";};
+          };
+      };
     };
     browser = {
       classes = ["firefox" "chromium-browser"];
-      ctrl = ["enter" "tab" "a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
-      keys =
-        navKeys
-        // {
-          g = {raw = "(tap-dance 200 ((multi (release-key rmet) C-end) (multi (release-key rmet) C-home)))";};
-        };
+      capsbinds = {
+        ctrl = ["enter" "tab" "a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
+        keys =
+          navKeys
+          // {
+            g = {raw = "(tap-dance 200 ((multi (release-key rmet) C-end) (multi (release-key rmet) C-home)))";};
+          };
+      };
     };
     terminal = {
       classes = ["com.mitchellh.ghostty" "foot"];
-      alt = ["e"];
-      keys =
-        navKeys
-        // {
-          d = {raw = "(multi (release-key rmet) (mwheel-down 50 1 ))";};
-          u = {raw = "(multi (release-key rmet) (mwheel-up 50 1 ))";};
-        };
+      capsbinds = {
+        alt = ["e"];
+        keys =
+          navKeys
+          // {
+            d = {raw = "(multi (release-key rmet) (mwheel-down 50 1 ))";};
+            u = {raw = "(multi (release-key rmet) (mwheel-up 50 1 ))";};
+          };
+      };
     };
   };
 in {
@@ -111,7 +119,7 @@ in {
           "52545"
         ];
 
-        rules = caps.hyprkanRules;
+        rules = keyLayers.hyprkanRules;
       };
     }
 
@@ -128,7 +136,7 @@ in {
           port = 52545;
           extraDefCfg = "danger-enable-cmd yes process-unmapped-keys yes";
 
-          config = caps.kanataConfig ''
+          config = keyLayers.kanataConfig ''
             launcher (cmd ${noctalia' "launcher toggle"})
             dbl (tap-dance-eager 250 (XX @launcher))
           '';

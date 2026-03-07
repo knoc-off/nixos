@@ -101,12 +101,15 @@ in {
         "match:class org.gnome.Nautilus, float on"
         "match:float 1, match:title (.*Open.*|.*Upload.*|.*Save.*|.*Select.*|.*Choose.*), size 45% 45%"
 
-        # Frecad fixes issue: https://github.com/hyprwm/Hyprland/discussions/13060
+        # FreeCad:
+        "match:initial_class ^org\\.freecad\\.FreeCAD$, match:initial_title ^Customize$, float on, center on, size (monitor_w*0.75) (monitor_h*0.75), no_max_size on"
+        "match:class org\\.freecad\\.FreeCAD, match:title Expression editor, stay_focused on"
+        # Freecad fixes transparency issue: https://github.com/hyprwm/Hyprland/discussions/13060
         "match:class org\\.freecad\\.FreeCAD, force_rgbx on"
         "match:class org\\.freecad\\.FreeCAD, opaque on"
         "match:class org\\.freecad\\.FreeCAD, opacity 1.0 override 1.0 override"
         "match:class org\\.freecad\\.FreeCAD, no_blur on"
-        "match:class org\\.freecad\\.FreeCAD, match:title Expression editor, stay_focused on"
+        # "match:class org\\.freecad\\.FreeCAD, match:title Preferences, stay_focused on"
       ];
 
       bind =

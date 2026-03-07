@@ -4,7 +4,12 @@
 # different modifiers, different keys, commands, or raw kanata actions.
 # Unlisted keys pass through as Super_R+key (triggering Hyprland WM binds).
 #
-# "base" is the wildcard fallback for windows not matching any other class.
+# "base" is the wildcard fallback for windows not matching any other class/title.
+#
+# Layers can match windows by class, title, or both:
+#   classes = ["firefox" "chromium-browser"];   -- match by window class
+#   titles  = ["DevTools" "Inspector"];         -- match by window title
+#   matchers = [{ class = "firefox"; title = "DevTools"; }];  -- match by both
 #
 # Each layer supports two forms that merge together (keys takes priority):
 #
@@ -32,6 +37,14 @@
 #       classes = ["firefox" "chromium-browser"];
 #       ctrl = ["a" "c" "f" "h" "j" "k" "l" "t" "v" "w"];
 #       alt = ["1" "2" "3" "4" "5"];
+#     };
+#     devtools = {
+#       titles = ["DevTools"];
+#       ctrl = ["a" "c" "f"];
+#     };
+#     slackThread = {
+#       matchers = [{ class = "Slack"; title = "Thread"; }];
+#       ctrl = ["enter"];
 #     };
 #     terminal = {
 #       classes = ["com.mitchellh.ghostty" "foot"];
@@ -142,14 +155,29 @@ in
         keyMap
       );
   in {
-    hyprkanRules =
+    hyprkanRules = let
+      nonBase = lib.filterAttrs (n: _: n != "base") layers;
+    in
       (lib.concatLists (lib.mapAttrsToList (
-        name: layer:
-          map (class: {
-            inherit class;
-            layer = name;
-          }) (layer.classes or [])
-      ) (lib.filterAttrs (n: _: n != "base") layers)))
+          name: layer: let
+            classRules = map (class: {
+              inherit class;
+              layer = name;
+            }) (layer.classes or []);
+
+            titleRules = map (title: {
+              inherit title;
+              layer = name;
+            }) (layer.titles or []);
+
+            matcherRules = map (m:
+              {layer = name;}
+              // lib.optionalAttrs (m ? class) {inherit (m) class;}
+              // lib.optionalAttrs (m ? title) {inherit (m) title;})
+            (layer.matchers or []);
+          in
+            matcherRules ++ classRules ++ titleRules)
+        nonBase))
       ++ [
         {
           class = "*";
