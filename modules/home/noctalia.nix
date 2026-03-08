@@ -510,7 +510,9 @@ in {
           excludedApps = "discord,firefox,chrome,chromium,edge";
         };
         enableMediaToast = false;
-        enableKeyboardLayoutToast = true;
+
+        # wtype tool for keyboard emulation, makes noise, if enabled:
+        enableKeyboardLayoutToast = false;
         enableBatteryToast = true;
       };
       osd = {
