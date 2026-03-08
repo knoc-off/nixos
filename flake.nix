@@ -230,14 +230,6 @@
       inputs.systems.follows = "hyprnix/systems";
     };
 
-    ags = {
-      url = "github:aylur/ags";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    astal.url = "github:Aylur/astal";
-    astal.inputs.nixpkgs.follows = "nixpkgs-unstable";
-
     sops-nix.url = "github:Mic92/sops-nix";
 
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";

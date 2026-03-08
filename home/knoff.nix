@@ -13,6 +13,17 @@
       ["noctalia-shell" "ipc" "call"] ++ (lib.splitString " " cmd)
     );
 
+  type-date = pkgs.writeShellApplication {
+    name = "type-date";
+    runtimeInputs = with pkgs; [wtype wl-clipboard coreutils];
+    text = ''
+      stamp=$(date +%Y-%m-%dT%H:%M:%S)
+      wl-copy --trim-newline "$stamp"
+      sleep 0.05
+      wtype -M ctrl v -m ctrl
+    '';
+  };
+
   # Not ideal with how its handled because it will act like caps is being clicked, and not held.
   navKeys = {
     h = {key = "left";};
@@ -50,6 +61,28 @@
           // {
             g = {raw = "(tap-dance 200 ((multi (release-key rmet) C-end) (multi (release-key rmet) C-home)))";};
           };
+      };
+    };
+    freecadExprEditor = {
+      matchers = [
+        {
+          class = "org.freecad.FreeCAD";
+          title = "Expression editor";
+        }
+      ];
+      capsbinds = {
+        ctrl = ["enter" "tab" "a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
+        keys =
+          navKeys
+          // {
+            g = {raw = "(tap-dance 200 ((multi (release-key rmet) C-end) (multi (release-key rmet) C-home)))";};
+          };
+      };
+      binds = {
+        tab = {
+          default = "down";
+          shift = "up";
+        };
       };
     };
     terminal = {
