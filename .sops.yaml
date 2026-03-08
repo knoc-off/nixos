@@ -27,7 +27,7 @@ creation_rules:
       - age:
           - *framework13h
           - *homeserver
-  - path_regex: systems/secrets/Nicholass-MacBook-Pro/[^/]+\.(yaml|json|env|ini)$
+  - path_regex: systems/secrets/work/[^/]+\.(yaml|json|env|ini)$
     key_groups:
       - age:
           - *framework13h
