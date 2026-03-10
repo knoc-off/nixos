@@ -23,6 +23,8 @@
       # ANTHROPIC_API_KEY = "$(cat /run/secrets/ANTHROPIC_API_KEY)";
       OPENROUTER_API_KEY = "$(cat /etc/secrets/gpt/openrouter )";
 
+      SOPS_AGE_KEY_CMD = "${pkgs.ssh-to-age}/bin/ssh-to-age -private-key -i $HOME/.ssh/id_ed25519";
+
       XDG_CURRENT_DESKTOP = "Hyprland";
       XDG_SESSION_DESKTOP = "Hyprland";
       XDG_SESSION_TYPE = "wayland";

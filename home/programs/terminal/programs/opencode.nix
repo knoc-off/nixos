@@ -301,7 +301,7 @@
         agent_cycle_reverse = "shift+tab";
         input_clear = "ctrl+c";
         input_paste = "ctrl+v";
-        input_submit = "shift+return,ctrl+return,super+return";
+        input_submit = "ctrl+return,super+return";
         input_newline = "return";
         input_move_left = "left,ctrl+b";
         input_move_right = "right,ctrl+f";

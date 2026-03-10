@@ -47,6 +47,7 @@ with lib; let
     swap = optionalAttrs (cfg.swapSize != null) {
       "/swap" = {
         mountpoint = "/.swapvol";
+        mountOptions = ["noatime"];
         swap.swapfile.size = cfg.swapSize;
       };
     };
@@ -120,6 +121,17 @@ in {
       '';
     };
 
+    hibernation = mkOption {
+      type = types.bool;
+      default = false;
+      description = ''
+        Enable hibernation support. Sets boot.resumeDevice to the LUKS volume.
+        Requires swap to be enabled (swapSize != null) and systemd initrd
+        (boot.initrd.systemd.enable = true) for automatic resume_offset detection
+        via EFI variables (systemd 255+).
+      '';
+    };
+
     extraSubvolumes = mkOption {
       type = types.attrsOf subvolumeType;
       default = {};
@@ -142,6 +154,15 @@ in {
   };
 
   config = mkIf cfg.enable {
+    assertions = [
+      {
+        assertion = cfg.hibernation -> cfg.swapSize != null;
+        message = "disks.btrfsLuks: hibernation requires swap. Set swapSize to enable swap.";
+      }
+    ];
+
+    boot.resumeDevice = mkIf cfg.hibernation "/dev/mapper/${cfg.luksName}";
+
     disko.devices.disk.${cfg.diskName} = {
       type = "disk";
       device = cfg.device;

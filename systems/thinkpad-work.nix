@@ -91,6 +91,7 @@
     enable = true;
     device = "/dev/nvme0n1";
     swapSize = "32G";
+    hibernation = true;
   };
 
   programs = {
@@ -255,7 +256,14 @@
   };
 
   boot = {
-    kernelParams = ["usbcore.autosuspend=-1"];
+    kernelParams = [
+      "usbcore.autosuspend=-1"
+      "resume=/dev/mapper/crypted"
+      # Physical offset of /.swapvol/swapfile within the btrfs filesystem.
+      # Obtain with: sudo btrfs inspect-internal map-swapfile -r /.swapvol/swapfile
+      # Must be updated if the swapfile is ever recreated (e.g. swapSize changes).
+      "resume_offset=533760"
+    ];
     kernel.sysctl = {
       "vm.swappiness" = 20;
       # Increase inotify limits for rust-analyzer and other file watchers

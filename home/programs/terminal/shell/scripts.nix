@@ -55,6 +55,34 @@ in {
       )
 
       (
+        pkgs.writeShellScriptBin "opencode-api" ''
+          set -euo pipefail
+
+          AUTH_DIR="$HOME/.local/share/opencode"
+          AUTH_FILE="$AUTH_DIR/auth.json"
+          AUTH_API="$AUTH_DIR/auth.json.api"
+          AUTH_BAK="$AUTH_DIR/auth.json.bak.$$"
+
+          [[ -f "$AUTH_API" ]] || { echo "Missing $AUTH_API"; exit 1; }
+
+          RESTORE_PID=""
+          cleanup() {
+            [[ -n "''${RESTORE_PID:-}" ]] && kill "$RESTORE_PID" 2>/dev/null || true
+            [[ -f "$AUTH_BAK" ]] && mv "$AUTH_BAK" "$AUTH_FILE"
+          }
+          trap cleanup EXIT
+
+          cp "$AUTH_FILE" "$AUTH_BAK"
+          cp "$AUTH_API" "$AUTH_FILE"
+
+          (sleep 2 && [[ -f "$AUTH_BAK" ]] && mv "$AUTH_BAK" "$AUTH_FILE") &
+          RESTORE_PID=$!
+
+          opencode "$@"
+        ''
+      )
+
+      (
         pkgs.writeShellScriptBin "git-branch-view" ''
           set -euo pipefail
 

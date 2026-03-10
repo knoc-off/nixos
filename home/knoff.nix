@@ -229,6 +229,8 @@ in {
 
       libratbag
       piper
+
+      sops # should maybe source this package somewhere common.
     ];
 
     stateVersion = "23.05";

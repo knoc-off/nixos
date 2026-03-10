@@ -44,6 +44,12 @@ in {
       description = "Allow editing boot entries at boot time (systemd-boot). Disable for security.";
     };
 
+    initrdSystemd = mkOption {
+      type = types.bool;
+      default = true;
+      description = "Use systemd-based initrd. Required for automatic hibernation resume via EFI variables (systemd 255+).";
+    };
+
     initrdSystemdDbus = mkOption {
       type = types.bool;
       default = true;
@@ -64,6 +70,7 @@ in {
     ];
 
     boot = {
+      initrd.systemd.enable = cfg.initrdSystemd;
       initrd.systemd.dbus.enable = cfg.initrdSystemdDbus;
 
       loader = {
