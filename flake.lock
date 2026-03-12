@@ -21,6 +21,42 @@
         "type": "github"
       }
     },
+    "NixVirt": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1765057211,
+        "narHash": "sha256-PPqZYBZNVNTeJ9s0JGdxkQI6X/Hsy6RGZSmL7dwLvHc=",
+        "owner": "AshleyYakeley",
+        "repo": "NixVirt",
+        "rev": "2eeb830dbf5b930c3e4cd32184bd8780459cc8c0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "AshleyYakeley",
+        "repo": "NixVirt",
+        "type": "github"
+      }
+    },
+    "UnattendedWinstall": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1764952921,
+        "narHash": "sha256-1SBNl/VSLSwIBbHB3RbTB/V57fQIUiVctpxfjTzozTM=",
+        "owner": "memstechtips",
+        "repo": "UnattendedWinstall",
+        "rev": "05d14eb7ca63090fce20652b50b1004985a6c439",
+        "type": "github"
+      },
+      "original": {
+        "owner": "memstechtips",
+        "repo": "UnattendedWinstall",
+        "type": "github"
+      }
+    },
     "aquamarine": {
       "inputs": {
         "hyprutils": [
@@ -2673,6 +2709,8 @@
     "root": {
       "inputs": {
         "Hyprspace": "Hyprspace",
+        "NixVirt": "NixVirt",
+        "UnattendedWinstall": "UnattendedWinstall",
         "disko": "disko",
         "fenix": "fenix",
         "firefox-addons": "firefox-addons",

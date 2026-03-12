@@ -263,6 +263,16 @@
       flake = false;
     };
 
+    NixVirt = {
+      url = "github:AshleyYakeley/NixVirt";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
+    UnattendedWinstall = {
+      url = "github:memstechtips/UnattendedWinstall";
+      flake = false;
+    };
+
     niri = {
       url = "github:sodiboo/niri-flake";
     };

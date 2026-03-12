@@ -25,6 +25,14 @@
     self.nixosModules.hyprland
     self.nixosModules.desktop.noctalia
 
+    self.nixosModules.windows-vm
+    {
+      windows-vm = {
+        enable = true;
+        autounattendFile = "${inputs.UnattendedWinstall}/autounattend.xml";
+      };
+    }
+
     inputs.hardware.nixosModules.lenovo-thinkpad
     inputs.hardware.nixosModules.common-cpu-intel
     inputs.hardware.nixosModules.common-gpu-intel
@@ -35,6 +43,7 @@
       # hardware.intelgpu.driver = "xe";
       # boot.kernelModules = ["xe"];
       # boot.blacklistedKernelModules = ["i915"];
+      boot.blacklistedKernelModules = ["ac"]; # battery issues with detection
       hardware.uinput.enable = true;
     }
 
@@ -95,20 +104,9 @@
   };
 
   programs = {
-    virt-manager.enable = true;
     direnv = {
       enable = true;
       silent = true;
-    };
-  };
-
-  virtualisation = {
-    waydroid.enable = false;
-
-    libvirtd = {
-      enable = true;
-
-      qemu.swtpm.enable = true;
     };
   };
 
@@ -138,6 +136,11 @@
   };
 
   programs.steam.enable = true;
+
+  # Suspend-then-hibernate: suspend to RAM first, auto-hibernate after 30 min
+  systemd.sleep.extraConfig = ''
+    HibernateDelaySec=30min
+  '';
   services = {
     gvfs.enable = true;
     devmon.enable = true;
@@ -146,8 +149,9 @@
     accounts-daemon.enable = true;
 
     logind = {
-      lidSwitch = "suspend";
-      powerKey = "suspend";
+      lidSwitch = "suspend-then-hibernate";
+      powerKey = "hibernate";
+      powerKeyLongPress = "poweroff";
     };
 
     # flatpak.enable = true;

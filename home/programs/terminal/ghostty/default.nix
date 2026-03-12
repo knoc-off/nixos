@@ -24,8 +24,8 @@ in {
       font-family = "FiraCode Nerd Font Mono";
       font-size = 15;
 
-      window-padding-x = 0;
-      window-padding-y = 0;
+      window-padding-x = 1;
+      window-padding-y = 1;
 
       command = ""; # Disable bell command
 

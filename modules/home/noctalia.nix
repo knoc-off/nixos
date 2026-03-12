@@ -74,6 +74,8 @@ in {
     hicolor-icon-theme
     papirus-icon-theme
     gpu-screen-recorder
+    wf-recorder # wlroots-native screen recorder
+    slurp # region selection for Wayland
   ];
 
   # Create a systemd drop-in to pass theme environment variables to the service

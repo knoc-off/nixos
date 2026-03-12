@@ -34,6 +34,36 @@ in {
     }
   '';
 
+  services.hypridle = {
+    enable = true;
+    settings = {
+      general = {
+        # lock_cmd is triggered by `loginctl lock-session`
+        lock_cmd = "${noctaliaCmd} ipc call lockScreen lock";
+        # Always lock before sleep, regardless of idle state
+        before_sleep_cmd = "loginctl lock-session";
+        # Restore monitors after waking
+        after_sleep_cmd = "hyprctl dispatch dpms on";
+      };
+
+      listener = [
+        {
+          timeout = 300; # 5 minutes
+          on-timeout = "loginctl lock-session";
+        }
+        {
+          timeout = 600; # 10 minutes
+          on-timeout = "hyprctl dispatch dpms off";
+          on-resume = "hyprctl dispatch dpms on";
+        }
+        {
+          timeout = 1800; # 30 minutes
+          on-timeout = "${pkgs.systemd}/bin/systemctl suspend";
+        }
+      ];
+    };
+  };
+
   wayland.windowManager.hyprland = {
     enable = true;
     package = inputs.hyprnix.packages.${system}.hyprland;
@@ -60,6 +90,10 @@ in {
         "3, left, dispatcher, layoutmsg, move +col"
         "3, right, dispatcher, layoutmsg, move -col"
       ];
+
+      decoration = {
+        rounding = 6;
+      };
 
       animations = {
         enabled = true;
@@ -89,7 +123,16 @@ in {
         };
       };
 
+      workspace = [
+        "w[tv1], gapsout:0, gapsin:0"
+        "f[1], gapsout:0, gapsin:0"
+      ];
+
       windowrule = [
+        # No borders/rounding when single tiled window or fullscreen
+        "match:float 0, match:workspace w[tv1], border_size 0, rounding 0"
+        "match:float 0, match:workspace f[1], border_size 0, rounding 0"
+
         "match:class org.gnome.Calculator, float on"
         "match:class org.gnome.Settings, float on"
         "match:class pavucontrol, float on"
@@ -101,6 +144,11 @@ in {
         "match:class org.gnome.Nautilus, float on"
         "match:float 1, match:title (.*Open.*|.*Upload.*|.*Save.*|.*Select.*|.*Choose.*), size 45% 45%"
 
+        # Term has transparent background when resizing.
+        "match:class com.mitchellh.ghostty, opaque on"
+        "match:class com.mitchellh.ghostty, opacity 1.0 override 1.0 override"
+        "match:class com.mitchellh.ghostty, no_blur on"
+
         # FreeCad:
         "match:initial_class ^org\\.freecad\\.FreeCAD$, match:initial_title ^Customize$, float on, center on, size (monitor_w*0.75) (monitor_h*0.75), no_max_size on"
         "match:class org\\.freecad\\.FreeCAD, match:title Expression editor, stay_focused on"
@@ -110,6 +158,12 @@ in {
         "match:class org\\.freecad\\.FreeCAD, opacity 1.0 override 1.0 override"
         "match:class org\\.freecad\\.FreeCAD, no_blur on"
         # "match:class org\\.freecad\\.FreeCAD, match:title Preferences, stay_focused on"
+
+        # dragon-drop: sticky bottom-right drag-and-drop widget
+        "match:class dragon-drop, float on"
+        "match:class dragon-drop, pin on"
+        "match:class dragon-drop, no_initial_focus on"
+        "match:class dragon-drop, move (monitor_w-window_w-20) (monitor_h-window_h-20)"
       ];
 
       bind =

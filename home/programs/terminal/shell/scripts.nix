@@ -195,6 +195,38 @@ in {
         ];
       })
 
+      (pkgs.writeShellApplication {
+        name = "record-region";
+        runtimeInputs = with pkgs; [wf-recorder slurp wl-clipboard libnotify coreutils dragon-drop];
+        text = ''
+          outdir="''${HOME}/Videos/recordings"
+          mkdir -p "$outdir"
+          timestamp=$(date +%Y%m%d_%H%M%S)
+          outfile="''${outdir}/recording_''${timestamp}.mp4"
+
+          geometry=$(slurp) || { echo "Selection cancelled"; exit 1; }
+
+          echo "Recording region: $geometry"
+          echo "Output: $outfile"
+          echo "Press Ctrl+C to stop recording."
+
+          # Trap SIGINT so wf-recorder exits cleanly and finalizes the mp4
+          trap 'echo ""' INT
+          wf-recorder -g "$geometry" -f "$outfile" || true
+          trap - INT
+
+          if [ -f "$outfile" ] && [ -s "$outfile" ]; then
+            printf '%s' "$outfile" | wl-copy
+            notify-send -i video-x-generic "Recording saved" "$outfile (path copied)"
+            echo "Saved: $outfile"
+            dragon-drop --and-exit "$outfile" &
+          else
+            notify-send -u critical "Recording failed" "No output file produced"
+            exit 1
+          fi
+        '';
+      })
+
       (pkgs.writeShellScriptBin "text-serch" ''
         sk --ansi -i -c 'rg --color=always --line-number "{}"' \
            --preview 'f=$(echo {} | cut -d: -f1); l=$(echo {} | cut -d: -f2); bat --color=always --style=numbers --highlight-line $l "$f"' \
