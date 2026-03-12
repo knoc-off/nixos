@@ -38,11 +38,16 @@
 #        - Navigate to E:\NetKVM\w11\amd64
 #        - Select the "Red Hat VirtIO Ethernet Adapter" driver
 #
-#   6. After installation, open File Explorer > E: drive and run
-#      virtio-win-guest-tools.exe — this single installer bundles all
-#      VirtIO drivers (balloon, serial, display, SCSI, etc.) plus the
-#      SPICE guest agent (clipboard sharing, auto-resolution).
-#      No need to manually install individual drivers from step 5.
+#   6. After installation:
+#      If autounattendFile is set, everything below is automatic at
+#      first login — virtio-win-guest-tools.exe is installed silently,
+#      WinFSP is downloaded and installed, and VirtioFsSvc is started.
+#      Check C:\ProgramData\vm-setup.log for status.
+#
+#      If installing manually: open File Explorer > VirtIO drive and
+#      run virtio-win-guest-tools.exe — this bundles all VirtIO drivers
+#      (balloon, serial, display, SCSI, FS, etc.) plus the SPICE guest
+#      agent (clipboard sharing, auto-resolution).
 #
 #   7. Enable SSH access from the host (inside the Windows VM):
 #      a. Open PowerShell as Administrator and run:
@@ -70,12 +75,15 @@
 #  10. Shared folder (virtiofs):
 #      A host directory is shared with the VM via virtiofs (set via
 #      windows-vm.sharePath, default /var/lib/libvirt/shared/windows-vm).
-#      To access it inside Windows:
-#        a. Install WinFSP: https://winfsp.dev/rel/ (or via winget:
-#             winget install WinFsp.WinFsp
-#           )
+#
+#      If autounattendFile is set, the shared folder is set up
+#      automatically at first login (WinFSP + VirtioFsSvc).
+#      The shared folder appears as drive Z: in File Explorer.
+#
+#      If installing manually:
+#        a. Install WinFSP: https://winfsp.dev/rel/
 #        b. virtio-win-guest-tools (step 6) includes the VirtIO FS driver.
-#        c. Start the VirtIO FS service (once, then it persists across reboots):
+#        c. Start the VirtIO FS service:
 #             sc start VirtioFsSvc
 #             sc config VirtioFsSvc start=auto
 #        d. The shared folder appears as drive Z: in File Explorer.
@@ -109,21 +117,120 @@
   virtioDriverPathsXml = let
     letters = ["C" "D" "E" "F" "G" "H" "I" "J" "K"];
     driverDirs = ["viostor\\w11\\amd64" "NetKVM\\w11\\amd64" "Balloon\\w11\\amd64" "vioscsi\\w11\\amd64"];
-    allPaths = lib.concatLists (map (l: map (d: {letter = l; dir = d;}) driverDirs) letters);
-    pathEntries = lib.imap1 (i: p:
-      ''        <PathAndCredentials wcm:action="add" wcm:keyValue="${toString i}"><Path>${p.letter}:\${p.dir}</Path></PathAndCredentials>''
-    ) allPaths;
+    allPaths = lib.concatLists (map (l:
+      map (d: {
+        letter = l;
+        dir = d;
+      })
+      driverDirs)
+    letters);
+    pathEntries =
+      lib.imap1 (
+        i: p: ''<PathAndCredentials wcm:action="add" wcm:keyValue="${toString i}"><Path>${p.letter}:\${p.dir}</Path></PathAndCredentials>''
+      )
+      allPaths;
   in
     pkgs.writeText "virtio-driver-paths.xml" ''
-      <component name="Microsoft-Windows-PnpCustomizationsWinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
-        <DriverPaths>
-  ${lib.concatStringsSep "\n" pathEntries}
-        </DriverPaths>
-      </component>
+          <component name="Microsoft-Windows-PnpCustomizationsWinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+            <DriverPaths>
+      ${lib.concatStringsSep "\n" pathEntries}
+            </DriverPaths>
+          </component>
     '';
 
+  # Post-install PowerShell script: installs VirtIO guest tools, WinFSP,
+  # and starts the VirtIO FS service for shared folders.
+  postInstallScript = pkgs.writeText "setup-vm.ps1" ''
+    $ErrorActionPreference = 'Continue'
+    $logFile = "$env:ProgramData\vm-setup.log"
+    function Write-Log($msg) {
+      $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+      "[$ts] $msg" | Out-File -Append $logFile -Encoding UTF8
+    }
+
+    Write-Log "=== VM post-install setup starting ==="
+
+    # 1. Install VirtIO Guest Tools (all drivers + SPICE agent + VirtIO FS driver)
+    Write-Log "Searching for virtio-win-guest-tools.exe..."
+    $installed = $false
+    foreach ($d in 'C','D','E','F','G','H','I','J','K') {
+      $exe = "$d`:\virtio-win-guest-tools.exe"
+      if (Test-Path $exe) {
+        Write-Log "Found: $exe - installing silently..."
+        $proc = Start-Process -FilePath $exe -ArgumentList '/S' -Wait -NoNewWindow -PassThru
+        Write-Log "VirtIO guest tools installer exited with code $($proc.ExitCode)"
+        $installed = $true
+        break
+      }
+    }
+    if (-not $installed) { Write-Log "WARNING: virtio-win-guest-tools.exe not found on any drive" }
+
+    # 2. Wait for network (re-enabled by previous FirstLogonCommand)
+    Write-Log "Waiting for network connectivity..."
+    $retries = 0
+    while ($retries -lt 30) {
+      try {
+        $null = Invoke-WebRequest -Uri "https://github.com" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+        Write-Log "Network is up"
+        break
+      } catch {
+        $retries++
+        Start-Sleep -Seconds 2
+      }
+    }
+    if ($retries -ge 30) { Write-Log "WARNING: Network not available after 60s, skipping WinFSP download" }
+
+    # 3. Install WinFSP for virtiofs shared folder
+    if ($retries -lt 30) {
+      Write-Log "Fetching latest WinFSP release..."
+      try {
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        $release = Invoke-RestMethod "https://api.github.com/repos/winfsp/winfsp/releases/latest"
+        $msiUrl = ($release.assets | Where-Object { $_.name -like "winfsp-*.msi" } | Select-Object -First 1).browser_download_url
+        if ($msiUrl) {
+          $msiPath = "$env:TEMP\winfsp.msi"
+          Write-Log "Downloading $msiUrl..."
+          Invoke-WebRequest -Uri $msiUrl -OutFile $msiPath -UseBasicParsing
+          Write-Log "Installing WinFSP..."
+          $proc = Start-Process msiexec.exe -ArgumentList "/i `"$msiPath`" /quiet /norestart" -Wait -NoNewWindow -PassThru
+          Write-Log "WinFSP installer exited with code $($proc.ExitCode)"
+          Remove-Item $msiPath -ErrorAction SilentlyContinue
+        } else {
+          Write-Log "WARNING: Could not find WinFSP MSI in release assets"
+        }
+      } catch {
+        Write-Log "WARNING: Failed to install WinFSP: $_"
+      }
+    }
+
+    # 4. Start VirtIO FS service (needs both guest tools + WinFSP installed)
+    Write-Log "Configuring VirtioFsSvc..."
+    Start-Sleep -Seconds 5
+    try {
+      sc.exe config VirtioFsSvc start=auto 2>&1 | Out-Null
+      sc.exe start VirtioFsSvc 2>&1 | Out-Null
+      Write-Log "VirtioFsSvc set to auto-start"
+    } catch {
+      Write-Log "WARNING: Failed to configure VirtioFsSvc: $_"
+    }
+
+    Write-Log "=== VM post-install setup complete ==="
+    Write-Log "Log file: $logFile"
+  ''; # Add sourcing binaries, web download, firefox bin.
+  # https://download.mozilla.org/?product=firefox-stub&os=win&lang=en-US
+
+  # FirstLogonCommands entry to run setup-vm.ps1 from whichever drive
+  # the autounattend ISO is mounted on.
+  postInstallCmdXml = pkgs.writeText "post-install-cmd.xml" ''
+    <SynchronousCommand>
+      <Order>2</Order>
+      <Description>VM post-install: VirtIO guest tools, WinFSP, virtiofs</Description>
+      <CommandLine>powershell.exe -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -Command "foreach($d in 'C','D','E','F','G','H','I','J','K'){$s=$d+':\setup-vm.ps1';if(Test-Path $s){powershell.exe -NoProfile -ExecutionPolicy Bypass -File $s;break}}"</CommandLine>
+    </SynchronousCommand>
+  '';
+
   # Build a minimal ISO containing autounattend.xml (patched with VirtIO
-  # driver paths) for fully unattended install.
+  # driver paths and post-install commands) plus setup-vm.ps1.
   autounattendIso =
     if cfg.autounattendFile != null
     then
@@ -131,16 +238,27 @@
         nativeBuildInputs = with pkgs; [cdrtools gawk];
       } ''
         mkdir -p content
-        # Inject VirtIO driver paths component into the windowsPE settings
-        # pass of the answer file. The awk script inserts the XML right
-        # before the first standalone </settings> (closing the windowsPE pass).
+        cp ${postInstallScript} content/setup-vm.ps1
+
+        # Pass 1: Inject VirtIO driver paths into the windowsPE settings pass.
         awk '
           /^[[:space:]]*<\/settings>[[:space:]]*$/ && !done {
             while ((getline line < "${virtioDriverPathsXml}") > 0) print line;
             done=1
           }
           {print}
-        ' ${cfg.autounattendFile} > content/autounattend.xml
+        ' ${cfg.autounattendFile} > content/autounattend.tmp
+
+        # Pass 2: Inject post-install command into every FirstLogonCommands block.
+        awk '
+          /<\/FirstLogonCommands>/ {
+            while ((getline line < "${postInstallCmdXml}") > 0) print line;
+            close("${postInstallCmdXml}");
+          }
+          {print}
+        ' content/autounattend.tmp > content/autounattend.xml
+        rm content/autounattend.tmp
+
         mkisofs -J -r -o $out content/
       ''
     else null;
@@ -246,7 +364,10 @@ in {
 
     # Allow VMs on the NAT bridge to reach host services
     networking.firewall.interfaces."virbr0".allowedTCPPortRanges = [
-      {from = 1; to = 65535;}
+      {
+        from = 1;
+        to = 65535;
+      }
     ];
 
     # Fix: upstream service hardcodes /usr/bin/sh (NixOS #496836)
@@ -364,23 +485,22 @@ in {
           };
 
           # Extra CDROM disks (autounattend answer file)
-          extraDisks =
-            lib.optionals (autounattendIso != null) [
-              {
-                type = "file";
-                device = "cdrom";
-                driver = {
-                  name = "qemu";
-                  type = "raw";
-                };
-                source = {file = "${autounattendIso}";};
-                target = {
-                  bus = "sata";
-                  dev = "hde";
-                };
-                readonly = true;
-              }
-            ];
+          extraDisks = lib.optionals (autounattendIso != null) [
+            {
+              type = "file";
+              device = "cdrom";
+              driver = {
+                name = "qemu";
+                type = "raw";
+              };
+              source = {file = "${autounattendIso}";};
+              target = {
+                bus = "sata";
+                dev = "hde";
+              };
+              readonly = true;
+            }
+          ];
 
           # Extra device overrides (virtiofs, autounattend CDROM)
           extraDevices =
@@ -401,13 +521,12 @@ in {
             });
 
           # Shared memory backing required by virtiofs
-          extraTop =
-            lib.optionalAttrs (cfg.sharePath != null) {
-              memoryBacking = {
-                source = {type = "memfd";};
-                access = {mode = "shared";};
-              };
+          extraTop = lib.optionalAttrs (cfg.sharePath != null) {
+            memoryBacking = {
+              source = {type = "memfd";};
+              access = {mode = "shared";};
             };
+          };
 
           finalDomain =
             baseDomain
