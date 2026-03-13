@@ -1,5 +1,9 @@
-{ lib, self, pkgs, ...}:
-let
+{
+  lib,
+  self,
+  pkgs,
+  ...
+}: let
   inherit (lib) mkDefault mkBefore;
   inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) grosshack;
 
@@ -16,13 +20,10 @@ let
     sleep 0.5
     echo 1 > /sys/class/leds/chromeos\:white\:power/brightness
   '';
-
   # udevRule = ''
   #   RUN+="${blinkScript}/bin/blink"
   # '';
-
-in
-{
+in {
   services.fprintd = {
     enable = true;
   };
@@ -37,6 +38,6 @@ in
     swaylock.text = mkDefault (mkBefore grosshackConfig);
     noctalia.text = mkDefault (mkBefore grosshackConfig);
     noctalia-shell.text = mkDefault (mkBefore grosshackConfig);
+    system-local-login.text = mkDefault (mkBefore grosshackConfig);
   };
 }
-

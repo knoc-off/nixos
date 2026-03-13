@@ -55,12 +55,17 @@
 
   # XML patcher as a proper Python derivation
   patchAutounattend = pkgs.writers.writePython3Bin "patch-autounattend" {
-    flakeIgnore = ["E265" "E501"];
+    flakeIgnore = ["E265" "E501" "W503"];
   } (
     builtins.readFile ./patch-autounattend.py
   );
 
-  # Patched autounattend.xml with VirtIO driver paths + post-install commands
+  # Patched autounattend.xml: ensures all VM elements, optionally merges overlay
+  mergeFlag =
+    if cfg.mergeAutounattendFile != null
+    then "--merge ${cfg.mergeAutounattendFile}"
+    else "";
+
   patchedAutounattend =
     if cfg.autounattendFile != null
     then
@@ -72,7 +77,8 @@
           --output $out \
           --driver-dirs "viostor\w11\amd64,NetKVM\w11\amd64,Balloon\w11\amd64,vioscsi\w11\amd64" \
           --locale ${cfg.locale} \
-          --username ${cfg.windowsUsername}
+          --username ${cfg.windowsUsername} \
+          ${mergeFlag}
       ''
     else null;
 
@@ -91,6 +97,9 @@
         cp -r ${pkgs.virtio-win}/* content/
         cp ${patchedAutounattend} content/autounattend.xml
         cp ${./setup-vm.ps1} content/setup-vm.ps1
+        ${lib.optionalString (cfg.sshPublicKey != null) ''
+          echo ${lib.escapeShellArg cfg.sshPublicKey} > content/authorized_keys
+        ''}
         mkisofs -J -r -V DEPLOYISO -o $out content/
       ''
     else null;
@@ -252,11 +261,47 @@ in {
       type = lib.types.nullOr lib.types.path;
       default = ./autounattend.xml;
       description = ''
-        Answer file for automated Windows installation. The built-in
-        default handles hardware bypasses, local account, VirtIO drivers,
-        and post-install guest tools setup. Override with a custom XML
-        (e.g. UnattendedWinstall) or set to null after installation
-        to detach the ISO.
+        Base answer file for automated Windows installation. The patcher
+        ensures all VM-critical elements exist regardless of input.
+        Set to null after installation to detach the deploy ISO.
+      '';
+    };
+
+    mergeAutounattendFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.path;
+      default = null;
+      description = ''
+        Optional overlay XML to merge into the base answer file.
+        Extra RunSynchronous/FirstLogonCommands and non-standard
+        elements (e.g. UnattendedWinstall Extensions with debloating
+        scripts) are imported. Network-disabling commands are
+        automatically skipped to avoid conflicts with VM setup.
+      '';
+    };
+
+    sshPublicKey = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = ''
+        SSH public key for passwordless access to the VM from the host.
+        Deployed to the Windows admin authorized_keys at first login.
+        Used by the sshfs automount to access the VM filesystem.
+      '';
+    };
+
+    sshIdentityFile = lib.mkOption {
+      type = lib.types.str;
+      default = "/home/${user}/.ssh/id_ed25519";
+      description = "Path to the SSH private key for sshfs mount.";
+    };
+
+    hostMountPath = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = "/mnt/windows-vm";
+      description = ''
+        Host path where the VM's filesystem is mounted via sshfs.
+        Uses systemd automount (lazy, mounts on first access).
+        Set to null to disable.
       '';
     };
   };
@@ -286,6 +331,7 @@ in {
       virtio-win
       win-spice
       virtiofsd
+      sshfs
     ];
 
     networking.firewall.interfaces."virbr0".allowedTCPPortRanges = [
@@ -314,6 +360,28 @@ in {
       ++ lib.optionals (cfg.sharePath != null) [
         "d ${cfg.sharePath} 0777 root root -"
       ];
+
+    # --- sshfs automount (host access to VM filesystem) ---
+    programs.fuse.userAllowOther = lib.mkIf (cfg.hostMountPath != null) true;
+
+    fileSystems = lib.mkIf (cfg.hostMountPath != null) {
+      ${cfg.hostMountPath} = {
+        device = "${cfg.windowsUsername}@192.168.122.129:/";
+        fsType = "fuse.sshfs";
+        options = [
+          "noauto"
+          "x-systemd.automount"
+          "_netdev"
+          "allow_other"
+          "reconnect"
+          "ServerAliveInterval=15"
+          "ServerAliveCountMax=3"
+          "IdentityFile=${cfg.sshIdentityFile}"
+          "StrictHostKeyChecking=no"
+          "UserKnownHostsFile=/dev/null"
+        ];
+      };
+    };
 
     # --- NixVirt ---
     virtualisation.libvirt = {

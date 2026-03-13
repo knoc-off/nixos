@@ -26,7 +26,12 @@
     self.nixosModules.desktop.noctalia
 
     self.nixosModules.windows-vm
-    {windows-vm.enable = true;}
+    {
+      windows-vm = {
+        enable = true;
+        mergeAutounattendFile = "${inputs.UnattendedWinstall}/autounattend.xml";
+      };
+    }
 
     inputs.hardware.nixosModules.lenovo-thinkpad
     inputs.hardware.nixosModules.common-cpu-intel
@@ -145,7 +150,7 @@
 
     logind = {
       lidSwitch = "suspend-then-hibernate";
-      powerKey = "hibernate";
+      powerKey = "hibernate"; # lock instead TODO
       powerKeyLongPress = "poweroff";
     };
 
