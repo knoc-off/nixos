@@ -197,7 +197,7 @@ in {
 
       (pkgs.writeShellApplication {
         name = "record-region";
-        runtimeInputs = with pkgs; [wf-recorder slurp wl-clipboard libnotify coreutils dragon-drop];
+        runtimeInputs = with pkgs; [wf-recorder slurp wl-clipboard libnotify coreutils dragon-drop socat jq gawk];
         text = ''
           outdir="''${HOME}/Videos/recordings"
           mkdir -p "$outdir"
@@ -219,7 +219,49 @@ in {
             printf '%s' "$outfile" | wl-copy
             notify-send -i video-x-generic "Recording saved" "$outfile (path copied)"
             echo "Saved: $outfile"
+
+            # Spawn dragon-drop for easy drag-and-drop of the recording
             dragon-drop --and-exit "$outfile" &
+            DRAGON_PID=$!
+            sleep 0.3
+
+            # Background listener: reposition dragon-drop to bottom-right
+            # of the focused monitor whenever the user switches monitors
+            (
+              set +e
+              trap 'exit 0' TERM
+
+              reposition() {
+                mon=$(hyprctl -j monitors | jq -r '
+                  [.[] | select(.focused)][0] |
+                  "\(.x) \(.y) \(.width) \(.height) \(.scale)"')
+                [ -n "$mon" ] || return 0
+                read -r mx my mw mh ms <<< "$mon"
+
+                win=$(hyprctl -j clients | jq -r '
+                  [.[] | select(.class == "dragon-drop")][0] |
+                  "\(.size[0]) \(.size[1])"')
+                [ -n "$win" ] && [ "$win" != "null null" ] || return 0
+                read -r ww wh <<< "$win"
+
+                tx=$(awk "BEGIN { printf \"%d\", $mx + ($mw / $ms) - $ww - 20 }")
+                ty=$(awk "BEGIN { printf \"%d\", $my + ($mh / $ms) - $wh - 20 }")
+                hyprctl dispatch movewindowpixel "exact $tx $ty,class:dragon-drop" \
+                  >/dev/null 2>&1
+                return 0
+              }
+
+              socat -U - \
+                "UNIX-CONNECT:''${XDG_RUNTIME_DIR}/hypr/''${HYPRLAND_INSTANCE_SIGNATURE}/.socket2.sock" \
+                2>/dev/null \
+              | while IFS= read -r ev; do
+                  case "$ev" in focusedmon*) reposition ;; esac
+                done
+            ) &
+            FOLLOW_PID=$!
+
+            wait $DRAGON_PID 2>/dev/null || true
+            kill $FOLLOW_PID 2>/dev/null || true
           else
             notify-send -u critical "Recording failed" "No output file produced"
             exit 1

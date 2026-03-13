@@ -26,12 +26,7 @@
     self.nixosModules.desktop.noctalia
 
     self.nixosModules.windows-vm
-    {
-      windows-vm = {
-        enable = true;
-        autounattendFile = "${inputs.UnattendedWinstall}/autounattend.xml";
-      };
-    }
+    {windows-vm.enable = true;}
 
     inputs.hardware.nixosModules.lenovo-thinkpad
     inputs.hardware.nixosModules.common-cpu-intel
