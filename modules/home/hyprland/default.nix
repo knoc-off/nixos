@@ -25,47 +25,50 @@
   mkWsPalette = wsHex: let
     base = "#${wsHex}";
     # Primary accent: bright, saturated version of the workspace hue
-    primary    = setOkhslLightness 0.65 (setOkhslSaturation 0.85 base);
-    secondary  = setOkhslLightness 0.60 (setOkhslSaturation 0.70 (adjustOkhslHue 0.08 base));
-    tertiary   = setOkhslLightness 0.60 (setOkhslSaturation 0.70 (adjustOkhslHue (-0.12) base));
-    error      = "#${theme.dark.base08}";
-    surface    = "#${theme.dark.base00}";
+    primary = "#${setOkhslLightness 0.65 (setOkhslSaturation 0.85 base)}";
+    secondary = "#${setOkhslLightness 0.60 (setOkhslSaturation 0.70 (adjustOkhslHue 0.08 base))}";
+    tertiary = "#${setOkhslLightness 0.60 (setOkhslSaturation 0.70 (adjustOkhslHue (-0.12) base))}";
+    error = "#${theme.dark.base08}";
+    surface = "#${theme.dark.base00}";
     surfaceVar = "#${theme.dark.base01}";
-    onSurface  = "#${theme.dark.base05}";
-    onSurfVar  = "#${theme.dark.base04}";
-    outline    = "#${theme.dark.base03}";
-    hover      = "#${theme.dark.base02}";
-    onBg       = "#${theme.dark.base00}";
-    onHover    = "#${theme.dark.base06}";
-  in builtins.toJSON {
-    mPrimary = primary;
-    mOnPrimary = onBg;
-    mSecondary = secondary;
-    mOnSecondary = onBg;
-    mTertiary = tertiary;
-    mOnTertiary = onBg;
-    mError = error;
-    mOnError = onBg;
-    mSurface = surface;
-    mOnSurface = onSurface;
-    mSurfaceVariant = surfaceVar;
-    mOnSurfaceVariant = onSurfVar;
-    mOutline = outline;
-    mShadow = "#000000";
-    mHover = hover;
-    mOnHover = onHover;
-  };
+    onSurface = "#${theme.dark.base05}";
+    onSurfVar = "#${theme.dark.base04}";
+    outline = "#${theme.dark.base03}";
+    hover = "#${theme.dark.base02}";
+    onBg = "#${theme.dark.base00}";
+    onHover = "#${theme.dark.base06}";
+  in
+    builtins.toJSON {
+      mPrimary = primary;
+      mOnPrimary = onBg;
+      mSecondary = secondary;
+      mOnSecondary = onBg;
+      mTertiary = tertiary;
+      mOnTertiary = onBg;
+      mError = error;
+      mOnError = onBg;
+      mSurface = surface;
+      mOnSurface = onSurface;
+      mSurfaceVariant = surfaceVar;
+      mOnSurfaceVariant = onSurfVar;
+      mOutline = outline;
+      mShadow = "#000000";
+      mHover = hover;
+      mOnHover = onHover;
+    };
 
   # Generate solid-color PNG files and colors.json palettes at build time
-  workspaceWallpapers = pkgs.runCommand "workspace-wallpapers" {
-    nativeBuildInputs = [ pkgs.imagemagick ];
-  } ''
-    mkdir -p $out
-    ${lib.concatImapStringsSep "\n" (i: color: ''
-      magick -size 256x256 xc:'#${color}' $out/ws-${toString i}.png
-      echo '${mkWsPalette color}' > $out/ws-${toString i}.json
-    '') wsColors}
-  '';
+  workspaceWallpapers =
+    pkgs.runCommand "workspace-wallpapers" {
+      nativeBuildInputs = [pkgs.imagemagick];
+    } ''
+      mkdir -p $out
+      ${lib.concatImapStringsSep "\n" (i: color: ''
+          magick -size 256x256 xc:'#${color}' $out/ws-${toString i}.png
+          echo '${mkWsPalette color}' > $out/ws-${toString i}.json
+        '')
+        wsColors}
+    '';
 
   # Daemon script: listens for Hyprland workspace changes, sets wallpaper + colors per-monitor
   workspaceWallpaperDaemon = pkgs.writeShellScript "workspace-wallpaper-daemon" ''
@@ -96,7 +99,9 @@
       local ws_id=$1
       local idx
       idx=$(ws_index "$ws_id")
-      cp "$WALLPAPER_DIR/ws-''${idx}.json" "$COLORS_FILE"
+      cat "$WALLPAPER_DIR/ws-''${idx}.json" > "$COLORS_FILE"
+      # Nudge noctalia to re-read the colors file
+      "$NOCTALIA" ipc call colorScheme setGenerationMethod "tonal-spot" &
     }
 
     # Sync all monitors on startup

@@ -26,7 +26,7 @@
         pf = "push --force-with-lease";
         p = "push";
         a = "add";
-        d = ''!f() { git diff HEAD~''${1:-0} "''${@:2}"; }; f'';
+        d = ''!f() { if [ $# -eq 0 ]; then git diff; elif [ $# -eq 1 ]; then if echo "$1" | grep -qE '^[0-9]+$'; then git diff HEAD~"$1"; else git diff -- "$1"; fi; elif [ $# -eq 2 ]; then if echo "$1" | grep -qE '^[0-9]+$'; then git diff HEAD~"$1" -- "$2"; elif echo "$2" | grep -qE '^[0-9]+$'; then git diff HEAD~"$2" -- "$1"; else git diff -- "$1" "$2"; fi; else git diff "$@"; fi; }; f'';
         r = ''!f() { git rebase -i HEAD~''${1:-0} --; }; f'';
         l = ''!f() { git log --oneline --graph --decorate -''${1:-10}; }; f'';
 

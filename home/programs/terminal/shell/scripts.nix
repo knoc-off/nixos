@@ -197,7 +197,7 @@ in {
 
       (pkgs.writeShellApplication {
         name = "record-region";
-        runtimeInputs = with pkgs; [wf-recorder slurp wl-clipboard libnotify coreutils dragon-drop socat jq gawk];
+        runtimeInputs = with pkgs; [wl-screenrec slurp wl-clipboard libnotify coreutils dragon-drop socat jq gawk];
         text = ''
           outdir="''${HOME}/Videos/recordings"
           mkdir -p "$outdir"
@@ -210,9 +210,9 @@ in {
           echo "Output: $outfile"
           echo "Press Ctrl+C to stop recording."
 
-          # Trap SIGINT so wf-recorder exits cleanly and finalizes the mp4
+          # Trap SIGINT so wl-screenrec exits cleanly and finalizes the mp4
           trap 'echo ""' INT
-          wf-recorder -g "$geometry" -f "$outfile" || true
+          wl-screenrec --geometry "$geometry" --filename "$outfile" || true
           trap - INT
 
           if [ -f "$outfile" ] && [ -s "$outfile" ]; then

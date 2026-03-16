@@ -40,10 +40,11 @@
     inputs.hardware.nixosModules.common-pc-ssd
 
     {
-      # hardware.intelgpu.driver = "xe";
-      # boot.kernelModules = ["xe"];
-      # boot.blacklistedKernelModules = ["i915"];
-      boot.blacklistedKernelModules = ["ac"]; # battery issues with detection
+      hardware.intelgpu.driver = "xe";
+      boot.blacklistedKernelModules = [
+        "i915" # use xe instead — i915 causes GPU HANGs on Arrow Lake-P
+        "ac" # battery issues with detection
+      ];
       hardware.uinput.enable = true;
     }
 
@@ -260,6 +261,7 @@
   };
 
   boot = {
+    kernelPackages = pkgs.linuxPackages_latest;
     kernelParams = [
       "usbcore.autosuspend=-1"
       "resume=/dev/mapper/crypted"
@@ -267,6 +269,9 @@
       # Obtain with: sudo btrfs inspect-internal map-swapfile -r /.swapvol/swapfile
       # Must be updated if the swapfile is ever recreated (e.g. swapSize changes).
       "resume_offset=533760"
+      # Force xe to claim the Arrow Lake-P GPU (PCI ID 7d51) and prevent i915 from taking it
+      "xe.force_probe=7d51"
+      "i915.force_probe=!7d51"
     ];
     kernel.sysctl = {
       "vm.swappiness" = 20;

@@ -183,7 +183,7 @@ in {
         outerCorners = true;
         hideOnOverview = false;
         displayMode = "always_visible";
-        autoHideDelay = 500;
+        autoHideDelay = 50;
         autoShowDelay = 150;
         widgets = {
           left = [
