@@ -4,6 +4,7 @@
   pkgs,
   config,
   theme,
+  color-lib,
   ...
 }: let
   system = pkgs.stdenv.hostPlatform.system;
@@ -14,49 +15,98 @@
   workspaces = builtins.genList (i: i + 1) 9;
   displayScale = 1.171339564;
 
-  # --- Per-workspace color wallpapers ---
+  # --- Per-workspace color wallpapers & palettes ---
+  inherit (color-lib) setOkhslLightness setOkhslSaturation adjustOkhslHue;
+
   wsColors = theme.dark.workspaceColors;
   numWsColors = builtins.length wsColors;
 
-  # Generate solid-color PNG files at build time (one per workspace color)
+  # Derive a noctalia Material 3 palette from a single workspace hex color (without #)
+  mkWsPalette = wsHex: let
+    base = "#${wsHex}";
+    # Primary accent: bright, saturated version of the workspace hue
+    primary    = setOkhslLightness 0.65 (setOkhslSaturation 0.85 base);
+    secondary  = setOkhslLightness 0.60 (setOkhslSaturation 0.70 (adjustOkhslHue 0.08 base));
+    tertiary   = setOkhslLightness 0.60 (setOkhslSaturation 0.70 (adjustOkhslHue (-0.12) base));
+    error      = "#${theme.dark.base08}";
+    surface    = "#${theme.dark.base00}";
+    surfaceVar = "#${theme.dark.base01}";
+    onSurface  = "#${theme.dark.base05}";
+    onSurfVar  = "#${theme.dark.base04}";
+    outline    = "#${theme.dark.base03}";
+    hover      = "#${theme.dark.base02}";
+    onBg       = "#${theme.dark.base00}";
+    onHover    = "#${theme.dark.base06}";
+  in builtins.toJSON {
+    mPrimary = primary;
+    mOnPrimary = onBg;
+    mSecondary = secondary;
+    mOnSecondary = onBg;
+    mTertiary = tertiary;
+    mOnTertiary = onBg;
+    mError = error;
+    mOnError = onBg;
+    mSurface = surface;
+    mOnSurface = onSurface;
+    mSurfaceVariant = surfaceVar;
+    mOnSurfaceVariant = onSurfVar;
+    mOutline = outline;
+    mShadow = "#000000";
+    mHover = hover;
+    mOnHover = onHover;
+  };
+
+  # Generate solid-color PNG files and colors.json palettes at build time
   workspaceWallpapers = pkgs.runCommand "workspace-wallpapers" {
     nativeBuildInputs = [ pkgs.imagemagick ];
   } ''
     mkdir -p $out
     ${lib.concatImapStringsSep "\n" (i: color: ''
       magick -size 256x256 xc:'#${color}' $out/ws-${toString i}.png
+      echo '${mkWsPalette color}' > $out/ws-${toString i}.json
     '') wsColors}
   '';
 
-  # Daemon script: listens for Hyprland workspace changes, sets noctalia wallpaper per-monitor
+  # Daemon script: listens for Hyprland workspace changes, sets wallpaper + colors per-monitor
   workspaceWallpaperDaemon = pkgs.writeShellScript "workspace-wallpaper-daemon" ''
     set -euo pipefail
 
     NOCTALIA="${noctaliaCmd}"
     WALLPAPER_DIR="${workspaceWallpapers}"
+    COLORS_FILE="$HOME/.config/noctalia/colors.json"
     NUM_COLORS=${toString numWsColors}
 
-    # Map workspace ID to a wallpaper path (1-indexed, wraps with modulo)
-    ws_wallpaper() {
+    # Map workspace ID to index (1-indexed, wraps with modulo)
+    ws_index() {
       local ws_id=$1
-      # Clamp to 1..NUM_COLORS (wrapping)
-      local idx=$(( ((ws_id - 1) % NUM_COLORS) + 1 ))
-      echo "$WALLPAPER_DIR/ws-''${idx}.png"
+      echo $(( ((ws_id - 1) % NUM_COLORS) + 1 ))
     }
 
     # Set wallpaper for a specific monitor based on its active workspace
     update_monitor() {
       local monitor=$1
       local ws_id=$2
-      local wp
-      wp=$(ws_wallpaper "$ws_id")
-      "$NOCTALIA" ipc call wallpaper set "$wp" "$monitor" &
+      local idx
+      idx=$(ws_index "$ws_id")
+      "$NOCTALIA" ipc call wallpaper set "$WALLPAPER_DIR/ws-''${idx}.png" "$monitor" &
+    }
+
+    # Update the color palette based on the focused monitor's workspace
+    update_colors() {
+      local ws_id=$1
+      local idx
+      idx=$(ws_index "$ws_id")
+      cp "$WALLPAPER_DIR/ws-''${idx}.json" "$COLORS_FILE"
     }
 
     # Sync all monitors on startup
     sync_all() {
-      ${pkgs.hyprland}/bin/hyprctl monitors -j | ${pkgs.jq}/bin/jq -r '.[] | "\(.name) \(.activeWorkspace.id)"' | while read -r mon ws; do
+      local focused_ws=""
+      ${pkgs.hyprland}/bin/hyprctl monitors -j | ${pkgs.jq}/bin/jq -r '.[] | "\(.name) \(.activeWorkspace.id) \(.focused)"' | while read -r mon ws focused; do
         update_monitor "$mon" "$ws"
+        if [ "$focused" = "true" ]; then
+          update_colors "$ws"
+        fi
       done
     }
 
@@ -77,10 +127,10 @@
           # workspacev2>>ID,NAME - active workspace changed, update the focused monitor
           ws_id="''${line#workspacev2>>}"
           ws_id="''${ws_id%%,*}"
-          # Get which monitor is focused
           focused_mon=$(${pkgs.hyprland}/bin/hyprctl monitors -j | ${pkgs.jq}/bin/jq -r '.[] | select(.focused) | .name')
           if [ -n "$focused_mon" ] && [ "$ws_id" -gt 0 ] 2>/dev/null; then
             update_monitor "$focused_mon" "$ws_id"
+            update_colors "$ws_id"
           fi
           ;;
         focusedmon\>\>*)
@@ -90,6 +140,7 @@
           ws_id="''${payload#*,}"
           if [ -n "$mon" ] && [ "$ws_id" -gt 0 ] 2>/dev/null; then
             update_monitor "$mon" "$ws_id"
+            update_colors "$ws_id"
           fi
           ;;
         moveworkspacev2\>\>*)

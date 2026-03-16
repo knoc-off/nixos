@@ -583,14 +583,14 @@ in {
         enableDdcSupport = false;
       };
       colorSchemes = {
-        useWallpaperColors = true;
+        useWallpaperColors = false; # we write colors.json directly from the workspace daemon
         predefinedScheme = "Noctalia (default)";
         darkMode = true;
         schedulingMode = "off";
         manualSunrise = "06:30";
         manualSunset = "18:30";
         generationMethod = "tonal-spot";
-        monitorForColors = ""; # empty = use focused monitor's wallpaper
+        monitorForColors = "";
       };
       templates = {
         activeTemplates = [];
