@@ -136,6 +136,24 @@ let
     base0E = createAccent (elemAt offsetAccentHues 6); # Accent 7
     base0F = createAccent (elemAt offsetAccentHues 7); # Accent 8
 
+    # --- Workspace Background Colors (12 evenly-spaced hues) ---
+    # Dark, muted colors suitable as desktop wallpaper backgrounds.
+    # Each workspace gets a unique color derived from the theme's bg.
+    numWorkspaceColors = 12;
+    wsLightness = l_bg + 0.04; # Slightly brighter than background
+    wsSaturation = 0.35;       # Moderate - visible but not garish
+
+    workspaceColors = imap0 (n: _:
+      let
+        hue = mod1 (n * 1.0 / numWorkspaceColors + hueOffset);
+        baseColor = setOkhslHue hue (setOkhslSaturation wsSaturation neutral);
+        colored = setOkhslLightness wsLightness baseColor;
+        # Mix with neutral for cohesion with the rest of the theme
+        finalColor = mixColors colored neutral 0.15;
+      in
+        setOkhslLightness wsLightness finalColor
+    ) (genList (x: x) numWorkspaceColors);
+
     # --- Determine Theme Type (Optional Metadata) ---
     bgLightness = getOkhslLightness bg;
     themeType = if bgLightness < 0.5 then "dark" else "light";
@@ -160,6 +178,9 @@ let
     base0D = lib.removePrefix "#" base0D; # theme.dark.base0D # cyan
     base0E = lib.removePrefix "#" base0E; # theme.dark.base0E # purple
     base0F = lib.removePrefix "#" base0F; # theme.dark.base0F # violet
+
+    # Per-workspace background colors (list of 12 hex strings without '#')
+    workspaceColors = map (c: lib.removePrefix "#" c) workspaceColors;
   };
 
 in {

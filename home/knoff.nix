@@ -231,6 +231,8 @@ in {
       piper
 
       sops # should maybe source this package somewhere common.
+
+      upkgs.freecad-wayland
     ];
 
     stateVersion = "23.05";

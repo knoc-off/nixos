@@ -67,8 +67,39 @@
     # Add more plugins here:
     # { name = "catwalk"; src = inputs.noctalia-plugins; settings = { hideBackground = true; }; }
   ];
+  # Initial colors JSON (used to seed the mutable file)
+  initialColorsJson = builtins.toJSON {
+    mSurface = "#${theme.dark.base00}";
+    mSurfaceVariant = "#${theme.dark.base01}";
+    mHover = "#${theme.dark.base02}";
+    mOutline = "#${theme.dark.base03}";
+    mOnSurfaceVariant = "#${theme.dark.base04}";
+    mOnSurface = "#${theme.dark.base05}";
+    mOnHover = "#${theme.dark.base06}";
+    mPrimary = "#${theme.dark.base0C}";
+    mSecondary = "#${theme.dark.base0D}";
+    mTertiary = "#${theme.dark.base0E}";
+    mError = "#${theme.dark.base08}";
+    mOnPrimary = "#${theme.dark.base00}";
+    mOnSecondary = "#${theme.dark.base00}";
+    mOnTertiary = "#${theme.dark.base00}";
+    mOnError = "#${theme.dark.base00}";
+    mShadow = "#000000";
+  };
 in {
   imports = [inputs.noctalia.homeModules.default];
+
+  # Seed a mutable colors.json so noctalia can overwrite it at runtime
+  # (the noctalia module's managed symlink is disabled below)
+  home.activation.noctaliaColors = lib.hm.dag.entryAfter ["writeBoundary"] ''
+    colors_file="$HOME/.config/noctalia/colors.json"
+    mkdir -p "$(dirname "$colors_file")"
+    if [ ! -f "$colors_file" ] || [ -L "$colors_file" ]; then
+      rm -f "$colors_file"
+      echo '${initialColorsJson}' > "$colors_file"
+    fi
+  '';
+
   home.packages = with pkgs; [
     ffmpeg-full
     hicolor-icon-theme
@@ -86,6 +117,10 @@ in {
         [Service]
         PassEnvironment=XDG_DATA_DIRS XDG_CURRENT_DESKTOP QT_QPA_PLATFORMTHEME QT_PLUGIN_PATH QT_STYLE_OVERRIDE XCURSOR_PATH XCURSOR_SIZE XCURSOR_THEME GTK_PATH
       '';
+
+      # Make colors.json mutable so noctalia can overwrite it at runtime
+      # (needed for useWallpaperColors to regenerate the palette on wallpaper change)
+      "noctalia/colors.json".enable = lib.mkForce false;
     }
     // noctaliaPlugins.configFiles;
 
@@ -218,7 +253,10 @@ in {
         animationSpeed = 1;
         animationDisabled = false;
         compactLockScreen = false;
-        lockScreenAnimations = false;
+        lockScreenAnimations = true;
+        lockScreenBlur = 0.6;
+        lockScreenTint = 0.3;
+        lockScreenMonitors = ["eDP-1"];
         lockOnSuspend = true;
         showSessionButtonsOnLockScreen = true;
         showHibernateOnLockScreen = false;
@@ -290,7 +328,7 @@ in {
         enableMultiMonitorDirectories = false;
         showHiddenFiles = false;
         viewMode = "single";
-        setWallpaperOnAllMonitors = true;
+        setWallpaperOnAllMonitors = false;
         fillMode = "crop";
         fillColor = "#000000";
         useSolidColor = false;
@@ -298,8 +336,8 @@ in {
         automationEnabled = false;
         wallpaperChangeMode = "random";
         randomIntervalSec = 300;
-        transitionDuration = 1500;
-        transitionType = "random";
+        transitionDuration = 500;
+        transitionType = "wipe";
         transitionEdgeSmoothness = 0.05;
         panelPosition = "follow_bar";
         hideWallpaperFilenames = false;
@@ -545,14 +583,14 @@ in {
         enableDdcSupport = false;
       };
       colorSchemes = {
-        useWallpaperColors = false;
+        useWallpaperColors = true;
         predefinedScheme = "Noctalia (default)";
         darkMode = true;
         schedulingMode = "off";
         manualSunrise = "06:30";
         manualSunset = "18:30";
         generationMethod = "tonal-spot";
-        monitorForColors = "";
+        monitorForColors = ""; # empty = use focused monitor's wallpaper
       };
       templates = {
         activeTemplates = [];

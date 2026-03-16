@@ -24,7 +24,9 @@
               fg = "#${color-lib.ensureTextContrast value value 4.5}";
             };
           }
-        else acc // flattenThemeToHighlights attrPath value
+        else if builtins.isAttrs value
+        then acc // flattenThemeToHighlights attrPath value
+        else acc # skip lists, numbers, etc.
     ) {} (builtins.attrNames attrs);
 
   themeHighlights = flattenThemeToHighlights "theme" theme;

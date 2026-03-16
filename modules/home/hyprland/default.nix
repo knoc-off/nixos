@@ -3,6 +3,7 @@
   lib,
   pkgs,
   config,
+  theme,
   ...
 }: let
   system = pkgs.stdenv.hostPlatform.system;
@@ -11,6 +12,104 @@
 
   mainMod = "SUPER";
   workspaces = builtins.genList (i: i + 1) 9;
+  displayScale = 1.171339564;
+
+  # --- Per-workspace color wallpapers ---
+  wsColors = theme.dark.workspaceColors;
+  numWsColors = builtins.length wsColors;
+
+  # Generate solid-color PNG files at build time (one per workspace color)
+  workspaceWallpapers = pkgs.runCommand "workspace-wallpapers" {
+    nativeBuildInputs = [ pkgs.imagemagick ];
+  } ''
+    mkdir -p $out
+    ${lib.concatImapStringsSep "\n" (i: color: ''
+      magick -size 256x256 xc:'#${color}' $out/ws-${toString i}.png
+    '') wsColors}
+  '';
+
+  # Daemon script: listens for Hyprland workspace changes, sets noctalia wallpaper per-monitor
+  workspaceWallpaperDaemon = pkgs.writeShellScript "workspace-wallpaper-daemon" ''
+    set -euo pipefail
+
+    NOCTALIA="${noctaliaCmd}"
+    WALLPAPER_DIR="${workspaceWallpapers}"
+    NUM_COLORS=${toString numWsColors}
+
+    # Map workspace ID to a wallpaper path (1-indexed, wraps with modulo)
+    ws_wallpaper() {
+      local ws_id=$1
+      # Clamp to 1..NUM_COLORS (wrapping)
+      local idx=$(( ((ws_id - 1) % NUM_COLORS) + 1 ))
+      echo "$WALLPAPER_DIR/ws-''${idx}.png"
+    }
+
+    # Set wallpaper for a specific monitor based on its active workspace
+    update_monitor() {
+      local monitor=$1
+      local ws_id=$2
+      local wp
+      wp=$(ws_wallpaper "$ws_id")
+      "$NOCTALIA" ipc call wallpaper set "$wp" "$monitor" &
+    }
+
+    # Sync all monitors on startup
+    sync_all() {
+      ${pkgs.hyprland}/bin/hyprctl monitors -j | ${pkgs.jq}/bin/jq -r '.[] | "\(.name) \(.activeWorkspace.id)"' | while read -r mon ws; do
+        update_monitor "$mon" "$ws"
+      done
+    }
+
+    # Wait for noctalia to be ready
+    for i in $(seq 1 30); do
+      if "$NOCTALIA" ipc call state all >/dev/null 2>&1; then
+        break
+      fi
+      sleep 1
+    done
+
+    sync_all
+
+    # Listen for Hyprland IPC events
+    ${pkgs.socat}/bin/socat -U - "UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock" | while IFS= read -r line; do
+      case "$line" in
+        workspacev2\>\>*)
+          # workspacev2>>ID,NAME - active workspace changed, update the focused monitor
+          ws_id="''${line#workspacev2>>}"
+          ws_id="''${ws_id%%,*}"
+          # Get which monitor is focused
+          focused_mon=$(${pkgs.hyprland}/bin/hyprctl monitors -j | ${pkgs.jq}/bin/jq -r '.[] | select(.focused) | .name')
+          if [ -n "$focused_mon" ] && [ "$ws_id" -gt 0 ] 2>/dev/null; then
+            update_monitor "$focused_mon" "$ws_id"
+          fi
+          ;;
+        focusedmon\>\>*)
+          # focusedmon>>MONNAME,WSID - focus moved to a different monitor
+          payload="''${line#focusedmon>>}"
+          mon="''${payload%%,*}"
+          ws_id="''${payload#*,}"
+          if [ -n "$mon" ] && [ "$ws_id" -gt 0 ] 2>/dev/null; then
+            update_monitor "$mon" "$ws_id"
+          fi
+          ;;
+        moveworkspacev2\>\>*)
+          # moveworkspacev2>>WSID,WSNAME,MONNAME - workspace moved to different monitor
+          payload="''${line#moveworkspacev2>>}"
+          ws_id="''${payload%%,*}"
+          rest="''${payload#*,}"
+          mon="''${rest#*,}"
+          if [ -n "$mon" ] && [ "$ws_id" -gt 0 ] 2>/dev/null; then
+            update_monitor "$mon" "$ws_id"
+          fi
+          ;;
+        monitoraddedv2\>\>*)
+          # New monitor connected - sync all
+          sleep 1
+          sync_all
+          ;;
+      esac
+    done
+  '';
 in {
   imports = [
     # ./plugins/hyprspace.nix        # needs upstream update for 0.54
@@ -18,6 +117,10 @@ in {
     # ./plugins/hyprglass.nix # works, but not for layershell :(
     ./plugins/kinetic-scroll.nix
   ];
+
+  # XWayland apps don't know the Wayland fractional scale, so they render at 96 DPI
+  # and get compositor-upscaled (blurry). Setting Xft.dpi tells them the real DPI.
+  xresources.properties."Xft.dpi" = builtins.floor (96 * displayScale);
 
   # Theme config for hyprqt6engine (used by hyprland-share-picker via XDPH service).
   # Matches Stylix font/icon settings so the screen-share picker looks consistent.
@@ -72,8 +175,12 @@ in {
     settings = {
       ecosystem.no_update_news = true;
 
+      exec-once = [
+        "${workspaceWallpaperDaemon}"
+      ];
+
       monitor = [
-        "eDP-1, preferred, 0x0, 1.171339564"
+        "eDP-1, preferred, 0x0, ${toString displayScale}"
         ", preferred, auto-center-up, 1"
       ];
 

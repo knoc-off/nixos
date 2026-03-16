@@ -18,6 +18,12 @@
 
     polarity = "dark";
 
+    # Icon theme for Qt apps (propagated to qt5ct/qt6ct via stylix's qt target)
+    icons = {
+      dark = "Papirus-Dark";
+      light = "Papirus-Light";
+    };
+
     # Stylix requires an image, but we can use a generated one from the base color
     image = pkgs.runCommand "wallpaper.png" { buildInputs = [ pkgs.imagemagick ]; } ''
       magick -size 1x1 xc:'#${theme.dark.base00}' $out
@@ -71,4 +77,5 @@
     package = pkgs.papirus-icon-theme;
     name = "Papirus-Dark";
   };
+
 }
