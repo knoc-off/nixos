@@ -1,7 +1,6 @@
 use nix_wasm_rust::Value;
 use palette::{FromColor, IntoColor, Okhsl, Okhsv, Srgb};
 
-// ---------------------------------------------------------------------------
 // Color string format:  "space:c1:c2:c3:alpha"
 //
 //   srgb   c1=r  c2=g  c3=b   all 0‑1
@@ -10,7 +9,6 @@ use palette::{FromColor, IntoColor, Okhsl, Okhsv, Srgb};
 //
 // Alpha is always 0‑1.
 // All floats use full f64 precision in the string.
-// ---------------------------------------------------------------------------
 
 #[derive(Clone)]
 struct Color {
@@ -81,8 +79,6 @@ impl Color {
             self.alpha,
         )
     }
-
-    // -- conversion helpers ------------------------------------------------
 
     /// Convert any color to sRGB (0‑1 per channel).
     fn to_srgb(&self) -> Color {
@@ -192,10 +188,6 @@ impl Color {
     }
 }
 
-// ===========================================================================
-// Hex parsing / formatting
-// ===========================================================================
-
 fn hex_to_srgb(hex: &str) -> Color {
     let hex = hex.strip_prefix('#').unwrap_or(hex);
     let hex = hex.to_ascii_uppercase();
@@ -221,8 +213,7 @@ fn hex_to_srgb(hex: &str) -> Color {
     let byte = |i: usize| -> f64 {
         let s = &expanded[i..i + 2];
         u8::from_str_radix(s, 16)
-            .unwrap_or_else(|_| nix_wasm_rust::panic(&format!("bad hex byte '{s}'")))
-            as f64
+            .unwrap_or_else(|_| nix_wasm_rust::panic(&format!("bad hex byte '{s}'"))) as f64
             / 255.0
     };
 
@@ -249,11 +240,7 @@ fn srgb_to_hex(c: &Color) -> String {
     }
 }
 
-// ===========================================================================
-// Exported WASM functions (called via builtins.wasm)
-// ===========================================================================
-
-// -- Conversions -----------------------------------------------------------
+// Exported WASM functions
 
 /// hex string -> color string (srgb)
 #[no_mangle]
@@ -290,8 +277,6 @@ pub extern "C" fn to_srgb(arg: Value) -> Value {
     let color = Color::parse(&arg.get_string());
     Value::make_string(&color.to_srgb().format())
 }
-
-// -- Channel access --------------------------------------------------------
 
 /// { color, channel } -> float
 /// Get a channel value from a color in its current space.
@@ -456,10 +441,12 @@ fn contrast_ratio_impl(a: &Color, b: &Color) -> f64 {
     let lum = |c: &Color| -> f64 { 0.2126 * c.c1 + 0.7152 * c.c2 + 0.0722 * c.c3 };
     let l1 = lum(a) + 0.05;
     let l2 = lum(b) + 0.05;
-    if l1 > l2 { l1 / l2 } else { l2 / l1 }
+    if l1 > l2 {
+        l1 / l2
+    } else {
+        l2 / l1
+    }
 }
-
-// -- Hex-level convenience functions ---------------------------------------
 
 /// hex string -> { r, g, b, alpha } (floats 0‑1)
 #[no_mangle]
