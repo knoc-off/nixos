@@ -149,7 +149,7 @@
       sops = {
         defaultSopsFile = ./secrets/${hostname}/default.yaml;
         age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
-        secrets."ANTHROPIC_API_KEY" = {
+        secrets."shell_environment/ANTHROPIC_API_KEY" = {
           mode = "0644";
         };
       };

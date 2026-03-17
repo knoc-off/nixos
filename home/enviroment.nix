@@ -20,11 +20,6 @@
     };
 
     sessionVariables = {
-      # ANTHROPIC_API_KEY = "$(cat /run/secrets/ANTHROPIC_API_KEY)";
-      OPENROUTER_API_KEY = "$(cat /etc/secrets/gpt/openrouter )";
-
-      #  ANTHROPIC_KEY = "$(cat sops... )";
-
       SOPS_AGE_KEY_CMD = "${pkgs.ssh-to-age}/bin/ssh-to-age -private-key -i $HOME/.ssh/id_ed25519";
 
       XDG_CURRENT_DESKTOP = "Hyprland";

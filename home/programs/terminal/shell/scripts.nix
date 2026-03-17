@@ -630,6 +630,7 @@ in {
         ];
       })
 
+      # (self.packages.${pkgs.stdenv.hostPlatform.system}.nx config_dir hostname)
       (self.packages.${pkgs.stdenv.hostPlatform.system}.nx config_dir hostname)
 
       (pkgs.writeShellScriptBin "chrome" ''

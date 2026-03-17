@@ -6,7 +6,8 @@
     };
 
     shellAliases = {
-      x = "xargs -I '{}' ";
+      x = "xargs ";
+      xi = "xargs -I '{}' ";
     };
   };
   programs.fish = {

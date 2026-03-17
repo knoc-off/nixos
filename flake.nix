@@ -152,7 +152,7 @@
       ];
 
     darwinConfigurations = listToAttrs [
-      (mkHost "Nicholass-MacBook-Pro" "niko" "aarch64-darwin")
+      # (mkHost "Nicholass-MacBook-Pro" "niko" "aarch64-darwin")
     ];
 
     nixosConfigurations = listToAttrs [

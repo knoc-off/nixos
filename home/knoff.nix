@@ -116,7 +116,7 @@ in {
     ./programs/editor/default.nix
 
     ./programs/browser/firefox
-    # ./programs/browser/firefox/pwa/notion.nix
+    ./programs/browser/firefox/pwa/linear.nix
     # ./programs/browser/slack-pwa.nix
 
     ./enviroment.nix

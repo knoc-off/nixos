@@ -336,9 +336,9 @@ in {
         automationEnabled = false;
         wallpaperChangeMode = "random";
         randomIntervalSec = 300;
-        transitionDuration = 500;
+        transitionDuration = 50;
         transitionType = "wipe";
-        transitionEdgeSmoothness = 0.05;
+        transitionEdgeSmoothness = 0.25;
         panelPosition = "follow_bar";
         hideWallpaperFilenames = false;
         useWallhaven = false;
