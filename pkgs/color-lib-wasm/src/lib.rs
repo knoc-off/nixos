@@ -449,10 +449,141 @@ pub extern "C" fn contrast_ratio(arg: Value) -> Value {
     let a = Color::parse(&a_str).to_srgb();
     let b = Color::parse(&b_str).to_srgb();
 
-    // Relative luminance (simplified, using sRGB values directly like original)
+    Value::make_float(contrast_ratio_impl(&a, &b))
+}
+
+fn contrast_ratio_impl(a: &Color, b: &Color) -> f64 {
     let lum = |c: &Color| -> f64 { 0.2126 * c.c1 + 0.7152 * c.c2 + 0.0722 * c.c3 };
-    let l1 = lum(&a) + 0.05;
-    let l2 = lum(&b) + 0.05;
-    let ratio = if l1 > l2 { l1 / l2 } else { l2 / l1 };
-    Value::make_float(ratio)
+    let l1 = lum(a) + 0.05;
+    let l2 = lum(b) + 0.05;
+    if l1 > l2 { l1 / l2 } else { l2 / l1 }
+}
+
+// -- Hex-level convenience functions ---------------------------------------
+
+/// hex string -> { r, g, b, alpha } (floats 0‑1)
+#[no_mangle]
+pub extern "C" fn hex_to_rgb_attr(arg: Value) -> Value {
+    let hex = arg.get_string();
+    let c = hex_to_srgb(&hex);
+    Value::make_attrset(&[
+        ("r", Value::make_float(c.c1)),
+        ("g", Value::make_float(c.c2)),
+        ("b", Value::make_float(c.c3)),
+        ("alpha", Value::make_float(c.alpha)),
+    ])
+}
+
+/// { fixed, color, factor } -> hex string
+/// Push `color` away from `fixed` in Okhsv space by `factor` (0‑1).
+/// Value is pushed toward opposite brightness, hue toward complement.
+#[no_mangle]
+pub extern "C" fn adjust_contrast(arg: Value) -> Value {
+    let fixed_str = arg
+        .get_attr("fixed")
+        .unwrap_or_else(|| nix_wasm_rust::panic("adjust_contrast: missing 'fixed' attr"))
+        .get_string();
+    let color_str = arg
+        .get_attr("color")
+        .unwrap_or_else(|| nix_wasm_rust::panic("adjust_contrast: missing 'color' attr"))
+        .get_string();
+    let factor = arg
+        .get_attr("factor")
+        .unwrap_or_else(|| nix_wasm_rust::panic("adjust_contrast: missing 'factor' attr"))
+        .get_float();
+
+    let fixed = Color::parse(&fixed_str).to_okhsv();
+    let color = Color::parse(&color_str);
+    let color_hsv = color.to_okhsv();
+
+    let fixed_v = fixed.c3;
+    let fixed_h = fixed.c1;
+    let cur_v = color_hsv.c3;
+    let cur_h = color_hsv.c1;
+
+    // Push value away from fixed
+    let v_delta = if fixed_v > 0.5 { -cur_v } else { 1.0 - cur_v };
+    let new_v = (cur_v + v_delta * factor).clamp(0.0, 1.0);
+
+    // Push hue toward complement
+    let target_h = (fixed_h + 0.5).rem_euclid(1.0);
+    let raw = target_h - cur_h;
+    let h_delta = if raw > 0.5 {
+        raw - 1.0
+    } else if raw < -0.5 {
+        raw + 1.0
+    } else {
+        raw
+    };
+    let new_h = (cur_h + h_delta * factor).rem_euclid(1.0);
+
+    let result = Color {
+        space: ColorSpace::Okhsv,
+        c1: new_h,
+        c2: color_hsv.c2,
+        c3: new_v,
+        alpha: color.alpha,
+    };
+    Value::make_string(&srgb_to_hex(&result))
+}
+
+/// { text, bg, min_ratio } -> hex string
+/// Adjust `text` color to ensure at least `min_ratio` contrast against `bg`.
+#[no_mangle]
+pub extern "C" fn ensure_contrast(arg: Value) -> Value {
+    let text_hex = arg
+        .get_attr("text")
+        .unwrap_or_else(|| nix_wasm_rust::panic("ensure_contrast: missing 'text' attr"))
+        .get_string();
+    let bg_hex = arg
+        .get_attr("bg")
+        .unwrap_or_else(|| nix_wasm_rust::panic("ensure_contrast: missing 'bg' attr"))
+        .get_string();
+    let min_ratio = arg
+        .get_attr("min_ratio")
+        .unwrap_or_else(|| nix_wasm_rust::panic("ensure_contrast: missing 'min_ratio' attr"))
+        .get_float();
+
+    let text_c = hex_to_srgb(&text_hex);
+    let bg_c = hex_to_srgb(&bg_hex);
+
+    let current = contrast_ratio_impl(&text_c.to_srgb(), &bg_c.to_srgb());
+    let needed = (min_ratio - current) / 3.0;
+    let factor = needed.clamp(0.0, 1.0);
+
+    if factor <= 0.0 {
+        // Already sufficient contrast
+        Value::make_string(&srgb_to_hex(&text_c))
+    } else {
+        // Reuse adjust_contrast logic inline
+        let fixed = bg_c.to_okhsv();
+        let color_hsv = text_c.to_okhsv();
+
+        let v_delta = if fixed.c3 > 0.5 {
+            -color_hsv.c3
+        } else {
+            1.0 - color_hsv.c3
+        };
+        let new_v = (color_hsv.c3 + v_delta * factor).clamp(0.0, 1.0);
+
+        let target_h = (fixed.c1 + 0.5).rem_euclid(1.0);
+        let raw = target_h - color_hsv.c1;
+        let h_delta = if raw > 0.5 {
+            raw - 1.0
+        } else if raw < -0.5 {
+            raw + 1.0
+        } else {
+            raw
+        };
+        let new_h = (color_hsv.c1 + h_delta * factor).rem_euclid(1.0);
+
+        let result = Color {
+            space: ColorSpace::Okhsv,
+            c1: new_h,
+            c2: color_hsv.c2,
+            c3: new_v,
+            alpha: text_c.alpha,
+        };
+        Value::make_string(&srgb_to_hex(&result))
+    }
 }

@@ -1,5 +1,5 @@
 {lib ? import <nixpkgs/lib>}: {
-  color-lib = import ./color-lib/color-manipulation.nix {inherit lib;};
+  color-lib = import ./color-lib.nix {inherit lib;};
   math = import ./math.nix {inherit lib;};
 
   # Recursively discover nix modules from a directory tree.
