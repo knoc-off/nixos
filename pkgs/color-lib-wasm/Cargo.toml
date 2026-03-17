@@ -1,0 +1,16 @@
+[package]
+name = "color-lib-wasm"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+nix-wasm-rust = { git = "https://github.com/DeterminateSystems/nix-wasm-rust" }
+palette = { version = "0.7", features = ["std"] }
+
+[profile.release]
+lto = true
+opt-level = 'z'
+strip = true

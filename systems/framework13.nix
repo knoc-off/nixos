@@ -9,6 +9,8 @@
   ...
 }: {
   imports = [
+    inputs.determinate.nixosModules.default
+
     self.nixosModules.home
     self.nixosModules.nix
     self.nixosModules.audio.pipewire

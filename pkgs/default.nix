@@ -71,6 +71,8 @@ in rec {
   relm4-layershell = rustPkgs-fenix.callPackage ./relm4-layershell {inherit rustPlatform;};
   marki-wasm = rustPkgs-fenix.callPackage ./marki-wasm {rustPlatform = rustPlatform-wasm;};
 
+  color-lib-wasm = rustPkgs-fenix.callPackage ./color-lib-wasm {rustPlatform = rustPlatform-wasm;};
+
   # rust fuse fileSystem that integrates with taskwarrior sql db
   fuse-taskchampion = rustPkgs-fenix.callPackage ./fuse-taskchampion {
     fenix = rustPkgs-fenix.fenix;

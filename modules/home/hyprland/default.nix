@@ -15,13 +15,11 @@
   workspaces = builtins.genList (i: i + 1) 9;
   displayScale = 1.171339564;
 
-  # --- Per-workspace color wallpapers & palettes ---
   inherit (color-lib) setOkhslLightness setOkhslSaturation adjustOkhslHue;
 
   wsColors = theme.dark.workspaceColors;
   numWsColors = builtins.length wsColors;
 
-  # Derive a noctalia Material 3 palette from a single workspace hex color (without #)
   mkWsPalette = wsHex: let
     base = "#${wsHex}";
     # Primary accent: bright, saturated version of the workspace hue
