@@ -14,6 +14,8 @@
     ./services/kdeconnect.nix
     ./services/home-assistant.nix
 
+    inputs.determinate.nixosModules.default
+
     self.nixosModules.audio.pipewire
     self.nixosModules.home
     self.nixosModules.nix
