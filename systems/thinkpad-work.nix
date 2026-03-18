@@ -10,6 +10,17 @@
 }: {
   imports = [
     inputs.determinate.nixosModules.default
+    {
+      # WORKAROUND: kernel 6.19+ btrfs causes the overlayfs stale-file-handle
+      # functional test to fail deterministically.  Disable the check phase so
+      # determinate-nix builds without running nix-functional-tests.
+      # Remove once upstream fixes the test or a newer determinate release lands.
+      nix.package = lib.mkForce (
+        inputs.determinate.inputs.nix.packages.${pkgs.stdenv.system}.default.overrideAttrs (_: {
+          doCheck = false;
+        })
+      );
+    }
 
     self.nixosModules.home
     self.nixosModules.nix

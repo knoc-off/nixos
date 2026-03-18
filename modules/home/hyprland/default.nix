@@ -303,7 +303,8 @@ in {
         "match:class xdg-desktop-portal-gnome, float on"
         "match:class xdg-desktop-portal-hyprland, float on"
         "match:class org.gnome.Nautilus, float on"
-        "match:float 1, match:title (.*Open.*|.*Upload.*|.*Save.*|.*Select.*|.*Choose.*), size 45% 45%"
+        # "match:float 1, match:title (.*Open.*|.*Upload.*|.*Save.*|.*Select.*|.*Choose.*), size 45% 45%"
+        # i think that the regex slows down on large titles?
 
         # Term has transparent background when resizing.
         "match:class com.mitchellh.ghostty, opaque on"
