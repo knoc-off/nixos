@@ -1,5 +1,5 @@
 use nix_wasm_rust::Value;
-use palette::{FromColor, IntoColor, Okhsl, Okhsv, Srgb};
+use palette::{color_difference::Wcag21RelativeContrast, FromColor, IntoColor, Okhsl, Okhsv, Srgb};
 
 // Color string format:  "space:c1:c2:c3:alpha"
 //
@@ -69,7 +69,6 @@ impl Color {
     }
 
     fn format(&self) -> String {
-        // Use enough precision to survive a round-trip through string repr.
         format!(
             "{}:{:.17}:{:.17}:{:.17}:{:.17}",
             self.space.as_str(),
@@ -80,7 +79,6 @@ impl Color {
         )
     }
 
-    /// Convert any color to sRGB (0‑1 per channel).
     fn to_srgb(&self) -> Color {
         match self.space {
             ColorSpace::Srgb => self.clone(),
@@ -142,8 +140,6 @@ impl Color {
             ColorSpace::Okhsv => self.to_okhsv(),
         }
     }
-
-    // -- channel access ----------------------------------------------------
 
     /// Channel names by space:
     ///   srgb:  r g b
@@ -366,8 +362,6 @@ pub extern "C" fn scale_channel(arg: Value) -> Value {
     Value::make_string(&color.set(idx, new_val).format())
 }
 
-// -- Mixing ----------------------------------------------------------------
-
 /// { a, b, factor } -> color string
 /// Linear mix in Okhsl space (shortest hue path). Factor 0.0 = a, 1.0 = b.
 #[no_mangle]
@@ -416,8 +410,6 @@ pub extern "C" fn mix(arg: Value) -> Value {
     Value::make_string(&result.format())
 }
 
-// -- Contrast & utility ----------------------------------------------------
-
 /// { a, b } -> float
 /// Approximate luminance-based contrast ratio between two colors.
 #[no_mangle]
@@ -438,14 +430,11 @@ pub extern "C" fn contrast_ratio(arg: Value) -> Value {
 }
 
 fn contrast_ratio_impl(a: &Color, b: &Color) -> f64 {
-    let lum = |c: &Color| -> f64 { 0.2126 * c.c1 + 0.7152 * c.c2 + 0.0722 * c.c3 };
-    let l1 = lum(a) + 0.05;
-    let l2 = lum(b) + 0.05;
-    if l1 > l2 {
-        l1 / l2
-    } else {
-        l2 / l1
-    }
+    // Use palette's Wcag21RelativeContrast which correctly linearizes sRGB
+    // before computing relative luminance.
+    let srgb_a = Srgb::new(a.c1, a.c2, a.c3);
+    let srgb_b = Srgb::new(b.c1, b.c2, b.c3);
+    srgb_a.relative_contrast(srgb_b)
 }
 
 /// hex string -> { r, g, b, alpha } (floats 0‑1)
@@ -515,7 +504,8 @@ pub extern "C" fn adjust_contrast(arg: Value) -> Value {
 }
 
 /// { text, bg, min_ratio } -> hex string
-/// Adjust `text` color to ensure at least `min_ratio` contrast against `bg`.
+/// Adjust `text` color lightness (in Okhsl) to ensure at least `min_ratio`
+/// WCAG 2.1 contrast against `bg`.  Hue and saturation are preserved.
 #[no_mangle]
 pub extern "C" fn ensure_contrast(arg: Value) -> Value {
     let text_hex = arg
@@ -535,42 +525,57 @@ pub extern "C" fn ensure_contrast(arg: Value) -> Value {
     let bg_c = hex_to_srgb(&bg_hex);
 
     let current = contrast_ratio_impl(&text_c.to_srgb(), &bg_c.to_srgb());
-    let needed = (min_ratio - current) / 3.0;
-    let factor = needed.clamp(0.0, 1.0);
-
-    if factor <= 0.0 {
-        // Already sufficient contrast
-        Value::make_string(&srgb_to_hex(&text_c))
-    } else {
-        // Reuse adjust_contrast logic inline
-        let fixed = bg_c.to_okhsv();
-        let color_hsv = text_c.to_okhsv();
-
-        let v_delta = if fixed.c3 > 0.5 {
-            -color_hsv.c3
-        } else {
-            1.0 - color_hsv.c3
-        };
-        let new_v = (color_hsv.c3 + v_delta * factor).clamp(0.0, 1.0);
-
-        let target_h = (fixed.c1 + 0.5).rem_euclid(1.0);
-        let raw = target_h - color_hsv.c1;
-        let h_delta = if raw > 0.5 {
-            raw - 1.0
-        } else if raw < -0.5 {
-            raw + 1.0
-        } else {
-            raw
-        };
-        let new_h = (color_hsv.c1 + h_delta * factor).rem_euclid(1.0);
-
-        let result = Color {
-            space: ColorSpace::Okhsv,
-            c1: new_h,
-            c2: color_hsv.c2,
-            c3: new_v,
-            alpha: text_c.alpha,
-        };
-        Value::make_string(&srgb_to_hex(&result))
+    if current >= min_ratio {
+        return Value::make_string(&srgb_to_hex(&text_c));
     }
+
+    // Binary search on Okhsl lightness to find the minimum adjustment that
+    // meets the target contrast.  Only lightness changes; hue and saturation
+    // are preserved.
+    let text_hsl = text_c.to_okhsl();
+    // On a dark bg we need to go lighter; on a light bg we need to go darker.
+    // Use Okhsl lightness of the bg as the heuristic for direction.
+    let bg_hsl = bg_c.to_okhsl();
+    let go_lighter = bg_hsl.c3 < 0.5;
+
+    let mut lo = if go_lighter { text_hsl.c3 } else { 0.0 };
+    let mut hi = if go_lighter { 1.0 } else { text_hsl.c3 };
+
+    // 24 iterations gives precision < 1/(2^24) ≈ 6e-8
+    for _ in 0..24 {
+        let mid = (lo + hi) / 2.0;
+        let candidate = Color {
+            space: ColorSpace::Okhsl,
+            c1: text_hsl.c1,
+            c2: text_hsl.c2,
+            c3: mid,
+            alpha: text_hsl.alpha,
+        };
+        let ratio = contrast_ratio_impl(&candidate.to_srgb(), &bg_c.to_srgb());
+        if ratio >= min_ratio {
+            // Sufficient — try to stay closer to the original lightness
+            if go_lighter {
+                hi = mid;
+            } else {
+                lo = mid;
+            }
+        } else {
+            // Not enough contrast — push further
+            if go_lighter {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+    }
+
+    let final_l = (lo + hi) / 2.0;
+    let result = Color {
+        space: ColorSpace::Okhsl,
+        c1: text_hsl.c1,
+        c2: text_hsl.c2,
+        c3: final_l,
+        alpha: text_hsl.alpha,
+    };
+    Value::make_string(&srgb_to_hex(&result))
 }
