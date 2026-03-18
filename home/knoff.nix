@@ -102,7 +102,6 @@ in {
   imports = [
     ./programs/terminal # default
     ./programs/terminal/ghostty
-    ./programs/terminal/foot
     ./programs/terminal/programs/pueue.nix
     ./programs/terminal/programs/opencode.nix
 
@@ -178,7 +177,6 @@ in {
     }
 
     ./modules/thunderbird.nix
-    # ./services/rclone.nix
 
     ./xdg-enviroment.nix
   ];

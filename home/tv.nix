@@ -2,75 +2,133 @@
   lib,
   inputs,
   pkgs,
+  upkgs,
   self,
-  hostname,
-  user,
-  config,
   ...
 } @ args: let
-  generateService = serviceName: command: {
-    Unit = {
-      Description = "${serviceName} Service";
-      PartOf = ["hyprland.target"];
-      Requires = ["hyprland.target"];
-      After = ["user-path-import.service"];
+  noctalia' = cmd:
+    lib.concatStringsSep " " (
+      ["noctalia-shell" "ipc" "call"] ++ (lib.splitString " " cmd)
+    );
+
+  mkKeyLayers = import ./key-layers.nix {inherit lib;};
+
+  navKeys = {
+    h = {key = "left";};
+    j = {key = "down";};
+    k = {key = "up";};
+    l = {key = "right";};
+    d = {raw = "(multi (release-key rmet) (mwheel-accel-down 50 150 1.05 0.80))";};
+    u = {raw = "(multi (release-key rmet) (mwheel-accel-up 50 150 1.05 0.80))";};
+  };
+
+  # maybe add things to spawn certain programs, etc?
+  keyLayers = mkKeyLayers {
+    base = {
+      capsbinds = {
+        ctrl = ["a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
+        keys = navKeys;
+      };
     };
-    Install.WantedBy = ["hyprland.target"];
-    Service = {
-      Type = "simple";
-      Restart = "on-failure";
-      ExecStart = "/usr/bin/env ${command}";
-      RestartSec = "1";
+    browser = {
+      classes = ["firefox" "chromium-browser"];
+      capsbinds = {
+        ctrl = ["enter" "tab" "a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
+        keys =
+          navKeys
+          // {
+            g = {raw = "(tap-dance 200 ((multi (release-key rmet) C-end) (multi (release-key rmet) C-home)))";};
+          };
+      };
     };
   };
 in {
   imports = [
-    ./programs/terminal/ghostty
     ./programs/terminal
-    ./desktop/hyprland.nix
+    ./programs/terminal/ghostty
     ./tv-xdg-env.nix
+
+    self.homeModules.noctalia
+    self.homeModules.hyprland
+    self.homeModules.stylix
+
+    self.homeModules.git
+
+    self.homeModules.starship
+
+    self.homeModules.kanata
+    self.homeModules.hyprkan
+    {
+      programs.hyprkan = {
+        package = self.packages.${pkgs.stdenv.hostPlatform.system}.hyprkan;
+        enable = true;
+        service.enable = true;
+
+        service.extraArgs = [
+          "--port"
+          "52545"
+        ];
+
+        rules = keyLayers.hyprkanRules;
+      };
+    }
+
+    {
+      services.kanata = {
+        enable = true;
+        package = upkgs.kanata-with-cmd;
+
+        keyboards.main = {
+          devices = []; # Auto-detect keyboards
+          excludeDevices = [
+            "Logitech USB Receiver"
+          ];
+          port = 52545;
+          extraDefCfg = "danger-enable-cmd yes process-unmapped-keys yes";
+
+          config = keyLayers.kanataConfig ''
+            launcher (cmd ${noctalia' "launcher toggle"})
+            dbl (tap-dance-eager 250 (XX @launcher))
+          '';
+        };
+      };
+    }
   ];
 
-  gtk = {
-    enable = true;
-    theme = {
-      name = "Breeze-Dark";
-      package = pkgs.kdePackages.breeze-gtk;
-    };
-    iconTheme = {
-      name = "breeze-dark";
-      package = pkgs.kdePackages.breeze-icons;
-    };
-    cursorTheme = {
-      name = "breeze_cursors";
-      package = pkgs.kdePackages.breeze;
-      size = 24;
-    };
-    font = {
-      name = "Noto Sans";
-      size = 10;
-    };
-    gtk3.extraConfig.gtk-application-prefer-dark-theme = true;
-    gtk4.extraConfig.gtk-application-prefer-dark-theme = true;
-  };
+  #  gtk = {
+  #    enable = true;
+  #    theme = {
+  #      name = "Breeze-Dark";
+  #      package = pkgs.kdePackages.breeze-gtk;
+  #    };
+  #    iconTheme = {
+  #      name = "breeze-dark";
+  #      package = pkgs.kdePackages.breeze-icons;
+  #    };
+  #    cursorTheme = {
+  #      name = "breeze_cursors";
+  #      package = pkgs.kdePackages.breeze;
+  #      size = 24;
+  #    };
+  #    font = {
+  #      name = "Noto Sans";
+  #      size = 10;
+  #    };
+  #    gtk3.extraConfig.gtk-application-prefer-dark-theme = true;
+  #    gtk4.extraConfig.gtk-application-prefer-dark-theme = true;
+  #  };
 
-  qt = {
-    enable = true;
-    platformTheme.name = "kde";
-    style = {
-      name = "breeze";
-      package = pkgs.kdePackages.breeze;
-    };
-  };
+  #   qt = {
+  #     enable = true;
+  #     platformTheme.name = "kde";
+  #     style = {
+  #       name = "breeze";
+  #       package = pkgs.kdePackages.breeze;
+  #     };
+  #   };
 
   home.sessionVariables = {
-    QT_QPA_PLATFORM = "wayland";
     XDG_SESSION_TYPE = "wayland";
-    QT_QPA_PLATFORMTHEME = "kde";
-    QT_STYLE_OVERRIDE = "breeze";
-
-    KDE_SESSION_VERSION = "6";
-    KDE_FULL_SESSION = "true";
   };
 
   programs.mpv = {
@@ -231,7 +289,7 @@ in {
           #!/usr/bin/env zsh
 
           moduleNames=(
-            "gtkconfig"
+            "gtkconfig" # not sure about this # TODO TBD
             "bluedevil"
             "networkmanagement"
             "networkstatus"

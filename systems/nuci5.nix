@@ -32,7 +32,8 @@
       };
     }
 
-    self.nixosModules.windowManager.hyprland
+    self.nixosModules.hyprland
+    self.nixosModules.desktop.noctalia
     {
       hardware.graphics = {
         enable = true;
