@@ -287,7 +287,12 @@
       "i915.force_probe=!7d51"
     ];
     kernel.sysctl = {
-      "vm.swappiness" = 20;
+      # Minimize swap usage — plenty of RAM available; only swap under real
+      # memory pressure.  Keeps the slow btrfs swap file for hibernation only.
+      "vm.swappiness" = 1;
+      # Reclaim vfs caches less aggressively (default 100 = equal pressure on
+      # page-cache vs dentries/inodes; 50 = keep more dentries/inodes cached)
+      "vm.vfs_cache_pressure" = 50;
       # Increase inotify limits for rust-analyzer and other file watchers
       "fs.inotify.max_user_watches" = 524288;
       "fs.inotify.max_user_instances" = 1024;
