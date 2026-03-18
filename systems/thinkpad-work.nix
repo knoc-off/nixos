@@ -53,9 +53,14 @@
     inputs.hardware.nixosModules.common-pc-ssd
 
     {
-      hardware.intelgpu.driver = "xe";
+      # Arrow Lake-P (PCI ID 7d51) GPU driver selection:
+      # xe: i915_flip kworkers get stuck in D-state, causing system-wide I/O
+      #     stalls and intermittent multi-second freezes (kernel 6.19.3).
+      # i915: has had GPU HANG reports on this hardware in earlier kernels.
+      # Using i915 for now as the lesser of two evils — revisit when xe
+      # display flip handling matures.
+      hardware.intelgpu.driver = "i915";
       boot.blacklistedKernelModules = [
-        "i915" # use xe instead — i915 causes GPU HANGs on Arrow Lake-P
         "ac" # battery issues with detection
       ];
       hardware.uinput.enable = true;
@@ -282,9 +287,7 @@
       # Obtain with: sudo btrfs inspect-internal map-swapfile -r /.swapvol/swapfile
       # Must be updated if the swapfile is ever recreated (e.g. swapSize changes).
       "resume_offset=533760"
-      # Force xe to claim the Arrow Lake-P GPU (PCI ID 7d51) and prevent i915 from taking it
-      "xe.force_probe=7d51"
-      "i915.force_probe=!7d51"
+      # Let i915 claim the Arrow Lake-P GPU normally no force_probe
     ];
     kernel.sysctl = {
       # Minimize swap usage — plenty of RAM available; only swap under real

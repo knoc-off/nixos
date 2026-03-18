@@ -104,10 +104,12 @@ let
     # Workspace background colors (12 evenly-spaced hues)
     # -------------------------------------------------------------------
     # Subtle, muted colors near bg lightness — distinguishable but not
-    # distracting.
+    # distracting.  On dark themes, slightly brighter than bg; on light
+    # themes, slightly darker.
+    isDark = l_bg < l_fg;
     numWS = 12;
-    wsL = l_bg + 0.04;
-    wsS = 0.35;
+    wsL = if isDark then l_bg + 0.04 else l_bg - 0.10;
+    wsS = if isDark then 0.35 else 0.45;
 
     workspaceColors = genList (n: let
       hue = mod1 (n * 1.0 / numWS + hueOffset);
