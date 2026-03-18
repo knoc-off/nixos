@@ -109,21 +109,6 @@ in {
     slurp # region selection for Wayland
   ];
 
-  # Create a systemd drop-in to pass theme environment variables to the service
-  # This fixes missing icons by ensuring noctalia can find icon themes
-  xdg.configFile =
-    {
-      "systemd/user/noctalia-shell.service.d/override.conf".text = ''
-        [Service]
-        PassEnvironment=XDG_DATA_DIRS XDG_CURRENT_DESKTOP QT_QPA_PLATFORMTHEME QT_PLUGIN_PATH QT_STYLE_OVERRIDE XCURSOR_PATH XCURSOR_SIZE XCURSOR_THEME GTK_PATH
-      '';
-
-      # Make colors.json mutable so noctalia can overwrite it at runtime
-      # (needed for useWallpaperColors to regenerate the palette on wallpaper change)
-      "noctalia/colors.json".enable = lib.mkForce false;
-    }
-    // noctaliaPlugins.configFiles;
-
   # Provide fallback icon for ActiveWindow when no app is focused
   xdg.dataFile."icons/hicolor/scalable/apps/user-desktop.svg".text = ''
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

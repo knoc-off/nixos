@@ -33,6 +33,9 @@
         enable = true;
       };
     }
+    {
+      services.hypridle.enable = lib.mkForce false;
+    }
 
     self.nixosModules.hyprland
     self.nixosModules.desktop.noctalia
@@ -55,7 +58,7 @@
           enable = true;
           settings = {
             default_session = {
-              command = "${pkgs.hyprland}/bin/Hyprland";
+              command = "uwsm start hyprland-uwsm.desktop";
               inherit user;
             };
           };
