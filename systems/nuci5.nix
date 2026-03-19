@@ -34,7 +34,22 @@
       };
     }
     {
-      services.hypridle.enable = lib.mkForce false;
+      # No lock, no suspend - just turn screen off when idle
+      home-manager.users.${user} = {
+        services.hypridle.settings = lib.mkForce {
+          general = {
+            after_sleep_cmd = "hyprctl dispatch dpms on";
+          };
+
+          listener = [
+            {
+              timeout = 600; # 10 minutes - screen off
+              on-timeout = "hyprctl dispatch dpms off";
+              on-resume = "hyprctl dispatch dpms on";
+            }
+          ];
+        };
+      };
     }
 
     self.nixosModules.hyprland
