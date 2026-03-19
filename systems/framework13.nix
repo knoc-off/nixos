@@ -238,9 +238,9 @@
     upower.enable = true;
     accounts-daemon.enable = true;
 
-    logind = {
-      lidSwitch = "suspend";
-      powerKey = "suspend";
+    logind.settings.Login = {
+      HandleLidSwitch = "suspend";
+      HandlePowerKey = "suspend";
     };
 
     # flatpak.enable = true;

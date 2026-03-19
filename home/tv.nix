@@ -47,6 +47,7 @@ in {
     ./programs/terminal
     ./programs/terminal/ghostty
     ./tv-xdg-env.nix
+    ./programs/terminal/programs/opencode.nix
 
     self.homeModules.noctalia
     self.homeModules.hyprland

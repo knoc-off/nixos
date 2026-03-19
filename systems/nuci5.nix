@@ -25,6 +25,20 @@
     }
 
     {
+      security.sudo.extraRules = [
+        {
+          users = ["tv"];
+          commands = [
+            {
+              command = "ALL";
+              options = ["NOPASSWD" "SETENV"];
+            }
+          ];
+        }
+      ];
+    }
+
+    {
       services.sabnzbd = {
         enable = true;
       };
@@ -147,6 +161,13 @@
       services.pipewire.alsa.support32Bit = true;
     }
   ];
+
+  # Prevent snd-usb-audio from claiming XING WEI 2.4G USB dongle (1915:1025).
+  # It's a keyboard/mouse dongle with unnecessary audio interfaces that waste USB bandwidth.
+  # HID interfaces (keyboard/mouse) are unaffected - only the audio driver is disabled.
+  boot.extraModprobeConfig = ''
+    options snd-usb-audio vid=0x1915 pid=0x1025 enable=0
+  '';
 
   services.dbus.enable = true;
 
