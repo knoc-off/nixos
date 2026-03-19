@@ -230,6 +230,7 @@ in {
       ecosystem.no_update_news = true;
 
       exec-once = [
+        "uwsm app -- ${noctaliaCmd}"
         "${workspaceWallpaperDaemon}"
       ];
 

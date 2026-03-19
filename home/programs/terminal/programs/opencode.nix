@@ -363,6 +363,11 @@
             scope = "openid";
           };
         };
+
+        grep = {
+          type = "remote";
+          url = "https://mcp.grep.app";
+        };
       };
     };
   };

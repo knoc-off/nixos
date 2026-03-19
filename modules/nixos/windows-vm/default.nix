@@ -125,7 +125,7 @@
       nvram_path = "${cfg.storagePath}/windows-vm.nvram";
       virtio_net = true;
       virtio_drive = true;
-      virtio_video = true;
+      virtio_video = false;
       install_virtio = false;  # we bundle virtio-win into our deploy ISO
     };
 
@@ -186,6 +186,7 @@
             };
         }
       else withVirtiofs;
+
   in
     withDeployIso;
 in {

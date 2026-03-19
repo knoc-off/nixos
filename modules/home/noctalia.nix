@@ -109,6 +109,16 @@ in {
     slurp # region selection for Wayland
   ];
 
+  # Noctalia is launched via `uwsm app` from the compositor (not a systemd service),
+  # so it inherits the full session environment — no drop-in override needed.
+  xdg.configFile =
+    {
+      # Make colors.json mutable so noctalia can overwrite it at runtime
+      # (needed for useWallpaperColors to regenerate the palette on wallpaper change)
+      "noctalia/colors.json".enable = lib.mkForce false;
+    }
+    // noctaliaPlugins.configFiles;
+
   # Provide fallback icon for ActiveWindow when no app is focused
   xdg.dataFile."icons/hicolor/scalable/apps/user-desktop.svg".text = ''
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -121,6 +131,7 @@ in {
 
   programs.noctalia-shell = {
     enable = lib.mkDefault true;
+    systemd.enable = lib.mkForce false;
     package = lib.mkForce (inputs.noctalia.packages.${pkgs.stdenv.hostPlatform.system}.default.override {
       calendarSupport = true;
     });
