@@ -14,156 +14,6 @@
   mainMod = "SUPER";
   workspaces = builtins.genList (i: i + 1) 9;
   displayScale = 1.171339564;
-
-  inherit (color-lib) setOkhslLightness setOkhslSaturation adjustOkhslHue;
-
-  wsColors = theme.dark.workspaceColors;
-  numWsColors = builtins.length wsColors;
-
-  mkWsPalette = wsHex: let
-    base = "#${wsHex}";
-    # Primary accent: bright, saturated version of the workspace hue
-    primary = "#${setOkhslLightness 0.65 (setOkhslSaturation 0.85 base)}";
-    secondary = "#${setOkhslLightness 0.60 (setOkhslSaturation 0.70 (adjustOkhslHue 0.08 base))}";
-    tertiary = "#${setOkhslLightness 0.60 (setOkhslSaturation 0.70 (adjustOkhslHue (-0.12) base))}";
-    error = "#${theme.dark.base08}";
-    surface = "#${theme.dark.base00}";
-    surfaceVar = "#${theme.dark.base01}";
-    onSurface = "#${theme.dark.base05}";
-    onSurfVar = "#${theme.dark.base04}";
-    outline = "#${theme.dark.base03}";
-    hover = "#${theme.dark.base02}";
-    onBg = "#${theme.dark.base00}";
-    onHover = "#${theme.dark.base06}";
-  in
-    builtins.toJSON {
-      mPrimary = primary;
-      mOnPrimary = onBg;
-      mSecondary = secondary;
-      mOnSecondary = onBg;
-      mTertiary = tertiary;
-      mOnTertiary = onBg;
-      mError = error;
-      mOnError = onBg;
-      mSurface = surface;
-      mOnSurface = onSurface;
-      mSurfaceVariant = surfaceVar;
-      mOnSurfaceVariant = onSurfVar;
-      mOutline = outline;
-      mShadow = "#000000";
-      mHover = hover;
-      mOnHover = onHover;
-    };
-
-  # Generate solid-color PNG files and colors.json palettes at build time
-  workspaceWallpapers =
-    pkgs.runCommand "workspace-wallpapers" {
-      nativeBuildInputs = [pkgs.imagemagick];
-    } ''
-      mkdir -p $out
-      ${lib.concatImapStringsSep "\n" (i: color: ''
-          magick -size 256x256 xc:'#${color}' $out/ws-${toString i}.png
-          echo '${mkWsPalette color}' > $out/ws-${toString i}.json
-        '')
-        wsColors}
-    '';
-
-  # Daemon script: listens for Hyprland workspace changes, sets wallpaper + colors per-monitor
-  workspaceWallpaperDaemon = pkgs.writeShellScript "workspace-wallpaper-daemon" ''
-    set -euo pipefail
-
-    NOCTALIA="${noctaliaCmd}"
-    WALLPAPER_DIR="${workspaceWallpapers}"
-    COLORS_FILE="$HOME/.config/noctalia/colors.json"
-    NUM_COLORS=${toString numWsColors}
-
-    # Map workspace ID to index (1-indexed, wraps with modulo)
-    ws_index() {
-      local ws_id=$1
-      echo $(( ((ws_id - 1) % NUM_COLORS) + 1 ))
-    }
-
-    # Set wallpaper for a specific monitor based on its active workspace
-    update_monitor() {
-      local monitor=$1
-      local ws_id=$2
-      local idx
-      idx=$(ws_index "$ws_id")
-      "$NOCTALIA" ipc call wallpaper set "$WALLPAPER_DIR/ws-''${idx}.png" "$monitor" &
-    }
-
-    # Update the color palette based on the focused monitor's workspace
-    update_colors() {
-      local ws_id=$1
-      local idx
-      idx=$(ws_index "$ws_id")
-      cat "$WALLPAPER_DIR/ws-''${idx}.json" > "$COLORS_FILE"
-      # Nudge noctalia to re-read the colors file
-      "$NOCTALIA" ipc call colorScheme setGenerationMethod "tonal-spot" &
-    }
-
-    # Sync all monitors on startup
-    sync_all() {
-      local focused_ws=""
-      ${pkgs.hyprland}/bin/hyprctl monitors -j | ${pkgs.jq}/bin/jq -r '.[] | "\(.name) \(.activeWorkspace.id) \(.focused)"' | while read -r mon ws focused; do
-        update_monitor "$mon" "$ws"
-        if [ "$focused" = "true" ]; then
-          update_colors "$ws"
-        fi
-      done
-    }
-
-    # Wait for noctalia to be ready
-    for i in $(seq 1 30); do
-      if "$NOCTALIA" ipc call state all >/dev/null 2>&1; then
-        break
-      fi
-      sleep 1
-    done
-
-    sync_all
-
-    # Listen for Hyprland IPC events
-    ${pkgs.socat}/bin/socat -U - "UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock" | while IFS= read -r line; do
-      case "$line" in
-        workspacev2\>\>*)
-          # workspacev2>>ID,NAME - active workspace changed, update the focused monitor
-          ws_id="''${line#workspacev2>>}"
-          ws_id="''${ws_id%%,*}"
-          focused_mon=$(${pkgs.hyprland}/bin/hyprctl monitors -j | ${pkgs.jq}/bin/jq -r '.[] | select(.focused) | .name')
-          if [ -n "$focused_mon" ] && [ "$ws_id" -gt 0 ] 2>/dev/null; then
-            update_monitor "$focused_mon" "$ws_id"
-            update_colors "$ws_id"
-          fi
-          ;;
-        focusedmon\>\>*)
-          # focusedmon>>MONNAME,WSID - focus moved to a different monitor
-          payload="''${line#focusedmon>>}"
-          mon="''${payload%%,*}"
-          ws_id="''${payload#*,}"
-          if [ -n "$mon" ] && [ "$ws_id" -gt 0 ] 2>/dev/null; then
-            update_monitor "$mon" "$ws_id"
-            update_colors "$ws_id"
-          fi
-          ;;
-        moveworkspacev2\>\>*)
-          # moveworkspacev2>>WSID,WSNAME,MONNAME - workspace moved to different monitor
-          payload="''${line#moveworkspacev2>>}"
-          ws_id="''${payload%%,*}"
-          rest="''${payload#*,}"
-          mon="''${rest#*,}"
-          if [ -n "$mon" ] && [ "$ws_id" -gt 0 ] 2>/dev/null; then
-            update_monitor "$mon" "$ws_id"
-          fi
-          ;;
-        monitoraddedv2\>\>*)
-          # New monitor connected - sync all
-          sleep 1
-          sync_all
-          ;;
-      esac
-    done
-  '';
 in {
   imports = [
     # ./plugins/hyprspace.nix        # needs upstream update for 0.54
@@ -230,8 +80,6 @@ in {
       ecosystem.no_update_news = true;
 
       exec-once = [
-        "uwsm app -- ${noctaliaCmd}"
-        "${workspaceWallpaperDaemon}"
       ];
 
       monitor = [
@@ -391,5 +239,168 @@ in {
         "${mainMod}, mouse:273, resizewindow"
       ];
     };
+  };
+
+  systemd.user.services.workspace-wallpaper-daemon = let
+    inherit (color-lib) setOkhslLightness setOkhslSaturation adjustOkhslHue;
+
+    wsColors = theme.dark.workspaceColors;
+    numWsColors = builtins.length wsColors;
+
+    mkWsPalette = wsHex: let
+      base = "#${wsHex}";
+      # Primary accent: bright, saturated version of the workspace hue
+      primary = "#${setOkhslLightness 0.65 (setOkhslSaturation 0.85 base)}";
+      secondary = "#${setOkhslLightness 0.60 (setOkhslSaturation 0.70 (adjustOkhslHue 0.08 base))}";
+      tertiary = "#${setOkhslLightness 0.60 (setOkhslSaturation 0.70 (adjustOkhslHue (-0.12) base))}";
+      error = "#${theme.dark.base08}";
+      surface = "#${theme.dark.base00}";
+      surfaceVar = "#${theme.dark.base01}";
+      onSurface = "#${theme.dark.base05}";
+      onSurfVar = "#${theme.dark.base04}";
+      outline = "#${theme.dark.base03}";
+      hover = "#${theme.dark.base02}";
+      onBg = "#${theme.dark.base00}";
+      onHover = "#${theme.dark.base06}";
+    in
+      builtins.toJSON {
+        mPrimary = primary;
+        mOnPrimary = onBg;
+        mSecondary = secondary;
+        mOnSecondary = onBg;
+        mTertiary = tertiary;
+        mOnTertiary = onBg;
+        mError = error;
+        mOnError = onBg;
+        mSurface = surface;
+        mOnSurface = onSurface;
+        mSurfaceVariant = surfaceVar;
+        mOnSurfaceVariant = onSurfVar;
+        mOutline = outline;
+        mShadow = "#000000";
+        mHover = hover;
+        mOnHover = onHover;
+      };
+
+    # Generate solid-color PNG files and colors.json palettes at build time
+    workspaceWallpapers =
+      pkgs.runCommand "workspace-wallpapers" {
+        nativeBuildInputs = [pkgs.imagemagick];
+      } ''
+        mkdir -p $out
+        ${lib.concatImapStringsSep "\n" (i: color: ''
+            magick -size 256x256 xc:'#${color}' $out/ws-${toString i}.png
+            echo '${mkWsPalette color}' > $out/ws-${toString i}.json
+          '')
+          wsColors}
+      '';
+
+    # Daemon script: listens for Hyprland workspace changes, sets wallpaper + colors per-monitor
+    workspaceWallpaperDaemon = pkgs.writeShellScript "workspace-wallpaper-daemon" ''
+      set -euo pipefail
+
+      NOCTALIA="${noctaliaCmd}"
+      WALLPAPER_DIR="${workspaceWallpapers}"
+      COLORS_FILE="$HOME/.config/noctalia/colors.json"
+      NUM_COLORS=${toString numWsColors}
+
+      # Map workspace ID to index (1-indexed, wraps with modulo)
+      ws_index() {
+        local ws_id=$1
+        echo $(( ((ws_id - 1) % NUM_COLORS) + 1 ))
+      }
+
+      # Set wallpaper for a specific monitor based on its active workspace
+      update_monitor() {
+        local monitor=$1
+        local ws_id=$2
+        local idx
+        idx=$(ws_index "$ws_id")
+        "$NOCTALIA" ipc call wallpaper set "$WALLPAPER_DIR/ws-''${idx}.png" "$monitor" &
+      }
+
+      # Update the color palette based on the focused monitor's workspace
+      update_colors() {
+        local ws_id=$1
+        local idx
+        idx=$(ws_index "$ws_id")
+        cat "$WALLPAPER_DIR/ws-''${idx}.json" > "$COLORS_FILE"
+      }
+
+      # Sync all monitors on startup
+      sync_all() {
+        local focused_ws=""
+        ${pkgs.hyprland}/bin/hyprctl monitors -j | ${pkgs.jq}/bin/jq -r '.[] | "\(.name) \(.activeWorkspace.id) \(.focused)"' | while read -r mon ws focused; do
+          update_monitor "$mon" "$ws"
+          if [ "$focused" = "true" ]; then
+            update_colors "$ws"
+          fi
+        done
+      }
+
+      # Wait for noctalia to be ready
+      for i in $(seq 1 30); do
+        if "$NOCTALIA" ipc call state all >/dev/null 2>&1; then
+          break
+        fi
+        sleep 1
+      done
+
+      sync_all
+
+      # Listen for Hyprland IPC events
+      ${pkgs.socat}/bin/socat -U - "UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock" | while IFS= read -r line; do
+        case "$line" in
+          workspacev2\>\>*)
+            # workspacev2>>ID,NAME - active workspace changed, update the focused monitor
+            ws_id="''${line#workspacev2>>}"
+            ws_id="''${ws_id%%,*}"
+            focused_mon=$(${pkgs.hyprland}/bin/hyprctl monitors -j | ${pkgs.jq}/bin/jq -r '.[] | select(.focused) | .name')
+            if [ -n "$focused_mon" ] && [ "$ws_id" -gt 0 ] 2>/dev/null; then
+              update_monitor "$focused_mon" "$ws_id"
+              update_colors "$ws_id"
+            fi
+            ;;
+          focusedmon\>\>*)
+            # focusedmon>>MONNAME,WSID - focus moved to a different monitor
+            payload="''${line#focusedmon>>}"
+            mon="''${payload%%,*}"
+            ws_id="''${payload#*,}"
+            if [ -n "$mon" ] && [ "$ws_id" -gt 0 ] 2>/dev/null; then
+              update_monitor "$mon" "$ws_id"
+              update_colors "$ws_id"
+            fi
+            ;;
+          moveworkspacev2\>\>*)
+            # moveworkspacev2>>WSID,WSNAME,MONNAME - workspace moved to different monitor
+            payload="''${line#moveworkspacev2>>}"
+            ws_id="''${payload%%,*}"
+            rest="''${payload#*,}"
+            mon="''${rest#*,}"
+            if [ -n "$mon" ] && [ "$ws_id" -gt 0 ] 2>/dev/null; then
+              update_monitor "$mon" "$ws_id"
+            fi
+            ;;
+          monitoraddedv2\>\>*)
+            # New monitor connected - sync all
+            sleep 1
+            sync_all
+            ;;
+        esac
+      done
+    '';
+  in {
+    Unit = {
+      Description = "Hyprland workspace wallpaper and color daemon";
+      After = ["noctalia-shell.service" "graphical-session.target"];
+      PartOf = ["graphical-session.target"];
+      ConditionEnvironment = "HYPRLAND_INSTANCE_SIGNATURE";
+    };
+    Service = {
+      ExecStart = "${workspaceWallpaperDaemon}";
+      Restart = "on-failure";
+      RestartSec = 2;
+    };
+    Install.WantedBy = ["graphical-session.target"];
   };
 }

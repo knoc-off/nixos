@@ -273,10 +273,6 @@
       flake = false;
     };
 
-    niri = {
-      url = "github:sodiboo/niri-flake";
-    };
-
     determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
 
     firefox-csshacks = {

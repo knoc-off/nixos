@@ -102,8 +102,6 @@ in {
     slurp # region selection for Wayland
   ];
 
-  # Noctalia is launched via `uwsm app` from the compositor (not a systemd service),
-  # so it inherits the full session environment — no drop-in override needed.
   xdg.configFile =
     {
       # Make colors.json mutable so noctalia can overwrite it at runtime
@@ -124,7 +122,7 @@ in {
 
   programs.noctalia-shell = {
     enable = lib.mkDefault true;
-    systemd.enable = lib.mkForce false;
+    systemd.enable = lib.mkDefault true;
     package = lib.mkForce (inputs.noctalia.packages.${pkgs.stdenv.hostPlatform.system}.default.override {
       calendarSupport = true;
     });
@@ -570,7 +568,7 @@ in {
       };
       colorSchemes = {
         useWallpaperColors = false; # we write colors.json directly from the workspace daemon
-        predefinedScheme = "Noctalia (default)";
+        predefinedScheme = "";
         darkMode = true;
         schedulingMode = "off";
         manualSunrise = "06:30";
