@@ -4,6 +4,9 @@
   color-lib,
   ...
 }: {
+  imports = [
+    ./programs/btop.nix
+  ];
   home.packages = with pkgs; [
     btop # htop but better
     jq # json parser

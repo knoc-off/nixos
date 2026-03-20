@@ -1,9 +1,9 @@
-{
+{ theme, ... }: {
   programs.btop = {
     enable = true;
 
     settings = {
-      color_theme = "Default";
+      color_theme = "custom";
       theme_background = false;
       truecolor = true;
 
@@ -128,4 +128,49 @@
       selected_battery = "auto";
     };
   };
+
+  xdg.configFile."btop/themes/custom.theme".text = with theme.dark; ''
+    theme[main_bg]="#${base00}"
+    theme[main_fg]="#${base05}"
+    theme[title]="#${base06}"
+    theme[hi_fg]="#${base0D}"
+    theme[selected_bg]="#${base02}"
+    theme[selected_fg]="#${base06}"
+    theme[inactive_fg]="#${base03}"
+    theme[graph_text]="#${base04}"
+    theme[meter_bg]="#${base01}"
+    theme[proc_misc]="#${base0D}"
+    theme[cpu_box]="#${base0D}"
+    theme[mem_box]="#${base0B}"
+    theme[net_box]="#${base0C}"
+    theme[proc_box]="#${base0E}"
+    theme[div_line]="#${base01}"
+    theme[temp_start]="#${base0B}"
+    theme[temp_mid]="#${base0A}"
+    theme[temp_end]="#${base08}"
+    theme[cpu_start]="#${base0D}"
+    theme[cpu_mid]="#${base0E}"
+    theme[cpu_end]="#${base08}"
+    theme[free_start]="#${base0B}"
+    theme[free_mid]="#${base0B}"
+    theme[free_end]="#${base0B}"
+    theme[cached_start]="#${base0D}"
+    theme[cached_mid]="#${base0D}"
+    theme[cached_end]="#${base0D}"
+    theme[available_start]="#${base0C}"
+    theme[available_mid]="#${base0C}"
+    theme[available_end]="#${base0C}"
+    theme[used_start]="#${base0A}"
+    theme[used_mid]="#${base09}"
+    theme[used_end]="#${base08}"
+    theme[download_start]="#${base0D}"
+    theme[download_mid]="#${base0C}"
+    theme[download_end]="#${base0C}"
+    theme[upload_start]="#${base0E}"
+    theme[upload_mid]="#${base09}"
+    theme[upload_end]="#${base08}"
+    theme[process_start]="#${base0D}"
+    theme[process_mid]="#${base0E}"
+    theme[process_end]="#${base0C}"
+  '';
 }
