@@ -262,7 +262,5 @@ in rec {
 
   gh-actions-language-server = upkgs.callPackage ./gh-actions-language-server {};
 
-  coffee-widget = pkgs.callPackage ./noctalia/coffee-widget {};
-
   audio-recorder = pkgs.callPackage ./noctalia/audio-recorder {};
 }

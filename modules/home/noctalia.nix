@@ -53,13 +53,6 @@
       };
     }
     {
-      name = "coffee";
-      src = pkgs.callPackage ../../pkgs/noctalia/coffee-widget/default.nix {};
-      settings = {
-        lockOnActivate = true;
-      };
-    }
-    {
       name = "audio-recorder";
       src = pkgs.callPackage ../../pkgs/noctalia/audio-recorder/default.nix {};
       settings = {};
@@ -210,9 +203,6 @@ in {
             }
             {
               id = "plugin:screen-recorder";
-            }
-            {
-              id = "plugin:coffee";
             }
             {
               id = "plugin:audio-recorder";
