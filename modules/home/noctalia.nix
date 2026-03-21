@@ -22,7 +22,6 @@
         pluginFiles)) {}
     plugins;
 
-    # pluginSettings entries
     settings = lib.listToAttrs (map (plugin: {
         name = plugin.name;
         value = plugin.settings or {};
@@ -30,37 +29,33 @@
       plugins);
   };
 
-  # Define all Noctalia plugins in ONE place
   noctaliaPlugins = mkNoctaliaPlugins [
     {
-      name = "screen-recorder";
+      name = "weekly-calendar";
+      src = inputs.noctalia-plugins;
+      settings = {};
+    }
+    {
+      name = "clipper";
       src = inputs.noctalia-plugins;
       settings = {
-        hideInactive = false;
-        iconColor = "none";
-        directory = "";
-        filenamePattern = "recording_yyyyMMdd_HHmmss";
-        frameRate = "60";
-        audioCodec = "opus";
-        videoCodec = "h264";
-        quality = "medium";
-        colorRange = "limited";
-        showCursor = true;
-        copyToClipboard = false;
-        audioSource = "default_output";
-        videoSource = "portal";
-        resolution = "1280x720";
+        enableTodoIntegration = false;
+        pincardsEnabled = true;
+        notecardsEnabled = true;
+        showCloseButton = true;
       };
+    }
+    {
+      name = "screen-shot";
+      src = pkgs.callPackage ../../pkgs/noctalia/screen-shot/default.nix {};
+      settings = {};
     }
     {
       name = "audio-recorder";
       src = pkgs.callPackage ../../pkgs/noctalia/audio-recorder/default.nix {};
       settings = {};
     }
-    # Add more plugins here:
-    # { name = "catwalk"; src = inputs.noctalia-plugins; settings = { hideBackground = true; }; }
   ];
-  # Initial colors JSON (used to seed the mutable file)
   initialColorsJson = builtins.toJSON {
     mSurface = "#${theme.dark.base00}";
     mSurfaceVariant = "#${theme.dark.base01}";
@@ -97,10 +92,14 @@ in {
     ffmpeg-full
     hicolor-icon-theme
     papirus-icon-theme
-    gpu-screen-recorder
-    wf-recorder # wlroots-native screen recorder
-    slurp # region selection for Wayland
+    wl-clipboard   # clipboard (clipper + screen-shot)
+    grim           # screenshot capture (screen-shot)
+    slurp          # region selection (screen-shot)
+    wl-screenrec   # region recorder (screen-shot)
+    dragon-drop    # drag-and-drop after recording (screen-shot)
   ];
+
+  services.cliphist.enable = true;
 
   xdg.configFile =
     {
@@ -200,7 +199,13 @@ in {
               id = "Tray";
             }
             {
-              id = "plugin:screen-recorder";
+              id = "plugin:screen-shot";
+            }
+            {
+              id = "plugin:clipper";
+            }
+            {
+              id = "plugin:weekly-calendar";
             }
             {
               id = "plugin:audio-recorder";
@@ -222,7 +227,25 @@ in {
             }
           ];
         };
-        screenOverrides = [];
+        screenOverrides = [
+          {
+            name = "DP-4";
+            widgets = {
+              left = [
+                {id = "Launcher";}
+                {id = "ActiveWindow";}
+              ];
+              center = [
+                {id = "Workspace";}
+              ];
+              right = [
+                {id = "Tray";}
+                {id = "Volume";}
+                {id = "ControlCenter";}
+              ];
+            };
+          }
+        ];
       };
       general = {
         avatarImage = "";

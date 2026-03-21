@@ -1,0 +1,25 @@
+{
+  "id": "screen-shot",
+  "name": "Screen Shot",
+  "version": "1.0.3",
+  "author": "local",
+  "license": "MIT",
+  "minNoctaliaVersion": "3.6.0",
+  "description": "Screenshot to clipboard and region recorder",
+  "tags": [
+    "Bar",
+    "Utility"
+  ],
+  "entryPoints": {
+    "main": "Main.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "metadata": {
+    "defaultSettings": {
+      "iconColor": "none",
+      "screenshotDir": "",
+      "recordingDir": "",
+      "filenamePattern": "screenshot_yyyyMMdd_HHmmss"
+    }
+  }
+}

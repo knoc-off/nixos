@@ -4,8 +4,89 @@
   upkgs,
   pkgs,
   lib,
+  inputs,
+  system,
   ...
-}: {
+}: let
+  # ── QML LSP import paths ───────────────────────────────────────────────────
+  # Exact quickshell version shipped with noctalia (has .qmltypes for all
+  # Quickshell.* modules including Quickshell.Io)
+  noctaliaShell = inputs.noctalia.packages.${system}.default;
+  quickshell = inputs.noctalia.inputs.noctalia-qs.packages.${system}.quickshell;
+
+  # Shim that generates proper qmldir files for each qs.* module so qmlls can
+  # actually resolve imports.  A plain symlink isn't enough — qmlls requires
+  # qmldir files to recognise a directory as a QML module.  We generate one for
+  # every directory under the noctalia-shell root that contains .qml files,
+  # mirroring Quickshell's `-p <shell-root>` → `qs.<dir>` naming convention.
+  #
+  # ── QML Type Inference Notes ─────────────────────────────────────────────
+  # When a property is typed as a base class (e.g., Process.stdout is
+  # DataStreamParser), the LSP can only infer the base type even if you assign
+  # a subclass (e.g., StdioCollector). To get proper type inference:
+  #
+  #   BAD:  Process { stdout: StdioCollector {}; onExited: stdout.text }
+  #         → LSP error: "text" not found on DataStreamParser
+  #
+  #   GOOD: Process { stdout: StdioCollector { id: collector }
+  #                   onExited: collector.text }
+  #         → LSP knows collector is StdioCollector with .text property
+  #
+  # Always assign an id to nested objects when you need to access their
+  # subclass-specific members. The LSP uses the id's declared type, not the
+  # parent property's type.
+  qsImportShim = pkgs.runCommand "noctalia-qmlls-shim" { } ''
+    shell_root="${noctaliaShell}/share/noctalia-shell"
+
+    # make_module <rel-path-from-shell-root> <qml-module-name>
+    # Creates $out/qs/<rel-path>/qmldir listing every .qml in that directory,
+    # plus a symlink to each source file so qmlls can parse them for type info.
+    make_module() {
+      local rel=$1 mod=$2
+      local src="$shell_root/$rel"
+      local dst="$out/qs/$rel"
+      [ -d "$src" ] || return 0
+      mkdir -p "$dst"
+      printf 'module %s\n' "$mod" > "$dst/qmldir"
+      for f in "$src"/*.qml; do
+        [ -f "$f" ] || continue
+        comp=$(basename "$f" .qml)
+        # Mark singletons correctly so qmlls can resolve their members
+        if grep -q 'pragma Singleton' "$f"; then
+          printf 'singleton %s 1.0 %s\n' "$comp" "$(basename "$f")" >> "$dst/qmldir"
+        else
+          printf '%s 1.0 %s\n' "$comp" "$(basename "$f")" >> "$dst/qmldir"
+        fi
+        ln -sf "$f" "$dst/$(basename "$f")"
+      done
+    }
+
+    make_module Commons        qs.Commons
+    make_module Widgets        qs.Widgets
+
+    # Widgets sub-modules (e.g. AudioSpectrum)
+    for d in "$shell_root/Widgets"/*/; do
+      [ -d "$d" ] || continue
+      sub=$(basename "$d")
+      make_module "Widgets/$sub" "qs.Widgets.$sub"
+    done
+
+    # Services sub-modules (UI, System, Compositor, …)
+    for d in "$shell_root/Services"/*/; do
+      [ -d "$d" ] || continue
+      svc=$(basename "$d")
+      make_module "Services/$svc" "qs.Services.$svc"
+    done
+  '';
+
+  qmlImportPath = builtins.concatStringsSep ":" [
+    "${qsImportShim}" # qs.*  (Noctalia modules)
+    "${quickshell}/lib/qt-6/qml" # Quickshell, Quickshell.Io, …
+    "${pkgs.kdePackages.qtdeclarative}/lib/qt-6/qml" # QtQuick, QtQuick.Controls, …
+  ];
+
+  qmlDocPath = "${pkgs.kdePackages.qtdoc}/share/doc/qtdoc";
+in {
   programs.opencode = let
     inherit (color-lib) setOkhslLightness setOkhslSaturation;
     lighten = setOkhslLightness 0.7;
@@ -277,6 +358,22 @@
         grep = {
           type = "remote";
           url = "https://mcp.grep.app";
+        };
+      };
+
+      lsp = {
+        qml = {
+          command = [
+            "${pkgs.kdePackages.qtdeclarative}/bin/qmlls"
+            "-E"
+            "--no-cmake-calls"
+            "--doc-dir"
+            qmlDocPath
+          ];
+          extensions = [ ".qml" ];
+          env = {
+            QML_IMPORT_PATH = qmlImportPath;
+          };
         };
       };
     };
