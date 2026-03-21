@@ -1,7 +1,7 @@
 {
   "id": "screen-shot",
   "name": "Screen Shot",
-  "version": "1.0.3",
+  "version": "2.0.0",
   "author": "local",
   "license": "MIT",
   "minNoctaliaVersion": "3.6.0",

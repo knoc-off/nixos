@@ -1,6 +1,3 @@
-// Screenshot and screen recording plugin for Noctalia
-// Provides functionality to capture screenshots and record screen regions using slurp, grim, and wl-screenrec
-
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -11,177 +8,223 @@ Item {
     id: root
     property var pluginApi: null
 
-    // ── Lifecycle guard ───────────────────────────────────────
-    // Prevents process exit handlers from firing after the plugin is unloaded.
-    property bool alive: false
-    Component.onCompleted:   { alive = true;  console.log("screen-shot: Main.qml loaded") }
-    Component.onDestruction: { alive = false; console.log("screen-shot: Main.qml destroyed") }
-
-    // ── State ─────────────────────────────────────────────────
-    property bool isCapturing: false
+    property bool isRunning: false
     property bool isRecording: false
-    property bool isPending: false
+    property string pendingTool: ""
     property string recordingPath: ""
+
+    readonly property string regionFile: "/tmp/screen-shot-region.txt"
 
     // ── IPC ───────────────────────────────────────────────────
     IpcHandler {
         target: "plugin:screen-shot"
-        function screenshot() { root.startScreenshot() }
-        function record()     { root.isRecording || root.isPending ? root.stopRecording() : root.startRecording() }
+        function screenshot() { root.runScreenshot() }
+        function record()     { root.isRecording ? root.stopRecording() : root.runRecord() }
     }
 
-    // ── Screenshot ────────────────────────────────────────────
-    // Step 1: run slurp to get geometry
-    function startScreenshot() {
-        console.log("screen-shot: startScreenshot called, isCapturing:", isCapturing, "isRecording:", isRecording, "isPending:", isPending)
-        if (isCapturing || isRecording || isPending) return
-        isCapturing = true
-        console.log("screen-shot: launching slurp")
-        slurpForShot.exec({ command: ["slurp"] })
+    // ── Public API (called from BarWidget) ────────────────────
+    function runScreenshot() {
+        if (isRunning) return
+        pendingTool = "screenshot"
+        isRunning = true
+        _launchSlurp()
     }
 
-    Process {
-        id: slurpForShot
-        // Note: Use id on StdioCollector to get proper LSP type inference.
-        // The Process.stdout property is typed as DataStreamParser (base class),
-        // so referencing stdout.text won't work with LSP even though StdioCollector
-        // has the text property. Reference the collector by id instead.
-        stdout: StdioCollector {
-            id: shotCollector
-        }
-        onExited: exitCode => {
-            console.log("screen-shot: slurp exited with code:", exitCode, "stdout:", shotCollector.text)
-            if (!root.alive || exitCode !== 0) {
-                root.isCapturing = false
-                return
-            }
-            var geo = shotCollector.text.trim()
-            if (!geo) { root.isCapturing = false; return }
-
-            var ts = Qt.formatDateTime(new Date(), "yyyyMMdd_HHmmss")
-            var path = "/tmp/screenshot_" + ts + ".png"
-            grimProc.outPath = path
-            console.log("screen-shot: launching grim with geo:", geo)
-            grimProc.exec({
-                command: ["sh", "-c",
-                    "grim -g '" + geo + "' - | tee '" + path + "' | wl-copy --type image/png"
-                ]
-            })
-        }
-    }
-
-    // Step 2: grim → tee to /tmp → wl-copy
-    Process {
-        id: grimProc
-        property string outPath: ""
-        onExited: exitCode => {
-            if (!root.alive) return
-            root.isCapturing = false
-            if (exitCode === 0) {
-                ToastService.showNotice("Screenshot", "Copied to clipboard  •  " + outPath, "camera")
-            } else {
-                ToastService.showError("Screenshot failed", "Check grim / wl-copy are available")
-            }
-        }
-    }
-
-    // ── Recording ─────────────────────────────────────────────
-    // Step 1: run slurp to get region
-    function startRecording() {
-        if (isCapturing || isRecording || isPending) return
-        isPending = true
-        slurpForRec.exec({ command: ["slurp"] })
-    }
-
-    Process {
-        id: slurpForRec
-        stdout: StdioCollector {
-            id: recCollector
-        }
-        onExited: exitCode => {
-            console.log("screen-shot: slurpForRec exited with code:", exitCode, "stdout:", recCollector.text)
-            if (!root.alive || exitCode !== 0) {
-                root.isPending = false
-                return
-            }
-            var geo = recCollector.text.trim()
-            if (!geo) { root.isPending = false; return }
-
-            var ts = Qt.formatDateTime(new Date(), "yyyyMMdd_HHmmss")
-            var home = Quickshell.env("HOME") || ""
-            root.recordingPath = home + "/Videos/recordings/recording_" + ts + ".mp4"
-
-            console.log("screen-shot: mkdir with geo:", geo)
-            mkdirProc.geometry = geo
-            mkdirProc.exec({
-                command: ["sh", "-c", "mkdir -p '" + home + "/Videos/recordings'"]
-            })
-        }
-    }
-
-    // Step 2: ensure output dir exists
-    Process {
-        id: mkdirProc
-        property string geometry: ""
-        onExited: exitCode => {
-            if (!root.alive || exitCode !== 0) {
-                root.isPending = false
-                if (root.alive) ToastService.showError("Recording failed", "Cannot create output directory")
-                return
-            }
-            recorderProc.exec({
-                command: ["wl-screenrec",
-                    "--geometry", mkdirProc.geometry,
-                    "--filename", root.recordingPath
-                ]
-            })
-            pendingTimer.start()
-        }
-    }
-
-    // Step 3: wl-screenrec runs until stopped
-    Process {
-        id: recorderProc
-        onExited: exitCode => {
-            if (!root.alive) return
-            root.isRecording = false
-            root.isPending = false
-            pendingTimer.stop()
-
-            if (exitCode === 0 || exitCode === 130 || exitCode === 2) {
-                Quickshell.execDetached(["sh", "-c",
-                    "printf '%s' '" + root.recordingPath + "' | wl-copy"
-                ])
-                ToastService.showNotice(
-                    "Recording saved",
-                    root.recordingPath + "  •  path copied",
-                    "video",
-                    4000
-                )
-                Quickshell.execDetached(["dragon-drop", "--and-exit", root.recordingPath])
-            } else {
-                ToastService.showError("Recording failed", "wl-screenrec exited " + exitCode)
-            }
-        }
+    function runRecord() {
+        if (isRunning || isRecording) return
+        pendingTool = "record"
+        isRunning = true
+        _launchSlurp()
     }
 
     function stopRecording() {
-        if (!isRecording && !isPending) return
-        Quickshell.execDetached(["sh", "-c", "pkill -INT wl-screenrec || true"])
+        if (!isRecording) return
+        isRecording = false
+        stopProc.exec({ command: ["bash", "-c", "pkill -INT wl-screenrec 2>/dev/null || true"] })
+    }
+
+    // ── Slurp via systemd-run (escapes layershell) ────────────
+    function _launchSlurp() {
+        clearRegionProc.exec({
+            command: ["bash", "-c",
+                "rm -f " + regionFile + " " + regionFile + ".cancel " + regionFile + ".tmp"
+            ]
+        })
+        slurpProc.exec({
+            command: ["bash", "-c",
+                "systemd-run --user --collect --quiet " +
+                "bash -c 'slurp > " + regionFile + ".tmp 2>/dev/null && " +
+                "REGION=$(cat " + regionFile + ".tmp); " +
+                "W=$(echo \"$REGION\" | cut -d\" \" -f2 | cut -dx -f1); " +
+                "H=$(echo \"$REGION\" | cut -d\" \" -f2 | cut -dx -f2); " +
+                "{ [ \"${W:-0}\" -gt 2 ] && [ \"${H:-0}\" -gt 2 ]; } && " +
+                "mv " + regionFile + ".tmp " + regionFile + " || " +
+                "{ rm -f " + regionFile + ".tmp; touch " + regionFile + ".cancel; }'"
+            ]
+        })
+        _slurpPollCount = 0
+        slurpPollTimer.start()
+    }
+
+    // ── Processes ─────────────────────────────────────────────
+    Process { id: clearRegionProc }
+    Process { id: stopProc }
+
+    Process {
+        id: slurpProc
+        onExited: code => {
+            if (code !== 0) {
+                slurpPollTimer.stop()
+                root.isRunning = false
+                root.pendingTool = ""
+            }
+        }
+    }
+
+    Process {
+        id: slurpCheckProc
+        stdout: StdioCollector { id: checkOut }
+        onExited: code => {
+            if (code !== 0) return  // not ready yet
+            var result = checkOut.text.trim()
+            slurpPollTimer.stop()
+            root._slurpPollCount = 0
+            if (result === "cancel") {
+                root.isRunning = false
+                root.pendingTool = ""
+            } else if (result === "ok") {
+                _dispatchTool()
+            }
+        }
+    }
+
+    // Screenshot: grim region -> tee /tmp file -> wl-copy
+    Process {
+        id: screenshotProc
+        onExited: code => {
+            root.isRunning = false
+            root.pendingTool = ""
+            if (code === 0)
+                ToastService.showNotice("Screenshot", "Copied to clipboard", "camera")
+            else
+                ToastService.showError("Screenshot failed")
+        }
+    }
+
+    // Recording: wl-screenrec
+    Process {
+        id: recorderProc
+        onExited: code => {
+            root.isRecording = false
+            root.isRunning = false
+            root.pendingTool = ""
+            if (code === 0 || code === 130 || code === 2) {
+                clipProc.exec({
+                    command: ["bash", "-c",
+                        "printf '%s' '" + root.recordingPath + "' | wl-copy"
+                    ]
+                })
+                ToastService.showNotice("Recording saved",
+                    root.recordingPath + "  •  path copied", "video")
+                dragonProc.exec({
+                    command: ["dragon-drop", "--and-exit", root.recordingPath]
+                })
+            } else {
+                ToastService.showError("Recording failed (exit " + code + ")")
+            }
+        }
+    }
+
+    Process {
+        id: recordRegionProc
+        stdout: StdioCollector { id: recRegionOut }
+        onExited: code => {
+            var region = recRegionOut.text.trim()
+            if (code === 0 && region !== "") {
+                root.isRecording = true
+                recorderProc.exec({
+                    command: ["wl-screenrec",
+                        "--geometry", region,
+                        "--filename", root.recordingPath
+                    ]
+                })
+            } else {
+                root.isRunning = false
+                root.pendingTool = ""
+            }
+        }
+    }
+
+    Process { id: clipProc }
+    Process { id: dragonProc }
+
+    // ── Timers ────────────────────────────────────────────────
+    property int _slurpPollCount: 0
+
+    Timer {
+        id: slurpPollTimer
+        interval: 200; repeat: true
+        onTriggered: {
+            root._slurpPollCount++
+            if (root._slurpPollCount > 300) {  // 60s timeout
+                slurpPollTimer.stop()
+                root._slurpPollCount = 0
+                root.isRunning = false
+                root.pendingTool = ""
+                return
+            }
+            slurpCheckProc.exec({
+                command: ["bash", "-c",
+                    "if [ -f " + root.regionFile + ".cancel ]; then " +
+                    "  rm -f " + root.regionFile + ".cancel; echo cancel; exit 0; " +
+                    "elif [ -f " + root.regionFile + " ]; then " +
+                    "  echo ok; exit 0; " +
+                    "else exit 1; fi"
+                ]
+            })
+        }
     }
 
     Timer {
-        id: pendingTimer
-        interval: 1500
+        id: launchScreenshot
+        interval: 50; repeat: false
         onTriggered: {
-            if (root.isPending && recorderProc.running) {
-                root.isPending = false
-                root.isRecording = true
-                ToastService.showNotice("Recording", "Recording…  click to stop", "video")
-            } else if (root.isPending) {
-                root.isPending = false
-                ToastService.showError("Recording failed", "wl-screenrec did not start")
-            }
+            var ts = Qt.formatDateTime(new Date(), "yyyyMMdd_HHmmss")
+            var path = "/tmp/screenshot_" + ts + ".png"
+            screenshotProc.exec({
+                command: ["bash", "-c",
+                    "REGION=$(cat " + root.regionFile + ") || exit 1; " +
+                    "grim -g \"$REGION\" - | tee '" + path + "' | wl-copy --type image/png; " +
+                    "rm -f " + root.regionFile
+                ]
+            })
+        }
+    }
+
+    Timer {
+        id: launchRecord
+        interval: 50; repeat: false
+        onTriggered: {
+            var ts = Qt.formatDateTime(new Date(), "yyyyMMdd_HHmmss")
+            var home = Quickshell.env("HOME") || ""
+            root.recordingPath = home + "/Videos/recordings/recording_" + ts + ".mp4"
+            recordRegionProc.exec({
+                command: ["bash", "-c",
+                    "mkdir -p '" + home + "/Videos/recordings' && " +
+                    "cat " + root.regionFile + " && rm -f " + root.regionFile
+                ]
+            })
+        }
+    }
+
+    // ── Internal ──────────────────────────────────────────────
+    function _dispatchTool() {
+        switch (root.pendingTool) {
+            case "screenshot": launchScreenshot.start(); break
+            case "record":     launchRecord.start();     break
+            default:
+                root.isRunning = false
+                root.pendingTool = ""
         }
     }
 }

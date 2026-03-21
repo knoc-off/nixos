@@ -2,7 +2,6 @@ import QtQuick
 import Quickshell
 import qs.Commons
 import qs.Services.UI
-import qs.Services.System
 import qs.Widgets
 
 NIconButton {
@@ -10,80 +9,48 @@ NIconButton {
 
     property var pluginApi: null
     property ShellScreen screen
-    property string widgetId: ""
-    property string section: ""
 
-    // Access mainInstance directly at call-time — binding on pluginApi?.mainInstance
-    // evaluates once before mainInstance is populated and never re-evaluates.
-    function mainInstance() { return pluginApi ? pluginApi.mainInstance : null }
+    readonly property var main: pluginApi ? pluginApi.mainInstance : null
 
-    readonly property bool recording: mainInstance()?.isRecording ?? false
-    readonly property bool pending:   mainInstance()?.isPending   ?? false
-
-    icon: (recording || pending) ? "video" : "camera"
+    icon: (main && (main.isRecording)) ? "player-stop" : "camera"
 
     tooltipText: {
-        if (recording) return "Recording…  click to stop"
-        if (pending)   return "Starting recording…"
-        return "Screenshot to clipboard  •  right-click for more"
+        if (main && main.isRecording) return "Recording…  click to stop"
+        if (main && main.isRunning) return "Selecting region…"
+        return "Screenshot  •  right-click: record"
     }
-    tooltipDirection: BarService.getTooltipDirection()
+    tooltipDirection: BarService.getTooltipDirection(screen?.name)
 
-    // For a vertical bar the BarWidgetLoader sets item.width = barHeight.
-    // baseSize drives both implicitWidth and implicitHeight in NIconButton.
-    // Use Style.baseWidgetSize as fallback so the widget is never 0-sized
-    // before screen is injected.
-    baseSize: Style.baseWidgetSize
-    applyUiScale: false
-    customRadius: Style.radiusL
-
-    colorBg: (recording || pending) ? Color.mError : Style.capsuleColor
-    colorFg: (recording || pending) ? Color.mOnError : Color.mOnSurfaceVariant
+    colorBg: (main && main.isRecording) ? (Color.mError || "#f44336") : Style.capsuleColor
+    colorFg: (main && main.isRecording) ? (Color.mOnError || "#ffffff") : Color.mOnSurfaceVariant
     colorBorder: "transparent"
     colorBorderHover: "transparent"
     border.color: Style.capsuleBorderColor
     border.width: Style.capsuleBorderWidth
 
+    // Pulse while recording
     SequentialAnimation on opacity {
-        running: recording
+        running: main ? main.isRecording : false
         loops: Animation.Infinite
         NumberAnimation { to: 0.5; duration: 600 }
         NumberAnimation { to: 1.0; duration: 600 }
     }
 
     onClicked: {
-        var m = mainInstance()
-        console.log("screen-shot BarWidget: clicked, mainInstance:", m)
-        if (!m) return
-        if (m.isRecording || m.isPending) {
-            m.stopRecording()
+        if (!main) return
+        if (main.isRecording) {
+            main.stopRecording()
         } else {
-            m.startScreenshot()
+            main.runScreenshot()
         }
     }
 
     onRightClicked: {
-        PanelService.showContextMenu(contextMenu, root, screen)
-    }
-
-    NPopupContextMenu {
-        id: contextMenu
-
-        model: (root.recording || root.pending)
-            ? [{ label: "Stop Recording", action: "stop-record", icon: "player-stop" }]
-            : [
-                { label: "Screenshot to Clipboard", action: "screenshot", icon: "camera" },
-                { label: "Record Region",           action: "record",     icon: "video"  }
-              ]
-
-        onTriggered: action => {
-            contextMenu.close()
-            PanelService.closeContextMenu(screen)
-            var m = mainInstance()
-            if (!m) return
-            if (action === "screenshot")       m.startScreenshot()
-            else if (action === "record")      m.startRecording()
-            else if (action === "stop-record") m.stopRecording()
+        if (!main) return
+        if (main.isRecording) {
+            main.stopRecording()
+        } else {
+            main.runRecord()
         }
     }
 }

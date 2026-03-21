@@ -92,11 +92,11 @@ in {
     ffmpeg-full
     hicolor-icon-theme
     papirus-icon-theme
-    wl-clipboard   # clipboard (clipper + screen-shot)
-    grim           # screenshot capture (screen-shot)
-    slurp          # region selection (screen-shot)
-    wl-screenrec   # region recorder (screen-shot)
-    dragon-drop    # drag-and-drop after recording (screen-shot)
+    wl-clipboard # clipboard (clipper + screen-shot)
+    grim # screenshot capture (screen-shot)
+    slurp # region selection (screen-shot)
+    wl-screenrec # region recorder (screen-shot)
+    dragon-drop # drag-and-drop after recording (screen-shot)
   ];
 
   services.cliphist.enable = true;

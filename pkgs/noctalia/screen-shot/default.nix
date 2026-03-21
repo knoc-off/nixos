@@ -1,7 +1,10 @@
-{ pkgs, ... }:
+{pkgs, ...}:
+let
+  manifest = builtins.fromJSON (builtins.readFile ./manifest.json);
+in
 pkgs.stdenv.mkDerivation {
   pname = "noctalia-screen-shot";
-  version = "1.0.0";
+  version = manifest.version;
   src = ./.;
   installPhase = ''
     mkdir -p $out/screen-shot
