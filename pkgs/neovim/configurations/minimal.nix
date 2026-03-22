@@ -26,6 +26,8 @@
     ./modules/languages/typescript.nix
     ./modules/languages/github-actions.nix
 
+    ./modules/avante.nix
+
     ./themes
 
     # Custom plugins

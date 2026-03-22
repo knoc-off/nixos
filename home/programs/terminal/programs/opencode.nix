@@ -1,4 +1,5 @@
 {
+  self,
   theme,
   color-lib,
   upkgs,
@@ -359,6 +360,21 @@ in {
           type = "remote";
           url = "https://mcp.grep.app";
         };
+        nixos = {
+          type = "local";
+          command = ["${upkgs.mcp-nixos}/bin/mcp-nixos"];
+        };
+        memory = {
+          type = "local";
+          command = [
+            "${pkgs.uv}/bin/uvx"
+            "basic-memory"
+            "mcp"
+          ];
+          environment = {
+            BASIC_MEMORY_NO_PROMOS = "1";
+          };
+        };
       };
 
       lsp = {
@@ -374,6 +390,12 @@ in {
           env = {
             QML_IMPORT_PATH = qmlImportPath;
           };
+        };
+        rust = {
+          command = [
+            "${self.packages.${system}.lspmux}/bin/lspmux"
+            "client"
+          ];
         };
       };
     };
