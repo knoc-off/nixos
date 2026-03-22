@@ -1,0 +1,25 @@
+{
+  "id": "bluetooth",
+  "name": "Bluetooth",
+  "version": "0.1.1",
+  "author": "Niko",
+  "license": "MIT",
+  "minNoctaliaVersion": "3.6.0",
+  "description": "Manage Bluetooth devices from the bar",
+  "tags": [
+    "Bar",
+    "Utility",
+    "Bluetooth"
+  ],
+  "entryPoints": {
+    "main": "Main.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "metadata": {
+    "defaultSettings": {
+      "iconColor": "none",
+      "hideWhenOff": false,
+      "pinnedDevices": []
+    }
+  }
+}

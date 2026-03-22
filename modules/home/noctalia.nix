@@ -55,6 +55,11 @@
       src = pkgs.callPackage ../../pkgs/noctalia/audio-recorder/default.nix {};
       settings = {};
     }
+    {
+      name = "bluetooth";
+      src = pkgs.callPackage ../../pkgs/noctalia/bluetooth/default.nix {};
+      settings = {};
+    }
   ];
   initialColorsJson = builtins.toJSON {
     mSurface = "#${theme.dark.base00}";
@@ -209,6 +214,9 @@ in {
             }
             {
               id = "plugin:audio-recorder";
+            }
+            {
+              id = "plugin:bluetooth";
             }
             {
               id = "NotificationHistory";

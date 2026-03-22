@@ -78,6 +78,24 @@
       svc=$(basename "$d")
       make_module "Services/$svc" "qs.Services.$svc"
     done
+
+    # Modules and all nested sub-modules (Bar/Extras, Panels/Bluetooth, …)
+    make_module Modules qs.Modules
+    for d in "$shell_root/Modules"/*/; do
+      [ -d "$d" ] || continue
+      sub=$(basename "$d")
+      make_module "Modules/$sub" "qs.Modules.$sub"
+      for d2 in "$d"/*/; do
+        [ -d "$d2" ] || continue
+        sub2=$(basename "$d2")
+        make_module "Modules/$sub/$sub2" "qs.Modules.$sub.$sub2"
+        for d3 in "$d2"/*/; do
+          [ -d "$d3" ] || continue
+          sub3=$(basename "$d3")
+          make_module "Modules/$sub/$sub2/$sub3" "qs.Modules.$sub.$sub2.$sub3"
+        done
+      done
+    done
   '';
 
   qmlImportPath = builtins.concatStringsSep ":" [
