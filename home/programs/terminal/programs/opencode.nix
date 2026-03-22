@@ -36,7 +36,7 @@
   # Always assign an id to nested objects when you need to access their
   # subclass-specific members. The LSP uses the id's declared type, not the
   # parent property's type.
-  qsImportShim = pkgs.runCommand "noctalia-qmlls-shim" { } ''
+  qsImportShim = pkgs.runCommand "noctalia-qmlls-shim" {} ''
     shell_root="${noctaliaShell}/share/noctalia-shell"
 
     # make_module <rel-path-from-shell-root> <qml-module-name>
@@ -373,6 +373,7 @@ in {
           ];
           environment = {
             BASIC_MEMORY_NO_PROMOS = "1";
+            PATH = "${pkgs.stdenv.cc}/bin:${pkgs.curl}/bin:${pkgs.bash}/bin:/run/current-system/sw/bin";
           };
         };
       };
@@ -386,7 +387,7 @@ in {
             "--doc-dir"
             qmlDocPath
           ];
-          extensions = [ ".qml" ];
+          extensions = [".qml"];
           env = {
             QML_IMPORT_PATH = qmlImportPath;
           };
