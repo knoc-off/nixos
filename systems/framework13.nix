@@ -37,8 +37,8 @@
     }
 
     {
-      # services.ivpn.enable = true;
-      services.mullvad-vpn.enable = true;
+      services.ivpn.enable = true;
+      # services.mullvad-vpn.enable = true;
     }
 
     self.nixosModules.services.lspmux
