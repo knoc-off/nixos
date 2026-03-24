@@ -288,6 +288,7 @@
       # Must be updated if the swapfile is ever recreated (e.g. swapSize changes).
       "resume_offset=533760"
       # Let i915 claim the Arrow Lake-P GPU normally no force_probe
+      "i915.enable_psr=0" # Disable Panel Self Refresh - mitigates atomic update failures and freezes on Arrow Lake-P
     ];
     kernel.sysctl = {
       # Minimize swap usage — plenty of RAM available; only swap under real

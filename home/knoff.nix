@@ -89,6 +89,7 @@
       classes = ["com.mitchellh.ghostty" "foot"];
       capsbinds = {
         alt = ["e"];
+        shift = [";"];
         keys =
           navKeys
           // {

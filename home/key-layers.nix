@@ -226,9 +226,12 @@ in
     layerNames = builtins.attrNames layers;
 
     # --- Normalize capsbinds for all layers ---
-    normalizedCaps = lib.mapAttrs (_: layer:
-      normalizeCapsBinds (layer.capsbinds or {})
-    ) layers;
+    normalizedCaps =
+      lib.mapAttrs (
+        _: layer:
+          normalizeCapsBinds (layer.capsbinds or {})
+      )
+      layers;
 
     # --- Caps alias generation ---
     allCapsAliases = let
@@ -329,7 +332,8 @@ in
               // lib.optionalAttrs (m ? title) {inherit (m) title;})
             (layer.matchers or []);
           in
-            matcherRules ++ classRules ++ titleRules)
+            matcherRules ++ classRules ++ titleRules
+        )
         nonBase))
       ++ [
         {
@@ -352,11 +356,13 @@ in
       )
 
       (defsrc caps)
-      ${lib.concatStringsSep "\n    " (map (n:
-        "(deflayermap (${n})\n      caps @cap-${n}"
-        + lib.optionalString (hasBinds n) "\n      ${bindEntries n}"
-        + "\n    )"
-      ) layerNames)}
+      ${lib.concatStringsSep "\n    " (map (
+          n:
+            "(deflayermap (${n})\n      caps @cap-${n}"
+            + lib.optionalString (hasBinds n) "\n      ${bindEntries n}"
+            + "\n    )"
+        )
+        layerNames)}
 
       ${lib.concatStringsSep "\n    " (map (n: "(deflayermap (shortcuts-${n})\n      ${mkCapsLayermap normalizedCaps.${n}}\n    )") layerNames)}
     '';

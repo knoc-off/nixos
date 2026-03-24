@@ -87,7 +87,10 @@ in {
         ", preferred, auto-center-up, 1"
       ];
 
-      general.layout = "scrolling";
+      general = {
+        layout = "scrolling";
+        gaps_out = "5 20 5 0";
+      };
 
       misc = {
         disable_hyprland_logo = true;

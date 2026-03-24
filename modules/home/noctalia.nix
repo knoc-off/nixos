@@ -64,6 +64,11 @@
       src = pkgs.callPackage ../../pkgs/noctalia/bluetooth/default.nix {};
       settings = {};
     }
+    {
+      name = "custom-commands";
+      src = inputs.noctalia-plugins;
+      settings = {};
+    }
   ];
   initialColorsJson = builtins.toJSON {
     mSurface = "#${theme.dark.base00}";
@@ -173,7 +178,7 @@ in {
         floating = true;
         marginVertical = 4;
         marginHorizontal = 4;
-        frameThickness = 8;
+        frameThickness = 9;
         frameRadius = 12;
         outerCorners = false;
         hideOnOverview = false;
@@ -181,79 +186,85 @@ in {
         autoHideDelay = 50;
         autoShowDelay = 150;
         widgets = {
+          # any secondary display
           left = [
-            {
-              id = "Launcher";
-            }
-            {
-              id = "Clock";
-            }
-            {
-              id = "SystemMonitor";
-            }
-            {
-              id = "ActiveWindow";
-            }
-            {
-              id = "MediaMini";
-            }
+            {id = "Launcher";}
+            {id = "ActiveWindow";}
           ];
           center = [
             {
               id = "Workspace";
+              showApplications = true;
             }
           ];
           right = [
-            {
-              id = "Tray";
-            }
-            {
-              id = "plugin:screen-shot";
-            }
-            {
-              id = "plugin:clipper";
-            }
-            {
-              id = "plugin:weekly-calendar";
-            }
-            {
-              id = "plugin:audio-recorder";
-            }
-            {
-              id = "plugin:bluetooth";
-            }
-            {
-              id = "NotificationHistory";
-            }
-            {
-              id = "Battery";
-            }
-            {
-              id = "Volume";
-            }
-            {
-              id = "Brightness";
-            }
-            {
-              id = "ControlCenter";
-            }
+            {id = "Tray";}
+            {id = "Volume";}
+            {id = "ControlCenter";}
           ];
         };
         screenOverrides = [
           {
-            name = "DP-4";
+            # main monitor.
+            name = "eDP-1";
             widgets = {
               left = [
-                {id = "Launcher";}
-                {id = "ActiveWindow";}
+                {
+                  id = "Launcher";
+                }
+                {
+                  id = "Clock";
+                }
+                {
+                  id = "SystemMonitor";
+                }
+                {
+                  id = "ActiveWindow";
+                }
+                {
+                  id = "MediaMini";
+                }
               ];
               center = [
-                {id = "Workspace";}
+                {
+                  id = "Workspace";
+                  showApplications = true;
+                }
               ];
               right = [
-                {id = "Tray";}
-                {id = "Volume";}
-                {id = "ControlCenter";}
+                {
+                  id = "Tray";
+                }
+                {
+                  id = "plugin:screen-shot";
+                }
+                {
+                  id = "plugin:clipper";
+                }
+                {
+                  id = "plugin:weekly-calendar";
+                }
+                {
+                  id = "plugin:audio-recorder";
+                }
+                {
+                  id = "plugin:bluetooth";
+                }
+                {
+                  id = "NotificationHistory";
+                }
+                {
+                  id = "Battery";
+                }
+                {
+                  id = "Volume";
+                }
+                {
+                  id = "Brightness";
+                }
+                {
+                  id = "ControlCenter";
+                }
               ];
             };
           }
@@ -602,7 +613,7 @@ in {
         enableDdcSupport = false;
       };
       colorSchemes = {
-        useWallpaperColors = false; # we write colors.json directly from the workspace daemon
+        useWallpaperColors = false;
         predefinedScheme = "";
         darkMode = true;
         schedulingMode = "off";
