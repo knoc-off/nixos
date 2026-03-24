@@ -205,7 +205,7 @@ in {
           "${mainMod}, f, layoutmsg, fit visible"
           "${mainMod} SHIFT, f, layoutmsg, fit all"
           # promote,
-          # "${mainMod} "
+          "${mainMod}, p, layoutmsg, promote"
 
           # Runtime layout switching
           "${mainMod} ALT, s, layoutmsg, setlayout, scrolling"

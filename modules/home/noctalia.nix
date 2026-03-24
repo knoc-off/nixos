@@ -562,9 +562,9 @@ in {
         overlayLayer = true;
         backgroundOpacity = layerOpacity;
         respectExpireTimeout = false;
-        lowUrgencyDuration = 3;
-        normalUrgencyDuration = 8;
-        criticalUrgencyDuration = 15;
+        lowUrgencyDuration = 30;
+        normalUrgencyDuration = 80;
+        criticalUrgencyDuration = 150;
         saveToHistory = {
           low = true;
           normal = true;

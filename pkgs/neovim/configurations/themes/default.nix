@@ -353,7 +353,7 @@ in {
           };
           TelescopeSelection = {
             fg = "$fg";
-            bg = "$bg1";
+            bg = "$bg3";
             bold = true;
           };
           TelescopePromptPrefix = {

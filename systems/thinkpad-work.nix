@@ -71,17 +71,22 @@
 
     self.nixosModules.boot
 
-    # TODO: re-enable after first install when SSH host keys exist for sops/age
-    # inputs.sops-nix.nixosModules.sops
-    # {
-    #   sops = {
-    #     defaultSopsFile = ./secrets/${hostname}/default.yaml;
-    #     age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
-    #     secrets."ANTHROPIC_API_KEY" = {
-    #       mode = "0644";
-    #     };
-    #   };
-    # }
+    inputs.sops-nix.nixosModules.sops
+    {
+      # todo: setup a systemd service, that will initialize the sops stuff.
+      # would need to generate a pub key and ideally write it to the file.
+      sops = {
+        defaultSopsFile = ./secrets/${hostname}/default.yaml;
+        #age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
+        age.sshKeyPaths = ["/home/knoff/.ssh/id_ed25519"];
+        secrets."shell_environment/_ANTHROPIC_API_KEY" = {
+          mode = "0644";
+        };
+        secrets."shell_environment/GOOGLE_TOTP_KEY" = {
+          mode = "0644";
+        };
+      };
+    }
 
     {
       nixpkgs.config.allowUnfree = true;
@@ -167,10 +172,10 @@
     upower.enable = true;
     accounts-daemon.enable = true;
 
-    logind = {
-      lidSwitch = "suspend-then-hibernate";
-      powerKey = "hibernate"; # lock instead TODO
-      powerKeyLongPress = "poweroff";
+    logind.settings.Login = {
+      HandleLidSwitch = "suspend-then-hibernate";
+      HandlePowerKey = "lock";
+      HandlePowerKeyLongPress = "poweroff";
     };
 
     # flatpak.enable = true;
