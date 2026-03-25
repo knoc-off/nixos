@@ -170,12 +170,12 @@ in {
         capsuleColorKey = "none";
         backgroundOpacity = layerOpacity;
         useSeparateOpacity = true;
-        floating = false;
+        floating = true;
         marginVertical = 4;
         marginHorizontal = 4;
         frameThickness = 8;
         frameRadius = 12;
-        outerCorners = true;
+        outerCorners = false;
         hideOnOverview = false;
         displayMode = "always_visible";
         autoHideDelay = 50;
