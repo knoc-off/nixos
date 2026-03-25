@@ -18,7 +18,7 @@ in {
   imports = [
     # ./plugins/hyprspace.nix        # needs upstream update for 0.54
     # ./plugins/xtra-dispatchers.nix  # hyprland-plugins lagging behind 0.54 API
-    # ./plugins/hyprglass.nix # works, but not for layershell :(
+    ./plugins/hyprglass.nix # v0.3.0: layers-only glass (BETA layer support)
     ./plugins/kinetic-scroll.nix
   ];
 

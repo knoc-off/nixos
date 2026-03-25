@@ -11,6 +11,26 @@
   imports = [
     inputs.determinate.nixosModules.default
 
+    self.nixosModules.services.dagu
+    {
+      services.dagu = {
+        enable = true;
+        port = 9090;
+        auth.mode = "basic";
+        environmentFile = config.sops.secrets."dagu/env".path;
+        settings = {
+          terminal.enabled = true;
+          ui.navbar_title = "Dagu";
+        };
+      };
+
+      sops.secrets."dagu/env" = {
+        owner = "dagu";
+        group = "dagu";
+        mode = "0400";
+      };
+    }
+
     self.nixosModules.home
     self.nixosModules.nix
     self.nixosModules.audio.pipewire
@@ -37,8 +57,8 @@
     }
 
     {
-      services.ivpn.enable = true;
-      # services.mullvad-vpn.enable = true;
+      # services.ivpn.enable = true;
+      services.mullvad-vpn.enable = true;
     }
 
     self.nixosModules.services.lspmux

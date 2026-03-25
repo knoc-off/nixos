@@ -162,9 +162,9 @@ in {
         density = "spacious";
         showOutline = false;
         showCapsule = true;
-        capsuleOpacity = 1;
+        capsuleOpacity = 0.70;
         capsuleColorKey = "none";
-        backgroundOpacity = 1.0;
+        backgroundOpacity = 0.70;
         useSeparateOpacity = true;
         floating = false;
         marginVertical = 4;
@@ -296,7 +296,7 @@ in {
         fontDefaultScale = 1;
         fontFixedScale = 1;
         tooltipsEnabled = true;
-        panelBackgroundOpacity = 0.93;
+        panelBackgroundOpacity = 0.70;
         panelsAttachedToBar = true;
         settingsPanelMode = "attached";
         wifiDetailsViewMode = "grid";
@@ -485,7 +485,7 @@ in {
         enabled = false;
         position = "bottom";
         displayMode = "auto_hide";
-        backgroundOpacity = 1;
+        backgroundOpacity = 0.70;
         floatingRatio = 1;
         size = 1;
         onlySameOutput = true;
@@ -545,7 +545,7 @@ in {
         monitors = [];
         location = "top_right";
         overlayLayer = true;
-        backgroundOpacity = 1;
+        backgroundOpacity = 0.70;
         respectExpireTimeout = false;
         lowUrgencyDuration = 3;
         normalUrgencyDuration = 8;
@@ -575,7 +575,7 @@ in {
         location = "top_right";
         autoHideMs = 2000;
         overlayLayer = true;
-        backgroundOpacity = 1;
+        backgroundOpacity = 0.70;
         enabledTypes = [
           0
           1

@@ -59,6 +59,7 @@ in rec {
 
   # minecraft router
   gate = pkgs.callPackage ./gate {};
+  dagu = upkgs.callPackage ./dagu {};
 
   # img to ascii
   ascii = pkgs.callPackage ./ascii {};

@@ -50,6 +50,21 @@
     {
       # No lock, no suspend - just turn screen off when idle
       home-manager.users.${user} = {
+        # Inhibit idle when any audio is playing (Spotify, mpv, etc.)
+        systemd.user.services.sway-audio-idle-inhibit = {
+          Unit = {
+            Description = "Inhibit idle when audio is playing";
+            After = ["graphical-session.target"];
+            PartOf = ["graphical-session.target"];
+          };
+          Service = {
+            ExecStart = "${pkgs.sway-audio-idle-inhibit}/bin/sway-audio-idle-inhibit";
+            Restart = "on-failure";
+            RestartSec = 5;
+          };
+          Install.WantedBy = ["graphical-session.target"];
+        };
+
         services.hypridle.settings = lib.mkForce {
           general = {
             after_sleep_cmd = "hyprctl dispatch dpms on";
@@ -130,6 +145,9 @@
         wireshark
 
         libcec
+
+        spotify
+        sway-audio-idle-inhibit
       ];
 
       hardware.bluetooth = {

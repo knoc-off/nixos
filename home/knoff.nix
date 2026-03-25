@@ -203,6 +203,8 @@ in {
       upkgs.foliate
       upkgs.readest
 
+      self.packages.${pkgs.stdenv.hostPlatform.system}.dagu
+
       upkgs.slack
       upkgs.notion-app-enhanced
 
