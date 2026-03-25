@@ -70,21 +70,21 @@ in {
         };
 
         # Dark theme overrides (for layers via preset)
-        "dark:brightness" = 0.82;
-        "dark:contrast" = 0.90;
-        "dark:saturation" = 0.80;
-        "dark:adaptive_dim" = 0.35;
+        "dark:brightness" = 0.85;
+        "dark:contrast" = 0.92;
+        "dark:saturation" = 0.85;
+        "dark:adaptive_dim" = 0.25;
 
         # Light theme overrides (for layers via preset)
-        "light:brightness" = 1.12;
-        "light:adaptive_boost" = 0.4;
+        "light:brightness" = 1.10;
+        "light:adaptive_boost" = 0.35;
 
         # ── Layer glass preset ──
-        # All the actual effect values live here so only layers get them.
+        # Low blur, high refraction/warping for a liquid-glass look.
         preset = [
-          "name:layer-glass, blur_strength:2.0, blur_iterations:3, glass_opacity:1.0, edge_thickness:0.06, refraction_strength:0.5, chromatic_aberration:0.4, fresnel_strength:0.5, specular_strength:0.7, lens_distortion:0.3"
-          "name:layer-glass:dark, brightness:0.82, contrast:0.90, saturation:0.80, adaptive_dim:0.35"
-          "name:layer-glass:light, brightness:1.12, adaptive_boost:0.4"
+          "name:layer-glass, blur_strength:0.4, blur_iterations:1, glass_opacity:0.80, edge_thickness:0.08, refraction_strength:0.9, chromatic_aberration:0.7, fresnel_strength:0.8, specular_strength:0.8, lens_distortion:0.8"
+          "name:layer-glass:dark, brightness:0.85, contrast:0.92, saturation:0.85, adaptive_dim:0.20"
+          "name:layer-glass:light, brightness:1.10, adaptive_boost:0.35"
         ];
       };
     };

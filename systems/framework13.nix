@@ -16,18 +16,11 @@
       services.dagu = {
         enable = true;
         port = 9090;
-        auth.mode = "basic";
-        environmentFile = config.sops.secrets."dagu/env".path;
         settings = {
+          auth.mode = "none";
           terminal.enabled = true;
           ui.navbar_title = "Dagu";
         };
-      };
-
-      sops.secrets."dagu/env" = {
-        owner = "dagu";
-        group = "dagu";
-        mode = "0400";
       };
     }
 

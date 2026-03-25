@@ -21,9 +21,6 @@ let
         port = cfg.port;
         tz = cfg.timezone;
       }
-      // lib.optionalAttrs (cfg.auth.mode != null) {
-        auth.mode = cfg.auth.mode;
-      }
       // lib.optionalAttrs (cfg.dagsDir != null) {
         paths.dags_dir = cfg.dagsDir;
       }
@@ -94,31 +91,13 @@ in
       description = "Group under which dagu runs.";
     };
 
-    auth = {
-      mode = lib.mkOption {
-        type = lib.types.nullOr (lib.types.enum ["none" "basic" "builtin"]);
-        default = null;
-        description = ''
-          Authentication mode. `null` leaves it at dagu's default (`builtin`).
-          - `none`: No authentication
-          - `basic`: HTTP basic auth (set credentials via environmentFile)
-          - `builtin`: Built-in auth with JWT tokens
-        '';
-      };
-    };
-
     environmentFile = lib.mkOption {
       type = lib.types.nullOr lib.types.path;
       default = null;
       description = ''
         Path to an environment file loaded by systemd (EnvironmentFile=).
         Use this for secrets that should not end up in the Nix store.
-
-        Useful variables:
-        - `DAGU_AUTH_BASIC_USERNAME` / `DAGU_AUTH_BASIC_PASSWORD` (for basic auth)
-        - `DAGU_AUTH_TOKEN_SECRET` (for builtin auth JWT secret)
-        - `DAGU_AUTH_BUILTIN_INITIAL_ADMIN_USERNAME` / `DAGU_AUTH_BUILTIN_INITIAL_ADMIN_PASSWORD`
-        - `DAGU_CERT_FILE` / `DAGU_KEY_FILE` (for TLS)
+        Any DAGU_* environment variable can be set here.
       '';
       example = "/run/secrets/dagu-env";
     };
@@ -129,7 +108,7 @@ in
       description = ''
         Freeform settings written to dagu's config.yaml.
         See https://dagu.readthedocs.io for all available options.
-        Explicit module options (host, port, auth.mode, etc.) take precedence.
+        Explicit module options (host, port, etc.) take precedence.
       '';
       example = lib.literalExpression ''
         {
@@ -167,19 +146,6 @@ in
       description = ''
         Declarative DAG workflow definitions.
         Each key becomes a `<name>.yaml` file in the DAGs directory.
-      '';
-      example = lib.literalExpression ''
-        {
-          backup = {
-            content = '''
-              type: graph
-              schedule: "0 2 * * *"
-              steps:
-                - id: backup_db
-                  command: pg_dump mydb > /backup/db.sql
-            ''';
-          };
-        }
       '';
     };
   };

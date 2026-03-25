@@ -29,6 +29,10 @@
       plugins);
   };
 
+  # Shared opacity for all noctalia layer surfaces.
+  # Lower = more glass visible through the surface. Must be > 0 for hyprglass to activate.
+  layerOpacity = 0.55;
+
   noctaliaPlugins = mkNoctaliaPlugins [
     {
       name = "weekly-calendar";
@@ -162,9 +166,9 @@ in {
         density = "spacious";
         showOutline = false;
         showCapsule = true;
-        capsuleOpacity = 0.70;
+        capsuleOpacity = layerOpacity;
         capsuleColorKey = "none";
-        backgroundOpacity = 0.70;
+        backgroundOpacity = layerOpacity;
         useSeparateOpacity = true;
         floating = false;
         marginVertical = 4;
@@ -257,7 +261,7 @@ in {
       };
       general = {
         avatarImage = "";
-        dimmerOpacity = 0.2;
+        dimmerOpacity = 0.0;
         showScreenCorners = false;
         forceBlackScreenCorners = false;
         scaleRatio = 1;
@@ -275,7 +279,7 @@ in {
         lockOnSuspend = true;
         showSessionButtonsOnLockScreen = true;
         showHibernateOnLockScreen = false;
-        enableShadows = true;
+        enableShadows = false;
         shadowDirection = "left";
         shadowOffsetX = 0;
         shadowOffsetY = -3;
@@ -296,7 +300,7 @@ in {
         fontDefaultScale = 1;
         fontFixedScale = 1;
         tooltipsEnabled = true;
-        panelBackgroundOpacity = 0.70;
+        panelBackgroundOpacity = layerOpacity;
         panelsAttachedToBar = true;
         settingsPanelMode = "attached";
         wifiDetailsViewMode = "grid";
@@ -485,7 +489,7 @@ in {
         enabled = false;
         position = "bottom";
         displayMode = "auto_hide";
-        backgroundOpacity = 0.70;
+        backgroundOpacity = layerOpacity;
         floatingRatio = 1;
         size = 1;
         onlySameOutput = true;
@@ -545,7 +549,7 @@ in {
         monitors = [];
         location = "top_right";
         overlayLayer = true;
-        backgroundOpacity = 0.70;
+        backgroundOpacity = layerOpacity;
         respectExpireTimeout = false;
         lowUrgencyDuration = 3;
         normalUrgencyDuration = 8;
@@ -575,7 +579,7 @@ in {
         location = "top_right";
         autoHideMs = 2000;
         overlayLayer = true;
-        backgroundOpacity = 0.70;
+        backgroundOpacity = layerOpacity;
         enabledTypes = [
           0
           1
