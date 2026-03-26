@@ -67,7 +67,7 @@
     qjackctl # JACK control panel
 
     # Effects
-    easyeffects # System-wide effects
+    easyeffects # System-wide effects # TODO: remove this, and add it to home manager services
     calf # Professional plugins
 
     # Diagnostics

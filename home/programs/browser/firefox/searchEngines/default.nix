@@ -15,7 +15,6 @@
     "fmhy"
   ];
   engines = {
-    # -------------------- Nix Search --------------------
     "Nix Packages" = {
       urls = [
         {
@@ -43,7 +42,7 @@
       #icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/package.svg";
       definedAliases = ["!p"];
     };
-    # -------------------- Nix Options --------------------
+
     "Nix Options" = {
       urls = [
         {
@@ -73,7 +72,7 @@
       #  "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/cm_options.svg";
       definedAliases = ["!o"];
     };
-    # -------------------- Nixos Wiki --------------------
+
     "NixOS Wiki" = {
       urls = [
         {
@@ -103,7 +102,7 @@
       #  "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/twitter-home.svg";
       definedAliases = ["!h"];
     };
-    # -------------------- dev sites --------------------
+
     "StackOverflow" = {
       urls = [
         {
@@ -120,7 +119,7 @@
       #   "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/stackoverflow.svg";
       definedAliases = ["!s"];
     };
-    # -------------------- Github --------------------
+
     "Github" = {
       urls = [
         {
@@ -137,7 +136,7 @@
       #   "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/github.svg";
       definedAliases = ["!g"];
     };
-    # -------------------- Nix Dots Searcher --------------------
+
     "NixDots" = {
       urls = [
         {
@@ -158,7 +157,7 @@
       #   "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/github.svg";
       definedAliases = ["!nd"];
     };
-    # -------------------- free information --------------------
+
     "fmhy" = {
       urls = [
         {
@@ -174,25 +173,6 @@
       # icon = "${pkgs.circle-flags}/share/circle-flags-svg/other/pirate.svg";
       definedAliases = ["!f"];
     };
-    # -------------------- Annas-Archive --------------------
-    "Annas-Archive" = {
-      urls = [
-        {
-          template = "https://annas-archive.org/search";
-          params = [
-            {
-              name = "q";
-              value = "{searchTerms}";
-            }
-          ];
-        }
-      ]; # https://annas-archive.org/favicon.ico
-      #icon = "https://annas-archive.org/favicon.ico";
-      updateInterval = 24 * 60 * 60 * 1000; # every day
-      #icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/bookmark.svg";
-      definedAliases = ["!a"];
-    };
-    # -------------------- Disable Defaults --------------------
 
     "bing".metaData.hidden = true;
     "google".metaData.hidden = true;

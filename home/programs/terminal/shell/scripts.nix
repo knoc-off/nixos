@@ -38,6 +38,23 @@ in {
 
       (
         pkgs.writeShellApplication {
+          name = "google-oauth";
+
+          runtimeInputs = [
+            pkgs.oath-toolkit
+            pkgs.wl-clipboard
+          ];
+
+          text = ''
+            CODE=$(oathtool --totp -b "$GOOGLE_TOTP_KEY")
+            echo "$CODE"
+            echo "$CODE" | wl-copy
+          '';
+        }
+      )
+
+      (
+        pkgs.writeShellApplication {
           name = "skim-env-vars";
 
           runtimeInputs = [
