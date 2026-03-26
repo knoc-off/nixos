@@ -32,6 +32,7 @@
     ./services/nginx.nix
     ./services/webdav.nix
     ./services/kitchenowl.nix
+    ./services/upvote-rss.nix
   ];
 
   nix.settings.auto-optimise-store = true;

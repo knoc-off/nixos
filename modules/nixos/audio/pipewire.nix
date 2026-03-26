@@ -66,10 +66,6 @@
     helvum # Patchbay for routing
     qjackctl # JACK control panel
 
-    # Effects
-    easyeffects # System-wide effects # TODO: remove this, and add it to home manager services
-    calf # Professional plugins
-
     # Diagnostics
     alsa-utils # amixer, aplay, etc.
     pulseaudio-ctl # CLI control

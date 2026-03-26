@@ -128,6 +128,15 @@ in {
     self.homeModules.noctalia
     self.homeModules.stylix
 
+    self.homeModules.easyeffects
+    {
+      services.easyeffects = {
+        enable = true;
+        presets.mic-denoise = true;
+        presets.framework-13 = true;
+      };
+    }
+
     self.homeModules.git
     {
       programs.git = {

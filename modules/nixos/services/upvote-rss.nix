@@ -1,6 +1,5 @@
 # Upvote RSS - RSS feed generator from Reddit, HN, Lobsters, Lemmy, etc.
-# Runs as a PHP-FPM service with optional Redis caching.
-# Web server (nginx/caddy) configuration is left to the user for now.
+# Runs as a PHP-FPM service with optional nginx frontend and Redis caching.
 {
   config,
   lib,
@@ -32,6 +31,9 @@
 
   # PHP-FPM pool name
   poolName = "upvote-rss";
+
+  # PHP-FPM socket path (NixOS convention)
+  fpmSocket = config.services.phpfpm.pools.${poolName}.socket;
 in {
   options.services.upvote-rss = {
     enable = lib.mkEnableOption "upvote-rss RSS feed generator";
@@ -115,6 +117,32 @@ in {
       description = "Whether to open the firewall for the upvote-rss port.";
     };
 
+    nginx = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Whether to configure an nginx virtualhost for upvote-rss.";
+      };
+
+      domain = lib.mkOption {
+        type = lib.types.str;
+        description = "Domain name for the nginx virtualhost.";
+        example = "upvote.example.com";
+      };
+
+      forceSSL = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Whether to force SSL on the nginx virtualhost.";
+      };
+
+      enableACME = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Whether to enable ACME (Let's Encrypt) for the nginx virtualhost.";
+      };
+    };
+
     redis = {
       createLocally = lib.mkOption {
         type = lib.types.bool;
@@ -191,6 +219,26 @@ in {
         RemainAfterExit = true;
         StateDirectory = "upvote-rss";
         StateDirectoryMode = "0750";
+
+        # Hardening
+        NoNewPrivileges = true;
+        ProtectSystem = "strict";
+        ProtectHome = true;
+        PrivateTmp = true;
+        PrivateDevices = true;
+        ProtectKernelTunables = true;
+        ProtectKernelModules = true;
+        ProtectKernelLogs = true;
+        ProtectControlGroups = true;
+        ProtectClock = true;
+        RestrictSUIDSGID = true;
+        RestrictNamespaces = true;
+        RestrictRealtime = true;
+        LockPersonality = true;
+        MemoryDenyWriteExecute = true;
+        SystemCallArchitectures = "native";
+        SystemCallFilter = ["@system-service" "~@privileged"];
+        ReadWritePaths = [cfg.dataDir];
       };
 
       script = ''
@@ -227,8 +275,15 @@ in {
       phpPackage = phpPackage;
 
       settings = {
-        "listen.owner" = cfg.user;
-        "listen.group" = cfg.group;
+        # When nginx is enabled, let the nginx user read the socket
+        "listen.owner" =
+          if cfg.nginx.enable
+          then config.services.nginx.user
+          else cfg.user;
+        "listen.group" =
+          if cfg.nginx.enable
+          then config.services.nginx.group
+          else cfg.group;
         "listen.mode" = "0660";
 
         "pm" = "dynamic";
@@ -242,9 +297,113 @@ in {
         "php_admin_value[error_log]" = "${cfg.dataDir}/logs/php-error.log";
         "php_admin_flag[log_errors]" = true;
         "php_value[max_execution_time]" = cfg.settings.MAX_EXECUTION_TIME or "60";
+
+        # Security: disable dangerous PHP functions
+        # Note: parse_ini_file is needed by config.php to read .env
+        "php_admin_value[disable_functions]" = "exec,passthru,shell_exec,system,proc_open,popen";
+        "php_admin_value[expose_php]" = "Off";
+        "php_admin_value[allow_url_fopen]" = "On";
+        "php_admin_value[allow_url_include]" = "Off";
+        "php_admin_value[open_basedir]" = "${appRoot}:${cfg.dataDir}:/tmp";
       };
 
       phpEnv = envVars;
+    };
+
+    # Harden the PHP-FPM systemd service
+    systemd.services."phpfpm-${poolName}".serviceConfig = {
+      NoNewPrivileges = true;
+      ProtectSystem = "strict";
+      ProtectHome = true;
+      PrivateTmp = true;
+      PrivateDevices = true;
+      ProtectKernelTunables = true;
+      ProtectKernelModules = true;
+      ProtectKernelLogs = true;
+      ProtectControlGroups = true;
+      ProtectClock = true;
+      RestrictSUIDSGID = true;
+      RestrictNamespaces = true;
+      RestrictRealtime = true;
+      LockPersonality = true;
+      SystemCallArchitectures = "native";
+      ReadWritePaths = [cfg.dataDir];
+      # PHP needs write+execute for opcache/JIT
+      # MemoryDenyWriteExecute = true; -- incompatible with PHP opcache
+    };
+
+    # Nginx virtualhost
+    services.nginx = lib.mkIf cfg.nginx.enable {
+      enable = true;
+
+      virtualHosts.${cfg.nginx.domain} = {
+        forceSSL = cfg.nginx.forceSSL;
+        enableACME = cfg.nginx.enableACME;
+
+        root = appRoot;
+        index = "index.php";
+
+        # Security headers
+        extraConfig = ''
+          add_header X-Content-Type-Options "nosniff" always;
+          add_header X-Frame-Options "SAMEORIGIN" always;
+          add_header X-XSS-Protection "1; mode=block" always;
+          add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        '';
+
+        # Serve static files directly, fall back to index.php for routing
+        locations."/" = {
+          tryFiles = "$uri $uri/ /index.php$is_args$args";
+        };
+
+        # Pass PHP scripts to the FPM pool
+        locations."~ \\.php$" = {
+          extraConfig = ''
+            fastcgi_pass unix:${fpmSocket};
+            fastcgi_index index.php;
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            include ${pkgs.nginx}/conf/fastcgi_params;
+            include ${pkgs.nginx}/conf/fastcgi.conf;
+
+            # Increase timeouts for long-running feed generation
+            fastcgi_read_timeout 120s;
+            fastcgi_send_timeout 120s;
+          '';
+        };
+
+        # Server-Sent Events endpoint needs special buffering config
+        locations."= /progress-sse.php" = {
+          extraConfig = ''
+            fastcgi_pass unix:${fpmSocket};
+            fastcgi_index index.php;
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            include ${pkgs.nginx}/conf/fastcgi_params;
+            include ${pkgs.nginx}/conf/fastcgi.conf;
+
+            # SSE-specific: disable buffering so events stream in real-time
+            fastcgi_buffering off;
+            proxy_buffering off;
+            chunked_transfer_encoding off;
+            fastcgi_read_timeout 300s;
+          '';
+        };
+
+        # Block access to dotfiles (.env, .git, etc.)
+        locations."~ /\\." = {
+          extraConfig = ''
+            deny all;
+            return 404;
+          '';
+        };
+
+        # Cache static assets
+        locations."~* \\.(css|js|ico|png|jpg|jpeg|gif|svg|woff|woff2)$" = {
+          extraConfig = ''
+            expires 7d;
+            add_header Cache-Control "public, immutable";
+          '';
+        };
+      };
     };
   };
 }
