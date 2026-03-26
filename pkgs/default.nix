@@ -63,6 +63,9 @@ in rec {
   gate = pkgs.callPackage ./gate {};
   dagu = upkgs.callPackage ./dagu {};
 
+  # RSS feed generator from Reddit, HN, Lobsters, Lemmy, etc.
+  upvote-rss = pkgs.callPackage ./upvote-rss {};
+
   # img to ascii
   ascii = pkgs.callPackage ./ascii {};
 
