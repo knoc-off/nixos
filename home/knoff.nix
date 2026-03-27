@@ -217,7 +217,7 @@ in {
       upkgs.slack
       upkgs.notion-app-enhanced
 
-      self.packages.${pkgs.stdenv.hostPlatform.system}.neovim-nix.default
+      self.packages.${pkgs.stdenv.hostPlatform.system}.neovim.default
 
       inputs.nelly.packages.${pkgs.stdenv.hostPlatform.system}.linear-cli
       spotify

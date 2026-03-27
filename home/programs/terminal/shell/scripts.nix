@@ -647,8 +647,9 @@ in {
         ];
       })
 
-      # (self.packages.${pkgs.stdenv.hostPlatform.system}.nx config_dir hostname)
-      (self.packages.${pkgs.stdenv.hostPlatform.system}.nx config_dir hostname)
+      (self.packages.${pkgs.stdenv.hostPlatform.system}.nx-script.override {
+        inherit config_dir hostname;
+      })
 
       (pkgs.writeShellScriptBin "chrome" ''
         nix shell nixpkgs#ungoogled-chromium --command chromium $1 &>/dev/null &

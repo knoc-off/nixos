@@ -1,8 +1,17 @@
 {
   lib,
   pkgs,
-  rustPlatform,
-}:
+  fenix,
+}: let
+  wasmToolchain = fenix.combine [
+    fenix.complete.toolchain
+    fenix.targets.wasm32-unknown-unknown.latest.rust-std
+  ];
+  rustPlatform = pkgs.makeRustPlatform {
+    cargo = wasmToolchain;
+    rustc = wasmToolchain;
+  };
+in
 rustPlatform.buildRustPackage {
   pname = "color-lib-wasm";
   version = "0.1.0";

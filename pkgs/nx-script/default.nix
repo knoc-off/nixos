@@ -3,8 +3,8 @@
 , makeWrapper
 , pkg-config
 , openssl
-, config_dir
-, hostname
+, config_dir ? "/etc/nixos"
+, hostname ? "unknown"
 }:
 
 rustPlatform.buildRustPackage rec {

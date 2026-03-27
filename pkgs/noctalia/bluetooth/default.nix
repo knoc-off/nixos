@@ -1,11 +1,7 @@
-{
-  pkgs,
-  lib,
-  ...
-}: let
+{lib, stdenv}: let
   manifest = builtins.fromJSON (builtins.readFile ./manifest.json);
 in
-  pkgs.stdenv.mkDerivation {
+  stdenv.mkDerivation {
     pname = "noctalia-bluetooth-plugin";
     version = manifest.version;
 

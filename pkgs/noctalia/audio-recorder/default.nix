@@ -1,5 +1,5 @@
-{ pkgs, ... }:
-pkgs.stdenv.mkDerivation {
+{ lib, stdenv }:
+stdenv.mkDerivation {
   pname = "noctalia-audio-recorder";
   version = "1.0.9";
   src = ./.;

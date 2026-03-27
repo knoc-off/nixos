@@ -18,7 +18,7 @@
 
     inherit (lib) nixosSystem listToAttrs;
 
-    inherit (import ./lib {inherit lib;}) discoverModules;
+    inherit (import ./lib {inherit lib;}) discoverModules discoverPackages;
 
     mkConfig = {
       hostname,
@@ -109,24 +109,19 @@
       };
 
     mkPkgs = system: let
-      upkgs = unstablePkgs system;
-
-      inherit (self.lib) math color-lib;
-
-      theme = import ./theme.nix {inherit color-lib math lib self;};
-
       pkgs = import nixpkgs {
         inherit system;
         config = {
           allowUnfree = true;
           android_sdk.accept_license = true;
         };
+        overlays = [
+          inputs.fenix.overlays.default
+          (_final: _prev: {inherit inputs;})
+        ];
       };
     in
-      import ./pkgs {
-        # TODO: I want to get rid of color-lib, math, theme - this could be a single module that provides just the color themeing for apps in a sperate file.
-        inherit inputs self system pkgs upkgs lib color-lib math theme;
-      };
+      discoverPackages pkgs ./pkgs;
   in {
     packages = forAllSystems mkPkgs;
     devShells = forAllSystems mkPkgs;

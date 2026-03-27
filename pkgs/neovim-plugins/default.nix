@@ -1,6 +1,5 @@
 {
   vimUtils,
-  lua,
   fetchFromGitHub,
 }: {
   overlay = self: super: {

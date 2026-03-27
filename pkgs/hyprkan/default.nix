@@ -1,11 +1,9 @@
 {
   lib,
-  buildPythonApplication,
+  python3Packages,
   fetchFromGitHub,
-  xlib,
-  i3ipc,
 }:
-buildPythonApplication rec {
+python3Packages.buildPythonApplication rec {
   pname = "hyprkan";
   version = "2.2.0";
   format = "other";
@@ -17,7 +15,7 @@ buildPythonApplication rec {
     hash = "sha256-4J0yQSkFTbHTDFBXECbCs/43xTDbeB/f3J7tZIbjbwM=";
   };
 
-  propagatedBuildInputs = [
+  propagatedBuildInputs = with python3Packages; [
     xlib
     i3ipc
   ];

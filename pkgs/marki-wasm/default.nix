@@ -1,8 +1,17 @@
 {
   lib,
   pkgs,
-  rustPlatform,
-}:
+  fenix,
+}: let
+  wasmToolchain = fenix.combine [
+    fenix.complete.toolchain
+    fenix.targets.wasm32-unknown-unknown.latest.rust-std
+  ];
+  rustPlatform = pkgs.makeRustPlatform {
+    cargo = wasmToolchain;
+    rustc = wasmToolchain;
+  };
+in
 pkgs.stdenv.mkDerivation {
   pname = "marki-wasm";
   version = "0.2.0";
