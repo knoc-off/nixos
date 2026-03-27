@@ -1,4 +1,5 @@
 {
+  inputs,
   self,
   pkgs,
   upkgs,
@@ -204,12 +205,12 @@ in {
       upkgs.foliate
       upkgs.readest
 
-      self.packages.${pkgs.stdenv.hostPlatform.system}.dagu
-
       upkgs.slack
       upkgs.notion-app-enhanced
 
       self.packages.${pkgs.stdenv.hostPlatform.system}.neovim-nix.default
+
+      inputs.nelly.packages.${pkgs.stdenv.hostPlatform.system}.linear-cli
       spotify
 
       upkgs.opencode

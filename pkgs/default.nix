@@ -42,6 +42,8 @@ in rec {
   # hyprland integration for kanata
   hyprkan = pkgs.python3Packages.callPackage ./hyprkan {};
 
+  linear-cli = pkgs.callPackage ./linear-cli {};
+
   # Unofficial Notion desktop client
   notion-electron = pkgs.callPackage ./notion-electron {};
 

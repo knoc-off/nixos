@@ -6,13 +6,6 @@
   system,
   ...
 } @ options: let
-  SSHKeys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"
-  ];
-  #setSSHKeys = name: userConfig:
-  #  lib.mkIf (userConfig.isNormalUser or (name == "root")) {
-  #    openssh.authorizedKeys.keys = lib.mkForce SSHKeys;
-  #  };
 in {
   imports = ["${modulesPath}/installer/sd-card/sd-image-aarch64.nix"];
   config =

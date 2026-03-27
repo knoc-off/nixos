@@ -89,7 +89,7 @@ in {
 
       general = {
         layout = "scrolling";
-        gaps_out = "5 20 5 0";
+        gaps_out = "10 30 10 10";
       };
 
       misc = {

@@ -72,36 +72,32 @@
       };
     };
 
-    mkImage = hostname: user: system: imageType: rec {
+    mkImage = hostname: user: system: imageType: let
       name = "${hostname}-${imageType}";
-      value =
+      imageOverrides =
+        {
+          isoImage = [{image.fileName = lib.mkForce name;}];
+          sdImage = [
+            {
+              nixpkgs.hostPlatform.system = system;
+              nixpkgs.buildPlatform.system = "x86_64-linux";
+            }
+          ];
+        }.${
+          imageType
+        } or [
+        ];
+    in
+      lib.nameValuePair name (
         (mkConfig {
           inherit hostname user system;
           extraModules =
-            [
-            ]
-            ++ (
-              if imageType == "isoImage"
-              then [
-                ./systems/modules/${imageType}.nix
-                {image = {fileName = lib.mkForce name;};}
-              ]
-              else if imageType == "sdImage"
-              then [
-                ./systems/modules/${imageType}.nix
-                {
-                  nixpkgs.hostPlatform.system = system;
-                  nixpkgs.buildPlatform.system = "x86_64-linux";
-                }
-              ]
-              else [
-                ./systems/modules/${imageType}.nix
-              ]
-            );
+            [./systems/modules/${imageType}.nix]
+            ++ imageOverrides;
         }).config.system.build.${
           imageType
-        };
-    };
+        }
+      );
 
     unstablePkgs = system:
       import nixpkgs-unstable {
@@ -278,6 +274,11 @@
     firefox-csshacks = {
       url = "github:MrOtherGuy/firefox-csshacks";
       flake = false;
+    };
+
+    nelly = {
+      url = "github:nelly-solutions/nix";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
   };
 

@@ -6,11 +6,6 @@
     pass_environment = [
       # --- Core identity / basic runtime ---
       "HOME"
-      "PATH"
-
-      # If lspmux keys on PWD / you rely on it for root detection, keep it.
-      # Otherwise you can drop it.
-      "PWD"
 
       # --- Rust / Cargo ---
       # (keep even if some aren't currently set; harmless)

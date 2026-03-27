@@ -18,20 +18,20 @@ in {
     [
       (
         pkgs.writeShellApplication {
-          name = "env-vars";
+          name = "get-review-requests";
 
           runtimeInputs = [
-            pkgs.python3
-            pkgs.skim
+            pkgs.gh
           ];
 
           text = ''
-            python3 - <<'PY'
-            import os
-            for k in sorted(os.environ):
-                v = os.environ[k]
-                print(f"{k}={v}")
-            PY
+            gh search prs \
+              --review-requested=@me \
+              --state=open \
+              --sort=updated \
+              --order=desc \
+              --json repository,title,url,createdAt,author \
+              --template '{{range .}}{{tablerow .repository.nameWithOwner .title .author.login (timeago .createdAt) .url}}{{end}}'
           '';
         }
       )
