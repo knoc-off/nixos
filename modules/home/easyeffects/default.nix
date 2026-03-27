@@ -6,20 +6,7 @@
 }: let
   cfg = config.services.easyeffects;
   presets = cfg.presets;
-
-  # ---------------------------------------------------------------------------
-  # Curated preset fragments
-  #
-  # Each "feature" option maps to a chunk of easyeffects JSON that gets merged
-  # into the final input/output preset.  This keeps the scary JSON out of
-  # per-host configs and lets you just flip booleans.
-  #
-  # IMPORTANT: within a direction (input OR output), only ONE preset should be
-  # active — plugins_order is a list and cannot be deep-merged.  Use assertions
-  # to enforce mutual exclusivity where needed.
-  # ---------------------------------------------------------------------------
-
-  # === INPUT (microphone) presets ============================================
+  jsonFormat = pkgs.formats.json {};
 
   # Simple RNNoise noise suppression — lightweight, single plugin.
   micDenoisePreset = {
@@ -375,14 +362,64 @@
             "enable-band" = enable;
           };
       in {
-        band0 = mkBand {attackTime = 50.0; releaseTime = 600.0; hcFreq = 250.0;};
-        band1 = mkBand {attackTime = 30.0; releaseTime = 450.0; splitFreq = 250.0; hcFreq = 1250.0; lcFreq = 250.0;};
-        band2 = mkBand {attackTime = 10.0; releaseTime = 250.0; splitFreq = 1250.0; hcFreq = 5000.0; lcFreq = 1250.0;};
-        band3 = mkBand {attackTime = 5.0; releaseTime = 100.0; splitFreq = 5000.0; hcFreq = 20000.0; lcFreq = 5000.0;};
-        band4 = mkBand {attackTime = 20.0; releaseTime = 100.0; enable = false; splitFreq = 4000.0; hcFreq = 8000.0; lcFreq = 4000.0;};
-        band5 = mkBand {attackTime = 20.0; releaseTime = 100.0; enable = false; splitFreq = 8000.0; hcFreq = 12000.0; lcFreq = 8000.0;};
-        band6 = mkBand {attackTime = 20.0; releaseTime = 100.0; enable = false; splitFreq = 12000.0; hcFreq = 16000.0; lcFreq = 12000.0;};
-        band7 = mkBand {attackTime = 20.0; releaseTime = 100.0; enable = false; splitFreq = 16000.0; hcFreq = 20000.0; lcFreq = 16000.0;};
+        band0 = mkBand {
+          attackTime = 50.0;
+          releaseTime = 600.0;
+          hcFreq = 250.0;
+        };
+        band1 = mkBand {
+          attackTime = 30.0;
+          releaseTime = 450.0;
+          splitFreq = 250.0;
+          hcFreq = 1250.0;
+          lcFreq = 250.0;
+        };
+        band2 = mkBand {
+          attackTime = 10.0;
+          releaseTime = 250.0;
+          splitFreq = 1250.0;
+          hcFreq = 5000.0;
+          lcFreq = 1250.0;
+        };
+        band3 = mkBand {
+          attackTime = 5.0;
+          releaseTime = 100.0;
+          splitFreq = 5000.0;
+          hcFreq = 20000.0;
+          lcFreq = 5000.0;
+        };
+        band4 = mkBand {
+          attackTime = 20.0;
+          releaseTime = 100.0;
+          enable = false;
+          splitFreq = 4000.0;
+          hcFreq = 8000.0;
+          lcFreq = 4000.0;
+        };
+        band5 = mkBand {
+          attackTime = 20.0;
+          releaseTime = 100.0;
+          enable = false;
+          splitFreq = 8000.0;
+          hcFreq = 12000.0;
+          lcFreq = 8000.0;
+        };
+        band6 = mkBand {
+          attackTime = 20.0;
+          releaseTime = 100.0;
+          enable = false;
+          splitFreq = 12000.0;
+          hcFreq = 16000.0;
+          lcFreq = 12000.0;
+        };
+        band7 = mkBand {
+          attackTime = 20.0;
+          releaseTime = 100.0;
+          enable = false;
+          splitFreq = 16000.0;
+          hcFreq = 20000.0;
+          lcFreq = 16000.0;
+        };
         bypass = false;
         "compressor-mode" = "Modern";
         dry = -80.01;
@@ -481,18 +518,47 @@
         };
         bands = {
           # Roll off sub-bass the tiny speakers cannot reproduce
-          band0 = mkBand {freq = 80.0; gain = 0.0; q = 4.36; type = "Hi-pass";};
+          band0 = mkBand {
+            freq = 80.0;
+            gain = 0.0;
+            q = 4.36;
+            type = "Hi-pass";
+          };
           # Cut driver resonance at 600 Hz — main source of muddiness
-          band1 = mkBand {freq = 600.0; gain = -8.0; q = 4.0; type = "Notch";};
+          band1 = mkBand {
+            freq = 600.0;
+            gain = -8.0;
+            q = 4.0;
+            type = "Notch";
+          };
           # Reduce upper-mid harshness
-          band2 = mkBand {freq = 1250.0; gain = -3.49; q = 4.17;};
+          band2 = mkBand {
+            freq = 1250.0;
+            gain = -3.49;
+            q = 4.17;
+          };
           # Boost vocal presence / clarity
-          band3 = mkBand {freq = 2016.0; gain = 4.85; q = 0.67;};
+          band3 = mkBand {
+            freq = 2016.0;
+            gain = 4.85;
+            q = 0.67;
+          };
           # Compensate for front port structure dip
-          band4 = mkBand {freq = 5272.0; gain = 3.83; q = 2.64; type = "Notch";};
+          band4 = mkBand {
+            freq = 5272.0;
+            gain = 3.83;
+            q = 2.64;
+            type = "Notch";
+          };
           # Lift highs for air and detail (muted by default in upstream preset —
           # enable in easyeffects GUI if you want extra sparkle)
-          band5 = mkBand {freq = 6000.0; gain = 4.85; q = 4.36; type = "Hi-shelf"; mute = true;};
+          band5 = mkBand {
+            freq = 6000.0;
+            gain = 4.85;
+            q = 4.36;
+            type = "Hi-shelf";
+            mute = true;
+          };
         };
       in {
         balance = 0.0;
@@ -531,13 +597,6 @@
     else if presets.loudness-equalizer
     then loudnessEqualizerPreset
     else null;
-
-  allPresets =
-    lib.optional (activeInputPreset != null) activeInputPreset
-    ++ lib.optional (activeOutputPreset != null) activeOutputPreset;
-
-  mergedPreset = lib.foldl' lib.recursiveUpdate {} allPresets;
-  hasAnyPreset = allPresets != [];
 in {
   options.services.easyeffects.presets = {
     # Input (microphone)
@@ -563,11 +622,36 @@ in {
       ];
     }
 
-    (lib.mkIf hasAnyPreset {
-      services.easyeffects = {
-        preset = "managed";
-        extraPresets.managed = mergedPreset;
-      };
+    # Place input/managed.json and output/managed.json separately.
+    # The upstream HM extraPresets option only supports one direction per entry,
+    # so we write xdg.dataFile directly (which is what extraPresets does internally).
+    (lib.mkIf (activeInputPreset != null) {
+      xdg.dataFile."easyeffects/input/managed.json".source =
+        jsonFormat.generate "input-managed.json" activeInputPreset;
+    })
+
+    (lib.mkIf (activeOutputPreset != null) {
+      xdg.dataFile."easyeffects/output/managed.json".source =
+        jsonFormat.generate "output-managed.json" activeOutputPreset;
+    })
+
+    # --load-preset in ExecStart is broken in easyeffects 8.x service mode:
+    # the signal has no handler on the primary instance path (upstream bug).
+    # Instead, start the service clean, then send the load command via IPC.
+    (lib.mkIf (activeInputPreset != null || activeOutputPreset != null) {
+      systemd.user.services.easyeffects.Service.ExecStartPost = let
+        loadScript = pkgs.writeShellScript "easyeffects-load-preset" ''
+          # Wait for easyeffects to be ready to accept IPC commands
+          for i in $(seq 1 20); do
+            if ${cfg.package}/bin/easyeffects --presets >/dev/null 2>&1; then
+              break
+            fi
+            sleep 0.25
+          done
+          exec ${cfg.package}/bin/easyeffects --load-preset managed
+        '';
+      in
+        loadScript;
     })
   ]);
 }
