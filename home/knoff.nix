@@ -219,7 +219,7 @@ in {
 
       self.packages.${pkgs.stdenv.hostPlatform.system}.neovim.default
 
-      inputs.nelly.packages.${pkgs.stdenv.hostPlatform.system}.linear-cli
+      #inputs.nelly.packages.${pkgs.stdenv.hostPlatform.system}.linear-cli
       spotify
 
       upkgs.opencode
