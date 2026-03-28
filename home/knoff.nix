@@ -124,6 +124,38 @@ in {
 
     ./services/lspmux.nix
 
+    self.homeModules.prompt-daemon
+    {
+      services.prompt-daemon = {
+        enable = true;
+        package = self.packages.${pkgs.stdenv.hostPlatform.system}.prompt-daemon;
+        daemon = {
+          workers = 2;
+          idle_timeout = "60s";
+        };
+        defaults = {
+          shell = true;
+          timeout = "5s";
+        };
+        commands = {
+          git_status = {
+            run = "git status --porcelain";
+            check = "git status --porcelain";
+            check_interval = "500ms";
+            idle_timeout = "30s";
+            env = ["CWD"];
+            exec_in_cwd = true;
+          };
+          git_branch = {
+            run = "git branch --show-current";
+            watch = [".git/HEAD"];
+            env = ["CWD"];
+            exec_in_cwd = true;
+          };
+        };
+      };
+    }
+
     self.homeModules.hyprland
     self.homeModules.noctalia
     self.homeModules.stylix
@@ -132,8 +164,37 @@ in {
     {
       services.easyeffects = {
         enable = true;
-        presets.mic-denoise = true;
-        presets.framework-13 = true;
+
+        autoload.output = {
+          # Built-in speakers get Framework 13 measured EQ correction
+          "alsa_output.pci-0000_c1_00.6.analog-stereo:Speakers" = {
+            preset = "framework-speakers";
+            description = "Ryzen HD Audio Controller Analog Stereo";
+          };
+          # Wired headphones — no processing
+          "alsa_output.pci-0000_c1_00.6.analog-stereo:Headphones" = {
+            preset = "passthrough";
+            description = "Ryzen HD Audio Controller Analog Stereo";
+          };
+          # AirPods Pro 2 (A2DP) — no processing
+          "bluez_output.F0_04_E1_D9_23_73.1:Headphone" = {
+            preset = "passthrough";
+            description = "AirPods Pro";
+          };
+          # AirPods Pro 2 (HFP/handsfree) — no processing
+          "bluez_output.F0_04_E1_D9_23_73.1:Handsfree" = {
+            preset = "passthrough";
+            description = "AirPods Pro";
+          };
+        };
+
+        autoload.input = {
+          # Built-in mic gets noise suppression
+          "alsa_input.pci-0000_c1_00.6.analog-stereo:Internal Microphone" = {
+            preset = "mic-denoise";
+            description = "Ryzen HD Audio Controller Analog Stereo";
+          };
+        };
       };
     }
 

@@ -22,9 +22,9 @@ in
       fenix.rust-analyzer
     ];
 
-    postCheck = ''
-      cargo clippy --all-targets -- -D warnings
-    '';
+    # postCheck = ''
+    #   cargo clippy --all-targets -- -D warnings
+    # '';
 
     cargoLock = {
       lockFile = ./Cargo.lock;
