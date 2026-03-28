@@ -1,0 +1,36 @@
+daemon:
+  workers: 2
+  idle_timeout: 60s
+
+defaults:
+  shell: true
+  timeout: 5s
+
+commands:
+  # Global commands — no env, single cache entry
+  uptime:
+    run: "uptime -p"
+    interval: 10s
+
+  whoami:
+    run: "whoami"
+
+  date:
+    run: "date +%H:%M:%S"
+    interval: 2s
+
+  # CWD-scoped — separate cache per directory
+  git_status:
+    run: "git status --porcelain"
+    env: [CWD]
+    exec_in_cwd: true
+    interval: 5s
+
+  # CWD + extra env var for finer cache granularity.
+  # User must ensure GIT_BRANCH is set in their shell environment,
+  # e.g. in fish: set -x GIT_BRANCH (git branch --show-current)
+  gh_ci:
+    run: "gh run list --limit 1"
+    env: [CWD, GIT_BRANCH]
+    exec_in_cwd: true
+    interval: 60s

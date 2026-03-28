@@ -1,6 +1,25 @@
 [package]
-name = "ipc-command-caching"
+name = "prompt-daemon"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
+
+[lib]
+name = "prompt_daemon"
+path = "src/lib.rs"
+
+[[bin]]
+name = "prompt-daemon"
+path = "src/main.rs"
+
+[[bin]]
+name = "prompt-client"
+path = "src/client.rs"
 
 [dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+notify = "7"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+libc = "0.2"

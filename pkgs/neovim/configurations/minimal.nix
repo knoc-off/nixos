@@ -24,7 +24,7 @@
     ./modules/languages/rust.nix
     ./modules/languages/nix.nix
     ./modules/languages/typescript.nix
-    ./modules/languages/github-actions.nix
+    # ./modules/languages/github-actions.nix
 
     ./modules/avante.nix
 

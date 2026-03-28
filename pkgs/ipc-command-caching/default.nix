@@ -14,6 +14,10 @@ in
 
     src = lib.cleanSource ./.;
 
+    nativeBuildInputs = [
+      fenix.rust-analyzer
+    ];
+
     cargoLock = {
       lockFile = ./Cargo.lock;
     };
