@@ -124,38 +124,6 @@ in {
 
     ./services/lspmux.nix
 
-    self.homeModules.prompt-daemon
-    {
-      services.prompt-daemon = {
-        enable = true;
-        package = self.packages.${pkgs.stdenv.hostPlatform.system}.prompt-daemon;
-        daemon = {
-          workers = 2;
-          idle_timeout = "60s";
-        };
-        defaults = {
-          shell = true;
-          timeout = "5s";
-        };
-        commands = {
-          git_status = {
-            run = "git status --porcelain";
-            check = "git status --porcelain";
-            check_interval = "500ms";
-            idle_timeout = "30s";
-            env = ["CWD"];
-            exec_in_cwd = true;
-          };
-          git_branch = {
-            run = "git branch --show-current";
-            watch = [".git/HEAD"];
-            env = ["CWD"];
-            exec_in_cwd = true;
-          };
-        };
-      };
-    }
-
     self.homeModules.hyprland
     self.homeModules.noctalia
     self.homeModules.stylix

@@ -1,4 +1,5 @@
 {
+  self,
   pkgs,
   lib,
   ...
@@ -69,13 +70,46 @@
     printf "\e[1;38;2;%d;%d;%dm\x{f062c} %s\e[0m", $r, $g, $b, $branch;
   '';
 in {
+  imports = [
+    self.homeModules.prompt-daemon
+    {
+      services.prompt-daemon = {
+        enable = true;
+        package = self.packages.${pkgs.stdenv.hostPlatform.system}.prompt-daemon;
+        daemon = {
+          workers = 4;
+          idle_timeout = "60s";
+        };
+        defaults = {
+          shell = true;
+          timeout = "5s";
+        };
+        commands = {
+          git_branch = {
+            run = "${gitBranchColored}/bin/git-branch-colored";
+            watch = [".git/HEAD"];
+            env = ["CWD"];
+            exec_in_cwd = true;
+          };
+          rust_version = {
+            run = "rustc --version | cut -d' ' -f2 | cut -d. -f1,2";
+            check = "which rustc";
+            check_interval = "2s";
+            env = ["CWD" "PATH"];
+            exec_in_cwd = true;
+          };
+        };
+      };
+    }
+  ];
+
   programs.starship = {
     enable = true;
     enableFishIntegration = true;
     settings = {
       add_newline = false;
 
-      format = "((($python )($rust )$nix_shell )(\${custom.git_branch} )\n)$directory( $cmd_duration)$line_break$character";
+      format = "((($python )(\${custom.rust} )$nix_shell )(\${custom.git_branch} )\n)$directory( $cmd_duration)$line_break$character";
 
       scan_timeout = 10;
       command_timeout = 500;
@@ -124,14 +158,7 @@ in {
         detect_folders = [".venv" "venv"];
       };
 
-      rust = {
-        symbol = "";
-        version_format = "$major.$minor";
-        format = "([$symbol$version]($style))";
-        style = "italic red";
-        detect_extensions = ["rs"];
-        detect_files = ["Cargo.toml"];
-      };
+      rust.disabled = true;
 
       cmd_duration = {
         min_time = 500;
@@ -146,9 +173,21 @@ in {
         format = "[$symbol$branch]($style)";
       };
 
+      custom.rust = {
+        command = "rust_version";
+        use_stdin = false;
+        shell = ["${self.packages.${pkgs.stdenv.hostPlatform.system}.prompt-daemon}/bin/prompt-client"];
+        detect_files = ["Cargo.toml"];
+        detect_extensions = ["rs"];
+        style = "italic red";
+        symbol = "";
+        format = "([$symbol$output]($style))";
+      };
+
       custom.git_branch = {
-        command = "";
-        shell = ["${gitBranchColored}/bin/git-branch-colored"];
+        command = "git_branch";
+        use_stdin = false;
+        shell = ["${self.packages.${pkgs.stdenv.hostPlatform.system}.prompt-daemon}/bin/prompt-client"];
         detect_folders = [".git"];
         when = "true";
         style = "";
