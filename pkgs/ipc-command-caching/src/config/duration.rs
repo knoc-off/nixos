@@ -3,8 +3,8 @@ use std::fmt;
 use serde::de;
 
 /// A wrapper around `std::time::Duration` that deserializes from strings like
-/// "2s", "30s", "5m", "1h", "1d".
-#[derive(Debug, Clone)]
+/// "500ms", "2s", "30s", "5m", "1h", "1d".
+#[derive(Debug, Clone, PartialEq)]
 pub struct Duration(pub std::time::Duration);
 
 impl<'de> de::Deserialize<'de> for Duration {
@@ -39,29 +39,33 @@ fn parse_duration(s: &str) -> Result<std::time::Duration, String> {
         .map_err(|e| format!("invalid duration number: {e}"))?;
 
     let suffix = &s[num_end..];
-    let secs = match suffix {
-        "s" => value,
-        "m" => value * 60,
-        "h" => value * 3600,
-        "d" => value * 86400,
-        "" => return Err(format!("missing duration suffix in '{s}' (use s, m, h, or d)")),
-        _ => return Err(format!("unknown duration suffix '{suffix}' (use s, m, h, or d)")),
-    };
-
-    Ok(std::time::Duration::from_secs(secs))
+    match suffix {
+        "ms" => Ok(std::time::Duration::from_millis(value)),
+        "s" => Ok(std::time::Duration::from_secs(value)),
+        "m" => Ok(std::time::Duration::from_secs(value * 60)),
+        "h" => Ok(std::time::Duration::from_secs(value * 3600)),
+        "d" => Ok(std::time::Duration::from_secs(value * 86400)),
+        "" => Err(format!("missing duration suffix in '{s}' (use ms, s, m, h, or d)")),
+        _ => Err(format!("unknown duration suffix '{suffix}' (use ms, s, m, h, or d)")),
+    }
 }
 
 impl fmt::Display for Duration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let millis = self.0.as_millis();
         let secs = self.0.as_secs();
-        if secs % 86400 == 0 && secs > 0 {
-            write!(f, "{}d", secs / 86400)
-        } else if secs % 3600 == 0 && secs > 0 {
-            write!(f, "{}h", secs / 3600)
-        } else if secs % 60 == 0 && secs > 0 {
-            write!(f, "{}m", secs / 60)
+        if secs > 0 && self.0.subsec_millis() == 0 {
+            if secs.is_multiple_of(86400) {
+                write!(f, "{}d", secs / 86400)
+            } else if secs.is_multiple_of(3600) {
+                write!(f, "{}h", secs / 3600)
+            } else if secs.is_multiple_of(60) {
+                write!(f, "{}m", secs / 60)
+            } else {
+                write!(f, "{secs}s")
+            }
         } else {
-            write!(f, "{secs}s")
+            write!(f, "{millis}ms")
         }
     }
 }
@@ -89,6 +93,12 @@ mod tests {
     #[test]
     fn test_parse_days() {
         assert_eq!(parse_duration("1d").unwrap().as_secs(), 86400);
+    }
+
+    #[test]
+    fn test_parse_millis() {
+        assert_eq!(parse_duration("500ms").unwrap().as_millis(), 500);
+        assert_eq!(parse_duration("100ms").unwrap().as_millis(), 100);
     }
 
     #[test]

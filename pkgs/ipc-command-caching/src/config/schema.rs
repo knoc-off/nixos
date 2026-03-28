@@ -70,7 +70,7 @@ fn default_timeout() -> Duration {
     Duration(std::time::Duration::from_secs(10))
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct StaleConfig {
     #[serde(default = "default_on_context_mismatch")]
     pub on_context_mismatch: String,
@@ -101,7 +101,7 @@ fn default_on_expired() -> String {
     "?".to_string()
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct CommandConfig {
     pub run: String,
     #[serde(default)]
@@ -118,6 +118,23 @@ pub struct CommandConfig {
     pub timeout: Option<Duration>,
     #[serde(default)]
     pub stale: Option<StaleConfig>,
+
+    /// Cheap command to detect changes. If its output changes, `run` is re-executed.
+    /// Inherits `shell`, `exec_in_cwd`, and `env` from the parent command.
+    #[serde(default)]
+    pub check: Option<String>,
+    /// How often to run the check command. Defaults to 1s when `check` is set.
+    #[serde(default)]
+    pub check_interval: Option<Duration>,
+    /// File/directory paths to watch for changes (relative to CWD when exec_in_cwd is set).
+    /// On any change, `run` is re-executed.
+    #[serde(default)]
+    pub watch: Vec<String>,
+
+    /// Per-command idle timeout override. When no requests have been made for this
+    /// duration, the scheduler goes cold and stops. Overrides `daemon.idle_timeout`.
+    #[serde(default)]
+    pub idle_timeout: Option<Duration>,
 }
 
 /// The magic env var name for the client's working directory.
@@ -153,5 +170,29 @@ impl CommandConfig {
 
     pub fn effective_stale<'a>(&'a self, defaults: &'a DefaultsSection) -> &'a StaleConfig {
         self.stale.as_ref().unwrap_or(&defaults.stale)
+    }
+
+    /// Effective check interval. Defaults to 1s when a check command is set.
+    pub fn effective_check_interval(&self) -> Option<std::time::Duration> {
+        if self.check.is_some() {
+            Some(
+                self.check_interval
+                    .as_ref()
+                    .map(|d| d.0)
+                    .unwrap_or(std::time::Duration::from_secs(1)),
+            )
+        } else {
+            None
+        }
+    }
+
+    /// Whether this command has any scheduler triggers (interval, check, or watch).
+    pub fn has_scheduler(&self) -> bool {
+        self.interval.is_some() || self.check.is_some() || !self.watch.is_empty()
+    }
+
+    /// Effective idle timeout. Per-command override or global fallback.
+    pub fn effective_idle_timeout(&self, global: std::time::Duration) -> std::time::Duration {
+        self.idle_timeout.as_ref().map(|d| d.0).unwrap_or(global)
     }
 }

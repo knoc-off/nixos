@@ -5,9 +5,16 @@ use tokio::time::Instant;
 use super::entry::CacheEntry;
 
 /// Tracks request activity for a cache key (hot/cold determination).
+#[derive(Debug)]
 pub struct ActivityTracker {
     pub last_requested_at: Instant,
     pub request_count: u64,
+}
+
+impl Default for ActivityTracker {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ActivityTracker {
@@ -29,11 +36,20 @@ impl ActivityTracker {
 }
 
 /// Per-key entry combining cache state and activity tracking.
+#[derive(Debug)]
 pub struct StoreEntry {
     pub cache: CacheEntry,
     pub activity: ActivityTracker,
     /// Last env vars received from a client request (carried forward for scheduler re-executions).
     pub last_env: HashMap<String, String>,
+    /// Last output of the check command (for change detection).
+    pub last_check_output: Option<String>,
+}
+
+impl Default for StoreEntry {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl StoreEntry {
@@ -42,13 +58,21 @@ impl StoreEntry {
             cache: CacheEntry::new(),
             activity: ActivityTracker::new(),
             last_env: HashMap::new(),
+            last_check_output: None,
         }
     }
 }
 
 /// The main cache store: maps resolved keys to their entries.
+#[derive(Debug)]
 pub struct CacheStore {
     entries: HashMap<String, StoreEntry>,
+}
+
+impl Default for CacheStore {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CacheStore {
@@ -82,10 +106,19 @@ impl CacheStore {
         self.entries.iter()
     }
 
-    /// Remove entries whose command names are no longer in the config.
-    pub fn retain_commands(&mut self, valid_prefixes: &[String]) {
+    /// Remove all cache entries for a given command name.
+    /// Cache keys have the format `command_name\0KEY=val\0...` or just `command_name`.
+    pub fn remove_command(&mut self, command: &str) {
         self.entries.retain(|key, _| {
-            valid_prefixes.iter().any(|prefix| key.contains(prefix))
+            key.split('\0').next().unwrap_or(key) != command
+        });
+    }
+
+    /// Remove entries whose command names are no longer in the config.
+    pub fn retain_commands(&mut self, valid_commands: &[String]) {
+        self.entries.retain(|key, _| {
+            let cmd_name = key.split('\0').next().unwrap_or(key);
+            valid_commands.iter().any(|name| name == cmd_name)
         });
     }
 }

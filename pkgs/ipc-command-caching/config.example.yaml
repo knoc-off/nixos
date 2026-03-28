@@ -7,30 +7,47 @@ defaults:
   timeout: 5s
 
 commands:
-  # Global commands — no env, single cache entry
+  # Global — no env, single cache entry, interval-only refresh
   uptime:
-    run: "uptime -p"
+    run: "uptime"
     interval: 10s
 
   whoami:
     run: "whoami"
 
+  echo:
+    run: "echo $CWD $BROWSER $(date +%s)"
+    env: [CWD, BROWSER]
+    interval: 2s
+
   date:
     run: "date +%H:%M:%S"
     interval: 2s
 
-  # CWD-scoped — separate cache per directory
+  # CWD-scoped with check-based invalidation.
+  # Short idle_timeout — cheap to restart, saves CPU when you leave a repo.
   git_status:
     run: "git status --porcelain"
+    check: "git status --porcelain"
+    check_interval: 500ms
+    idle_timeout: 30s
     env: [CWD]
     exec_in_cwd: true
-    interval: 5s
 
-  # CWD + extra env var for finer cache granularity.
-  # User must ensure GIT_BRANCH is set in their shell environment,
-  # e.g. in fish: set -x GIT_BRANCH (git branch --show-current)
+  # CWD-scoped with file watch-based invalidation (instant, no polling)
+  git_branch:
+    run: "git branch --show-current"
+    watch: [".git/HEAD"]
+    env: [CWD]
+    exec_in_cwd: true
+
+  # Both check + watch: watch for local changes, check for remote.
+  # Long idle_timeout — API calls are slow, keep polling even if idle.
   gh_ci:
     run: "gh run list --limit 1"
+    check: "git rev-parse HEAD"
+    check_interval: 5s
+    idle_timeout: 5m
     env: [CWD, GIT_BRANCH]
     exec_in_cwd: true
-    interval: 60s
+    interval: 120s

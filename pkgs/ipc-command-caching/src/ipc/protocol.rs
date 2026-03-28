@@ -176,3 +176,125 @@ async fn read_null_terminated<R: AsyncReadExt + Unpin>(
     String::from_utf8(buf)
         .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[tokio::test]
+    async fn command_round_trip() {
+        let mut buf = Vec::new();
+        write_command(&mut buf, "git_status", "/home/user").await.unwrap();
+
+        let mut reader = Cursor::new(buf);
+        let (cmd, cwd, is_status) = read_command(&mut reader).await.unwrap();
+        assert_eq!(cmd, "git_status");
+        assert_eq!(cwd, "/home/user");
+        assert!(!is_status);
+    }
+
+    #[tokio::test]
+    async fn status_query_round_trip() {
+        let mut buf = Vec::new();
+        write_command(&mut buf, "", "").await.unwrap();
+
+        let mut reader = Cursor::new(buf);
+        let (cmd, cwd, is_status) = read_command(&mut reader).await.unwrap();
+        assert_eq!(cmd, "");
+        assert_eq!(cwd, "");
+        assert!(is_status);
+    }
+
+    #[tokio::test]
+    async fn env_request_round_trip() {
+        let names = vec!["GIT_BRANCH".into(), "HOSTNAME".into()];
+        let mut buf = Vec::new();
+        write_env_request(&mut buf, &names).await.unwrap();
+
+        let mut reader = Cursor::new(buf);
+        let result = read_env_request(&mut reader).await.unwrap();
+        assert_eq!(result, vec!["GIT_BRANCH", "HOSTNAME"]);
+    }
+
+    #[tokio::test]
+    async fn env_request_empty() {
+        let mut buf = Vec::new();
+        write_env_request(&mut buf, &[]).await.unwrap();
+
+        let mut reader = Cursor::new(buf);
+        let result = read_env_request(&mut reader).await.unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn env_values_round_trip() {
+        let values = vec!["main".into(), "myhost".into()];
+        let mut buf = Vec::new();
+        write_env_values(&mut buf, &values).await.unwrap();
+
+        let mut reader = Cursor::new(buf);
+        let result = read_env_values(&mut reader).await.unwrap();
+        assert_eq!(result, vec!["main", "myhost"]);
+    }
+
+    #[tokio::test]
+    async fn response_round_trip() {
+        let mut buf = Vec::new();
+        write_response(&mut buf, 0x01, "cached value").await.unwrap();
+
+        let mut reader = Cursor::new(buf);
+        let (status, value) = read_response(&mut reader).await.unwrap();
+        assert_eq!(status, 0x01);
+        assert_eq!(value, "cached value");
+    }
+
+    #[tokio::test]
+    async fn response_empty_value() {
+        let mut buf = Vec::new();
+        write_response(&mut buf, 0x04, "").await.unwrap();
+
+        let mut reader = Cursor::new(buf);
+        let (status, value) = read_response(&mut reader).await.unwrap();
+        assert_eq!(status, 0x04);
+        assert_eq!(value, "");
+    }
+
+    #[tokio::test]
+    async fn full_4_phase_exchange() {
+        // Simulate a complete client<->daemon exchange in a single buffer
+        let mut wire = Vec::new();
+
+        // Phase 1: client writes command + CWD
+        write_command(&mut wire, "git_branch", "/repo").await.unwrap();
+
+        // Phase 2: daemon writes env request
+        let env_names = vec!["GIT_BRANCH".into()];
+        write_env_request(&mut wire, &env_names).await.unwrap();
+
+        // Phase 3: client writes env values
+        let env_vals = vec!["main".into()];
+        write_env_values(&mut wire, &env_vals).await.unwrap();
+
+        // Phase 4: daemon writes response
+        write_response(&mut wire, 0x01, "main").await.unwrap();
+
+        // Now read it all back
+        let mut reader = Cursor::new(wire);
+
+        let (cmd, cwd, is_status) = read_command(&mut reader).await.unwrap();
+        assert_eq!(cmd, "git_branch");
+        assert_eq!(cwd, "/repo");
+        assert!(!is_status);
+
+        let names = read_env_request(&mut reader).await.unwrap();
+        assert_eq!(names, vec!["GIT_BRANCH"]);
+
+        let vals = read_env_values(&mut reader).await.unwrap();
+        assert_eq!(vals, vec!["main"]);
+
+        let (status, value) = read_response(&mut reader).await.unwrap();
+        assert_eq!(status, 0x01);
+        assert_eq!(value, "main");
+    }
+}

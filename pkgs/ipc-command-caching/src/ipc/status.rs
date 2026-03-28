@@ -1,8 +1,7 @@
 use crate::cache::store::CacheStore;
-use crate::config::schema::DaemonConfig;
 
 /// Format a human-readable status dump of all active cache entries.
-pub fn format_status_dump(store: &CacheStore, _config: &DaemonConfig) -> String {
+pub fn format_status_dump(store: &CacheStore) -> String {
     let mut out = String::new();
 
     out.push_str(&format!(
@@ -20,8 +19,8 @@ pub fn format_status_dump(store: &CacheStore, _config: &DaemonConfig) -> String 
             "Cold"
         };
 
-        // Extract command name from key (part after the last ':')
-        let cmd_name = key.rsplit(':').next().unwrap_or(key);
+        // Extract command name from key (part before the first '\0' separator)
+        let cmd_name = key.split('\0').next().unwrap_or(key);
 
         out.push_str(&format!(
             "{:<20} {:<40} {:<10} {:<10} {:<8} {}\n",

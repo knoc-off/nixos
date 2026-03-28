@@ -3,9 +3,13 @@
   pkgs,
   fenix,
 }: let
+  toolchain = fenix.combine [
+    fenix.minimal.toolchain
+    fenix.default.clippy
+  ];
   rustPlatform = pkgs.makeRustPlatform {
-    cargo = fenix.minimal.toolchain;
-    rustc = fenix.minimal.toolchain;
+    cargo = toolchain;
+    rustc = toolchain;
   };
 in
   rustPlatform.buildRustPackage {
@@ -17,6 +21,10 @@ in
     nativeBuildInputs = [
       fenix.rust-analyzer
     ];
+
+    postCheck = ''
+      cargo clippy --all-targets -- -D warnings
+    '';
 
     cargoLock = {
       lockFile = ./Cargo.lock;

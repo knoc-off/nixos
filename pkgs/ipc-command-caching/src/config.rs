@@ -3,14 +3,13 @@ pub mod schema;
 
 use std::path::PathBuf;
 
+use crate::error::Error;
 use schema::DaemonConfig;
 
 /// Well-known socket path: $XDG_RUNTIME_DIR/prompt-daemon.sock
-/// Falls back to /tmp/prompt-daemon-$UID.sock
 pub fn socket_path() -> PathBuf {
     let runtime_dir = std::env::var("XDG_RUNTIME_DIR");
-
-    PathBuf::from(runtime_dir.expect("socket already taken")).join("prompt-daemon.sock")
+    PathBuf::from(runtime_dir.expect("XDG_RUNTIME_DIR must be set")).join("prompt-daemon.sock")
 }
 
 /// Resolve config file path in priority order:
@@ -40,8 +39,8 @@ pub fn resolve_config_path(explicit: Option<&str>) -> Option<PathBuf> {
 }
 
 /// Load and parse the config file.
-pub fn load_config(path: &std::path::Path) -> Result<DaemonConfig, Box<dyn std::error::Error>> {
+pub fn load_config(path: &std::path::Path) -> Result<DaemonConfig, Error> {
     let contents = std::fs::read_to_string(path)?;
-    let config: DaemonConfig = serde_yaml::from_str(&contents)?;
+    let config: DaemonConfig = serde_yaml_ng::from_str(&contents)?;
     Ok(config)
 }
