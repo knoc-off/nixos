@@ -356,6 +356,7 @@
   };
 
   boot = {
+    binfmt.emulatedSystems = ["aarch64-linux"];
     kernelParams = ["usbcore.autosuspend=-1"];
     kernel.sysctl = {
       "vm.swappiness" = 20;

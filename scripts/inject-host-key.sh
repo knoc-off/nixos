@@ -3,17 +3,20 @@
 # secrets on first boot. Works with SD images, raw disk images, etc.
 #
 # Usage:
-#   sudo ./scripts/inject-host-key.sh <disk-image.img> <ssh-host-private-key> [partition]
+#   sudo ./scripts/inject-host-key.sh <disk-image> <ssh-host-private-key> [partition]
 #
 # Arguments:
-#   disk-image.img          Path to a raw disk image (decompressed)
+#   disk-image              Path to a raw disk image (.img or .img.zst — auto-decompresses)
 #   ssh-host-private-key    Path to the SSH ed25519 private key to inject
 #   partition               (Optional) Partition number for root, e.g. "2" for p2.
 #                           Auto-detected if omitted.
 #
 # Examples:
-#   # RPi SD image (root is typically p2)
-#   sudo ./scripts/inject-host-key.sh ./rpi-3a-plus.img /tmp/tmp.XXXXX/ssh_host_ed25519_key
+#   # Directly from nix build output (auto-decompresses .zst)
+#   sudo ./scripts/inject-host-key.sh ./result/sd-image/*.img.zst /tmp/tmp.XXXXX/ssh_host_ed25519_key
+#
+#   # Already decompressed
+#   sudo ./scripts/inject-host-key.sh ./rpi-3a-plus.img /tmp/key
 #
 #   # Explicit partition
 #   sudo ./scripts/inject-host-key.sh ./server.img /tmp/key 3
@@ -30,6 +33,18 @@ PART_NUM="${3:-}"
 if [[ ! -f "$IMG" ]]; then
   echo "Error: Image file '$IMG' not found"
   exit 1
+fi
+
+# Auto-decompress .zst files
+if [[ "$IMG" == *.zst ]]; then
+  DECOMPRESSED="./$(basename "${IMG%.zst}")"
+  if [[ -f "$DECOMPRESSED" ]]; then
+    echo "Decompressed image already exists: $DECOMPRESSED"
+  else
+    echo "Decompressing $IMG..."
+    zstd -d "$IMG" -o "$DECOMPRESSED"
+  fi
+  IMG="$DECOMPRESSED"
 fi
 
 if [[ ! -f "$KEY" ]]; then

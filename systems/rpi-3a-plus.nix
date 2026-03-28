@@ -13,7 +13,7 @@
   sops = {
     defaultSopsFile = ./secrets/${hostname}/default.yaml;
     age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
-    secrets."wifi/envFile0" = {};
+    secrets."wifi/home/fritz" = {};
   };
 
   boot = {
@@ -32,8 +32,8 @@
     hostName = hostname;
     wireless = {
       enable = true;
-      secretsFile = config.sops.secrets."wifi/envFile0".path;
-      networks."Tiamat".pskRaw = "ext:PSK0";
+      secretsFile = config.sops.secrets."wifi/home/fritz".path;
+      networks."FRITZ!Box 7590 SI".pskRaw = "ext:PSK0";
     };
     firewall = {enable = false;};
   };

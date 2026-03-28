@@ -10,6 +10,13 @@ in {
   imports = ["${modulesPath}/installer/sd-card/sd-image-aarch64.nix"];
   config =
     {
+      # ZFS is enabled by default in installer profiles but is never cached
+      # (built against specific kernel versions). Disable it for SD images.
+      boot.supportedFilesystems.zfs = lib.mkForce false;
+
+      # The all-hardware profile includes dw-hdmi which was renamed/removed
+      # in newer kernels and doesn't exist in the RPi kernel. Disable it.
+      hardware.enableAllHardware = lib.mkForce false;
       users.users.root.openssh.authorizedKeys.keys = lib.mkForce [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"
       ];

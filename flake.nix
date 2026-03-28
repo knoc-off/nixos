@@ -77,12 +77,7 @@
       imageOverrides =
         {
           isoImage = [{image.fileName = lib.mkForce name;}];
-          sdImage = [
-            {
-              nixpkgs.hostPlatform.system = system;
-              nixpkgs.buildPlatform.system = "x86_64-linux";
-            }
-          ];
+          sdImage = [];
         }.${
           imageType
         } or [
@@ -151,7 +146,7 @@
       (mkHost "thinkpad-work" "knoff" "x86_64-linux")
       (mkHost "nuci5" "tv" "x86_64-linux")
       (mkHost "hetzner" "knoff" "x86_64-linux")
-      (mkHost "rpi-3a-plus" "root" "x86_64-linux")
+      (mkHost "rpi-3a-plus" "root" "aarch64-linux")
     ];
   };
 
