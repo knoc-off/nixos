@@ -8,9 +8,9 @@
 in {
   imports = [
     # ./home-automations/dnd.nix
-    ./home-automations/bedroom.nix
-    ./home-automations/motion-doorbell.nix
-    ./home-automations/livingroom-button-c.nix
+    # ./home-automations/bedroom.nix
+    # ./home-automations/motion-doorbell.nix
+    # ./home-automations/livingroom-button-c.nix
   ];
 
   services.mosquitto = {

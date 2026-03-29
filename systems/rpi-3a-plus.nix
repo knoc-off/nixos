@@ -8,6 +8,8 @@
 }: {
   imports = [
     inputs.sops-nix.nixosModules.sops
+
+    ./services/home-assistant.nix
   ];
 
   sops = {
@@ -19,14 +21,17 @@
   boot = {
     kernelPackages = pkgs.linuxPackages_rpi3;
     loader = {
-      grub = {
-        efiSupport = true;
-        efiInstallAsRemovable = true;
-      };
+      grub.enable = false;
+      generic-extlinux-compatible.enable = true;
     };
   };
 
   hardware.enableRedistributableFirmware = true;
+
+  fileSystems."/" = {
+    device = "/dev/disk/by-label/NIXOS_SD";
+    fsType = "ext4";
+  };
 
   networking = {
     hostName = hostname;
@@ -41,7 +46,7 @@
   swapDevices = [
     {
       device = "/var/lib/swapfile";
-      size = 2 * 1024; # 2 GB
+      size = 512; # 500mb
     }
   ];
 
@@ -64,4 +69,6 @@
       ];
     };
   };
+
+  system.stateVersion = "25.11";
 }

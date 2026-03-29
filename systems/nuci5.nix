@@ -12,7 +12,6 @@
     inputs.disko.nixosModules.disko
     ./hardware/disks/simple-disk.nix
     ./services/kdeconnect.nix
-    ./services/home-assistant.nix
 
     inputs.determinate.nixosModules.default
 
