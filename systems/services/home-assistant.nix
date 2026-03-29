@@ -7,10 +7,7 @@
   slzb06Ip = "slzb-06";
 in {
   imports = [
-    # ./home-automations/dnd.nix
-    # ./home-automations/bedroom.nix
-    # ./home-automations/motion-doorbell.nix
-    # ./home-automations/livingroom-button-c.nix
+    ./mqtt-automations
   ];
 
   services.mosquitto = {
@@ -74,12 +71,35 @@ in {
         name = "Home";
         unit_system = "metric";
       };
+
+      mqtt = {
+        broker = "127.0.0.1";
+        port = 1883;
+        discovery = true;
+      };
+
+      notify = [
+        {
+          name = "all_phones";
+          platform = "group";
+          services = [
+            {service = "mobile_app_pixel_10";}
+            {service = "mobile_app_pixel_7";}
+          ];
+        }
+      ];
     };
   };
 
   networking.firewall.allowedTCPPorts = [
     8123 # Home Assistant
     7768 # Zigbee2MQTT
+  ];
+
+  # Z2M v4 auto-discovers .ts files in <dataDir>/external_converters/
+  systemd.tmpfiles.rules = [
+    "d /var/lib/zigbee2mqtt/external_converters 0755 zigbee2mqtt zigbee2mqtt -"
+    "L+ /var/lib/zigbee2mqtt/external_converters/LTA016.ts - - - - ${./zigbee-converters/LTA016.ts}"
   ];
 
   systemd.services.mosquitto = {
