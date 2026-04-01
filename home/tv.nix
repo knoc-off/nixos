@@ -290,7 +290,7 @@ in {
           #!/usr/bin/env zsh
 
           moduleNames=(
-            "gtkconfig" # not sure about this # TODO TBD
+            "gtkconfig"
             "bluedevil"
             "networkmanagement"
             "networkstatus"

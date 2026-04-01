@@ -76,9 +76,6 @@
     };
     shellInitLast = ''
 
-      # ssh with kitty, if using kitty
-      # [ "$TERM" = "xterm-kitty" ] && alias ssh="kitty +kitten ssh"
-
       # This stupid magic function annoys me, of course it works
       # function fish_user_key_bindings
       #   bind --preset \cw backward-kill-word

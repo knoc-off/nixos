@@ -9,7 +9,6 @@
   plugins.codediff.enable = true;
 
   keymaps = [
-    # TODO: Git blame line
     {
       mode = "n";
       key = "<leader>gm";

@@ -248,11 +248,11 @@ in {
           light = "base05";
         };
         diffAddedLineNumberBg = {
-          dark = "base00-2"; # TODO
+          dark = "diffadded";
           light = "base06";
         };
         diffRemovedLineNumberBg = {
-          dark = "base00-2"; # TODO
+          dark = "diffremoved";
           light = "base06";
         };
 

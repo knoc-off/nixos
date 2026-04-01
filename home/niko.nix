@@ -102,6 +102,12 @@
   };
 in {
   imports = [
+    {programs.ghostty.package = lib.mkForce null;}
+    ./programs/terminal/ghostty
+
+    ./programs/terminal
+    ./programs/browser/firefox/default.nix
+
     ./programs/terminal # default
     ./programs/terminal/ghostty
     ./programs/terminal/programs/pueue.nix
