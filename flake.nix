@@ -143,7 +143,7 @@
 
     nixosConfigurations = listToAttrs [
       (mkHost "framework13" "knoff" "x86_64-linux")
-      (mkHost "thinkpad-work" "knoff" "x86_64-linux")
+      (mkHost "thinkpad-work" "niko" "x86_64-linux")
       (mkHost "nuci5" "tv" "x86_64-linux")
       (mkHost "hetzner" "knoff" "x86_64-linux")
       (mkHost "rpi-3a-plus" "root" "aarch64-linux")

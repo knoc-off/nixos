@@ -92,7 +92,7 @@ in {
           cp "$AUTH_FILE" "$AUTH_BAK"
           cp "$AUTH_API" "$AUTH_FILE"
 
-          (sleep 2 && [[ -f "$AUTH_BAK" ]] && mv "$AUTH_BAK" "$AUTH_FILE") &
+          (sleep 30 && [[ -f "$AUTH_BAK" ]] && mv "$AUTH_BAK" "$AUTH_FILE") &
           RESTORE_PID=$!
 
           opencode "$@"

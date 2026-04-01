@@ -4,32 +4,27 @@
   lib,
   ...
 }: let
-  # Palette: one color per repo, derived by hashing the remote URL.
   branchColors = [
-    "#e06c75" # soft red
-    "#98c379" # green
-    "#e5c07b" # warm yellow
-    "#61afef" # blue
-    "#c678dd" # purple
-    "#56b6c2" # teal
-    "#d19a66" # orange
-    "#be5046" # brick
-    "#7ec8e3" # sky blue
-    "#c3e88d" # lime
-    "#ffcb6b" # gold
-    "#f78c6c" # coral
-    "#bb80b3" # mauve
-    "#89ddff" # cyan
-    "#f07178" # pink
-    "#82aaff" # periwinkle
+    "#e06c75"
+    "#98c379"
+    "#e5c07b"
+    "#61afef"
+    "#c678dd"
+    "#56b6c2"
+    "#d19a66"
+    "#be5046"
+    "#7ec8e3"
+    "#c3e88d"
+    "#ffcb6b"
+    "#f78c6c"
+    "#bb80b3"
+    "#89ddff"
+    "#f07178"
+    "#82aaff"
   ];
 
-  # Inline the palette as a Perl array literal: ("#rrggbb", "#rrggbb", ...)
   colorArrayPerl = "(${builtins.concatStringsSep ", " (map (c: "\"${c}\"") branchColors)})";
 
-  # Single self-contained script: reads .git files directly (one git subprocess
-  # to find the git dir, then pure file I/O) → hashes remote URL → prints
-  # colored branch name with ANSI codes. No env vars, no extra processes.
   gitBranchColored = pkgs.writers.writePerlBin "git-branch-colored" {} ''
     use utf8;
     binmode STDOUT, ':utf8';
@@ -45,6 +40,9 @@
     my ($branch) = $head =~ m{^ref: refs/heads/(.+)$};
     $branch //= substr($head, 0, 8);
 
+    # Strip ticket prefix (e.g. INT-2895-) for display
+    (my $display = $branch) =~ s/^[A-Z]+-\d+-//i;
+
     my $url = 'local';
     if (open my $cfg, '<', "$gitdir/config") {
       my $in_origin = 0;
@@ -59,15 +57,55 @@
     $h = (($h << 5) + $h + ord($_)) & 0xFFFFFFFF for split //, $url;
     my $idx = $h % scalar @colors;
 
-    if (length($branch) > 25) {
-      my $start = substr($branch, 0, 10);
-      my $end   = substr($branch, -9);
-      $branch = "$start\x{2026}$end";
+    if (length($display) > 25) {
+      my $start = substr($display, 0, 10);
+      my $end   = substr($display, -9);
+      $display = "$start\x{2026}$end";
     }
 
     my ($r, $g, $b) = map { hex } ($colors[$idx] =~ /^#(..)(..)(..)$/);
 
-    printf "\e[1;38;2;%d;%d;%dm\x{f062c} %s\e[0m", $r, $g, $b, $branch;
+    printf "\e[1;38;2;%d;%d;%dm%s\e[0m", $r, $g, $b, $display;
+  '';
+
+  linearTicket = pkgs.writeShellScriptBin "linear-ticket" ''
+    branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
+    ticket=$(echo "$branch" | grep -oiP '^[A-Z]+-\d+') || exit 0
+
+    json=$(linear i v "$ticket" -j 2>/dev/null) || exit 0
+
+    state_color=$(echo "$json" | jq -r '.state.color // empty')
+    linear_url=$(echo "$json" | jq -r '.url // empty')
+    [ -z "$state_color" ] || [ -z "$linear_url" ] && exit 0
+
+    r=$(printf '%d' "0x''${state_color:1:2}")
+    g=$(printf '%d' "0x''${state_color:3:2}")
+    b=$(printf '%d' "0x''${state_color:5:2}")
+
+    printf '\e[38;2;%d;%d;%dm\e]8;;%s\e\\● %s\e]8;;\e\\\e[0m' \
+      "$r" "$g" "$b" "$linear_url" "$ticket"
+  '';
+
+  upstreamLink = pkgs.writeShellScriptBin "upstream-link" ''
+    branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
+    remote_url=$(git remote get-url origin 2>/dev/null) || exit 0
+    repo=$(echo "$remote_url" | sed -E 's|.*github\.com[:/]||; s|\.git$||')
+
+    json=$(${pkgs.gh}/bin/gh pr view --json url,state 2>/dev/null) || {
+      create_url="https://github.com/$repo/compare/$branch?expand=1"
+      printf '\e[2;37m\e]8;;%s\e\\󰘬\e]8;;\e\\\e[0m' "$create_url"
+      exit 0
+    }
+
+    url=$(echo "$json" | jq -r '.url' | tr -d '\n')
+    state=$(echo "$json" | jq -r '.state' | tr -d '\n')
+    case "$state" in
+      MERGED) color="38;2;163;113;247" ;;
+      OPEN)   color="38;2;63;185;80"   ;;
+      *)      color="38;2;128;128;128" ;;
+    esac
+
+    printf '\e[%sm\e]8;;%s\e\\󰘬\e]8;;\e\\\e[0m' "$color" "$url"
   '';
 in {
   imports = [
@@ -94,9 +132,27 @@ in {
           rust_version = {
             run = "rustc --version | cut -d' ' -f2 | cut -d. -f1,2";
             check = "which rustc";
-            check_interval = "2s";
             env = ["CWD" "PATH"];
             exec_in_cwd = true;
+          };
+          linear_ticket = {
+            run = "${linearTicket}/bin/linear-ticket"; # or the resolved store path;
+            check = "git rev-parse --abbrev-ref HEAD";
+            check_interval = "5m";
+            watch = [".git/HEAD"];
+            env = ["CWD"];
+            exec_in_cwd = true;
+            idle_timeout = "30m";
+          };
+          upstream_link = {
+            run = "${upstreamLink}/bin/upstream-link";
+            check = "git rev-parse --abbrev-ref HEAD";
+            check_interval = "5m";
+            interval = "5m"; # also poll — PR might be created while on the same branch;
+            watch = [".git/HEAD"];
+            env = ["CWD"];
+            exec_in_cwd = true;
+            idle_timeout = "30m";
           };
         };
       };
@@ -109,9 +165,8 @@ in {
     settings = {
       add_newline = false;
 
-      format = "((($python )(\${custom.rust} )$nix_shell )(\${custom.git_branch} )\n)$directory( $cmd_duration)$line_break$character";
-
-      scan_timeout = 10;
+      # format = "((($python )(\${custom.rust} )$nix_shell )(\${custom.upstream_link} (\${custom.linear_ticket}-)\${custom.git_branch} )\n)$directory( $cmd_duration)$line_break$character";
+      format = "((($python )(\${custom.rust} )$nix_shell )(\${custom.upstream_link} (\${custom.linear_ticket}-)\${custom.git_branch} )\n)$directory( $cmd_duration)$line_break$character";
       command_timeout = 500;
 
       character = {
@@ -186,6 +241,26 @@ in {
 
       custom.git_branch = {
         command = "git_branch";
+        use_stdin = false;
+        shell = ["${self.packages.${pkgs.stdenv.hostPlatform.system}.prompt-daemon}/bin/prompt-client"];
+        detect_folders = [".git"];
+        when = "true";
+        style = "";
+        symbol = "";
+        format = "$output";
+      };
+      custom.linear_ticket = {
+        command = "linear_ticket";
+        use_stdin = false;
+        shell = ["${self.packages.${pkgs.stdenv.hostPlatform.system}.prompt-daemon}/bin/prompt-client"];
+        detect_folders = [".git"];
+        when = "true";
+        style = "";
+        symbol = "";
+        format = "$output";
+      };
+      custom.upstream_link = {
+        command = "upstream_link";
         use_stdin = false;
         shell = ["${self.packages.${pkgs.stdenv.hostPlatform.system}.prompt-daemon}/bin/prompt-client"];
         detect_folders = [".git"];

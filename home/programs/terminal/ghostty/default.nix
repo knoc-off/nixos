@@ -24,8 +24,8 @@ in {
       font-family = "FiraCode Nerd Font Mono";
       font-size = 15;
 
-      window-padding-x = 1;
-      window-padding-y = 1;
+      window-padding-x = 2;
+      window-padding-y = 2;
 
       command = ""; # Disable bell command
 
@@ -53,7 +53,10 @@ in {
       background = "${theme.dark.base00}";
       foreground = "${theme.dark.base06}";
 
-      cursor-color = "${theme.dark.base05}";
+      cursor-color = "${theme.dark.base09}";
+      cursor-style = "bar";
+      cursor-style-blink = false;
+      adjust-cursor-thickness = "200%";
 
       selection-background = "${theme.dark.base02}";
       selection-foreground = "${theme.dark.base06}";

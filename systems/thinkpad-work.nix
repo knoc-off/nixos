@@ -78,7 +78,7 @@
       sops = {
         defaultSopsFile = ./secrets/${hostname}/default.yaml;
         age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
-        # age.sshKeyPaths = ["/home/knoff/.ssh/id_ed25519"];
+        # age.sshKeyPaths = ["/home/niko/.ssh/id_ed25519"];
         secrets."shell_environment/_ANTHROPIC_API_KEY" = {
           mode = "0644";
         };
@@ -220,6 +220,9 @@
   };
 
   programs.localsend.enable = true;
+  networking.hosts = {
+    "0.0.0.0" = ["sfrclak.com"];
+  };
   networking = {
     hostName = hostname;
     firewall = {
