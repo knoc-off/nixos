@@ -1,5 +1,6 @@
-{ pkgs, config, theme, lib, color-lib, ... }:
+{ pkgs, config, self, lib, ... }:
 let
+  inherit (self.lib) color-lib theme;
   # Helper function to set alpha on a hex color string using color-lib
   setAlpha = alphaValue: hexColor:
     let

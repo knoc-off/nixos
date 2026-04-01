@@ -27,9 +27,6 @@
       extraModules ? [],
       extraConfigs ? {},
     }: let
-      inherit (self.lib) math color-lib;
-      theme = import ./theme.nix {inherit color-lib math lib;};
-
       mkSystem =
         # move this to inputs, override-able
         if lib.strings.hasSuffix "darwin" system
@@ -40,16 +37,11 @@
         inherit system;
         specialArgs =
           {
-            inherit # TODO: i want to phase out all of these. its a mess
-              self # needed
-              inputs # needed
-              hostname # needed
-              user # needed
-              system # not needed
-              theme # not here
-              color-lib # not here/not needed
-              math # not here/not needed
-              lib # this is redundant
+            inherit
+              self
+              inputs
+              hostname
+              user
               ;
             upkgs = unstablePkgs system;
           }

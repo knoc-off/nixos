@@ -1,10 +1,10 @@
 {
-  color-lib,
-  theme,
+  self,
   lib,
   pkgs,
   ...
 }: let
+  inherit (self.lib) color-lib theme;
   inherit (color-lib) setOkhslLightness setOkhslSaturation;
   lighten = setOkhslLightness 0.7;
   saturate = setOkhslSaturation 0.9;

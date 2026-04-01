@@ -1,6 +1,6 @@
-{ pkgs, lib, config, theme, color-lib, ... }:
+{ pkgs, lib, config, self, ... }:
 let
-  # Define lighten and saturate based on your color-lib
+  inherit (self.lib) color-lib theme;
   lighten = color-lib.setOkhslLightness 0.7;
   saturate = color-lib.setOkhslSaturation 0.9;
   sa = Hex: (lighten (saturate Hex));

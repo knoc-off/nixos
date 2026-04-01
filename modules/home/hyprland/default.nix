@@ -3,10 +3,10 @@
   lib,
   pkgs,
   config,
-  theme,
-  color-lib,
+  self,
   ...
 }: let
+  inherit (self.lib) color-lib theme;
   system = pkgs.stdenv.hostPlatform.system;
   noctaliaCmd = lib.getExe config.programs.noctalia-shell.package;
   noctalia = cmd: "${noctaliaCmd} ipc call ${cmd}";

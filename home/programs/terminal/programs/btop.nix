@@ -1,4 +1,7 @@
-{ theme, ... }: {
+{ self, ... }:
+let
+  inherit (self.lib) theme;
+in {
   programs.btop = {
     enable = true;
 

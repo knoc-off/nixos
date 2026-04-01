@@ -2,9 +2,10 @@
   inputs,
   lib,
   pkgs,
-  theme,
+  self,
   ...
 }: let
+  inherit (self.lib) theme;
   # Unified function to configure Noctalia plugins from flake inputs
   # Returns: { configFiles, settings } - derived from a single plugin list
   mkNoctaliaPlugins = plugins: {

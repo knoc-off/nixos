@@ -1,9 +1,9 @@
 {
   inputs,
-  self,
   pkgs,
   upkgs,
   user,
+  self,
   lib,
   ...
 }: let

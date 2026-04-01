@@ -1,4 +1,7 @@
-{ inputs, theme, pkgs, lib, ... }:
+{ inputs, self, pkgs, lib, ... }:
+let
+  inherit (self.lib) theme;
+in
 {
   imports = [ inputs.stylix.homeModules.stylix ];
 

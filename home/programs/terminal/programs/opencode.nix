@@ -1,15 +1,15 @@
 {
   self,
-  theme,
-  color-lib,
   upkgs,
   pkgs,
   lib,
   inputs,
-  system,
   ...
 }: let
-  # ── QML LSP import paths ───────────────────────────────────────────────────
+  inherit (self.lib) color-lib theme;
+  system = pkgs.stdenv.hostPlatform.system;
+
+  # QML LSP import paths
   # Exact quickshell version shipped with noctalia (has .qmltypes for all
   # Quickshell.* modules including Quickshell.Io)
   noctaliaShell = inputs.noctalia.packages.${system}.default;

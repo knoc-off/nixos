@@ -3,7 +3,6 @@
   pkgs,
   lib,
   modulesPath,
-  system,
   ...
 } @ options: let
   SSHKeys = [

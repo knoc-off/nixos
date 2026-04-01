@@ -1,6 +1,9 @@
-{lib ? import <nixpkgs/lib>}: {
+{lib ? import <nixpkgs/lib>}: let
   color-lib = import ./color-lib.nix {inherit lib;};
+in {
+  inherit color-lib;
   math = import ./math.nix {inherit lib;};
+  theme = import ../theme.nix {inherit lib color-lib;};
 
   # Recursively discover packages from a directory tree.
   # - foo.nix (not default.nix) -> { foo = pkgs.callPackage ./foo.nix {}; }

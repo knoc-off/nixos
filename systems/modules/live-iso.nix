@@ -3,9 +3,9 @@
   pkgs,
   lib,
   modulesPath,
-  system,
   ...
 } @ options: let
+  system = pkgs.stdenv.hostPlatform.system;
   SSHKeys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"
   ];

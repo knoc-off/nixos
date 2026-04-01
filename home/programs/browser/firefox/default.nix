@@ -1,12 +1,12 @@
 {
   inputs,
   pkgs,
-  theme,
+  self,
   lib,
-  color-lib,
   config,
   ...
 }: let
+  inherit (self.lib) color-lib theme;
   addons = inputs.firefox-addons.packages.${pkgs.stdenv.hostPlatform.system};
 
   firefox-csshacks = pkgs.stdenv.mkDerivation {

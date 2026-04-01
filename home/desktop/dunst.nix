@@ -1,6 +1,7 @@
-{ theme, color-lib, ... }:
+{ self, ... }:
 
 let
+  inherit (self.lib) color-lib theme;
   inherit (color-lib) hexToRgb rgbToHex setOkhslLightness mixColors;
 in
 {

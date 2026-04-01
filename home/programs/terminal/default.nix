@@ -1,7 +1,5 @@
 {
   pkgs,
-  theme,
-  color-lib,
   ...
 }: {
   imports = [
