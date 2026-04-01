@@ -2,7 +2,6 @@
   color-lib = import ./color-lib.nix {inherit lib;};
 in {
   inherit color-lib;
-  math = import ./math.nix {inherit lib;};
   theme = import ../theme.nix {inherit lib color-lib;};
 
   # Recursively discover packages from a directory tree.
@@ -14,26 +13,27 @@ in {
     discover = dir:
       lib.pipe (builtins.readDir dir) [
         (lib.filterAttrs (name: _: name != "default.nix" && !lib.hasPrefix "." name))
-        (lib.mapAttrs' (name: type:
-          if type == "regular" && lib.hasSuffix ".nix" name
-          then {
-            name = lib.removeSuffix ".nix" name;
-            value = pkgs.callPackage (dir + "/${name}") {};
-          }
-          else if type == "directory" && builtins.pathExists (dir + "/${name}/default.nix")
-          then {
-            name = name;
-            value = pkgs.callPackage (dir + "/${name}") {};
-          }
-          else if type == "directory"
-          then {
-            name = name;
-            value = discover (dir + "/${name}");
-          }
-          else {
-            name = name;
-            value = null;
-          }
+        (lib.mapAttrs' (
+          name: type:
+            if type == "regular" && lib.hasSuffix ".nix" name
+            then {
+              name = lib.removeSuffix ".nix" name;
+              value = pkgs.callPackage (dir + "/${name}") {};
+            }
+            else if type == "directory" && builtins.pathExists (dir + "/${name}/default.nix")
+            then {
+              name = name;
+              value = pkgs.callPackage (dir + "/${name}") {};
+            }
+            else if type == "directory"
+            then {
+              name = name;
+              value = discover (dir + "/${name}");
+            }
+            else {
+              name = name;
+              value = null;
+            }
         ))
         (lib.filterAttrs (_: v: v != null))
       ];
@@ -48,26 +48,27 @@ in {
     discover = dir:
       lib.pipe (builtins.readDir dir) [
         (lib.filterAttrs (name: _: name != "default.nix"))
-        (lib.mapAttrs' (name: type:
-          if type == "regular" && lib.hasSuffix ".nix" name
-          then {
-            name = lib.removeSuffix ".nix" name;
-            value = import (dir + "/${name}");
-          }
-          else if type == "directory" && builtins.pathExists (dir + "/${name}/default.nix")
-          then {
-            name = name;
-            value = import (dir + "/${name}");
-          }
-          else if type == "directory"
-          then {
-            name = name;
-            value = discover (dir + "/${name}");
-          }
-          else {
-            name = name;
-            value = null;
-          }
+        (lib.mapAttrs' (
+          name: type:
+            if type == "regular" && lib.hasSuffix ".nix" name
+            then {
+              name = lib.removeSuffix ".nix" name;
+              value = import (dir + "/${name}");
+            }
+            else if type == "directory" && builtins.pathExists (dir + "/${name}/default.nix")
+            then {
+              name = name;
+              value = import (dir + "/${name}");
+            }
+            else if type == "directory"
+            then {
+              name = name;
+              value = discover (dir + "/${name}");
+            }
+            else {
+              name = name;
+              value = null;
+            }
         ))
         (lib.filterAttrs (_: v: v != null))
       ];
