@@ -55,7 +55,7 @@
         ["D "] = { symbol = "-", hl = "GitSignsDelete" },  -- Deleted
         ["AM"] = { symbol = "⊕", hl = "GitSignsChange" },
         ["AD"] = { symbol = "⊖", hl = "GitSignsChange" },
-        ["R "] = { symbol = "→", hl = "GitSignsChange" },  -- Renamed
+        ["R "] = { symbol = "->", hl = "GitSignsChange" },  -- Renamed
         ["U "] = { symbol = "‖", hl = "GitSignsChange" },  -- Unmerged
         ["UU"] = { symbol = "⇄", hl = "GitSignsChange" },
         ["UA"] = { symbol = "⊕", hl = "GitSignsAdd" },

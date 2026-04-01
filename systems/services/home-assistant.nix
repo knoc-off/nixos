@@ -72,11 +72,8 @@ in {
         unit_system = "metric";
       };
 
-      mqtt = {
-        broker = "127.0.0.1";
-        port = 1883;
-        discovery = true;
-      };
+      # MQTT is configured via HA UI integration, not here.
+      # Declarative mqtt config conflicts with the UI-based setup.
 
       notify = [
         {
@@ -117,9 +114,12 @@ in {
     after = ["mosquitto.service" "network-online.target"];
     wants = ["network-online.target"];
     bindsTo = ["mosquitto.service"];
+    environment.NODE_OPTIONS = "--max-old-space-size=64";
     serviceConfig = {
       Restart = lib.mkForce "always";
       RestartSec = lib.mkForce "5s";
+      MemoryMax = "120M";
+      MemoryHigh = "100M";
     };
     unitConfig = {
       StartLimitIntervalSec = 300;
@@ -134,6 +134,8 @@ in {
     serviceConfig = {
       Restart = lib.mkForce "always";
       RestartSec = lib.mkForce "5s";
+      MemoryMax = "150M";
+      MemoryHigh = "120M";
     };
     unitConfig = {
       StartLimitIntervalSec = 300;

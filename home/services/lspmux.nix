@@ -4,10 +4,10 @@
   ];
   services.lspmux.settings = {
     pass_environment = [
-      # --- Core identity / basic runtime ---
+      # Core identity / basic runtime
       "HOME"
 
-      # --- Rust / Cargo ---
+      # Rust / Cargo
       # (keep even if some aren't currently set; harmless)
       "RUST_SRC_PATH"
       "RUSTUP_HOME"

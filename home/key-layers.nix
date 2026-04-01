@@ -74,7 +74,7 @@
 #   result.hyprkanRules   -- list of hyprkan rule attrsets
 #   result.kanataConfig   -- function: extraAliases string -> kanata config string
 {lib}: let
-  # --- Modifier configuration ---
+  # Modifier configuration
   modPrefix = {
     ctrl = "C";
     shift = "S";
@@ -82,7 +82,7 @@
   };
   modNames = builtins.attrNames modPrefix;
 
-  # --- Fork configuration ---
+  # Fork configuration
   # Check order determines priority: shift > ctrl > alt
   modCheckOrder = ["shift" "ctrl" "alt"];
   modForkKeys = {
@@ -101,7 +101,7 @@
     "alt_ctrl_shift"
   ];
 
-  # --- Detection ---
+  # Detection
   # An attrset is a fork if it has fork fields and NO simple action fields.
   isFork = value:
     builtins.isAttrs value
@@ -111,7 +111,7 @@
     && !(value ? mod)
     && builtins.any (field: value ? ${field}) forkFields;
 
-  # --- Shared key expression compilation ---
+  # Shared key expression compilation
   # Core compilation used by both capsbinds and binds.
   compileKeyExpr = keyName: action:
     if action ? raw
@@ -134,7 +134,7 @@
     then base
     else "(multi (release-key rmet) ${base})";
 
-  # --- Normalization ---
+  # Normalization
   # In capsbinds, string shorthand = modifier name: "ctrl" -> { mod = "ctrl"; }
   normalizeCapsAction = keyName: action:
     if builtins.isString action
@@ -147,7 +147,7 @@
     then {key = action;}
     else action;
 
-  # --- Fork compilation ---
+  # Fork compilation
   # Canonical name for a set of held modifiers (sorted alphabetically).
   modComboName = mods:
     if mods == []
@@ -199,13 +199,13 @@
   in
     buildTree [] modCheckOrder;
 
-  # --- Bind compilation (dispatches to simple or fork) ---
+  # Bind compilation (dispatches to simple or fork)
   compileBind = keyName: value:
     if isFork value
     then compileFork keyName value
     else compileKeyExpr keyName (normalizeBindAction keyName value);
 
-  # --- Capsbinds normalization ---
+  # Capsbinds normalization
   # Expands bulk modifier lists + per-key overrides into { key = action; }
   normalizeCapsBinds = capsbinds: let
     bulkEntries =
@@ -225,7 +225,7 @@ in
   layers: let
     layerNames = builtins.attrNames layers;
 
-    # --- Normalize capsbinds for all layers ---
+    # Normalize capsbinds for all layers
     normalizedCaps =
       lib.mapAttrs (
         _: layer:
@@ -233,7 +233,7 @@ in
       )
       layers;
 
-    # --- Caps alias generation ---
+    # Caps alias generation
     allCapsAliases = let
       pairs = lib.concatLists (lib.mapAttrsToList (
           _: keyMap:
@@ -262,7 +262,7 @@ in
     capsAliasLines =
       lib.mapAttrsToList (name: pair: "${name} ${pair.compiled}") allCapsAliases;
 
-    # --- Bind alias generation ---
+    # Bind alias generation
     allBindAliases = let
       pairs = lib.concatLists (lib.mapAttrsToList (
           _: layer:
@@ -294,7 +294,7 @@ in
     # Combined alias lines
     allAliasLines = capsAliasLines ++ bindAliasLines;
 
-    # --- Layermap generation ---
+    # Layermap generation
     mkCapsLayermap = keyMap:
       lib.concatStringsSep "  " (
         lib.mapAttrsToList (

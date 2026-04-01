@@ -13,13 +13,13 @@ function Write-Log($msg) {
 
 Write-Log "=== VM post-install setup starting ==="
 
-# --- 1. Execution policy ---
+# 1. Execution policy
 
 Write-Log "Setting execution policy to Unrestricted..."
 Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Scope LocalMachine -Force
 Write-Log "Execution policy set"
 
-# --- 2. OpenSSH Server (for sshfs access from host) ---
+# 2. OpenSSH Server (for sshfs access from host)
 
 Write-Log "Installing OpenSSH Server..."
 $sshCap = Get-WindowsCapability -Online | Where-Object { $_.Name -like 'OpenSSH.Server*' }
@@ -65,7 +65,7 @@ if ($keyFile) {
     Write-Log "WARNING: No authorized_keys file found on any drive"
 }
 
-# --- 3. VirtIO FS service ---
+# 3. VirtIO FS service
 
 Write-Log "Configuring VirtioFsSvc..."
 sc.exe config VirtioFsSvc start=auto 2>&1 | Out-Null

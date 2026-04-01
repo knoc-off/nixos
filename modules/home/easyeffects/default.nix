@@ -8,16 +8,14 @@
   presets = cfg.presets;
   jsonFormat = pkgs.formats.json {};
 
-  # ===========================================================================
   # Preset definitions
   #
   # Each preset is a named attrset containing a full easyeffects JSON preset.
   # The top-level key (input/output) determines which pipeline it targets.
   # Presets are placed as separate files in ~/.local/share/easyeffects/{input,output}/
   # and referenced by name from autoload profiles.
-  # ===========================================================================
 
-  # --- Input presets ---------------------------------------------------------
+  # Input presets
 
   inputPresets = {
     mic-denoise = {
@@ -154,10 +152,10 @@
     };
   };
 
-  # --- Output presets --------------------------------------------------------
+  # Output presets
 
   outputPresets = {
-    # Framework 13 speaker correction — measured by Kieran Levin (Framework engineer).
+    # Framework 13 speaker correction -- measured by Kieran Levin (Framework engineer).
     # Source: https://github.com/ceiphr/ee-framework-presets (kieran_levin.json)
     framework-speakers = {
       output = {
@@ -185,7 +183,7 @@
       };
     };
 
-    # Loudness equalizer — ISO 226 equal-loudness contour approximation.
+    # Loudness equalizer -- ISO 226 equal-loudness contour approximation.
     # Source: Digitalone1/EasyEffects-Presets
     loudness-equalizer = {
       output = {
@@ -279,7 +277,7 @@
     };
   };
 
-  # --- Passthrough preset (empty plugin chain) -------------------------------
+  # Passthrough preset (empty plugin chain)
   passthrough = direction: {
     ${direction} = {
       blocklist = [];
@@ -287,10 +285,8 @@
     };
   };
 
-  # ===========================================================================
   # Collect all preset names referenced by autoload profiles, so we know which
   # preset files to generate.
-  # ===========================================================================
 
   autoloadCfg = cfg.autoload;
 
@@ -305,9 +301,7 @@
     then outputPresets.${name} or (throw "easyeffects: unknown output preset '${name}'")
     else inputPresets.${name} or (throw "easyeffects: unknown input preset '${name}'");
 
-  # ===========================================================================
   # Generate xdg.dataFile entries
-  # ===========================================================================
 
   # Preset files: ~/.local/share/easyeffects/{input,output}/<name>.json
   outputPresetFiles = lib.listToAttrs (map (name:
@@ -345,9 +339,7 @@
 
   hasAutoload = autoloadCfg.output != {} || autoloadCfg.input != {};
 
-  # ===========================================================================
   # Autoload submodule type
-  # ===========================================================================
 
   autoloadEntryType = lib.types.submodule {
     options = {
@@ -409,7 +401,7 @@ in {
     (lib.mkIf hasAutoload {
       xdg.dataFile = outputPresetFiles // inputPresetFiles // outputAutoloadFiles // inputAutoloadFiles;
 
-      # Autoload profiles handle everything — easyeffects watches PipeWire for
+      # Autoload profiles handle everything -- easyeffects watches PipeWire for
       # device/route changes and loads the matching preset automatically, including
       # on initial startup when it first sees the active devices.
       # No ExecStartPost needed (and --load-preset is broken in service mode anyway).

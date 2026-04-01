@@ -16,7 +16,7 @@ let
 
   # Define all the test sets in a separate attribute set
   testSets = rec {
-    # --- Tests for math.nix ---
+    # Tests for math.nix
 
     testConstants = {
       # Test pi
@@ -297,7 +297,7 @@ let
            true;
     };
 
-    # --- Tests for equations.nix ---
+    # Tests for equations.nix
 
     testCoordinateSystems = {
       # Test cartesianToPolar
@@ -458,7 +458,7 @@ let
 in
 # Return the test sets, adding the aggregate runner
 testSets // {
-  # --- Aggregate Test Runner ---
+  # Aggregate Test Runner
   # This attribute recursively checks all assertions in the nested sets.
   # Evaluating this attribute will run all tests.
   runAllTests = lib.recurseIntoAttrs testSets;

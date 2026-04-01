@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# --- Locate artifacts ---
+# Locate artifacts
 
 # nix build output: files are alongside this script
 # local build: files are in pkg/ and vendor/
@@ -31,7 +31,7 @@ if [[ -d "$SCRIPT_DIR/templates" ]]; then
     TEMPLATES_DIR="$SCRIPT_DIR/templates"
 fi
 
-# --- Detect Anki ---
+# Detect Anki
 
 if [[ "$(uname)" == "Darwin" ]]; then
     ANKI_BASE="$HOME/Library/Application Support/Anki2"
@@ -45,7 +45,7 @@ if [[ ! -d "$ANKI_BASE" ]]; then
     exit 1
 fi
 
-# --- Select profile ---
+# Select profile
 
 PROFILES=()
 while IFS= read -r dir; do
@@ -81,7 +81,7 @@ fi
 
 MEDIA_DIR="$ANKI_BASE/$PROFILE/collection.media"
 
-# --- Install files ---
+# Install files
 
 echo ""
 echo "Installing to: $MEDIA_DIR"
@@ -99,7 +99,7 @@ echo "  _marki.js       OK"
 echo "  _marki_bg.wasm  OK"
 echo "  _hljs.js        OK"
 
-# --- Print setup instructions ---
+# Print setup instructions
 
 echo ""
 echo "=== Note Type Setup ==="

@@ -1,5 +1,5 @@
 # Avante.nvim - AI agent UI via ACP (Agent Client Protocol)
-# Uses OpenCode as the backend agent — all tools, MCP servers, rules, and
+# Uses OpenCode as the backend agent -- all tools, MCP servers, rules, and
 # permissions are handled by OpenCode. Avante is just the neovim UI layer.
 {lib, ...}: {
   plugins.avante = {

@@ -10,7 +10,7 @@
 */
 
 rec {
-  # --- Constants ---
+  # Constants
   pi = 3.141592653589793;
   tau = 2.0 * pi;
   pi_half = pi / 2.0;
@@ -27,7 +27,7 @@ rec {
   # Physics/Geography
   earthRadiusMeters = 6371000.0; # Mean radius of Earth in meters
 
-  # --- Core Functions ---
+  # Core Functions
   safeDiv = num: den: if den == 0 then 0 else num / den;
 
   # Basic arithmetic helpers
@@ -117,8 +117,8 @@ rec {
         in cubicBezierY y1 y2 u_approx;
     in result;
 
-  # --- Keep the other Bézier functions as they were, they are correct ---
-  # --- for their specific definitions (e.g., bezier3 takes 4 points) ---
+  # Keep the other Bézier functions as they were, they are correct
+  # for their specific definitions (e.g., bezier3 takes 4 points)
 
   # Linear Bézier curve (equivalent to lerp)
   bezier1 = p0: p1: t: lerp p0 p1 t;
@@ -184,7 +184,7 @@ rec {
   # Returns the linearly interpolated y-value corresponding to t.
   linearInterpolatePoints = points: t:
     let
-      # --- Input Validation ---
+      # Input Validation
       _assertList = assert builtins.isList points; ""; # Use dummy var to ensure evaluation
       _assertLength = assert builtins.length points >= 2; "";
       _assertPointsFormat = assert builtins.all (p: builtins.isList p && builtins.length p == 2) points; "";
@@ -200,7 +200,7 @@ rec {
       # Clamp t to the range of x-values in the points
       clampedT = clamp t firstX lastX;
 
-      # --- Find the segment containing t ---
+      # Find the segment containing t
       findSegment = index:
         let
           p0 = builtins.elemAt points index;
@@ -402,7 +402,7 @@ rec {
           res_abs = pow_iter base abs_exp 1.0;
         in if exp_int < 0 then 1.0 / res_abs else res_abs;
 
-      # --- Step 1: Range Reduction ---
+      # Step 1: Range Reduction
       # Reduce x to r + k*ln(2), where r is in [-ln(2)/2, ln(2)/2]
       # We want x = k*ln(2) + r  =>  x/ln(2) = k + r/ln(2)
       # Let k = round(x/ln(2)), then r = x - k*ln(2)
@@ -412,7 +412,7 @@ rec {
       r_untraced = x - (k * ln2);
       r = r_untraced; # Removed trace
 
-      # --- Step 2: Calculate e^r using direct summation of Taylor series ---
+      # Step 2: Calculate e^r using direct summation of Taylor series
       # e^r = 1 + r + r^2/2! + r^3/3! + ...
       # Calculate terms iteratively: term_n = term_{n-1} * r / n
       exp_r_untraced = let
@@ -435,11 +435,11 @@ rec {
       in term0 + term1 + term2 + term3 + term4 + term5 + term6 + term7 + term8
       + term9 + term10 + term11 + term12 + term13;
 
-      # --- Step 3: Calculate 2^k ---
+      # Step 3: Calculate 2^k
       pow2_k_untraced = integerPow 2.0 k_int;
       pow2_k = pow2_k_untraced;
 
-      # --- Step 4: Combine and Final Result ---
+      # Step 4: Combine and Final Result
       result_untraced = pow2_k * exp_r_untraced;
       result = result_untraced;
 
@@ -480,7 +480,7 @@ rec {
       # fmod(a, n) = a - n * floor(a / n)
       fmod = a: n: a - n * (builtins.floor (a / n));
 
-      # --- Step 1: Range Reduction ---
+      # Step 1: Range Reduction
 
       # Reduce x to the primary range [-pi, pi) using tau = 2*pi
       # x_mod_tau = fmod x tau; # This gives [0, tau) or (-tau, 0]
@@ -497,7 +497,7 @@ rec {
       x_final = if x_abs > pi_half then pi - x_abs else x_abs;
       # x_final is now in [0, pi/2]
 
-      # --- Step 2: Calculate sin(x_final) using iterative Taylor series ---
+      # Step 2: Calculate sin(x_final) using iterative Taylor series
       # sin(y) = y - y^3/3! + y^5/5! - ...
       # term_{n+1} = term_n * (-y^2) / ((2n+3)*(2n+2))
 
@@ -533,7 +533,7 @@ rec {
         # Start the loop: sum starts with the first term, first term is y, n=0
       in sum_loop y y 0.0;
 
-      # --- Step 3: Apply the sign ---
+      # Step 3: Apply the sign
     in initial_sign * series_sum;
 
   cos = x: sin (0.5 * pi - x);

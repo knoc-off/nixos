@@ -17,7 +17,7 @@
       all.apcu
     ]);
 
-  # The app's webroot — a mutable working copy derived from the immutable
+  # The app's webroot -- a mutable working copy derived from the immutable
   # Nix store package, with cache/logs symlinked from the state directory.
   appRoot = "${cfg.dataDir}/webroot";
 

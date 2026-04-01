@@ -139,17 +139,17 @@ in {
             preset = "framework-speakers";
             description = "Ryzen HD Audio Controller Analog Stereo";
           };
-          # Wired headphones — no processing
+          # Wired headphones -- no processing
           "alsa_output.pci-0000_c1_00.6.analog-stereo:Headphones" = {
             preset = "passthrough";
             description = "Ryzen HD Audio Controller Analog Stereo";
           };
-          # AirPods Pro 2 (A2DP) — no processing
+          # AirPods Pro 2 (A2DP) -- no processing
           "bluez_output.F0_04_E1_D9_23_73.1:Headphone" = {
             preset = "passthrough";
             description = "AirPods Pro";
           };
-          # AirPods Pro 2 (HFP/handsfree) — no processing
+          # AirPods Pro 2 (HFP/handsfree) -- no processing
           "bluez_output.F0_04_E1_D9_23_73.1:Handsfree" = {
             preset = "passthrough";
             description = "AirPods Pro";

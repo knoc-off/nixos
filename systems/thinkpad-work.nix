@@ -57,7 +57,7 @@
       # xe: i915_flip kworkers get stuck in D-state, causing system-wide I/O
       #     stalls and intermittent multi-second freezes (kernel 6.19.3).
       # i915: has had GPU HANG reports on this hardware in earlier kernels.
-      # Using i915 for now as the lesser of two evils — revisit when xe
+      # Using i915 for now as the lesser of two evils -- revisit when xe
       # display flip handling matures.
       hardware.intelgpu.driver = "i915";
       boot.blacklistedKernelModules = [
@@ -299,7 +299,7 @@
       "i915.enable_psr=0" # Disable Panel Self Refresh - mitigates atomic update failures and freezes on Arrow Lake-P
     ];
     kernel.sysctl = {
-      # Minimize swap usage — plenty of RAM available; only swap under real
+      # Minimize swap usage -- plenty of RAM available; only swap under real
       # memory pressure.  Keeps the slow btrfs swap file for hibernation only.
       "vm.swappiness" = 1;
       # Reclaim vfs caches less aggressively (default 100 = equal pressure on

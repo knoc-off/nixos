@@ -25,9 +25,37 @@
       grub.enable = false;
       generic-extlinux-compatible.enable = true;
     };
+    # Disable bluetooth (fails every boot, saves memory)
+    blacklistedKernelModules = ["btsdio" "hci_uart" "bluetooth"];
   };
 
-  hardware.enableRedistributableFirmware = true;
+  hardware = {
+    enableRedistributableFirmware = true;
+    bluetooth.enable = false;
+  };
+
+  # NOTE: gpu_mem=16 is set manually in /dev/mmcblk0p1/config.txt (firmware partition)
+  # This reduces GPU memory from 64MB to 16MB, freeing ~48MB for the system.
+  # Must be re-applied if the SD card is re-flashed.
+
+  # Compressed in-RAM swap - much faster than SD card swap, effectively
+  # multiplies available memory via compression (~2-3x ratio)
+  zramSwap = {
+    enable = true;
+    memoryPercent = 50; # up to 50% of RAM as zram swap
+    algorithm = "zstd";
+    priority = 100; # prefer zram over disk swap
+  };
+
+  # Userspace OOM killer - prevents hard lockups by killing the largest
+  # process before the system becomes completely unresponsive.
+  # systemd-oomd cannot work on this kernel (no PSI support).
+  services.earlyoom = {
+    enable = true;
+    freeMemThreshold = 5;
+    freeSwapThreshold = 10;
+    enableNotifications = false;
+  };
 
   fileSystems."/" = {
     device = "/dev/disk/by-label/NIXOS_SD";
@@ -47,7 +75,7 @@
   swapDevices = [
     {
       device = "/var/lib/swapfile";
-      size = 512; # 500mb
+      size = 1024;
     }
   ];
 

@@ -10,7 +10,7 @@
   pam_fprintd_grosshackSo = "${grosshack}/lib/security/pam_fprintd_grosshack.so";
 
   # PAM services to enable grosshack fingerprint auth on.
-  # greetd is excluded — its gnome-keyring integration adds extra pam_unix
+  # greetd is excluded -- its gnome-keyring integration adds extra pam_unix
   # (unix-early) before grosshack, causing multiple password prompts.
   pamServices = [
     "sudo"
@@ -24,7 +24,7 @@
 
   mkGrosshackService = name: {
     ${name} = {
-      # Disable the default sequential pam_fprintd.so — grosshack replaces it.
+      # Disable the default sequential pam_fprintd.so -- grosshack replaces it.
       fprintAuth = false;
 
       # Insert grosshack immediately before pam_unix in the auth chain.

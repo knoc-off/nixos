@@ -505,7 +505,7 @@ in {
 #
 #     # Define your custom colorscheme here
 #     colorscheme = {
-#       # --- Replace these placeholder hex codes with your desired colors ---
+#       # Replace these placeholder hex codes with your desired colors
 #       base00 = "#${theme.dark.base00}"; # #1d2021 Default Background
 #       base01 = "#${theme.dark.base01}"; # #3c3836 Lighter Background (Status Bar)
 #       base02 = "#${theme.dark.base02}"; # #504945 Selection Background
@@ -522,7 +522,7 @@ in {
 #       base0D = "#${theme.dark.base0D}"; # #83a598 Functions, Methods, Attribute IDs, Headings
 #       base0E = "#${theme.dark.base0E}"; # #d3869b Keywords, Storage, Selector, Markup Italic, Diff Changed
 #       base0F = "#${theme.dark.base0F}"; # #d65d0e Deprecated, Opening/Closing Embedded Language Tags e.g. <?php ?>
-#       # --- End of custom color definitions ---
+#       # End of custom color definitions
 #     };
 #
 #     # Optional: Configure integrations (defaults are shown in the plugin definition)

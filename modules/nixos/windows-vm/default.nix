@@ -85,7 +85,7 @@
   # Bundle VirtIO drivers + guest tools + patched XML + post-install script
   # into a single ISO.  This replaces NixVirt's separate virtio-win CDROM
   # so that virtio-win-guest-tools.exe, the driver tree, autounattend.xml,
-  # and setup-vm.ps1 all live on the same drive letter — guaranteeing the
+  # and setup-vm.ps1 all live on the same drive letter -- guaranteeing the
   # post-install script can always find the guest-tools installer.
   deployIso =
     if patchedAutounattend != null
@@ -253,7 +253,7 @@ in {
       default = "user";
       description = ''
         Local administrator account created during unattended install.
-        No password is set — the account auto-logs in once for
+        No password is set -- the account auto-logs in once for
         FirstLogonCommands, then behaves as a normal local account.
       '';
     };
@@ -308,7 +308,7 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
-    # --- Virtualization base ---
+    # Virtualization base
     virtualisation.libvirtd = {
       enable = true;
       onBoot = "ignore";
@@ -350,7 +350,7 @@ in {
     in
       lib.mkForce ["" script];
 
-    # --- Directories ---
+    # Directories
     systemd.tmpfiles.rules =
       [
         "d ${cfg.storagePath} 0755 root root -"
@@ -362,7 +362,7 @@ in {
         "d ${cfg.sharePath} 0777 root root -"
       ];
 
-    # --- sshfs automount (host access to VM filesystem) ---
+    # sshfs automount (host access to VM filesystem)
     programs.fuse.userAllowOther = lib.mkIf (cfg.hostMountPath != null) true;
 
     fileSystems = lib.mkIf (cfg.hostMountPath != null) {
@@ -384,7 +384,7 @@ in {
       };
     };
 
-    # --- NixVirt ---
+    # NixVirt
     virtualisation.libvirt = {
       enable = true;
       swtpm.enable = true;

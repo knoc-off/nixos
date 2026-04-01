@@ -25,6 +25,9 @@
 
   colorArrayPerl = "(${builtins.concatStringsSep ", " (map (c: "\"${c}\"") branchColors)})";
 
+  # Single self-contained script: reads .git files directly (one git subprocess
+  # to find the git dir, then pure file I/O) -> hashes remote URL -> prints
+  # colored branch name with ANSI codes. No env vars, no extra processes.
   gitBranchColored = pkgs.writers.writePerlBin "git-branch-colored" {} ''
     use utf8;
     binmode STDOUT, ':utf8';

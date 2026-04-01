@@ -80,7 +80,7 @@ python3Packages.buildPythonApplication rec {
   ];
 
   # pyright is listed as a runtime dep upstream (likely a mistake)
-  # — it's a type checker and not needed at runtime
+  # -- it's a type checker and not needed at runtime
   pythonRemoveDeps = ["pyright"];
 
   # Tests require postgres testcontainers / Docker

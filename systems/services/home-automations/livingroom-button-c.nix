@@ -3,20 +3,18 @@
   pkgs,
   ...
 }: let
-  # --- Entities ---
+  # Entities
   livingRoomLight = "light.living_room";
   buttonCTopic = "zigbee2mqtt/Button C/action";
 
-  # --- Color temperatures (mireds) ---
+  # Color temperatures (mireds)
   ctNeutral = 250; # ~4000K neutral
   ctWarmer = 370; # ~2700K warmer
 in {
   services.home-assistant = {
     config = {
       automation = [
-        # --------------------------------------------------------------
         # Button C: single = toggle on/off, double = toggle color temp
-        # --------------------------------------------------------------
         {
           id = "button_c_livingroom_light";
           alias = "Button C: living room light toggle / color temp";

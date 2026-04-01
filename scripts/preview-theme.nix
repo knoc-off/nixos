@@ -1,4 +1,4 @@
-# Called by preview-theme.fish — takes { variant } as argument.
+# Called by preview-theme.fish -- takes { variant } as argument.
 # variant: "dark", "light", or "both"
 { variant ? "both" }:
 let
@@ -7,7 +7,7 @@ let
   theme = import ../theme.nix { inherit lib color-lib; };
   c = color-lib;
 
-  # Real ESC byte (0x1B) — terminal interprets these directly.
+  # Real ESC byte (0x1B) -- terminal interprets these directly.
   esc = builtins.fromJSON ''"\u001b"'';
 
   hexToRgb = hex: {

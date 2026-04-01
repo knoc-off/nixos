@@ -120,7 +120,7 @@
           };
         };
 
-        # Called fresh on every RustAnalyzer start — injects RA_TARGET into
+        # Called fresh on every RustAnalyzer start -- injects RA_TARGET into
         # cargo.target so the lspmux instance and RA settings stay in sync.
         settings = lib.nixvim.mkRaw ''
           function(project_root, default_settings)
@@ -361,7 +361,7 @@
         vim.env.RA_TARGET = target
 
         -- Stop tears down the lspmux client pipe, start spawns a new one
-        -- that inherits the updated RA_TARGET env → lspmux routes to the
+        -- that inherits the updated RA_TARGET env -> lspmux routes to the
         -- matching instance (or spawns a fresh one). The server.settings
         -- function reads RA_TARGET on each start to keep cargo.target in sync.
         vim.cmd("RustAnalyzer stop")
@@ -373,7 +373,7 @@
             verb = "Cleared"
             display = "native"
           end
-          vim.notify(verb .. " rust-analyzer target → " .. display, vim.log.levels.INFO)
+          vim.notify(verb .. " rust-analyzer target -> " .. display, vim.log.levels.INFO)
         end, 200)
       end
 

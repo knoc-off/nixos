@@ -3,28 +3,26 @@
   pkgs,
   ...
 }: let
-  # --- Entities ---
+  # Entities
   bedroomLight = "light.bedroom_light";
   bedroomPlug = "switch.bedroom_plug";
   buttonATopic = "zigbee2mqtt/Button A/action";
 
-  # --- Helper entities ---
+  # Helper entities
   plugTimerSelect = "input_select.plug_auto_off";
   sunriseTimeEntity = "input_datetime.bedroom_sunrise_time";
 
-  # --- Sunrise defaults ---
+  # Sunrise defaults
   sunriseDefaultTime = "07:00:00";
 
-  # --- Light settings ---
+  # Light settings
   sunriseWarmColorTemp = 400; # warm (mireds)
   sunriseCoolColorTemp = 250; # cooler daylight
   bedtimeFadeDurationSec = 1800; # 30 minutes
 in {
   services.home-assistant = {
     config = {
-      # ------------------------------------------------------------------
       # Helpers
-      # ------------------------------------------------------------------
       input_select = {
         plug_auto_off = {
           name = "Plug auto-off timer";
@@ -48,13 +46,9 @@ in {
         };
       };
 
-      # ------------------------------------------------------------------
       # Scripts
-      # ------------------------------------------------------------------
       script = {
-        # --------------------------------------------------------------
         # Plug auto-off: dynamic delay based on input_select
-        # --------------------------------------------------------------
         bedroom_plug_auto_off = {
           alias = "Bedroom plug auto-off";
           mode = "restart";
@@ -89,11 +83,9 @@ in {
           ];
         };
 
-        # --------------------------------------------------------------
         # Sunrise ramp: 2-hour gradual brightness increase
         # Hour 1: brightness 1->60, warm color temp
         # Hour 2: brightness 60->300, shift to cooler
-        # --------------------------------------------------------------
         bedroom_sunrise_ramp = {
           alias = "Bedroom sunrise ramp";
           mode = "restart";
@@ -150,9 +142,7 @@ in {
           ];
         };
 
-        # --------------------------------------------------------------
         # Bedtime fade: dim to 10%, then fade off over 30 minutes
-        # --------------------------------------------------------------
         bedroom_light_bedtime_fade = {
           alias = "Bedroom light bedtime fade";
           mode = "restart";
@@ -177,13 +167,9 @@ in {
         };
       };
 
-      # ------------------------------------------------------------------
       # Automations
-      # ------------------------------------------------------------------
       automation = [
-        # --------------------------------------------------------------
         # Plug auto-off: trigger when plug turns on
-        # --------------------------------------------------------------
         {
           id = "bedroom_plug_auto_off_trigger";
           alias = "Bedroom plug auto-off trigger";
@@ -200,9 +186,7 @@ in {
           ];
         }
 
-        # --------------------------------------------------------------
         # Sunrise: trigger at configured time
-        # --------------------------------------------------------------
         {
           id = "bedroom_sunrise_at_configured_time";
           alias = "Bedroom sunrise at configured time";
@@ -218,9 +202,7 @@ in {
           ];
         }
 
-        # --------------------------------------------------------------
         # Button A: single = toggle, hold = bedtime fade
-        # --------------------------------------------------------------
         {
           id = "button_a_bedroom_light";
           alias = "Button A: bedroom light toggle / bedtime fade";

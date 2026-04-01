@@ -391,7 +391,7 @@ in {
             loginctl lock-session
           fi
 
-          # --- Execute systemd-inhibit ---
+          # Execute systemd-inhibit
           echo "$why_message (Duration: $duration_sec seconds/specifier)"
           echo "Press Ctrl+C to cancel the inhibit lock."
 
@@ -478,7 +478,7 @@ in {
             echo "Cleanup finished."
           }
 
-          # --- Argument Parsing ---
+          # Argument Parsing
           if [ $# -gt 0 ]; then
             case "$1" in
               -c|--clean) remove_combined_sinks; exit 0 ;;
@@ -487,7 +487,7 @@ in {
             esac
           fi
 
-          # --- Main Logic ---
+          # Main Logic
           remove_combined_sinks # Clean before creating new
 
           echo "Scanning for audio sinks..."
@@ -516,7 +516,7 @@ in {
             printf "[%d] %s\n" "$((i+1))" "$desc" # Use printf for formatting
           done
 
-          # --- User Selection ---
+          # User Selection
           select_sink() {
             local prompt="$1"
             local exclude_index="$2" # Optional index to exclude
@@ -541,13 +541,13 @@ in {
           idx1=$(select_sink "Select first device")
           idx2=$(select_sink "Select second device" "$idx1") # Exclude first selection
 
-          # --- Create Combined Sink ---
+          # Create Combined Sink
           read -rp "Enter name for combined sink [combined]: " combined_name
           combined_name=''${combined_name:-combined}
 
           echo "Creating '$combined_name' with:"
-          echo "  → ''${sink_descs[$idx1]}"
-          echo "  → ''${sink_descs[$idx2]}"
+          echo "  -> ''${sink_descs[$idx1]}"
+          echo "  -> ''${sink_descs[$idx2]}"
 
           "$PACTL" load-module module-combine-sink \
             sink_name="$combined_name" \
@@ -556,7 +556,7 @@ in {
           echo "Combined sink created. Waiting for registration..."
           "$SLEEP" 2 # Give PipeWire/PulseAudio time
 
-          # --- Set Default ---
+          # Set Default
           # Find the ID of the newly created sink
           new_sink_id=$("$PW_DUMP" | "$JQ" -r --arg name "$combined_name" '
             [.[] | select(.type == "PipeWire:Interface:Node" and

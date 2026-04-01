@@ -16,10 +16,10 @@
   quickshell = inputs.noctalia.inputs.noctalia-qs.packages.${system}.quickshell;
 
   # Shim that generates proper qmldir files for each qs.* module so qmlls can
-  # actually resolve imports.  A plain symlink isn't enough — qmlls requires
+  # actually resolve imports.  A plain symlink isn't enough -- qmlls requires
   # qmldir files to recognise a directory as a QML module.  We generate one for
   # every directory under the noctalia-shell root that contains .qml files,
-  # mirroring Quickshell's `-p <shell-root>` → `qs.<dir>` naming convention.
+  # mirroring Quickshell's `-p <shell-root>` -> `qs.<dir>` naming convention.
   #
   # ── QML Type Inference Notes ─────────────────────────────────────────────
   # When a property is typed as a base class (e.g., Process.stdout is
@@ -27,11 +27,11 @@
   # a subclass (e.g., StdioCollector). To get proper type inference:
   #
   #   BAD:  Process { stdout: StdioCollector {}; onExited: stdout.text }
-  #         → LSP error: "text" not found on DataStreamParser
+  #         -> LSP error: "text" not found on DataStreamParser
   #
   #   GOOD: Process { stdout: StdioCollector { id: collector }
   #                   onExited: collector.text }
-  #         → LSP knows collector is StdioCollector with .text property
+  #         -> LSP knows collector is StdioCollector with .text property
   #
   # Always assign an id to nested objects when you need to access their
   # subclass-specific members. The LSP uses the id's declared type, not the
@@ -72,14 +72,14 @@
       make_module "Widgets/$sub" "qs.Widgets.$sub"
     done
 
-    # Services sub-modules (UI, System, Compositor, …)
+    # Services sub-modules (UI, System, Compositor, ...)
     for d in "$shell_root/Services"/*/; do
       [ -d "$d" ] || continue
       svc=$(basename "$d")
       make_module "Services/$svc" "qs.Services.$svc"
     done
 
-    # Modules and all nested sub-modules (Bar/Extras, Panels/Bluetooth, …)
+    # Modules and all nested sub-modules (Bar/Extras, Panels/Bluetooth, ...)
     make_module Modules qs.Modules
     for d in "$shell_root/Modules"/*/; do
       [ -d "$d" ] || continue
@@ -100,8 +100,8 @@
 
   qmlImportPath = builtins.concatStringsSep ":" [
     "${qsImportShim}" # qs.*  (Noctalia modules)
-    "${quickshell}/lib/qt-6/qml" # Quickshell, Quickshell.Io, …
-    "${pkgs.kdePackages.qtdeclarative}/lib/qt-6/qml" # QtQuick, QtQuick.Controls, …
+    "${quickshell}/lib/qt-6/qml" # Quickshell, Quickshell.Io, ...
+    "${pkgs.kdePackages.qtdeclarative}/lib/qt-6/qml" # QtQuick, QtQuick.Controls, ...
   ];
 
   qmlDocPath = "${pkgs.kdePackages.qtdoc}/share/doc/qtdoc";

@@ -1,114 +1,38 @@
-# MQTT automation framework.
+# MQTT automations -- Rust binaries from pkgs/mqtt-automations.
 #
-# Each automation file in this directory returns a simple attrset:
-#   { name, script, description?, pythonPackages?, env? }
-#
-# The `script` field is inline Python. A prelude is injected that provides:
-#   - client        : connected paho MQTT client
-#   - publish(topic, payload)  : publish to MQTT (dicts auto-JSON-encoded)
-#   - subscribe(topic, cb)     : subscribe with callback(topic, payload)
-#   - @on_message(topic)       : decorator form of subscribe
-#   - env(key, default?)       : read environment variable
-#   - wait_until(datetime)     : sleep until a target time
-#   - sleep(seconds)           : interruptible sleep
-#   - log(msg)                 : timestamped print
-#
-# To add a new automation, create a .nix file in this directory and add it
-# to the `automations` list below.
+# Each automation is a lightweight Rust binary using the shared mqtt_automations
+# runtime. Config is passed via environment variables and (for buttons) a
+# generated JSON file.
 {
-  lib,
   config,
+  lib,
   pkgs,
+  self,
   ...
 }: let
-  # -- Prelude injected into every script ----------------------------------
-  mqttPrelude = ''
-    import os, sys, json, time, signal
-    from datetime import datetime, timedelta, timezone
-    import paho.mqtt.client as mqtt
+  mqttPkg = self.packages.${pkgs.stdenv.hostPlatform.system}.mqtt-automations;
 
-    def log(msg):
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
-
-    def env(key, default=None):
-        return os.environ.get(key, default)
-
-    _mqtt_host = env("MQTT_HOST", "127.0.0.1")
-    _mqtt_port = int(env("MQTT_PORT", "1883"))
-
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    client.connect(_mqtt_host, _mqtt_port)
-    client.loop_start()
-
-    def publish(topic, payload):
-        """Publish to an MQTT topic. Dicts are JSON-encoded."""
-        if isinstance(payload, dict):
-            payload = json.dumps(payload)
-        client.publish(topic, payload)
-        log(f"-> {topic}: {payload}")
-
-    def subscribe(topic, callback):
-        """Subscribe to a topic. callback(topic: str, payload: dict|str)"""
-        def _on_message(_client, _userdata, msg):
-            try:
-                payload = json.loads(msg.payload.decode())
-            except (json.JSONDecodeError, UnicodeDecodeError):
-                payload = msg.payload.decode()
-            callback(msg.topic, payload)
-        client.subscribe(topic)
-        client.message_callback_add(topic, _on_message)
-        log(f"<- subscribed: {topic}")
-
-    def on_message(topic):
-        """Decorator: @on_message("zigbee2mqtt/button")"""
-        def decorator(func):
-            subscribe(topic, func)
-            return func
-        return decorator
-
-    def sleep(seconds):
-        time.sleep(seconds)
-
-    def wait_until(target_dt):
-        """Sleep until a datetime. Returns immediately if in the past."""
-        now = datetime.now(target_dt.tzinfo or None)
-        delta = (target_dt - now).total_seconds()
-        if delta > 0:
-            log(f"waiting until {target_dt.strftime('%H:%M:%S')} ({delta:.0f}s)")
-            time.sleep(delta)
-
-    def _shutdown(sig, frame):
-        log("shutting down")
-        client.loop_stop()
-        client.disconnect()
-        sys.exit(0)
-
-    signal.signal(signal.SIGTERM, _shutdown)
-    signal.signal(signal.SIGINT, _shutdown)
-
-    log("automation started")
-  '';
-
-  # -- mkAutomation: turn an automation definition into a systemd service ---
-  mkAutomation = def: let
-    python = pkgs.python3.withPackages (ps:
-      [ps.paho-mqtt] ++ (def.pythonPackages or (_: []) ) ps);
-    scriptFile = pkgs.writeTextFile {
-      name = "mqtt-auto-${def.name}.py";
-      text = mqttPrelude + def.script;
-    };
-  in {
-    "mqtt-auto-${def.name}" = {
-      description = def.description or "MQTT automation: ${def.name}";
+  # Shared systemd service defaults for all automation binaries.
+  mkAutomation = {
+    name,
+    bin,
+    description ? "MQTT automation: ${name}",
+    env ? {},
+    args ? [],
+  }: {
+    "mqtt-auto-${name}" = {
+      inherit description;
       after = ["mosquitto.service" "network-online.target"];
       wants = ["mosquitto.service" "network-online.target"];
       wantedBy = ["multi-user.target"];
       serviceConfig = {
-        ExecStart = "${python}/bin/python -u ${scriptFile}";
+        ExecStart =
+          "${mqttPkg}/bin/${bin}"
+          + lib.optionalString (args != []) (" " + lib.concatStringsSep " " args);
         Restart = "always";
         RestartSec = "10s";
-        Environment = lib.mapAttrsToList (k: v: ''"${k}=${v}"'') (def.env or {});
-      } // (def.extraServiceConfig or {});
+        Environment = lib.mapAttrsToList (k: v: ''"${k}=${v}"'') env;
+      };
       unitConfig = {
         StartLimitIntervalSec = 300;
         StartLimitBurst = 20;
@@ -116,61 +40,75 @@
     };
   };
 
-  # -- mkButtonAction: generate an automation from a button -> action map ---
-  #
-  # Usage:
-  #   mkButtonAction "zigbee2mqtt/button_1/action" {
-  #     single = { topic = "zigbee2mqtt/light_1/set"; payload = { state = "TOGGLE"; }; };
-  #     double = { topic = "zigbee2mqtt/light_1/set"; payload = { brightness = 254; }; };
-  #   }
-  #
-  # Returns a mkAutomation-compatible attrset.
-  mkButtonAction = button: actions: let
-    # Derive a service name from the button topic
-    safeName = builtins.replaceStrings ["/"] ["-"]
-      (lib.removePrefix "zigbee2mqtt/" button);
+  # -- Button dispatcher config (JSON) --------------------------------------
+  buttonConfig = pkgs.writeText "button-dispatcher.json" (builtins.toJSON {
+    buttons = {
+      "zigbee2mqtt/button_1/action" = {
+        single = {
+          topic = "zigbee2mqtt/light_1/set";
+          payload = {state = "TOGGLE";};
+        };
+        double = {
+          topic = "zigbee2mqtt/light_1/set";
+          payload = {brightness = 254;};
+        };
+        hold = {
+          topic = "zigbee2mqtt/light_1/set";
+          payload = {state = "OFF";};
+        };
+      };
+    };
+  });
 
-    # Generate Python dict entries from the actions attrset
-    actionLines = lib.concatStringsSep "\n    " (lib.mapAttrsToList
-      (payload: action:
-        ''"${payload}": ("${action.topic}", ${builtins.toJSON action.payload}),''
-      ) actions);
-  in {
-    name = "button-${safeName}";
-    description = "Button handler: ${safeName}";
-    script = ''
-      ACTIONS = {
-          ${actionLines}
-      }
-
-      @on_message("${button}")
-      def handle(topic, payload):
-          if payload in ACTIONS:
-              target, data = ACTIONS[payload]
-              publish(target, data)
-
-      while True:
-          sleep(60)
-    '';
-  };
-
-  # -- List of automation definitions --------------------------------------
-  # Add new automations here by importing their .nix file.
-  catDoorbell = import ./cat-doorbell.nix;
-
-  buttonActions = import ./button-actions.nix;
-
+  # -- All automations -------------------------------------------------------
   automations = [
-    (import ./sunrise-lights.nix)
-    (import ./plug-auto-off.nix)
-    (catDoorbell // {
-      env = catDoorbell.env // {
+    {
+      name = "plug-auto-off";
+      bin = "plug-auto-off";
+      description = "Auto-set 1hr countdown when plug turns on";
+      env = {
+        PLUG_TOPIC = "zigbee2mqtt/plug_1";
+        COUNTDOWN_SECONDS = "3600";
+      };
+    }
+    {
+      name = "cat-doorbell";
+      bin = "cat-doorbell";
+      description = "Notify phone on motion detection (cat doorbell)";
+      env = {
+        SENSOR_TOPIC = "zigbee2mqtt/motion_sensor";
+        HA_URL = "http://localhost:8123";
+        NOTIFY_SERVICE = "notify.all_phones";
+        COOLDOWN_SECONDS = "300";
+        NOTIFICATION_TITLE = "Cat Doorbell";
         HA_TOKEN_FILE = config.sops.secrets."ha/api_token".path;
       };
-    })
-  ] ++ (lib.mapAttrsToList mkButtonAction buttonActions);
+    }
+    {
+      name = "sunrise-lights";
+      bin = "sunrise-lights";
+      description = "Gradually turn on lights at sunrise";
+      env = {
+        LIGHT_TOPIC = "zigbee2mqtt/light_3/set";
+        LATITUDE = "52.52";
+        LONGITUDE = "13.405";
+        RAMP_MINUTES = "60";
+        OFFSET_MINUTES = "0";
+        UPDATE_INTERVAL = "30";
+        COLOR_TEMP_START = "454";
+        COLOR_TEMP_END = "250";
+        TIMEZONE = "Europe/Berlin";
+        ELEVATION_END = "11";
+      };
+    }
+    {
+      name = "button-dispatcher";
+      bin = "button-dispatcher";
+      description = "Button action dispatcher";
+      args = ["${buttonConfig}"];
+    }
+  ];
 
-  # -- Merge all automation services into one attrset ----------------------
   allServices = lib.foldl' (acc: def: acc // (mkAutomation def)) {} automations;
 in {
   systemd.services = allServices;

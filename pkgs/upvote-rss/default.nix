@@ -30,7 +30,7 @@ phpWithExtensions.buildComposerProject2 (finalAttrs: {
 
   php = phpWithExtensions;
 
-  # The app is not a CLI tool — it's a web application.
+  # The app is not a CLI tool -- it's a web application.
   # We need to install the entire source tree, not just vendor/bin.
   installPhase = ''
     runHook preInstall
@@ -46,7 +46,7 @@ phpWithExtensions.buildComposerProject2 (finalAttrs: {
     rm -rf $out/share/upvote-rss/package.json
     rm -rf $out/share/upvote-rss/package-lock.json
 
-    # Remove mutable directories — the NixOS module will symlink
+    # Remove mutable directories -- the NixOS module will symlink
     # these from the state directory at runtime
     rm -rf $out/share/upvote-rss/cache
     rm -rf $out/share/upvote-rss/logs

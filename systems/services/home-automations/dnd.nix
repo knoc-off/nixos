@@ -3,25 +3,23 @@
   pkgs,
   ...
 }: let
-  # --- Entities / MQTT ---
+  # Entities / MQTT
   livingRoomLight = "light.living_room";
   buttonBTopic = "zigbee2mqtt/Button B/action";
 
-  # --- Presets (mireds: 50..1000) ---
+  # Presets (mireds: 50..1000)
   ctDaylight = 222; # ~6500K
   ctTavern = 333; # ~2700K
   ctEmbers = 1000; # warmest possible
 
-  # --- Brightness presets (pct: 0..100) ---
+  # Brightness presets (pct: 0..100)
   briDaylightPct = 100;
   briTavernPct = 100;
 
-  # ------------------------------------------------------------
   # MASTER BRIGHTNESS (slider multiplier)
-  # ------------------------------------------------------------
   masterBriEntity = "input_number.living_room_master_brightness"; # 0..120 (%)
 
-  # Campfire (BRIGHT, dynamic but not dim) — softened + slower
+  # Campfire (BRIGHT, dynamic but not dim) -- softened + slower
   campfireBaseBriPct = 75; # starting point (pre-master)
   campfireBriMinPct = 72; # gentler wander min
   campfireBriMaxPct = 78; # gentler wander max
@@ -35,18 +33,18 @@
   campfireCtMax = 500; # slightly tighter (still warm)
   campfireBaseCt = 450; # cozy base
 
-  # Embers (BRIGHT and slow pulse) — base 85%, +/- 5%
+  # Embers (BRIGHT and slow pulse) -- base 85%, +/- 5%
   embersBaseBriPct = 85;
 
-  # "Down" part of the pulse: 80–82% (stays near -5%)
+  # "Down" part of the pulse: 80-82% (stays near -5%)
   embersLowMinPct = 80;
   embersLowMaxPct = 82;
 
-  # "Up" part of the pulse: 88–90% (stays near +5%)
+  # "Up" part of the pulse: 88-90% (stays near +5%)
   embersHighMinPct = 88;
   embersHighMaxPct = 90;
 
-  # --- Timing (seconds) ---
+  # Timing (seconds)
   tShort = 3;
 
   # Campfire loop timing (slower)
@@ -67,9 +65,7 @@
 in {
   services.home-assistant = {
     config = {
-      # ------------------------------------------------------------
       # Helpers: mode flags + master brightness slider
-      # ------------------------------------------------------------
       input_boolean = {
         living_room_campfire = {
           name = "Living room campfire";
@@ -96,9 +92,7 @@ in {
         };
       };
 
-      # ------------------------------------------------------------
       # Scripts: behavior lives here
-      # ------------------------------------------------------------
       script = {
         # Snapshot only when entering FX from "normal"
         living_room_snapshot_if_needed = {
@@ -207,9 +201,7 @@ in {
           ];
         };
 
-        # ------------------------------------------------------------
-        # CAMPFIRE (dynamic, BRIGHT) — slowed + less intense
-        # ------------------------------------------------------------
+        # CAMPFIRE (dynamic, BRIGHT) -- slowed + less intense
         living_room_campfire_on = {
           alias = "Living room: campfire ON (dynamic, bright)";
           mode = "restart";
@@ -338,9 +330,7 @@ in {
           ];
         };
 
-        # ------------------------------------------------------------
         # EMBERS (slow pulse, BRIGHT)
-        # ------------------------------------------------------------
         living_room_embers_on = {
           alias = "Living room: embers ON (slow pulse, bright)";
           mode = "restart";
@@ -440,9 +430,7 @@ in {
         };
       };
 
-      # ------------------------------------------------------------
       # Automations: button routes to scripts
-      # ------------------------------------------------------------
       automation = [
         # HOLD -> Embers pulse
         {
