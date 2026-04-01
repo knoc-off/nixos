@@ -94,10 +94,16 @@
 
     -- Auto-detect merge-base on startup (deferred)
     vim.defer_fn(function()
-      if vim.fn.isdirectory(".git") == 1 or vim.fn.system("git rev-parse --git-dir 2>/dev/null"):find("%.git") then
-        -- Pre-cache the merge-base
+      if vim.fn.isdirectory(".git") == 1 then
         _G.GitState.get_merge_base()
+        return
       end
+      -- Async fallback for repos where .git is a file (worktrees, submodules)
+      vim.system({ "git", "rev-parse", "--git-dir" }, { text = true }, function(result)
+        if result.code == 0 then
+          vim.schedule(function() _G.GitState.get_merge_base() end)
+        end
+      end)
     end, 100)
   '';
 }

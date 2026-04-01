@@ -5,13 +5,11 @@
 
     ./modules/treesitter.nix
     ./modules/bufferline.nix
-    ./modules/focus.nix
     ./modules/scope.nix
     ./modules/textobjects.nix
     ./modules/telescope.nix
     ./modules/completion.nix
     ./modules/mini-files.nix
-    # ./modules/dashboard.nix # disabled: snacks dashboard requires lazy.nvim
 
     ./modules/trainingwheels.nix
     ./modules/git-state.nix # shared git comparison state (source of truth)
@@ -26,7 +24,7 @@
     ./modules/languages/typescript.nix
     # ./modules/languages/github-actions.nix
 
-    ./modules/avante.nix
+    ./modules/opencode.nix
 
     ./themes
 

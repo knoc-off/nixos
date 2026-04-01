@@ -40,7 +40,7 @@
       base = nil,         -- The base used for branch diff
       time = 0,
     }
-    local cacheTimeout = 2000
+    local cacheTimeout = 2 -- seconds (os.time() returns seconds)
 
     -- Status types for combined display
     -- W = working tree change, B = branch change, WB = both

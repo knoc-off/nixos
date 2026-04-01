@@ -148,6 +148,7 @@
         options.desc = "Resume last search";
       };
 
+
       # LSP pickers (supplement to gd, gr, etc.)
       "<leader>ls" = {
         action = "lsp_document_symbols";
@@ -159,4 +160,23 @@
       };
     };
   };
+
+  keymaps = [
+    {
+      mode = "n";
+      key = "<leader>ft";
+      action = lib.nixvim.mkRaw ''
+        function()
+          require('telescope.builtin').live_grep({
+            default_text = "TODO",
+            initial_mode = "normal",
+          })
+        end
+      '';
+      options = {
+        silent = true;
+        desc = "Find TODOs";
+      };
+    }
+  ];
 }

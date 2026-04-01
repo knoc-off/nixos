@@ -6,8 +6,6 @@
     settings.diff_opts.vertical = true;
   };
 
-  plugins.codediff.enable = true;
-
   keymaps = [
     {
       mode = "n";

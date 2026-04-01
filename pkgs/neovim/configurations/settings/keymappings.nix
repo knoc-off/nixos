@@ -56,14 +56,6 @@
 
         "Y" = "y$";
 
-        "<leader>a" = ":lua vim.lsp.buf.code_action()<CR>";
-
-        # LSP functions without telescope equivalents
-        "<leader>lh" = ":lua vim.lsp.buf.hover()<CR>";
-        "<leader>lS" = ":lua vim.lsp.buf.signature_help()<CR>";
-        "<leader>ln" = ":lua vim.lsp.buf.rename()<CR>";
-        "<leader>lf" = ":lua vim.lsp.buf.format()<CR>";
-
         "," = "@@";
 
         "<leader>h" = "<C-w>h";

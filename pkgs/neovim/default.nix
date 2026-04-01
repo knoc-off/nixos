@@ -1,5 +1,4 @@
-# Neovim configurations built via nixvim.
-# Returns an attrset: { default, minimal }
+# Neovim configuration built via nixvim
 {
   lib,
   pkgs,
@@ -36,5 +35,4 @@
     };
 in {
   default = mkNeovim ./configurations/minimal.nix;
-  minimal = mkNeovim ./configurations/minimal.nix;
 }

@@ -41,8 +41,6 @@
         gt = "type_definition";
         "<leader>ca" = "code_action";
         "<leader>rn" = "rename";
-        "<leader>fs" = "document_symbol";
-        "<leader>fS" = "workspace_symbol";
       };
     };
 
