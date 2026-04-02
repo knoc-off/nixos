@@ -10,15 +10,15 @@
       typescriptreact = ["biome"];
       json = ["biome"];
       jsonc = ["biome"];
-      yaml = ["prettier"];
-      markdown = ["prettier"];
+      yaml = ["prettierd"];
+      markdown = ["prettierd"];
     };
 
     formatters = {
       biome = {
         command = lib.getExe pkgs.biome;
       };
-      prettier = {
+      prettierd = {
         command = lib.getExe pkgs.prettierd;
       };
     };

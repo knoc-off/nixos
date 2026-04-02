@@ -29,6 +29,8 @@
       diagnostic = {
         "<leader>j" = "goto_next";
         "<leader>k" = "goto_prev";
+        "]d" = "goto_next";
+        "[d" = "goto_prev";
         "<leader>e" = "open_float";
       };
 

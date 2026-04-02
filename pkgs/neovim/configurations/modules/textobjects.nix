@@ -1,5 +1,9 @@
-# Text objects via mini.ai - sensible defaults, just works
+# Text objects via mini.ai and hardtime for building good habits
 {...}: {
-  plugins.mini.enable = true;
-  plugins.mini.modules.ai = {};
+  plugins.mini = {
+    enable = true;
+    modules.ai = {};
+  };
+
+  plugins.hardtime.enable = true;
 }

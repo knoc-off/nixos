@@ -3,21 +3,23 @@
     ./settings/options.nix
     ./settings/keymappings.nix
 
+    ./modules/ui.nix
     ./modules/treesitter.nix
     ./modules/bufferline.nix
+    ./modules/statusline.nix
     ./modules/scope.nix
     ./modules/textobjects.nix
     ./modules/telescope.nix
     ./modules/completion.nix
     ./modules/mini-files.nix
+    ./modules/which-key.nix
 
-    ./modules/trainingwheels.nix
-    ./modules/git-state.nix # shared git comparison state (source of truth)
+    ./modules/git-state.nix
     ./modules/git.nix
     ./modules/sessions.nix
 
-    ./modules/languages/default.nix # shared LSP base
-    ./modules/languages/formatters.nix # biome + prettier
+    ./modules/languages/default.nix
+    ./modules/languages/formatters.nix
     ./modules/languages/c.nix
     ./modules/languages/rust.nix
     ./modules/languages/nix.nix
@@ -31,16 +33,11 @@
     # Custom plugins
     ../plugins/smart-paste/module.nix
     {
-      # Smart paste: auto-indent pasted code
-      plugins.smart-paste = {
-        enable = true;
-      };
+      plugins.smart-paste.enable = true;
     }
   ];
 
   viAlias = true;
   vimAlias = true;
-
-  # plugin manager, that loads plugin with lua code
   luaLoader.enable = true;
 }

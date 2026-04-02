@@ -40,7 +40,6 @@ in {
       ending_tildes = false;
       cmp_itemkind_reverse = false;
 
-
       colors = {
         # Map theme colors to the colorscheme's expected color variables
         bg0 = "#${theme.dark.base00}"; # Background
@@ -392,52 +391,44 @@ in {
             fg = "$bg0";
             bg = "$green";
           };
-          CmpItemKindField = {
-            fg = "$bg0";
-            bg = "$red";
+          # Blink.cmp completion menu
+          BlinkCmpMenu = {
+            fg = "$fg";
+            bg = "$bg1";
           };
-
-          # Additional CMP styling
-          CmpItemAbbr = {
+          BlinkCmpMenuSelection = {
+            fg = "$bg0";
+            bg = "$blue";
+          };
+          BlinkCmpLabel = {
             fg = "$fg";
           };
-          CmpItemAbbrMatch = {
+          BlinkCmpLabelMatch = {
             fg = "$blue";
           };
-          CmpItemAbbrMatchFuzzy = {
+          BlinkCmpKindFunction = {
             fg = "$blue";
           };
-          CmpItemKindVariable = {
-            fg = "$bg0";
-            bg = "$cyan";
+          BlinkCmpKindMethod = {
+            fg = "$blue";
           };
-          CmpItemKindInterface = {
-            fg = "$bg0";
-            bg = "$cyan";
+          BlinkCmpKindVariable = {
+            fg = "$cyan";
           };
-          CmpItemKindText = {
-            fg = "$bg0";
-            bg = "$cyan";
+          BlinkCmpKindField = {
+            fg = "$red";
           };
-          CmpItemKindFunction = {
-            fg = "$bg0";
-            bg = "$blue";
+          BlinkCmpKindKeyword = {
+            fg = "$purple";
           };
-          CmpItemKindMethod = {
-            fg = "$bg0";
-            bg = "$blue";
+          BlinkCmpKindText = {
+            fg = "$cyan";
           };
-          CmpItemKindKeyword = {
-            fg = "$bg0";
-            bg = "$purple";
+          BlinkCmpKindInterface = {
+            fg = "$cyan";
           };
-          CmpItemKindProperty = {
-            fg = "$bg0";
-            bg = "$purple";
-          };
-          CmpItemKindUnit = {
-            fg = "$bg0";
-            bg = "$purple";
+          BlinkCmpGhostText = {
+            fg = "$grey";
           };
 
           # Indent-blankline plugin highlights

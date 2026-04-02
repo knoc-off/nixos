@@ -81,7 +81,8 @@ in {
           platform = "group";
           services = [
             {service = "mobile_app_pixel_10";}
-            {service = "mobile_app_pixel_7";}
+            {service = "mobile_app_pixel_7a";}
+            {service = "mobile_app_eileens_iphone";}
           ];
         }
       ];

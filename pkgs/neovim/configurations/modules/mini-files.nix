@@ -337,5 +337,15 @@
       pattern = "GitStateInvalidate",
       callback = clearCache,
     })
+
+    -- Auto-close mini.files when opening a file (Enter on an entry)
+    autocmd("User", {
+      group = augroup,
+      pattern = "MiniFilesActionOpen",
+      callback = function()
+        local ok, MiniFiles = pcall(require, "mini.files")
+        if ok then MiniFiles.close() end
+      end,
+    })
   '';
 }

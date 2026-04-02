@@ -1,17 +1,28 @@
 # Completion via blink.cmp
-# LSP-only for now -- extend with snippets, buffer, etc. later
+# Enter to accept, Tab/S-Tab for snippet placeholder jumping
+# Sources: LSP, snippets, buffer, path
 {lib, ...}: {
   plugins.blink-cmp = {
     enable = true;
     setupLspCapabilities = true;
 
     settings = {
-      keymap.preset = "super-tab";
+      keymap = {
+        "<CR>" = ["accept" "fallback"];
+        "<C-space>" = ["show" "show_documentation" "hide_documentation"];
+        "<C-e>" = ["hide" "fallback"];
+        "<Tab>" = ["select_next" "snippet_forward" "fallback"];
+        "<S-Tab>" = ["select_prev" "snippet_backward" "fallback"];
+        "<C-j>" = ["select_next" "fallback"];
+        "<C-k>" = ["select_prev" "fallback"];
+        "<C-n>" = ["select_next" "fallback"];
+        "<C-p>" = ["select_prev" "fallback"];
+      };
 
       completion = {
         list.selection = {
           preselect = true;
-          auto_insert = true;
+          auto_insert = false;
         };
 
         accept.auto_brackets.enabled = true;
@@ -38,14 +49,24 @@
 
       signature.enabled = true;
 
+      snippets.preset = "default";
+
       sources = {
-        default = ["lsp" "path"];
-        cmdline = [];
+        default = ["lsp" "snippets" "buffer" "path"];
+      };
+
+      cmdline = {
+        enabled = true;
+        sources = ["cmdline" "buffer"];
+        keymap = {
+          "<Tab>" = ["accept"];
+          "<CR>" = ["accept_and_enter" "fallback"];
+        };
+        completion.menu.auto_show = true;
       };
 
       appearance = {
         nerd_font_variant = "mono";
-        use_nvim_cmp_as_default = true;
       };
 
       fuzzy.implementation = "prefer_rust";

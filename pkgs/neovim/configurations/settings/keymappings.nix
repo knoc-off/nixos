@@ -6,42 +6,18 @@
 
   keymaps = let
     misc = [
-      {
-        mode = "n";
-        key = "<S-CR>";
-        action = lib.nixvim.mkRaw ''
-          function()
-            local path = vim.fn.expand('<cfile>')
-            if path ~= "" then
-              local current_file = vim.fn.expand('%:p')
-              local base_dir = current_file ~= "" and vim.fn.fnamemodify(current_file, ':h') or vim.fn.getcwd()
-              local is_absolute = path:sub(1, 1) == '/'
-              local full_path = is_absolute and path or vim.fn.resolve(base_dir .. '/' .. path)
-              local stat = vim.loop.fs_stat(full_path)
-              if stat then
-                vim.cmd('edit '..vim.fn.fnameescape(full_path))
-              else
-                local extensions = { '.md', '.txt', "" }
-                for _, ext in ipairs(extensions) do
-                  local test_path = full_path .. ext
-                  if vim.loop.fs_stat(test_path) then
-                    vim.cmd('edit '..vim.fn.fnameescape(test_path))
-                    return
-                  end
-                end
-                vim.notify("Path not found: "..full_path, vim.log.levels.WARN)
-              end
-            end
-          end
-        '';
-        options = { silent = true; desc = "Open path under cursor"; };
-      }
       { mode = "n"; key = "q:"; action = "<Nop>"; }
       {
         mode = "n";
         key = "<leader>q";
         action = lib.nixvim.mkRaw "function() vim.cmd('qall') end";
-        options = { silent = true; desc = "Quit"; };
+        options = { silent = true; desc = "Quit all"; };
+      }
+      {
+        mode = "n";
+        key = "<leader>w";
+        action = "<cmd>w<cr>";
+        options = { silent = true; desc = "Save"; };
       }
     ];
     normal =
@@ -58,20 +34,27 @@
 
         "," = "@@";
 
-        "<leader>h" = "<C-w>h";
-        "<leader>l" = "<C-w>l";
+        # Window navigation (C-hjkl is standard, avoids <leader>l conflict with lsp)
+        "<C-h>" = "<C-w>h";
+        "<C-l>" = "<C-w>l";
+        "<C-j>" = "<C-w>j";
+        "<C-k>" = "<C-w>k";
 
         L = "$";
         H = "^";
 
-        # M = Alt key
+        # Move lines with Alt
         "<M-k>" = ":move-2<CR>";
         "<M-j>" = ":move+<CR>";
 
-        # Always search forward using the current @/ pattern.
+        # Half-page jump + center
+        "<C-d>" = "<C-d>zz";
+        "<C-u>" = "<C-u>zz";
+
+        # Always search forward using the current @/ pattern
         "n" = ":<C-U>call search(@/, 'W')<CR>";
 
-        # Always search backward using the current @/ pattern.
+        # Always search backward using the current @/ pattern
         "N" = ":<C-U>call search(@/, 'bW')<CR>";
 
         # Yank word under cursor and set it as search pattern
@@ -84,7 +67,7 @@
             local pat = [[\V\<]] .. vim.fn.escape(w, [[\]]) .. [[\>]]
             vim.fn.setreg("/", pat)
             vim.opt.hlsearch = true
-            vim.fn.search(pat, "n")   -- establishes forward search context without moving
+            vim.fn.search(pat, "n")
           end
         '';
 
@@ -95,7 +78,7 @@
             local pat = [[\V\<]] .. vim.fn.escape(w, [[\]]) .. [[\>]]
             vim.fn.setreg("/", pat)
             vim.opt.hlsearch = true
-            vim.fn.search(pat, "nb")  -- establishes backward search context without moving
+            vim.fn.search(pat, "nb")
           end
         '';
 
@@ -105,15 +88,25 @@
               if not query or query == "" then return end
               vim.fn.setreg("/", query)
               vim.opt.hlsearch = true
-              vim.fn.search(query, "n") -- 'n' = don't move cursor
+              vim.fn.search(query, "n")
             end)
           end
         '';
 
-        # No-jump search backward
-        "?" =
-          lib.nixvim.mkRaw
-          "function() local query = vim.fn.input('?'); if query ~= '' then vim.fn.setreg('/', query); vim.fn.search(query, 'bn'); vim.opt.hlsearch = true; end end";
+        "?" = lib.nixvim.mkRaw ''
+          function()
+            vim.ui.input({ prompt = "?" }, function(query)
+              if not query or query == "" then return end
+              vim.fn.setreg("/", query)
+              vim.opt.hlsearch = true
+              vim.fn.search(query, "bn")
+            end)
+          end
+        '';
+
+        # Splits
+        "<leader>sv" = "<cmd>vsplit<cr>";
+        "<leader>sh" = "<cmd>split<cr>";
       };
 
     visual =
@@ -121,9 +114,8 @@
         mode = "v";
         inherit action key;
       }) {
-        # Allows replacing with clipboard without replacing clip
-        "p" = ''
-          "_dP''; # for whatever reason this breaks rust analyzer when pasting too much.
+        # Paste without clobbering register
+        "p" = ''"_dP'';
 
         "." = ":normal .<CR>";
 
@@ -136,6 +128,25 @@
         "J" = ":m '>+1<CR>gv=gv";
       };
 
+    visualStar = [
+      # Visual mode: search for selected text
+      {
+        mode = "v";
+        key = "*";
+        action = lib.nixvim.mkRaw ''
+          function()
+            local old = vim.fn.getreg('"')
+            vim.cmd('normal! y')
+            local pat = [[\V]] .. vim.fn.escape(vim.fn.getreg('"'), [[\/]])
+            vim.fn.setreg("/", pat)
+            vim.opt.hlsearch = true
+            vim.fn.setreg('"', old)
+          end
+        '';
+        options = { silent = true; desc = "Search selection"; };
+      }
+    ];
+
     insert =
       lib.mapAttrsToList (key: action: {
         mode = "i";
@@ -147,5 +158,6 @@
   in
     lib.nixvim.keymaps.mkKeymaps {options.silent = true;}
     (normal ++ visual ++ insert)
-    ++ misc;
+    ++ misc
+    ++ visualStar;
 }
