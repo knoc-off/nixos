@@ -3,6 +3,7 @@
     ./settings/options.nix
     ./settings/keymappings.nix
 
+    ./modules/foldtext.nix
     ./modules/ui.nix
     ./modules/treesitter.nix
     ./modules/bufferline.nix
@@ -26,7 +27,7 @@
     ./modules/languages/typescript.nix
     # ./modules/languages/github-actions.nix
 
-    ./modules/opencode.nix
+    # ./modules/opencode.nix
 
     ./themes
 

@@ -8,21 +8,17 @@
 
     settings = {
       keymap = {
-        "<CR>" = ["accept" "fallback"];
-        "<C-space>" = ["show" "show_documentation" "hide_documentation"];
-        "<C-e>" = ["hide" "fallback"];
+        preset = "enter";
         "<Tab>" = ["select_next" "snippet_forward" "fallback"];
         "<S-Tab>" = ["select_prev" "snippet_backward" "fallback"];
         "<C-j>" = ["select_next" "fallback"];
         "<C-k>" = ["select_prev" "fallback"];
-        "<C-n>" = ["select_next" "fallback"];
-        "<C-p>" = ["select_prev" "fallback"];
       };
 
       completion = {
         list.selection = {
           preselect = true;
-          auto_insert = false;
+          auto_insert = true;
         };
 
         accept.auto_brackets.enabled = true;
@@ -52,7 +48,23 @@
       snippets.preset = "default";
 
       sources = {
-        default = ["lsp" "snippets" "buffer" "path"];
+        default = lib.nixvim.mkRaw ''
+          function()
+            local ok, in_comment = pcall(function()
+              local cursor = vim.api.nvim_win_get_cursor(0)
+              local row = cursor[1] - 1
+              local col = math.max(0, cursor[2] - 1)
+              for _, cap in ipairs(vim.treesitter.get_captures_at_pos(0, row, col)) do
+                if cap.capture == "comment" then return true end
+              end
+              return false
+            end)
+            if ok and in_comment then
+              return { "buffer", "path" }
+            end
+            return { "lsp", "snippets", "buffer", "path" }
+          end
+        '';
       };
 
       cmdline = {

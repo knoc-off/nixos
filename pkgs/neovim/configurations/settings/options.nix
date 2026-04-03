@@ -62,8 +62,9 @@
     foldexpr = "v:lua.vim.treesitter.foldexpr()";
     foldlevel = 99;
     foldlevelstart = 99;
-    foldenable = true;
+    foldtext = "";
 
+    foldenable = true;
     # gf extension fallback
     suffixesadd = ".md,.txt,.nix";
   };

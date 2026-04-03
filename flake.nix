@@ -28,7 +28,6 @@
       extraConfigs ? {},
     }: let
       mkSystem =
-        # move this to inputs, override-able
         if lib.strings.hasSuffix "darwin" system
         then inputs.nix-darwin.lib.darwinSystem
         else nixosSystem;
@@ -129,9 +128,9 @@
         (mkImage "rpi-3a-plus" "root" "aarch64-linux" "sdImage")
       ];
 
-    darwinConfigurations = listToAttrs [
-      # (mkHost "Nicholass-MacBook-Pro" "niko" "aarch64-darwin")
-    ];
+    # darwinConfigurations = listToAttrs [
+    #   # (mkHost "Nicholass-MacBook-Pro" "niko" "aarch64-darwin")
+    # ];
 
     nixosConfigurations = listToAttrs [
       (mkHost "framework13" "knoff" "x86_64-linux")

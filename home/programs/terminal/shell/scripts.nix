@@ -7,12 +7,6 @@
 }: let
   config_dir = "/etc/nixos";
   inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) mkComplgenScript;
-  # inherit (color-lib) setOkhslLightness setOkhslSaturation;
-  # Helper to transform colors like in kitty config
-  # lighten = setOkhslLightness 0.7;
-  # saturate = setOkhslSaturation 0.9;
-  # sa = hex: lib.removePrefix "#" (lighten (saturate "#${hex}"));
-  # sal = hex: lib.removePrefix "#" (setOkhslLightness 0.5 (saturate "#${hex}"));
 in {
   home.packages =
     [
@@ -176,29 +170,8 @@ in {
       )
 
       (mkComplgenScript {
-        name = "csv_to_excel";
-        scriptContent = ''
-          #!${pkgs.bash}/bin/bash
-          set -euo pipefail
-          if [ "$#" -ne 2 ]; then echo "Usage: csv_to_excel <input.csv> <output.xlsx>"; exit 1; fi
-          input_csv="$1"; output_xlsx="$2"
-          if [ ! -f "$input_csv" ]; then echo "Error: Input CSV file not found: '$input_csv'"; exit 1; fi
-          python -c "import pandas as pd; import sys; df = pd.read_csv(sys.argv[1], encoding='utf-8'); df.to_excel(sys.argv[2], index=False)" "$input_csv" "$output_xlsx"
-          echo "Converted '$input_csv' to '$output_xlsx'"
-        '';
-        grammar = ''csv_to_excel {{{ ${pkgs.fd}/bin/fd --type f --extension csv --max-depth 1 . --color never --hidden --no-ignore }}} "Input CSV file" <PATH> "Output XLSX file";'';
-        runtimeDeps = [
-          (pkgs.python3.withPackages (ps: [
-            ps.pandas
-            ps.openpyxl
-          ]))
-        ];
-      })
-
-      (mkComplgenScript {
         name = "excel_to_csv";
         scriptContent = ''
-          #!${pkgs.bash}/bin/bash
           python -c "import pandas as pd; import sys; pd.read_excel(sys.argv[1]).to_csv(sys.argv[2], index=False, encoding='utf-8')" "$1" "$2"
         '';
         grammar = ''
@@ -286,7 +259,8 @@ in {
         '';
       })
 
-      (pkgs.writeShellScriptBin "text-serch" ''
+      # TODO: Add ignore glob as easy to add. more important than include tbh
+      (pkgs.writeShellScriptBin "text-search" ''
         sk --ansi -i -c 'rg --color=always --line-number "{}"' \
            --preview 'f=$(echo {} | cut -d: -f1); l=$(echo {} | cut -d: -f2); bat --color=always --style=numbers --highlight-line $l "$f"' \
            --preview-window '+{2}-/2' \
@@ -294,132 +268,6 @@ in {
       '')
     ]
     ++ lib.optionals pkgs.stdenv.isLinux [
-      (mkComplgenScript {
-        name = "anti-sleep";
-        scriptContent = ''
-          #!${pkgs.bash}/bin/bash
-          set -euo pipefail
-
-          INHIBIT_WHAT="sleep:idle:handle-lid-switch"
-          INHIBIT_WHO="$USER"
-          INHIBIT_MODE="block"
-          LOCK_SCREEN=false
-
-          usage() {
-            echo "Usage: anti-sleep [-l] <duration | HH:MM>"
-            echo "  -l:       Lock the screen immediately but keep system awake"
-            echo "  duration: e.g., 30m, 1h, 6h, or any value accepted by 'sleep' (like 90s, 2h30m)"
-            echo "  HH:MM:    Target time (24-hour format), e.g., 13:00. Inhibits sleep until that time today (or tomorrow if the time has passed)."
-            exit 1
-          }
-
-          # Parse arguments
-          while [[ "$#" -gt 0 ]]; do
-            case $1 in
-              -l|--lock) LOCK_SCREEN=true; shift ;;
-              -h|--help) usage ;;
-              -*) echo "Unknown option: $1"; usage ;;
-              *) input="$1"; shift; break ;;
-            esac
-          done
-
-          if [ -z "${"input:-"}" ]; then
-             echo "Error: Missing duration argument"
-             usage
-          fi
-
-          duration_sec=""
-          why_message="Manual sleep prevention" # Default reason
-
-          # Check for predefined keywords first
-          case "$input" in
-            30m)
-              duration_sec=1800 # 30 * 60
-              why_message="Preventing sleep for 30 minutes"
-              ;;
-            1h)
-              duration_sec=3600 # 1 * 60 * 60
-              why_message="Preventing sleep for 1 hour"
-              ;;
-            6h)
-              duration_sec=21600 # 6 * 60 * 60
-              why_message="Preventing sleep for 6 hours"
-              ;;
-            # Check if it looks like HH:MM time format
-            [0-2][0-9]:[0-5][0-9])
-              # Validate time format more strictly (e.g., 24:00 is invalid)
-              if ! date -d "$input" >/dev/null 2>&1; then
-                 echo "Error: Invalid time format '$input'. Use HH:MM (24-hour)."
-                 exit 1
-              fi
-
-              current_epoch=$(date +%s)
-              target_epoch=$(date -d "$input" +%s)
-
-              # If target time is in the past today, assume target is tomorrow
-              if [ "$target_epoch" -lt "$current_epoch" ]; then
-                target_epoch=$(date -d "$input + 1 day" +%s)
-                why_message="Preventing sleep until $input tomorrow"
-              else
-                why_message="Preventing sleep until $input today"
-              fi
-
-              duration_sec=$((target_epoch - current_epoch))
-              ;;
-            # Otherwise, assume it's a duration string for 'sleep' command
-            *)
-              # Basic validation: Check if 'sleep' understands the duration
-              if ! sleep "$input" --help >/dev/null 2>&1 && ! sleep "$input" 0 ; then
-                 echo "Error: Invalid duration or time format: '$input'"
-                 usage
-              fi
-              # We let systemd-inhibit pass the raw duration string to sleep
-              # This allows formats like '2h30m', '90s' etc.
-              # Note: We don't calculate seconds here, pass the string directly.
-              duration_sec="$input"
-              why_message="Preventing sleep for duration '$input'"
-              ;;
-          esac
-
-          if [ -z "$duration_sec" ]; then
-             echo "Error: Could not determine sleep duration from input '$input'"
-             usage
-          fi
-
-          if [ "$LOCK_SCREEN" = true ]; then
-            echo "Locking screen..."
-            loginctl lock-session
-          fi
-
-          # Execute systemd-inhibit
-          echo "$why_message (Duration: $duration_sec seconds/specifier)"
-          echo "Press Ctrl+C to cancel the inhibit lock."
-
-          # Use exec to replace the shell process with systemd-inhibit
-          # This ensures signals (like Ctrl+C) are handled correctly by systemd-inhibit
-          exec ${pkgs.systemd}/bin/systemd-inhibit \
-            --what="$INHIBIT_WHAT" \
-            --who="$INHIBIT_WHO" \
-            --why="$why_message" \
-            --mode="$INHIBIT_MODE" \
-            ${pkgs.coreutils}/bin/sleep "$duration_sec"
-
-          # This part is unlikely to be reached because of 'exec'
-          echo "Sleep inhibit finished or was cancelled."
-        '';
-
-        # Grammar for command-line completion
-        grammar = ''
-          anti-sleep <WORD> "Duration or Time";
-        '';
-
-        # Runtime dependencies for the script
-        runtimeDeps = [
-          pkgs.systemd
-          pkgs.coreutils
-        ]; # coreutils for date and sleep
-      })
-
       (mkComplgenScript {
         name = "cli";
         scriptContent = ''
