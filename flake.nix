@@ -125,7 +125,7 @@
       [
         (mkImage "minimal" "default" "x86_64-linux" "isoImage")
         (mkImage "framework13" "knoff" "x86_64-linux" "isoImage")
-        (mkImage "rpi-3a-plus" "root" "aarch64-linux" "sdImage")
+        (mkImage "rpi-4b-plus" "root" "aarch64-linux" "sdImage")
       ];
 
     # darwinConfigurations = listToAttrs [
@@ -137,7 +137,7 @@
       (mkHost "thinkpad-work" "niko" "x86_64-linux")
       (mkHost "nuci5" "tv" "x86_64-linux")
       (mkHost "hetzner" "knoff" "x86_64-linux")
-      (mkHost "rpi-3a-plus" "root" "aarch64-linux")
+      (mkHost "rpi-4b-plus" "root" "aarch64-linux")
     ];
   };
 

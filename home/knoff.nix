@@ -243,6 +243,8 @@ in {
       upkgs.foliate
       upkgs.readest
 
+      upkgs.trilium-desktop
+
       upkgs.slack
       upkgs.notion-app-enhanced
 

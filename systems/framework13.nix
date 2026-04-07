@@ -9,6 +9,8 @@
   ...
 }: {
   imports = [
+    # inputs.nixgl.packages.x86_64-linux.nixGLIntel
+
     inputs.determinate.nixosModules.default
 
     self.nixosModules.services.dagu
@@ -237,6 +239,10 @@
     nix-ld = {
       enable = true;
       libraries = with pkgs; [
+        libxcursor
+        xorg.libXrandr
+        libx11
+        libGL
         stdenv.cc.cc
         SDL2
         SDL2_image

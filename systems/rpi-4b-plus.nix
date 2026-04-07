@@ -20,7 +20,7 @@
   };
 
   boot = {
-    kernelPackages = pkgs.linuxPackages_rpi3;
+    kernelPackages = pkgs.linuxPackages_rpi4;
     loader = {
       grub.enable = false;
       generic-extlinux-compatible.enable = true;

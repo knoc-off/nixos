@@ -8,8 +8,6 @@ use serde_json::json;
 async fn main() -> Result<()> {
     let rt = Runtime::from_env("sunrise-lights").await?;
 
-    // -- config ---------------------------------------------------------------
-
     let set_topic = rt.env_or("LIGHT_TOPIC", "zigbee2mqtt/light_1/set");
     // State topic defaults to the set topic minus "/set" (Z2M convention).
     let state_topic = rt.env_or(
