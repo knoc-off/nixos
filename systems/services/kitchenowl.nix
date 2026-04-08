@@ -27,12 +27,7 @@
 
   services.caddy.virtualHosts."kitchenowl.niko.ink".extraConfig = ''
     import security-headers
-    import authelia
-    reverse_proxy localhost:3043
-  '';
-
-  services.caddy.virtualHosts."kitchenowl.api.niko.ink".extraConfig = ''
-    import security-headers
+    import auth-public
     reverse_proxy localhost:3043
   '';
 }

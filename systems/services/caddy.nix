@@ -1,19 +1,9 @@
-{config, ...}: {
-  sops.secrets."services/caddy/env" = {
-    owner = "caddy";
-    group = "caddy";
-    mode = "0400";
-    # Caddy loads this as a systemd EnvironmentFile and expands {$VAR}
-    # placeholders in the generated Caddyfile at startup.
-    restartUnits = ["caddy.service"];
-  };
-
+{config, lib, ...}: let
+  trustedIps = lib.concatStringsSep " " config.services.wireguard-network.trustedSubnets;
+in {
   services.caddy = {
     enable = true;
     email = "acme@niko.ink";
-
-    # Sops-managed env file supplies API basic-auth user + bcrypt hash.
-    environmentFile = config.sops.secrets."services/caddy/env".path;
 
     # Caddy handles ACME automatically via HTTP-01 for public-facing servers.
     # No security.acme or DNS provider config needed.
@@ -39,16 +29,28 @@
         }
       }
 
-      (authelia) {
-        forward_auth localhost:9091 {
-          uri /api/authz/forward-auth?authelia_url=https://auth.niko.ink/
-          copy_headers Remote-User Remote-Groups Remote-Email Remote-Name
+      (auth) {
+        forward_auth localhost:4180 {
+          uri /oauth2/auth
+          copy_headers X-Auth-Request-User X-Auth-Request-Email
+
+          @unauthorized status 401
+          handle_response @unauthorized {
+            redir https://auth.niko.ink/oauth2/start?rd=https://{host}{uri}
+          }
         }
       }
 
-      (api-basic-auth) {
-        basicauth {
-          {$API_AUTH_USER} {$API_AUTH_HASH}
+      (auth-public) {
+        @untrusted not remote_ip ${trustedIps} 127.0.0.1
+        forward_auth @untrusted localhost:4180 {
+          uri /oauth2/auth
+          copy_headers X-Auth-Request-User X-Auth-Request-Email
+
+          @unauthorized status 401
+          handle_response @unauthorized {
+            redir https://auth.niko.ink/oauth2/start?rd=https://{host}{uri}
+          }
         }
       }
     '';
@@ -60,7 +62,7 @@
 
     virtualHosts."auth.niko.ink".extraConfig = ''
       import security-headers
-      reverse_proxy localhost:9091
+      reverse_proxy localhost:4180
     '';
 
     # Abort connections to unknown hostnames / bare IP

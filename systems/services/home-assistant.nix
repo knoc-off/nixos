@@ -40,7 +40,8 @@ in {
       frontend = {
         enabled = true;
         port = 7768;
-        host = "0.0.0.0";
+        # Localhost only -- no auth on the Z2M frontend
+        host = "127.0.0.1";
       };
 
       serial = {
@@ -65,11 +66,16 @@ in {
       http = {
         server_host = "0.0.0.0";
         server_port = 8123;
+        # Caddy on Hetzner reverse-proxies via WireGuard
+        use_x_forwarded_for = true;
+        trusted_proxies = ["10.100.0.1"];
       };
 
       homeassistant = {
         name = "Home";
         unit_system = "metric";
+        external_url = "https://home.niko.ink";
+        internal_url = "http://192.168.178.54:8123";
       };
 
       # MQTT is configured via HA UI integration, not here.
@@ -91,7 +97,6 @@ in {
 
   networking.firewall.allowedTCPPorts = [
     8123 # Home Assistant
-    7768 # Zigbee2MQTT
   ];
 
   # Z2M v4 auto-discovers .ts files in <dataDir>/external_converters/
@@ -115,12 +120,12 @@ in {
     after = ["mosquitto.service" "network-online.target"];
     wants = ["network-online.target"];
     bindsTo = ["mosquitto.service"];
-    environment.NODE_OPTIONS = "--max-old-space-size=64";
+    environment.NODE_OPTIONS = "--max-old-space-size=128";
     serviceConfig = {
       Restart = lib.mkForce "always";
       RestartSec = lib.mkForce "5s";
-      MemoryMax = "120M";
-      MemoryHigh = "100M";
+      MemoryMax = "256M";
+      MemoryHigh = "200M";
     };
     unitConfig = {
       StartLimitIntervalSec = 300;
@@ -135,8 +140,8 @@ in {
     serviceConfig = {
       Restart = lib.mkForce "always";
       RestartSec = lib.mkForce "5s";
-      MemoryMax = "150M";
-      MemoryHigh = "120M";
+      MemoryMax = "512M";
+      MemoryHigh = "400M";
     };
     unitConfig = {
       StartLimitIntervalSec = 300;

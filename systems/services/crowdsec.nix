@@ -33,59 +33,6 @@
           journalctl_filter = ["_SYSTEMD_UNIT=sshd.service"];
           labels.type = "syslog";
         }
-        {
-          filenames = ["/var/log/authelia/authelia.log"];
-          labels.type = "authelia";
-        }
-      ];
-
-      # Custom Authelia parser -- extracts remote_ip and message from
-      # Authelia's logrus-style text format.
-      parsers.s01Parse = [
-        {
-          name = "custom/authelia-logs";
-          description = "Parse Authelia logrus text log lines";
-          filter = "evt.Line.Labels.type == 'authelia'";
-          onsuccess = "next_stage";
-          nodes = [
-            {
-              grok = {
-                pattern = ''time="%{TIMESTAMP_ISO8601:timestamp}" level=%{WORD:log_level} msg="%{DATA:msg}"'';
-                apply_on = "message";
-              };
-            }
-            {
-              grok = {
-                pattern = ''remote_ip=%{IP:source_ip}'';
-                apply_on = "message";
-              };
-              statics = [
-                {
-                  meta = "source_ip";
-                  expression = "evt.Parsed.source_ip";
-                }
-              ];
-            }
-          ];
-        }
-      ];
-
-      # Custom Authelia scenario -- triggers on repeated failed login attempts
-      scenarios = [
-        {
-          type = "leaky";
-          name = "custom/authelia-bf";
-          description = "Detect Authelia brute force attempts";
-          filter = "evt.Parsed.log_level == 'error' && evt.Parsed.msg contains 'Unsuccessful'";
-          leakspeed = "30s";
-          capacity = 2;
-          groupby = "evt.Meta.source_ip";
-          blackhole = "5m";
-          labels = {
-            type = "authelia_bruteforce";
-            remediation = true;
-          };
-        }
       ];
 
       # Aggressive ban profile -- 24h base, repeat offenders get longer
@@ -121,9 +68,8 @@
     };
   };
 
-  # CrowdSec needs to read Caddy and Authelia log files
+  # CrowdSec needs to read Caddy log files
   systemd.services.crowdsec.serviceConfig.SupplementaryGroups = [
     "caddy"
-    "authelia-main"
   ];
 }

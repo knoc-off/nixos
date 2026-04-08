@@ -21,6 +21,7 @@
         secrets = {
           "services/website/env" = {};
           "services/kitchenowl/jwt-secret" = {};
+          "wireguard/private-key" = {};
         };
       };
     }
@@ -29,9 +30,18 @@
 
     ./services/caddy.nix
     ./services/crowdsec.nix
-    ./services/authelia.nix
+    ./services/oauth2-proxy.nix
     ./services/kitchenowl.nix
     ./services/trilium.nix
+
+    ./services/wireguard.nix
+    {
+      services.wireguard-network.dns = {
+        enable = true;
+        localOnly = true;
+        listenAddress = "10.100.0.1";
+      };
+    }
   ];
 
   nix.optimise.automatic = true;
@@ -45,8 +55,35 @@
   networking.firewall = {
     enable = true;
     allowedTCPPorts = [80 443];
+    allowedUDPPorts = [51820];
     logRefusedConnections = true;
   };
+
+  # WireGuard hub
+  networking.wireguard.interfaces.wg0 = {
+    ips = ["10.100.0.1/24"];
+    listenPort = 51820;
+    privateKeyFile = config.sops.secrets."wireguard/private-key".path;
+    peers = [
+      {
+        # Raspberry Pi (home gateway) -- also routes home LAN
+        publicKey = "7tiH8n6rpPN6U2+xJ58Fd9lhkVeS+jduVPA1Uq7IzR0=";
+        allowedIPs = ["10.100.0.2/32" "192.168.178.0/24"];
+      }
+      {
+        # Android phone
+        publicKey = "E3rALFimpj/yG1JrxemcfYEMwp5neGd7c5EDMoWXS1Q=";
+        allowedIPs = ["10.100.0.3/32"];
+      }
+    ];
+  };
+
+  # Home Assistant on the Pi, proxied over WireGuard with real TLS
+  services.caddy.virtualHosts."home.niko.ink".extraConfig = ''
+    import security-headers
+    import lan-only
+    reverse_proxy 10.100.0.2:8123
+  '';
 
   boot.loader.grub = {
     efiSupport = true;

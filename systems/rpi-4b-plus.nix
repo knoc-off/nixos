@@ -10,6 +10,14 @@
     inputs.sops-nix.nixosModules.sops
 
     ./services/home-assistant.nix
+
+    ./services/wireguard.nix
+    {
+      services.wireguard-network.dns = {
+        enable = true;
+        upstream = ["192.168.178.1"];
+      };
+    }
   ];
 
   sops = {
@@ -17,6 +25,7 @@
     age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
     secrets."wifi/home/fritz" = {};
     secrets."ha/api_token" = {};
+    secrets."wireguard/private-key" = {};
   };
 
   boot = {
@@ -69,7 +78,31 @@
       secretsFile = config.sops.secrets."wifi/home/fritz".path;
       networks."FRITZ!Box 7590 SI".pskRaw = "ext:PSK0";
     };
-    firewall = {enable = false;};
+    firewall = {
+      enable = true;
+      allowedTCPPorts = [
+        22    # SSH
+        53    # DNS (for home LAN devices)
+        8123  # Home Assistant
+      ];
+      allowedUDPPorts = [
+        53    # DNS
+      ];
+    };
+
+    # WireGuard spoke -- connects to the Hetzner hub
+    wireguard.interfaces.wg0 = {
+      ips = ["10.100.0.2/24"];
+      privateKeyFile = config.sops.secrets."wireguard/private-key".path;
+      peers = [
+        {
+          publicKey = "xhsyVKOlzOHtOSDsXU7d/CRdyzamNgotO8NocNLpFno=";
+          endpoint = "157.90.17.55:51820";
+          allowedIPs = ["10.100.0.0/24"];
+          persistentKeepalive = 25;
+        }
+      ];
+    };
   };
 
   swapDevices = [
