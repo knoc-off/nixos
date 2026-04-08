@@ -22,12 +22,10 @@ in {
     ./plugins/kinetic-scroll.nix
   ];
 
-  # XWayland apps don't know the Wayland fractional scale, so they render at 96 DPI
-  # and get compositor-upscaled (blurry). Setting Xft.dpi tells them the real DPI.
+  # XWayland renders at 96 DPI without this -- compositor upscales (blurry)
   xresources.properties."Xft.dpi" = builtins.floor (96 * displayScale);
 
-  # Theme config for hyprqt6engine (used by hyprland-share-picker via XDPH service).
-  # Matches Stylix font/icon settings so the screen-share picker looks consistent.
+  # hyprqt6engine: match Stylix fonts so screen-share picker looks consistent
   xdg.configFile."hypr/hyprqt6engine.conf".text = let
     fonts = config.stylix.fonts;
   in ''
@@ -45,12 +43,9 @@ in {
     enable = true;
     settings = {
       general = {
-        # lock_cmd is triggered by `loginctl lock-session`
-        lock_cmd = "${noctaliaCmd} ipc call lockScreen lock";
-        # Always lock before sleep, regardless of idle state
-        before_sleep_cmd = "loginctl lock-session";
-        # Restore monitors after waking
-        after_sleep_cmd = "hyprctl dispatch dpms on";
+        lock_cmd = "${noctaliaCmd} ipc call lockScreen lock"; # triggered by loginctl lock-session
+        before_sleep_cmd = "loginctl lock-session"; # always lock before sleep
+        after_sleep_cmd = "hyprctl dispatch dpms on"; # restore monitors after wake
       };
 
       listener = [

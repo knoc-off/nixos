@@ -74,6 +74,11 @@
         publicKey = "E3rALFimpj/yG1JrxemcfYEMwp5neGd7c5EDMoWXS1Q=";
         allowedIPs = ["10.100.0.3/32"];
       }
+      {
+        # Framework 13 laptop
+        publicKey = "Ad+7eq4h0eIrGyFTsziEU+mB5q0/cwat2gW6iVOEtzc=";
+        allowedIPs = ["10.100.0.4/32"];
+      }
     ];
   };
 

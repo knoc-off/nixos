@@ -9,7 +9,6 @@
     reverseProxy = true;
     setXauthrequest = true;
 
-    # sops env file -- keeps secrets out of the nix store
     keyFile = config.sops.secrets."services/oauth2-proxy/env".path;
 
     cookie = {
@@ -22,10 +21,10 @@
 
     email.addresses = ''
       selby@niko.ink
-      placeholder@example.com
+      git@tilley.cc
     '';
 
-    email.domains = ["*"]; # allowlist is addresses above, not domain
+    email.domains = ["*"];
 
     extraConfig = {
       approval-prompt = "auto"; # skip prompt for returning users

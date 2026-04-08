@@ -172,8 +172,11 @@
         secrets."shell_environment/ANTHROPIC_API_KEY" = {
           mode = "0644";
         };
+        secrets."wireguard/private-key" = {};
       };
     }
+
+    ./services/wireguard.nix
 
     {
       nixpkgs.config.allowUnfree = true;
@@ -310,6 +313,32 @@
   programs.localsend.enable = true;
   networking = {
     hostName = hostname;
+
+    wireguard.interfaces.wg0 = {
+      ips = ["10.100.0.4/24"];
+      privateKeyFile = config.sops.secrets."wireguard/private-key".path;
+
+      # Tell systemd-resolved to route *.niko.ink queries to the hub's
+      # dnsmasq over the tunnel. All other DNS goes through the normal
+      # resolver. This is the systemd-resolved equivalent of split DNS.
+      postSetup = ''
+        ${pkgs.systemd}/bin/resolvectl dns wg0 10.100.0.1
+        ${pkgs.systemd}/bin/resolvectl domain wg0 "~niko.ink"
+      '';
+      postShutdown = ''
+        ${pkgs.systemd}/bin/resolvectl revert wg0
+      '';
+
+      peers = [
+        {
+          publicKey = "xhsyVKOlzOHtOSDsXU7d/CRdyzamNgotO8NocNLpFno=";
+          endpoint = "157.90.17.55:51820";
+          allowedIPs = ["10.100.0.0/24"];
+          persistentKeepalive = 25;
+        }
+      ];
+    };
+
     firewall = {
       enable = true;
       allowedTCPPorts = [

@@ -1,8 +1,5 @@
 # MQTT automations -- Rust binaries from pkgs/mqtt-automations.
-#
-# Each automation is a lightweight Rust binary using the shared mqtt_automations
-# runtime. Config is passed via environment variables and (for buttons) a
-# generated JSON file.
+# Config via environment variables; buttons get a generated JSON file.
 {
   config,
   lib,
@@ -12,7 +9,6 @@
 }: let
   mqttPkg = self.packages.${pkgs.stdenv.hostPlatform.system}.mqtt-automations;
 
-  # Shared systemd service defaults for all automation binaries.
   mkAutomation = {
     name,
     bin,
@@ -40,7 +36,6 @@
     };
   };
 
-  # -- Button dispatcher config (JSON) --------------------------------------
   buttonConfig = pkgs.writeText "button-dispatcher.json" (builtins.toJSON {
     buttons = {
       "zigbee2mqtt/button_1/action" = {
@@ -60,7 +55,6 @@
     };
   });
 
-  # -- All automations -------------------------------------------------------
   automations = [
     {
       name = "plug-auto-off";
