@@ -59,14 +59,13 @@
     logRefusedConnections = true;
   };
 
-  # WireGuard hub
   networking.wireguard.interfaces.wg0 = {
     ips = ["10.100.0.1/24"];
     listenPort = 51820;
     privateKeyFile = config.sops.secrets."wireguard/private-key".path;
     peers = [
       {
-        # Raspberry Pi (home gateway) -- also routes home LAN
+        # Pi -- gateway for home LAN
         publicKey = "7tiH8n6rpPN6U2+xJ58Fd9lhkVeS+jduVPA1Uq7IzR0=";
         allowedIPs = ["10.100.0.2/32" "192.168.178.0/24"];
       }
@@ -78,7 +77,6 @@
     ];
   };
 
-  # Home Assistant on the Pi, proxied over WireGuard with real TLS
   services.caddy.virtualHosts."home.niko.ink".extraConfig = ''
     import security-headers
     import lan-only
@@ -90,11 +88,9 @@
     efiInstallAsRemovable = true;
   };
 
-  # SSH hardening
   services.openssh = {
     enable = true;
     settings = {
-      # Key-only auth -- passwords are brute-forceable on a public server
       PasswordAuthentication = lib.mkForce false;
       KbdInteractiveAuthentication = false;
       X11Forwarding = false;
@@ -104,7 +100,7 @@
       ClientAliveCountMax = 3;
       ClientAliveInterval = 60;
     };
-    # Only ed25519 -- RSA/ECDSA host keys are unnecessary attack surface
+    # ed25519 only -- drop RSA/ECDSA attack surface
     hostKeys = [
       {
         path = "/etc/ssh/ssh_host_ed25519_key";
@@ -114,7 +110,6 @@
   };
 
 
-  # Kernel and network hardening for a public-facing host
   boot.kernel.sysctl = {
     "net.ipv4.tcp_syncookies" = 1;
     "net.ipv4.conf.all.rp_filter" = 1;
@@ -141,7 +136,7 @@
     "net.core.bpf_jit_harden" = 2;
   };
 
-  # Non-root admin -- prefer ssh knoff@ over root for audit trail
+  # non-root admin for audit trail
   users.users.knoff = {
     isNormalUser = true;
     extraGroups = ["wheel"];
@@ -156,7 +151,7 @@
     execWheelOnly = true;
   };
 
-  # Root key retained for emergency recovery
+  # emergency recovery
   users.users.root.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"
   ];

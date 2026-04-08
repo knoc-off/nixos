@@ -1,6 +1,4 @@
-# Shared VPN topology -- imported by all hosts that participate in the
-# WireGuard network. Per-host differences (dns upstream, listen address)
-# are set inline in each host's imports block.
+# Shared VPN topology. Per-host overrides set inline.
 {self, ...}: {
   imports = [self.nixosModules.services.wireguard-network];
 

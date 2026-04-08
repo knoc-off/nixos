@@ -40,8 +40,7 @@ in {
       frontend = {
         enabled = true;
         port = 7768;
-        # Localhost only -- no auth on the Z2M frontend
-        host = "127.0.0.1";
+        host = "127.0.0.1"; # no auth on Z2M frontend
       };
 
       serial = {
@@ -66,8 +65,7 @@ in {
       http = {
         server_host = "0.0.0.0";
         server_port = 8123;
-        # Caddy on Hetzner reverse-proxies via WireGuard
-        use_x_forwarded_for = true;
+        use_x_forwarded_for = true; # Caddy proxies via WireGuard
         trusted_proxies = ["10.100.0.1"];
       };
 
@@ -78,8 +76,7 @@ in {
         internal_url = "http://192.168.178.54:8123";
       };
 
-      # MQTT is configured via HA UI integration, not here.
-      # Declarative mqtt config conflicts with the UI-based setup.
+      # MQTT configured via HA UI -- declarative config conflicts with it
 
       notify = [
         {
@@ -95,11 +92,8 @@ in {
     };
   };
 
-  networking.firewall.allowedTCPPorts = [
-    8123 # Home Assistant
-  ];
+  networking.firewall.allowedTCPPorts = [8123];
 
-  # Z2M v4 auto-discovers .ts files in <dataDir>/external_converters/
   systemd.tmpfiles.rules = [
     "d /var/lib/zigbee2mqtt/external_converters 0755 zigbee2mqtt zigbee2mqtt -"
     "L+ /var/lib/zigbee2mqtt/external_converters/LTA016.ts - - - - ${./zigbee-converters/LTA016.ts}"

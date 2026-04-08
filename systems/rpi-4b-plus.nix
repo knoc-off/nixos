@@ -34,8 +34,7 @@
       grub.enable = false;
       generic-extlinux-compatible.enable = true;
     };
-    # Disable bluetooth (fails every boot, saves memory)
-    blacklistedKernelModules = ["btsdio" "hci_uart" "bluetooth"];
+    blacklistedKernelModules = ["btsdio" "hci_uart" "bluetooth"]; # fails every boot
   };
 
   hardware = {
@@ -43,22 +42,17 @@
     bluetooth.enable = false;
   };
 
-  # NOTE: gpu_mem=16 is set manually in /dev/mmcblk0p1/config.txt (firmware partition)
-  # This reduces GPU memory from 64MB to 16MB, freeing ~48MB for the system.
-  # Must be re-applied if the SD card is re-flashed.
+  # gpu_mem=16 set manually in /dev/mmcblk0p1/config.txt -- must re-apply after re-flash
 
-  # Compressed in-RAM swap - much faster than SD card swap, effectively
-  # multiplies available memory via compression (~2-3x ratio)
+  # in-RAM compressed swap, faster than SD card
   zramSwap = {
     enable = true;
-    memoryPercent = 50; # up to 50% of RAM as zram swap
+    memoryPercent = 50;
     algorithm = "zstd";
-    priority = 100; # prefer zram over disk swap
+    priority = 100;
   };
 
-  # Userspace OOM killer - prevents hard lockups by killing the largest
-  # process before the system becomes completely unresponsive.
-  # systemd-oomd cannot work on this kernel (no PSI support).
+  # systemd-oomd unavailable (no PSI support on this kernel)
   services.earlyoom = {
     enable = true;
     freeMemThreshold = 5;
@@ -80,17 +74,10 @@
     };
     firewall = {
       enable = true;
-      allowedTCPPorts = [
-        22    # SSH
-        53    # DNS (for home LAN devices)
-        8123  # Home Assistant
-      ];
-      allowedUDPPorts = [
-        53    # DNS
-      ];
+      allowedTCPPorts = [22 53 8123];
+      allowedUDPPorts = [53];
     };
 
-    # WireGuard spoke -- connects to the Hetzner hub
     wireguard.interfaces.wg0 = {
       ips = ["10.100.0.2/24"];
       privateKeyFile = config.sops.secrets."wireguard/private-key".path;

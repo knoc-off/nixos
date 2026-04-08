@@ -4,9 +4,7 @@
     autoUpdateService = true;
 
     settings = {
-      # Enable the Local API so the agent and bouncers can communicate.
-      # Port 8081 because Trilium uses the default 8080.
-      # Credentials are auto-generated on first start.
+      # port 8081 -- Trilium occupies 8080
       general.api.server = {
         enable = true;
         listen_uri = "127.0.0.1:8081";
@@ -35,7 +33,6 @@
         }
       ];
 
-      # Aggressive ban profile -- 24h base, repeat offenders get longer
       profiles = [
         {
           name = "default_ip_remediation";
@@ -52,11 +49,9 @@
     };
   };
 
-  # Firewall-level blocking via nftables. The Hetzner kernel has
-  # nf_tables but lacks ip_set and some nft expression modules (nft_ct,
-  # nft_log), so we can't use iptables mode or enable the full NixOS
-  # nftables firewall. set-only=false lets the bouncer create its own
-  # table/chain/set via netlink without needing networking.nftables.
+  # nftables mode -- kernel has nf_tables but lacks ip_set and nft_ct/nft_log,
+  # so iptables mode and networking.nftables both fail. set-only=false lets
+  # the bouncer create its own table via netlink.
   services.crowdsec-firewall-bouncer = {
     enable = true;
     registerBouncer.enable = true;
@@ -68,7 +63,6 @@
     };
   };
 
-  # CrowdSec needs to read Caddy log files
   systemd.services.crowdsec.serviceConfig.SupplementaryGroups = [
     "caddy"
   ];

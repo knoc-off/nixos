@@ -1,8 +1,6 @@
-# Thin wrapper around WireGuard networking plumbing. Generates dnsmasq
-# split DNS, Caddy lan-only snippet, CrowdSec whitelist, IP forwarding,
-# and systemd ordering from a shared set of options. Does NOT generate
-# the WireGuard interface itself -- each host defines its own peers and
-# keys explicitly via networking.wireguard.interfaces.
+# Generates dnsmasq split DNS, Caddy lan-only snippet, CrowdSec whitelist,
+# IP forwarding, and dnsmasq ordering. WireGuard interfaces are defined
+# explicitly per-host.
 {
   config,
   lib,
@@ -65,7 +63,6 @@ in {
   config = lib.mkIf cfg.enable {
     boot.kernel.sysctl."net.ipv4.ip_forward" = 1;
 
-    # Split DNS -- LAN-only subdomains resolve to the hub's VPN IP
     services.dnsmasq = lib.mkIf cfg.dns.enable {
       enable = true;
       resolveLocalQueries = !cfg.dns.localOnly;
@@ -82,7 +79,7 @@ in {
     };
 
     systemd.services.dnsmasq = lib.mkIf cfg.dns.enable {
-      # dnsmasq may bind to a WireGuard IP that doesn't exist until wg0 is up
+      # wg0 must exist before dnsmasq if listenAddress is a WG IP
       after = ["wireguard-wg0.service"];
       wants = ["wireguard-wg0.service"];
       serviceConfig = {
@@ -91,11 +88,9 @@ in {
       };
     };
 
-    # DNS port only on the WireGuard interface (not public)
     networking.firewall.interfaces.wg0.allowedUDPPorts =
       lib.mkIf (cfg.dns.enable && cfg.dns.listenAddress != null) [53];
 
-    # Caddy: inject (lan-only) snippet when Caddy is present on this host
     services.caddy.extraConfig = lib.mkIf config.services.caddy.enable (lib.mkAfter ''
       (lan-only) {
         @denied not remote_ip ${lib.concatStringsSep " " cfg.trustedSubnets} 127.0.0.1
@@ -103,7 +98,6 @@ in {
       }
     '');
 
-    # CrowdSec: whitelist trusted subnets when CrowdSec is present
     services.crowdsec.localConfig.parsers.s02Enrich =
       lib.mkIf config.services.crowdsec.enable [
         {

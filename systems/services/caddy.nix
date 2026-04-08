@@ -5,9 +5,6 @@ in {
     enable = true;
     email = "acme@niko.ink";
 
-    # Caddy handles ACME automatically via HTTP-01 for public-facing servers.
-    # No security.acme or DNS provider config needed.
-
     logFormat = ''
       output file /var/log/caddy/access.log {
         roll_size 50MiB
@@ -16,7 +13,6 @@ in {
       format json
     '';
 
-    # Shared snippets. Each service imports the ones it needs.
     extraConfig = ''
       (security-headers) {
         header {
@@ -65,7 +61,6 @@ in {
       reverse_proxy localhost:4180
     '';
 
-    # Abort connections to unknown hostnames / bare IP
     virtualHosts.":443".extraConfig = ''
       tls internal
       abort
@@ -75,7 +70,7 @@ in {
     '';
   };
 
-  # Group-readable logs so CrowdSec can parse them via SupplementaryGroups
+  # 0027 so CrowdSec (supplementary group) can read logs
   systemd.services.caddy.serviceConfig.UMask = "0027";
   systemd.tmpfiles.rules = [
     "d /var/log/caddy 0750 caddy caddy -"

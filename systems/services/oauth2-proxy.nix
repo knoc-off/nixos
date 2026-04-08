@@ -9,8 +9,7 @@
     reverseProxy = true;
     setXauthrequest = true;
 
-    # Secrets (client-id, client-secret, cookie-secret) loaded from sops
-    # env file so they don't leak into the nix store or /proc.
+    # sops env file -- keeps secrets out of the nix store
     keyFile = config.sops.secrets."services/oauth2-proxy/env".path;
 
     cookie = {
@@ -26,12 +25,10 @@
       placeholder@example.com
     '';
 
-    # Allow any email domain -- actual restriction is via the addresses above
-    email.domains = ["*"];
+    email.domains = ["*"]; # allowlist is addresses above, not domain
 
     extraConfig = {
-      # Show "auto" prompt so returning users skip the provider choice
-      approval-prompt = "auto";
+      approval-prompt = "auto"; # skip prompt for returning users
       whitelist-domain = ".niko.ink";
     };
   };

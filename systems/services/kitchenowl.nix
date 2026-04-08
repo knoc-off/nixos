@@ -10,7 +10,6 @@
     oci-containers.backend = "podman";
     oci-containers.containers.kitchenowl = {
       image = "tombursch/kitchenowl@sha256:9d5e4402c2abc734e1536586caa103840a7ebe961fdce1570e31b956abeba70b";
-      # Localhost-only -- Caddy handles external traffic
       ports = ["127.0.0.1:3043:8080"];
       environmentFiles = [
         config.sops.secrets."services/kitchenowl/jwt-secret".path
