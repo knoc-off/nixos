@@ -65,8 +65,10 @@ in {
       http = {
         server_host = "0.0.0.0";
         server_port = 8123;
-        use_x_forwarded_for = true; # Caddy proxies via WireGuard
-        trusted_proxies = ["10.100.0.1"];
+        use_x_forwarded_for = true;
+        # 10.100.0.1: Hetzner Caddy via WG (remote + VPN path).
+        # 127.0.0.1: Pi-local Caddy on same host (home LAN path).
+        trusted_proxies = ["10.100.0.1" "127.0.0.1"];
       };
 
       homeassistant = {

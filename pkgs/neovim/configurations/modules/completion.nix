@@ -1,7 +1,23 @@
-# Completion via blink.cmp
+# Completion via blink.cmp + LuaSnip
 # Enter to accept, Tab/S-Tab for snippet placeholder jumping
-# Sources: LSP, snippets, buffer, path
+# Sources: LSP, snippets (LuaSnip + friendly-snippets), buffer, path
 {lib, ...}: {
+  # LuaSnip snippet engine
+  plugins.luasnip = {
+    enable = true;
+    settings = {
+      keep_roots = true;
+      link_roots = true;
+      link_children = true;
+      update_events = "TextChanged,TextChangedI";
+      region_check_events = "CursorMoved";
+      delete_check_events = "TextChanged";
+    };
+  };
+
+  # Community snippet collection -- nixvim auto-wires this into LuaSnip via fromVscode
+  plugins.friendly-snippets.enable = true;
+
   plugins.blink-cmp = {
     enable = true;
     setupLspCapabilities = true;
@@ -9,8 +25,8 @@
     settings = {
       keymap = {
         preset = "enter";
-        "<Tab>" = ["select_next" "snippet_forward" "fallback"];
-        "<S-Tab>" = ["select_prev" "snippet_backward" "fallback"];
+        "<Tab>" = ["snippet_forward" "select_next" "fallback"];
+        "<S-Tab>" = ["snippet_backward" "select_prev" "fallback"];
         "<C-j>" = ["select_next" "fallback"];
         "<C-k>" = ["select_prev" "fallback"];
       };
@@ -45,7 +61,7 @@
 
       signature.enabled = true;
 
-      snippets.preset = "default";
+      snippets.preset = "luasnip";
 
       sources = {
         default = lib.nixvim.mkRaw ''

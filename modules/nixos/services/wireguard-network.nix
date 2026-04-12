@@ -31,10 +31,37 @@ in {
       description = "WireGuard IP of the hub node. LAN-only domains resolve here.";
     };
 
-    lanOnlySubdomains = lib.mkOption {
-      type = lib.types.listOf lib.types.str;
-      default = [];
-      description = "Subdomain prefixes only reachable via trusted subnets (e.g. [\"kitchenowl\" \"notes.api\"]).";
+    lanServices = lib.mkOption {
+      default = {};
+      description = ''
+        Services exposed on the home LAN. Keys are subdomain prefixes
+        without the base domain (e.g. "home", "kitchenowl"). Drives four
+        downstream configurations from a single source of truth:
+          - hub dnsmasq rewrites each host to the hub WG IP for VPN clients
+          - gateway dnsmasq rewrites each host to its own LAN IP for
+            clients on home WiFi
+          - gateway Caddy terminates TLS for each host (reverse-proxies
+            locally if localBackend is set, otherwise forwards to the hub
+            over WG so the request arrives from a trusted source and
+            skips public auth)
+          - hub cert-sync ships each service's cert/key to the gateway
+      '';
+      type = lib.types.attrsOf (lib.types.submodule {
+        options = {
+          localBackend = lib.mkOption {
+            type = lib.types.nullOr lib.types.str;
+            default = null;
+            example = "localhost:8123";
+            description = ''
+              When set, the home gateway's Caddy reverse-proxies this
+              service to the given address on its local host (used for
+              services physically hosted on the gateway). When null,
+              the gateway transparently forwards the service to the
+              hub over WireGuard.
+            '';
+          };
+        };
+      });
     };
 
     dns = {
@@ -57,6 +84,33 @@ in {
         default = null;
         description = "Bind dnsmasq to a specific IP (e.g. the WireGuard address). Null means all interfaces.";
       };
+
+      lanOnlyAnswer = lib.mkOption {
+        type = lib.types.str;
+        default = cfg.hubIp;
+        defaultText = lib.literalExpression "config.services.wireguard-network.hubIp";
+        description = ''
+          IP that dnsmasq returns for the rewritten LAN-only subdomains.
+          Defaults to the WG hub IP, which is correct for remote VPN clients
+          reaching services through the hub. Override on a host whose
+          dnsmasq serves LAN clients that cannot reach the hub IP directly
+          (e.g. the home gateway returning its own LAN IP so WiFi clients
+          can reach a locally hosted service without running WireGuard).
+        '';
+      };
+
+      rewriteHosts = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = lib.attrNames cfg.lanServices;
+        defaultText = lib.literalExpression "lib.attrNames config.services.wireguard-network.lanServices";
+        description = ''
+          Full hostnames this host's dnsmasq rewrites to lanOnlyAnswer.
+          Defaults to every key in lanServices. Override on hosts that
+          should only rewrite a subset (e.g. a gateway that hosts only
+          some services locally and lets the rest resolve to the hub's
+          public address as normal).
+        '';
+      };
     };
   };
 
@@ -70,7 +124,7 @@ in {
         {
           no-resolv = true;
           server = cfg.dns.upstream;
-          address = map (sub: "/${sub}.${cfg.domain}/${cfg.hubIp}") cfg.lanOnlySubdomains;
+          address = map (host: "/${host}/${cfg.dns.lanOnlyAnswer}") cfg.dns.rewriteHosts;
         }
         // lib.optionalAttrs (cfg.dns.listenAddress != null) {
           listen-address = cfg.dns.listenAddress;

@@ -127,6 +127,8 @@ in {
     self.homeModules.hyprland
     self.homeModules.noctalia
     self.homeModules.stylix
+    self.homeModules.quickshell-overview
+    {programs.quickshell-overview.enable = true;}
 
     self.homeModules.easyeffects
     {
@@ -274,7 +276,7 @@ in {
 
       sops # should maybe source this package somewhere common.
 
-      upkgs.freecad-wayland
+      upkgs.freecad
     ];
 
     stateVersion = "23.05";

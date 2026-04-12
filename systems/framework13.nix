@@ -169,9 +169,9 @@
         secrets."shell_environment/OPENROUTER_API_KEY" = {
           mode = "0644";
         };
-        secrets."shell_environment/ANTHROPIC_API_KEY" = {
-          mode = "0644";
-        };
+        # secrets."shell_environment/ANTHROPIC_API_KEY" = {
+        #   mode = "0644";
+        # };
         secrets."wireguard/private-key" = {};
       };
     }

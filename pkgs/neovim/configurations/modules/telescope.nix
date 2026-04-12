@@ -61,6 +61,23 @@
             "<C-j>" = lib.nixvim.mkRaw "require('telescope.actions').move_selection_next";
             "<C-k>" = lib.nixvim.mkRaw "require('telescope.actions').move_selection_previous";
             "<C-q>" = lib.nixvim.mkRaw "require('telescope.actions').send_selected_to_qflist + require('telescope.actions').open_qflist";
+            "<C-CR>" = lib.nixvim.mkRaw ''
+              function(prompt_bufnr)
+                local actions = require('telescope.actions')
+                local state = require('telescope.actions.state')
+                local picker = state.get_current_picker(prompt_bufnr)
+                local selections = picker:get_multi_selection()
+                if #selections == 0 then
+                  actions.select_default(prompt_bufnr)
+                  return
+                end
+                actions.close(prompt_bufnr)
+                for _, entry in ipairs(selections) do
+                  local path = entry.path or entry.filename
+                  if path then vim.cmd.edit(path) end
+                end
+              end
+            '';
             "<Esc>" = lib.nixvim.mkRaw "require('telescope.actions').close";
           };
           n = {

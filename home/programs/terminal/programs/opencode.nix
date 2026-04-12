@@ -353,6 +353,10 @@ in {
     };
 
     settings = {
+      plugin = [
+        "opencode-claude-auth@latest"
+      ];
+
       permission = {
         edit = "ask";
         bash = "ask";

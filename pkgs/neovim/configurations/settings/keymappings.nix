@@ -10,8 +10,8 @@
       {
         mode = "n";
         key = "<leader>q";
-        action = lib.nixvim.mkRaw "function() vim.cmd('qall') end";
-        options = { silent = true; desc = "Quit all"; };
+        action = lib.nixvim.mkRaw "function() vim.cmd('bdelete') end";
+        options = { silent = true; desc = "Close buffer"; };
       }
       {
         mode = "n";

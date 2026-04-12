@@ -1,6 +1,13 @@
-{config, lib, ...}: let
+{
+  self,
+  config,
+  lib,
+  ...
+}: let
   trustedIps = lib.concatStringsSep " " config.services.wireguard-network.trustedSubnets;
 in {
+  imports = [self.nixosModules.services.caddy-common];
+
   services.caddy = {
     enable = true;
     email = "acme@niko.ink";
@@ -14,17 +21,6 @@ in {
     '';
 
     extraConfig = ''
-      (security-headers) {
-        header {
-          X-Content-Type-Options "nosniff"
-          X-Frame-Options "SAMEORIGIN"
-          Referrer-Policy "strict-origin-when-cross-origin"
-          Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
-          Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-          -Server
-        }
-      }
-
       (auth) {
         forward_auth localhost:4180 {
           uri /oauth2/auth

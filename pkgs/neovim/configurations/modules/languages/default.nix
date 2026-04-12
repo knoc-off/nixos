@@ -35,7 +35,6 @@
       };
 
       lspBuf = {
-        K = "hover";
         gd = "definition";
         gD = "declaration";
         gi = "implementation";
@@ -49,14 +48,6 @@
     # Configure LSP floating windows with rounded borders
     preConfig = ''
       local border = "rounded"
-
-      vim.lsp.handlers["textDocument/hover"] = vim.lsp.with(
-        vim.lsp.handlers.hover, { border = border }
-      )
-
-      vim.lsp.handlers["textDocument/signatureHelp"] = vim.lsp.with(
-        vim.lsp.handlers.signature_help, { border = border }
-      )
 
       vim.diagnostic.config({
         float = {
@@ -99,6 +90,12 @@
   };
 
   keymaps = [
+    {
+      mode = "n";
+      key = "K";
+      action = lib.nixvim.mkRaw ''function() vim.lsp.buf.hover({ border = "rounded" }) end'';
+      options = { silent = true; desc = "Hover"; };
+    }
     {
       mode = "n";
       key = "<leader>cf";

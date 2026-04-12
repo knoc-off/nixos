@@ -33,6 +33,12 @@ in {
     f3d
 
     feh
+
+    # Nautilus + supporting bits: file-roller handles archive extraction
+    # from the right-click menu, sushi provides space-bar quick preview.
+    nautilus
+    file-roller
+    sushi
   ];
 
   xdg.mimeApps = {

@@ -1,4 +1,5 @@
 {
+  self,
   lib,
   config,
   inputs,
@@ -10,12 +11,38 @@
     inputs.sops-nix.nixosModules.sops
 
     ./services/home-assistant.nix
+    ./services/caddy-lan.nix
 
     ./services/wireguard.nix
     {
+      # Home LAN clients cannot reach 10.100.0.1 without running WG
+      # themselves. Point every lanServices hostname at the Pi's own
+      # LAN IP so WiFi clients hit the Pi's Caddy directly. Caddy
+      # serves home.niko.ink locally and transparent-proxies the rest
+      # back to the hub over WG, where the proxied request arrives
+      # from 10.100.0.2 and is trusted (auth skipped). The list of
+      # rewritten subdomains defaults to attrNames lanServices, so no
+      # explicit override is needed here.
       services.wireguard-network.dns = {
         enable = true;
         upstream = ["192.168.178.1"];
+        lanOnlyAnswer = "192.168.178.54";
+      };
+    }
+
+    self.nixosModules.services.cert-receiver
+    {
+      # Receive home.niko.ink cert from the hub's cert-sync. The
+      # dispatch script accepts either an rsync drop (enforced by
+      # rrsync -wo) or a reload-caddy keyword.
+      services.cert-receiver = {
+        enable = true;
+        path = "/var/lib/caddy-certs";
+        owner = "caddy";
+        group = "caddy";
+        reloadUnit = "caddy.service";
+        reloadCommandName = "reload-caddy";
+        authorizedKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIE1r+skHBEYfZS4mnZ/hAGFYho+SwqKuy3TUP/0hgUIj cert-sync@hetzner";
       };
     }
   ];
@@ -74,7 +101,7 @@
     };
     firewall = {
       enable = true;
-      allowedTCPPorts = [22 53 8123];
+      allowedTCPPorts = [22 53 443 8123];
       allowedUDPPorts = [53];
     };
 

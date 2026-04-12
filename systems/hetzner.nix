@@ -22,6 +22,10 @@
           "services/website/env" = {};
           "services/kitchenowl/jwt-secret" = {};
           "wireguard/private-key" = {};
+          "cert-sync/ssh-key" = {
+            owner = "root";
+            mode = "0400";
+          };
         };
       };
     }
@@ -42,6 +46,38 @@
         listenAddress = "10.100.0.1";
       };
     }
+
+    self.nixosModules.services.cert-sync
+    # Ship ACME-issued certs to the Pi over WireGuard whenever Caddy
+    # renews them. The Pi's local Caddy terminates TLS for home-LAN
+    # clients (home.niko.ink directly to HA, kitchenowl/notes via
+    # transparent reverse-proxy back through WG to here). The cert
+    # list is derived from lanServices so adding a new LAN-accelerated
+    # service is a single-line change in wireguard.nix.
+    (
+      {
+        config,
+        lib,
+        ...
+      }: let
+        hubCertDir = "/var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory";
+        mkCertEntry = host: _svc: {
+          name = host;
+          certFile = "${hubCertDir}/${host}/${host}.crt";
+          keyFile = "${hubCertDir}/${host}/${host}.key";
+        };
+      in {
+        services.cert-sync = {
+          enable = true;
+          destination = {
+            host = "10.100.0.2";
+            sshKeyFile = config.sops.secrets."cert-sync/ssh-key".path;
+            reloadCommand = "reload-caddy";
+          };
+          certs = lib.mapAttrsToList mkCertEntry config.services.wireguard-network.lanServices;
+        };
+      }
+    )
   ];
 
   nix.optimise.automatic = true;
@@ -87,6 +123,9 @@
     import lan-only
     reverse_proxy 10.100.0.2:8123
   '';
+
+  # Cap journal size so it doesn't eat disk over time
+  services.journald.extraConfig = "SystemMaxUse=500M";
 
   boot.loader.grub = {
     efiSupport = true;

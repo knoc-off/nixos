@@ -338,13 +338,14 @@
       callback = clearCache,
     })
 
-    -- Auto-close mini.files when opening a file (Enter on an entry)
+    -- Map <CR> to go_in: open file (and close explorer) or enter directory
     autocmd("User", {
       group = augroup,
-      pattern = "MiniFilesActionOpen",
-      callback = function()
-        local ok, MiniFiles = pcall(require, "mini.files")
-        if ok then MiniFiles.close() end
+      pattern = "MiniFilesBufferCreate",
+      callback = function(args)
+        vim.keymap.set("n", "<CR>", function()
+          require("mini.files").go_in({ close_on_file = true })
+        end, { buffer = args.data.buf_id, desc = "Open file or enter directory" })
       end,
     })
   '';

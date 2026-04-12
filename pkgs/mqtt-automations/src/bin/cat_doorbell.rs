@@ -101,6 +101,14 @@ fn send_notification(
         .send_json(serde_json::json!({
             "message": message,
             "title": title,
+            "data": {
+                "ttl": 0,
+                "priority": "high",
+                "push": {
+                    "expiration": 0,
+                    "interruption-level": "active"
+                }
+            }
         }))?;
 
     if resp.status() >= 400 {
