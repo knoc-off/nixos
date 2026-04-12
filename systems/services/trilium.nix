@@ -1,5 +1,8 @@
-{...}: {
-  services.trilium-server.enable = true;
+{upkgs, ...}: {
+  services.trilium-server = {
+    enable = true;
+    package = upkgs.trilium-server;
+  };
 
   services.caddy.virtualHosts."notes.niko.ink".extraConfig = ''
     import security-headers
