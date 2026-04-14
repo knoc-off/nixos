@@ -1,0 +1,23 @@
+[package]
+name = "compat-proxy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.8", features = ["json"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net", "fs"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+arc-swap = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4", features = ["derive", "env"] }
+thiserror = "2"
+futures-util = "0.3"
+tokio-stream = "0.1"
+tower = "0.5"
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+rand = "0.8"

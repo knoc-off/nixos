@@ -95,6 +95,7 @@
       };
 
     mkPkgs = system: let
+      upkgs = unstablePkgs system;
       pkgs = import nixpkgs {
         inherit system;
         config = {
@@ -103,7 +104,7 @@
         };
         overlays = [
           inputs.fenix.overlays.default
-          (_final: _prev: {inherit inputs;})
+          (_final: _prev: {inherit inputs upkgs;})
         ];
       };
     in
@@ -264,6 +265,8 @@
       url = "github:nelly-solutions/nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+
+    jail-nix.url = "sourcehut:~alexdavid/jail.nix";
   };
 
   nixConfig = {

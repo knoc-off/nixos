@@ -353,9 +353,22 @@ in {
     };
 
     settings = {
-      plugin = [
-        "opencode-claude-auth@latest"
-      ];
+      provider = {
+        anthropic = {
+          options = {
+            baseURL = "http://127.0.0.1:58192/v1";
+            apiKey = "not-needed";
+          };
+        };
+      };
+      # mode = {
+      #   plan = {
+      #     prompt = "You are Claude Code, Anthropic's official CLI for Claude.";
+      #   };
+      #   build = {
+      #     prompt = "You are Claude Code, Anthropic's official CLI for Claude.";
+      #   };
+      # };
 
       permission = {
         edit = "ask";

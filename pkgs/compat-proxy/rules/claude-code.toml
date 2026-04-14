@@ -1,0 +1,108 @@
+# claude-code.toml — Claude Code client rule file
+#
+# Maps Claude Code's tool names and conventions to the canonical
+# upstream format. This is the entire client-specific surface area.
+
+[meta]
+client_name = "claude-code"
+target_cc_version = "2.1.97"
+
+[system_prompt]
+# How to recognize the client's system prompt and replace it.
+# detection: substring match against the deserialized system prompt text.
+# replacement: load from this path relative to the rules directory.
+detect = "You are Claude Code"
+replace_with_file = "system-prompts/cc-2.1.97.txt"
+
+[[system_prompt.text_replacements]]
+# Applied AFTER the wholesale replacement, against any remaining text blocks.
+find = "https://github.com/anthropics/claude-code/issues"
+replace = "https://github.com/anthropics/claude-code/issues"
+
+[tools]
+# Default policy when a tool has no mapping rule.
+# error = return 400 with "unmapped tool: X" message
+# drop = silently remove unmapped tools
+# passthrough = send as-is
+unmapped_policy = "error"
+
+# Tool renames: from = client name, to_schema = canonical name in cc-schemas.toml
+[[tools.rename]]
+from = "Bash"
+to_schema = "Bash"
+
+[[tools.rename]]
+from = "Read"
+to_schema = "Read"
+
+[[tools.rename]]
+from = "Write"
+to_schema = "Write"
+
+[[tools.rename]]
+from = "Edit"
+to_schema = "Edit"
+
+[[tools.rename]]
+from = "Glob"
+to_schema = "Glob"
+
+[[tools.rename]]
+from = "Grep"
+to_schema = "Grep"
+
+[[tools.rename]]
+from = "WebFetch"
+to_schema = "WebFetch"
+
+[[tools.rename]]
+from = "TodoWrite"
+to_schema = "TodoWrite"
+
+[[tools.rename]]
+from = "Task"
+to_schema = "Task"
+
+[[tools.rename]]
+from = "mcp_question"
+to_schema = "AskUser"
+
+[[tools.rename]]
+from = "GithubSearch"
+to_schema = "GithubSearch"
+
+[[tools.rename]]
+from = "LibrarySearch"
+to_schema = "LibrarySearch"
+
+[[tools.rename]]
+from = "LibraryDocs"
+to_schema = "LibraryDocs"
+
+# Tools the client ships that have no upstream equivalent.
+# Listed explicitly so unmapped_policy = "error" doesn't fire.
+[[tools.drop]]
+name = "SkillLoad"
+
+[properties]
+# Walk tool_use.input and rename properties recursively.
+# Bidirectional: applied forward on requests, reversed on responses.
+# Add property renames here as needed.
+# [[properties.rename]]
+# from = "session_id"
+# to = "thread_id"
+
+[headers]
+# Additional headers to inject on the upstream request.
+# Note: Stainless SDK headers (user-agent, x-app, x-stainless-*, etc.)
+# are now injected automatically by the proxy in OAuth mode.
+# Headers listed here can override the defaults.
+inject = []
+
+[billing]
+# Whether to inject the billing header text block into the system prompt.
+# When enabled, computes a per-request SHA256 fingerprint matching real CC's
+# billing header format.
+inject_block = true
+cc_version = "2.1.97"
+# hash_salt and hash_indices use defaults from real CC if not specified

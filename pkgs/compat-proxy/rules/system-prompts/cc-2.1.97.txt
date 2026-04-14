@@ -1,0 +1,12 @@
+TODO: Capture this from a real canonical client session.
+
+This file should contain the exact system prompt text sent by the
+canonical client at version 2.1.97. To capture it:
+
+1. Run the canonical client with request logging enabled
+2. Copy the system prompt text verbatim from the logged request
+3. Replace this placeholder with the captured text
+4. Update the version number in the filename if needed
+
+The proxy will replace the incoming client's system prompt with
+this text when the detection substring matches.

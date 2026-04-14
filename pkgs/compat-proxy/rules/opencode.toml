@@ -1,0 +1,120 @@
+# opencode.toml — OpenCode client rule file
+#
+# Maps OpenCode's tool names and conventions to the canonical
+# upstream format expected by the Anthropic API.
+
+[meta]
+client_name = "opencode"
+target_cc_version = "2.1.97"
+
+[system_prompt]
+detect = "You are OpenCode"
+replace_with_file = "system-prompts/cc-2.1.97.txt"
+
+# Applied AFTER the wholesale replacement, against any remaining text blocks.
+[[system_prompt.text_replacements]]
+find = "You are OpenCode, the best coding agent on the planet."
+replace = "You are Claude Code."
+
+[[system_prompt.text_replacements]]
+find = "OpenCode docs"
+replace = "Claude Code docs"
+
+[[system_prompt.text_replacements]]
+find = "https://opencode.ai/docs"
+replace = "https://docs.claude.com/en/docs/claude-code"
+
+[[system_prompt.text_replacements]]
+find = "https://github.com/anomalyco/opencode"
+replace = "https://github.com/anthropics/claude-code/issues"
+
+[[system_prompt.text_replacements]]
+find = "can OpenCode do"
+replace = "can Claude Code do"
+
+[[system_prompt.text_replacements]]
+find = "does OpenCode have"
+replace = "does Claude Code have"
+
+[[system_prompt.text_replacements]]
+find = "use a specific OpenCode feature"
+replace = "use a specific Claude Code feature"
+
+[[system_prompt.text_replacements]]
+find = "asks about OpenCode"
+replace = "asks about Claude Code"
+
+[[system_prompt.text_replacements]]
+find = "OpenCode"
+replace = "Claude Code"
+
+[[system_prompt.text_replacements]]
+find = "opencode"
+replace = "claude-code"
+
+[tools]
+unmapped_policy = "error"
+
+[[tools.rename]]
+from = "mcp_bash"
+to_schema = "Bash"
+
+[[tools.rename]]
+from = "mcp_read"
+to_schema = "Read"
+
+[[tools.rename]]
+from = "mcp_write"
+to_schema = "Write"
+
+[[tools.rename]]
+from = "mcp_edit"
+to_schema = "Edit"
+
+[[tools.rename]]
+from = "mcp_glob"
+to_schema = "Glob"
+
+[[tools.rename]]
+from = "mcp_grep"
+to_schema = "Grep"
+
+[[tools.rename]]
+from = "mcp_webfetch"
+to_schema = "WebFetch"
+
+[[tools.rename]]
+from = "mcp_todowrite"
+to_schema = "TodoWrite"
+
+[[tools.rename]]
+from = "mcp_task"
+to_schema = "Task"
+
+[[tools.rename]]
+from = "mcp_question"
+to_schema = "AskUser"
+
+[[tools.rename]]
+from = "mcp_grep_searchGitHub"
+to_schema = "GithubSearch"
+
+[[tools.rename]]
+from = "mcp_context7_resolve-library-id"
+to_schema = "LibrarySearch"
+
+[[tools.rename]]
+from = "mcp_context7_query-docs"
+to_schema = "LibraryDocs"
+
+[[tools.drop]]
+name = "mcp_skill"
+
+[properties]
+
+[headers]
+inject = []
+
+[billing]
+inject_block = true
+cc_version = "2.1.97"
