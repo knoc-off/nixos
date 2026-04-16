@@ -356,7 +356,7 @@ in {
       provider = {
         anthropic = {
           options = {
-            baseURL = "http://127.0.0.1:58192/v1";
+            baseURL = "{env:OPENCODE_PROXY_URL}";
             apiKey = "not-needed";
           };
         };

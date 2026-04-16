@@ -68,7 +68,6 @@ mod tests {
     use super::*;
     use crate::rules::{PropertyRename, ResolvedToolRename, UnmappedPolicy};
     use crate::wire::content::ContentBlock;
-    use crate::wire::request::{InputSchema, Tool};
     use crate::wire::response::{MessagesResponse, Usage};
 
     fn minimal_ruleset() -> RuleSet {
@@ -115,17 +114,8 @@ mod tests {
             "mcp_bash".into(),
             ResolvedToolRename {
                 canonical_name: "Bash".into(),
-                tool: Tool {
-                    name: "Bash".into(),
-                    description: Some("Execute a command".into()),
-                    input_schema: InputSchema {
-                        schema_type: "object".into(),
-                        properties: None,
-                        required: None,
-                        additional_properties: None,
-                    },
-                    cache_control: None,
-                },
+                description: Some("Execute a command".into()),
+                schema_override: None,
             },
         );
 
@@ -206,34 +196,16 @@ mod tests {
             "mcp_bash".into(),
             ResolvedToolRename {
                 canonical_name: "Bash".into(),
-                tool: Tool {
-                    name: "Bash".into(),
-                    description: Some("Execute a command".into()),
-                    input_schema: InputSchema {
-                        schema_type: "object".into(),
-                        properties: None,
-                        required: None,
-                        additional_properties: None,
-                    },
-                    cache_control: None,
-                },
+                description: Some("Execute a command".into()),
+                schema_override: None,
             },
         );
         rules.tool_renames.insert(
             "mcp_read".into(),
             ResolvedToolRename {
                 canonical_name: "Read".into(),
-                tool: Tool {
-                    name: "Read".into(),
-                    description: Some("Read a file".into()),
-                    input_schema: InputSchema {
-                        schema_type: "object".into(),
-                        properties: None,
-                        required: None,
-                        additional_properties: None,
-                    },
-                    cache_control: None,
-                },
+                description: Some("Read a file".into()),
+                schema_override: None,
             },
         );
 

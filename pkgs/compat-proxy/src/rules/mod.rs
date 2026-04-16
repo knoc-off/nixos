@@ -7,7 +7,7 @@ pub mod validate;
 
 use std::collections::HashMap;
 
-use crate::wire::request::Tool;
+use crate::wire::request::InputSchema;
 
 pub use apply_request::apply_request_rules;
 pub use apply_response::apply_response_rules;
@@ -66,14 +66,24 @@ pub struct RuleSet {
     pub billing_hash_indices: Vec<usize>,
 }
 
-/// A resolved tool rename: the canonical name and full tool definition.
+/// A resolved tool rename: the canonical name, optional description
+/// override, and optional schema override.
+///
+/// When `schema_override` is `None`, the client's original `input_schema`
+/// is preserved — this is the default and recommended mode. Schema
+/// overrides are only needed when a client sends an incorrect schema.
 #[derive(Debug, Clone)]
 pub struct ResolvedToolRename {
-    /// The canonical tool name (e.g., "exec").
+    /// The canonical tool name (e.g., "Bash").
     pub canonical_name: String,
 
-    /// The full tool definition from the schema registry.
-    pub tool: Tool,
+    /// Description override. When `Some`, replaces the client's description.
+    pub description: Option<String>,
+
+    /// Schema override. When `Some`, replaces the client's input_schema
+    /// (with client's `required`/`additionalProperties` merged as fallback).
+    /// When `None`, the client's schema is preserved intact.
+    pub schema_override: Option<InputSchema>,
 }
 
 /// A text find/replace pair.
@@ -123,11 +133,6 @@ impl RuleSet {
                 to: r.from.clone(),
             })
             .collect()
-    }
-
-    /// Get the resolved Tool definition for a client tool name.
-    pub fn resolved_tool(&self, client_name: &str) -> Option<&Tool> {
-        self.tool_renames.get(client_name).map(|r| &r.tool)
     }
 }
 

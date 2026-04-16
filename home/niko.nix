@@ -102,7 +102,7 @@
   };
 in {
   imports = [
-    {programs.ghostty.package = lib.mkForce null;}
+    # {programs.ghostty.package = lib.mkForce null;}
     ./programs/terminal/ghostty
 
     ./programs/terminal
@@ -168,6 +168,122 @@ in {
             preset = "mic-denoise";
             description = "Ryzen HD Audio Controller Analog Stereo";
           };
+        };
+      };
+    }
+
+    self.homeModules.compat-proxy
+    # Fuck anthropic
+    {
+      services.compat-proxy = {
+        enable = true;
+        port = 58192;
+        logLevel = "compat_proxy=debug,tower=info";
+        dumpRequests = true;
+
+        clients.opencode = {
+          systemPrompt.detect = "You are OpenCode";
+
+          textReplacements = [
+            {
+              find = "You are OpenCode, the best coding agent on the planet.";
+              replace = "You are Claude Code.";
+            }
+            {
+              find = "OpenCode docs";
+              replace = "Claude Code docs";
+            }
+            {
+              find = "https://opencode.ai/docs";
+              replace = "https://docs.claude.com/en/docs/claude-code";
+            }
+            {
+              find = "https://github.com/anomalyco/opencode";
+              replace = "https://github.com/anthropics/claude-code/issues";
+            }
+            {
+              find = "can OpenCode do";
+              replace = "can Claude Code do";
+            }
+            {
+              find = "does OpenCode have";
+              replace = "does Claude Code have";
+            }
+            {
+              find = "use a specific OpenCode feature";
+              replace = "use a specific Claude Code feature";
+            }
+            {
+              find = "asks about OpenCode";
+              replace = "asks about Claude Code";
+            }
+            {
+              find = "OpenCode";
+              replace = "Claude Code";
+            }
+            {
+              find = "opencode";
+              replace = "claude-code";
+            }
+          ];
+
+          toolRenames = [
+            {
+              from = "bash";
+              to = "Bash";
+            }
+            {
+              from = "read";
+              to = "Read";
+            }
+            {
+              from = "write";
+              to = "Write";
+            }
+            {
+              from = "edit";
+              to = "Edit";
+            }
+            {
+              from = "glob";
+              to = "Glob";
+            }
+            {
+              from = "grep";
+              to = "Grep";
+            }
+            {
+              from = "webfetch";
+              to = "WebFetch";
+            }
+            {
+              from = "todowrite";
+              to = "TodoWrite";
+            }
+            {
+              from = "task";
+              to = "Task";
+            }
+            {
+              from = "question";
+              to = "AskUser";
+            }
+            {
+              from = "grep_searchGitHub";
+              to = "GithubSearch";
+            }
+            {
+              from = "context7_resolve-library-id";
+              to = "LibrarySearch";
+            }
+            {
+              from = "context7_query-docs";
+              to = "LibraryDocs";
+            }
+          ];
+
+          toolDrops = ["skill"];
+          unmappedPolicy = "passthrough";
         };
       };
     }
@@ -257,6 +373,7 @@ in {
 
       upkgs.slack
 
+      self.packages.${pkgs.stdenv.hostPlatform.system}.opencode-bubblewrap
       self.packages.${pkgs.stdenv.hostPlatform.system}.neovim.default
 
       inputs.nelly.packages.${pkgs.stdenv.hostPlatform.system}.linear-cli

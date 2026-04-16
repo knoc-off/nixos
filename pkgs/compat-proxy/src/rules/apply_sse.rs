@@ -151,8 +151,6 @@ mod tests {
     use super::*;
     use crate::rules::{PropertyRename, ResolvedToolRename, UnmappedPolicy};
     use crate::wire::content::ContentBlock;
-    use crate::wire::request::{InputSchema, Tool};
-    use crate::wire::response::{MessagesResponse, Usage};
     use crate::wire::sse::SseState;
 
     fn minimal_ruleset() -> RuleSet {
@@ -181,17 +179,8 @@ mod tests {
             "mcp_bash".into(),
             ResolvedToolRename {
                 canonical_name: "Bash".into(),
-                tool: Tool {
-                    name: "Bash".into(),
-                    description: None,
-                    input_schema: InputSchema {
-                        schema_type: "object".into(),
-                        properties: None,
-                        required: None,
-                        additional_properties: None,
-                    },
-                    cache_control: None,
-                },
+                description: None,
+                schema_override: None,
             },
         );
 
@@ -264,17 +253,8 @@ mod tests {
             "mcp_bash".into(),
             ResolvedToolRename {
                 canonical_name: "Bash".into(),
-                tool: Tool {
-                    name: "Bash".into(),
-                    description: None,
-                    input_schema: InputSchema {
-                        schema_type: "object".into(),
-                        properties: None,
-                        required: None,
-                        additional_properties: None,
-                    },
-                    cache_control: None,
-                },
+                description: None,
+                schema_override: None,
             },
         );
         rules.property_renames.push(PropertyRename {

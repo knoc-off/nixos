@@ -121,33 +121,54 @@ fn drop_tools(req: &mut MessagesRequest, rules: &RuleSet) {
         });
 }
 
-/// Step 3: Rename tools — substitute name and input_schema from registry.
+/// Step 3: Rename tools — substitute name, description, and optionally input_schema.
 ///
-/// When replacing the schema, we preserve the client's `required` and
-/// `additionalProperties` fields if the registry schema doesn't have them.
-/// This is critical because the client validates tool_use responses against
-/// its own schema, and the model needs to see `required` to know which
-/// parameters are mandatory.
+/// Description is always replaced when the registry provides one.
+/// Schema replacement is opt-in: only when the registry entry defines
+/// an `input_schema` is the client's schema overridden. When not
+/// overriding, the client's original schema is preserved intact —
+/// this avoids stripping nested structures (e.g., `items` in array
+/// schemas for tools like TodoWrite and AskUser).
+///
+/// When overriding, the client's `required` and `additionalProperties`
+/// are preserved as fallback if the registry schema doesn't specify them.
 fn rename_tools(req: &mut MessagesRequest, rules: &RuleSet) {
     // Rename tool definitions
     for tool in &mut req.tools {
         if let Some(resolved) = rules.tool_renames.get(&tool.name) {
-            // Preserve client's required/additionalProperties before replacing
-            let client_required = tool.input_schema.required.take();
-            let client_additional_props = tool.input_schema.additional_properties.take();
-
+            let old_name = tool.name.clone();
             tool.name = resolved.canonical_name.clone();
-            if let Some(ref desc) = resolved.tool.description {
+
+            // Always replace description if the registry provides one
+            if let Some(ref desc) = resolved.description {
                 tool.description = Some(desc.clone());
             }
-            tool.input_schema = resolved.tool.input_schema.clone();
 
-            // Merge: prefer registry values, fall back to client values
-            if tool.input_schema.required.is_none() {
-                tool.input_schema.required = client_required;
-            }
-            if tool.input_schema.additional_properties.is_none() {
-                tool.input_schema.additional_properties = client_additional_props;
+            // Only replace schema if the registry explicitly defines an override
+            if let Some(ref schema_override) = resolved.schema_override {
+                tracing::debug!(
+                    tool = %old_name,
+                    canonical = %resolved.canonical_name,
+                    "replacing client schema with registry override"
+                );
+                let client_required = tool.input_schema.required.take();
+                let client_additional_props = tool.input_schema.additional_properties.take();
+
+                tool.input_schema = schema_override.clone();
+
+                // Merge: prefer registry values, fall back to client values
+                if tool.input_schema.required.is_none() {
+                    tool.input_schema.required = client_required;
+                }
+                if tool.input_schema.additional_properties.is_none() {
+                    tool.input_schema.additional_properties = client_additional_props;
+                }
+            } else {
+                tracing::trace!(
+                    tool = %old_name,
+                    canonical = %resolved.canonical_name,
+                    "preserving client schema (no registry override)"
+                );
             }
         }
     }
@@ -407,9 +428,7 @@ fn strip_trailing_prefill(req: &mut MessagesRequest) {
 mod tests {
     use super::*;
     use crate::rules::{ResolvedToolRename, TextReplacement};
-    use crate::wire::request::{InputSchema, Message, Tool};
-
-    fn minimal_ruleset() -> RuleSet {
+    use crate::wire::request::{InputSchema, Message, Tool};    fn minimal_ruleset() -> RuleSet {
         RuleSet {
             client_name: "test".into(),
             cc_version: "1.0".into(),
@@ -540,19 +559,15 @@ mod tests {
             "mcp_bash".into(),
             ResolvedToolRename {
                 canonical_name: "Bash".into(),
-                tool: Tool {
-                    name: "Bash".into(),
-                    description: Some("Execute a command".into()),
-                    input_schema: InputSchema {
-                        schema_type: "object".into(),
-                        properties: Some(serde_json::json!({
-                            "command": {"type": "string"}
-                        })),
-                        required: Some(vec!["command".into()]),
-                        additional_properties: None,
-                    },
-                    cache_control: None,
-                },
+                description: Some("Execute a command".into()),
+                schema_override: Some(InputSchema {
+                    schema_type: "object".into(),
+                    properties: Some(serde_json::json!({
+                        "command": {"type": "string"}
+                    })),
+                    required: Some(vec!["command".into()]),
+                    additional_properties: None,
+                }),
             },
         );
 
@@ -599,6 +614,76 @@ mod tests {
                 panic!("expected tool_use");
             }
         }
+    }
+
+    #[test]
+    fn test_tool_rename_preserves_client_schema_when_no_override() {
+        let mut rules = minimal_ruleset();
+        rules.tool_renames.insert(
+            "mcp_todo".into(),
+            ResolvedToolRename {
+                canonical_name: "TodoWrite".into(),
+                description: Some("Write todos".into()),
+                schema_override: None, // No schema override — client schema preserved
+            },
+        );
+
+        let client_schema = InputSchema {
+            schema_type: "object".into(),
+            properties: Some(serde_json::json!({
+                "todos": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "content": {"type": "string"},
+                            "title": {"type": "string"}
+                        },
+                        "required": ["id", "content", "title"]
+                    }
+                }
+            })),
+            required: Some(vec!["todos".into()]),
+            additional_properties: Some(false),
+        };
+
+        let req = MessagesRequest {
+            model: "test".into(),
+            max_tokens: 1024,
+            temperature: None,
+            system: None,
+            messages: vec![],
+            tools: vec![Tool {
+                name: "mcp_todo".into(),
+                description: Some("Client description".into()),
+                input_schema: client_schema.clone(),
+                cache_control: None,
+            }],
+            tool_choice: None,
+            metadata: None,
+            stream: false,
+            thinking: None,
+            top_p: None,
+            top_k: None,
+            stop_sequences: None,
+        };
+
+        let result = apply_request_rules(req, &rules, "test-session", "test-device").unwrap();
+        let tool = &result.tools[0];
+
+        // Name and description should be replaced
+        assert_eq!(tool.name, "TodoWrite");
+        assert_eq!(tool.description.as_deref(), Some("Write todos"));
+
+        // Schema should be preserved from the client (including nested items)
+        let props = tool.input_schema.properties.as_ref().unwrap();
+        assert!(props["todos"]["items"]["properties"]["content"].is_object());
+        assert_eq!(
+            tool.input_schema.required.as_deref(),
+            Some(&["todos".to_string()][..])
+        );
+        assert_eq!(tool.input_schema.additional_properties, Some(false));
     }
 
     #[test]

@@ -1,11 +1,14 @@
 # cc-schemas.toml — Canonical tool definitions
 #
-# This file defines the tool schemas that the upstream API expects.
-# Each [[tool]] entry defines a tool name, description, and input schema.
+# Each [[tool]] entry defines the canonical name and description that the
+# upstream API expects. These replace the client's tool name and description
+# during request translation.
 #
-# NOTE: These descriptions and schemas should be captured from a real
-# session with the canonical client. The placeholders below have the
-# correct structure but need real content.
+# input_schema is OPTIONAL. When omitted (the default), the client's own
+# schema is preserved — this is the recommended mode since clients already
+# send correct, detailed schemas with full nested structure (items, required
+# fields, etc.). Only define input_schema when you need to override what
+# the client sends.
 
 [[tool]]
 name = "Bash"
@@ -15,8 +18,12 @@ The command is run in a bash shell with common utilities available. \
 Each command runs in the same persistent shell session, so environment \
 variables and directory changes persist between calls."""
 
+# Example schema override — when present, this replaces the client's
+# input_schema for this tool. Remove [tool.input_schema] entirely to
+# fall back to the client's own schema (the default for all other tools).
 [tool.input_schema]
 type = "object"
+required = ["command", "description"]
 
 [tool.input_schema.properties.command]
 type = "string"
@@ -41,37 +48,11 @@ Reads the contents of a file at the specified path. \
 Returns the file content as text. For large files, use the \
 offset and limit parameters to read specific portions."""
 
-[tool.input_schema]
-type = "object"
-
-[tool.input_schema.properties.filePath]
-type = "string"
-description = "The absolute path to the file to read"
-
-[tool.input_schema.properties.offset]
-type = "number"
-description = "Line offset to start reading from (0-based)"
-
-[tool.input_schema.properties.limit]
-type = "number"
-description = "Maximum number of lines to read"
-
 [[tool]]
 name = "Write"
 description = """
 Writes content to a file at the specified path. \
 Creates the file if it doesn't exist, or overwrites it if it does."""
-
-[tool.input_schema]
-type = "object"
-
-[tool.input_schema.properties.filePath]
-type = "string"
-description = "The absolute path to the file to write"
-
-[tool.input_schema.properties.content]
-type = "string"
-description = "The content to write to the file"
 
 [[tool]]
 name = "Edit"
@@ -79,41 +60,11 @@ description = """
 Makes targeted edits to a file by replacing specific text. \
 Uses exact string matching to find and replace content."""
 
-[tool.input_schema]
-type = "object"
-
-[tool.input_schema.properties.filePath]
-type = "string"
-description = "The absolute path to the file to edit"
-
-[tool.input_schema.properties.oldString]
-type = "string"
-description = "The exact text to find and replace"
-
-[tool.input_schema.properties.newString]
-type = "string"
-description = "The replacement text"
-
-[tool.input_schema.properties.replaceAll]
-type = "boolean"
-description = "Whether to replace all occurrences (default: false)"
-
 [[tool]]
 name = "Glob"
 description = """
 Finds files matching a glob pattern. Returns a list of matching \
 file paths relative to the specified directory."""
-
-[tool.input_schema]
-type = "object"
-
-[tool.input_schema.properties.pattern]
-type = "string"
-description = "The glob pattern to match"
-
-[tool.input_schema.properties.path]
-type = "string"
-description = "The directory to search in"
 
 [[tool]]
 name = "Grep"
@@ -121,41 +72,11 @@ description = """
 Searches for a pattern in files. Uses regular expressions to find \
 matching lines across files in a directory tree."""
 
-[tool.input_schema]
-type = "object"
-
-[tool.input_schema.properties.pattern]
-type = "string"
-description = "The regex pattern to search for"
-
-[tool.input_schema.properties.path]
-type = "string"
-description = "The directory to search in"
-
-[tool.input_schema.properties.include]
-type = "string"
-description = "Glob pattern to filter which files to search"
-
 [[tool]]
 name = "WebFetch"
 description = """
 Fetches a URL and returns its content. Supports various \
 content types and can return raw text, markdown, or HTML."""
-
-[tool.input_schema]
-type = "object"
-
-[tool.input_schema.properties.url]
-type = "string"
-description = "The URL to fetch"
-
-[tool.input_schema.properties.format]
-type = "string"
-description = "Output format: 'text', 'markdown', or 'html'"
-
-[tool.input_schema.properties.timeout]
-type = "number"
-description = "Optional timeout in milliseconds"
 
 [[tool]]
 name = "TodoWrite"
@@ -163,33 +84,11 @@ description = """
 Creates or updates a todo list for tracking tasks. \
 Manages a structured list of items with status and priority."""
 
-[tool.input_schema]
-type = "object"
-
-[tool.input_schema.properties.todos]
-type = "array"
-description = "Array of todo items"
-
 [[tool]]
 name = "Task"
 description = """
 Delegates a task to a sub-agent for specialized processing. \
 Used for complex operations that benefit from focused execution."""
-
-[tool.input_schema]
-type = "object"
-
-[tool.input_schema.properties.description]
-type = "string"
-description = "A description of the task"
-
-[tool.input_schema.properties.prompt]
-type = "string"
-description = "The prompt for the sub-agent"
-
-[tool.input_schema.properties.subagent_type]
-type = "string"
-description = "The type of sub-agent to use"
 
 [[tool]]
 name = "AskUser"
@@ -197,37 +96,11 @@ description = """
 Presents a question to the user and waits for their response. \
 Supports multiple choice and free-form questions."""
 
-[tool.input_schema]
-type = "object"
-
-[tool.input_schema.properties.questions]
-type = "array"
-description = "Array of questions to present"
-
 [[tool]]
 name = "GithubSearch"
 description = """
 Searches GitHub code repositories. Supports filtering by \
 language, path, and repository."""
-
-[tool.input_schema]
-type = "object"
-
-[tool.input_schema.properties.query]
-type = "string"
-description = "The search query"
-
-[tool.input_schema.properties.repo]
-type = "string"
-description = "Repository to search in (owner/name)"
-
-[tool.input_schema.properties.language]
-type = "array"
-description = "Programming languages to filter by"
-
-[tool.input_schema.properties.path]
-type = "string"
-description = "Path pattern to filter by"
 
 [[tool]]
 name = "LibrarySearch"
@@ -235,30 +108,8 @@ description = """
 Searches for documentation libraries by name and query. \
 Returns matching libraries with their IDs for further lookup."""
 
-[tool.input_schema]
-type = "object"
-
-[tool.input_schema.properties.query]
-type = "string"
-description = "The search query"
-
-[tool.input_schema.properties.libraryName]
-type = "string"
-description = "The name of the library to search for"
-
 [[tool]]
 name = "LibraryDocs"
 description = """
 Queries documentation for a specific library by its ID. \
 Returns relevant documentation snippets."""
-
-[tool.input_schema]
-type = "object"
-
-[tool.input_schema.properties.libraryId]
-type = "string"
-description = "The library ID from LibrarySearch results"
-
-[tool.input_schema.properties.query]
-type = "string"
-description = "The documentation query"

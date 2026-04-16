@@ -18,7 +18,6 @@ in {
   imports = [
     # ./plugins/hyprspace.nix        # needs upstream update for 0.54
     # ./plugins/xtra-dispatchers.nix  # hyprland-plugins lagging behind 0.54 API
-    ./plugins/hyprglass.nix # v0.3.0: layers-only glass (BETA layer support)
     ./plugins/kinetic-scroll.nix
   ];
 
@@ -101,6 +100,11 @@ in {
 
       decoration = {
         rounding = 6;
+        blur = {
+          enabled = true;
+          size = 5;
+          passes = 2;
+        };
       };
 
       animations = {
@@ -150,13 +154,6 @@ in {
         "match:class xdg-desktop-portal-gnome, float on"
         "match:class xdg-desktop-portal-hyprland, float on"
         "match:class org.gnome.Nautilus, float on"
-        # "match:float 1, match:title (.*Open.*|.*Upload.*|.*Save.*|.*Select.*|.*Choose.*), size 45% 45%"
-        # i think that the regex slows down on large titles?
-
-        # Term has transparent background when resizing.
-        "match:class com.mitchellh.ghostty, opaque on"
-        "match:class com.mitchellh.ghostty, opacity 1.0 override 1.0 override"
-        "match:class com.mitchellh.ghostty, no_blur on"
 
         # FreeCad:
         "match:initial_class ^org\\.freecad\\.FreeCAD$, match:initial_title ^Customize$, float on, center on, size (monitor_w*0.75) (monitor_h*0.75), no_max_size on"

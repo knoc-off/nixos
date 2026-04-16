@@ -4,16 +4,16 @@
 }: {
   force = lib.mkOverride 1000 true;
   default = "duckduckgo";
-  order = [
-    "Annas-Archive"
-    "NixOS Wiki"
-    "Nix Packages"
-    "Nix Options"
-    "Home-Manager"
-    "StackOverflow"
-    "Github"
-    "fmhy"
-  ];
+  # order = [
+  #   "Annas-Archive"
+  #   "NixOS Wiki"
+  #   "Nix Packages"
+  #   "Nix Options"
+  #   "Home-Manager"
+  #   "StackOverflow"
+  #   "Github"
+  #   "fmhy"
+  # ];
   engines = {
     "Nix Packages" = {
       urls = [

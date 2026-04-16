@@ -1,11 +1,16 @@
 //! Schema registry: loads canonical tool definitions from cc-schemas.toml.
+//!
+//! Each registry entry defines a canonical tool name and description.
+//! An `input_schema` is **optional** — when absent, the client's own
+//! schema is preserved during tool renaming (the default and recommended
+//! mode). When present, it overrides the client's schema.
 
 use std::collections::HashMap;
 use std::path::Path;
 
 use serde::Deserialize;
 
-use crate::wire::request::{InputSchema, Tool};
+use crate::wire::request::InputSchema;
 
 /// Raw TOML structure for the schema registry file.
 #[derive(Deserialize, Debug)]
@@ -17,8 +22,9 @@ struct SchemaFile {
 #[derive(Deserialize, Debug)]
 struct ToolSchemaEntry {
     name: String,
-    description: String,
-    input_schema: InputSchemaEntry,
+    description: Option<String>,
+    #[serde(default)]
+    input_schema: Option<InputSchemaEntry>,
 }
 
 /// Input schema as defined in the registry TOML.
@@ -32,10 +38,21 @@ struct InputSchemaEntry {
     required: Option<Vec<String>>,
 }
 
+/// A tool definition as stored in the registry.
+///
+/// Unlike the wire `Tool` type, both `description` and `input_schema`
+/// are optional here. When `None`, the client's original value is preserved.
+#[derive(Debug, Clone)]
+pub struct RegistryTool {
+    pub name: String,
+    pub description: Option<String>,
+    pub input_schema: Option<InputSchema>,
+}
+
 /// The loaded schema registry, mapping tool names to their canonical definitions.
 #[derive(Debug, Clone)]
 pub struct SchemaRegistry {
-    tools: HashMap<String, Tool>,
+    tools: HashMap<String, RegistryTool>,
 }
 
 impl SchemaRegistry {
@@ -49,25 +66,30 @@ impl SchemaRegistry {
 
         let mut tools = HashMap::new();
         for entry in schema_file.tool {
-            let properties = entry
-                .input_schema
-                .properties
-                .map(|v| toml_to_json_value(&v))
-                .transpose()
-                .map_err(|e| {
-                    RegistryError::SchemaConversion(entry.name.clone(), e.to_string())
-                })?;
+            let input_schema = match entry.input_schema {
+                Some(schema_entry) => {
+                    let properties = schema_entry
+                        .properties
+                        .map(|v| toml_to_json_value(&v))
+                        .transpose()
+                        .map_err(|e| {
+                            RegistryError::SchemaConversion(entry.name.clone(), e.to_string())
+                        })?;
 
-            let tool = Tool {
+                    Some(InputSchema {
+                        schema_type: schema_entry.schema_type,
+                        properties,
+                        required: schema_entry.required,
+                        additional_properties: None,
+                    })
+                }
+                None => None,
+            };
+
+            let tool = RegistryTool {
                 name: entry.name.clone(),
-                description: Some(entry.description),
-                input_schema: InputSchema {
-                    schema_type: entry.input_schema.schema_type,
-                    properties,
-                    required: entry.input_schema.required,
-                    additional_properties: None,
-                },
-                cache_control: None,
+                description: entry.description,
+                input_schema,
             };
             tools.insert(entry.name, tool);
         }
@@ -76,7 +98,7 @@ impl SchemaRegistry {
     }
 
     /// Look up a tool by its canonical name.
-    pub fn get_tool(&self, name: &str) -> Option<&Tool> {
+    pub fn get_tool(&self, name: &str) -> Option<&RegistryTool> {
         self.tools.get(name)
     }
 
@@ -153,5 +175,51 @@ mod tests {
         let json = toml_to_json_value(&toml_val).unwrap();
         assert_eq!(json["command"]["type"], "string");
         assert_eq!(json["command"]["description"], "The command to execute");
+    }
+
+    #[test]
+    fn test_load_description_only_tool() {
+        let path = std::env::temp_dir().join(format!(
+            "compat-proxy-desc-only-{:?}.toml",
+            std::thread::current().id(),
+        ));
+        std::fs::write(
+            &path,
+            "[[tool]]\nname = \"Bash\"\ndescription = \"Run a command\"\n",
+        )
+        .unwrap();
+
+        let registry = SchemaRegistry::load(&path).unwrap();
+        let tool = registry.get_tool("Bash").unwrap();
+        assert_eq!(tool.description.as_deref(), Some("Run a command"));
+        assert!(tool.input_schema.is_none());
+    }
+
+    #[test]
+    fn test_load_tool_with_schema_override() {
+        let path = std::env::temp_dir().join(format!(
+            "compat-proxy-schema-override-{:?}.toml",
+            std::thread::current().id(),
+        ));
+        std::fs::write(
+            &path,
+            r#"
+[[tool]]
+name = "Bash"
+description = "Run a command"
+[tool.input_schema]
+type = "object"
+[tool.input_schema.properties.command]
+type = "string"
+description = "The command"
+"#,
+        )
+        .unwrap();
+
+        let registry = SchemaRegistry::load(&path).unwrap();
+        let tool = registry.get_tool("Bash").unwrap();
+        assert!(tool.input_schema.is_some());
+        let schema = tool.input_schema.as_ref().unwrap();
+        assert!(schema.properties.is_some());
     }
 }

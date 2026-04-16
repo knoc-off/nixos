@@ -5,31 +5,34 @@
   pkgs,
   ...
 }:
-
-with lib;
-
-let
+with lib; let
   cfg = config.services.compat-proxy;
   system = pkgs.stdenv.hostPlatform.system;
 
   # Generate a single TOML rule file from a client config attrset.
   mkRuleToml = name: client: let
-    replacementLines = concatMapStringsSep "\n" (r: ''
-      [[system_prompt.text_replacements]]
-      find = ${builtins.toJSON r.find}
-      replace = ${builtins.toJSON r.replace}
-    '') client.textReplacements;
+    replacementLines =
+      concatMapStringsSep "\n" (r: ''
+        [[system_prompt.text_replacements]]
+        find = ${builtins.toJSON r.find}
+        replace = ${builtins.toJSON r.replace}
+      '')
+      client.textReplacements;
 
-    renameLines = concatMapStringsSep "\n" (r: ''
-      [[tools.rename]]
-      from = ${builtins.toJSON r.from}
-      to_schema = ${builtins.toJSON r.to}
-    '') client.toolRenames;
+    renameLines =
+      concatMapStringsSep "\n" (r: ''
+        [[tools.rename]]
+        from = ${builtins.toJSON r.from}
+        to_schema = ${builtins.toJSON r.to}
+      '')
+      client.toolRenames;
 
-    dropLines = concatMapStringsSep "\n" (t: ''
-      [[tools.drop]]
-      name = ${builtins.toJSON t}
-    '') client.toolDrops;
+    dropLines =
+      concatMapStringsSep "\n" (t: ''
+        [[tools.drop]]
+        name = ${builtins.toJSON t}
+      '')
+      client.toolDrops;
   in
     pkgs.writeText "${name}.toml" ''
       [meta]
@@ -63,13 +66,15 @@ let
   bundledRules = "${cfg.package}/share/compat-proxy/rules";
 
   rulesDir = pkgs.runCommand "compat-proxy-rules" {} (''
-    mkdir -p $out
-    # Copy schema registry and system prompts from the package
-    cp ${bundledRules}/cc-schemas.toml $out/
-    cp -r ${bundledRules}/system-prompts $out/
-  '' + concatStringsSep "\n" (mapAttrsToList (name: client:
-    "cp ${mkRuleToml name client} $out/${name}.toml"
-  ) cfg.clients));
+      mkdir -p $out
+      # Copy schema registry and system prompts from the package
+      cp ${bundledRules}/cc-schemas.toml $out/
+      cp -r ${bundledRules}/system-prompts $out/
+    ''
+    + concatStringsSep "\n" (mapAttrsToList (
+        name: client: "cp ${mkRuleToml name client} $out/${name}.toml"
+      )
+      cfg.clients));
 
   textReplacementType = types.submodule {
     options = {
@@ -216,6 +221,8 @@ in {
     # Generate the rules directory into XDG config
     xdg.configFile."compat-proxy/rules".source = rulesDir;
 
+    home.sessionVariables.OPENCODE_PROXY_URL = "http://127.0.0.1:58192/v1";
+
     systemd.user.services.compat-proxy = {
       Unit = {
         Description = "compat-proxy API compatibility proxy";
@@ -224,16 +231,16 @@ in {
 
       Service = {
         ExecStart = concatStringsSep " " ([
-          "${lib.getExe cfg.package}"
-          "--rules-dir ${config.xdg.configHome}/compat-proxy/rules"
-          "--schema-registry ${config.xdg.configHome}/compat-proxy/rules/cc-schemas.toml"
-          "--credentials-path ${cfg.credentialsPath}"
-          "--upstream-url ${cfg.upstreamUrl}"
-          "--log-level ${cfg.logLevel}"
-        ]
-        ++ optional (cfg.port != null) "--port ${toString cfg.port}"
-        ++ optional (cfg.socket != null) "--socket ${cfg.socket}"
-        ++ optional cfg.dumpRequests "--dump-requests");
+            "${lib.getExe cfg.package}"
+            "--rules-dir ${config.xdg.configHome}/compat-proxy/rules"
+            "--schema-registry ${config.xdg.configHome}/compat-proxy/rules/cc-schemas.toml"
+            "--credentials-path ${cfg.credentialsPath}"
+            "--upstream-url ${cfg.upstreamUrl}"
+            "--log-level ${cfg.logLevel}"
+          ]
+          ++ optional (cfg.port != null) "--port ${toString cfg.port}"
+          ++ optional (cfg.socket != null) "--socket ${cfg.socket}"
+          ++ optional cfg.dumpRequests "--dump-requests");
         Restart = "on-failure";
         RestartSec = 5;
       };

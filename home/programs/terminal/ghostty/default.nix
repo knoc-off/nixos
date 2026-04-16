@@ -61,6 +61,10 @@ in {
       selection-background = "${theme.dark.base02}";
       selection-foreground = "${theme.dark.base06}";
 
+      background-opacity = 0.9;
+      background-blur = 20;
+      background-opacity-cells = true;
+
       keybind = let
         isLinux = pkgs.stdenv.isLinux;
         isDarwin = pkgs.stdenv.isDarwin;

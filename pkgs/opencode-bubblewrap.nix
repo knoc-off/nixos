@@ -8,27 +8,57 @@
   inherit (pkgs) lib;
 
   compatProxy = pkgs.callPackage ./compat-proxy {};
-  rulesDir = "${compatProxy}/share/compat-proxy/rules";
 
   agentToolbelt = with pkgs; [
+    # Shell essentials
     bashInteractive
+    bash
     coreutils
     findutils
     diffutils
+
+    # Version control
     git
+    openssh # git over SSH, scp
+
+    # Search & navigation
     ripgrep
     fd
-    jq
-    curl
-    cacert
+    tree
+    file
+    which
+
+    # Text processing
     gnused
     gawk
     gnugrep
+    jq
+    less
+    bat
+
+    # Networking
+    curl
+    wget
+    cacert
+
+    # Archives & compression
     gnutar
     gzip
+    unzip
+    xz
+
+    # Patching
+    gnupatch
+
+    # Process inspection
+    procps # ps, top, pgrep, etc.
+
+    # Nix — self-provisioning inside the jail
+    nix
+
+    # Coding agents
     upkgs.claude-code
     upkgs.opencode
-    bash
   ];
 in
   jail "jailed-opencode" upkgs.fish (with jail.combinators; [
@@ -71,9 +101,10 @@ in
 
       COMPAT_PROXY_LOG=''${COMPAT_PROXY_LOG:-info}
 
+      RULES_DIR="''${COMPAT_PROXY_RULES:-$HOME/.config/compat-proxy/rules}"
       ${lib.getExe compatProxy} \
-        --rules-dir "''${COMPAT_PROXY_RULES:-${rulesDir}}" \
-        --schema-registry "''${COMPAT_PROXY_RULES:-${rulesDir}}/cc-schemas.toml" \
+        --rules-dir "$RULES_DIR" \
+        --schema-registry "$RULES_DIR/cc-schemas.toml" \
         --credentials-path "$HOME/.claude/.credentials.json" \
         --port $PROJECT_PORT \
         --log-level "$COMPAT_PROXY_LOG" \
@@ -90,17 +121,34 @@ in
         sleep 0.25
       done
 
-      export OPENCODE_PROXY_URL="http://127.0.0.1:$PROJECT_PORT"
+      export OPENCODE_PROXY_URL="http://127.0.0.1:$PROJECT_PORT/v1"
       ${entry}
     ''))
 
     (try-rw-bind (noescape "\"$HOME/.config/opencode\"") (noescape "~/.config/opencode"))
     (try-rw-bind (noescape "\"$HOME/.cache/opencode\"") (noescape "~/.cache/opencode"))
-    (try-rw-bind (noescape "\"$HOME/.config/compat-proxy\"") (noescape "~/.config/compat-proxy"))
+    (add-runtime ''
+      COMPAT_PROXY_RULES_REAL=$(readlink -f "$HOME/.config/compat-proxy/rules" 2>/dev/null || true)
+    '')
+    (try-ro-bind (noescape "\"$COMPAT_PROXY_RULES_REAL\"") (noescape "~/.config/compat-proxy/rules"))
     (rw-bind (noescape "\"$PROJECT_CLAUDE_JSON\"") (noescape "~/.claude.json"))
     (rw-bind (noescape "\"$PROJECT_CLAUDE\"") (noescape "~/.claude"))
     (rw-bind (noescape "\"$PROJECT_SHARE\"") (noescape "~/.local/share/opencode"))
     (rw-bind (noescape "\"$PROJECT_STATE\"") (noescape "~/.local/state/opencode"))
+
+    # Nix support — allows nix build/shell/run inside the jail.
+    #
+    # The jail's /nix/store is per-path bind mounts (from add-pkg-deps), so
+    # newly-built paths aren't visible. We mount the entire store directory
+    # so the daemon's downloads appear immediately. NIX_REMOTE=daemon is
+    # required because bwrap's uid mapping makes the store look user-owned,
+    # which tricks nix into single-user mode.
+    (ro-bind "/nix/store" "/nix/store")
+    (try-rw-bind "/nix/var/nix/daemon-socket" "/nix/var/nix/daemon-socket")
+    (try-ro-bind "/nix/var/nix/db" "/nix/var/nix/db")
+    (try-ro-bind "/etc/nix" "/etc/nix")
+    # NixOS symlinks /etc/nix/{registry.json,nix.custom.conf} → /etc/static/…
+    (try-ro-bind "/etc/static/nix" "/etc/static/nix")
 
     (try-fwd-env "ANTHROPIC_API_KEY")
     (try-fwd-env "OPENAI_API_KEY")
@@ -108,6 +156,8 @@ in
     (try-fwd-env "COMPAT_PROXY_RULES")
     (try-fwd-env "COMPAT_PROXY_DUMP")
     (try-fwd-env "COMPAT_PROXY_UPSTREAM")
+    (try-fwd-env "NIX_PATH")
+    (set-env "NIX_REMOTE" "daemon")
 
     (add-pkg-deps (agentToolbelt ++ [compatProxy]))
   ])

@@ -31,7 +31,7 @@
   };
 
   # Shared opacity for all noctalia layer surfaces.
-  # Lower = more glass visible through the surface. Must be > 0 for hyprglass to activate.
+  # Lower = more glass visible through the surface.
   layerOpacity = 0.55;
 
   noctaliaPlugins = mkNoctaliaPlugins [

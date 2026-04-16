@@ -73,12 +73,13 @@ pub fn validate_rules(
 
             // Schema reference check
             match registry.get_tool(&rename.to_schema) {
-                Some(tool) => {
+                Some(reg_tool) => {
                     tool_renames.insert(
                         rename.from.clone(),
                         ResolvedToolRename {
                             canonical_name: rename.to_schema.clone(),
-                            tool: tool.clone(),
+                            description: reg_tool.description.clone(),
+                            schema_override: reg_tool.input_schema.clone(),
                         },
                     );
                 }
@@ -226,7 +227,7 @@ mod tests {
         ));
         std::fs::write(
             &path,
-            "[[tool]]\nname = \"Bash\"\ndescription = \"test\"\ninput_schema.type = \"object\"\n",
+            "[[tool]]\nname = \"Bash\"\ndescription = \"test\"\n",
         )
         .unwrap();
         SchemaRegistry::load(&path).unwrap()
