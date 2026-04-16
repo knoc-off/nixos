@@ -124,6 +124,7 @@ in
 
       ${lib.getExe upkgs.opencode} "$@" || true
 
+      # fish
       ${entry}
     ''))
 

@@ -236,19 +236,58 @@ in {
           ];
 
           toolRenames = [
-            {from = "bash"; to = "Bash";}
-            {from = "read"; to = "Read";}
-            {from = "write"; to = "Write";}
-            {from = "edit"; to = "Edit";}
-            {from = "glob"; to = "Glob";}
-            {from = "grep"; to = "Grep";}
-            {from = "webfetch"; to = "WebFetch";}
-            {from = "todowrite"; to = "TodoWrite";}
-            {from = "task"; to = "Task";}
-            {from = "question"; to = "AskUser";}
-            {from = "grep_searchGitHub"; to = "GithubSearch";}
-            {from = "context7_resolve-library-id"; to = "LibrarySearch";}
-            {from = "context7_query-docs"; to = "LibraryDocs";}
+            {
+              from = "bash";
+              to = "Bash";
+            }
+            {
+              from = "read";
+              to = "Read";
+            }
+            {
+              from = "write";
+              to = "Write";
+            }
+            {
+              from = "edit";
+              to = "Edit";
+            }
+            {
+              from = "glob";
+              to = "Glob";
+            }
+            {
+              from = "grep";
+              to = "Grep";
+            }
+            {
+              from = "webfetch";
+              to = "WebFetch";
+            }
+            {
+              from = "todowrite";
+              to = "TodoWrite";
+            }
+            {
+              from = "task";
+              to = "Task";
+            }
+            {
+              from = "question";
+              to = "AskUser";
+            }
+            {
+              from = "grep_searchGitHub";
+              to = "GithubSearch";
+            }
+            {
+              from = "context7_resolve-library-id";
+              to = "LibrarySearch";
+            }
+            {
+              from = "context7_query-docs";
+              to = "LibraryDocs";
+            }
           ];
 
           toolDrops = ["skill"];
@@ -328,6 +367,7 @@ in {
       upkgs.notion-app-enhanced
 
       self.packages.${pkgs.stdenv.hostPlatform.system}.neovim.default
+      self.packages.${pkgs.stdenv.hostPlatform.system}.opencode-bubblewrap
 
       #inputs.nelly.packages.${pkgs.stdenv.hostPlatform.system}.linear-cli
       spotify
