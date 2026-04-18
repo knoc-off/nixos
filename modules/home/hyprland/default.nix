@@ -204,12 +204,6 @@ in {
           "${mainMod} ALT, s, layoutmsg, setlayout, scrolling"
           "${mainMod} ALT, d, layoutmsg, setlayout, dwindle"
           "${mainMod} ALT, m, layoutmsg, setlayout, master"
-
-          # Media
-          ", XF86AudioNext, exec, ${lib.getExe pkgs.playerctl} next"
-          ", XF86AudioPrev, exec, ${lib.getExe pkgs.playerctl} previous"
-          ", XF86AudioPlay, exec, ${lib.getExe pkgs.playerctl} play-pause"
-          ", XF86AudioPause, exec, ${lib.getExe pkgs.playerctl} play-pause"
         ]
         ++ (map (i: "${mainMod}, ${toString i}, focusworkspaceoncurrentmonitor, ${toString i}") workspaces)
         ++ (map (i: "${mainMod} SHIFT, ${toString i}, movetoworkspace, ${toString i}") workspaces);
@@ -228,6 +222,11 @@ in {
         wpctl = "${pkgs.wireplumber}/bin/wpctl";
       in [
         ", XF86AudioMute, exec, ${wpctl} set-mute @DEFAULT_AUDIO_SINK@ toggle"
+        # Media
+        ", XF86AudioNext, exec, ${lib.getExe pkgs.playerctl} next"
+        ", XF86AudioPrev, exec, ${lib.getExe pkgs.playerctl} previous"
+        ", XF86AudioPlay, exec, ${lib.getExe pkgs.playerctl} play-pause"
+        ", XF86AudioPause, exec, ${lib.getExe pkgs.playerctl} play-pause"
       ];
 
       bindm = [

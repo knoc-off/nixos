@@ -53,8 +53,11 @@
     # Process inspection
     procps # ps, top, pgrep, etc.
 
-    # Nix — self-provisioning inside the jail
-    nix
+    # Nix — self-provisioning inside the jail.
+    # Use Determinate's nix-cli (instead of pkgs.nix) so it recognizes
+    # the eval-cores / lazy-trees settings present in /etc/nix/nix.conf
+    # and doesn't emit warnings on every invocation.
+    inputs.determinate.inputs.nix.packages.${pkgs.system}.nix-cli
 
     # Coding agents
     upkgs.claude-code
@@ -81,13 +84,6 @@ in
       # Each jail gets its own .claude.json; seed with onboarding-complete so
       # claude-code doesn't re-run setup on every launch (auth happens separately)
       [ -f "$PROJECT_CLAUDE_JSON" ] || echo '{"hasCompletedOnboarding":true,"migrationVersion":11,"opusProMigrationComplete":true,"sonnet1m45MigrationComplete":true}' > "$PROJECT_CLAUDE_JSON"
-
-      while IFS= read -r f; do
-        target=$(readlink "$f" 2>/dev/null || true)
-        if [ -n "$target" ] && [[ "$target" == /nix/store/* ]]; then
-          RUNTIME_ARGS+=(--ro-bind "$target" "$target")
-        fi
-      done < <(find "$HOME/.config/opencode" -path "*/node_modules" -prune -o -type l -print)
     '')
 
     (wrap-entry (entry: ''
@@ -122,6 +118,12 @@ in
       done
 
       export OPENCODE_PROXY_URL="http://127.0.0.1:$PROJECT_PORT/v1"
+
+      # fucks startup time, but it will work
+      claude -p "say just 'ok'" --model 'haiku'
+
+      ${lib.getExe upkgs.opencode} "$@" || true
+
       ${entry}
     ''))
 
@@ -150,8 +152,7 @@ in
     # NixOS symlinks /etc/nix/{registry.json,nix.custom.conf} → /etc/static/…
     (try-ro-bind "/etc/static/nix" "/etc/static/nix")
 
-    (try-fwd-env "ANTHROPIC_API_KEY")
-    (try-fwd-env "OPENAI_API_KEY")
+    (try-fwd-env "SHELL")
     (try-fwd-env "COMPAT_PROXY_LOG")
     (try-fwd-env "COMPAT_PROXY_RULES")
     (try-fwd-env "COMPAT_PROXY_DUMP")

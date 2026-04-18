@@ -391,6 +391,13 @@ in {
           };
         };
 
+        figma = {
+          type = "remote";
+          url = "https://mcp.figma.com/mcp";
+          enabled = true;
+          oauth = {};
+        };
+
         grep = {
           type = "remote";
           url = "https://mcp.grep.app";
