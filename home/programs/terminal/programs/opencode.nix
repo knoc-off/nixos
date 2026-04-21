@@ -391,11 +391,24 @@ in {
           };
         };
 
+        # need to generate the figma auth vars seperatly
+        # curl -s -X POST "https://api.figma.com/v1/oauth/mcp/register" \
+        #   -H "Content-Type: application/json" \
+        #   -d '{
+        # "client_name": "Claude Code (figma)",
+        # "redirect_uris": ["http://127.0.0.1:19876/mcp/oauth/callback"],
+        # "grant_types": ["authorization_code", "refresh_token"],
+        # "response_types": ["code"],
+        # "token_endpoint_auth_method": "none"
+        # }'
         figma = {
           type = "remote";
           url = "https://mcp.figma.com/mcp";
           enabled = true;
-          oauth = {};
+          oauth = {
+            clientId = "{env:FIGMA_CLIENTID}";
+            clientSecret = "{env:FIGMA_CLIENTSECRET}";
+          };
         };
 
         grep = {

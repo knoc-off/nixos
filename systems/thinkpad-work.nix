@@ -82,6 +82,12 @@
         secrets."shell_environment/_ANTHROPIC_API_KEY" = {
           mode = "0644";
         };
+        secrets."shell_environment/FIGMA_CLIENTID" = {
+          mode = "0644";
+        };
+        secrets."shell_environment/FIGMA_CLIENTSECRET" = {
+          mode = "0644";
+        };
         secrets."shell_environment/GOOGLE_TOTP_KEY" = {
           mode = "0644";
         };
