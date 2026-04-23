@@ -2,6 +2,7 @@
   inputs,
   lib,
   pkgs,
+  config,
   self,
   ...
 }: let
@@ -136,7 +137,6 @@ in {
 
   programs.noctalia-shell = {
     enable = lib.mkDefault true;
-    systemd.enable = lib.mkDefault true;
     package = lib.mkForce (inputs.noctalia.packages.${pkgs.stdenv.hostPlatform.system}.default.override {
       calendarSupport = true;
     });
@@ -672,5 +672,21 @@ in {
         monitorWidgets = [];
       };
     };
+  };
+
+  systemd.user.services.noctalia-shell = {
+    Unit = {
+      Description = "Noctalia Shell - Wayland desktop shell";
+      Documentation = "https://docs.noctalia.dev";
+      BindsTo = ["graphical-session.target"];
+      PartOf = ["graphical-session.target"];
+      After = ["graphical-session.target"];
+    };
+    Service = {
+      ExecStart = "${lib.getExe config.programs.noctalia-shell.package}";
+      Restart = "on-failure";
+      RestartSec = 2;
+    };
+    Install.WantedBy = ["graphical-session.target"];
   };
 }

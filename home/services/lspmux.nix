@@ -3,9 +3,11 @@
     self.homeModules.lspmux
   ];
   services.lspmux.settings = {
+    instance_timeout = 3600; # 1 hour
     pass_environment = [
       # Core identity / basic runtime
       "HOME"
+      "PATH"
 
       # Rust / Cargo
       # (keep even if some aren't currently set; harmless)

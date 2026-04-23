@@ -57,7 +57,7 @@
     # Use Determinate's nix-cli (instead of pkgs.nix) so it recognizes
     # the eval-cores / lazy-trees settings present in /etc/nix/nix.conf
     # and doesn't emit warnings on every invocation.
-    inputs.determinate.inputs.nix.packages.${pkgs.system}.nix-cli
+    inputs.determinate.inputs.nix.packages.${pkgs.stdenv.hostPlatform.system}.nix-cli
 
     # Coding agents
     upkgs.claude-code

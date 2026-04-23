@@ -293,6 +293,28 @@
   };
 
   boot = {
+    # WORKAROUND: aes_generic was merged into the kernel proper in Linux 7.0
+    # and no longer exists as a loadable module.  The nixpkgs default
+    # boot.initrd.luks.cryptoModules still lists it, causing initrd builds to
+    # fail.  Override with the same list minus aes_generic.
+    # TODO: remove once nixpkgs drops aes_generic from cryptoModules default.
+    initrd.luks.cryptoModules = [
+      "aes"
+      "blowfish"
+      "twofish"
+      "serpent"
+      "cbc"
+      "xts"
+      "lrw"
+      "sha1"
+      "sha256"
+      "sha512"
+      "af_alg"
+      "algif_skcipher"
+      "cryptd"
+      "input_leds"
+    ];
+
     kernelPackages = pkgs.linuxPackages_latest;
     kernelParams = [
       "usbcore.autosuspend=-1"
