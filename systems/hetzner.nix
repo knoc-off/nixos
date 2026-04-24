@@ -26,6 +26,11 @@
             owner = "root";
             mode = "0400";
           };
+          # markid / anki sync
+          "markid/git-token" = {
+            owner = "markid";
+            mode = "0400";
+          };
         };
       };
     }
@@ -48,6 +53,7 @@
     }
 
     self.nixosModules.services.cert-sync
+    self.nixosModules.services.markid
     # Ship ACME-issued certs to the Pi over WireGuard whenever Caddy
     # renews them. The Pi's local Caddy terminates TLS for home-LAN
     # clients (home.niko.ink directly to HA, kitchenowl/notes via
@@ -79,6 +85,40 @@
       }
     )
   ];
+
+  # ─────────────────────────────────────────────────────────────────────
+  # markid — markdown cards pushed into a server-local Anki (xvfb), which
+  # itself syncs to AnkiWeb. Devices (phone, laptop Anki) sync to AnkiWeb,
+  # not to this host. No ports need to be opened for Anki.
+  #
+  # One-time setup: after first boot, SSH in with X forwarding (or VNC)
+  # and `systemctl stop anki-desktop`; run `anki -b /var/lib/markid/Anki2 -p 'User 1'`
+  # once to log the profile into AnkiWeb. Then restart the service.
+  # ─────────────────────────────────────────────────────────────────────
+  services.markid = {
+    enable = true;
+
+    settings = {
+      cards_dir = "/var/lib/markid/cards";
+      anki_endpoint = "http://127.0.0.1:8765";
+      sync_interval = "5m";
+      # Call AnkiConnect `sync` before and after each cycle so AnkiWeb
+      # round-trips device edits through while markid owns the writes.
+      ankiweb_sync = true;
+    };
+
+    anki.enable = true;
+    # anki.syncServer intentionally not enabled — we rely on AnkiWeb for
+    # device sync. Leave the options off.
+
+    gitPoll = {
+      enable = true;
+      repo = "https://github.com/knoc-off/flashcards.git";
+      branch = "main";
+      interval = "5m";
+      tokenFile = config.sops.secrets."markid/git-token".path;
+    };
+  };
 
   nix.optimise.automatic = true;
   nix.gc = {

@@ -1,0 +1,15 @@
+[package]
+name = "marki-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+blake3.workspace = true
+getrandom = "0.3"
+pulldown-cmark.workspace = true
+regex.workspace = true
+strum.workspace = true
+syntect.workspace = true
+thiserror.workspace = true
+marki-macros.workspace = true

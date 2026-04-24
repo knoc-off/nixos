@@ -283,7 +283,14 @@
       };
     };
 
-    xserver.xkb.layout = "us";
+    xserver.xkb = {
+      layout = "us";
+      # Kanata owns the physical Caps key (remapped to rmet+layer).
+      # This makes the Caps_Lock *keysym* a no-op at the XKB layer,
+      # so stray Caps_Lock events from wtype/VMs/remote apps can
+      # never latch the lock state. Shift+Caps etc. also can't toggle it.
+      options = "caps:none";
+    };
 
     printing = {
       enable = true;
