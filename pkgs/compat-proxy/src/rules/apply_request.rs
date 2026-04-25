@@ -42,8 +42,11 @@ pub fn apply_request_rules(
     // Step 5: System prompt detection + replacement
     replace_system_prompt(&mut req, rules);
 
-    // Step 6: Text replacements
+    // Step 6: Text replacements (system prompt only)
     apply_text_replacements(&mut req, rules);
+
+    // Step 6b: Append enhancement text to system prompt
+    append_to_system_prompt(&mut req, rules);
 
     // Step 7: Billing block injection (with SHA256 fingerprint)
     inject_billing_block(&mut req, rules);
@@ -53,6 +56,15 @@ pub fn apply_request_rules(
 
     // Step 9: Strip trailing assistant prefill
     strip_trailing_prefill(&mut req);
+
+    // Step 10: Log unknown request fields for visibility
+    if !req.extra.is_empty() {
+        let keys: Vec<&str> = req.extra.keys().map(|k| k.as_str()).collect();
+        tracing::warn!(
+            fields = ?keys,
+            "forwarding unknown request fields to upstream (consider adding explicit support)"
+        );
+    }
 
     Ok(req)
 }
@@ -263,13 +275,17 @@ fn replace_system_prompt(req: &mut MessagesRequest, rules: &RuleSet) {
     }
 }
 
-/// Step 6: Apply text replacements to text blocks in messages and system prompt.
+/// Step 6: Apply text replacements to the system prompt only.
+///
+/// Message content blocks are intentionally left untouched — the proxy
+/// should not mutate user or assistant text in the conversation history,
+/// only the initialization prompt that it is replacing wholesale.
 fn apply_text_replacements(req: &mut MessagesRequest, rules: &RuleSet) {
     if rules.text_replacements.is_empty() {
         return;
     }
 
-    // Apply to system prompt
+    // Apply to system prompt only
     if let Some(SystemPrompt::Blocks(blocks)) = &mut req.system {
         for block in blocks {
             let SystemBlock::Text { text, .. } = block;
@@ -278,17 +294,44 @@ fn apply_text_replacements(req: &mut MessagesRequest, rules: &RuleSet) {
             }
         }
     }
+}
 
-    // Apply to message text blocks
-    for msg in &mut req.messages {
-        if let MessageContent::Blocks(blocks) = &mut msg.content {
-            for block in blocks {
-                if let ContentBlock::Text { text, .. } = block {
-                    for tr in &rules.text_replacements {
-                        *text = text.replace(&tr.find, &tr.replace);
-                    }
-                }
-            }
+/// Step 6b: Append enhancement text to the system prompt.
+///
+/// Adds the pre-read append text as a new system block after all other
+/// system prompt transformations (replacement, text replacements) have
+/// been applied. This allows injecting additional behavioral guidelines
+/// without replacing the client's base prompt.
+fn append_to_system_prompt(req: &mut MessagesRequest, rules: &RuleSet) {
+    let append_text = match &rules.system_prompt_append {
+        Some(t) if !t.is_empty() => t,
+        _ => return,
+    };
+
+    match &mut req.system {
+        Some(SystemPrompt::Blocks(blocks)) => {
+            blocks.push(SystemBlock::Text {
+                text: append_text.clone(),
+                cache_control: None,
+            });
+        }
+        Some(SystemPrompt::String(s)) => {
+            req.system = Some(SystemPrompt::Blocks(vec![
+                SystemBlock::Text {
+                    text: s.clone(),
+                    cache_control: None,
+                },
+                SystemBlock::Text {
+                    text: append_text.clone(),
+                    cache_control: None,
+                },
+            ]));
+        }
+        None => {
+            req.system = Some(SystemPrompt::Blocks(vec![SystemBlock::Text {
+                text: append_text.clone(),
+                cache_control: None,
+            }]));
         }
     }
 }
@@ -434,6 +477,7 @@ mod tests {
             cc_version: "1.0".into(),
             system_prompt_detect: None,
             system_prompt_replacement: None,
+            system_prompt_append: None,
             text_replacements: vec![],
             tool_renames: std::collections::HashMap::new(),
             tool_drops: std::collections::HashSet::new(),
@@ -476,6 +520,7 @@ mod tests {
             top_p: None,
             top_k: None,
             stop_sequences: None,
+            extra: serde_json::Map::new(),
         };
 
         let result = apply_request_rules(req, &rules, "test-session", "test-device");
@@ -538,6 +583,7 @@ mod tests {
             top_p: None,
             top_k: None,
             stop_sequences: None,
+            extra: serde_json::Map::new(),
         };
 
         let result = apply_request_rules(req, &rules, "test-session", "test-device").unwrap();
@@ -603,6 +649,7 @@ mod tests {
             top_p: None,
             top_k: None,
             stop_sequences: None,
+            extra: serde_json::Map::new(),
         };
 
         let result = apply_request_rules(req, &rules, "test-session", "test-device").unwrap();
@@ -645,7 +692,7 @@ mod tests {
                 }
             })),
             required: Some(vec!["todos".into()]),
-            additional_properties: Some(false),
+            additional_properties: Some(serde_json::Value::Bool(false)),
         };
 
         let req = MessagesRequest {
@@ -667,6 +714,7 @@ mod tests {
             top_p: None,
             top_k: None,
             stop_sequences: None,
+            extra: serde_json::Map::new(),
         };
 
         let result = apply_request_rules(req, &rules, "test-session", "test-device").unwrap();
@@ -683,7 +731,7 @@ mod tests {
             tool.input_schema.required.as_deref(),
             Some(&["todos".to_string()][..])
         );
-        assert_eq!(tool.input_schema.additional_properties, Some(false));
+        assert_eq!(tool.input_schema.additional_properties, Some(serde_json::Value::Bool(false)));
     }
 
     #[test]
@@ -731,6 +779,7 @@ mod tests {
             top_p: None,
             top_k: None,
             stop_sequences: None,
+            extra: serde_json::Map::new(),
         };
 
         let result = apply_request_rules(req, &rules, "test-session", "test-device").unwrap();
@@ -765,6 +814,7 @@ mod tests {
             top_p: None,
             top_k: None,
             stop_sequences: None,
+            extra: serde_json::Map::new(),
         };
 
         let result = apply_request_rules(req, &rules, "test-session", "test-device").unwrap();
@@ -803,12 +853,29 @@ mod tests {
             top_p: None,
             top_k: None,
             stop_sequences: None,
+            extra: serde_json::Map::new(),
         };
 
         let result = apply_request_rules(req, &rules, "test-session", "test-device").unwrap();
+
+        // System prompt should be replaced
         let sys_text = result.system.unwrap().text_content();
         assert!(sys_text.contains("new-url.com"));
         assert!(!sys_text.contains("old-url.com"));
+
+        // Message text should be preserved (NOT replaced)
+        if let MessageContent::Blocks(blocks) = &result.messages[0].content {
+            if let ContentBlock::Text { text, .. } = &blocks[0] {
+                assert!(
+                    text.contains("old-url.com"),
+                    "message text should NOT be transformed"
+                );
+            } else {
+                panic!("expected text block");
+            }
+        } else {
+            panic!("expected blocks");
+        }
     }
 
     #[test]
@@ -834,6 +901,7 @@ mod tests {
             top_p: None,
             top_k: None,
             stop_sequences: None,
+            extra: serde_json::Map::new(),
         };
 
         let result = apply_request_rules(req, &rules, "test-session", "test-device").unwrap();

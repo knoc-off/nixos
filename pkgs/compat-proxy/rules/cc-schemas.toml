@@ -1,11 +1,11 @@
-# cc-schemas.toml — Canonical tool definitions
+# cc-schemas.toml -- Canonical tool definitions
 #
 # Each [[tool]] entry defines the canonical name and description that the
 # upstream API expects. These replace the client's tool name and description
 # during request translation.
 #
 # input_schema is OPTIONAL. When omitted (the default), the client's own
-# schema is preserved — this is the recommended mode since clients already
+# schema is preserved -- this is the recommended mode since clients already
 # send correct, detailed schemas with full nested structure (items, required
 # fields, etc.). Only define input_schema when you need to override what
 # the client sends.
@@ -18,7 +18,7 @@ The command is run in a bash shell with common utilities available. \
 Each command runs in the same persistent shell session, so environment \
 variables and directory changes persist between calls."""
 
-# Example schema override — when present, this replaces the client's
+# Example schema override -- when present, this replaces the client's
 # input_schema for this tool. Remove [tool.input_schema] entirely to
 # fall back to the client's own schema (the default for all other tools).
 [tool.input_schema]
@@ -82,13 +82,39 @@ content types and can return raw text, markdown, or HTML."""
 name = "TodoWrite"
 description = """
 Creates or updates a todo list for tracking tasks. \
-Manages a structured list of items with status and priority."""
+Manages a structured list of items with content, status \
+(pending, in_progress, completed, cancelled), and priority \
+(high, medium, low). Use proactively for complex multi-step \
+tasks. Mark items complete immediately as you finish them. \
+Only have one task in_progress at a time."""
 
 [[tool]]
 name = "Task"
 description = """
 Delegates a task to a sub-agent for specialized processing. \
-Used for complex operations that benefit from focused execution."""
+Used for complex operations that benefit from focused execution.\n\
+\n\
+Available agent types:\n\
+- explore: Fast agent specialized for exploring codebases. Use this when you \
+need to quickly find files by patterns (eg. "src/components/**/*.tsx"), search \
+code for keywords (eg. "API endpoints"), or answer questions about the codebase. \
+When calling this agent, specify the desired thoroughness level: "quick" for \
+basic searches, "medium" for moderate exploration, or "very thorough" for \
+comprehensive analysis across multiple locations and naming conventions.\n\
+- general: General-purpose agent for researching complex questions and executing \
+multi-step tasks. Use this agent to execute multiple units of work in parallel.\n\
+\n\
+When NOT to use this tool:\n\
+- Reading a specific file path -- use Read or Glob directly\n\
+- Searching for a specific class definition -- use Grep directly\n\
+- Searching within 2-3 known files -- use Read directly\n\
+\n\
+Usage notes:\n\
+- Always include a short description (3-5 words) summarizing what the agent will do\n\
+- The agent result is not visible to the user. Summarize it yourself.\n\
+- Specify subagent_type to select the agent type. Defaults to general.\n\
+- For open-ended codebase exploration, prefer explore over direct Grep/Glob.\n\
+- You can call multiple Task tools in parallel for independent work units."""
 
 [[tool]]
 name = "AskUser"

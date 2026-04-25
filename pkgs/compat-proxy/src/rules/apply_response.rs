@@ -36,9 +36,15 @@ fn reverse_rename_tools(resp: &mut MessagesResponse, rules: &RuleSet) {
                     *name = client_name.to_string();
                 }
             }
-            // Thinking blocks: pass through unchanged (no mutation API)
-            ContentBlock::Thinking { .. } | ContentBlock::RedactedThinking { .. } => {}
-            _ => {}
+            // Thinking, server tools, images, and unknown blocks: pass through unchanged
+            ContentBlock::Thinking { .. }
+            | ContentBlock::RedactedThinking { .. }
+            | ContentBlock::ServerToolUse { .. }
+            | ContentBlock::WebSearchToolResult { .. }
+            | ContentBlock::Other(_)
+            | ContentBlock::Text { .. }
+            | ContentBlock::Image { .. }
+            | ContentBlock::ToolResult { .. } => {}
         }
     }
 }
@@ -76,6 +82,7 @@ mod tests {
             cc_version: "1.0".into(),
             system_prompt_detect: None,
             system_prompt_replacement: None,
+            system_prompt_append: None,
             text_replacements: vec![],
             tool_renames: std::collections::HashMap::new(),
             tool_drops: std::collections::HashSet::new(),
@@ -103,7 +110,9 @@ mod tests {
                 output_tokens: 50,
                 cache_creation_input_tokens: None,
                 cache_read_input_tokens: None,
+                extra: serde_json::Map::new(),
             },
+            extra: serde_json::Map::new(),
         }
     }
 

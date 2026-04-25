@@ -34,6 +34,10 @@ pub struct RuleSet {
     /// Replacement system prompt text (pre-read from file).
     pub system_prompt_replacement: Option<String>,
 
+    /// Text to append to the system prompt (pre-read from file).
+    /// Applied after replacement and text replacements.
+    pub system_prompt_append: Option<String>,
+
     /// Text replacements applied after system prompt replacement.
     pub text_replacements: Vec<TextReplacement>,
 

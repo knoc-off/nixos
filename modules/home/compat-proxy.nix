@@ -41,7 +41,10 @@ with lib; let
 
       [system_prompt]
       detect = ${builtins.toJSON client.systemPrompt.detect}
-      replace_with_file = ${builtins.toJSON client.systemPrompt.replaceWithFile}
+      ${optionalString (client.systemPrompt.replaceWithFile != null)
+        "replace_with_file = ${builtins.toJSON client.systemPrompt.replaceWithFile}"}
+      ${optionalString (client.systemPrompt.appendFile != null)
+        "append_file = ${builtins.toJSON client.systemPrompt.appendFile}"}
 
       ${replacementLines}
 
@@ -117,9 +120,15 @@ with lib; let
         };
 
         replaceWithFile = mkOption {
-          type = types.str;
-          default = "system-prompts/cc-2.1.97.txt";
-          description = "Replacement system prompt file, relative to rules dir.";
+          type = types.nullOr types.str;
+          default = null;
+          description = "Replacement system prompt file, relative to rules dir. Null to keep the client's prompt.";
+        };
+
+        appendFile = mkOption {
+          type = types.nullOr types.str;
+          default = null;
+          description = "File to append to the system prompt, relative to rules dir.";
         };
       };
 

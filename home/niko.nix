@@ -178,54 +178,10 @@ in {
       services.compat-proxy = {
         enable = true;
         port = 58192;
-        logLevel = "compat_proxy=debug,tower=info";
-        dumpRequests = true;
 
         clients.opencode = {
           systemPrompt.detect = "You are OpenCode";
-
-          textReplacements = [
-            {
-              find = "You are OpenCode, the best coding agent on the planet.";
-              replace = "You are Claude Code.";
-            }
-            {
-              find = "OpenCode docs";
-              replace = "Claude Code docs";
-            }
-            {
-              find = "https://opencode.ai/docs";
-              replace = "https://docs.claude.com/en/docs/claude-code";
-            }
-            {
-              find = "https://github.com/anomalyco/opencode";
-              replace = "https://github.com/anthropics/claude-code/issues";
-            }
-            {
-              find = "can OpenCode do";
-              replace = "can Claude Code do";
-            }
-            {
-              find = "does OpenCode have";
-              replace = "does Claude Code have";
-            }
-            {
-              find = "use a specific OpenCode feature";
-              replace = "use a specific Claude Code feature";
-            }
-            {
-              find = "asks about OpenCode";
-              replace = "asks about Claude Code";
-            }
-            {
-              find = "OpenCode";
-              replace = "Claude Code";
-            }
-            {
-              find = "opencode";
-              replace = "claude-code";
-            }
-          ];
+          systemPrompt.replaceWithFile = "system-prompts/cc-2.1.97.txt";
 
           toolRenames = [
             {

@@ -61,6 +61,10 @@ pub struct Tool {
 }
 
 /// JSON Schema for tool input parameters.
+///
+/// `additional_properties` is `Option<serde_json::Value>` because in JSON
+/// Schema it can be a boolean (`false`) OR a schema object
+/// (`{"type": "string"}`, `{"type": "object", "properties": {...}}`).
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct InputSchema {
     #[serde(rename = "type")]
@@ -71,7 +75,7 @@ pub struct InputSchema {
     pub required: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(rename = "additionalProperties")]
-    pub additional_properties: Option<bool>,
+    pub additional_properties: Option<serde_json::Value>,
 }
 
 /// Tool choice constraint.
@@ -159,6 +163,10 @@ pub struct Thinking {
 }
 
 /// The top-level Messages API request body.
+///
+/// Known fields are modeled explicitly. Unknown fields (e.g. `output_config`,
+/// `service_tier`, `container`) are captured in `extra` and forwarded to
+/// upstream so new API features don't silently break.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct MessagesRequest {
     pub model: String,
@@ -184,4 +192,8 @@ pub struct MessagesRequest {
     pub top_k: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stop_sequences: Option<Vec<String>>,
+    /// Catch-all for unknown top-level fields. Preserved and forwarded
+    /// to upstream. Check logs for warnings about forwarded fields.
+    #[serde(flatten, default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub extra: serde_json::Map<String, serde_json::Value>,
 }

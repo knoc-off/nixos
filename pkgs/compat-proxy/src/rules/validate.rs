@@ -31,6 +31,7 @@ pub fn validate_rules(
     // -- System prompt validation --
     let mut system_prompt_detect = None;
     let mut system_prompt_replacement = None;
+    let mut system_prompt_append = None;
     let mut text_replacements = Vec::new();
 
     if let Some(sp) = &rules_file.system_prompt {
@@ -40,6 +41,17 @@ pub fn validate_rules(
             let full_path = rules_dir.join(path);
             match std::fs::read_to_string(&full_path) {
                 Ok(content) => system_prompt_replacement = Some(content),
+                Err(e) => errors.push(ValidationError::FileNotFound(
+                    full_path.display().to_string(),
+                    e.to_string(),
+                )),
+            }
+        }
+
+        if let Some(ref path) = sp.append_file {
+            let full_path = rules_dir.join(path);
+            match std::fs::read_to_string(&full_path) {
+                Ok(content) => system_prompt_append = Some(content),
                 Err(e) => errors.push(ValidationError::FileNotFound(
                     full_path.display().to_string(),
                     e.to_string(),
@@ -177,6 +189,7 @@ pub fn validate_rules(
             cc_version,
             system_prompt_detect,
             system_prompt_replacement,
+            system_prompt_append,
             text_replacements,
             tool_renames,
             tool_drops,

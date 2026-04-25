@@ -43,6 +43,13 @@ pub fn apply_sse_event_rules(
                 ContentBlock::Thinking { .. } | ContentBlock::RedactedThinking { .. } => {
                     state.thinking_blocks.insert(index);
                 }
+                // Server tool blocks and unknown blocks: track as passthrough
+                // (their deltas should not be buffered or mangled)
+                ContentBlock::ServerToolUse { .. }
+                | ContentBlock::WebSearchToolResult { .. }
+                | ContentBlock::Other(_) => {
+                    state.thinking_blocks.insert(index);
+                }
                 // Reverse-rename tool_use blocks and track them
                 ContentBlock::ToolUse { id, name, .. } => {
                     state.tool_id_map.insert(index, id.clone());
@@ -159,6 +166,7 @@ mod tests {
             cc_version: "1.0".into(),
             system_prompt_detect: None,
             system_prompt_replacement: None,
+            system_prompt_append: None,
             text_replacements: vec![],
             tool_renames: std::collections::HashMap::new(),
             tool_drops: std::collections::HashSet::new(),

@@ -144,15 +144,46 @@ fn build_beta_header(user_betas: Option<&str>, is_oauth: bool) -> String {
 }
 
 /// Main proxy handler for POST /v1/messages.
+///
+/// Accepts raw bytes first so we can dump the body even when
+/// deserialization fails (critical for debugging new block types).
 pub async fn handle_messages(
     State(state): State<AppState>,
     _headers: HeaderMap,
-    Json(req): Json<MessagesRequest>,
+    body: axum::body::Bytes,
 ) -> Result<Response, ProxyError> {
-    let wants_stream = req.stream;
     let rules = state.rules.load_full(); // Arc<RuleSet>
 
-    // Log incoming request if debugging
+    // Always dump raw bytes BEFORE deserialization so we capture
+    // the exact payload even when parsing fails.
+    if state.dump_requests {
+        let path = std::env::temp_dir().join(format!(
+            "proxy-raw-{}.json",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+        ));
+        if let Err(e) = std::fs::write(&path, &body) {
+            tracing::warn!("failed to dump raw request: {e}");
+        } else {
+            tracing::debug!("dumped raw request to {} ({} bytes)", path.display(), body.len());
+        }
+    }
+
+    // Deserialize — now failures are debuggable via the raw dump above.
+    let req: MessagesRequest = serde_json::from_slice(&body).map_err(|e| {
+        tracing::error!(
+            error = %e,
+            body_len = body.len(),
+            "failed to deserialize request body"
+        );
+        ProxyError::Deserialize(format!("{e}"))
+    })?;
+
+    let wants_stream = req.stream;
+
+    // Log the parsed (pre-translation) request if debugging
     if state.dump_requests {
         if let Ok(json) = serde_json::to_string_pretty(&req) {
             let path = std::env::temp_dir().join(format!(
@@ -165,7 +196,7 @@ pub async fn handle_messages(
             if let Err(e) = std::fs::write(&path, &json) {
                 tracing::warn!("failed to dump request: {e}");
             } else {
-                tracing::debug!("dumped request to {}", path.display());
+                tracing::debug!("dumped parsed request to {}", path.display());
             }
         }
     }

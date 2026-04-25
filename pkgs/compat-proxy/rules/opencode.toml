@@ -1,7 +1,8 @@
-# opencode.toml — OpenCode client rule file
+# opencode.toml -- OpenCode client rule file
 #
-# Maps OpenCode's tool names and conventions to the canonical
-# upstream format expected by the Anthropic API.
+# Patches OpenCode's system prompt with behavioral improvements and
+# maps tool names to canonical upstream format. Does NOT wholesale
+# replace the prompt -- keeps opencode's tool descriptions intact.
 
 [meta]
 client_name = "opencode"
@@ -9,16 +10,18 @@ target_cc_version = "2.1.97"
 
 [system_prompt]
 detect = "You are OpenCode"
-replace_with_file = "system-prompts/cc-2.1.97.txt"
+# No replace_with_file -- keep opencode's prompt as base
+append_file = "system-prompts/cc-enhancements.txt"
 
-# Applied AFTER the wholesale replacement, against any remaining text blocks.
+# Identity scrubbing -- strip OpenCode branding without breaking
+# tool references or MCP server names in the prompt.
 [[system_prompt.text_replacements]]
 find = "You are OpenCode, the best coding agent on the planet."
-replace = "You are Claude Code."
+replace = "You are an expert coding assistant."
 
 [[system_prompt.text_replacements]]
 find = "OpenCode docs"
-replace = "Claude Code docs"
+replace = "documentation"
 
 [[system_prompt.text_replacements]]
 find = "https://opencode.ai/docs"
@@ -30,85 +33,82 @@ replace = "https://github.com/anthropics/claude-code/issues"
 
 [[system_prompt.text_replacements]]
 find = "can OpenCode do"
-replace = "can Claude Code do"
+replace = "can the assistant do"
 
 [[system_prompt.text_replacements]]
 find = "does OpenCode have"
-replace = "does Claude Code have"
+replace = "does the assistant have"
 
 [[system_prompt.text_replacements]]
 find = "use a specific OpenCode feature"
-replace = "use a specific Claude Code feature"
+replace = "use a specific feature"
 
 [[system_prompt.text_replacements]]
 find = "asks about OpenCode"
-replace = "asks about Claude Code"
+replace = "asks about the assistant"
 
 [[system_prompt.text_replacements]]
 find = "OpenCode"
-replace = "Claude Code"
+replace = "the assistant"
 
-[[system_prompt.text_replacements]]
-find = "opencode"
-replace = "claude-code"
 
 [tools]
-unmapped_policy = "error"
+unmapped_policy = "passthrough"
 
 [[tools.rename]]
-from = "mcp_bash"
+from = "bash"
 to_schema = "Bash"
 
 [[tools.rename]]
-from = "mcp_read"
+from = "read"
 to_schema = "Read"
 
 [[tools.rename]]
-from = "mcp_write"
+from = "write"
 to_schema = "Write"
 
 [[tools.rename]]
-from = "mcp_edit"
+from = "edit"
 to_schema = "Edit"
 
 [[tools.rename]]
-from = "mcp_glob"
+from = "glob"
 to_schema = "Glob"
 
 [[tools.rename]]
-from = "mcp_grep"
+from = "grep"
 to_schema = "Grep"
 
 [[tools.rename]]
-from = "mcp_webfetch"
+from = "webfetch"
 to_schema = "WebFetch"
 
 [[tools.rename]]
-from = "mcp_todowrite"
+from = "todowrite"
 to_schema = "TodoWrite"
 
 [[tools.rename]]
-from = "mcp_task"
+from = "task"
 to_schema = "Task"
 
 [[tools.rename]]
-from = "mcp_question"
+from = "question"
 to_schema = "AskUser"
 
 [[tools.rename]]
-from = "mcp_grep_searchGitHub"
+from = "grep_searchGitHub"
 to_schema = "GithubSearch"
 
 [[tools.rename]]
-from = "mcp_context7_resolve-library-id"
+from = "context7_resolve-library-id"
 to_schema = "LibrarySearch"
 
 [[tools.rename]]
-from = "mcp_context7_query-docs"
+from = "context7_query-docs"
 to_schema = "LibraryDocs"
 
 [[tools.drop]]
-name = "mcp_skill"
+name = "skill"
 
 [properties]
 

@@ -4,17 +4,126 @@ use super::content::ContentBlock;
 use super::response::{ApiError, MessagesResponse};
 
 /// Delta types for streaming content blocks.
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(tag = "type")]
+///
+/// Uses custom Deserialize so unknown delta types (e.g. future Anthropic
+/// additions) are captured as `Other(Value)` instead of breaking the stream.
+#[derive(Debug, Clone)]
 pub enum ContentDelta {
-    #[serde(rename = "text_delta")]
     TextDelta { text: String },
-    #[serde(rename = "input_json_delta")]
     InputJsonDelta { partial_json: String },
-    #[serde(rename = "thinking_delta")]
     ThinkingDelta { thinking: String },
-    #[serde(rename = "signature_delta")]
     SignatureDelta { signature: String },
+    CitationsDelta { citation: serde_json::Value },
+    /// Catch-all for unrecognized delta types.
+    Other(serde_json::Value),
+}
+
+impl<'de> Deserialize<'de> for ContentDelta {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        let delta_type = value
+            .get("type")
+            .and_then(|t| t.as_str())
+            .unwrap_or("");
+
+        match delta_type {
+            "text_delta" => {
+                let text = value
+                    .get("text")
+                    .and_then(|t| t.as_str())
+                    .ok_or_else(|| serde::de::Error::missing_field("text"))?
+                    .to_string();
+                Ok(ContentDelta::TextDelta { text })
+            }
+            "input_json_delta" => {
+                let partial_json = value
+                    .get("partial_json")
+                    .and_then(|t| t.as_str())
+                    .ok_or_else(|| serde::de::Error::missing_field("partial_json"))?
+                    .to_string();
+                Ok(ContentDelta::InputJsonDelta { partial_json })
+            }
+            "thinking_delta" => {
+                let thinking = value
+                    .get("thinking")
+                    .and_then(|t| t.as_str())
+                    .ok_or_else(|| serde::de::Error::missing_field("thinking"))?
+                    .to_string();
+                Ok(ContentDelta::ThinkingDelta { thinking })
+            }
+            "signature_delta" => {
+                let signature = value
+                    .get("signature")
+                    .and_then(|t| t.as_str())
+                    .ok_or_else(|| serde::de::Error::missing_field("signature"))?
+                    .to_string();
+                Ok(ContentDelta::SignatureDelta { signature })
+            }
+            "citations_delta" => {
+                let citation = value
+                    .get("citation")
+                    .cloned()
+                    .unwrap_or(serde_json::json!(null));
+                Ok(ContentDelta::CitationsDelta { citation })
+            }
+            _other => {
+                tracing::debug!(
+                    delta_type = _other,
+                    "unrecognized content delta type, preserving as Other"
+                );
+                Ok(ContentDelta::Other(value))
+            }
+        }
+    }
+}
+
+impl Serialize for ContentDelta {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde_json::{Map, Value};
+
+        match self {
+            ContentDelta::TextDelta { text } => {
+                let mut map = Map::new();
+                map.insert("type".into(), Value::String("text_delta".into()));
+                map.insert("text".into(), Value::String(text.clone()));
+                Value::Object(map).serialize(serializer)
+            }
+            ContentDelta::InputJsonDelta { partial_json } => {
+                let mut map = Map::new();
+                map.insert("type".into(), Value::String("input_json_delta".into()));
+                map.insert(
+                    "partial_json".into(),
+                    Value::String(partial_json.clone()),
+                );
+                Value::Object(map).serialize(serializer)
+            }
+            ContentDelta::ThinkingDelta { thinking } => {
+                let mut map = Map::new();
+                map.insert("type".into(), Value::String("thinking_delta".into()));
+                map.insert("thinking".into(), Value::String(thinking.clone()));
+                Value::Object(map).serialize(serializer)
+            }
+            ContentDelta::SignatureDelta { signature } => {
+                let mut map = Map::new();
+                map.insert("type".into(), Value::String("signature_delta".into()));
+                map.insert("signature".into(), Value::String(signature.clone()));
+                Value::Object(map).serialize(serializer)
+            }
+            ContentDelta::CitationsDelta { citation } => {
+                let mut map = Map::new();
+                map.insert("type".into(), Value::String("citations_delta".into()));
+                map.insert("citation".into(), citation.clone());
+                Value::Object(map).serialize(serializer)
+            }
+            ContentDelta::Other(value) => value.serialize(serializer),
+        }
+    }
 }
 
 /// Message delta payload (sent near end of stream).

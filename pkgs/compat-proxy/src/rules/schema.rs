@@ -35,6 +35,9 @@ pub struct SystemPromptConfig {
     pub detect: Option<String>,
     /// Path to replacement file, relative to the rules file.
     pub replace_with_file: Option<String>,
+    /// Path to file whose contents are appended to the system prompt
+    /// (after any replacement and text replacements have been applied).
+    pub append_file: Option<String>,
     /// Text replacements applied after wholesale replacement.
     #[serde(default)]
     pub text_replacements: Vec<TextReplacementConfig>,
