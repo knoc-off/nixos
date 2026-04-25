@@ -16,6 +16,7 @@ use compat_proxy::config::{AppConfig, AppState};
 use compat_proxy::creds::CredentialReader;
 use compat_proxy::proxy;
 use compat_proxy::rules::{validate_rules, RuleSet, SchemaRegistry};
+use compat_proxy::session_log::{default_log_dir, SessionLogger};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -82,6 +83,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing::info!("session_id: {session_id}");
     tracing::debug!("device_id: {device_id}");
 
+    // Open the session log if requested.
+    let session_log = if config.session_log {
+        let dir = config
+            .session_log_dir
+            .clone()
+            .unwrap_or_else(default_log_dir);
+        let path = dir.join(format!("{session_id}.jsonl"));
+        match SessionLogger::open(path) {
+            Ok(logger) => {
+                tracing::info!("session log: writing to {}", logger.path().display());
+                Some(Arc::new(logger))
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "failed to open session log (continuing without it): {e}"
+                );
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     // Build application state
     let state = AppState {
         rules: Arc::new(ArcSwap::new(Arc::new(rule_set))),
@@ -91,6 +115,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         api_version: config.api_version.clone(),
         betas: config.betas.clone(),
         dump_requests: config.dump_requests,
+        session_log,
         session_id,
         device_id,
     };

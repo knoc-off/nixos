@@ -186,6 +186,7 @@ in {
       services.compat-proxy = {
         enable = true;
         port = 58192;
+        sessionLog = true;
 
         clients.opencode = {
           systemPrompt.detect = "You are OpenCode";

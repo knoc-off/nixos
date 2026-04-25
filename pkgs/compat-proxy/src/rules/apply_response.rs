@@ -11,16 +11,27 @@ use super::{RuleError, RuleSet};
 
 /// Apply all reverse translation rules to a non-streaming response.
 pub fn apply_response_rules(
-    mut resp: MessagesResponse,
+    resp: MessagesResponse,
     rules: &RuleSet,
 ) -> Result<MessagesResponse, RuleError> {
+    apply_response_rules_with_changes(resp, rules).map(|(r, _)| r)
+}
+
+/// Apply reverse translation, also returning a list of human-readable
+/// changes (for the session log).
+pub fn apply_response_rules_with_changes(
+    mut resp: MessagesResponse,
+    rules: &RuleSet,
+) -> Result<(MessagesResponse, Vec<String>), RuleError> {
+    let mut changes: Vec<String> = Vec::new();
+
     // Reverse tool renames in content blocks
-    reverse_rename_tools(&mut resp, rules);
+    reverse_rename_tools(&mut resp, rules, &mut changes);
 
     // Reverse property renames in tool_use.input values
-    reverse_rename_properties(&mut resp, rules)?;
+    reverse_rename_properties(&mut resp, rules, &mut changes)?;
 
-    Ok(resp)
+    Ok((resp, changes))
 }
 
 /// Reverse tool name renames in response content blocks.
@@ -28,12 +39,17 @@ pub fn apply_response_rules(
 /// When the model emits `tool_use.name = "Bash"`, we need to map it back
 /// to whatever the client originally sent (e.g., "mcp_bash"). The forward
 /// and reverse mappings come from the same rule, applied symmetrically.
-fn reverse_rename_tools(resp: &mut MessagesResponse, rules: &RuleSet) {
+fn reverse_rename_tools(resp: &mut MessagesResponse, rules: &RuleSet, changes: &mut Vec<String>) {
     for block in &mut resp.content {
         match block {
             ContentBlock::ToolUse { name, .. } => {
                 if let Some(client_name) = rules.client_name_for(name) {
-                    *name = client_name.to_string();
+                    let canonical = name.clone();
+                    let client = client_name.to_string();
+                    *name = client.clone();
+                    if canonical != client {
+                        changes.push(format!("tool reverse-rename: {canonical} → {client}"));
+                    }
                 }
             }
             // Thinking, server tools, images, and unknown blocks: pass through unchanged
@@ -53,6 +69,7 @@ fn reverse_rename_tools(resp: &mut MessagesResponse, rules: &RuleSet) {
 fn reverse_rename_properties(
     resp: &mut MessagesResponse,
     rules: &RuleSet,
+    changes: &mut Vec<String>,
 ) -> Result<(), RuleError> {
     if rules.property_renames.is_empty() {
         return Ok(());
@@ -64,6 +81,17 @@ fn reverse_rename_properties(
         if let ContentBlock::ToolUse { input, .. } = block {
             rename_properties_in_value(input, &reverse_renames);
         }
+    }
+
+    let renames: Vec<String> = reverse_renames
+        .iter()
+        .map(|r| format!("{} → {}", r.from, r.to))
+        .collect();
+    if !renames.is_empty() {
+        changes.push(format!(
+            "property reverse-renames applied: {}",
+            renames.join(", ")
+        ));
     }
 
     Ok(())

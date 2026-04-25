@@ -9,8 +9,8 @@ use std::collections::HashMap;
 
 use crate::wire::request::InputSchema;
 
-pub use apply_request::apply_request_rules;
-pub use apply_response::apply_response_rules;
+pub use apply_request::{apply_request_rules, apply_request_rules_with_changes};
+pub use apply_response::{apply_response_rules, apply_response_rules_with_changes};
 pub use apply_sse::apply_sse_event_rules;
 pub use registry::SchemaRegistry;
 pub use schema::{RulesFile, UnmappedPolicy};

@@ -1,6 +1,7 @@
 //! HTTP layer: Axum handlers, upstream forwarding, SSE streaming.
 
 use std::convert::Infallible;
+use std::sync::{Arc, Mutex};
 
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
@@ -14,7 +15,11 @@ use tokio_stream::wrappers::ReceiverStream;
 use crate::config::{AppState, REQUIRED_OAUTH_BETAS};
 use crate::creds::CredentialError;
 use crate::rules::apply_sse::take_flushed_input;
-use crate::rules::{apply_request_rules, apply_response_rules, apply_sse_event_rules, RuleError};
+use crate::rules::{
+    apply_request_rules_with_changes, apply_response_rules_with_changes, apply_sse_event_rules,
+    RuleError,
+};
+use crate::session_log::TransactionBuilder;
 use crate::wire::request::MessagesRequest;
 use crate::wire::response::MessagesResponse;
 use crate::wire::sse::{ContentDelta, SseEvent, SseState};
@@ -144,9 +149,6 @@ fn build_beta_header(user_betas: Option<&str>, is_oauth: bool) -> String {
 }
 
 /// Main proxy handler for POST /v1/messages.
-///
-/// Accepts raw bytes first so we can dump the body even when
-/// deserialization fails (critical for debugging new block types).
 pub async fn handle_messages(
     State(state): State<AppState>,
     _headers: HeaderMap,
@@ -154,115 +156,136 @@ pub async fn handle_messages(
 ) -> Result<Response, ProxyError> {
     let rules = state.rules.load_full(); // Arc<RuleSet>
 
-    // Always dump raw bytes BEFORE deserialization so we capture
-    // the exact payload even when parsing fails.
-    if state.dump_requests {
-        let path = std::env::temp_dir().join(format!(
-            "proxy-raw-{}.json",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis()
-        ));
-        if let Err(e) = std::fs::write(&path, &body) {
-            tracing::warn!("failed to dump raw request: {e}");
-        } else {
-            tracing::debug!("dumped raw request to {} ({} bytes)", path.display(), body.len());
-        }
-    }
+    // Begin a session-log transaction (if logging is enabled).
+    let mut txn_owned = state.session_log.as_ref().map(|l| l.begin());
 
-    // Deserialize — now failures are debuggable via the raw dump above.
-    let req: MessagesRequest = serde_json::from_slice(&body).map_err(|e| {
-        tracing::error!(
-            error = %e,
-            body_len = body.len(),
-            "failed to deserialize request body"
-        );
-        ProxyError::Deserialize(format!("{e}"))
-    })?;
+    // Deserialize. On failure, capture the raw body for debugging.
+    let req: MessagesRequest = match serde_json::from_slice(&body) {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::error!(
+                error = %e,
+                body_len = body.len(),
+                "failed to deserialize request body"
+            );
+            if let Some(txn) = txn_owned.as_mut() {
+                txn.set_raw_body(&body);
+                txn.set_parse_error(e.to_string());
+                txn.set_error("request deserialize failed".to_string());
+            }
+            // Drop runs and writes the line.
+            return Err(ProxyError::Deserialize(format!("{e}")));
+        }
+    };
 
     let wants_stream = req.stream;
 
-    // Log the parsed (pre-translation) request if debugging
-    if state.dump_requests {
-        if let Ok(json) = serde_json::to_string_pretty(&req) {
-            let path = std::env::temp_dir().join(format!(
-                "proxy-req-{}.json",
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_millis()
-            ));
-            if let Err(e) = std::fs::write(&path, &json) {
-                tracing::warn!("failed to dump request: {e}");
-            } else {
-                tracing::debug!("dumped parsed request to {}", path.display());
-            }
-        }
+    if let Some(txn) = txn_owned.as_mut() {
+        txn.set_request(&req);
     }
 
     // Forward translation (includes billing fingerprint injection)
-    let translated = apply_request_rules(req, &rules, &state.session_id, &state.device_id)?;
+    let req_for_log = if txn_owned.is_some() {
+        Some(req.clone())
+    } else {
+        None
+    };
+    let (translated, request_changes) = match apply_request_rules_with_changes(
+        req,
+        &rules,
+        &state.session_id,
+        &state.device_id,
+    ) {
+        Ok(v) => v,
+        Err(e) => {
+            if let Some(txn) = txn_owned.as_mut() {
+                txn.set_error(format!("rule error: {e}"));
+            }
+            return Err(ProxyError::Rule(e));
+        }
+    };
+
+    if let (Some(txn), Some(_)) = (txn_owned.as_mut(), &req_for_log) {
+        txn.set_request_translation(&translated, request_changes);
+    }
 
     // Read credentials fresh
     let cred = state.creds.read_credential()?;
 
     // Build upstream request
     let upstream_url = format!("{}/v1/messages", state.upstream_url);
+    if let Some(txn) = txn_owned.as_mut() {
+        txn.set_upstream_url(upstream_url.clone());
+    }
 
     let mut upstream_req = state.client.post(&upstream_url);
 
     // Auth header: OAuth uses Bearer, API keys use x-api-key
     if cred.is_oauth {
-        upstream_req = upstream_req.header("authorization", format!("Bearer {}", cred.token));
+        let value = format!("Bearer {}", cred.token);
+        upstream_req = upstream_req.header("authorization", &value);
+        if let Some(txn) = txn_owned.as_mut() {
+            txn.add_upstream_header("authorization", &value);
+        }
     } else {
         upstream_req = upstream_req.header("x-api-key", &cred.token);
+        if let Some(txn) = txn_owned.as_mut() {
+            txn.add_upstream_header("x-api-key", &cred.token);
+        }
     }
 
     // Core headers
     upstream_req = upstream_req
         .header("anthropic-version", &state.api_version)
         .header("content-type", "application/json");
+    if let Some(txn) = txn_owned.as_mut() {
+        txn.add_upstream_header("anthropic-version", &state.api_version);
+        txn.add_upstream_header("content-type", "application/json");
+    }
 
     // Beta flags (merges user betas + required OAuth betas)
     let beta_header = build_beta_header(state.betas.as_deref(), cred.is_oauth);
     if !beta_header.is_empty() {
         upstream_req = upstream_req.header("anthropic-beta", &beta_header);
+        if let Some(txn) = txn_owned.as_mut() {
+            txn.add_upstream_header("anthropic-beta", &beta_header);
+        }
     }
 
     // Stainless SDK headers (mimic real Claude Code's JS SDK fingerprint)
     for (name, value) in stainless_headers(&rules.cc_version, &state.session_id) {
-        upstream_req = upstream_req.header(name, value);
+        upstream_req = upstream_req.header(name, &value);
+        if let Some(txn) = txn_owned.as_mut() {
+            txn.add_upstream_header(name, &value);
+        }
     }
 
     // Inject additional headers from rules (these can override stainless headers)
     for header in &rules.headers {
         upstream_req = upstream_req.header(&header.name, &header.value);
+        if let Some(txn) = txn_owned.as_mut() {
+            txn.add_upstream_header(&header.name, &header.value);
+        }
     }
 
     // Send the translated request body
     let body = serde_json::to_vec(&translated)
         .map_err(|e| ProxyError::Internal(format!("failed to serialize request: {e}")))?;
 
-    if state.dump_requests {
-        let path = std::env::temp_dir().join(format!(
-            "proxy-translated-{}.json",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis()
-        ));
-        let _ = std::fs::write(&path, &body);
-        tracing::debug!("dumped translated request to {}", path.display());
-    }
-
-    let upstream_resp = upstream_req
-        .body(body)
-        .send()
-        .await
-        .map_err(|e| ProxyError::Upstream(e.to_string()))?;
+    let upstream_resp = match upstream_req.body(body).send().await {
+        Ok(r) => r,
+        Err(e) => {
+            if let Some(txn) = txn_owned.as_mut() {
+                txn.set_error(format!("upstream request failed: {e}"));
+            }
+            return Err(ProxyError::Upstream(e.to_string()));
+        }
+    };
 
     let status = upstream_resp.status();
+    if let Some(txn) = txn_owned.as_mut() {
+        txn.set_upstream_status(status.as_u16());
+    }
 
     // If upstream returned an error, forward it
     if !status.is_success() {
@@ -270,46 +293,76 @@ pub async fn handle_messages(
             .text()
             .await
             .unwrap_or_else(|_| "failed to read error body".into());
+        if let Some(txn) = txn_owned.as_mut() {
+            txn.set_error(format!("upstream {} body={}", status.as_u16(), body));
+        }
         return Err(ProxyError::UpstreamStatus(status.as_u16(), body));
     }
 
     if wants_stream {
-        // SSE streaming response
-        let stream = create_sse_stream(upstream_resp, rules.clone());
+        // SSE: hand the txn (if any) to the stream task so it can append
+        // events and finalize when the stream completes.
+        let txn_shared = txn_owned.take().map(|t| Arc::new(Mutex::new(Some(t))));
+        let stream = create_sse_stream(upstream_resp, rules.clone(), txn_shared);
         Ok(Sse::new(stream)
             .keep_alive(KeepAlive::default())
             .into_response())
     } else {
         // JSON response
-        let resp_body = upstream_resp
-            .text()
-            .await
-            .map_err(|e| ProxyError::Upstream(format!("failed to read response: {e}")))?;
+        let resp_body = match upstream_resp.text().await {
+            Ok(b) => b,
+            Err(e) => {
+                if let Some(txn) = txn_owned.as_mut() {
+                    txn.set_error(format!("failed to read response: {e}"));
+                }
+                return Err(ProxyError::Upstream(format!("failed to read response: {e}")));
+            }
+        };
 
-        if state.dump_requests {
-            let path = std::env::temp_dir().join(format!(
-                "proxy-resp-{}.json",
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap_or_default()
-                    .as_millis()
-            ));
-            let _ = std::fs::write(&path, &resp_body);
+        let resp: MessagesResponse = match serde_json::from_str(&resp_body) {
+            Ok(r) => r,
+            Err(e) => {
+                if let Some(txn) = txn_owned.as_mut() {
+                    txn.set_error(format!("response deserialize failed: {e}"));
+                }
+                return Err(ProxyError::Deserialize(format!("{e}: {resp_body}")));
+            }
+        };
+
+        let original = resp.clone();
+        let (translated_resp, response_changes) =
+            match apply_response_rules_with_changes(resp, &rules) {
+                Ok(v) => v,
+                Err(e) => {
+                    if let Some(txn) = txn_owned.as_mut() {
+                        txn.set_error(format!("response rule error: {e}"));
+                    }
+                    return Err(ProxyError::Rule(e));
+                }
+            };
+
+        if let Some(txn) = txn_owned.as_mut() {
+            txn.set_response_translation(&original, &translated_resp, response_changes);
         }
 
-        let resp: MessagesResponse = serde_json::from_str(&resp_body)
-            .map_err(|e| ProxyError::Deserialize(format!("{e}: {resp_body}")))?;
+        // Finalize the transaction line.
+        if let Some(txn) = txn_owned.take() {
+            txn.finish();
+        }
 
-        let translated_resp = apply_response_rules(resp, &rules)?;
         Ok(Json(translated_resp).into_response())
     }
 }
 
 /// Create an SSE stream that reads from the upstream response,
 /// applies reverse translation rules, and emits events to the client.
+///
+/// If `txn` is provided, each translated event is appended to it and
+/// the transaction is finalized when the upstream stream ends.
 fn create_sse_stream(
     upstream_resp: reqwest::Response,
     rules: std::sync::Arc<crate::rules::RuleSet>,
+    txn: Option<Arc<Mutex<Option<TransactionBuilder>>>>,
 ) -> impl Stream<Item = Result<Event, Infallible>> {
     let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(64);
 
@@ -319,13 +372,34 @@ fn create_sse_stream(
         let mut line_buffer = String::new();
         let mut current_event_type = String::new();
         let mut current_data = String::new();
+        let mut reverse_renames_seen: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+
+        let finalize = |txn: &Option<Arc<Mutex<Option<TransactionBuilder>>>>,
+                        renames: &std::collections::HashSet<String>,
+                        error: Option<String>| {
+            if let Some(handle) = txn {
+                if let Ok(mut guard) = handle.lock() {
+                    if let Some(mut t) = guard.take() {
+                        for r in renames {
+                            t.add_response_change(r.clone());
+                        }
+                        if let Some(e) = error {
+                            t.set_error(e);
+                        }
+                        t.finish();
+                    }
+                }
+            }
+        };
 
         while let Some(chunk_result) = bytes_stream.next().await {
             let chunk = match chunk_result {
                 Ok(c) => c,
                 Err(e) => {
                     tracing::error!("upstream stream error: {e}");
-                    break;
+                    finalize(&txn, &reverse_renames_seen, Some(format!("upstream stream error: {e}")));
+                    return;
                 }
             };
 
@@ -333,7 +407,8 @@ fn create_sse_stream(
                 Ok(s) => s,
                 Err(e) => {
                     tracing::error!("upstream sent invalid UTF-8: {e}");
-                    break;
+                    finalize(&txn, &reverse_renames_seen, Some(format!("invalid utf-8: {e}")));
+                    return;
                 }
             };
 
@@ -349,18 +424,37 @@ fn create_sse_stream(
                 if line.is_empty() {
                     // Empty line = end of event
                     if !current_data.is_empty() {
-                        let event = process_sse_event(
+                        let result = process_sse_event(
                             &current_event_type,
                             &current_data,
                             &rules,
                             &mut state,
                         );
 
-                        match event {
-                            Ok(Some(sse_events)) => {
+                        match result {
+                            Ok(Some((sse_events, log_entries, renames))) => {
+                                // Record into the transaction (if any).
+                                if let Some(handle) = &txn {
+                                    if let Ok(mut guard) = handle.lock() {
+                                        if let Some(t) = guard.as_mut() {
+                                            for (ev_name, data_value) in &log_entries {
+                                                t.push_sse_event(ev_name, data_value.clone());
+                                            }
+                                        }
+                                    }
+                                }
+                                for r in renames {
+                                    reverse_renames_seen.insert(r);
+                                }
                                 for sse_event in sse_events {
                                     if tx.send(Ok(sse_event)).await.is_err() {
-                                        return; // Client disconnected
+                                        // Client disconnected — still finalize.
+                                        finalize(
+                                            &txn,
+                                            &reverse_renames_seen,
+                                            Some("client disconnected".to_string()),
+                                        );
+                                        return;
                                     }
                                 }
                             }
@@ -373,6 +467,11 @@ fn create_sse_stream(
                                         r#"{{"type":"error","error":{{"type":"proxy_error","message":"{e}"}}}}"#
                                     ));
                                 let _ = tx.send(Ok(error_event)).await;
+                                finalize(
+                                    &txn,
+                                    &reverse_renames_seen,
+                                    Some(format!("sse translation error: {e}")),
+                                );
                                 return;
                             }
                         }
@@ -398,25 +497,52 @@ fn create_sse_stream(
                 }
             }
         }
+
+        // Stream ended cleanly.
+        finalize(&txn, &reverse_renames_seen, None);
     });
 
     ReceiverStream::new(rx)
 }
 
 /// Process a single SSE event: parse, translate, re-serialize.
+///
+/// Returns:
+/// - The events to emit to the client
+/// - A list of (event_name, json_value) pairs to log
+/// - A list of reverse-rename change descriptions observed
+type SseEventOutput = (
+    Vec<Event>,
+    Vec<(String, serde_json::Value)>,
+    Vec<String>,
+);
+
 fn process_sse_event(
     _event_type: &str,
     data: &str,
     rules: &crate::rules::RuleSet,
     state: &mut SseState,
-) -> Result<Option<Vec<Event>>, ProxyError> {
+) -> Result<Option<SseEventOutput>, ProxyError> {
     let sse_event: SseEvent = serde_json::from_str(data)
         .map_err(|e| ProxyError::Deserialize(format!("SSE event parse error: {e}: {data}")))?;
+
+    // Capture pre-translation tool names so we can detect reverse renames.
+    let pre_tool_names = collect_tool_names(&sse_event);
 
     let translated =
         apply_sse_event_rules(sse_event, rules, state).map_err(ProxyError::Rule)?;
 
     let mut events = Vec::new();
+    let mut log_entries = Vec::new();
+    let mut renames = Vec::new();
+
+    // Detect reverse renames by comparing tool names before/after.
+    let post_tool_names = collect_tool_names(&translated);
+    for (before, after) in pre_tool_names.iter().zip(post_tool_names.iter()) {
+        if before != after {
+            renames.push(format!("sse tool reverse-rename: {before} → {after}"));
+        }
+    }
 
     // For content_block_stop, check if we need to emit a flushed delta first
     if let SseEvent::ContentBlockStop { index } = &translated {
@@ -427,13 +553,18 @@ fn process_sse_event(
                     partial_json: flushed_json,
                 },
             };
-            let flush_data = serde_json::to_string(&flush_delta)
-                .map_err(|e| ProxyError::Internal(format!("failed to serialize flush delta: {e}")))?;
+            let flush_data = serde_json::to_string(&flush_delta).map_err(|e| {
+                ProxyError::Internal(format!("failed to serialize flush delta: {e}"))
+            })?;
             events.push(
                 Event::default()
                     .event("content_block_delta")
-                    .data(flush_data),
+                    .data(flush_data.clone()),
             );
+            // Log the flush delta
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&flush_data) {
+                log_entries.push(("content_block_delta".to_string(), v));
+            }
         }
     }
 
@@ -451,9 +582,38 @@ fn process_sse_event(
         SseEvent::Error { .. } => "error",
     };
 
-    events.push(Event::default().event(event_name).data(translated_data));
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&translated_data) {
+        log_entries.push((event_name.to_string(), v));
+    }
 
-    Ok(Some(events))
+    events.push(
+        Event::default()
+            .event(event_name)
+            .data(translated_data),
+    );
+
+    Ok(Some((events, log_entries, renames)))
+}
+
+/// Extract tool names from an SSE event for reverse-rename detection.
+fn collect_tool_names(event: &SseEvent) -> Vec<String> {
+    let mut names = Vec::new();
+    match event {
+        SseEvent::MessageStart { message } => {
+            for block in &message.content {
+                if let crate::wire::content::ContentBlock::ToolUse { name, .. } = block {
+                    names.push(name.clone());
+                }
+            }
+        }
+        SseEvent::ContentBlockStart { content_block, .. } => {
+            if let crate::wire::content::ContentBlock::ToolUse { name, .. } = content_block {
+                names.push(name.clone());
+            }
+        }
+        _ => {}
+    }
+    names
 }
 
 /// Fallback handler — logs unmatched requests so we can see what clients are hitting.

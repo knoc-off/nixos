@@ -23,50 +23,68 @@ use super::{PropertyRename, RuleError, RuleSet, UnmappedPolicy};
 
 /// Apply all forward translation rules to a request.
 pub fn apply_request_rules(
-    mut req: MessagesRequest,
+    req: MessagesRequest,
     rules: &RuleSet,
     session_id: &str,
     device_id: &str,
 ) -> Result<MessagesRequest, RuleError> {
+    apply_request_rules_with_changes(req, rules, session_id, device_id).map(|(r, _)| r)
+}
+
+/// Apply all forward translation rules to a request, also returning a
+/// human-readable description of every transformation performed. Used
+/// by the session log to populate `request_changes`.
+pub fn apply_request_rules_with_changes(
+    mut req: MessagesRequest,
+    rules: &RuleSet,
+    session_id: &str,
+    device_id: &str,
+) -> Result<(MessagesRequest, Vec<String>), RuleError> {
+    let mut changes: Vec<String> = Vec::new();
+
     // Step 1: Validate all tools have a rule
     validate_tools(&req, rules)?;
 
     // Step 2: Drop tools
-    drop_tools(&mut req, rules);
+    drop_tools(&mut req, rules, &mut changes);
 
     // Step 3: Rename tools
-    rename_tools(&mut req, rules);
+    rename_tools(&mut req, rules, &mut changes);
 
     // Step 4: Rename properties in tool_use.input
-    rename_properties(&mut req, rules)?;
+    rename_properties(&mut req, rules, &mut changes)?;
 
     // Step 5: System prompt detection + replacement
-    replace_system_prompt(&mut req, rules);
+    replace_system_prompt(&mut req, rules, &mut changes);
 
     // Step 6: Text replacements (system prompt only)
-    apply_text_replacements(&mut req, rules);
+    apply_text_replacements(&mut req, rules, &mut changes);
 
     // Step 6b: Append enhancement text to system prompt
-    append_to_system_prompt(&mut req, rules);
+    append_to_system_prompt(&mut req, rules, &mut changes);
 
     // Step 7: Billing block injection (with SHA256 fingerprint)
-    inject_billing_block(&mut req, rules);
+    inject_billing_block(&mut req, rules, &mut changes);
 
     // Step 8: Inject metadata (device_id + session_id)
-    inject_metadata(&mut req, session_id, device_id);
+    inject_metadata(&mut req, session_id, device_id, &mut changes);
 
     // Step 9: Strip trailing assistant prefill
-    strip_trailing_prefill(&mut req);
+    strip_trailing_prefill(&mut req, &mut changes);
 
     // Step 10: Apply unknown-field rules. Anything unhandled still warns
     // so we can add explicit rules for it (these fields are fingerprint
     // signals -- real Claude Code only sends documented Anthropic fields).
-    apply_unknown_field_rules(&mut req, rules);
+    apply_unknown_field_rules(&mut req, rules, &mut changes);
 
-    Ok(req)
+    Ok((req, changes))
 }
 
-fn apply_unknown_field_rules(req: &mut MessagesRequest, rules: &RuleSet) {
+fn apply_unknown_field_rules(
+    req: &mut MessagesRequest,
+    rules: &RuleSet,
+    changes: &mut Vec<String>,
+) {
     if req.extra.is_empty() {
         return;
     }
@@ -78,6 +96,7 @@ fn apply_unknown_field_rules(req: &mut MessagesRequest, rules: &RuleSet) {
         match rules.unknown_field_rules.get(name) {
             Some(super::UnknownFieldRule::Strip) => {
                 req.extra.remove(name);
+                changes.push(format!("stripped unknown field: {name}"));
             }
             Some(super::UnknownFieldRule::Keep) => {
                 // leave it
@@ -85,6 +104,7 @@ fn apply_unknown_field_rules(req: &mut MessagesRequest, rules: &RuleSet) {
             Some(super::UnknownFieldRule::Rename(target)) => {
                 if let Some(value) = req.extra.remove(name) {
                     req.extra.insert(target.clone(), value);
+                    changes.push(format!("renamed unknown field: {name} → {target}"));
                 }
             }
             None => {
@@ -98,6 +118,9 @@ fn apply_unknown_field_rules(req: &mut MessagesRequest, rules: &RuleSet) {
             fields = ?unhandled,
             "forwarding unknown request fields to upstream (add an unknown_fields rule to handle them)"
         );
+        for f in &unhandled {
+            changes.push(format!("forwarded unknown field (no rule): {f}"));
+        }
     }
 }
 
@@ -120,7 +143,7 @@ fn validate_tools(req: &MessagesRequest, rules: &RuleSet) -> Result<(), RuleErro
 
 /// Step 2: Remove dropped tools from the tools list and their
 /// tool_use/tool_result blocks from message history.
-fn drop_tools(req: &mut MessagesRequest, rules: &RuleSet) {
+fn drop_tools(req: &mut MessagesRequest, rules: &RuleSet, changes: &mut Vec<String>) {
     if rules.tool_drops.is_empty() {
         return;
     }
@@ -140,29 +163,40 @@ fn drop_tools(req: &mut MessagesRequest, rules: &RuleSet) {
     }
 
     // Remove tool definitions
+    let before = req.tools.len();
     req.tools.retain(|t| !rules.tool_drops.contains(&t.name));
+    let dropped_def_count = before - req.tools.len();
 
     // Remove tool_use and tool_result blocks for dropped tools
     for msg in &mut req.messages {
         if let MessageContent::Blocks(blocks) = &mut msg.content {
-            blocks.retain(|block| {
-                match block {
-                    ContentBlock::ToolUse { name, .. } => !rules.tool_drops.contains(name),
-                    ContentBlock::ToolResult { tool_use_id, .. } => {
-                        !dropped_ids.contains(tool_use_id)
-                    }
-                    _ => true,
+            blocks.retain(|block| match block {
+                ContentBlock::ToolUse { name, .. } => !rules.tool_drops.contains(name),
+                ContentBlock::ToolResult { tool_use_id, .. } => {
+                    !dropped_ids.contains(tool_use_id)
                 }
+                _ => true,
             });
         }
     }
 
     // Remove messages that became empty after dropping blocks
-    req.messages
-        .retain(|msg| match &msg.content {
-            MessageContent::Blocks(blocks) => !blocks.is_empty(),
-            MessageContent::String(s) => !s.is_empty(),
-        });
+    req.messages.retain(|msg| match &msg.content {
+        MessageContent::Blocks(blocks) => !blocks.is_empty(),
+        MessageContent::String(s) => !s.is_empty(),
+    });
+
+    if dropped_def_count > 0 {
+        changes.push(format!(
+            "dropped {dropped_def_count} tool definition(s): {}",
+            rules
+                .tool_drops
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>()
+                .join(", ")
+        ));
+    }
 }
 
 /// Step 3: Rename tools — substitute name, description, and optionally input_schema.
@@ -176,12 +210,19 @@ fn drop_tools(req: &mut MessagesRequest, rules: &RuleSet) {
 ///
 /// When overriding, the client's `required` and `additionalProperties`
 /// are preserved as fallback if the registry schema doesn't specify them.
-fn rename_tools(req: &mut MessagesRequest, rules: &RuleSet) {
+fn rename_tools(req: &mut MessagesRequest, rules: &RuleSet, changes: &mut Vec<String>) {
     // Rename tool definitions
     for tool in &mut req.tools {
         if let Some(resolved) = rules.tool_renames.get(&tool.name) {
             let old_name = tool.name.clone();
             tool.name = resolved.canonical_name.clone();
+
+            if old_name != resolved.canonical_name {
+                changes.push(format!(
+                    "tool rename: {old_name} → {}",
+                    resolved.canonical_name
+                ));
+            }
 
             // Always replace description if the registry provides one
             if let Some(ref desc) = resolved.description {
@@ -207,6 +248,10 @@ fn rename_tools(req: &mut MessagesRequest, rules: &RuleSet) {
                 if tool.input_schema.additional_properties.is_none() {
                     tool.input_schema.additional_properties = client_additional_props;
                 }
+                changes.push(format!(
+                    "tool schema override: {}",
+                    resolved.canonical_name
+                ));
             } else {
                 tracing::trace!(
                     tool = %old_name,
@@ -232,7 +277,11 @@ fn rename_tools(req: &mut MessagesRequest, rules: &RuleSet) {
 }
 
 /// Step 4: Walk all tool_use.input values and rename properties.
-fn rename_properties(req: &mut MessagesRequest, rules: &RuleSet) -> Result<(), RuleError> {
+fn rename_properties(
+    req: &mut MessagesRequest,
+    rules: &RuleSet,
+    changes: &mut Vec<String>,
+) -> Result<(), RuleError> {
     if rules.property_renames.is_empty() {
         return Ok(());
     }
@@ -245,6 +294,15 @@ fn rename_properties(req: &mut MessagesRequest, rules: &RuleSet) -> Result<(), R
                 }
             }
         }
+    }
+
+    let renames: Vec<String> = rules
+        .property_renames
+        .iter()
+        .map(|r| format!("{} → {}", r.from, r.to))
+        .collect();
+    if !renames.is_empty() {
+        changes.push(format!("property renames applied: {}", renames.join(", ")));
     }
 
     Ok(())
@@ -285,7 +343,7 @@ pub(crate) fn rename_properties_in_value(
 }
 
 /// Step 5: Detect and replace the system prompt.
-fn replace_system_prompt(req: &mut MessagesRequest, rules: &RuleSet) {
+fn replace_system_prompt(req: &mut MessagesRequest, rules: &RuleSet, changes: &mut Vec<String>) {
     let detect = match &rules.system_prompt_detect {
         Some(d) => d,
         None => return,
@@ -299,10 +357,15 @@ fn replace_system_prompt(req: &mut MessagesRequest, rules: &RuleSet) {
     if let Some(ref system) = req.system {
         let text = system.text_content();
         if text.contains(detect.as_str()) {
+            let before_len = text.len();
+            let after_len = replacement.len();
             req.system = Some(SystemPrompt::Blocks(vec![SystemBlock::Text {
                 text: replacement.clone(),
                 cache_control: None,
             }]));
+            changes.push(format!(
+                "system prompt: replaced ({before_len} → {after_len} chars)"
+            ));
         }
     }
 }
@@ -312,19 +375,33 @@ fn replace_system_prompt(req: &mut MessagesRequest, rules: &RuleSet) {
 /// Message content blocks are intentionally left untouched — the proxy
 /// should not mutate user or assistant text in the conversation history,
 /// only the initialization prompt that it is replacing wholesale.
-fn apply_text_replacements(req: &mut MessagesRequest, rules: &RuleSet) {
+fn apply_text_replacements(
+    req: &mut MessagesRequest,
+    rules: &RuleSet,
+    changes: &mut Vec<String>,
+) {
     if rules.text_replacements.is_empty() {
         return;
     }
+
+    let mut total_hits = 0usize;
 
     // Apply to system prompt only
     if let Some(SystemPrompt::Blocks(blocks)) = &mut req.system {
         for block in blocks {
             let SystemBlock::Text { text, .. } = block;
             for tr in &rules.text_replacements {
-                *text = text.replace(&tr.find, &tr.replace);
+                let hits = text.matches(&tr.find).count();
+                if hits > 0 {
+                    *text = text.replace(&tr.find, &tr.replace);
+                    total_hits += hits;
+                }
             }
         }
+    }
+
+    if total_hits > 0 {
+        changes.push(format!("text replacements applied: {total_hits} hit(s)"));
     }
 }
 
@@ -334,7 +411,11 @@ fn apply_text_replacements(req: &mut MessagesRequest, rules: &RuleSet) {
 /// system prompt transformations (replacement, text replacements) have
 /// been applied. This allows injecting additional behavioral guidelines
 /// without replacing the client's base prompt.
-fn append_to_system_prompt(req: &mut MessagesRequest, rules: &RuleSet) {
+fn append_to_system_prompt(
+    req: &mut MessagesRequest,
+    rules: &RuleSet,
+    changes: &mut Vec<String>,
+) {
     let append_text = match &rules.system_prompt_append {
         Some(t) if !t.is_empty() => t,
         _ => return,
@@ -366,6 +447,11 @@ fn append_to_system_prompt(req: &mut MessagesRequest, rules: &RuleSet) {
             }]));
         }
     }
+
+    changes.push(format!(
+        "system prompt: appended {} chars",
+        append_text.len()
+    ));
 }
 
 /// Compute the billing fingerprint hash matching real CC's computeFingerprint().
@@ -425,7 +511,7 @@ mod hex {
 /// Computes a per-request SHA256 fingerprint from the first user message
 /// matching real CC's billing header format:
 ///   x-anthropic-billing-header: cc_version=2.1.97.<hash>; cc_entrypoint=cli; cch=00000;
-fn inject_billing_block(req: &mut MessagesRequest, rules: &RuleSet) {
+fn inject_billing_block(req: &mut MessagesRequest, rules: &RuleSet, changes: &mut Vec<String>) {
     if !rules.inject_billing_block {
         return;
     }
@@ -469,12 +555,21 @@ fn inject_billing_block(req: &mut MessagesRequest, rules: &RuleSet) {
             req.system = Some(SystemPrompt::Blocks(vec![billing_block]));
         }
     }
+
+    changes.push(format!(
+        "billing block injected: cc_version={version}.{fingerprint}"
+    ));
 }
 
 /// Step 8: Inject metadata (device_id + session_id) matching real CC format.
 ///
 /// Real CC sends: metadata.user_id = JSON.stringify({device_id, session_id})
-fn inject_metadata(req: &mut MessagesRequest, session_id: &str, device_id: &str) {
+fn inject_metadata(
+    req: &mut MessagesRequest,
+    session_id: &str,
+    device_id: &str,
+    changes: &mut Vec<String>,
+) {
     let meta_value = serde_json::json!({
         "device_id": device_id,
         "session_id": session_id,
@@ -483,19 +578,26 @@ fn inject_metadata(req: &mut MessagesRequest, session_id: &str, device_id: &str)
     req.metadata = Some(Metadata {
         user_id: Some(meta_value.to_string()),
     });
+
+    changes.push("metadata injected: user_id".to_string());
 }
 
 /// Step 9: Strip trailing assistant messages (prefill).
 ///
 /// Some clients send a trailing assistant message as a prefill hint.
 /// The upstream API may reject these. Remove them.
-fn strip_trailing_prefill(req: &mut MessagesRequest) {
+fn strip_trailing_prefill(req: &mut MessagesRequest, changes: &mut Vec<String>) {
+    let mut stripped = 0usize;
     while req
         .messages
         .last()
         .map_or(false, |m| m.role == Role::Assistant)
     {
         req.messages.pop();
+        stripped += 1;
+    }
+    if stripped > 0 {
+        changes.push(format!("stripped {stripped} trailing assistant prefill message(s)"));
     }
 }
 

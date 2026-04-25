@@ -263,6 +263,32 @@ in {
       description = "Dump request/response bodies for debugging. WARNING: logs sensitive data.";
     };
 
+    sessionLog = mkOption {
+      type = types.bool;
+      default = false;
+      description = ''
+        Enable per-session JSONL transaction logging.
+
+        When enabled, the proxy writes one line per request to
+        `$XDG_STATE_HOME/compat-proxy/sessions/<session_id>.jsonl`
+        (or whatever `sessionLogDir` is set to). Each line captures the
+        parsed inbound request, a JSON Patch describing the translation
+        we applied, redacted upstream headers, the upstream status, and
+        the (reverse-translated) response or SSE event sequence.
+
+        File mode is 0600. New file per proxy restart.
+      '';
+    };
+
+    sessionLogDir = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = ''
+        Override directory for session log files.
+        Default: `$XDG_STATE_HOME/compat-proxy/sessions`.
+      '';
+    };
+
     clients = mkOption {
       type = types.attrsOf clientType;
       default = {};
@@ -295,7 +321,9 @@ in {
           ]
           ++ optional (cfg.port != null) "--port ${toString cfg.port}"
           ++ optional (cfg.socket != null) "--socket ${cfg.socket}"
-          ++ optional cfg.dumpRequests "--dump-requests");
+          ++ optional cfg.dumpRequests "--dump-requests"
+          ++ optional cfg.sessionLog "--session-log"
+          ++ optional (cfg.sessionLogDir != null) "--session-log-dir ${cfg.sessionLogDir}");
         Restart = "on-failure";
         RestartSec = 5;
       };
