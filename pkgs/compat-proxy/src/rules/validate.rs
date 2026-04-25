@@ -9,10 +9,11 @@ use std::path::Path;
 
 use crate::rules::{
     PropertyRename, ResolvedHeader, ResolvedToolRename, RuleSet, TextReplacement,
+    UnknownFieldRule,
 };
 
 use super::registry::SchemaRegistry;
-use super::schema::{RulesFile, UnmappedPolicy};
+use super::schema::{RulesFile, UnknownFieldAction, UnmappedPolicy};
 
 /// Validate a rules file against the schema registry.
 ///
@@ -183,6 +184,30 @@ pub fn validate_rules(
         }
     }
 
+    // Unknown field rules
+    let mut unknown_field_rules = std::collections::HashMap::new();
+    if let Some(uf) = &rules_file.unknown_fields {
+        let mut seen = HashSet::new();
+        for rule in &uf.rules {
+            if !seen.insert(rule.name.clone()) {
+                errors.push(ValidationError::DuplicateUnknownField(rule.name.clone()));
+                continue;
+            }
+            let resolved = match rule.action {
+                UnknownFieldAction::Strip => UnknownFieldRule::Strip,
+                UnknownFieldAction::Keep => UnknownFieldRule::Keep,
+                UnknownFieldAction::Rename => match &rule.rename_to {
+                    Some(target) => UnknownFieldRule::Rename(target.clone()),
+                    None => {
+                        errors.push(ValidationError::RenameMissingTarget(rule.name.clone()));
+                        continue;
+                    }
+                },
+            };
+            unknown_field_rules.insert(rule.name.clone(), resolved);
+        }
+    }
+
     if errors.is_empty() {
         Ok(RuleSet {
             client_name,
@@ -200,6 +225,7 @@ pub fn validate_rules(
             billing_cc_version,
             billing_hash_salt,
             billing_hash_indices,
+            unknown_field_rules,
         })
     } else {
         Err(errors)
@@ -226,6 +252,12 @@ pub enum ValidationError {
 
     #[error("duplicate 'from' value in property renames: '{0}'")]
     DuplicatePropertyFrom(String),
+
+    #[error("duplicate unknown_fields rule for '{0}'")]
+    DuplicateUnknownField(String),
+
+    #[error("unknown_fields rule for '{0}' uses action='rename' but no 'rename_to' provided")]
+    RenameMissingTarget(String),
 }
 
 #[cfg(test)]
@@ -272,6 +304,7 @@ mod tests {
             properties: None,
             headers: None,
             billing: None,
+            unknown_fields: None,
         };
 
         let result = validate_rules(&rules_file, &registry, Path::new("/tmp"));
@@ -302,6 +335,7 @@ mod tests {
             properties: None,
             headers: None,
             billing: None,
+            unknown_fields: None,
         };
 
         let result = validate_rules(&rules_file, &registry, Path::new("/tmp"));
@@ -334,6 +368,7 @@ mod tests {
             properties: None,
             headers: None,
             billing: None,
+            unknown_fields: None,
         };
 
         let result = validate_rules(&rules_file, &registry, Path::new("/tmp"));

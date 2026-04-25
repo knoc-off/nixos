@@ -33,6 +33,16 @@ with lib; let
         name = ${builtins.toJSON t}
       '')
       client.toolDrops;
+
+    unknownFieldLines =
+      concatMapStringsSep "\n" (r: ''
+        [[unknown_fields.rules]]
+        name = ${builtins.toJSON r.name}
+        action = ${builtins.toJSON r.action}
+        ${optionalString (r.renameTo != null)
+          "rename_to = ${builtins.toJSON r.renameTo}"}
+      '')
+      client.unknownFields;
   in
     pkgs.writeText "${name}.toml" ''
       [meta]
@@ -63,6 +73,8 @@ with lib; let
       [billing]
       inject_block = ${boolToString client.billing.injectBlock}
       cc_version = ${builtins.toJSON client.billing.ccVersion}
+
+      ${unknownFieldLines}
     '';
 
   # Assemble a rules directory from all client configs + the bundled schema registry.
@@ -101,6 +113,29 @@ with lib; let
       to = mkOption {
         type = types.str;
         description = "Canonical schema name.";
+      };
+    };
+  };
+
+  unknownFieldType = types.submodule {
+    options = {
+      name = mkOption {
+        type = types.str;
+        description = "Top-level field name as the client sends it.";
+      };
+      action = mkOption {
+        type = types.enum ["strip" "keep" "rename"];
+        description = ''
+          What to do with the field:
+          - strip: drop it silently (use for known-bogus client-only fields)
+          - keep: forward as-is, no warning (use when upstream accepts it)
+          - rename: forward under a different name (requires renameTo)
+        '';
+      };
+      renameTo = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Destination field name when action = \"rename\".";
       };
     };
   };
@@ -154,6 +189,17 @@ with lib; let
         type = types.enum ["error" "drop" "passthrough"];
         default = "error";
         description = "Policy for tools with no mapping rule.";
+      };
+
+      unknownFields = mkOption {
+        type = types.listOf unknownFieldType;
+        default = [];
+        description = ''
+          Rules for handling unknown top-level request fields.
+          Real Claude Code only sends documented Anthropic API fields,
+          so any unhandled field is a fingerprint signal. Anything not
+          listed here will be forwarded with a warning.
+        '';
       };
 
       billing = {

@@ -248,6 +248,25 @@ in {
 
           toolDrops = ["skill"];
           unmappedPolicy = "passthrough";
+
+          # OpenCode-specific top-level fields the Anthropic API doesn't
+          # define. Real Claude Code never sends these -- forwarding
+          # them is a fingerprint signal.
+          unknownFields = [
+            {
+              # output_config: { effort: ... } -- OpenCode's reasoning
+              # effort wrapper. Equivalent in CC is the `thinking` field,
+              # which OpenCode doesn't generate. Strip silently.
+              name = "output_config";
+              action = "strip";
+            }
+            {
+              # speed: "fast" | "default" -- OpenCode's response speed
+              # hint. Not a documented Anthropic field. Strip silently.
+              name = "speed";
+              action = "strip";
+            }
+          ];
         };
       };
     }

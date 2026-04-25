@@ -10,6 +10,7 @@
 //! 7. Inject billing block (with SHA256 fingerprint)
 //! 8. Inject metadata (device_id + session_id)
 //! 9. Strip trailing assistant prefill messages
+//! 10. Apply unknown-field rules (strip / keep / rename, warn on unhandled)
 
 use sha2::{Digest, Sha256};
 
@@ -57,16 +58,47 @@ pub fn apply_request_rules(
     // Step 9: Strip trailing assistant prefill
     strip_trailing_prefill(&mut req);
 
-    // Step 10: Log unknown request fields for visibility
-    if !req.extra.is_empty() {
-        let keys: Vec<&str> = req.extra.keys().map(|k| k.as_str()).collect();
-        tracing::warn!(
-            fields = ?keys,
-            "forwarding unknown request fields to upstream (consider adding explicit support)"
-        );
-    }
+    // Step 10: Apply unknown-field rules. Anything unhandled still warns
+    // so we can add explicit rules for it (these fields are fingerprint
+    // signals -- real Claude Code only sends documented Anthropic fields).
+    apply_unknown_field_rules(&mut req, rules);
 
     Ok(req)
+}
+
+fn apply_unknown_field_rules(req: &mut MessagesRequest, rules: &RuleSet) {
+    if req.extra.is_empty() {
+        return;
+    }
+
+    let names: Vec<String> = req.extra.keys().cloned().collect();
+    let mut unhandled: Vec<&str> = Vec::new();
+
+    for name in &names {
+        match rules.unknown_field_rules.get(name) {
+            Some(super::UnknownFieldRule::Strip) => {
+                req.extra.remove(name);
+            }
+            Some(super::UnknownFieldRule::Keep) => {
+                // leave it
+            }
+            Some(super::UnknownFieldRule::Rename(target)) => {
+                if let Some(value) = req.extra.remove(name) {
+                    req.extra.insert(target.clone(), value);
+                }
+            }
+            None => {
+                unhandled.push(name.as_str());
+            }
+        }
+    }
+
+    if !unhandled.is_empty() {
+        tracing::warn!(
+            fields = ?unhandled,
+            "forwarding unknown request fields to upstream (add an unknown_fields rule to handle them)"
+        );
+    }
 }
 
 /// Step 1: Validate that all tools in the request have a mapping rule.
@@ -488,6 +520,7 @@ mod tests {
             billing_cc_version: None,
             billing_hash_salt: "59cf53e54c78".into(),
             billing_hash_indices: vec![4, 7, 20],
+            unknown_field_rules: std::collections::HashMap::new(),
         }
     }
 

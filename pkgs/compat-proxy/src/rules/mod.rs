@@ -68,6 +68,21 @@ pub struct RuleSet {
 
     /// Character indices from first user message for fingerprint.
     pub billing_hash_indices: Vec<usize>,
+
+    /// Per-name rules for handling unknown top-level request fields.
+    /// Anything not listed will warn and pass through (for discovery).
+    pub unknown_field_rules: HashMap<String, UnknownFieldRule>,
+}
+
+/// Resolved rule for a single unknown top-level field.
+#[derive(Debug, Clone)]
+pub enum UnknownFieldRule {
+    /// Drop silently.
+    Strip,
+    /// Forward as-is, no warning.
+    Keep,
+    /// Forward under a different name.
+    Rename(String),
 }
 
 /// A resolved tool rename: the canonical name, optional description

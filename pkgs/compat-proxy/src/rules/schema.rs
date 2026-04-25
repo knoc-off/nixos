@@ -19,6 +19,8 @@ pub struct RulesFile {
     pub headers: Option<HeadersConfig>,
     #[serde(default)]
     pub billing: Option<BillingConfig>,
+    #[serde(default)]
+    pub unknown_fields: Option<UnknownFieldsConfig>,
 }
 
 /// Metadata about the client and target version.
@@ -132,4 +134,42 @@ pub struct BillingConfig {
     pub hash_salt: Option<String>,
     /// Character indices from first user message for fingerprint (optional, has default).
     pub hash_indices: Option<Vec<usize>>,
+}
+
+/// Configuration for handling unknown top-level request fields.
+///
+/// Real Claude Code only sends documented Anthropic API fields. Any
+/// extra field forwarded to upstream is a fingerprint signal. This
+/// config lets each client declare known-bogus fields and how to
+/// handle them. Unlisted unknown fields still warn (for discovery).
+#[derive(Deserialize, Debug, Clone, Default)]
+pub struct UnknownFieldsConfig {
+    /// Per-field rules. Anything not listed will warn and pass through.
+    #[serde(default)]
+    pub rules: Vec<UnknownFieldRule>,
+}
+
+/// A single rule for an unknown top-level field.
+#[derive(Deserialize, Debug, Clone)]
+pub struct UnknownFieldRule {
+    /// The field name as the client sends it.
+    pub name: String,
+    /// What to do with it.
+    pub action: UnknownFieldAction,
+    /// New name when action is "rename".
+    #[serde(default)]
+    pub rename_to: Option<String>,
+}
+
+/// What to do with a known-unknown field.
+#[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum UnknownFieldAction {
+    /// Drop the field silently. Use for known-bogus client-specific fields.
+    Strip,
+    /// Forward it as-is without warning. Use when you've confirmed
+    /// upstream accepts it and it doesn't fingerprint.
+    Keep,
+    /// Forward it under a different name. Requires `rename_to`.
+    Rename,
 }

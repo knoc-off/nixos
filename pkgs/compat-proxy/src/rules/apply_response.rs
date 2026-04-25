@@ -93,6 +93,7 @@ mod tests {
             billing_cc_version: None,
             billing_hash_salt: "59cf53e54c78".into(),
             billing_hash_indices: vec![4, 7, 20],
+            unknown_field_rules: std::collections::HashMap::new(),
         }
     }
 
