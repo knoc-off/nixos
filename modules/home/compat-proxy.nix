@@ -50,7 +50,8 @@ with lib; let
       target_cc_version = ${builtins.toJSON client.targetVersion}
 
       [system_prompt]
-      detect = ${builtins.toJSON client.systemPrompt.detect}
+      ${optionalString (client.systemPrompt.detect != null)
+        "detect = ${builtins.toJSON client.systemPrompt.detect}"}
       ${optionalString (client.systemPrompt.replaceWithFile != null)
         "replace_with_file = ${builtins.toJSON client.systemPrompt.replaceWithFile}"}
       ${optionalString (client.systemPrompt.appendFile != null)
@@ -150,8 +151,9 @@ with lib; let
 
       systemPrompt = {
         detect = mkOption {
-          type = types.str;
-          description = "Substring to detect in the client's system prompt.";
+          type = types.nullOr types.str;
+          default = null;
+          description = "Substring to detect in the client's system prompt. Null for unconditional replacement.";
         };
 
         replaceWithFile = mkOption {

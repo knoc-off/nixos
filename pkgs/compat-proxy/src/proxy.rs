@@ -3,7 +3,7 @@
 use std::convert::Infallible;
 use std::sync::{Arc, Mutex};
 
-use axum::extract::State;
+use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::{IntoResponse, Response};
@@ -19,7 +19,7 @@ use crate::rules::{
     apply_request_rules_with_changes, apply_response_rules_with_changes, apply_sse_event_rules,
     RuleError,
 };
-use crate::session_log::TransactionBuilder;
+use crate::session_log::{session_uuid_for_name, TransactionBuilder};
 use crate::wire::request::MessagesRequest;
 use crate::wire::response::MessagesResponse;
 use crate::wire::sse::{ContentDelta, SseEvent, SseState};
@@ -148,16 +148,47 @@ fn build_beta_header(user_betas: Option<&str>, is_oauth: bool) -> String {
     betas.join(",")
 }
 
-/// Main proxy handler for POST /v1/messages.
+/// Handler for `POST /v1/messages` — no per-request logging.
 pub async fn handle_messages(
     State(state): State<AppState>,
+    headers: HeaderMap,
+    body: axum::body::Bytes,
+) -> Result<Response, ProxyError> {
+    handle_messages_inner(state, headers, body, None).await
+}
+
+/// Handler for `POST /:name/v1/messages` — logs to `<name>.jsonl` and
+/// uses a deterministic UUIDv5(name) as the upstream session id.
+pub async fn handle_messages_named(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+    headers: HeaderMap,
+    body: axum::body::Bytes,
+) -> Result<Response, ProxyError> {
+    handle_messages_inner(state, headers, body, Some(name)).await
+}
+
+async fn handle_messages_inner(
+    state: AppState,
     _headers: HeaderMap,
     body: axum::body::Bytes,
+    session_name: Option<String>,
 ) -> Result<Response, ProxyError> {
     let rules = state.rules.load_full(); // Arc<RuleSet>
 
-    // Begin a session-log transaction (if logging is enabled).
-    let mut txn_owned = state.session_log.as_ref().map(|l| l.begin());
+    // Per-request session id: hashed from URL name when present, else
+    // the proxy-wide stable id.
+    let request_session_id = match session_name.as_deref() {
+        Some(name) => session_uuid_for_name(name),
+        None => state.session_id.clone(),
+    };
+
+    // Begin a session-log transaction (if logging is enabled and we
+    // have a session name to key the log file by).
+    let mut txn_owned = match (&state.session_log, session_name.as_deref()) {
+        (Some(pool), Some(name)) => pool.logger_for(name).map(|l| l.begin()),
+        _ => None,
+    };
 
     // Deserialize. On failure, capture the raw body for debugging.
     let req: MessagesRequest = match serde_json::from_slice(&body) {
@@ -193,7 +224,7 @@ pub async fn handle_messages(
     let (translated, request_changes) = match apply_request_rules_with_changes(
         req,
         &rules,
-        &state.session_id,
+        &request_session_id,
         &state.device_id,
     ) {
         Ok(v) => v,
@@ -253,7 +284,7 @@ pub async fn handle_messages(
     }
 
     // Stainless SDK headers (mimic real Claude Code's JS SDK fingerprint)
-    for (name, value) in stainless_headers(&rules.cc_version, &state.session_id) {
+    for (name, value) in stainless_headers(&rules.cc_version, &request_session_id) {
         upstream_req = upstream_req.header(name, &value);
         if let Some(txn) = txn_owned.as_mut() {
             txn.add_upstream_header(name, &value);
@@ -630,6 +661,10 @@ async fn fallback(req: axum::extract::Request) -> impl IntoResponse {
 pub fn build_router(state: AppState) -> axum::Router {
     axum::Router::new()
         .route("/v1/messages", axum::routing::post(handle_messages))
+        .route(
+            "/{name}/v1/messages",
+            axum::routing::post(handle_messages_named),
+        )
         .route("/health", axum::routing::get(health))
         .fallback(fallback)
         .with_state(state)

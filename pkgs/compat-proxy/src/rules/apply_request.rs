@@ -343,12 +343,13 @@ pub(crate) fn rename_properties_in_value(
 }
 
 /// Step 5: Detect and replace the system prompt.
+///
+/// When `detect` is set, the replacement only fires if the system prompt
+/// contains that substring. When `detect` is `None`, the replacement is
+/// unconditional — every request gets the canonical prompt regardless of
+/// what the client sent (needed for subagent prompts that don't share the
+/// parent's preamble).
 fn replace_system_prompt(req: &mut MessagesRequest, rules: &RuleSet, changes: &mut Vec<String>) {
-    let detect = match &rules.system_prompt_detect {
-        Some(d) => d,
-        None => return,
-    };
-
     let replacement = match &rules.system_prompt_replacement {
         Some(r) => r,
         None => return,
@@ -356,17 +357,23 @@ fn replace_system_prompt(req: &mut MessagesRequest, rules: &RuleSet, changes: &m
 
     if let Some(ref system) = req.system {
         let text = system.text_content();
-        if text.contains(detect.as_str()) {
-            let before_len = text.len();
-            let after_len = replacement.len();
-            req.system = Some(SystemPrompt::Blocks(vec![SystemBlock::Text {
-                text: replacement.clone(),
-                cache_control: None,
-            }]));
-            changes.push(format!(
-                "system prompt: replaced ({before_len} → {after_len} chars)"
-            ));
+
+        // If a detect string is configured, only replace when it matches.
+        if let Some(ref detect) = rules.system_prompt_detect {
+            if !text.contains(detect.as_str()) {
+                return;
+            }
         }
+
+        let before_len = text.len();
+        let after_len = replacement.len();
+        req.system = Some(SystemPrompt::Blocks(vec![SystemBlock::Text {
+            text: replacement.clone(),
+            cache_control: None,
+        }]));
+        changes.push(format!(
+            "system prompt: replaced ({before_len} → {after_len} chars)"
+        ));
     }
 }
 

@@ -14,6 +14,7 @@
 //!
 //! This replaces the old per-request `/tmp/proxy-*.json` dump format.
 
+use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
@@ -114,6 +115,89 @@ pub fn default_log_dir() -> PathBuf {
         }
     }
     PathBuf::from("/tmp/compat-proxy/sessions")
+}
+
+/// Lazily-opened pool of per-name session log files.
+///
+/// Clients pass a session name in the URL (`POST /:name/v1/messages`)
+/// and we open `<dir>/<name>.jsonl` on first use, then reuse the open
+/// file handle for subsequent transactions with the same name.
+pub struct SessionLogPool {
+    dir: PathBuf,
+    /// name -> logger. `Mutex` because `HashMap::entry` needs `&mut`.
+    loggers: Mutex<HashMap<String, SessionLogger>>,
+}
+
+impl SessionLogPool {
+    pub fn new(dir: PathBuf) -> std::io::Result<Self> {
+        std::fs::create_dir_all(&dir)?;
+        Ok(Self {
+            dir,
+            loggers: Mutex::new(HashMap::new()),
+        })
+    }
+
+    pub fn dir(&self) -> &Path {
+        &self.dir
+    }
+
+    /// Get-or-open the logger for `name`. Returns `None` if `name` fails
+    /// validation or the file can't be opened.
+    pub fn logger_for(&self, name: &str) -> Option<SessionLogger> {
+        if !is_valid_session_name(name) {
+            tracing::warn!("session log: rejecting invalid session name {name:?}");
+            return None;
+        }
+        let mut guard = match self.loggers.lock() {
+            Ok(g) => g,
+            Err(e) => {
+                tracing::warn!("session log: pool mutex poisoned: {e}");
+                return None;
+            }
+        };
+        if let Some(existing) = guard.get(name) {
+            return Some(existing.clone());
+        }
+        let path = self.dir.join(format!("{name}.jsonl"));
+        match SessionLogger::open(path) {
+            Ok(logger) => {
+                tracing::info!(
+                    "session log: opened {} for session {:?}",
+                    logger.path().display(),
+                    name
+                );
+                guard.insert(name.to_string(), logger.clone());
+                Some(logger)
+            }
+            Err(e) => {
+                tracing::warn!("session log: failed to open log for {name:?}: {e}");
+                None
+            }
+        }
+    }
+}
+
+/// A session name is safe if it's a single path segment of reasonable
+/// characters. We reject anything that could traverse paths or hide on
+/// disk.
+fn is_valid_session_name(name: &str) -> bool {
+    if name.is_empty() || name.len() > 128 {
+        return false;
+    }
+    if name.starts_with('.') {
+        return false;
+    }
+    name.chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+/// Stable UUIDv5 derived from a session name. Used as the upstream
+/// `x-claude-code-session-id` so each named URL looks like its own CC
+/// session to Anthropic, while remaining deterministic per name.
+pub fn session_uuid_for_name(name: &str) -> String {
+    // Arbitrary fixed namespace UUID for compat-proxy.
+    const NS: uuid::Uuid = uuid::Uuid::from_u128(0x6c6f63616c5f636f6d7061745f70726f);
+    uuid::Uuid::new_v5(&NS, name.as_bytes()).to_string()
 }
 
 /// Accumulator for one transaction. Writes a JSONL line on `finish()`.

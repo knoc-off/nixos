@@ -189,7 +189,6 @@ in {
         sessionLog = true;
 
         clients.opencode = {
-          systemPrompt.detect = "You are OpenCode";
           systemPrompt.replaceWithFile = "system-prompts/cc-2.1.97.txt";
 
           toolRenames = [

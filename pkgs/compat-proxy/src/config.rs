@@ -8,7 +8,7 @@ use clap::Parser;
 
 use crate::creds::CredentialReader;
 use crate::rules::RuleSet;
-use crate::session_log::SessionLogger;
+use crate::session_log::SessionLogPool;
 
 /// Compatibility proxy — translates client API requests into
 /// upstream-compatible format using TOML rule files.
@@ -49,9 +49,9 @@ pub struct AppConfig {
     pub dump_requests: bool,
 
     /// Enable per-session JSONL transaction logging.
-    /// Writes one line per request to
-    /// `$XDG_STATE_HOME/compat-proxy/sessions/<session_id>.jsonl`
-    /// (or override with --session-log-dir).
+    /// Logging activates when clients use `POST /:name/v1/messages` —
+    /// each `name` gets its own `<dir>/<name>.jsonl` file. The plain
+    /// `/v1/messages` route is unaffected (no logging).
     /// Replaces the old per-file `/tmp/proxy-*.json` dump format.
     #[arg(long, default_value_t = false)]
     pub session_log: bool,
@@ -137,8 +137,8 @@ pub struct AppState {
     /// Whether to dump request/response bodies.
     pub dump_requests: bool,
 
-    /// Optional session-log writer (None when --session-log is not set).
-    pub session_log: Option<Arc<SessionLogger>>,
+    /// Optional per-name session-log pool (None when --session-log is not set).
+    pub session_log: Option<Arc<SessionLogPool>>,
 
     /// Persistent session ID (generated once at startup, like real CC).
     pub session_id: String,

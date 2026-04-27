@@ -16,7 +16,7 @@ use compat_proxy::config::{AppConfig, AppState};
 use compat_proxy::creds::CredentialReader;
 use compat_proxy::proxy;
 use compat_proxy::rules::{validate_rules, RuleSet, SchemaRegistry};
-use compat_proxy::session_log::{default_log_dir, SessionLogger};
+use compat_proxy::session_log::{default_log_dir, SessionLogPool};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -83,21 +83,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing::info!("session_id: {session_id}");
     tracing::debug!("device_id: {device_id}");
 
-    // Open the session log if requested.
+    // Open the session log pool if requested.
     let session_log = if config.session_log {
         let dir = config
             .session_log_dir
             .clone()
             .unwrap_or_else(default_log_dir);
-        let path = dir.join(format!("{session_id}.jsonl"));
-        match SessionLogger::open(path) {
-            Ok(logger) => {
-                tracing::info!("session log: writing to {}", logger.path().display());
-                Some(Arc::new(logger))
+        match SessionLogPool::new(dir) {
+            Ok(pool) => {
+                tracing::info!(
+                    "session log: pool ready at {} (use POST /:name/v1/messages)",
+                    pool.dir().display()
+                );
+                Some(Arc::new(pool))
             }
             Err(e) => {
                 tracing::warn!(
-                    "failed to open session log (continuing without it): {e}"
+                    "failed to set up session log pool (continuing without it): {e}"
                 );
                 None
             }

@@ -105,6 +105,8 @@
   ];
 
   qmlDocPath = "${pkgs.kdePackages.qtdoc}/share/doc/qtdoc";
+
+  promptsDir = ./opencode-prompts;
 in {
   programs.opencode = let
     inherit (color-lib) setOkhslLightness setOkhslSaturation;
@@ -353,6 +355,7 @@ in {
     };
 
     settings = {
+      autoupdate = false;
       provider = {
         anthropic = {
           options = {
@@ -369,6 +372,12 @@ in {
       #     prompt = "You are Claude Code, Anthropic's official CLI for Claude.";
       #   };
       # };
+
+      agent = {
+        explore = {
+          prompt = builtins.readFile (promptsDir + "/probe-explore.txt");
+        };
+      };
 
       permission = {
         edit = "ask";
