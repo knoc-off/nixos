@@ -15,8 +15,10 @@
 use sha2::{Digest, Sha256};
 
 use crate::wire::content::ContentBlock;
+use crate::wire::content::CacheControl;
 use crate::wire::request::{
-    MessageContent, Metadata, MessagesRequest, Role, SystemBlock, SystemPrompt,
+    MessageContent, Metadata, MessagesRequest, Role, SystemBlock, SystemPrompt, Thinking,
+    ToolChoice,
 };
 
 use super::{PropertyRename, RuleError, RuleSet, UnmappedPolicy};
@@ -67,7 +69,7 @@ pub fn apply_request_rules_with_changes(
     inject_billing_block(&mut req, rules, &mut changes);
 
     // Step 8: Inject metadata (device_id + session_id)
-    inject_metadata(&mut req, session_id, device_id, &mut changes);
+    inject_metadata(&mut req, rules, session_id, device_id, &mut changes);
 
     // Step 9: Strip trailing assistant prefill
     strip_trailing_prefill(&mut req, &mut changes);
@@ -76,6 +78,18 @@ pub fn apply_request_rules_with_changes(
     // so we can add explicit rules for it (these fields are fingerprint
     // signals -- real Claude Code only sends documented Anthropic fields).
     apply_unknown_field_rules(&mut req, rules, &mut changes);
+
+    // Step 11: Inject thinking:{type:"adaptive"} when absent
+    inject_thinking(&mut req, rules, &mut changes);
+
+    // Step 12: Inject context_management when absent
+    inject_context_management(&mut req, rules, &mut changes);
+
+    // Step 13: Strip tool_choice:{type:"auto"} (real CC omits it)
+    strip_tool_choice_auto(&mut req, rules, &mut changes);
+
+    // Step 14: Override max_tokens
+    override_max_tokens(&mut req, rules, &mut changes);
 
     Ok((req, changes))
 }
@@ -344,37 +358,92 @@ pub(crate) fn rename_properties_in_value(
 
 /// Step 5: Detect and replace the system prompt.
 ///
-/// When `detect` is set, the replacement only fires if the system prompt
-/// contains that substring. When `detect` is `None`, the replacement is
-/// unconditional — every request gets the canonical prompt regardless of
-/// what the client sent (needed for subagent prompts that don't share the
-/// parent's preamble).
+/// Three-tier replacement:
+/// 1. **Marker**: if system text starts with `[proxy:replace=NAME]`, look up
+///    NAME in the markers map and use that replacement text.
+/// 2. **Detect substring**: if `detect` is set and matches, use `replace_with_file`.
+/// 3. **Unconditional**: if no `detect` but `replace_with_file` is set, always replace.
+///
+/// After replacement, emits the CC-standard 2-block structure (identity line +
+/// main prompt, each with `cache_control: {type: "ephemeral", ttl: "1h"}`).
+/// The billing block is added separately in step 7.
 fn replace_system_prompt(req: &mut MessagesRequest, rules: &RuleSet, changes: &mut Vec<String>) {
+    let system_text = match &req.system {
+        Some(s) => s.text_content(),
+        None => return,
+    };
+
+    // Tier 1: marker-based replacement
+    if let Some(replacement) = try_marker_replacement(&system_text, rules) {
+        let before_len = system_text.len();
+        let after_len = replacement.len();
+        req.system = Some(make_cc_system_blocks(&replacement));
+        changes.push(format!(
+            "system prompt: marker-replaced ({before_len} → {after_len} chars)"
+        ));
+        return;
+    }
+
+    // Tier 2/3: detect-based or unconditional replacement
     let replacement = match &rules.system_prompt_replacement {
         Some(r) => r,
         None => return,
     };
 
-    if let Some(ref system) = req.system {
-        let text = system.text_content();
-
-        // If a detect string is configured, only replace when it matches.
-        if let Some(ref detect) = rules.system_prompt_detect {
-            if !text.contains(detect.as_str()) {
-                return;
-            }
+    if let Some(ref detect) = rules.system_prompt_detect {
+        if !system_text.contains(detect.as_str()) {
+            return;
         }
-
-        let before_len = text.len();
-        let after_len = replacement.len();
-        req.system = Some(SystemPrompt::Blocks(vec![SystemBlock::Text {
-            text: replacement.clone(),
-            cache_control: None,
-        }]));
-        changes.push(format!(
-            "system prompt: replaced ({before_len} → {after_len} chars)"
-        ));
     }
+
+    let before_len = system_text.len();
+    let after_len = replacement.len();
+    req.system = Some(make_cc_system_blocks(replacement));
+    changes.push(format!(
+        "system prompt: replaced ({before_len} → {after_len} chars)"
+    ));
+}
+
+/// Try to find a `[proxy:replace=NAME]` marker at the start of the system
+/// text and look up the replacement in the markers map.
+fn try_marker_replacement<'a>(text: &str, rules: &'a RuleSet) -> Option<&'a String> {
+    let text = text.trim_start();
+    if !text.starts_with("[proxy:replace=") {
+        return None;
+    }
+    let rest = &text["[proxy:replace=".len()..];
+    let end = rest.find(']')?;
+    let name = &rest[..end];
+    let replacement = rules.system_prompt_markers.get(name);
+    if replacement.is_none() {
+        tracing::warn!(
+            "system prompt has marker [proxy:replace={name}] but no marker rule found — falling through to detect"
+        );
+    }
+    replacement
+}
+
+/// Build the 2-block system prompt structure matching real CC:
+///   Block 0: identity line with cache_control
+///   Block 1: main prompt with cache_control
+///
+/// The billing block (block -1 in real CC) is prepended separately by
+/// `inject_billing_block()`.
+fn make_cc_system_blocks(prompt_text: &str) -> SystemPrompt {
+    let cc_cache = Some(CacheControl {
+        cache_type: "ephemeral".into(),
+        ttl: Some("1h".into()),
+    });
+    SystemPrompt::Blocks(vec![
+        SystemBlock::Text {
+            text: "You are Claude Code, Anthropic's official CLI for Claude.\n".into(),
+            cache_control: cc_cache.clone(),
+        },
+        SystemBlock::Text {
+            text: prompt_text.to_string(),
+            cache_control: cc_cache,
+        },
+    ])
 }
 
 /// Step 6: Apply text replacements to the system prompt only.
@@ -568,19 +637,24 @@ fn inject_billing_block(req: &mut MessagesRequest, rules: &RuleSet, changes: &mu
     ));
 }
 
-/// Step 8: Inject metadata (device_id + session_id) matching real CC format.
+/// Step 8: Inject metadata (device_id + session_id + account_uuid) matching real CC format.
 ///
-/// Real CC sends: metadata.user_id = JSON.stringify({device_id, session_id})
+/// Real CC sends: metadata.user_id = JSON.stringify({device_id, account_uuid, session_id})
 fn inject_metadata(
     req: &mut MessagesRequest,
+    rules: &RuleSet,
     session_id: &str,
     device_id: &str,
     changes: &mut Vec<String>,
 ) {
-    let meta_value = serde_json::json!({
+    let mut meta_value = serde_json::json!({
         "device_id": device_id,
         "session_id": session_id,
     });
+
+    if let Some(ref uuid) = rules.account_uuid {
+        meta_value["account_uuid"] = serde_json::Value::String(uuid.clone());
+    }
 
     req.metadata = Some(Metadata {
         user_id: Some(meta_value.to_string()),
@@ -608,6 +682,75 @@ fn strip_trailing_prefill(req: &mut MessagesRequest, changes: &mut Vec<String>) 
     }
 }
 
+/// Step 11: Inject `thinking: {type: "adaptive"}` when absent.
+///
+/// Real CC always sends this. OpenCode doesn't.
+fn inject_thinking(req: &mut MessagesRequest, rules: &RuleSet, changes: &mut Vec<String>) {
+    if !rules.inject_thinking {
+        return;
+    }
+    if req.thinking.is_none() {
+        req.thinking = Some(Thinking {
+            thinking_type: "adaptive".into(),
+            budget_tokens: None,
+        });
+        changes.push("thinking injected: type=adaptive".into());
+    }
+}
+
+/// Step 12: Inject `context_management` when absent.
+///
+/// Real CC sends `{edits: [{keep: "all", type: "clear_thinking_20251015"}]}`.
+fn inject_context_management(
+    req: &mut MessagesRequest,
+    rules: &RuleSet,
+    changes: &mut Vec<String>,
+) {
+    if !rules.inject_context_management {
+        return;
+    }
+    if !req.extra.contains_key("context_management") {
+        req.extra.insert(
+            "context_management".into(),
+            serde_json::json!({
+                "edits": [{"keep": "all", "type": "clear_thinking_20251015"}]
+            }),
+        );
+        changes.push("context_management injected".into());
+    }
+}
+
+/// Step 13: Strip `tool_choice: {type: "auto"}`.
+///
+/// Real CC never sends tool_choice. OpenCode sends `{type: "auto"}` on
+/// every request. Strip it to match real CC's fingerprint.
+fn strip_tool_choice_auto(
+    req: &mut MessagesRequest,
+    rules: &RuleSet,
+    changes: &mut Vec<String>,
+) {
+    if !rules.strip_tool_choice_auto {
+        return;
+    }
+    if let Some(ToolChoice::Auto { .. }) = &req.tool_choice {
+        req.tool_choice = None;
+        changes.push("stripped tool_choice: auto".into());
+    }
+}
+
+/// Step 14: Override max_tokens to match real CC.
+///
+/// Real CC sends 64000; OpenCode sends 32000.
+fn override_max_tokens(req: &mut MessagesRequest, rules: &RuleSet, changes: &mut Vec<String>) {
+    if let Some(target) = rules.max_tokens_override {
+        if req.max_tokens != target {
+            let old = req.max_tokens;
+            req.max_tokens = target;
+            changes.push(format!("max_tokens overridden: {old} → {target}"));
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -630,6 +773,12 @@ mod tests {
             billing_hash_salt: "59cf53e54c78".into(),
             billing_hash_indices: vec![4, 7, 20],
             unknown_field_rules: std::collections::HashMap::new(),
+            system_prompt_markers: std::collections::HashMap::new(),
+            max_tokens_override: None,
+            inject_thinking: false,
+            inject_context_management: false,
+            strip_tool_choice_auto: false,
+            account_uuid: None,
         }
     }
 
@@ -925,8 +1074,23 @@ mod tests {
         };
 
         let result = apply_request_rules(req, &rules, "test-session", "test-device").unwrap();
-        let text = result.system.unwrap().text_content();
-        assert_eq!(text, "You are the canonical assistant.");
+        // After replacement, system prompt has 2 blocks: identity line + replacement text
+        let blocks = match result.system.unwrap() {
+            SystemPrompt::Blocks(b) => b,
+            _ => panic!("expected Blocks"),
+        };
+        assert_eq!(blocks.len(), 2);
+        match &blocks[0] {
+            SystemBlock::Text { text, cache_control } => {
+                assert_eq!(text, "You are Claude Code, Anthropic's official CLI for Claude.\n");
+                assert!(cache_control.is_some());
+            }
+        }
+        match &blocks[1] {
+            SystemBlock::Text { text, .. } => {
+                assert_eq!(text, "You are the canonical assistant.");
+            }
+        }
     }
 
     #[test]

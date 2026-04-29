@@ -3,6 +3,8 @@
 //! These are the raw deserialized forms. After validation they are
 //! converted into `RuleSet` which pre-resolves all references.
 
+use std::collections::HashMap;
+
 use serde::Deserialize;
 
 /// Top-level rule file structure.
@@ -43,6 +45,11 @@ pub struct SystemPromptConfig {
     /// Text replacements applied after wholesale replacement.
     #[serde(default)]
     pub text_replacements: Vec<TextReplacementConfig>,
+    /// Named marker replacements: marker name → path to replacement file.
+    /// When a system prompt starts with `[proxy:replace=NAME]`, the proxy
+    /// looks up NAME here and replaces the entire system block.
+    #[serde(default)]
+    pub markers: HashMap<String, String>,
 }
 
 /// A single find/replace pair for text blocks.
@@ -101,6 +108,19 @@ pub struct ToolDropConfig {
 pub struct PropertiesConfig {
     #[serde(default)]
     pub rename: Vec<PropertyRenameConfig>,
+    /// Override max_tokens to this value on every request.
+    pub max_tokens: Option<u32>,
+    /// Inject `thinking: {type: "adaptive"}` when absent.
+    #[serde(default)]
+    pub inject_thinking: bool,
+    /// Inject `context_management` when absent.
+    #[serde(default)]
+    pub inject_context_management: bool,
+    /// Strip `tool_choice: {type: "auto"}` (real CC omits it).
+    #[serde(default)]
+    pub strip_tool_choice_auto: bool,
+    /// Account UUID for metadata.user_id injection.
+    pub account_uuid: Option<String>,
 }
 
 /// A bidirectional property rename.

@@ -34,6 +34,7 @@ pub fn validate_rules(
     let mut system_prompt_replacement = None;
     let mut system_prompt_append = None;
     let mut text_replacements = Vec::new();
+    let mut system_prompt_markers = std::collections::HashMap::new();
 
     if let Some(sp) = &rules_file.system_prompt {
         system_prompt_detect = sp.detect.clone();
@@ -65,6 +66,20 @@ pub fn validate_rules(
                 find: tr.find.clone(),
                 replace: tr.replace.clone(),
             });
+        }
+
+        // Read marker replacement files
+        for (name, path) in &sp.markers {
+            let full_path = rules_dir.join(path);
+            match std::fs::read_to_string(&full_path) {
+                Ok(content) => {
+                    system_prompt_markers.insert(name.clone(), content);
+                }
+                Err(e) => errors.push(ValidationError::FileNotFound(
+                    full_path.display().to_string(),
+                    e.to_string(),
+                )),
+            }
         }
     }
 
@@ -116,6 +131,11 @@ pub fn validate_rules(
 
     // -- Property validation --
     let mut property_renames = Vec::new();
+    let mut max_tokens_override = None;
+    let mut inject_thinking = false;
+    let mut inject_context_management = false;
+    let mut strip_tool_choice_auto = false;
+    let mut account_uuid = None;
     if let Some(props) = &rules_file.properties {
         let mut seen_prop_froms = HashSet::new();
         for rename in &props.rename {
@@ -129,6 +149,11 @@ pub fn validate_rules(
                 to: rename.to.clone(),
             });
         }
+        max_tokens_override = props.max_tokens;
+        inject_thinking = props.inject_thinking;
+        inject_context_management = props.inject_context_management;
+        strip_tool_choice_auto = props.strip_tool_choice_auto;
+        account_uuid = props.account_uuid.clone();
     }
 
     // -- Header validation --
@@ -226,6 +251,12 @@ pub fn validate_rules(
             billing_hash_salt,
             billing_hash_indices,
             unknown_field_rules,
+            system_prompt_markers,
+            max_tokens_override,
+            inject_thinking,
+            inject_context_management,
+            strip_tool_choice_auto,
+            account_uuid,
         })
     } else {
         Err(errors)

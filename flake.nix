@@ -267,6 +267,11 @@
     };
 
     jail-nix.url = "sourcehut:~alexdavid/jail.nix";
+
+    claude-code-system-prompts = {
+      url = "github:Piebald-AI/claude-code-system-prompts";
+      flake = false;
+    };
   };
 
   nixConfig = {

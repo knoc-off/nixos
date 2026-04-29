@@ -178,6 +178,12 @@ mod tests {
             billing_hash_salt: "59cf53e54c78".into(),
             billing_hash_indices: vec![4, 7, 20],
             unknown_field_rules: std::collections::HashMap::new(),
+            system_prompt_markers: std::collections::HashMap::new(),
+            max_tokens_override: None,
+            inject_thinking: false,
+            inject_context_management: false,
+            strip_tool_choice_auto: false,
+            account_uuid: None,
         }
     }
 

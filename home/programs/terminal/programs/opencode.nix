@@ -105,8 +105,6 @@
   ];
 
   qmlDocPath = "${pkgs.kdePackages.qtdoc}/share/doc/qtdoc";
-
-  promptsDir = ./opencode-prompts;
 in {
   programs.opencode = let
     inherit (color-lib) setOkhslLightness setOkhslSaturation;
@@ -364,19 +362,13 @@ in {
           };
         };
       };
-      # mode = {
-      #   plan = {
-      #     prompt = "You are Claude Code, Anthropic's official CLI for Claude.";
-      #   };
-      #   build = {
-      #     prompt = "You are Claude Code, Anthropic's official CLI for Claude.";
-      #   };
-      # };
-
       agent = {
-        explore = {
-          prompt = builtins.readFile (promptsDir + "/probe-explore.txt");
-        };
+        build.prompt = "[proxy:replace=build]";
+        plan.prompt = "[proxy:replace=plan]";
+        explore.prompt = "[proxy:replace=explore]";
+        general.prompt = "[proxy:replace=general]";
+        title.prompt = "[proxy:replace=title]";
+        summary.prompt = "[proxy:replace=summary]";
       };
 
       permission = {

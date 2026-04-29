@@ -43,6 +43,12 @@ with lib; let
           "rename_to = ${builtins.toJSON r.renameTo}"}
       '')
       client.unknownFields;
+
+    markerLines =
+      concatStringsSep "\n" (mapAttrsToList (
+          marker: path: "${builtins.toJSON marker} = ${builtins.toJSON path}"
+        )
+        client.systemPrompt.markers);
   in
     pkgs.writeText "${name}.toml" ''
       [meta]
@@ -57,6 +63,11 @@ with lib; let
       ${optionalString (client.systemPrompt.appendFile != null)
         "append_file = ${builtins.toJSON client.systemPrompt.appendFile}"}
 
+      ${optionalString (client.systemPrompt.markers != {}) ''
+        [system_prompt.markers]
+        ${markerLines}
+      ''}
+
       ${replacementLines}
 
       [tools]
@@ -67,6 +78,13 @@ with lib; let
       ${dropLines}
 
       [properties]
+      ${optionalString (client.maxTokens != null)
+        "max_tokens = ${toString client.maxTokens}"}
+      inject_thinking = ${boolToString client.injectThinking}
+      inject_context_management = ${boolToString client.injectContextManagement}
+      strip_tool_choice_auto = ${boolToString client.stripToolChoiceAuto}
+      ${optionalString (client.accountUuid != null)
+        "account_uuid = ${builtins.toJSON client.accountUuid}"}
 
       [headers]
       inject = []
@@ -82,11 +100,19 @@ with lib; let
   bundledRules = "${cfg.package}/share/compat-proxy/rules";
 
   rulesDir = pkgs.runCommand "compat-proxy-rules" {} (''
-      mkdir -p $out
+      mkdir -p $out/system-prompts
       # Copy schema registry and system prompts from the package
       cp ${bundledRules}/cc-schemas.toml $out/
-      cp -r ${bundledRules}/system-prompts $out/
+      cp -r ${bundledRules}/system-prompts/* $out/system-prompts/ 2>/dev/null || true
     ''
+    # Copy extra system prompt files (strip markdown frontmatter comments)
+    + concatStringsSep "\n" (mapAttrsToList (
+        name: path: ''
+          ${pkgs.gnused}/bin/sed '/^<!--$/,/^-->$/d' ${path} > $out/system-prompts/${name}
+        ''
+      )
+      cfg.extraSystemPrompts)
+    + "\n"
     + concatStringsSep "\n" (mapAttrsToList (
         name: client: "cp ${mkRuleToml name client} $out/${name}.toml"
       )
@@ -167,6 +193,17 @@ with lib; let
           default = null;
           description = "File to append to the system prompt, relative to rules dir.";
         };
+
+        markers = mkOption {
+          type = types.attrsOf types.str;
+          default = {};
+          description = ''
+            Named marker replacements. When a system prompt starts with
+            `[proxy:replace=NAME]`, the proxy looks up NAME in this map
+            and replaces the entire system block with the referenced file.
+            Values are paths relative to the rules dir.
+          '';
+        };
       };
 
       textReplacements = mkOption {
@@ -216,6 +253,36 @@ with lib; let
           default = "2.1.97";
           description = "Claude Code version for billing fingerprint.";
         };
+      };
+
+      maxTokens = mkOption {
+        type = types.nullOr types.int;
+        default = null;
+        description = "Override max_tokens on every request (e.g. 64000 to match real CC).";
+      };
+
+      injectThinking = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Inject thinking:{type:adaptive} when absent.";
+      };
+
+      injectContextManagement = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Inject context_management when absent.";
+      };
+
+      stripToolChoiceAuto = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Strip tool_choice:{type:auto} (real CC omits it).";
+      };
+
+      accountUuid = mkOption {
+        type = types.nullOr types.str;
+        default = null;
+        description = "Account UUID for metadata.user_id injection.";
       };
     };
   };
@@ -288,6 +355,17 @@ in {
       description = ''
         Override directory for session log files.
         Default: `$XDG_STATE_HOME/compat-proxy/sessions`.
+      '';
+    };
+
+    extraSystemPrompts = mkOption {
+      type = types.attrsOf types.path;
+      default = {};
+      description = ''
+        Extra system prompt files to include in the rules directory.
+        Keys are filenames under `system-prompts/`, values are paths
+        to the source files. Markdown frontmatter (HTML comments) is
+        stripped automatically.
       '';
     };
 

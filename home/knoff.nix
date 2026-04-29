@@ -181,15 +181,42 @@ in {
     self.homeModules.starship
 
     self.homeModules.compat-proxy
-    # Fuck anthropic
     {
       services.compat-proxy = {
         enable = true;
         port = 58192;
         sessionLog = true;
 
+        # Pull CC subagent prompts from Piebald repo
+        extraSystemPrompts = let
+          piebald = "${inputs.claude-code-system-prompts}/system-prompts";
+        in {
+          "cc-explore.txt" = "${piebald}/agent-prompt-explore.md";
+          "cc-general.txt" = "${piebald}/agent-prompt-general-purpose.md";
+          "cc-title.txt" = "${piebald}/agent-prompt-coding-session-title-generator.md";
+          "cc-summary.txt" = "${piebald}/agent-prompt-conversation-summarization.md";
+          "cc-plan.txt" = "${piebald}/agent-prompt-plan-mode-enhanced.md";
+        };
+
         clients.opencode = {
+          # Fallback for unmarked requests
           systemPrompt.replaceWithFile = "system-prompts/cc-2.1.97.txt";
+
+          systemPrompt.markers = {
+            build = "system-prompts/cc-2.1.97.txt";
+            plan = "system-prompts/cc-plan.txt";
+            explore = "system-prompts/cc-explore.txt";
+            general = "system-prompts/cc-general.txt";
+            title = "system-prompts/cc-title.txt";
+            summary = "system-prompts/cc-summary.txt";
+          };
+
+          # Match real CC's request shape
+          maxTokens = 64000;
+          injectThinking = true;
+          injectContextManagement = true;
+          stripToolChoiceAuto = true;
+          accountUuid = "eb263d3b-dc7d-4d1d-858d-2b476d9128d7";
 
           toolRenames = [
             {
@@ -253,13 +280,6 @@ in {
           # define. Real Claude Code never sends these -- forwarding
           # them is a fingerprint signal.
           unknownFields = [
-            {
-              # output_config: { effort: ... } -- OpenCode's reasoning
-              # effort wrapper. Equivalent in CC is the `thinking` field,
-              # which OpenCode doesn't generate. Strip silently.
-              name = "output_config";
-              action = "strip";
-            }
             {
               # speed: "fast" | "default" -- OpenCode's response speed
               # hint. Not a documented Anthropic field. Strip silently.

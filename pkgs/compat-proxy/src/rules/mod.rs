@@ -72,6 +72,26 @@ pub struct RuleSet {
     /// Per-name rules for handling unknown top-level request fields.
     /// Anything not listed will warn and pass through (for discovery).
     pub unknown_field_rules: HashMap<String, UnknownFieldRule>,
+
+    /// Named marker replacements: marker name → replacement text (pre-read).
+    /// When system prompt starts with `[proxy:replace=NAME]`, look up NAME
+    /// here and use its text as the replacement.
+    pub system_prompt_markers: HashMap<String, String>,
+
+    /// Override max_tokens to this value when set.
+    pub max_tokens_override: Option<u32>,
+
+    /// Whether to inject `thinking: {type: "adaptive"}` when absent.
+    pub inject_thinking: bool,
+
+    /// Whether to inject `context_management` when absent.
+    pub inject_context_management: bool,
+
+    /// Whether to strip `tool_choice: {type: "auto"}`.
+    pub strip_tool_choice_auto: bool,
+
+    /// Account UUID for metadata injection.
+    pub account_uuid: Option<String>,
 }
 
 /// Resolved rule for a single unknown top-level field.
