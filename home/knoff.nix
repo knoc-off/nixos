@@ -281,8 +281,17 @@ in {
           # them is a fingerprint signal.
           unknownFields = [
             {
-              # speed: "fast" | "default" -- OpenCode's response speed
-              # hint. Not a documented Anthropic field. Strip silently.
+              # output_config: { effort: ... } -- real CC sends this too.
+              name = "output_config";
+              action = "keep";
+            }
+            {
+              # context_management -- real CC sends this on opus/sonnet.
+              name = "context_management";
+              action = "keep";
+            }
+            {
+              # speed: "fast" | "default" -- OpenCode-only field. Strip.
               name = "speed";
               action = "strip";
             }

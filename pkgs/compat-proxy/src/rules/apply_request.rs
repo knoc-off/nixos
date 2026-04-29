@@ -684,9 +684,16 @@ fn strip_trailing_prefill(req: &mut MessagesRequest, changes: &mut Vec<String>) 
 
 /// Step 11: Inject `thinking: {type: "adaptive"}` when absent.
 ///
-/// Real CC always sends this. OpenCode doesn't.
+/// Real CC sends this on models that support it (opus, sonnet) but NOT
+/// on haiku. Only inject when the model name contains "opus" or "sonnet".
+/// When thinking is active, temperature must be unset (Anthropic API requirement).
 fn inject_thinking(req: &mut MessagesRequest, rules: &RuleSet, changes: &mut Vec<String>) {
     if !rules.inject_thinking {
+        return;
+    }
+    // Only inject on models that support adaptive thinking
+    let model = req.model.to_lowercase();
+    if !model.contains("opus") && !model.contains("sonnet") {
         return;
     }
     if req.thinking.is_none() {
@@ -696,17 +703,27 @@ fn inject_thinking(req: &mut MessagesRequest, rules: &RuleSet, changes: &mut Vec
         });
         changes.push("thinking injected: type=adaptive".into());
     }
+    // Anthropic requires temperature=1 (or unset) when thinking is enabled.
+    if req.thinking.is_some() && req.temperature.is_some() {
+        req.temperature = None;
+        changes.push("temperature stripped (required for thinking mode)".into());
+    }
 }
 
 /// Step 12: Inject `context_management` when absent.
 ///
-/// Real CC sends `{edits: [{keep: "all", type: "clear_thinking_20251015"}]}`.
+/// Real CC sends `{edits: [{keep: "all", type: "clear_thinking_20251015"}]}`
+/// on models that support thinking (opus, sonnet). Skip on haiku.
 fn inject_context_management(
     req: &mut MessagesRequest,
     rules: &RuleSet,
     changes: &mut Vec<String>,
 ) {
     if !rules.inject_context_management {
+        return;
+    }
+    let model = req.model.to_lowercase();
+    if !model.contains("opus") && !model.contains("sonnet") {
         return;
     }
     if !req.extra.contains_key("context_management") {
@@ -740,10 +757,12 @@ fn strip_tool_choice_auto(
 
 /// Step 14: Override max_tokens to match real CC.
 ///
-/// Real CC sends 64000; OpenCode sends 32000.
+/// Only overrides when the current value matches OpenCode's default (32000).
+/// Requests with other values (e.g. title gen's max_tokens=1) are left alone.
 fn override_max_tokens(req: &mut MessagesRequest, rules: &RuleSet, changes: &mut Vec<String>) {
     if let Some(target) = rules.max_tokens_override {
-        if req.max_tokens != target {
+        // Only override OpenCode's default, not intentionally-small values
+        if req.max_tokens == 32000 && req.max_tokens != target {
             let old = req.max_tokens;
             req.max_tokens = target;
             changes.push(format!("max_tokens overridden: {old} → {target}"));
