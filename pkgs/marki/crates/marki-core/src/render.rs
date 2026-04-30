@@ -27,7 +27,7 @@
 //! byte-identical output.
 
 use crate::tag::NoteId;
-use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag, TagEnd};
+use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
 use regex::Regex;
 use std::ops::Range;
 use std::sync::LazyLock;
@@ -127,7 +127,7 @@ fn split_keyword(token: &str) -> Option<(&str, Option<&str>)> {
 /// inline code span.
 fn find_code_ranges(source: &str) -> Vec<Range<usize>> {
     let mut ranges = Vec::new();
-    let parser = Parser::new(source).into_offset_iter();
+    let parser = Parser::new_ext(source, Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH).into_offset_iter();
     let mut code_start: Option<usize> = None;
     for (event, range) in parser {
         match event {

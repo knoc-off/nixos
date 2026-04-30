@@ -12,10 +12,12 @@
 
 use anyhow::{Context, Result};
 use marki_core::card::{Card, NoteType};
+use marki_core::{BlockSide, EmittedAsset, RenderedBlock, placeholder_for};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use crate::anki::{AnkiConnect, ManagedNote, ModelKind};
+use crate::render::Registry;
 use crate::scan::{ScannedCard, deck_for};
 use crate::sync::media;
 
@@ -33,14 +35,21 @@ pub struct Outcome {
 
 struct Local<'a> {
     sc: &'a ScannedCard,
-    card: &'a Card,
+    /// Card with external block placeholders already replaced. The
+    /// original `ScannedCard.parsed.card` is left untouched.
+    card: Card,
     deck: String,
+    /// Asset uploads produced by external renderers, accumulated across
+    /// all blocks in this card.
+    assets: Vec<EmittedAsset>,
 }
 
 pub fn reconcile(
     anki: &AnkiConnect,
     root: &Path,
     scanned: &[ScannedCard],
+    registry: &Registry,
+    cache_dir: &Path,
 ) -> Result<Outcome> {
     let mut outcome = Outcome::default();
 
@@ -53,18 +62,38 @@ pub fn reconcile(
     }
 
     // ---- Build local index keyed by marki_id (String).
+    // Cards whose external blocks fail to render are dropped from the
+    // index with an error logged; the daemon never aborts the corpus.
     let mut local: HashMap<String, Local<'_>> = HashMap::new();
     for sc in scanned {
         let card = &sc.parsed.card;
         match &card.id {
             Some(id) => {
                 let deck = deck_for(root, &sc.path);
+                let mut resolved = match dispatch_blocks(sc, registry, cache_dir) {
+                    Ok(r) => r,
+                    Err(e) => {
+                        outcome
+                            .errors
+                            .push(format!("{}: render: {e}", sc.path.display()));
+                        continue;
+                    }
+                };
+                // Recompute the hash over the final HTML (after block
+                // rendering) so that map version / theme / epsilon
+                // changes automatically trigger a re-push without
+                // touching the markdown source.
+                resolved.card.current_hash = marki_core::content_hash_html(
+                    &resolved.card.front_html,
+                    &resolved.card.back_html,
+                );
                 if let Some(prev) = local.insert(
                     id.clone(),
                     Local {
                         sc,
-                        card,
+                        card: resolved.card,
                         deck: deck.clone(),
+                        assets: resolved.assets,
                     },
                 ) {
                     outcome.errors.push(format!(
@@ -96,6 +125,16 @@ pub fn reconcile(
     let local_ids: HashSet<&str> = local.keys().map(|s| s.as_str()).collect();
 
     for (id, l) in &local {
+        // Push any external-renderer assets first so the note's HTML
+        // (which may already reference them) finds them on flip.
+        for asset in &l.assets {
+            if let Err(e) = media::push_emitted(anki, asset) {
+                outcome
+                    .errors
+                    .push(format!("{}: storeMediaFile: {e}", l.sc.path.display()));
+            }
+        }
+
         match remote.remove(id) {
             Some(r) => {
                 let new_hash = &l.card.current_hash;
@@ -130,7 +169,7 @@ pub fn reconcile(
                     outcome.moved += 1;
                 }
             }
-            None => match push_add(anki, root, l.sc, l.card, id, &l.deck) {
+            None => match push_add(anki, root, l.sc, &l.card, id, &l.deck) {
                 Ok(_) => outcome.added += 1,
                 Err(e) => outcome
                     .errors
@@ -153,6 +192,74 @@ pub fn reconcile(
     }
 
     Ok(outcome)
+}
+
+/// Card after external-block placeholders have been replaced and assets
+/// collected.
+pub struct ResolvedCard {
+    pub card: Card,
+    pub assets: Vec<EmittedAsset>,
+}
+
+/// Walk every [`marki_core::BlockRequest`] on the parsed card, dispatch
+/// to the registry, and splice each [`RenderedBlock`] into the card's
+/// front/back HTML at the matching placeholder. On the first block
+/// failure, return Err — the daemon turns that into a per-card error
+/// and continues the batch. We log + render-stub a friendlier message
+/// in `render_failed_stub` for failures that should still produce a
+/// pushable card; for now any failure aborts the card.
+pub fn dispatch_blocks(
+    sc: &ScannedCard,
+    registry: &Registry,
+    cache_dir: &Path,
+) -> Result<ResolvedCard> {
+    let mut card = sc.parsed.card.clone();
+    let mut assets: Vec<EmittedAsset> = Vec::new();
+
+    // Iterate over a snapshot — `card` itself is mutated as we splice.
+    let requests = card.block_requests.clone();
+    for req in &requests {
+        let rendered: RenderedBlock = match registry.dispatch(req, &sc.path, cache_dir) {
+            Ok(r) => r,
+            Err(e) => {
+                let stub = render_failed_stub(&req.lang, &e.to_string());
+                splice_placeholder(&mut card, req.side, &req.id, &stub);
+                tracing::warn!("{}: {} block failed: {e}", sc.path.display(), req.lang);
+                continue;
+            }
+        };
+
+        splice_placeholder(&mut card, req.side, &req.id, &rendered.front_html);
+        if !rendered.back_html_extras.is_empty() {
+            if !card.back_html.is_empty() {
+                card.back_html.push('\n');
+            }
+            card.back_html.push_str(&rendered.back_html_extras);
+        }
+        assets.extend(rendered.assets);
+    }
+
+    Ok(ResolvedCard { card, assets })
+}
+
+fn splice_placeholder(card: &mut Card, side: BlockSide, id: &str, html: &str) {
+    let placeholder = placeholder_for(&id.to_string());
+    let target: &mut String = match side {
+        BlockSide::Front => &mut card.front_html,
+        BlockSide::Back => &mut card.back_html,
+    };
+    *target = target.replacen(&placeholder, html, 1);
+}
+
+fn render_failed_stub(lang: &str, msg: &str) -> String {
+    let escaped_lang = html_escape(lang);
+    let escaped_msg = html_escape(msg);
+    format!(
+        "<div style=\"color:#a00;border:1px solid #a00;padding:0.5em;\
+         font-family:monospace;font-size:0.85em;\">\
+         <strong>{escaped_lang} block failed:</strong> {escaped_msg}\
+         </div>"
+    )
 }
 
 fn push_add(
@@ -186,7 +293,7 @@ fn push_update(
     l: &Local<'_>,
     r: &ManagedNote,
 ) -> Result<()> {
-    let (front_html, back_html) = rewrite_media_refs(anki, root, &l.sc.path, l.card)?;
+    let (front_html, back_html) = rewrite_media_refs(anki, root, &l.sc.path, &l.card)?;
     let model = model_for(l.card.note_type);
     let fields = visible_fields_for(model, &front_html, &back_html);
     anki.update_note_fields(r.anki_note_id, &fields)?;
@@ -267,4 +374,127 @@ fn html_escape(s: &str) -> String {
         }
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use marki_core::parser::parse_with_externals;
+    use std::path::PathBuf;
+
+    #[test]
+    fn splice_replaces_placeholder() {
+        let mut card = Card {
+            id: None,
+            current_hash: String::new(),
+            note_type: NoteType::Basic,
+            cloze_algorithm: marki_core::tag::ClozeAlgorithm::Increment,
+            front_html: format!("<p>before {}</p>", placeholder_for(&"abc".to_string())),
+            back_html: String::new(),
+            anki_tags: Vec::new(),
+            media_refs: Vec::new(),
+            stripped_source: String::new(),
+            block_requests: Vec::new(),
+        };
+        splice_placeholder(&mut card, BlockSide::Front, "abc", "<svg/>");
+        assert_eq!(card.front_html, "<p>before <svg/></p>");
+    }
+
+    #[test]
+    fn unused_placeholder_is_no_op() {
+        let mut card = Card {
+            id: None,
+            current_hash: String::new(),
+            note_type: NoteType::Basic,
+            cloze_algorithm: marki_core::tag::ClozeAlgorithm::Increment,
+            front_html: "no placeholder here".into(),
+            back_html: String::new(),
+            anki_tags: Vec::new(),
+            media_refs: Vec::new(),
+            stripped_source: String::new(),
+            block_requests: Vec::new(),
+        };
+        splice_placeholder(&mut card, BlockSide::Front, "abc", "<svg/>");
+        assert_eq!(card.front_html, "no placeholder here");
+    }
+
+    #[test]
+    fn dispatch_blocks_runs_map_renderer_and_replaces_placeholder() {
+        // Use a tempdir as cache_dir so the cache layer can write
+        // freely. NATURAL_EARTH_DATA isn't set in the test environment,
+        // so we expect the renderer to fail at resolve time and the
+        // dispatch to splice in a `block failed` stub. That still
+        // exercises the parse → registry → splice path which is the
+        // real point of this test.
+        let mut reg = Registry::new();
+        reg.register(Box::new(marki_map::MapRenderer::new()));
+
+        let src = "What highlights Bavaria?\n\n\
+                  ```map\n\
+                  size = [600, 400]\n\
+                  \n\
+                  [layers.base]\n\
+                  features = [\"country/DEU\"]\n\
+                  ```\n\
+                  ---\n\
+                  Bavaria.\n";
+        let parsed = parse_with_externals(src, reg.external_langs());
+        assert_eq!(parsed.card.block_requests.len(), 1);
+        // Placeholder should be in the front HTML right now.
+        assert!(parsed.card.front_html.contains("MARKI-BLOCK"));
+
+        let sc = ScannedCard {
+            path: PathBuf::from("/tmp/test.md"),
+            source: src.into(),
+            parsed,
+        };
+        let cache = std::env::temp_dir().join("marki-engine-test");
+        let _ = std::fs::create_dir_all(&cache);
+        let resolved = dispatch_blocks(&sc, &reg, &cache).unwrap();
+        // After dispatch the placeholder is gone; either real map HTML
+        // or the failure-stub div replaced it.
+        assert!(!resolved.card.front_html.contains("MARKI-BLOCK"));
+        assert!(
+            resolved.card.front_html.contains("marki-map")
+                || resolved.card.front_html.contains("block failed"),
+            "front: {}",
+            resolved.card.front_html
+        );
+    }
+
+    #[test]
+    fn dispatch_blocks_renders_stub_on_renderer_failure() {
+        // Empty registry but the parser saw `map`, so dispatch will
+        // fail with Resolve. Verify the stub is spliced in and the
+        // function still returns Ok (the daemon continues the batch).
+        let reg = Registry::new();
+        let req = marki_core::BlockRequest {
+            id: "x".into(),
+            lang: "map".into(),
+            source: String::new(),
+            byte_offset: 0,
+            side: BlockSide::Front,
+        };
+        let placeholder = placeholder_for(&"x".to_string());
+        let card = Card {
+            id: None,
+            current_hash: String::new(),
+            note_type: NoteType::Basic,
+            cloze_algorithm: marki_core::tag::ClozeAlgorithm::Increment,
+            front_html: placeholder.clone(),
+            back_html: String::new(),
+            anki_tags: Vec::new(),
+            media_refs: Vec::new(),
+            stripped_source: String::new(),
+            block_requests: vec![req],
+        };
+        let sc = ScannedCard {
+            path: PathBuf::from("/tmp/test.md"),
+            source: String::new(),
+            parsed: marki_core::parser::ParseOutput { card, errors: vec![] },
+        };
+        let resolved = dispatch_blocks(&sc, &reg, &PathBuf::from("/tmp/cache")).unwrap();
+        assert!(!resolved.card.front_html.contains(&placeholder));
+        assert!(resolved.card.front_html.contains("block failed"));
+    }
 }

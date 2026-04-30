@@ -3,6 +3,7 @@
 pub mod anki;
 pub mod config;
 pub mod fmt;
+pub mod render;
 pub mod scan;
 pub mod sync;
 pub mod watch;

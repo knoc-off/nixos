@@ -15,6 +15,25 @@ pub fn content_hash(content: &str) -> String {
     let mut hasher = blake3::Hasher::new();
     hasher.update(&RENDER_VERSION.to_le_bytes());
     hasher.update(content.as_bytes());
+    truncate_hash(hasher)
+}
+
+/// Version-bound hash over the final rendered HTML (front + back).
+///
+/// Called by the sync engine *after* external block placeholders have
+/// been spliced. A NUL separator prevents collisions from content
+/// that could be rearranged across front/back to produce the same
+/// concatenation.
+pub fn content_hash_html(front: &str, back: &str) -> String {
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(&RENDER_VERSION.to_le_bytes());
+    hasher.update(front.as_bytes());
+    hasher.update(&[0]);
+    hasher.update(back.as_bytes());
+    truncate_hash(hasher)
+}
+
+fn truncate_hash(hasher: blake3::Hasher) -> String {
     let out = hasher.finalize();
     let bytes = out.as_bytes();
     // 8 bytes = 16 hex chars
@@ -44,5 +63,20 @@ mod tests {
     #[test]
     fn hash_changes_with_content() {
         assert_ne!(content_hash("hello"), content_hash("world"));
+    }
+
+    #[test]
+    fn html_hash_is_stable() {
+        let a = content_hash_html("<p>front</p>", "<p>back</p>");
+        let b = content_hash_html("<p>front</p>", "<p>back</p>");
+        assert_eq!(a, b);
+        assert_eq!(a.len(), 16);
+    }
+
+    #[test]
+    fn html_hash_not_fooled_by_front_back_swap() {
+        let a = content_hash_html("ab", "cd");
+        let b = content_hash_html("abc", "d");
+        assert_ne!(a, b);
     }
 }

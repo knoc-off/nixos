@@ -3,4 +3,4 @@
 pub mod engine;
 pub mod media;
 
-pub use engine::{Outcome, reconcile};
+pub use engine::{Outcome, dispatch_blocks, reconcile};

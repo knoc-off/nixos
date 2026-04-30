@@ -5,7 +5,7 @@
 
 use anyhow::{Context, Result};
 use ignore::WalkBuilder;
-use marki_core::parser::{ParseOutput, parse};
+use marki_core::parser::{ParseOutput, parse_with_externals};
 use std::path::{Path, PathBuf};
 
 pub struct ScannedCard {
@@ -14,7 +14,7 @@ pub struct ScannedCard {
     pub parsed: ParseOutput,
 }
 
-pub fn scan_dir(root: &Path) -> Result<Vec<ScannedCard>> {
+pub fn scan_dir(root: &Path, external_langs: &[&str]) -> Result<Vec<ScannedCard>> {
     let mut out = Vec::new();
     for dent in WalkBuilder::new(root)
         .standard_filters(true) // .gitignore, .ignore, hidden files
@@ -40,7 +40,7 @@ pub fn scan_dir(root: &Path) -> Result<Vec<ScannedCard>> {
         }
         let source = std::fs::read_to_string(path)
             .with_context(|| format!("read {}", path.display()))?;
-        let parsed = parse(&source);
+        let parsed = parse_with_externals(&source, external_langs);
         out.push(ScannedCard {
             path: path.to_path_buf(),
             source,

@@ -25,10 +25,6 @@ pub struct Config {
     #[serde(default = "default_debounce_ms")]
     pub debounce_ms: u64,
 
-    /// Whether to call AnkiConnect `sync` before and after each cycle to
-    /// round-trip changes via AnkiWeb.
-    #[serde(default = "default_ankiweb_sync")]
-    pub ankiweb_sync: bool,
 }
 
 fn default_endpoint() -> String {
@@ -39,9 +35,6 @@ fn default_sync_interval() -> Duration {
 }
 fn default_debounce_ms() -> u64 {
     250
-}
-fn default_ankiweb_sync() -> bool {
-    true
 }
 
 mod duration_secs {

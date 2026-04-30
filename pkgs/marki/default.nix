@@ -5,8 +5,10 @@
 }: let
   cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
   version = cargoToml.workspace.package.version;
-in
-  pkgs.rustPlatform.buildRustPackage {
+
+  naturalEarthData = pkgs.callPackage ../natural-earth-data {};
+
+  markid = pkgs.rustPlatform.buildRustPackage {
     pname = "markid";
     inherit version;
 
@@ -28,4 +30,20 @@ in
       license = lib.licenses.mit;
       mainProgram = "markid";
     };
-  }
+
+    passthru.devShell = pkgs.mkShell {
+      inputsFrom = [markid];
+      nativeBuildInputs = [
+        pkgs.gdal
+        pkgs.curl
+        pkgs.jq
+      ];
+      NATURAL_EARTH_DATA = "${naturalEarthData}";
+      shellHook = ''
+        echo "marki dev shell"
+        echo "  NATURAL_EARTH_DATA=$NATURAL_EARTH_DATA"
+      '';
+    };
+  };
+in
+  markid

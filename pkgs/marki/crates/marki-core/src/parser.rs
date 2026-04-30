@@ -9,12 +9,19 @@
 //! nothing special to the parser — it's just another system tag, picked
 //! up wherever it appears. By convention `markid fmt` writes it as the
 //! first line of the file.
+//!
+//! External fenced-code-block renderers (e.g. ` ```map ` handed off to
+//! `marki-map`) are registered with the parser via the `external_langs`
+//! argument: matching blocks are NOT highlighted, instead a placeholder
+//! comment is emitted into the rendered HTML and a [`BlockRequest`] is
+//! pushed onto [`Card::block_requests`] for the daemon to fulfil.
 
+use crate::block_dispatch::{BlockRequest, BlockSide, mint_block_req_id, placeholder_for};
 use crate::card::{Card, NoteType};
 use crate::hash::content_hash;
 use crate::highlighter;
 use crate::tag::{ClozeAlgorithm, Parsed, SystemTag, TagParseError, parse_token};
-use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Parser, Tag, TagEnd};
+use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use regex::Regex;
 use std::sync::LazyLock;
 
@@ -44,7 +51,24 @@ pub enum ParseError {
 }
 
 /// Parse a markdown file's full text into a [`Card`].
+///
+/// Equivalent to [`parse_with_externals(source, &[])`] — every fenced
+/// block goes through the standard syntax-highlighter path.
 pub fn parse(source: &str) -> ParseOutput {
+    parse_with_externals(source, &[])
+}
+
+/// Like [`parse`], but fenced code blocks whose lang token matches one
+/// of `external_langs` are NOT rendered inline. Instead the parser:
+///
+///   * pushes a [`BlockRequest`] onto the resulting card's
+///     `block_requests`,
+///   * writes a `<!--MARKI-BLOCK:<id>-->` placeholder into the rendered
+///     HTML on whichever side (front/back of the `---`) the block lived.
+///
+/// The caller (typically the markid daemon) then dispatches each
+/// request to a registered renderer and splices the result back in.
+pub fn parse_with_externals(source: &str, external_langs: &[&str]) -> ParseOutput {
     let body = source;
 
     // 1. Lex every tag token out of the body (outside code blocks — the
@@ -79,7 +103,14 @@ pub fn parse(source: &str) -> ParseOutput {
     //    collecting anki-bound tags + media refs in source order. This
     //    pass also picks up `#id(...)` since it runs through every text
     //    span.
-    let render = render_card(body, note_type, cloze_algorithm, &mut anki_tags, &mut errors);
+    let render = render_card(
+        body,
+        note_type,
+        cloze_algorithm,
+        external_langs,
+        &mut anki_tags,
+        &mut errors,
+    );
 
     // 4. Second pass over tokens to pick up any system tags that weren't
     //    model-affecting (namely #id). We do this as a flat regex pass
@@ -114,6 +145,7 @@ pub fn parse(source: &str) -> ParseOutput {
         anki_tags: dedupe_preserving_order(anki_tags),
         media_refs: render.media,
         stripped_source: body.to_string(),
+        block_requests: render.block_requests,
     };
 
     ParseOutput { card, errors }
@@ -176,6 +208,7 @@ struct Rendered {
     front: String,
     back: String,
     media: Vec<String>,
+    block_requests: Vec<BlockRequest>,
 }
 
 #[derive(Debug)]
@@ -187,25 +220,30 @@ enum Section {
 enum State {
     Normal,
     InCodeBlock { lang: String, buf: String },
+    InExternalBlock { lang: String, buf: String, byte_offset: usize },
 }
 
 fn render_card(
     body: &str,
     note_type: NoteType,
     cloze_algorithm: ClozeAlgorithm,
+    external_langs: &[&str],
     anki_tags: &mut Vec<String>,
     errors: &mut Vec<ParseError>,
 ) -> Rendered {
     let mut front = String::new();
     let mut back = String::new();
     let mut media = Vec::new();
+    let mut block_requests: Vec<BlockRequest> = Vec::new();
     let mut section = Section::Front;
     let mut state = State::Normal;
     let mut cloze_counter = 0u32;
+    let mut external_block_index: usize = 0;
 
-    let parser = Parser::new(body);
+    let parser = Parser::new_ext(body, Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH)
+        .into_offset_iter();
 
-    for event in parser {
+    for (event, range) in parser {
         let out: &mut String = match section {
             Section::Front => &mut front,
             Section::Back => &mut back,
@@ -242,14 +280,53 @@ fn render_card(
 
             // ---- code blocks
             Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))) => {
-                state = State::InCodeBlock {
-                    lang: lang.to_string(),
-                    buf: String::new(),
-                };
+                let lang_str = lang.to_string();
+                // Match on the first whitespace-delimited token of the
+                // info string so authors can write ` ```map id=foo ` etc.
+                let lang_head = lang_str
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or("")
+                    .to_string();
+                if external_langs.iter().any(|l| *l == lang_head.as_str()) {
+                    state = State::InExternalBlock {
+                        lang: lang_head,
+                        buf: String::new(),
+                        byte_offset: range.start,
+                    };
+                } else {
+                    state = State::InCodeBlock {
+                        lang: lang_str,
+                        buf: String::new(),
+                    };
+                }
             }
             Event::End(TagEnd::CodeBlock) => {
-                if let State::InCodeBlock { lang, buf } = std::mem::replace(&mut state, State::Normal) {
-                    out.push_str(&render_code_block(&lang, &buf));
+                match std::mem::replace(&mut state, State::Normal) {
+                    State::InCodeBlock { lang, buf } => {
+                        out.push_str(&render_code_block(&lang, &buf));
+                    }
+                    State::InExternalBlock {
+                        lang,
+                        buf,
+                        byte_offset,
+                    } => {
+                        let id = mint_block_req_id(external_block_index, &lang);
+                        external_block_index += 1;
+                        let side = match section {
+                            Section::Front => BlockSide::Front,
+                            Section::Back => BlockSide::Back,
+                        };
+                        out.push_str(&placeholder_for(&id));
+                        block_requests.push(BlockRequest {
+                            id,
+                            lang,
+                            source: buf,
+                            byte_offset,
+                            side,
+                        });
+                    }
+                    State::Normal => {}
                 }
             }
             Event::Start(Tag::CodeBlock(CodeBlockKind::Indented)) => {
@@ -271,6 +348,7 @@ fn render_card(
             // ---- text
             Event::Text(text) => match &mut state {
                 State::InCodeBlock { buf, .. } => buf.push_str(&text),
+                State::InExternalBlock { buf, .. } => buf.push_str(&text),
                 State::Normal => {
                     let cleaned = strip_tags_from_text(&text, anki_tags, errors);
                     out.push_str(&escape_html(&cleaned));
@@ -279,6 +357,7 @@ fn render_card(
 
             Event::SoftBreak | Event::HardBreak => match &mut state {
                 State::InCodeBlock { buf, .. } => buf.push('\n'),
+                State::InExternalBlock { buf, .. } => buf.push('\n'),
                 State::Normal => out.push_str("<br>"),
             },
 
@@ -313,6 +392,32 @@ fn render_card(
             Event::Start(Tag::BlockQuote(_)) => out.push_str("<blockquote>"),
             Event::End(TagEnd::BlockQuote(_)) => out.push_str("</blockquote>"),
 
+            // ---- tables
+            Event::Start(Tag::Table(alignments)) => {
+                out.push_str("<table>");
+                // Stash alignments for use in cells. We encode them as a
+                // data attribute so we can retrieve them later if needed,
+                // but for now we just emit plain <table>.
+                let _ = alignments; // consumed below via TableCell
+            }
+            Event::End(TagEnd::Table) => out.push_str("</table>"),
+            Event::Start(Tag::TableHead) => out.push_str("<thead><tr>"),
+            Event::End(TagEnd::TableHead) => out.push_str("</tr></thead>"),
+            Event::Start(Tag::TableRow) => out.push_str("<tr>"),
+            Event::End(TagEnd::TableRow) => out.push_str("</tr>"),
+            Event::Start(Tag::TableCell) => {
+                // pulldown-cmark emits TableCell for both <th> (inside
+                // TableHead) and <td> (inside TableRow). We can't easily
+                // distinguish here without extra state, so we emit <td>
+                // uniformly — Anki renders both fine.
+                out.push_str("<td>");
+            }
+            Event::End(TagEnd::TableCell) => out.push_str("</td>"),
+
+            // ---- strikethrough
+            Event::Start(Tag::Strikethrough) => out.push_str("<del>"),
+            Event::End(TagEnd::Strikethrough) => out.push_str("</del>"),
+
             // ---- links
             Event::Start(Tag::Link { dest_url, .. }) => {
                 out.push_str(&format!("<a href=\"{}\">", escape_html(&dest_url)));
@@ -337,6 +442,7 @@ fn render_card(
         front: front.trim().to_string(),
         back: back.trim().to_string(),
         media,
+        block_requests,
     }
 }
 
@@ -565,6 +671,72 @@ mod tests {
             !out.card.front_html.contains("<p></p>"),
             "front_html was: {}",
             out.card.front_html
+        );
+    }
+
+    #[test]
+    fn external_block_emits_placeholder_and_request() {
+        let src = "before\n\n```map\nsize = [600, 400]\n```\n\nafter\n";
+        let out = parse_with_externals(src, &["map"]);
+        // Exactly one external block was captured.
+        assert_eq!(out.card.block_requests.len(), 1, "{:?}", out.card.block_requests);
+        let req = &out.card.block_requests[0];
+        assert_eq!(req.lang, "map");
+        assert!(req.source.contains("size ="), "got: {:?}", req.source);
+        assert_eq!(req.side, BlockSide::Front);
+
+        // Placeholder appears in the rendered front; the raw block body
+        // does not.
+        let placeholder = placeholder_for(&req.id);
+        assert!(
+            out.card.front_html.contains(&placeholder),
+            "front: {}",
+            out.card.front_html
+        );
+        assert!(
+            !out.card.front_html.contains("size ="),
+            "raw block body leaked into front: {}",
+            out.card.front_html
+        );
+    }
+
+    #[test]
+    fn external_block_on_back_side_records_back_side() {
+        let src = "front\n\n---\n\nback\n\n```map\nsize = [400, 300]\n```\n";
+        let out = parse_with_externals(src, &["map"]);
+        assert_eq!(out.card.block_requests.len(), 1);
+        assert_eq!(out.card.block_requests[0].side, BlockSide::Back);
+        let placeholder = placeholder_for(&out.card.block_requests[0].id);
+        assert!(out.card.back_html.contains(&placeholder));
+        assert!(!out.card.front_html.contains("MARKI-BLOCK"));
+    }
+
+    #[test]
+    fn external_lang_unregistered_falls_back_to_highlighter() {
+        // Without map registered, ```map should go through the normal
+        // (syntect) code-block path; no block_requests produced.
+        let src = "```map\nsize = [600, 400]\n```\n";
+        let out = parse(src);
+        assert!(out.card.block_requests.is_empty());
+        assert!(!out.card.front_html.contains("MARKI-BLOCK"));
+    }
+
+    #[test]
+    fn unknown_external_lang_is_ignored() {
+        // Block lang not in the externals list still goes to highlighter.
+        let src = "```rust\nlet x = 1;\n```\n";
+        let out = parse_with_externals(src, &["map"]);
+        assert!(out.card.block_requests.is_empty());
+    }
+
+    #[test]
+    fn multiple_external_blocks_get_distinct_ids() {
+        let src = "```map\na\n```\n\n```map\nb\n```\n";
+        let out = parse_with_externals(src, &["map"]);
+        assert_eq!(out.card.block_requests.len(), 2);
+        assert_ne!(
+            out.card.block_requests[0].id,
+            out.card.block_requests[1].id
         );
     }
 }

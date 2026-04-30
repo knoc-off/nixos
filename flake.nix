@@ -111,7 +111,17 @@
       discoverPackages pkgs ./pkgs;
   in {
     packages = forAllSystems mkPkgs;
-    devShells = forAllSystems mkPkgs;
+    devShells = forAllSystems (system: let
+      pkgs = mkPkgs system;
+      # Recursively prefer passthru.devShell where available.
+      preferShell = lib.mapAttrs (_: v:
+        if v ? devShell then v.devShell
+        else if lib.isAttrs v && !(lib.isDerivation v) then preferShell v
+        else v
+      );
+    in
+      preferShell pkgs
+    );
 
     nixosModules = discoverModules ./modules/nixos;
     homeModules = discoverModules ./modules/home;

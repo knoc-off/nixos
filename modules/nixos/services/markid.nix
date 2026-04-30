@@ -128,6 +128,21 @@ in {
       description = "RUST_LOG value.";
     };
 
+    naturalEarthData = mkOption {
+      type = types.nullOr types.package;
+      default = self.packages.${pkgs.stdenv.hostPlatform.system}.natural-earth-data or null;
+      description = ''
+        Natural Earth shapefile bundle used by `marki-map` to resolve
+        `country/<iso>`, `admin1/<iso>/<name>`, `coastline`, and
+        `neighbors/<iso>` feature references in `map` blocks.
+
+        Exposed to the daemon via the `NATURAL_EARTH_DATA` env var.
+        Set to `null` to disable; map blocks referencing offline
+        features will then fail with a `block failed` stub on the
+        rendered card (the daemon never aborts the corpus).
+      '';
+    };
+
     # -----------------------------------------------------------------
     # Anki (xvfb)
     # -----------------------------------------------------------------
@@ -192,6 +207,17 @@ in {
             URL still has to be set interactively in the GUI the first
             time; once set, it persists in the profile's prefs.db.
           '';
+        };
+      };
+
+      # ---- AnkiWeb sync timer (decoupled from markid cycles)
+      syncTimer = {
+        enable = mkEnableOption "periodic AnkiWeb sync via AnkiConnect (decoupled from markid card-push cycles)";
+
+        interval = mkOption {
+          type = types.str;
+          default = "30m";
+          description = "systemd `OnUnitActiveSec` syntax.";
         };
       };
     };
@@ -264,10 +290,14 @@ in {
         wants = optional cfg.anki.enable "anki-desktop.service";
         wantedBy = ["multi-user.target"];
 
-        environment = {
-          RUST_LOG = cfg.logLevel;
-          MARKID_CONFIG = "/etc/markid/config.toml";
-        };
+        environment =
+          {
+            RUST_LOG = cfg.logLevel;
+            MARKID_CONFIG = "/etc/markid/config.toml";
+          }
+          // lib.optionalAttrs (cfg.naturalEarthData != null) {
+            NATURAL_EARTH_DATA = "${cfg.naturalEarthData}";
+          };
 
         serviceConfig = {
           User = cfg.user;
@@ -365,6 +395,11 @@ in {
           ProtectSystem = "strict";
           ProtectHome = true;
           ReadWritePaths = [cfg.stateDir];
+
+          # cgroup-local OOM, so anki can't take other services down with it.
+          MemoryHigh = "500M";
+          MemoryMax = "700M";
+          OOMPolicy = "kill";
         };
       };
     })
@@ -411,6 +446,44 @@ in {
           ReadWritePaths = ["${cfg.stateDir}/anki-sync-server"];
           NoNewPrivileges = true;
           PrivateTmp = true;
+        };
+      };
+    })
+
+    # ---------- AnkiWeb sync timer ----------
+    (mkIf (cfg.anki.enable && cfg.anki.syncTimer.enable) {
+      systemd.services.anki-sync = {
+        description = "Trigger AnkiWeb sync via AnkiConnect";
+        after = ["anki-desktop.service"];
+
+        serviceConfig = {
+          Type = "oneshot";
+          User = cfg.user;
+          Group = cfg.group;
+          ExecStart = pkgs.writeShellScript "anki-sync-trigger" ''
+            set -eu
+            ${pkgs.curl}/bin/curl -sf -X POST \
+              "http://127.0.0.1:${toString cfg.anki.ankiConnectPort}" \
+              -H "Content-Type: application/json" \
+              -d '{"action":"sync","version":6,"params":{}}' \
+              --connect-timeout 5 \
+              --max-time 120
+          '';
+          TimeoutStartSec = "180";
+          ProtectSystem = "strict";
+          ProtectHome = true;
+          NoNewPrivileges = true;
+          PrivateTmp = true;
+        };
+      };
+
+      systemd.timers.anki-sync = {
+        description = "AnkiWeb sync timer";
+        wantedBy = ["timers.target"];
+        timerConfig = {
+          OnBootSec = "5m";
+          OnUnitActiveSec = cfg.anki.syncTimer.interval;
+          Persistent = true;
         };
       };
     })

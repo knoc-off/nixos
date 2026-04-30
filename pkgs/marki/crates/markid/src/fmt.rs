@@ -33,7 +33,7 @@ pub struct FmtOutcome {
 pub fn run(root: &Path) -> Result<FmtOutcome> {
     let mut outcome = FmtOutcome::default();
 
-    let scanned = scan_dir(root)?;
+    let scanned = scan_dir(root, &[])?;
 
     for sc in &scanned {
         // Surface any parse warnings but keep going.
@@ -82,7 +82,7 @@ pub fn run(root: &Path) -> Result<FmtOutcome> {
     }
 
     // Sanity: after the pass, no two files should claim the same id.
-    let rescanned = scan_dir(root)?;
+    let rescanned = scan_dir(root, &[])?;
     let mut seen = std::collections::HashMap::<String, std::path::PathBuf>::new();
     for sc in rescanned {
         if let Some(id) = sc.parsed.card.id {

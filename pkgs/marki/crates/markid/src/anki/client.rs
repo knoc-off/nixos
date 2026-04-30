@@ -281,10 +281,4 @@ impl AnkiConnect {
             .ok_or_else(|| AnkiError::Shape("storeMediaFile returned non-string".into()))
     }
 
-    // ---------- sync ----------
-
-    pub fn sync(&self) -> Result<(), AnkiError> {
-        self.call("sync", Value::Null)?;
-        Ok(())
-    }
 }

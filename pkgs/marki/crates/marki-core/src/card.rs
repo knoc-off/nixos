@@ -1,5 +1,6 @@
 //! Card model — what a single `.md` file, once parsed, represents in Anki.
 
+use crate::block_dispatch::BlockRequest;
 use crate::tag::{ClozeAlgorithm, ModelKind, NoteId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,4 +43,8 @@ pub struct Card {
     pub media_refs: Vec<String>,
     /// Raw markdown content after system tags have been stripped.
     pub stripped_source: String,
+    /// Fenced blocks deferred to external renderers. The parser left
+    /// `<!--MARKI-BLOCK:<id>-->` placeholders in `front_html`/`back_html`
+    /// where the renderer output should be spliced in.
+    pub block_requests: Vec<BlockRequest>,
 }

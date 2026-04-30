@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/marki-core",
     "crates/marki-macros",
+    "crates/marki-map",
     "crates/markid",
 ]
 
@@ -38,5 +39,9 @@ syn = { version = "2", features = ["full"] }
 quote = "1"
 proc-macro2 = "1"
 
+# map renderer deps
+shapefile = "0.6"
+
 marki-core = { path = "crates/marki-core" }
 marki-macros = { path = "crates/marki-macros" }
+marki-map = { path = "crates/marki-map" }

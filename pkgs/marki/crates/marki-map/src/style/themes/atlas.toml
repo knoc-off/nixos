@@ -1,0 +1,36 @@
+# atlas — soft, antique-cartography palette.
+#
+# Roles map to feature kinds the pipeline emits:
+#   - outline   : country outlines, default emphasis
+#   - highlight : the answer / focus feature
+#   - neighbor  : adjacent regions drawn for context
+#   - coast     : coastline polylines
+#
+# Background applies to the layer's <svg> element. Layers without
+# explicit features inherit transparent.
+
+background = "#f4ecd8"
+
+[[role]]
+role = "outline"
+fill = "#e8dcb8"
+stroke = "#5a4632"
+stroke_width = 1.0
+
+[[role]]
+role = "highlight"
+fill = "#c64f3f"
+stroke = "#7a2818"
+stroke_width = 1.5
+
+[[role]]
+role = "neighbor"
+fill = "#dccdac"
+stroke = "#8a7758"
+stroke_width = 0.8
+
+[[role]]
+role = "coast"
+fill = "none"
+stroke = "#3a5a82"
+stroke_width = 0.8

@@ -63,6 +63,16 @@
     };
   };
 
+  # The bouncer races crowdsec at boot, exits 1 before LAPI is up.
+  systemd.services.crowdsec-firewall-bouncer = {
+    after = ["crowdsec.service"];
+    requires = ["crowdsec.service"];
+    serviceConfig = {
+      Restart = "on-failure";
+      RestartSec = "10s";
+    };
+  };
+
   systemd.services.crowdsec.serviceConfig.SupplementaryGroups = [
     "caddy"
   ];

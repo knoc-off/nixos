@@ -82,7 +82,6 @@ in {
           - `anki_endpoint` (string): default `http://127.0.0.1:8765`
           - `sync_interval` (string or int): e.g. `"5m"` or `300`
           - `debounce_ms` (int): default `250`
-          - `ankiweb_sync` (bool): default `true` — call AnkiConnect `sync` before/after each cycle
       '';
       example = literalExpression ''
         {
@@ -96,6 +95,21 @@ in {
       type = types.str;
       default = "info";
       description = "Value for `RUST_LOG` env var passed to the daemon.";
+    };
+
+    naturalEarthData = mkOption {
+      type = types.nullOr types.package;
+      default = self.packages.${pkgs.stdenv.hostPlatform.system}.natural-earth-data or null;
+      description = ''
+        Natural Earth shapefile bundle used by `marki-map` to resolve
+        `country/<iso>`, `admin1/<iso>/<name>`, `coastline`, and
+        `neighbors/<iso>` feature references in `map` blocks.
+
+        The package's output directory is exposed to the daemon via the
+        `NATURAL_EARTH_DATA` environment variable. Set to `null` to
+        disable (any map blocks referencing offline features will fail
+        with a `block failed` stub on the rendered card).
+      '';
     };
 
     # --------------------------------------------------------------------
@@ -252,10 +266,13 @@ in {
 
         Service = {
           ExecStart = "${getExe cfg.package} watch";
-          Environment = [
-            "RUST_LOG=${cfg.logLevel}"
-            "MARKID_CONFIG=%h/.config/markid/config.toml"
-          ];
+          Environment =
+            [
+              "RUST_LOG=${cfg.logLevel}"
+              "MARKID_CONFIG=%h/.config/markid/config.toml"
+            ]
+            ++ optional (cfg.naturalEarthData != null)
+            "NATURAL_EARTH_DATA=${cfg.naturalEarthData}";
           Restart = "on-failure";
           RestartSec = 5;
         };

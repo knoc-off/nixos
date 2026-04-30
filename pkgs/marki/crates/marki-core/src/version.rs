@@ -13,4 +13,4 @@
 //!   * CSS-only changes (CSS lives in the Anki model and is updated separately)
 //!   * tag parsing changes that don't alter rendered HTML
 //!   * refactors, comments, dep bumps that don't affect output bytes
-pub const RENDER_VERSION: u32 = 2;
+pub const RENDER_VERSION: u32 = 3;

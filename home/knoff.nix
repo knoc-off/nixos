@@ -180,6 +180,19 @@ in {
     }
     self.homeModules.starship
 
+    self.homeModules.markid
+    {
+      services.markid = {
+        enable = true;
+        settings.cards_dir = "/home/knoff/projects/flashcards";
+      };
+      # Anki with AnkiConnect pre-installed — launch as a normal desktop app,
+      # markid connects via wait_for_anki() once it's open.
+      home.packages = [
+        (pkgs.anki.withAddons (with pkgs.ankiAddons; [anki-connect]))
+      ];
+    }
+
     self.homeModules.compat-proxy
     {
       services.compat-proxy = {
@@ -362,6 +375,7 @@ in {
 
   home = {
     packages = with pkgs; [
+      upkgs.orca-slicer
       upkgs.foliate
       upkgs.readest
 
