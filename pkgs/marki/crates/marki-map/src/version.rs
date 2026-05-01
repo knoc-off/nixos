@@ -19,4 +19,4 @@
 //! - `5` — base layer always emitted first in the DOM so overlays
 //!   stack on top (fixes highlight invisible behind base).
 
-pub const RENDER_VERSION_MAP: u32 = 11;
+pub const RENDER_VERSION_MAP: u32 = 12;

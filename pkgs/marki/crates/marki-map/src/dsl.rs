@@ -19,7 +19,7 @@
 //! anything it doesn't understand so authors get fast feedback.
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use indexmap::IndexMap;
 
 /// Top-level map block.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -35,10 +35,10 @@ pub struct MapSpec {
     #[serde(default = "default_style")]
     pub style: String,
 
-    /// Layers, keyed by name. `BTreeMap` so iteration order is stable
-    /// (alphabetical) regardless of input ordering, which makes cache
-    /// keys deterministic.
-    pub layers: BTreeMap<String, LayerSpec>,
+    /// Layers, keyed by name. `IndexMap` preserves TOML source order,
+    /// which controls DOM stacking: earlier layers render underneath
+    /// later ones. Authors should write `base` first.
+    pub layers: IndexMap<String, LayerSpec>,
 }
 
 fn default_style() -> String {

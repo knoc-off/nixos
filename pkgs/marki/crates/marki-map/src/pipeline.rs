@@ -289,14 +289,6 @@ fn build_block(
             reveal: reveals.get(name).copied().unwrap_or(RevealMode::Fade),
         })
         .collect();
-    // Base must be first (bottom of the stack) so overlays render on
-    // top. BTreeMap gives alphabetical order which puts "answer"
-    // before "base" — wrong stacking.
-    layers.sort_by(|a, b| match (a.name == "base", b.name == "base") {
-        (true, false) => std::cmp::Ordering::Less,
-        (false, true) => std::cmp::Ordering::Greater,
-        _ => a.name.cmp(b.name),
-    });
     let embed = embed_layers(render_w, render_h, &layers);
 
     let mut assets: Vec<EmittedAsset> = svg_files

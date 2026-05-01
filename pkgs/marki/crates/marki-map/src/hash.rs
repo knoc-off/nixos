@@ -13,9 +13,10 @@
 //! ```
 //!
 //! `canonical_toml_of` re-serialises the parsed [`MapSpec`] so author
-//! whitespace / key-order tweaks don't bust the cache. Because we use
-//! a `BTreeMap` for `layers`, layer iteration order is alphabetical
-//! and stable.
+//! whitespace tweaks don't bust the cache. Because we use an
+//! `IndexMap` for `layers`, layer order is preserved from the TOML
+//! source — reordering layers changes the visual output and therefore
+//! produces a different cache key.
 
 use crate::dsl::MapSpec;
 use crate::error::MapError;
@@ -36,6 +37,14 @@ pub fn cache_key(spec: &MapSpec, theme_bytes: &[u8]) -> Result<String, MapError>
     hasher.update(&RENDER_VERSION_MAP.to_le_bytes());
     hasher.update(spec.style.as_bytes());
     hasher.update(theme_bytes);
+    // Hash layer names in insertion order so that reordering layers
+    // (which changes DOM stacking) produces a different cache key.
+    // The canonical TOML alone doesn't capture order because the toml
+    // serializer sorts table keys alphabetically.
+    for name in spec.layers.keys() {
+        hasher.update(name.as_bytes());
+        hasher.update(&[0]);
+    }
     hasher.update(canonical.as_bytes());
     let hex = hasher.finalize().to_hex();
     Ok(hex.as_str()[..16].to_string())
@@ -104,14 +113,15 @@ features = []
     }
 
     #[test]
-    fn key_invariant_to_layer_input_order() {
-        // BTreeMap means alphabetical iteration; both should hash equal.
+    fn key_changes_with_layer_order() {
+        // Reordering layers changes DOM stacking, so the cache key
+        // must differ.
         let a = cache_key(
             &spec(r#"
 size = [600, 400]
-[layers.zeta]
-features = []
 [layers.alpha]
+features = []
+[layers.zeta]
 features = []
 "#),
             b"t",
@@ -120,14 +130,14 @@ features = []
         let b = cache_key(
             &spec(r#"
 size = [600, 400]
-[layers.alpha]
-features = []
 [layers.zeta]
+features = []
+[layers.alpha]
 features = []
 "#),
             b"t",
         )
         .unwrap();
-        assert_eq!(a, b);
+        assert_ne!(a, b);
     }
 }

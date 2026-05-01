@@ -35,6 +35,7 @@
 //! Pure CSS — no JavaScript — works on AnkiDroid, AnkiMobile, AnkiWeb.
 
 use crate::dsl::{LayerSpec, RevealMode};
+use indexmap::IndexMap;
 use std::collections::BTreeMap;
 
 /// One layer's emitted SVG, plus how it should reveal.
@@ -114,7 +115,7 @@ pub fn embed_layers(width: u32, height: u32, layers: &[EmbedLayer<'_>]) -> Embed
 /// "base = none, others = fade" default rule. Returns a map keyed by
 /// layer name.
 pub fn resolve_reveals(
-    layers: &BTreeMap<String, LayerSpec>,
+    layers: &IndexMap<String, LayerSpec>,
 ) -> BTreeMap<String, RevealMode> {
     layers
         .iter()
