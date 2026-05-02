@@ -9,6 +9,8 @@
 }: let
   mkKeyLayers = import ./key-layers.nix {inherit lib;};
 
+  hayleox-flags = pkgs.callPackage ../pkgs/hayleox-flags {};
+
   noctalia' = cmd:
     lib.concatStringsSep " " (
       ["noctalia-shell" "ipc" "call"] ++ (lib.splitString " " cmd)
@@ -185,6 +187,10 @@ in {
       services.markid = {
         enable = true;
         settings.cards_dir = "/home/knoff/projects/flashcards";
+        flagSources = {
+          circle = "${pkgs.circle-flags}/share/circle-flags-svg";
+          flags = "${hayleox-flags}/share/hayleox-flags";
+        };
       };
       # Anki with AnkiConnect pre-installed — launch as a normal desktop app,
       # markid connects via wait_for_anki() once it's open.

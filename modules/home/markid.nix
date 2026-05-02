@@ -30,7 +30,10 @@ with lib; let
   # config file. See `anki-prefs.nix` comment below for the file layout.
   syncBaseUrl = "http://${cfg.anki.syncServer.host}:${toString cfg.anki.syncServer.port}/";
 
-  markidConfig = tomlFormat.generate "markid-config.toml" cfg.settings;
+  markidConfig = tomlFormat.generate "markid-config.toml" (
+    cfg.settings
+    // (if cfg.flagSources != {} then { flag_sources = cfg.flagSources; } else {})
+  );
 
   # Build an Anki wrapper with AnkiConnect pre-installed so Anki itself
   # doesn't need runtime write access to copy addon files into the profile.
@@ -82,6 +85,7 @@ in {
           - `anki_endpoint` (string): default `http://127.0.0.1:8765`
           - `sync_interval` (string or int): e.g. `"5m"` or `300`
           - `debounce_ms` (int): default `250`
+          - `flag_sources` (table, optional): named flag directories for ```flag``` blocks. Prefer the `flagSources` option — it merges into this table automatically.
       '';
       example = literalExpression ''
         {
@@ -109,6 +113,38 @@ in {
         `NATURAL_EARTH_DATA` environment variable. Set to `null` to
         disable (any map blocks referencing offline features will fail
         with a `block failed` stub on the rendered card).
+      '';
+    };
+
+    flagDir = mkOption {
+      type = types.nullOr types.path;
+      default = null;
+      description = ''
+        Single flag SVG directory — convenience shorthand for a single
+        unnamed source. Prefer `flagSources` for multiple collections.
+        Exposed via `MARKID_FLAG_DIR`; searched after any named sources.
+      '';
+    };
+
+    flagSources = mkOption {
+      type = types.attrsOf types.path;
+      default = {};
+      description = ''
+        Named flag SVG sources for the `flag` block renderer. Each key
+        is a source name usable as a prefix in the DSL
+        (`flag = "circle/de"`), and the value is the directory containing
+        SVGs. Order matters: when no prefix is given, sources are
+        searched in definition order and the first match wins.
+
+        Written to `[flag_sources]` in `config.toml`. Set to `{}` to
+        disable — any ```flag``` blocks then fall through to plain code
+        rendering.
+      '';
+      example = literalExpression ''
+        {
+          circle = "''${pkgs.circle-flags}/share/circle-flags-svg";
+          flags = "''${hayleox-flags}/share/hayleox-flags";
+        }
       '';
     };
 
@@ -272,7 +308,9 @@ in {
               "MARKID_CONFIG=%h/.config/markid/config.toml"
             ]
             ++ optional (cfg.naturalEarthData != null)
-            "NATURAL_EARTH_DATA=${cfg.naturalEarthData}";
+            "NATURAL_EARTH_DATA=${cfg.naturalEarthData}"
+            ++ optional (cfg.flagDir != null)
+            "MARKID_FLAG_DIR=${cfg.flagDir}";
           Restart = "on-failure";
           RestartSec = 5;
         };

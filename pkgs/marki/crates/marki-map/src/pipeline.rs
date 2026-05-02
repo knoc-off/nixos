@@ -141,7 +141,6 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
         render_h,
         &reveals,
         &svg_files,
-        &sidecar_bytes,
     ))
 }
 
@@ -172,10 +171,6 @@ fn fit_canvas(budget: [u32; 2], aspect: f64) -> (u32, u32) {
 /// cache key prevents collisions between cards.
 fn layer_media_filename(key: &str, layer_name: &str) -> String {
     format!("marki-map-{key}-{layer_name}.svg")
-}
-
-fn sidecar_media_filename(key: &str) -> String {
-    format!("marki-map-{key}-sidecar.json")
 }
 
 fn resolve_all_layers<'a>(
@@ -269,7 +264,6 @@ fn build_block(
     render_h: u32,
     reveals: &BTreeMap<String, RevealMode>,
     svg_files: &[(String, String, Vec<u8>)],
-    sidecar_bytes: &[u8],
 ) -> RenderedBlock {
     let media_files: Vec<(String, String)> = svg_files
         .iter()
@@ -299,11 +293,6 @@ fn build_block(
             mime: AssetMime::SvgXml,
         })
         .collect();
-    assets.push(EmittedAsset {
-        filename: sidecar_media_filename(key),
-        bytes: sidecar_bytes.to_vec(),
-        mime: AssetMime::ApplicationJson,
-    });
 
     RenderedBlock {
         front_html: embed.front_html,
@@ -317,24 +306,21 @@ fn load_from_cache(
     cache_root: &Path,
     key: &str,
 ) -> Result<RenderedBlock, MapError> {
-    let names = cache::list_files(cache_root, key)?;
-    let mut svg_files: Vec<(String, String, Vec<u8>)> = Vec::new();
-    let mut sidecar_bytes: Vec<u8> = Vec::new();
-    for n in names {
-        let bytes = cache::read_file(cache_root, key, &n)?;
-        if n == "sidecar.json" {
-            sidecar_bytes = bytes;
-            continue;
-        }
-        if let Some(stem) = n.strip_suffix(".svg") {
-            svg_files.push((stem.to_string(), n.clone(), bytes));
-        }
-    }
-    // Recover the actual rendered dimensions from the cached sidecar.
-    // Falling back to `spec.size` would be wrong here — the cached
-    // SVGs were composed at the autosized canvas, not the budget.
+    // Read sidecar first — its `layers` array is the authoritative
+    // source for layer order (written in TOML/IndexMap order during
+    // the fresh render). Never rely on filesystem directory listing
+    // order, which is alphabetical and would reorder layers.
+    let sidecar_bytes = cache::read_file(cache_root, key, "sidecar.json")?;
     let parsed: Sidecar = serde_json::from_slice(&sidecar_bytes)
         .map_err(|e| MapError::Internal(format!("sidecar parse: {e}")))?;
+
+    let mut svg_files: Vec<(String, String, Vec<u8>)> = Vec::new();
+    for layer in &parsed.layers {
+        let svg_name = format!("{}.svg", layer.name);
+        let bytes = cache::read_file(cache_root, key, &svg_name)?;
+        svg_files.push((layer.name.clone(), svg_name, bytes));
+    }
+
     let reveals = resolve_reveals(&spec.layers);
     Ok(build_block(
         key,
@@ -342,7 +328,6 @@ fn load_from_cache(
         parsed.height,
         &reveals,
         &svg_files,
-        &sidecar_bytes,
     ))
 }
 

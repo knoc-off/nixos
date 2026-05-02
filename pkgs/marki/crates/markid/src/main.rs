@@ -32,6 +32,12 @@ struct Cli {
     #[arg(long, env = "MARKID_ANKICONNECT", global = true)]
     anki_endpoint: Option<String>,
 
+    /// Override the directory containing flag SVGs used by ```flag``` blocks.
+    /// Adds a single unnamed source (searched last, after any [flag_sources]
+    /// configured in the config file).
+    #[arg(long, env = "MARKID_FLAG_DIR", global = true)]
+    flag_dir: Option<PathBuf>,
+
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -69,10 +75,12 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    // RenderMap doesn't need a config file at all (it's pure offline);
-    // give it its own short-circuit.
+    // RenderMap doesn't need a working AnkiConnect — but it does want
+    // the same renderer registry the daemon uses, which in turn wants
+    // config (for `flag_dir`). Load the config the same way as below.
     if let Cmd::RenderMap { file, out } = &cli.cmd {
-        let registry = build_registry();
+        let cfg = load_config_for_render(&cli)?;
+        let registry = build_registry(&cfg);
         return cmd_render_map(file, out, &registry);
     }
 
@@ -82,27 +90,39 @@ fn main() -> Result<()> {
         Cmd::Fmt => cmd_fmt(&cfg),
         Cmd::Push => {
             let anki = AnkiConnect::new(&cfg.anki_endpoint).context("init AnkiConnect client")?;
-            let registry = build_registry();
+            let registry = build_registry(&cfg);
             cmd_push(&anki, &cfg, &registry)
         }
         Cmd::Status => {
             let anki = AnkiConnect::new(&cfg.anki_endpoint).context("init AnkiConnect client")?;
-            let registry = build_registry();
+            let registry = build_registry(&cfg);
             cmd_status(&anki, &cfg, &registry)
         }
         Cmd::Watch => {
             let anki = AnkiConnect::new(&cfg.anki_endpoint).context("init AnkiConnect client")?;
-            let registry = build_registry();
+            let registry = build_registry(&cfg);
             cmd_watch(&anki, &cfg, &registry)
         }
         Cmd::RenderMap { .. } => unreachable!("handled above"),
     }
 }
 
-/// Build the external block-renderer registry.
-fn build_registry() -> Registry {
+/// Build the external block-renderer registry. The flag renderer is
+/// only registered when at least one flag source is configured —
+/// otherwise ```flag``` blocks fall through to plain code rendering.
+fn build_registry(cfg: &Config) -> Registry {
     let mut reg = Registry::new();
     reg.register(Box::new(marki_map::MapRenderer::new()));
+
+    let sources: Vec<(String, std::path::PathBuf)> = cfg
+        .flag_sources
+        .iter()
+        .map(|(name, dir)| (name.clone(), dir.clone()))
+        .collect();
+
+    if !sources.is_empty() {
+        reg.register(Box::new(marki_flag::FlagRenderer::new(sources)));
+    }
     reg
 }
 
@@ -131,6 +151,7 @@ fn load_config(cli: &Cli) -> Result<Config> {
             anki_endpoint: "http://127.0.0.1:8765".into(),
             sync_interval: Duration::from_secs(300),
             debounce_ms: 250,
+            flag_sources: Default::default(),
         }
     };
 
@@ -140,8 +161,40 @@ fn load_config(cli: &Cli) -> Result<Config> {
     if let Some(e) = &cli.anki_endpoint {
         cfg.anki_endpoint = e.clone();
     }
+    if let Some(p) = &cli.flag_dir {
+        cfg.flag_sources
+            .entry("_default".into())
+            .or_insert_with(|| p.clone());
+    }
     if cfg.cards_dir.as_os_str().is_empty() {
         anyhow::bail!("cards_dir is required (set in config or pass --cards-dir)");
+    }
+    Ok(cfg)
+}
+
+/// Like [`load_config`] but doesn't require `cards_dir` — used by the
+/// offline `render-map` subcommand which only needs the renderer
+/// registry config (e.g. `flag_dir`).
+fn load_config_for_render(cli: &Cli) -> Result<Config> {
+    let path = cli.config.clone().or_else(Config::default_path);
+
+    let mut cfg = match path {
+        Some(p) if p.exists() => {
+            Config::load_from(&p).with_context(|| format!("read config {}", p.display()))?
+        }
+        _ => Config {
+            cards_dir: PathBuf::new(),
+            anki_endpoint: "http://127.0.0.1:8765".into(),
+            sync_interval: Duration::from_secs(300),
+            debounce_ms: 250,
+            flag_sources: Default::default(),
+        },
+    };
+
+    if let Some(p) = &cli.flag_dir {
+        cfg.flag_sources
+            .entry("_default".into())
+            .or_insert_with(|| p.clone());
     }
     Ok(cfg)
 }

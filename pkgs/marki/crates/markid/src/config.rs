@@ -3,6 +3,7 @@
 //! Config lives at `~/.config/markid/config.toml` by default; overridable
 //! via `--config` and/or `$MARKID_CONFIG`.
 
+use indexmap::IndexMap;
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
@@ -24,6 +25,13 @@ pub struct Config {
     /// Debounce window for inotify events, in milliseconds.
     #[serde(default = "default_debounce_ms")]
     pub debounce_ms: u64,
+
+    /// Named flag SVG sources for the `flag` block renderer. Each key
+    /// is a source name usable as a prefix in the DSL (`flag = "circle/de"`),
+    /// and the value is the directory containing SVGs. Order matters:
+    /// when no prefix is given, sources are searched in definition order.
+    #[serde(default)]
+    pub flag_sources: IndexMap<String, PathBuf>,
 
 }
 

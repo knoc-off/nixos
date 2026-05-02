@@ -2,6 +2,7 @@
 
 use anyhow::Result;
 use notify::RecursiveMode;
+use notify::event::EventKind;
 use notify_debouncer_full::{DebouncedEvent, new_debouncer};
 use std::path::{Component, Path};
 use std::sync::mpsc::{RecvTimeoutError, channel};
@@ -42,11 +43,22 @@ where
         let wait = next_heartbeat.saturating_duration_since(now);
         match rx.recv_timeout(wait) {
             Ok(Ok(events)) => {
-                // Filter out events inside dotdirs like `.git` — a git
-                // pull churns thousands of object-file writes that we
-                // don't care about. Only fire a cycle if at least one
-                // event touches a file outside any hidden directory.
-                if !events.iter().any(|e| events_path_worth_scanning(&e.paths)) {
+                // Two filters:
+                //
+                // 1. Event kind: drop read-only events (Access, Open,
+                //    CloseNoWrite) that markid's own scan cycle
+                //    generates — opening .md files for parsing fires
+                //    IN_OPEN, which would retrigger an immediate cycle,
+                //    creating a tight self-feeding loop.
+                //
+                // 2. Path: drop events inside hidden directories
+                //    (.git, .direnv, …) — git operations churn
+                //    thousands of object writes we don't care about.
+                let dominated = events.iter().any(|e| {
+                    is_write_event(&e.event.kind)
+                        && events_path_worth_scanning(&e.paths)
+                });
+                if !dominated {
                     continue;
                 }
                 if !handler(Tick::Filesystem)? {
@@ -72,6 +84,17 @@ where
     }
 }
 
+/// True for events that indicate actual content changes: file
+/// created, modified, removed, or renamed. False for read-only
+/// events (open, access, close-no-write) which markid's own scan
+/// cycle generates when it reads `.md` files.
+fn is_write_event(kind: &EventKind) -> bool {
+    matches!(
+        kind,
+        EventKind::Create(_) | EventKind::Modify(_) | EventKind::Remove(_)
+    )
+}
+
 /// True if any path in the event is outside every hidden (`.`-prefixed)
 /// directory component. That excludes `.git/…`, `.direnv/…`, etc.
 fn events_path_worth_scanning(paths: &[std::path::PathBuf]) -> bool {
@@ -84,4 +107,26 @@ fn events_path_worth_scanning(paths: &[std::path::PathBuf]) -> bool {
             _ => false,
         })
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use notify::event::*;
+
+    #[test]
+    fn write_events_are_interesting() {
+        assert!(is_write_event(&EventKind::Create(CreateKind::File)));
+        assert!(is_write_event(&EventKind::Modify(ModifyKind::Data(DataChange::Content))));
+        assert!(is_write_event(&EventKind::Modify(ModifyKind::Name(RenameMode::Both))));
+        assert!(is_write_event(&EventKind::Remove(RemoveKind::File)));
+    }
+
+    #[test]
+    fn read_events_are_ignored() {
+        assert!(!is_write_event(&EventKind::Access(AccessKind::Open(AccessMode::Read))));
+        assert!(!is_write_event(&EventKind::Access(AccessKind::Close(AccessMode::Read))));
+        assert!(!is_write_event(&EventKind::Other));
+        assert!(!is_write_event(&EventKind::Any));
+    }
 }

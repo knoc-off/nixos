@@ -878,6 +878,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "marki-flag"
+version = "0.3.0"
+dependencies = [
+ "base64",
+ "indexmap",
+ "marki-core",
+ "serde",
+ "thiserror",
+ "toml",
+ "tracing",
+]
+
+[[package]]
 name = "marki-macros"
 version = "0.3.0"
 dependencies = [
@@ -914,7 +927,9 @@ dependencies = [
  "clap",
  "dirs",
  "ignore",
+ "indexmap",
  "marki-core",
+ "marki-flag",
  "marki-map",
  "notify",
  "notify-debouncer-full",

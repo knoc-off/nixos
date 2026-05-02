@@ -4,6 +4,7 @@ members = [
     "crates/marki-core",
     "crates/marki-macros",
     "crates/marki-map",
+    "crates/marki-flag",
     "crates/markid",
 ]
 
@@ -46,3 +47,4 @@ shapefile = "0.6"
 marki-core = { path = "crates/marki-core" }
 marki-macros = { path = "crates/marki-macros" }
 marki-map = { path = "crates/marki-map" }
+marki-flag = { path = "crates/marki-flag" }
