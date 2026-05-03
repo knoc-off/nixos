@@ -14,6 +14,7 @@
 //! pipeline lands in steps 3–7.
 
 pub mod cache;
+pub mod cluster;
 pub mod compose;
 pub mod data;
 pub mod dsl;
@@ -26,6 +27,7 @@ pub mod project;
 pub mod sidecar;
 pub mod simplify;
 pub mod style;
+pub mod unwrap;
 pub mod version;
 
 use marki_core::{BlockError, BlockRenderer, RenderCtx, RenderedBlock};

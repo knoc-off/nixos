@@ -22,11 +22,6 @@
   shapefiles. Wired through `services.markid.naturalEarthData`
   (default = derivation), exposed at runtime as
   `NATURAL_EARTH_DATA`.
-- `country/<ISO>/mainland` feature reference: returns only the
-  largest connected component of a country's geometry. Pairs well
-  with explicit neighbour references for atlases of multi-territory
-  countries (`USA`, `FRA`, `GBR`, …). No-op for single-bloc
-  countries.
 - `region/<ISO>/<NAME>` feature reference: composite of all admin-1
   entries whose NE `region` column matches. Use for Italian regioni
   (`region/ITA/Sicily`), French régions (`region/FRA/Île-de-France`),
@@ -38,6 +33,19 @@
   and sets `NATURAL_EARTH_DATA` for exploring NE data with `ogrinfo`.
 - Authoring docs: new "Finding feature IDs" and "admin1 vs. region"
   sections in `crates/marki-map/README.md`.
+- Smart viewport: `country/<ISO>` now auto-focuses on the main
+  cluster of polygon components — `country/USA` shows CONUS + Alaska
+  + Aleutians without losing Hawaii from the geometry (Hawaii is
+  drawn but clipped by the viewBox); `country/FRA` shows Metropolitan
+  + Corsica without zooming out for Guiana; `country/ITA` keeps
+  Sicily and Sardinia in frame. Highlighting an outlying region (e.g.
+  `highlights = ["admin1/USA/Hawaii"]`) stretches the viewport to
+  include the highlight.
+- Cross-dateline maps (NZ + Fiji, Russia + Alaska, Pacific Rim, …)
+  now pick an optimal central meridian automatically and project as
+  a tight contiguous bbox instead of a 350°-wide world span. No DSL
+  changes required — write `features = ["country/NZL", "country/FJI"]`
+  and you'll get a correct Pacific view.
 
 ### Changed
 
@@ -50,13 +58,15 @@
   `highlights` (list of strings). Multiple regions can now be
   highlighted in a single layer — Italy's industrial triangle card
   drops from 4 layers to 2.
+- **Breaking DSL**: removed the `/mainland` modifier from
+  `country/`, `continent/`, and `subregion/` references. The smart
+  viewport (above) supersedes it: geometry is always full, viewport
+  auto-focuses on the main cluster. Cards that still write
+  `country/USA/mainland` get a resolve error — drop the suffix.
 - `continent/<name>` and `subregion/<name>` feature references:
   composite MultiPolygon of all countries in a UN continent or
   subregion (read from NE's `CONTINENT` / `SUBREGION` columns).
   `features = ["continent/Europe"]` draws all ~45 European countries.
-  Both support a `/mainland` modifier (`continent/Europe/mainland`)
-  that uses each country's largest polygon only, excluding overseas
-  territories.
 - Per-layer style override: layers can now carry a `[layers.X.style]`
   sub-table with `fill`, `stroke`, and `stroke_width` to override the
   theme's highlight role per layer. Unset fields inherit from the theme.
@@ -77,7 +87,10 @@
 - SVG compose now renders roles in explicit stacking order
   (coast → neighbor → outline → highlight) instead of alphabetical.
   Fixes highlight-on-base-layer being buried under opaque country fills.
-- `RENDER_VERSION_MAP` bumped to `11`. Existing render cache entries
+- `neighbors/<ISO>` now returns each neighbour's full geometry rather
+  than only the largest polygon. Smart viewport handles outlying
+  components correctly.
+- `RENDER_VERSION_MAP` bumped to `15`. Existing render cache entries
   will rebuild lazily on next sync.
 - `marki-map` default projection is now Mercator (was equirectangular).
   Mid-latitude regions like Germany no longer appear horizontally

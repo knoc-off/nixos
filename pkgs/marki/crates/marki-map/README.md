@@ -93,11 +93,9 @@ The renderer understands these reference shapes:
 - `coastline` — every coastline polyline from Natural Earth.
 - `country/<ISO_A3>` — one country by three-letter ISO code (`DEU`,
   `FRA`, `JPN`, …). Source: Natural Earth `ne_10m_admin_0_countries`.
-- `country/<ISO_A3>/mainland` — same as `country/<ISO_A3>` but
-  returns only the largest connected component. Use this when you
-  want Continental US instead of US + Alaska + Hawaii, or
-  metropolitan France instead of France + French Guiana + Réunion.
-  No-op for single-bloc countries (`DEU`, `POL`, `CHE`, …).
+  Always returns the full geometry; outlying components (Alaska,
+  French Guiana, Chatham Islands, …) are drawn but the viewport is
+  auto-focused on the main cluster — see "Auto-focus" below.
 - `admin1/<ISO_A3>/<NAME>` — one admin-1 entry inside a country
   (province, state, oblast, …). Indexed by both `name_en` and
   `name` (case-insensitive). Source: Natural Earth
@@ -114,18 +112,50 @@ The renderer understands these reference shapes:
   `CONTINENT` column matches (case-insensitive). Values: `Africa`,
   `Antarctica`, `Asia`, `Europe`, `North America`, `Oceania`,
   `South America`.
-- `continent/<NAME>/mainland` — same as above but each country
-  contributes only its largest polygon (no overseas territories).
 - `subregion/<NAME>` — composite of all countries whose NE
   `SUBREGION` column matches (case-insensitive). Values include
   `Western Europe`, `Eastern Europe`, `Southern Europe`,
   `Northern Europe`, `Northern Africa`, `Central America`,
   `South-Eastern Asia`, etc. (~20 UN subregions).
-- `subregion/<NAME>/mainland` — mainland variant of the above.
 - `relation/<N>` and `way/<N>` — fetched from
   [Overpass](https://overpass-api.de/) and cached
   content-addressably. Use this when Natural Earth's admin-1
   boundaries don't match the political boundary you want.
+
+## Auto-focus
+
+Most countries with overseas territories (USA + Alaska + Hawaii,
+France + Corsica + Guiana, NZ + Chatham, …) would otherwise produce
+a viewport so wide that the main landmass is a tiny dot.
+
+The renderer auto-focuses on the **main cluster** of polygon
+components: it picks the largest by area as a seed and pulls in any
+component whose bbox lies within `0.3 ×` the seed's diagonal.
+
+Concretely:
+
+- `country/USA` → CONUS + Alaska + Aleutians (Hawaii drawn but clipped).
+- `country/FRA` → Metropolitan France + Corsica (Guiana drawn but clipped).
+- `country/NZL` → North + South Islands (Chatham drawn but clipped).
+- `country/ITA` → Peninsula + Sicily + Sardinia.
+- `country/DEU`, `country/POL`, `country/CHE` → unchanged (single component).
+
+If you explicitly highlight an outlying region — say
+`highlights = ["admin1/USA/Hawaii"]` over a `country/USA` base — the
+viewport stretches to include the highlight, so your answer never
+gets clipped.
+
+Geometry is **never thrown away**. Outlying islands always render;
+they just fall outside the SVG viewBox in the unfocused case.
+
+## World-wrapping
+
+For maps that span the antimeridian (NZ + Fiji, Russia + Alaska, …)
+the renderer picks an optimal central meridian so the data forms a
+contiguous coordinate range — no more 350°-wide bboxes that fill the
+canvas with empty ocean. Authors don't need to think about this;
+write `features = ["country/NZL", "country/FJI"]` and you'll get a
+tight Pacific view.
 
 ### admin1 vs. region
 
@@ -160,16 +190,6 @@ extras for unrecognised territories).
   `DEU FRA GBR ITA ESP NLD BEL CHE AUT POL CZE`
   `SWE NOR FIN DNK IRL PRT GRC TUR UKR RUS`
   `USA CAN MEX BRA ARG CHL JPN CHN KOR IND IDN AUS NZL ZAF EGY`
-
-### `country/<ISO_A3>/mainland`
-
-Returns only the largest connected component of the country's
-geometry. Useful for atlas-style outlines of countries with distant
-territories: `USA`, `FRA`, `GBR`, `NLD`, `RUS`, `NOR`, `DNK`, `ESP`,
-`PRT`, `AUS`, `NZL`, `JPN`, `IDN`, `PHL`, `CHN`, …
-
-For single-island / single-bloc countries (`DEU`, `POL`, `CHE`,
-`AND`, …) it's a no-op — same geometry as `country/<ISO_A3>`.
 
 ### `admin1/<ISO_A3>/<NAME>` and `region/<ISO_A3>/<NAME>`
 

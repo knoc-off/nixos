@@ -19,6 +19,7 @@
 //! blank top/bottom strips.
 
 use crate::cache::{self, CacheFile};
+use crate::cluster;
 use crate::compose::{Feature, compose_layer};
 use crate::data::{natural_earth, overpass};
 use crate::dsl::{MapSpec, RevealMode};
@@ -29,6 +30,7 @@ use crate::hash::cache_key;
 use crate::project::{Mercator, Projector};
 use crate::sidecar::{Sidecar, SidecarLayer};
 use crate::style::load as load_theme;
+use crate::unwrap;
 use marki_core::{AssetMime, EmittedAsset, RenderedBlock};
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -58,10 +60,26 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
     }
 
     // ---- Resolve.
-    let resolved = resolve_all_layers(spec, cache_root)?;
+    let mut resolved = resolve_all_layers(spec, cache_root)?;
+
+    // ---- Pick optimal central meridian and rotate every geometry into
+    //      that frame. This lets cross-dateline regions (NZ + Fiji,
+    //      Russia + Alaska, …) project as a tight contiguous bbox
+    //      instead of a 350°-wide world span.
+    let central = pick_central_meridian(&resolved);
+    if central.abs() > f64::EPSILON {
+        for layer in &mut resolved {
+            for (g, _, _) in &mut layer.features {
+                unwrap::rotate_geometry(g, central);
+            }
+        }
+    }
 
     // ---- Compute padded bbox + render-time canvas dimensions.
-    let padded = combined_bbox(&resolved)?.padded(0.05);
+    //      Viewport focuses on the main cluster of features; outlying
+    //      components (Alaska on a USA-without-highlight map, Hawaii
+    //      on USA, …) still get drawn but fall outside the viewBox.
+    let padded = viewport_bbox(&resolved)?.padded(0.05);
     let aspect = Mercator::projected_aspect(padded);
     let (render_w, render_h) = fit_canvas(spec.size, aspect);
     let projector: Box<dyn Projector> =
@@ -238,16 +256,77 @@ fn role_for_feature_ref(r: &str, layer_name: &str) -> &'static str {
     }
 }
 
-fn combined_bbox(layers: &[ResolvedLayer<'_>]) -> Result<BBox, MapError> {
-    let mut bb = BBox::empty();
+/// Pick the optimal central meridian for the given resolved layers.
+///
+/// We sample longitudes from every viewport-contributing feature
+/// (`features` and `highlights`, but NOT `context` — context is purely
+/// decorative, so it shouldn't influence the rotation). Then [`unwrap::central_meridian`]
+/// picks the antipode of the largest empty arc.
+///
+/// Returns `0.0` when the data already sits in a contiguous range
+/// around the prime meridian — in which case the rotation step is a
+/// no-op and gets skipped at the call site.
+fn pick_central_meridian(layers: &[ResolvedLayer<'_>]) -> f64 {
+    let mut lons: Vec<f64> = Vec::new();
     for l in layers {
         for (g, _, is_context) in &l.features {
-            if !is_context {
-                bb.extend(g.bbox());
+            if *is_context {
+                continue;
+            }
+            unwrap::collect_lons(g, &mut lons);
+        }
+    }
+    unwrap::central_meridian(lons)
+}
+
+/// Viewport bbox using the "main cluster" heuristic.
+///
+/// Geometry is split into three buckets by purpose:
+///   * **focus** features (non-context, non-highlight) — the base
+///     geometry whose dominant landmass should fill the canvas.
+///   * **highlights** — always stretch the viewport to include them
+///     (so a Hawaii highlight on a USA base correctly spans the
+///     Pacific).
+///   * **context** — drawn but excluded from the viewport entirely.
+///
+/// Focus features go through [`cluster::main_cluster_bbox`] which picks
+/// the largest connected cluster of polygon components; Hawaii / French
+/// Guiana / Chatham Islands are drawn but clipped by the viewBox.
+fn viewport_bbox(layers: &[ResolvedLayer<'_>]) -> Result<BBox, MapError> {
+    let mut focus: Vec<&Geometry> = Vec::new();
+    let mut highlights: Vec<&Geometry> = Vec::new();
+    for l in layers {
+        for (g, role, is_context) in &l.features {
+            if *is_context {
+                continue;
+            }
+            if *role == "highlight" {
+                highlights.push(g);
+            } else {
+                focus.push(g);
             }
         }
     }
+
+    // 1. Main cluster of focus features. Falls back to plain union for
+    //    line-only inputs (coastline) which have no polygon area.
+    let mut bb = cluster::main_cluster_bbox(&focus, cluster::DEFAULT_CLUSTER_FACTOR)
+        .unwrap_or_else(|| {
+            let mut acc = BBox::empty();
+            for g in &focus {
+                acc.extend(g.bbox());
+            }
+            acc
+        });
+
+    // 2. Highlights ALWAYS stretch the viewport (full bbox).
+    for g in &highlights {
+        bb.extend(g.bbox());
+    }
+
     if bb.is_empty() {
+        // Nothing resolved (or only `context`) — fall back to a
+        // standard world bbox so the renderer still produces something.
         return Ok(BBox {
             min_lon: -180.0,
             min_lat: -85.0,

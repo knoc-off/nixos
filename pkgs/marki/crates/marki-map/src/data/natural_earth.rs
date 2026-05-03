@@ -9,10 +9,9 @@
 //!
 //!   * `coastline` — every coastline polyline.
 //!   * `country/<ISO_A3>` — one country polygon (or multipolygon) by
-//!     three-letter ISO code (`DEU`, `FRA`, …).
-//!   * `country/<ISO_A3>/mainland` — same as above but only the
-//!     largest connected component (e.g. Continental US, mainland
-//!     France). For single-bloc countries this is a no-op.
+//!     three-letter ISO code (`DEU`, `FRA`, …). Always the full
+//!     geometry; the renderer focuses the viewport on the main
+//!     cluster automatically (see `cluster.rs`).
 //!   * `admin1/<ISO_A3>/<NAME>` — one admin-1 entry (province, state,
 //!     oblast, …) inside a country by ISO + name. Indexed by both
 //!     `name_en` and `name` (case-insensitive).
@@ -22,6 +21,8 @@
 //!   * `neighbors/<ISO_A3>` — every country that shares a border
 //!     segment with the target (topological adjacency). Falls back
 //!     to bbox-intersect for island nations with no shared edges.
+//!   * `continent/<NAME>` and `subregion/<NAME>` — composite of every
+//!     country in the named NE `CONTINENT` / `SUBREGION` group.
 //!
 //! The resolver caches the parsed dataset per process; subsequent
 //! lookups are in-memory.
@@ -55,13 +56,9 @@ struct NeIndex {
     /// Continent-level composites by lowercase continent name.
     /// Built from the NE `CONTINENT` column on admin-0 records.
     continents: HashMap<String, NeFeature>,
-    /// Continent composites using each country's mainland only.
-    continent_mainlands: HashMap<String, NeFeature>,
     /// UN subregion composites by lowercase subregion name.
     /// Built from the NE `SUBREGION` column on admin-0 records.
     subregions: HashMap<String, NeFeature>,
-    /// Subregion composites using each country's mainland only.
-    subregion_mainlands: HashMap<String, NeFeature>,
     /// All coastline lines, grouped into one MultiLineString-like
     /// list. We keep them as a Vec so the bbox of a region-of-interest
     /// can still filter at draw time.
@@ -121,24 +118,25 @@ fn index() -> Result<&'static NeIndex, MapError> {
 
 /// Resolve one feature reference like `country/DEU` to a [`Geometry`].
 /// `coastline` and `neighbors/<ISO>` return composite geometries.
+///
+/// Geometry is always the *full* shape (every polygon component, every
+/// overseas territory). The pipeline picks an appropriate viewport via
+/// [`crate::cluster`].
 pub fn resolve_feature(name: &str) -> Result<Geometry, MapError> {
     let idx = index()?;
     if let Some(rest) = name.strip_prefix("country/") {
-        let (iso, modifier) = match rest.split_once('/') {
-            Some((iso, m)) => (iso, Some(m)),
-            None => (rest, None),
-        };
+        if rest.contains('/') {
+            return Err(MapError::Resolve(format!(
+                "country refs no longer take a modifier; got `{name}`. \
+                 The `/mainland` suffix has been removed — viewport now \
+                 auto-focuses on the main cluster."
+            )));
+        }
         let feat = idx
             .countries
-            .get(iso)
-            .ok_or_else(|| MapError::Resolve(format!("unknown country: {iso}")))?;
-        return match modifier {
-            None => Ok(feat.geom.clone()),
-            Some("mainland") => Ok(largest_polygon(&feat.geom)),
-            Some(other) => Err(MapError::Resolve(format!(
-                "unknown country modifier: {other} (expected nothing or `mainland`)"
-            ))),
-        };
+            .get(rest)
+            .ok_or_else(|| MapError::Resolve(format!("unknown country: {rest}")))?;
+        return Ok(feat.geom.clone());
     }
     if let Some(rest) = name.strip_prefix("admin1/") {
         let (iso, region) = rest
@@ -190,8 +188,9 @@ pub fn resolve_feature(name: &str) -> Result<Geometry, MapError> {
         let mut polys: Vec<Polygon> = Vec::new();
         for iso in isos {
             if let Some(feat) = idx.countries.get(iso) {
-                let mainland = largest_polygon(&feat.geom);
-                match &mainland {
+                // Pass the full geometry; viewport clustering on the
+                // pipeline side handles outlying components.
+                match &feat.geom {
                     Geometry::Polygon { outer, holes } => polys.push(Polygon {
                         outer: outer.clone(),
                         holes: holes.clone(),
@@ -204,48 +203,32 @@ pub fn resolve_feature(name: &str) -> Result<Geometry, MapError> {
         return Ok(Geometry::MultiPolygon(polys));
     }
     if let Some(rest) = name.strip_prefix("continent/") {
-        let (cname, modifier) = match rest.split_once('/') {
-            Some((n, m)) => (n, Some(m)),
-            None => (rest, None),
-        };
-        let key = cname.to_lowercase();
-        return match modifier {
-            None => idx
-                .continents
-                .get(&key)
-                .map(|f| f.geom.clone())
-                .ok_or_else(|| MapError::Resolve(format!("unknown continent: {cname}"))),
-            Some("mainland") => idx
-                .continent_mainlands
-                .get(&key)
-                .map(|f| f.geom.clone())
-                .ok_or_else(|| MapError::Resolve(format!("unknown continent: {cname}"))),
-            Some(other) => Err(MapError::Resolve(format!(
-                "unknown continent modifier: {other} (expected nothing or `mainland`)"
-            ))),
-        };
+        if rest.contains('/') {
+            return Err(MapError::Resolve(format!(
+                "continent refs no longer take a modifier; got `{name}`. \
+                 The `/mainland` suffix has been removed."
+            )));
+        }
+        let key = rest.to_lowercase();
+        return idx
+            .continents
+            .get(&key)
+            .map(|f| f.geom.clone())
+            .ok_or_else(|| MapError::Resolve(format!("unknown continent: {rest}")));
     }
     if let Some(rest) = name.strip_prefix("subregion/") {
-        let (sname, modifier) = match rest.split_once('/') {
-            Some((n, m)) => (n, Some(m)),
-            None => (rest, None),
-        };
-        let key = sname.to_lowercase();
-        return match modifier {
-            None => idx
-                .subregions
-                .get(&key)
-                .map(|f| f.geom.clone())
-                .ok_or_else(|| MapError::Resolve(format!("unknown subregion: {sname}"))),
-            Some("mainland") => idx
-                .subregion_mainlands
-                .get(&key)
-                .map(|f| f.geom.clone())
-                .ok_or_else(|| MapError::Resolve(format!("unknown subregion: {sname}"))),
-            Some(other) => Err(MapError::Resolve(format!(
-                "unknown subregion modifier: {other} (expected nothing or `mainland`)"
-            ))),
-        };
+        if rest.contains('/') {
+            return Err(MapError::Resolve(format!(
+                "subregion refs no longer take a modifier; got `{name}`. \
+                 The `/mainland` suffix has been removed."
+            )));
+        }
+        let key = rest.to_lowercase();
+        return idx
+            .subregions
+            .get(&key)
+            .map(|f| f.geom.clone())
+            .ok_or_else(|| MapError::Resolve(format!("unknown subregion: {rest}")));
     }
     Err(MapError::Resolve(format!("unsupported feature ref: {name}")))
 }
@@ -314,9 +297,7 @@ fn load_admin0(path: &Path, idx: &mut NeIndex) -> Result<(), MapError> {
         .map_err(|e| MapError::Resolve(format!("read {}: {e}", path.display())))?;
 
     let mut continent_buckets: HashMap<String, Vec<(Geometry, BBox)>> = HashMap::new();
-    let mut continent_ml_buckets: HashMap<String, Vec<(Geometry, BBox)>> = HashMap::new();
     let mut subregion_buckets: HashMap<String, Vec<(Geometry, BBox)>> = HashMap::new();
-    let mut subregion_ml_buckets: HashMap<String, Vec<(Geometry, BBox)>> = HashMap::new();
 
     for rec in reader.iter_shapes_and_records() {
         let (shape, record) = rec
@@ -334,20 +315,20 @@ fn load_admin0(path: &Path, idx: &mut NeIndex) -> Result<(), MapError> {
         };
         let bbox = geom.bbox();
 
-        // Accumulate into continent / subregion buckets.
+        // Accumulate into continent / subregion buckets. Each country
+        // contributes its full geometry — viewport clustering handles
+        // outlying components on the rendering side.
         if let Some(c) = record.get("CONTINENT").and_then(char_field) {
-            let c_lower = c.to_lowercase();
-            continent_buckets.entry(c_lower.clone()).or_default().push((geom.clone(), bbox));
-            let ml = largest_polygon(&geom);
-            let ml_bbox = ml.bbox();
-            continent_ml_buckets.entry(c_lower).or_default().push((ml, ml_bbox));
+            continent_buckets
+                .entry(c.to_lowercase())
+                .or_default()
+                .push((geom.clone(), bbox));
         }
         if let Some(s) = record.get("SUBREGION").and_then(char_field) {
-            let s_lower = s.to_lowercase();
-            subregion_buckets.entry(s_lower.clone()).or_default().push((geom.clone(), bbox));
-            let ml = largest_polygon(&geom);
-            let ml_bbox = ml.bbox();
-            subregion_ml_buckets.entry(s_lower).or_default().push((ml, ml_bbox));
+            subregion_buckets
+                .entry(s.to_lowercase())
+                .or_default()
+                .push((geom.clone(), bbox));
         }
 
         idx.country_bbox.insert(iso.clone(), bbox);
@@ -356,9 +337,7 @@ fn load_admin0(path: &Path, idx: &mut NeIndex) -> Result<(), MapError> {
 
     // Fold buckets into composite MultiPolygon features.
     fold_into_composites(continent_buckets, &mut idx.continents);
-    fold_into_composites(continent_ml_buckets, &mut idx.continent_mainlands);
     fold_into_composites(subregion_buckets, &mut idx.subregions);
-    fold_into_composites(subregion_ml_buckets, &mut idx.subregion_mainlands);
 
     Ok(())
 }
@@ -686,53 +665,6 @@ fn normalize_antimeridian(pts: &mut [LonLat]) {
     }
 }
 
-// ---------- helpers ----------
-
-/// Return the largest-area component of a country geometry as a
-/// single `Polygon`. For an already-single Polygon, returns it
-/// unchanged. Lines/points are passed through (the `mainland`
-/// modifier is meaningless for them).
-fn largest_polygon(g: &Geometry) -> Geometry {
-    match g {
-        Geometry::Polygon { outer, holes } => Geometry::Polygon {
-            outer: outer.clone(),
-            holes: holes.clone(),
-        },
-        Geometry::MultiPolygon(polys) => {
-            let mut best: Option<&Polygon> = None;
-            let mut best_area = -1.0;
-            for p in polys {
-                let a = ring_area(&p.outer).abs();
-                if a > best_area {
-                    best = Some(p);
-                    best_area = a;
-                }
-            }
-            match best {
-                Some(p) => Geometry::Polygon {
-                    outer: p.outer.clone(),
-                    holes: p.holes.clone(),
-                },
-                None => Geometry::MultiPolygon(vec![]),
-            }
-        }
-        other => other.clone(),
-    }
-}
-
-/// Signed shoelace area of a closed ring.
-fn ring_area(pts: &[LonLat]) -> f64 {
-    if pts.len() < 3 {
-        return 0.0;
-    }
-    let mut acc = 0.0;
-    for i in 0..pts.len() {
-        let j = (i + 1) % pts.len();
-        acc += pts[i].lon * pts[j].lat - pts[j].lon * pts[i].lat;
-    }
-    acc * 0.5
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -762,52 +694,6 @@ mod tests {
                 LonLat { lon: min_lon, lat: min_lat },
             ],
             holes: vec![],
-        }
-    }
-
-    #[test]
-    fn ring_area_signed_shoelace() {
-        let ccw = vec![
-            LonLat { lon: 0.0, lat: 0.0 },
-            LonLat { lon: 1.0, lat: 0.0 },
-            LonLat { lon: 1.0, lat: 1.0 },
-            LonLat { lon: 0.0, lat: 1.0 },
-            LonLat { lon: 0.0, lat: 0.0 },
-        ];
-        assert!((ring_area(&ccw) - 1.0).abs() < 1e-9);
-        let cw: Vec<LonLat> = ccw.iter().rev().copied().collect();
-        assert!((ring_area(&cw) + 1.0).abs() < 1e-9);
-        assert_eq!(ring_area(&[]), 0.0);
-        assert_eq!(ring_area(&ccw[..2]), 0.0);
-    }
-
-    #[test]
-    fn largest_polygon_picks_biggest_outer_ring() {
-        let big = square(0.0, 0.0, 10.0);
-        let tiny = square(50.0, 50.0, 1.0);
-        let g = Geometry::MultiPolygon(vec![tiny.clone(), big.clone()]);
-        match largest_polygon(&g) {
-            Geometry::Polygon { outer, holes } => {
-                assert_eq!(outer, big.outer);
-                assert!(holes.is_empty());
-            }
-            other => panic!("expected Polygon, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn largest_polygon_passthrough_for_single_polygon() {
-        let only = square(0.0, 0.0, 5.0);
-        let g = Geometry::Polygon {
-            outer: only.outer.clone(),
-            holes: only.holes.clone(),
-        };
-        match largest_polygon(&g) {
-            Geometry::Polygon { outer, holes } => {
-                assert_eq!(outer, only.outer);
-                assert_eq!(holes.len(), only.holes.len());
-            }
-            other => panic!("expected Polygon, got {other:?}"),
         }
     }
 

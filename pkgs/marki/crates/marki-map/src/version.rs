@@ -18,5 +18,11 @@
 //!   bbox).
 //! - `5` — base layer always emitted first in the DOM so overlays
 //!   stack on top (fixes highlight invisible behind base).
+//! - `15` — viewport now auto-focuses on the main cluster of
+//!   components (CONUS + Alaska on `country/USA`, peninsula + Sicily
+//!   + Sardinia on `country/ITA`, …). Cross-dateline maps (NZ + Fiji,
+//!   Russia + Alaska) pick an optimal central meridian so the bbox
+//!   stays tight. The `/mainland` modifier is removed; geometry is
+//!   always full and outliers clip naturally outside the viewBox.
 
-pub const RENDER_VERSION_MAP: u32 = 14;
+pub const RENDER_VERSION_MAP: u32 = 15;
