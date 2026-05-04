@@ -98,6 +98,13 @@ pub struct EmittedAsset {
 pub enum AssetMime {
     SvgXml,
     ImagePng,
+    ImageJpeg,
+    ImageWebp,
+    ImageGif,
+    AudioMpeg,
+    AudioOgg,
+    AudioMp4,
+    AudioWav,
     ApplicationJson,
 }
 
@@ -106,6 +113,13 @@ impl AssetMime {
         match self {
             AssetMime::SvgXml => "image/svg+xml",
             AssetMime::ImagePng => "image/png",
+            AssetMime::ImageJpeg => "image/jpeg",
+            AssetMime::ImageWebp => "image/webp",
+            AssetMime::ImageGif => "image/gif",
+            AssetMime::AudioMpeg => "audio/mpeg",
+            AssetMime::AudioOgg => "audio/ogg",
+            AssetMime::AudioMp4 => "audio/mp4",
+            AssetMime::AudioWav => "audio/wav",
             AssetMime::ApplicationJson => "application/json",
         }
     }

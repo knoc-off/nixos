@@ -187,7 +187,7 @@ in {
       services.markid = {
         enable = true;
         settings.cards_dir = "/home/knoff/projects/flashcards";
-        flagSources = {
+        mediaSources = {
           circle = "${pkgs.circle-flags}/share/circle-flags-svg";
           flags = "${hayleox-flags}/share/hayleox-flags";
         };

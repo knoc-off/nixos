@@ -1,14 +1,12 @@
 [package]
-name = "marki-flag"
+name = "marki-media"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [dependencies]
-base64.workspace = true
-indexmap.workspace = true
+blake3.workspace = true
 marki-core.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 toml.workspace = true
-tracing.workspace = true

@@ -32,7 +32,7 @@ with lib; let
 
   markidConfig = tomlFormat.generate "markid-config.toml" (
     cfg.settings
-    // (if cfg.flagSources != {} then { flag_sources = cfg.flagSources; } else {})
+    // (if cfg.mediaSources != {} then { media_sources = cfg.mediaSources; } else {})
   );
 
   # Build an Anki wrapper with AnkiConnect pre-installed so Anki itself
@@ -85,7 +85,7 @@ in {
           - `anki_endpoint` (string): default `http://127.0.0.1:8765`
           - `sync_interval` (string or int): e.g. `"5m"` or `300`
           - `debounce_ms` (int): default `250`
-          - `flag_sources` (table, optional): named flag directories for ```flag``` blocks. Prefer the `flagSources` option — it merges into this table automatically.
+          - `media_sources` (table, optional): named media directories for ```media``` blocks. Prefer the `mediaSources` option — it merges into this table automatically.
       '';
       example = literalExpression ''
         {
@@ -116,28 +116,33 @@ in {
       '';
     };
 
-    flagDir = mkOption {
+    mediaDir = mkOption {
       type = types.nullOr types.path;
       default = null;
       description = ''
-        Single flag SVG directory — convenience shorthand for a single
-        unnamed source. Prefer `flagSources` for multiple collections.
-        Exposed via `MARKID_FLAG_DIR`; searched after any named sources.
+        Single media directory — convenience shorthand for a single
+        unnamed source. Prefer `mediaSources` for multiple collections.
+        Exposed via `MARKID_MEDIA_DIR`; searched after any named sources.
       '';
     };
 
-    flagSources = mkOption {
+    mediaSources = mkOption {
       type = types.attrsOf types.path;
       default = {};
       description = ''
-        Named flag SVG sources for the `flag` block renderer. Each key
+        Named media sources for the `media` block renderer. Each key
         is a source name usable as a prefix in the DSL
-        (`flag = "circle/de"`), and the value is the directory containing
-        SVGs. Order matters: when no prefix is given, sources are
-        searched in definition order and the first match wins.
+        (`src = "circle/de"`), and the value is a directory containing
+        the media files (images and/or audio). Order matters: when no
+        prefix is given, sources are searched in definition order and
+        the first match wins.
 
-        Written to `[flag_sources]` in `config.toml`. Set to `{}` to
-        disable — any ```flag``` blocks then fall through to plain code
+        Supported file extensions:
+          - Images: svg, png, webp, jpg, jpeg, gif
+          - Audio: mp3, ogg, m4a, wav
+
+        Written to `[media_sources]` in `config.toml`. Set to `{}` to
+        disable — any ```media``` blocks then fall through to plain code
         rendering.
       '';
       example = literalExpression ''
@@ -309,8 +314,8 @@ in {
             ]
             ++ optional (cfg.naturalEarthData != null)
             "NATURAL_EARTH_DATA=${cfg.naturalEarthData}"
-            ++ optional (cfg.flagDir != null)
-            "MARKID_FLAG_DIR=${cfg.flagDir}";
+            ++ optional (cfg.mediaDir != null)
+            "MARKID_MEDIA_DIR=${cfg.mediaDir}";
           Restart = "on-failure";
           RestartSec = 5;
         };

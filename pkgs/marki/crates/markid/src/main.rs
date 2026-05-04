@@ -32,11 +32,11 @@ struct Cli {
     #[arg(long, env = "MARKID_ANKICONNECT", global = true)]
     anki_endpoint: Option<String>,
 
-    /// Override the directory containing flag SVGs used by ```flag``` blocks.
-    /// Adds a single unnamed source (searched last, after any [flag_sources]
+    /// Override the directory containing media files used by ```media``` blocks.
+    /// Adds a single unnamed source (searched last, after any [media_sources]
     /// configured in the config file).
-    #[arg(long, env = "MARKID_FLAG_DIR", global = true)]
-    flag_dir: Option<PathBuf>,
+    #[arg(long, env = "MARKID_MEDIA_DIR", global = true)]
+    media_dir: Option<PathBuf>,
 
     #[command(subcommand)]
     cmd: Cmd,
@@ -77,7 +77,7 @@ fn main() -> Result<()> {
 
     // RenderMap doesn't need a working AnkiConnect — but it does want
     // the same renderer registry the daemon uses, which in turn wants
-    // config (for `flag_dir`). Load the config the same way as below.
+    // config (for `media_dir`). Load the config the same way as below.
     if let Cmd::RenderMap { file, out } = &cli.cmd {
         let cfg = load_config_for_render(&cli)?;
         let registry = build_registry(&cfg);
@@ -107,21 +107,21 @@ fn main() -> Result<()> {
     }
 }
 
-/// Build the external block-renderer registry. The flag renderer is
-/// only registered when at least one flag source is configured —
-/// otherwise ```flag``` blocks fall through to plain code rendering.
+/// Build the external block-renderer registry. The media renderer is
+/// only registered when at least one media source is configured —
+/// otherwise ```media``` blocks fall through to plain code rendering.
 fn build_registry(cfg: &Config) -> Registry {
     let mut reg = Registry::new();
     reg.register(Box::new(marki_map::MapRenderer::new()));
 
     let sources: Vec<(String, std::path::PathBuf)> = cfg
-        .flag_sources
+        .media_sources
         .iter()
         .map(|(name, dir)| (name.clone(), dir.clone()))
         .collect();
 
     if !sources.is_empty() {
-        reg.register(Box::new(marki_flag::FlagRenderer::new(sources)));
+        reg.register(Box::new(marki_media::MediaRenderer::new(sources)));
     }
     reg
 }
@@ -151,7 +151,7 @@ fn load_config(cli: &Cli) -> Result<Config> {
             anki_endpoint: "http://127.0.0.1:8765".into(),
             sync_interval: Duration::from_secs(300),
             debounce_ms: 250,
-            flag_sources: Default::default(),
+            media_sources: Default::default(),
         }
     };
 
@@ -161,8 +161,8 @@ fn load_config(cli: &Cli) -> Result<Config> {
     if let Some(e) = &cli.anki_endpoint {
         cfg.anki_endpoint = e.clone();
     }
-    if let Some(p) = &cli.flag_dir {
-        cfg.flag_sources
+    if let Some(p) = &cli.media_dir {
+        cfg.media_sources
             .entry("_default".into())
             .or_insert_with(|| p.clone());
     }
@@ -174,7 +174,7 @@ fn load_config(cli: &Cli) -> Result<Config> {
 
 /// Like [`load_config`] but doesn't require `cards_dir` — used by the
 /// offline `render-map` subcommand which only needs the renderer
-/// registry config (e.g. `flag_dir`).
+/// registry config (e.g. `media_dir`).
 fn load_config_for_render(cli: &Cli) -> Result<Config> {
     let path = cli.config.clone().or_else(Config::default_path);
 
@@ -187,12 +187,12 @@ fn load_config_for_render(cli: &Cli) -> Result<Config> {
             anki_endpoint: "http://127.0.0.1:8765".into(),
             sync_interval: Duration::from_secs(300),
             debounce_ms: 250,
-            flag_sources: Default::default(),
+            media_sources: Default::default(),
         },
     };
 
-    if let Some(p) = &cli.flag_dir {
-        cfg.flag_sources
+    if let Some(p) = &cli.media_dir {
+        cfg.media_sources
             .entry("_default".into())
             .or_insert_with(|| p.clone());
     }

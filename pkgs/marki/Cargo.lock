@@ -878,19 +878,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "marki-flag"
-version = "0.3.0"
-dependencies = [
- "base64",
- "indexmap",
- "marki-core",
- "serde",
- "thiserror",
- "toml",
- "tracing",
-]
-
-[[package]]
 name = "marki-macros"
 version = "0.3.0"
 dependencies = [
@@ -918,6 +905,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "marki-media"
+version = "0.3.0"
+dependencies = [
+ "blake3",
+ "marki-core",
+ "serde",
+ "thiserror",
+ "toml",
+]
+
+[[package]]
 name = "markid"
 version = "0.3.0"
 dependencies = [
@@ -929,8 +927,8 @@ dependencies = [
  "ignore",
  "indexmap",
  "marki-core",
- "marki-flag",
  "marki-map",
+ "marki-media",
  "notify",
  "notify-debouncer-full",
  "reqwest",

@@ -4,6 +4,62 @@
 
 ### Added
 
+- New `marki-media` crate (replaces `marki-flag`): renders fenced
+  ` ```media ` blocks to images or audio. Supports both image
+  (svg/png/webp/jpg/jpeg/gif) and audio (mp3/ogg/m4a/wav) types.
+  The block author's `src` field can omit the file extension — the
+  resolver tries a fixed preference list (svg → png → webp → jpg
+  → jpeg → gif → mp3 → ogg → m4a → wav) and infers the renderer
+  from the resolved file. Multiple named sources, search-all
+  fallback, prefix routing, and case-insensitive lookup all work
+  the same as the old flag block.
+- `marki-media` emits a content-addressed `EmittedAsset` instead of
+  inlining base64 into the HTML, matching how `marki-map` ships its
+  SVGs. Smaller HTML, native Anki media-collection dedup.
+
+### Changed
+
+- **Breaking DSL**: `flag` block lang renamed to `media`. The
+  `flag = "..."` and `country = "..."` fields are replaced by
+  `src = "..."`. `deny_unknown_fields` means existing cards using
+  the old shape get an immediate parse error. One-shot migration
+  in the cards repo:
+  ```bash
+  find . -name '*.md' -print0 | xargs -0 sed -i '
+    s/^```flag$/```media/
+    /^```media$/,/^```$/ {
+      s/^flag = /src = /
+      s/^country = /src = /
+    }
+  '
+  ```
+- `media` blocks support new optional fields beyond `src`/`size`/`alt`:
+  `controls` (default `true`), `loop` (default `false`), `autoplay`
+  (default `false`), and `preload` (default `"auto"` — Anki stores
+  media locally so there's no fetch cost). All four are silently
+  ignored when `src` resolves to an image; `size` is silently
+  ignored when `src` resolves to audio.
+- **Breaking config**: `flag_sources` config key renamed to
+  `media_sources`. `MARKID_FLAG_DIR` env renamed to
+  `MARKID_MEDIA_DIR`. `--flag-dir` CLI flag renamed to
+  `--media-dir`. Home-Manager options `flagSources`/`flagDir`
+  renamed to `mediaSources`/`mediaDir`. No alias retained.
+- `AssetMime` gains `ImageJpeg`, `ImageWebp`, `ImageGif`,
+  `AudioMpeg`, `AudioOgg`, `AudioMp4`, `AudioWav` variants. Anki
+  infers content type from filename extension, so this is for
+  diagnostics only.
+
+### Notes for upgraders
+
+- Cards that used `flag` blocks will re-push on the next sync cycle
+  because the rendered HTML changes byte-for-byte (file-ref instead
+  of inline base64). The sync engine hashes final HTML, so the
+  re-push is automatic — no `RENDER_VERSION` bump needed.
+
+## Earlier (was Unreleased)
+
+### Added
+
 - New `marki-map` crate: renders fenced ` ```map ` blocks to one SVG
   per layer plus a JSON sidecar. Outline mode only; vector geometry
   pulled from Natural Earth (`country/<iso>`, `admin1/<iso>/<name>`,

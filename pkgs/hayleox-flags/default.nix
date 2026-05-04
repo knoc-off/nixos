@@ -33,7 +33,7 @@ stdenvNoCC.mkDerivation {
   '';
 
   meta = with lib; {
-    description = "Country and sub-national flag SVGs (hierarchical) for marki-flag";
+    description = "Country and sub-national flag SVGs (hierarchical) for marki-media";
     homepage = "https://github.com/hayleox/flags";
     license = licenses.free;
     platforms = platforms.all;

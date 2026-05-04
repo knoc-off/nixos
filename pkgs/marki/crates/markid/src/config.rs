@@ -26,12 +26,13 @@ pub struct Config {
     #[serde(default = "default_debounce_ms")]
     pub debounce_ms: u64,
 
-    /// Named flag SVG sources for the `flag` block renderer. Each key
-    /// is a source name usable as a prefix in the DSL (`flag = "circle/de"`),
-    /// and the value is the directory containing SVGs. Order matters:
-    /// when no prefix is given, sources are searched in definition order.
+    /// Named media SVG/audio sources for the `media` block renderer.
+    /// Each key is a source name usable as a prefix in the DSL
+    /// (`src = "circle/de"`), and the value is the directory containing
+    /// the media files. Order matters: when no prefix is given, sources
+    /// are searched in definition order.
     #[serde(default)]
-    pub flag_sources: IndexMap<String, PathBuf>,
+    pub media_sources: IndexMap<String, PathBuf>,
 
 }
 

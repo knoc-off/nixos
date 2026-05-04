@@ -5,7 +5,7 @@
 #
 # Data is public domain (sourced from Wikimedia Commons).
 #
-# Consumers read MARKID_FLAG_DIR env, which the markid home-manager
+# Consumers read MARKID_MEDIA_DIR env, which the markid home-manager
 # module sets to the build output of this derivation (or a merged
 # directory that also includes iso-flags).
 {
@@ -35,7 +35,7 @@ stdenvNoCC.mkDerivation {
   '';
 
   meta = with lib; {
-    description = "Country and sub-national flag SVGs (ISO 3166-1 + ISO 3166-2) for marki-flag";
+    description = "Country and sub-national flag SVGs (ISO 3166-1 + ISO 3166-2) for marki-media";
     homepage = "https://github.com/fonttools/region-flags";
     license = licenses.publicDomain;
     platforms = platforms.all;
