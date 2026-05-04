@@ -86,6 +86,15 @@ in {
         gaps_out = "10 30 10 10";
       };
 
+      scrolling = {
+        direction = "down";
+        column_width = 1.0;
+      };
+
+      cursor = {
+        warp_on_change_workspace = true;
+      };
+
       misc = {
         disable_hyprland_logo = true;
         force_default_wallpaper = 0;
@@ -93,9 +102,9 @@ in {
       };
 
       gestures.gesture = [
-        "3, vertical, workspace"
-        "3, left, dispatcher, layoutmsg, move +col"
-        "3, right, dispatcher, layoutmsg, move -col"
+        "3, horizontal, workspace"
+        "3, up, dispatcher, layoutmsg, move +col"
+        "3, down, dispatcher, layoutmsg, move -col"
       ];
 
       decoration = {
@@ -111,10 +120,12 @@ in {
         enabled = true;
         bezier = [
           "snap, 0.2, 1, 0.3, 1"
+          "smooth, 0.25, 0.8, 0.25, 1"
         ];
         animation = [
           "global, 1, 2, snap"
-          "workspaces, 1, 2, snap, slidevert"
+          "windowsMove, 1, 4, smooth"
+          "workspaces, 1, 2, snap, slide"
         ];
       };
 
@@ -133,6 +144,12 @@ in {
 
           scroll_factor = 0.25;
         };
+
+      };
+
+      device = {
+        name = "logitech-usb-receiver-mouse";
+        accel_profile = "flat";
       };
 
       workspace = [
@@ -178,15 +195,15 @@ in {
           "${mainMod}, W, killactive"
           "${mainMod} SHIFT, L, exec, ${noctalia "lockScreen lock"}"
 
-          "${mainMod}, left, layoutmsg, focus l"
-          "${mainMod}, right, layoutmsg, focus r"
-          "${mainMod}, up, movefocus, u"
-          "${mainMod}, down, movefocus, d"
+          "${mainMod}, left, movefocus, l"
+          "${mainMod}, right, movefocus, r"
+          "${mainMod}, up, layoutmsg, focus u"
+          "${mainMod}, down, layoutmsg, focus d"
 
-          "${mainMod}, h, layoutmsg, move -col"
-          "${mainMod}, l, layoutmsg, move +col"
-          "${mainMod}, k, movefocus, u"
-          "${mainMod}, j, movefocus, d"
+          "${mainMod}, h, movefocus, l"
+          "${mainMod}, l, movefocus, r"
+          "${mainMod}, k, layoutmsg, move -col"
+          "${mainMod}, j, layoutmsg, move +col"
 
           # Scrolling layout
           "${mainMod}, period, layoutmsg, move +col"

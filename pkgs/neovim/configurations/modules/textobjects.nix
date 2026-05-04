@@ -5,5 +5,5 @@
     modules.ai = {};
   };
 
-  plugins.hardtime.enable = true;
+  plugins.hardtime.enable = false;
 }
