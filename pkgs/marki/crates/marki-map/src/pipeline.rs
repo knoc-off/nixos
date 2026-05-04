@@ -62,16 +62,34 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
     // ---- Resolve.
     let mut resolved = resolve_all_layers(spec, cache_root)?;
 
-    // ---- Pick optimal central meridian and rotate every geometry into
-    //      that frame. This lets cross-dateline regions (NZ + Fiji,
-    //      Russia + Alaska, …) project as a tight contiguous bbox
-    //      instead of a 350°-wide world span.
-    let central = pick_central_meridian(&resolved);
+    // ---- Pick the optimal central meridian.
+    //
+    // We do this in two passes so outlying components (French
+    // Polynesia, Hawaii, Chatham Islands, …) don't pollute the
+    // choice of frame. The cluster heuristic in `viewport_bbox`
+    // already filters them out by area; we just call it first on
+    // the unrotated coordinates and use the resulting bbox's
+    // longitude midpoint as the central meridian. The wrap meridian
+    // (central ± 180°) ends up safely on the far side of the globe
+    // from the data we care about.
+    let rough_bb = viewport_bbox(&resolved)?;
+    let central = (rough_bb.min_lon + rough_bb.max_lon) * 0.5;
+
+    // ---- Rotate every geometry into the chosen frame, then split
+    //      any rings that cross the wrap meridian. After this, no
+    //      ring has a 360°-jump teleportation edge, so the SVG
+    //      composer can draw clean paths.
     if central.abs() > f64::EPSILON {
         for layer in &mut resolved {
             for (g, _, _) in &mut layer.features {
                 unwrap::rotate_geometry(g, central);
             }
+        }
+    }
+    for layer in &mut resolved {
+        for (g, _, _) in &mut layer.features {
+            let old = std::mem::take(g);
+            *g = unwrap::split_at_wrap(old, central);
         }
     }
 
@@ -256,29 +274,6 @@ fn role_for_feature_ref(r: &str, layer_name: &str) -> &'static str {
     }
 }
 
-/// Pick the optimal central meridian for the given resolved layers.
-///
-/// We sample longitudes from every viewport-contributing feature
-/// (`features` and `highlights`, but NOT `context` — context is purely
-/// decorative, so it shouldn't influence the rotation). Then [`unwrap::central_meridian`]
-/// picks the antipode of the largest empty arc.
-///
-/// Returns `0.0` when the data already sits in a contiguous range
-/// around the prime meridian — in which case the rotation step is a
-/// no-op and gets skipped at the call site.
-fn pick_central_meridian(layers: &[ResolvedLayer<'_>]) -> f64 {
-    let mut lons: Vec<f64> = Vec::new();
-    for l in layers {
-        for (g, _, is_context) in &l.features {
-            if *is_context {
-                continue;
-            }
-            unwrap::collect_lons(g, &mut lons);
-        }
-    }
-    unwrap::central_meridian(lons)
-}
-
 /// Viewport bbox using the "main cluster" heuristic.
 ///
 /// Geometry is split into three buckets by purpose:
@@ -450,3 +445,4 @@ mod tests {
         assert!(w >= 1 && h >= 1);
     }
 }
+

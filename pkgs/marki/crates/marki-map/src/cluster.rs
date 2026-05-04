@@ -4,9 +4,9 @@
 //!
 //! Many countries have outlying components: the USA has Alaska + Hawaii
 //! + Aleutians + Pacific territories; France has Corsica + Guiana +
-//! Réunion + Mayotte; New Zealand has Chatham Islands. A naive
-//! union-of-bboxes viewport zooms out so far that the "main" landmass
-//! is a tiny dot.
+//! Réunion + Mayotte; New Zealand has Chatham Islands. Europe has
+//! Svalbard, Iceland, the Azores, etc. A naive union-of-bboxes
+//! viewport zooms out so far that the "main" landmass is a tiny dot.
 //!
 //! The fix is to focus the *viewport* on the dominant cluster of
 //! components without dropping any geometry from the *render*. The
@@ -17,7 +17,7 @@
 //!
 //! 1. Decompose every input geometry into its component polygons.
 //! 2. Pick the largest by signed area as the seed.
-//! 3. Threshold = `factor × diagonal(seed.bbox)` (default factor 0.3).
+//! 3. Threshold = `factor × diagonal(seed.bbox)` (default factor 0.15).
 //! 4. Iteratively grow the cluster: any polygon whose bbox is within
 //!    `threshold` of *any* polygon already in the cluster joins.
 //!    Repeat until stable.
@@ -26,21 +26,32 @@
 //! Components with no polygon area (lines, points) are ignored — the
 //! caller should fall back to a full-bbox union for those cases.
 //!
-//! ## Verified behaviour at factor=0.3
+//! ## Verified behaviour at factor=0.15
 //!
-//! | Feature        | Cluster                      |
-//! |----------------|------------------------------|
-//! | `country/USA`  | CONUS + Alaska + Aleutians   |
-//! | `country/FRA`  | Metropolitan + Corsica       |
-//! | `country/NZL`  | North Is + South Is + Stewart|
-//! | `country/ITA`  | Peninsula + Sicily + Sardinia|
-//! | `country/DEU`  | (single component)           |
+//! | Feature                    | Cluster                       |
+//! |----------------------------|-------------------------------|
+//! | `country/USA`              | CONUS only (Alaska clipped)   |
+//! | `country/FRA`              | Metropolitan + Corsica        |
+//! | `country/NZL`              | North Is + South Is + Stewart |
+//! | `country/ITA`              | Peninsula + Sicily + Sardinia |
+//! | `country/DEU`              | (single component)            |
+//! | `subregion/Western Europe` | Mainland + UK + Ireland       |
+//!
+//! Outlying components (Alaska, Svalbard, Iceland, …) are still
+//! *rendered* (their geometry is untouched); they just fall outside
+//! the SVG viewBox and clip naturally.
 
 use crate::geometry::{BBox, Geometry, LonLat};
 
 /// Default cluster threshold: outlying components within
-/// `0.3 × diagonal_of_largest` of the cluster join the viewport.
-pub const DEFAULT_CLUSTER_FACTOR: f64 = 0.3;
+/// `0.15 × diagonal_of_largest` of the cluster join the viewport.
+///
+/// Chosen so European maps don't include Svalbard or Iceland in the
+/// viewport (which would force a tall narrow frame), while Sicily,
+/// Sardinia, Corsica, the UK, and Ireland remain inside. Alaska also
+/// falls outside CONUS at this threshold — that's an acceptable
+/// trade-off; Alaska is still drawn at the top of the SVG.
+pub const DEFAULT_CLUSTER_FACTOR: f64 = 0.15;
 
 /// Compute the viewport bbox using the "main cluster" heuristic. Every
 /// polygon component across `geoms` is considered. Returns `None` if
@@ -233,25 +244,41 @@ mod tests {
         assert!((bb.max_lat - 10.0).abs() < 1e-6);
     }
 
+    fn rect_poly(min_lon: f64, min_lat: f64, w: f64, h: f64) -> Polygon {
+        let mx = min_lon + w;
+        let my = min_lat + h;
+        Polygon {
+            outer: vec![
+                LonLat { lon: min_lon, lat: min_lat },
+                LonLat { lon: mx, lat: min_lat },
+                LonLat { lon: mx, lat: my },
+                LonLat { lon: min_lon, lat: my },
+                LonLat { lon: min_lon, lat: min_lat },
+            ],
+            holes: vec![],
+        }
+    }
+
     #[test]
-    fn usa_like_clusters_alaska() {
-        // Synthetic CONUS at (-125,25)-(-65,49), ~60×24°. Diagonal
-        // ≈ 64.6°; threshold ≈ 19.4°.
-        let conus = square_poly(-125.0, 25.0, 60.0);
-        // Synthetic Alaska at (-168,55)-(-141,71), ~27×16°. Closest
-        // to CONUS at (-141, 49 vs 55) → distance = 16+6=√(16²+6²)≈17°.
-        let alaska = square_poly(-168.0, 55.0, 27.0);
+    fn usa_like_excludes_alaska_and_hawaii() {
+        // Synthetic CONUS at (-125,25)-(-65,49), 60×24°. Diagonal
+        // ≈ 64.6°; threshold at factor=0.15 ≈ 9.7°.
+        let conus = rect_poly(-125.0, 25.0, 60.0, 24.0);
+        // Synthetic Alaska at (-168,55)-(-141,71), 27×16°. Closest
+        // to CONUS at (-141, 49 vs 55) → distance = √(16²+6²)≈17° —
+        // beyond the 9.7° threshold.
+        let alaska = rect_poly(-168.0, 55.0, 27.0, 16.0);
         // Synthetic Hawaii at (-160, 19)-(-155,22). Distance from
-        // CONUS (~-125,25) is ~30° away → excluded.
-        let hawaii = square_poly(-160.0, 19.0, 5.0);
+        // CONUS ≈ 30° — also excluded.
+        let hawaii = rect_poly(-160.0, 19.0, 5.0, 3.0);
 
         let g = Geometry::MultiPolygon(vec![conus, alaska, hawaii]);
         let bb = main_cluster_bbox(&[&g], DEFAULT_CLUSTER_FACTOR).unwrap();
-        // Cluster should include CONUS + Alaska, not Hawaii.
-        assert!(bb.min_lon <= -125.0);
-        assert!(bb.max_lat >= 71.0); // Alaska top reached
-        // Hawaii would push min_lat down to 19. Verify it's NOT included.
-        assert!(bb.min_lat > 19.5, "min_lat={}", bb.min_lat);
+        // Cluster should be CONUS only.
+        assert!((bb.min_lon - -125.0).abs() < 1e-6);
+        assert!((bb.max_lon - -65.0).abs() < 1e-6);
+        assert!((bb.min_lat - 25.0).abs() < 1e-6);
+        assert!((bb.max_lat - 49.0).abs() < 1e-6);
     }
 
     #[test]

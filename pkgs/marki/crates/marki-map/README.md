@@ -130,18 +130,19 @@ a viewport so wide that the main landmass is a tiny dot.
 
 The renderer auto-focuses on the **main cluster** of polygon
 components: it picks the largest by area as a seed and pulls in any
-component whose bbox lies within `0.3 ×` the seed's diagonal.
+component whose bbox lies within `0.15 ×` the seed's diagonal.
 
 Concretely:
 
-- `country/USA` → CONUS + Alaska + Aleutians (Hawaii drawn but clipped).
+- `country/USA` → CONUS only (Alaska, Hawaii drawn but clipped).
 - `country/FRA` → Metropolitan France + Corsica (Guiana drawn but clipped).
 - `country/NZL` → North + South Islands (Chatham drawn but clipped).
 - `country/ITA` → Peninsula + Sicily + Sardinia.
 - `country/DEU`, `country/POL`, `country/CHE` → unchanged (single component).
+- `subregion/Western Europe` → mainland Europe + UK + Ireland (Svalbard, Iceland drawn but clipped).
 
 If you explicitly highlight an outlying region — say
-`highlights = ["admin1/USA/Hawaii"]` over a `country/USA` base — the
+`highlights = ["admin1/USA/Alaska"]` over a `country/USA` base — the
 viewport stretches to include the highlight, so your answer never
 gets clipped.
 

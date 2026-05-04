@@ -28,6 +28,14 @@ pub enum Geometry {
     MultiLineString(Vec<Vec<LonLat>>),
 }
 
+impl Default for Geometry {
+    /// Empty multi-polygon. Used as a placeholder for `mem::take` /
+    /// `mem::replace` when transforming a `Vec<Geometry>` in place.
+    fn default() -> Self {
+        Geometry::MultiPolygon(Vec::new())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Polygon {
     pub outer: Vec<LonLat>,

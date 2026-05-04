@@ -24,5 +24,9 @@
 //!   Russia + Alaska) pick an optimal central meridian so the bbox
 //!   stays tight. The `/mainland` modifier is removed; geometry is
 //!   always full and outliers clip naturally outside the viewBox.
+//!   Wrap-meridian splitting: polygons whose outer ring genuinely
+//!   wraps around the globe (e.g. Russia drawn from a European-
+//!   centred frame) are now cut at the wrap meridian into proper
+//!   closed fragments instead of streaking across the canvas.
 
 pub const RENDER_VERSION_MAP: u32 = 15;
