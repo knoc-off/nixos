@@ -14,6 +14,7 @@
 //! pipeline lands in steps 3–7.
 
 pub mod cache;
+pub mod clip;
 pub mod cluster;
 pub mod compose;
 pub mod data;

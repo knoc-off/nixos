@@ -28,5 +28,11 @@
 //!   wraps around the globe (e.g. Russia drawn from a European-
 //!   centred frame) are now cut at the wrap meridian into proper
 //!   closed fragments instead of streaking across the canvas.
+//! - `17` — Natural Earth dateline-stitching: shapefile-pre-split
+//!   polygons (Russia's Chukotka peninsula, etc.) are reunited at
+//!   load time into a single ring. Removes the visible vertical seam
+//!   through eastern Russia on Asia-centric maps. Per-feature
+//!   viewport bbox + Sutherland-Hodgman clipping at 10% margin
+//!   shrink SVGs by ~70–80%.
 
-pub const RENDER_VERSION_MAP: u32 = 15;
+pub const RENDER_VERSION_MAP: u32 = 18;

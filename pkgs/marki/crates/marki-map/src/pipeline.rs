@@ -19,6 +19,7 @@
 //! blank top/bottom strips.
 
 use crate::cache::{self, CacheFile};
+use crate::clip;
 use crate::cluster;
 use crate::compose::{Feature, compose_layer};
 use crate::data::{natural_earth, overpass};
@@ -98,6 +99,22 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
     //      components (Alaska on a USA-without-highlight map, Hawaii
     //      on USA, …) still get drawn but fall outside the viewBox.
     let padded = viewport_bbox(&resolved)?.padded(0.05);
+
+    // ---- Clip every geometry to a 10% margin around the viewport.
+    //      Components fully outside are dropped; straddling rings are
+    //      clipped with Sutherland-Hodgman so they end with clean
+    //      edges. 10% margin keeps S-H clip lines ~20–30 px off-
+    //      canvas so they're never visible, while cutting geometry
+    //      close to the viewport boundary for maximum SVG size
+    //      reduction.
+    let clip_bb = padded.padded(0.10);
+    for layer in &mut resolved {
+        for (g, _, _) in &mut layer.features {
+            let old = std::mem::take(g);
+            *g = clip::clip_geometry(old, clip_bb);
+        }
+    }
+
     let aspect = Mercator::projected_aspect(padded);
     let (render_w, render_h) = fit_canvas(spec.size, aspect);
     let projector: Box<dyn Projector> =
@@ -303,20 +320,30 @@ fn viewport_bbox(layers: &[ResolvedLayer<'_>]) -> Result<BBox, MapError> {
         }
     }
 
-    // 1. Main cluster of focus features. Falls back to plain union for
-    //    line-only inputs (coastline) which have no polygon area.
-    let mut bb = cluster::main_cluster_bbox(&focus, cluster::DEFAULT_CLUSTER_FACTOR)
-        .unwrap_or_else(|| {
-            let mut acc = BBox::empty();
-            for g in &focus {
-                acc.extend(g.bbox());
-            }
-            acc
-        });
+    // 1. Each focus feature contributes its own main-cluster bbox.
+    //    We cluster *per feature* (not on the unioned component pool)
+    //    so multi-country composites (`subregion/Western Europe`) get
+    //    their own cluster filtering, and a list of distinct countries
+    //    (`country/DEU` + `country/ITA` + `country/ESP`) doesn't get
+    //    pruned by the inter-country gap exceeding a single feature's
+    //    cluster threshold. Falls back to the full bbox for line-only
+    //    geometries (coastline) which have no polygon area.
+    let mut bb = BBox::empty();
+    for g in &focus {
+        let g_bb = cluster::main_cluster_bbox(&[*g], cluster::DEFAULT_CLUSTER_FACTOR)
+            .unwrap_or_else(|| g.bbox());
+        bb.extend(g_bb);
+    }
 
-    // 2. Highlights ALWAYS stretch the viewport (full bbox).
+    // 2. Highlights stretch the viewport, also cluster-reduced
+    //    individually so a multi-component highlight (e.g.
+    //    `country/FJI`, which has islands on both sides of the
+    //    antimeridian) doesn't blow the bbox up to a 360°-wide span.
+    //    Single-component highlights collapse to a normal bbox.
     for g in &highlights {
-        bb.extend(g.bbox());
+        let g_bb = cluster::main_cluster_bbox(&[*g], cluster::DEFAULT_CLUSTER_FACTOR)
+            .unwrap_or_else(|| g.bbox());
+        bb.extend(g_bb);
     }
 
     if bb.is_empty() {

@@ -614,6 +614,10 @@ fn polygon_to_geometry(poly: shapefile::Polygon) -> Geometry {
     if let Some(c) = current {
         polygons.push(c);
     }
+    // Reunite polygons that NE pre-split at the dateline (Russia's
+    // Chukotka, Fiji, etc.). Without this, the two halves' artificial
+    // closing edges show up as a vertical seam through the landmass.
+    let polygons = stitch_dateline_polygons(polygons);
     if polygons.len() == 1 {
         let p = polygons.into_iter().next().unwrap();
         Geometry::Polygon {
@@ -662,6 +666,229 @@ fn normalize_antimeridian(pts: &mut [LonLat]) {
                 p.lon += 360.0;
             }
         }
+    }
+}
+
+/// Tolerance for "vertex sits on the dateline" detection. Natural
+/// Earth dateline-edge vertices are at lon == ±180.0 exactly, so a
+/// loose tolerance is fine.
+const DATELINE_EPS: f64 = 1e-6;
+
+/// Natural Earth pre-splits dateline-crossing polygons into two
+/// pieces: one ending at lon=+180 with a vertical closing edge, and
+/// another starting at lon=-180 with the matching mirrored edge.
+/// Russia's Chukotka peninsula is the canonical example. When we
+/// later draw both halves on a viewport that doesn't cross the
+/// dateline (e.g. an Asia-centric Russia map), the two abutting
+/// vertical closure edges show up as a vertical seam through the
+/// landmass.
+///
+/// This function detects pairs of polygons that abut on the dateline
+/// and stitches them back into a single ring whose longitudes wrap
+/// past 180° (e.g. the merged Russia ring spans lon = 27° to 191°).
+/// The merged ring crosses the antimeridian only conceptually; its
+/// vertices are continuous, so downstream rotation + `split_at_wrap`
+/// handles it correctly for *any* viewport.
+///
+/// Pairs are matched by:
+///   * one polygon has consecutive vertices on lon = +180 (the +180-
+///     side closure edge),
+///   * the other has consecutive vertices on lon = -180,
+///   * their latitude ranges along that edge overlap.
+///
+/// If no matching pair exists, the polygons are returned unchanged.
+fn stitch_dateline_polygons(polys: Vec<Polygon>) -> Vec<Polygon> {
+    if polys.len() < 2 {
+        return polys;
+    }
+    // Find the index range of every dateline edge in every polygon.
+    // A dateline edge is a maximal run of consecutive vertices all
+    // sitting on lon = ±180 (actually we look for pairs of adjacent
+    // vertices both on the meridian — that signals an artificial
+    // closure edge, not a coincidental near-pole crossing).
+    let mut polys: Vec<Option<Polygon>> = polys.into_iter().map(Some).collect();
+    let mut stitched_anything = true;
+    // Iterate to fixed point so a chain (very rare) of dateline
+    // pieces can all merge.
+    while stitched_anything {
+        stitched_anything = false;
+        let n = polys.len();
+        'outer: for i in 0..n {
+            if polys[i].is_none() {
+                continue;
+            }
+            let a_edge = match find_dateline_edge(polys[i].as_ref().unwrap(), 180.0) {
+                Some(e) => e,
+                None => continue,
+            };
+            for j in 0..n {
+                if i == j || polys[j].is_none() {
+                    continue;
+                }
+                let b_edge = match find_dateline_edge(polys[j].as_ref().unwrap(), -180.0) {
+                    Some(e) => e,
+                    None => continue,
+                };
+                // Lat ranges along the two edges must overlap.
+                if !lat_ranges_overlap(&a_edge, &b_edge) {
+                    continue;
+                }
+                // Stitch.
+                let a = polys[i].take().unwrap();
+                let b = polys[j].take().unwrap();
+                let merged = stitch_pair(a, a_edge, b, b_edge);
+                polys[i] = Some(merged);
+                stitched_anything = true;
+                break 'outer;
+            }
+        }
+    }
+    polys.into_iter().flatten().collect()
+}
+
+/// Returns the (start, end) vertex indices of the longest consecutive
+/// run of vertices on `target_lon` (within tolerance), if any. The
+/// run must have at least two vertices to count as a closure edge.
+/// Indices are inclusive.
+fn find_dateline_edge(p: &Polygon, target_lon: f64) -> Option<DatelineEdge> {
+    let pts = &p.outer;
+    let n = pts.len();
+    if n < 4 {
+        return None;
+    }
+    // Drop the closure-duplicate vertex if present so the run doesn't
+    // get artificially split by it.
+    let working_n = if pts.first() == pts.last() { n - 1 } else { n };
+    let on_meridian = |idx: usize| {
+        (pts[idx % working_n].lon - target_lon).abs() < DATELINE_EPS
+    };
+    // Find any starting index where the run begins.
+    let mut best: Option<DatelineEdge> = None;
+    let mut start: Option<usize> = None;
+    // Walk twice around so we can capture runs that span the index-0
+    // boundary.
+    for i in 0..(working_n * 2) {
+        if on_meridian(i) {
+            if start.is_none() {
+                start = Some(i);
+            }
+        } else if let Some(s) = start.take() {
+            let len = i - s;
+            if len >= 2 {
+                let s_norm = s % working_n;
+                let e_norm = (i - 1) % working_n;
+                let lat0 = pts[s_norm].lat;
+                let lat1 = pts[e_norm].lat;
+                let edge = DatelineEdge {
+                    start: s_norm,
+                    end: e_norm,
+                    lat_min: lat0.min(lat1),
+                    lat_max: lat0.max(lat1),
+                };
+                if best.as_ref().map(|b| len > (b.end + working_n - b.start) % working_n + 1).unwrap_or(true) {
+                    best = Some(edge);
+                }
+            }
+            // We've already covered the whole loop once; no need to
+            // continue around.
+            if i >= working_n {
+                break;
+            }
+        }
+    }
+    best
+}
+
+#[derive(Clone, Copy, Debug)]
+struct DatelineEdge {
+    /// Index of the first vertex on the meridian (inclusive).
+    start: usize,
+    /// Index of the last vertex on the meridian (inclusive).
+    end: usize,
+    lat_min: f64,
+    lat_max: f64,
+}
+
+fn lat_ranges_overlap(a: &DatelineEdge, b: &DatelineEdge) -> bool {
+    !(a.lat_max < b.lat_min || b.lat_max < a.lat_min)
+}
+
+/// Stitch polygon A's +180-edge to polygon B's -180-edge. After
+/// stitching, B's vertices are shifted by +360° in longitude so the
+/// merged ring forms a continuous loop with longitudes spanning
+/// roughly `(A.min_lon, B.max_lon + 360°)`.
+///
+/// Strategy: walk A from just-after-its-dateline-edge all the way
+/// around to just-before-its-dateline-edge. Then walk shifted B from
+/// just-after-its-dateline-edge around to just-before. Concatenate
+/// and close.
+fn stitch_pair(a: Polygon, a_edge: DatelineEdge, b: Polygon, b_edge: DatelineEdge) -> Polygon {
+    let a_pts = strip_closure(&a.outer);
+    let b_pts: Vec<LonLat> = strip_closure(&b.outer)
+        .iter()
+        .map(|p| LonLat { lon: p.lon + 360.0, lat: p.lat })
+        .collect();
+    let a_n = a_pts.len();
+    let b_n = b_pts.len();
+
+    // Build the merged outer ring.
+    //   * Start just after A's edge (= a_edge.end + 1 mod a_n).
+    //   * Walk A all the way around until we reach a_edge.start (exclusive).
+    //   * Then jump to B's edge endpoint that lat-matches (B's edge
+    //     was traversed in the opposite direction relative to A).
+    //   * Walk B all the way around back to its other endpoint.
+    let mut merged: Vec<LonLat> = Vec::with_capacity(a_n + b_n);
+    // A walk: from (end+1) round to (start-1), inclusive.
+    let mut idx = (a_edge.end + 1) % a_n;
+    loop {
+        merged.push(a_pts[idx]);
+        if idx == a_edge.start {
+            // We've collected all of A's non-edge vertices.
+            // Don't include the edge itself; it's the seam.
+            merged.pop();
+            break;
+        }
+        idx = (idx + 1) % a_n;
+    }
+    // B walk: from b_edge.end+1 round to b_edge.start-1, inclusive.
+    let mut idx = (b_edge.end + 1) % b_n;
+    loop {
+        merged.push(b_pts[idx]);
+        if idx == b_edge.start {
+            merged.pop();
+            break;
+        }
+        idx = (idx + 1) % b_n;
+    }
+    // Close the ring.
+    if let Some(&first) = merged.first() {
+        merged.push(first);
+    }
+
+    Polygon {
+        outer: merged,
+        // Holes are kept as-is from A; B's holes are shifted +360 and
+        // appended. (Holes don't typically straddle the dateline; if
+        // any did, their per-ring `normalize_antimeridian` already
+        // handled them.)
+        holes: a
+            .holes
+            .into_iter()
+            .chain(b.holes.into_iter().map(|h| {
+                h.into_iter()
+                    .map(|p| LonLat { lon: p.lon + 360.0, lat: p.lat })
+                    .collect()
+            }))
+            .collect(),
+    }
+}
+
+/// Drop the trailing closure-duplicate vertex if present.
+fn strip_closure(pts: &[LonLat]) -> Vec<LonLat> {
+    if pts.len() > 1 && pts.first() == pts.last() {
+        pts[..pts.len() - 1].to_vec()
+    } else {
+        pts.to_vec()
     }
 }
 
@@ -895,5 +1122,141 @@ mod tests {
         assert_eq!(dest.len(), 2);
         assert!(dest.contains_key("europe"));
         assert!(dest.contains_key("asia"));
+    }
+
+    // ---------- dateline stitching ----------
+
+    /// A simple Russia-shaped pair: polygon A is the western half
+    /// (with a closing edge on lon=+180), polygon B is Chukotka
+    /// (with a closing edge on lon=-180). After stitching they
+    /// should become one ring.
+    #[test]
+    fn stitch_pair_basic_russia_shape() {
+        // A: ccw outer ring 0..180 lat 60..70, with the dateline
+        // closing edge from (180, 70) → (180, 60).
+        let a = Polygon {
+            outer: vec![
+                LonLat { lon: 0.0,   lat: 60.0 },
+                LonLat { lon: 180.0, lat: 60.0 },
+                LonLat { lon: 180.0, lat: 70.0 },
+                LonLat { lon: 0.0,   lat: 70.0 },
+                LonLat { lon: 0.0,   lat: 60.0 },
+            ],
+            holes: vec![],
+        };
+        // B: ccw outer ring -180..-160 lat 60..70, with the dateline
+        // edge (-180, 60) → (-180, 70).
+        let b = Polygon {
+            outer: vec![
+                LonLat { lon: -180.0, lat: 60.0 },
+                LonLat { lon: -160.0, lat: 60.0 },
+                LonLat { lon: -160.0, lat: 70.0 },
+                LonLat { lon: -180.0, lat: 70.0 },
+                LonLat { lon: -180.0, lat: 60.0 },
+            ],
+            holes: vec![],
+        };
+        let polys = stitch_dateline_polygons(vec![a, b]);
+        assert_eq!(polys.len(), 1, "expected single stitched polygon");
+        let merged = &polys[0];
+        // Stitched ring should span past lon=180.
+        let max_lon = merged.outer.iter().map(|p| p.lon).fold(f64::NEG_INFINITY, f64::max);
+        let min_lon = merged.outer.iter().map(|p| p.lon).fold(f64::INFINITY, f64::min);
+        assert!(max_lon > 180.0, "expected max_lon > 180, got {max_lon}");
+        assert!(min_lon >= 0.0, "expected min_lon >= 0, got {min_lon}");
+        // No vertex on the dateline (lon == 180 exactly).
+        let on_dateline = merged.outer.iter().filter(|p| (p.lon - 180.0).abs() < 1e-6).count();
+        assert!(on_dateline == 0, "stitched ring still has {} dateline vertices", on_dateline);
+        // First == last (closed ring).
+        assert_eq!(merged.outer.first(), merged.outer.last());
+    }
+
+    #[test]
+    fn stitch_no_match_passthrough() {
+        // Two unrelated squares far from the dateline.
+        let a = square(0.0, 0.0, 5.0);
+        let b = square(50.0, 50.0, 5.0);
+        let polys = stitch_dateline_polygons(vec![a.clone(), b.clone()]);
+        assert_eq!(polys.len(), 2);
+    }
+
+    #[test]
+    fn stitch_with_only_one_dateline_polygon_passthrough() {
+        // A has a +180 edge but no matching -180 polygon exists.
+        let a = Polygon {
+            outer: vec![
+                LonLat { lon: 0.0, lat: 0.0 },
+                LonLat { lon: 180.0, lat: 0.0 },
+                LonLat { lon: 180.0, lat: 10.0 },
+                LonLat { lon: 0.0, lat: 10.0 },
+                LonLat { lon: 0.0, lat: 0.0 },
+            ],
+            holes: vec![],
+        };
+        let b = square(50.0, 50.0, 1.0);
+        let polys = stitch_dateline_polygons(vec![a, b]);
+        assert_eq!(polys.len(), 2, "no stitching when there's no -180 partner");
+    }
+
+    #[test]
+    fn stitch_lat_range_mismatch_passthrough() {
+        // A's +180 edge lat 60..70, B's -180 edge lat 0..10 (no overlap).
+        let a = Polygon {
+            outer: vec![
+                LonLat { lon: 0.0,   lat: 60.0 },
+                LonLat { lon: 180.0, lat: 60.0 },
+                LonLat { lon: 180.0, lat: 70.0 },
+                LonLat { lon: 0.0,   lat: 70.0 },
+                LonLat { lon: 0.0,   lat: 60.0 },
+            ],
+            holes: vec![],
+        };
+        let b = Polygon {
+            outer: vec![
+                LonLat { lon: -180.0, lat: 0.0 },
+                LonLat { lon: -160.0, lat: 0.0 },
+                LonLat { lon: -160.0, lat: 10.0 },
+                LonLat { lon: -180.0, lat: 10.0 },
+                LonLat { lon: -180.0, lat: 0.0 },
+            ],
+            holes: vec![],
+        };
+        let polys = stitch_dateline_polygons(vec![a, b]);
+        assert_eq!(polys.len(), 2);
+    }
+
+    #[test]
+    fn find_dateline_edge_basic() {
+        let p = Polygon {
+            outer: vec![
+                LonLat { lon: 0.0,   lat: 0.0 },
+                LonLat { lon: 180.0, lat: 0.0 },
+                LonLat { lon: 180.0, lat: 10.0 },
+                LonLat { lon: 0.0,   lat: 10.0 },
+                LonLat { lon: 0.0,   lat: 0.0 },
+            ],
+            holes: vec![],
+        };
+        let e = find_dateline_edge(&p, 180.0).unwrap();
+        // Two consecutive vertices on lon=180 (indices 1 and 2).
+        assert_eq!(e.start, 1);
+        assert_eq!(e.end, 2);
+        assert!((e.lat_min - 0.0).abs() < 1e-9);
+        assert!((e.lat_max - 10.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn find_dateline_edge_no_edge() {
+        let p = square(0.0, 0.0, 5.0);
+        assert!(find_dateline_edge(&p, 180.0).is_none());
+    }
+
+    #[test]
+    fn lat_ranges_overlap_basic() {
+        let a = DatelineEdge { start: 0, end: 0, lat_min: 0.0, lat_max: 10.0 };
+        let b = DatelineEdge { start: 0, end: 0, lat_min: 5.0, lat_max: 15.0 };
+        assert!(lat_ranges_overlap(&a, &b));
+        let c = DatelineEdge { start: 0, end: 0, lat_min: 20.0, lat_max: 30.0 };
+        assert!(!lat_ranges_overlap(&a, &c));
     }
 }
