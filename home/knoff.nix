@@ -191,6 +191,15 @@ in {
           circle = "${pkgs.circle-flags}/share/circle-flags-svg";
           flags = "${hayleox-flags}/share/hayleox-flags";
         };
+        # Wrapped Typst with circuiteria (block circuit diagrams) plus
+        # its CeTZ dependency available out of the box. Add packages
+        # here as needed; markid auto-registers the typst renderer
+        # whenever this is non-null.
+        typstPackage = pkgs.typst.withPackages (p:
+          with p; [
+            circuiteria
+            cetz
+          ]);
       };
       # Anki with AnkiConnect pre-installed — launch as a normal desktop app,
       # markid connects via wait_for_anki() once it's open.

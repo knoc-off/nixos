@@ -146,11 +146,28 @@ in {
         rendering.
       '';
       example = literalExpression ''
-        {
-          circle = "''${pkgs.circle-flags}/share/circle-flags-svg";
+        {          circle = "''${pkgs.circle-flags}/share/circle-flags-svg";
           flags = "''${hayleox-flags}/share/hayleox-flags";
         }
       '';
+    };
+
+    typstPackage = mkOption {
+      type = types.nullOr types.package;
+      default = null;
+      description = ''
+        Typst package used to render ```typst``` blocks. The binary
+        path is exposed to the daemon via `MARKID_TYPST`. Set to
+        `pkgs.typst` (or a custom derivation with extra fonts) to
+        enable. Set to `null` (the default) to disable — any
+        ```typst``` blocks then fall through to plain code rendering.
+
+        The user controls the install: install Typst Universe packages
+        like `@preview/circuiteria`, set `TYPST_FONT_PATHS` for custom
+        fonts, or pin a specific version. Markid just invokes whatever
+        binary is configured here.
+      '';
+      example = literalExpression "pkgs.typst";
     };
 
     # --------------------------------------------------------------------
@@ -315,7 +332,9 @@ in {
             ++ optional (cfg.naturalEarthData != null)
             "NATURAL_EARTH_DATA=${cfg.naturalEarthData}"
             ++ optional (cfg.mediaDir != null)
-            "MARKID_MEDIA_DIR=${cfg.mediaDir}";
+            "MARKID_MEDIA_DIR=${cfg.mediaDir}"
+            ++ optional (cfg.typstPackage != null)
+            "MARKID_TYPST=${getExe cfg.typstPackage}";
           Restart = "on-failure";
           RestartSec = 5;
         };

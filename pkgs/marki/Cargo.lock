@@ -916,6 +916,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "marki-typst"
+version = "0.3.0"
+dependencies = [
+ "blake3",
+ "marki-core",
+ "thiserror",
+]
+
+[[package]]
 name = "markid"
 version = "0.3.0"
 dependencies = [
@@ -929,6 +938,7 @@ dependencies = [
  "marki-core",
  "marki-map",
  "marki-media",
+ "marki-typst",
  "notify",
  "notify-debouncer-full",
  "reqwest",

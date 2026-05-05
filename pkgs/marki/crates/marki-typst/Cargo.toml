@@ -1,0 +1,10 @@
+[package]
+name = "marki-typst"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+blake3.workspace = true
+marki-core.workspace = true
+thiserror.workspace = true

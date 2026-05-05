@@ -35,6 +35,12 @@ pub struct MapSpec {
     #[serde(default = "default_style")]
     pub style: String,
 
+    /// Viewport-tuning knobs. Defaults trim sparse Mercator-stretched
+    /// edges (e.g. northern Norway on a Europe map) and exclude
+    /// outlying components from clustering. See [`ViewportSpec`].
+    #[serde(default)]
+    pub viewport: ViewportSpec,
+
     /// Layers, keyed by name. `IndexMap` preserves TOML source order,
     /// which controls DOM stacking: earlier layers render underneath
     /// later ones. Authors should write `base` first.
@@ -48,6 +54,60 @@ fn default_style() -> String {
 fn default_size() -> [u32; 2] {
     [600, 400]
 }
+
+/// Per-card viewport tuning.
+///
+/// All fields are optional and have sensible defaults that match the
+/// behaviour you'd expect for typical country/region cards. Override
+/// them in TOML when the auto-framing produces something off:
+///
+/// ```toml
+/// [viewport]
+/// min_density = 0.10     # crop more aggressively
+/// min_aspect = 0.8       # never go narrower than 4:5
+/// cluster_factor = 0.3   # include far islands (Alaska, Iceland) in viewport
+/// ```
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct ViewportSpec {
+    /// Trim latitude/longitude edges with cumulative geometry density
+    /// below this fraction. Default `0.0` (disabled — opt-in only).
+    /// Set to a small positive value (e.g. `0.05`) to crop sparse
+    /// edges; useful when a feature's bbox extends well beyond its
+    /// dense interior. Tends to over-crop for natural country shapes,
+    /// so it's off by default.
+    #[serde(default = "default_min_density")]
+    pub min_density: f64,
+
+    /// Hard Mercator aspect ratio floor. After density trimming, if
+    /// the viewport is still narrower than this, additional latitude
+    /// is trimmed from whichever edge is furthest from the equator.
+    /// Default `0.0` (disabled). Set to e.g. `0.6` if you want to
+    /// force a less-tall canvas for high-latitude regions.
+    #[serde(default = "default_min_aspect")]
+    pub min_aspect: f64,
+
+    /// Cluster threshold for excluding outlying components from the
+    /// viewport. Polygons within `cluster_factor × seed_diagonal` of
+    /// the cluster join it; further-away components are drawn but
+    /// fall outside the viewport. Default `0.15`.
+    #[serde(default = "default_cluster_factor")]
+    pub cluster_factor: f64,
+}
+
+impl Default for ViewportSpec {
+    fn default() -> Self {
+        Self {
+            min_density: default_min_density(),
+            min_aspect: default_min_aspect(),
+            cluster_factor: default_cluster_factor(),
+        }
+    }
+}
+
+fn default_min_density() -> f64 { 0.0 }
+fn default_min_aspect() -> f64 { 0.0 }
+fn default_cluster_factor() -> f64 { 0.15 }
 
 /// One named layer inside a map block.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -293,6 +353,66 @@ features = ["country/DEU"]
 highlights = ["admin1/DEU/Bavaria"]
 [layers.answer.style]
 bogus = true
+"#;
+        let err = parse_map_spec(src).unwrap_err();
+        assert!(matches!(err, DslError::Toml(_)), "got: {err:?}");
+    }
+
+    // ---------- viewport ----------
+
+    #[test]
+    fn viewport_defaults_when_absent() {
+        let src = r#"
+[layers.base]
+features = ["coastline"]
+"#;
+        let s = parse_map_spec(src).unwrap();
+        assert_eq!(s.viewport.min_density, 0.0);
+        assert_eq!(s.viewport.min_aspect, 0.0);
+        assert!((s.viewport.cluster_factor - 0.15).abs() < 1e-9);
+    }
+
+    #[test]
+    fn viewport_section_parses() {
+        let src = r#"
+[viewport]
+min_density = 0.10
+min_aspect = 0.8
+cluster_factor = 0.3
+
+[layers.base]
+features = ["coastline"]
+"#;
+        let s = parse_map_spec(src).unwrap();
+        assert!((s.viewport.min_density - 0.10).abs() < 1e-9);
+        assert!((s.viewport.min_aspect - 0.8).abs() < 1e-9);
+        assert!((s.viewport.cluster_factor - 0.3).abs() < 1e-9);
+    }
+
+    #[test]
+    fn viewport_partial_fields() {
+        // Only override one field; the rest should default.
+        let src = r#"
+[viewport]
+min_density = 0.05
+
+[layers.base]
+features = ["coastline"]
+"#;
+        let s = parse_map_spec(src).unwrap();
+        assert_eq!(s.viewport.min_density, 0.05);
+        assert_eq!(s.viewport.min_aspect, 0.0);
+        assert!((s.viewport.cluster_factor - 0.15).abs() < 1e-9);
+    }
+
+    #[test]
+    fn viewport_unknown_field_rejected() {
+        let src = r#"
+[viewport]
+bogus_field = 0.5
+
+[layers.base]
+features = ["coastline"]
 "#;
         let err = parse_map_spec(src).unwrap_err();
         assert!(matches!(err, DslError::Toml(_)), "got: {err:?}");

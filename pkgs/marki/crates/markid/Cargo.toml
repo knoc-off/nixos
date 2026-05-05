@@ -18,6 +18,7 @@ clap.workspace = true
 marki-core.workspace = true
 marki-map.workspace = true
 marki-media.workspace = true
+marki-typst.workspace = true
 notify.workspace = true
 notify-debouncer-full.workspace = true
 reqwest.workspace = true

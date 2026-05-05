@@ -38,6 +38,11 @@ struct Cli {
     #[arg(long, env = "MARKID_MEDIA_DIR", global = true)]
     media_dir: Option<PathBuf>,
 
+    /// Path to the `typst` CLI binary, used to render ```typst``` blocks.
+    /// When unset, ```typst``` blocks fall through to syntax highlighting.
+    #[arg(long, env = "MARKID_TYPST", global = true)]
+    typst_binary: Option<PathBuf>,
+
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -110,6 +115,8 @@ fn main() -> Result<()> {
 /// Build the external block-renderer registry. The media renderer is
 /// only registered when at least one media source is configured —
 /// otherwise ```media``` blocks fall through to plain code rendering.
+/// Likewise, the typst renderer is only registered when a typst binary
+/// is configured.
 fn build_registry(cfg: &Config) -> Registry {
     let mut reg = Registry::new();
     reg.register(Box::new(marki_map::MapRenderer::new()));
@@ -123,6 +130,11 @@ fn build_registry(cfg: &Config) -> Registry {
     if !sources.is_empty() {
         reg.register(Box::new(marki_media::MediaRenderer::new(sources)));
     }
+
+    if let Some(bin) = &cfg.typst_binary {
+        reg.register(Box::new(marki_typst::TypstRenderer::new(bin.clone())));
+    }
+
     reg
 }
 
@@ -152,6 +164,7 @@ fn load_config(cli: &Cli) -> Result<Config> {
             sync_interval: Duration::from_secs(300),
             debounce_ms: 250,
             media_sources: Default::default(),
+            typst_binary: None,
         }
     };
 
@@ -188,6 +201,7 @@ fn load_config_for_render(cli: &Cli) -> Result<Config> {
             sync_interval: Duration::from_secs(300),
             debounce_ms: 250,
             media_sources: Default::default(),
+            typst_binary: None,
         },
     };
 
@@ -195,6 +209,9 @@ fn load_config_for_render(cli: &Cli) -> Result<Config> {
         cfg.media_sources
             .entry("_default".into())
             .or_insert_with(|| p.clone());
+    }
+    if let Some(p) = &cli.typst_binary {
+        cfg.typst_binary = Some(p.clone());
     }
     Ok(cfg)
 }

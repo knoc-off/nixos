@@ -28,6 +28,7 @@ pub mod project;
 pub mod sidecar;
 pub mod simplify;
 pub mod style;
+pub mod trim;
 pub mod unwrap;
 pub mod version;
 

@@ -31,6 +31,7 @@ use crate::hash::cache_key;
 use crate::project::{Mercator, Projector};
 use crate::sidecar::{Sidecar, SidecarLayer};
 use crate::style::load as load_theme;
+use crate::trim;
 use crate::unwrap;
 use marki_core::{AssetMime, EmittedAsset, RenderedBlock};
 use std::collections::BTreeMap;
@@ -73,7 +74,7 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
     // longitude midpoint as the central meridian. The wrap meridian
     // (central ± 180°) ends up safely on the far side of the globe
     // from the data we care about.
-    let rough_bb = viewport_bbox(&resolved)?;
+    let rough_bb = viewport_bbox(&resolved, spec.viewport.cluster_factor)?;
     let central = (rough_bb.min_lon + rough_bb.max_lon) * 0.5;
 
     // ---- Rotate every geometry into the chosen frame, then split
@@ -98,7 +99,19 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
     //      Viewport focuses on the main cluster of features; outlying
     //      components (Alaska on a USA-without-highlight map, Hawaii
     //      on USA, …) still get drawn but fall outside the viewBox.
-    let padded = viewport_bbox(&resolved)?.padded(0.05);
+    //      Density-based trimming then crops sparse Mercator-stretched
+    //      edges (e.g. northern tip of Norway on a Europe map) so the
+    //      canvas stays well-proportioned. Both behaviours are tunable
+    //      via the `[viewport]` DSL section.
+    let raw_bb = viewport_bbox(&resolved, spec.viewport.cluster_factor)?;
+    let focus_geoms = collect_focus_geoms(&resolved);
+    let trimmed = trim::trim_sparse_edges(
+        raw_bb,
+        &focus_geoms,
+        spec.viewport.min_density,
+        spec.viewport.min_aspect,
+    );
+    let padded = trimmed.padded(0.05);
 
     // ---- Clip every geometry to a 10% margin around the viewport.
     //      Components fully outside are dropped; straddling rings are
@@ -291,6 +304,24 @@ fn role_for_feature_ref(r: &str, layer_name: &str) -> &'static str {
     }
 }
 
+/// Collect the focus geometries (non-context, non-highlight) across
+/// every layer. Used to feed [`trim::trim_sparse_edges`] which only
+/// inspects the main subject geometry — context and highlights are
+/// either explicitly background (`context`) or already accounted for
+/// in `viewport_bbox`'s highlight-stretch step.
+fn collect_focus_geoms<'a>(layers: &'a [ResolvedLayer<'_>]) -> Vec<&'a Geometry> {
+    let mut out = Vec::new();
+    for l in layers {
+        for (g, role, is_context) in &l.features {
+            if *is_context || *role == "highlight" {
+                continue;
+            }
+            out.push(g);
+        }
+    }
+    out
+}
+
 /// Viewport bbox using the "main cluster" heuristic.
 ///
 /// Geometry is split into three buckets by purpose:
@@ -304,7 +335,7 @@ fn role_for_feature_ref(r: &str, layer_name: &str) -> &'static str {
 /// Focus features go through [`cluster::main_cluster_bbox`] which picks
 /// the largest connected cluster of polygon components; Hawaii / French
 /// Guiana / Chatham Islands are drawn but clipped by the viewBox.
-fn viewport_bbox(layers: &[ResolvedLayer<'_>]) -> Result<BBox, MapError> {
+fn viewport_bbox(layers: &[ResolvedLayer<'_>], cluster_factor: f64) -> Result<BBox, MapError> {
     let mut focus: Vec<&Geometry> = Vec::new();
     let mut highlights: Vec<&Geometry> = Vec::new();
     for l in layers {
@@ -330,7 +361,7 @@ fn viewport_bbox(layers: &[ResolvedLayer<'_>]) -> Result<BBox, MapError> {
     //    geometries (coastline) which have no polygon area.
     let mut bb = BBox::empty();
     for g in &focus {
-        let g_bb = cluster::main_cluster_bbox(&[*g], cluster::DEFAULT_CLUSTER_FACTOR)
+        let g_bb = cluster::main_cluster_bbox(&[*g], cluster_factor)
             .unwrap_or_else(|| g.bbox());
         bb.extend(g_bb);
     }
@@ -341,7 +372,7 @@ fn viewport_bbox(layers: &[ResolvedLayer<'_>]) -> Result<BBox, MapError> {
     //    antimeridian) doesn't blow the bbox up to a 360°-wide span.
     //    Single-component highlights collapse to a normal bbox.
     for g in &highlights {
-        let g_bb = cluster::main_cluster_bbox(&[*g], cluster::DEFAULT_CLUSTER_FACTOR)
+        let g_bb = cluster::main_cluster_bbox(&[*g], cluster_factor)
             .unwrap_or_else(|| g.bbox());
         bb.extend(g_bb);
     }

@@ -5,6 +5,7 @@ members = [
     "crates/marki-macros",
     "crates/marki-map",
     "crates/marki-media",
+    "crates/marki-typst",
     "crates/markid",
 ]
 
@@ -48,3 +49,4 @@ marki-core = { path = "crates/marki-core" }
 marki-macros = { path = "crates/marki-macros" }
 marki-map = { path = "crates/marki-map" }
 marki-media = { path = "crates/marki-media" }
+marki-typst = { path = "crates/marki-typst" }

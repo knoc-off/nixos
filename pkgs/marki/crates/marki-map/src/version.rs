@@ -34,5 +34,15 @@
 //!   through eastern Russia on Asia-centric maps. Per-feature
 //!   viewport bbox + Sutherland-Hodgman clipping at 10% margin
 //!   shrink SVGs by ~70–80%.
+//! - `19` — Geometry-density viewport trimming: sparse Mercator-
+//!   stretched edges (e.g. northern Norway/Finland on a Europe map)
+//!   are cropped based on actual vertex density, with a hard
+//!   Mercator aspect-ratio floor as a safety net. Tunable per-card
+//!   via the new `[viewport]` TOML section: `min_density`,
+//!   `min_aspect`, and `cluster_factor`.
+//! - `20` — Density trimming and aspect floor are off by default
+//!   (`min_density = 0.0`, `min_aspect = 0.0`); the machinery is
+//!   kept in place for opt-in use, but defaults preserve the natural
+//!   Mercator framing of country geometry.
 
-pub const RENDER_VERSION_MAP: u32 = 18;
+pub const RENDER_VERSION_MAP: u32 = 20;

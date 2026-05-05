@@ -34,6 +34,14 @@ pub struct Config {
     #[serde(default)]
     pub media_sources: IndexMap<String, PathBuf>,
 
+    /// Path to the `typst` CLI binary used to render `typst` blocks.
+    /// When `None`, ` ```typst ` blocks fall through to syntax highlighting.
+    /// The user controls how Typst is installed (with which fonts,
+    /// packages, or pinned version) — markid just invokes whatever path
+    /// is configured here.
+    #[serde(default)]
+    pub typst_binary: Option<PathBuf>,
+
 }
 
 fn default_endpoint() -> String {
