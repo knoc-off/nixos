@@ -34,6 +34,7 @@
 //! Lines / points contribute their vertices the same way polygons do.
 
 use crate::geometry::{BBox, Geometry, LonLat};
+use crate::project::mercator_y;
 
 /// Number of bins along each axis. 64 bins on a 36°-tall European
 /// viewport gives ~0.5° per bin — fine enough to follow country
@@ -69,10 +70,10 @@ pub fn trim_sparse_edges(
 
     let mut trimmed = bb;
     if min_density > 0.0 {
-        trimmed = trim_top(trimmed, &hist, min_density);
-        trimmed = trim_bottom(trimmed, &hist, min_density);
-        trimmed = trim_left(trimmed, &hist, min_density);
-        trimmed = trim_right(trimmed, &hist, min_density);
+        trimmed = trim_edge(trimmed, &hist, min_density, Edge::Top);
+        trimmed = trim_edge(trimmed, &hist, min_density, Edge::Bottom);
+        trimmed = trim_edge(trimmed, &hist, min_density, Edge::Left);
+        trimmed = trim_edge(trimmed, &hist, min_density, Edge::Right);
     }
 
     if min_aspect > 0.0 {
@@ -168,106 +169,83 @@ fn walk_vertices<F: FnMut(LonLat)>(g: &Geometry, f: &mut F) {
 
 // ---------- per-edge trimming ----------
 
-/// Walk inward from the top edge while the cumulative trimmed-strip
-/// fraction stays below `min_density`. Returns the new max_lat.
-fn trim_top(mut bb: BBox, hist: &Histogram, min_density: f64) -> BBox {
-    let total = hist.total as f64;
-    let lat_span = (hist.bb.max_lat - hist.bb.min_lat).max(f64::MIN_POSITIVE);
-    let bin_lat = lat_span / BIN_COUNT as f64;
-    let mut cum: f64 = 0.0;
-    // Walk from the top (BIN_COUNT-1) downward.
-    for i in (0..BIN_COUNT).rev() {
-        // Map this bin's row to its top latitude.
-        let top_lat = hist.bb.min_lat + bin_lat * (i as f64 + 1.0);
-        if top_lat <= bb.min_lat {
-            break;
-        }
-        let next = cum + hist.row_sum(i) as f64 / total;
-        if next > min_density {
-            // This row would push us past the threshold. Stop.
-            break;
-        }
-        cum = next;
-        // Move max_lat down to this bin's bottom edge.
-        let bottom_lat = hist.bb.min_lat + bin_lat * i as f64;
-        bb.max_lat = bottom_lat;
-    }
-    // Guard against degenerate trim that produces an empty bbox.
-    if bb.max_lat <= bb.min_lat {
-        bb.max_lat = hist.bb.max_lat;
-    }
-    bb
+/// Which edge of the bbox to trim inward.
+enum Edge {
+    Top,
+    Bottom,
+    Left,
+    Right,
 }
 
-fn trim_bottom(mut bb: BBox, hist: &Histogram, min_density: f64) -> BBox {
+/// Walk inward from `edge` while the cumulative vertex fraction in
+/// the trimmed strip stays below `min_density`.
+fn trim_edge(mut bb: BBox, hist: &Histogram, min_density: f64, edge: Edge) -> BBox {
     let total = hist.total as f64;
-    let lat_span = (hist.bb.max_lat - hist.bb.min_lat).max(f64::MIN_POSITIVE);
-    let bin_lat = lat_span / BIN_COUNT as f64;
-    let mut cum: f64 = 0.0;
-    for i in 0..BIN_COUNT {
-        let bottom_lat = hist.bb.min_lat + bin_lat * i as f64;
-        if bottom_lat >= bb.max_lat {
-            break;
-        }
-        let next = cum + hist.row_sum(i) as f64 / total;
-        if next > min_density {
-            break;
-        }
-        cum = next;
-        let top_lat = hist.bb.min_lat + bin_lat * (i as f64 + 1.0);
-        bb.min_lat = top_lat;
-    }
-    if bb.min_lat >= bb.max_lat {
-        bb.min_lat = hist.bb.min_lat;
-    }
-    bb
-}
 
-fn trim_left(mut bb: BBox, hist: &Histogram, min_density: f64) -> BBox {
-    let total = hist.total as f64;
-    let lon_span = (hist.bb.max_lon - hist.bb.min_lon).max(f64::MIN_POSITIVE);
-    let bin_lon = lon_span / BIN_COUNT as f64;
-    let mut cum: f64 = 0.0;
-    for i in 0..BIN_COUNT {
-        let left_lon = hist.bb.min_lon + bin_lon * i as f64;
-        if left_lon >= bb.max_lon {
-            break;
-        }
-        let next = cum + hist.col_sum(i) as f64 / total;
-        if next > min_density {
-            break;
-        }
-        cum = next;
-        let right_lon = hist.bb.min_lon + bin_lon * (i as f64 + 1.0);
-        bb.min_lon = right_lon;
-    }
-    if bb.min_lon >= bb.max_lon {
-        bb.min_lon = hist.bb.min_lon;
-    }
-    bb
-}
+    let is_lat = matches!(edge, Edge::Top | Edge::Bottom);
+    let from_max = matches!(edge, Edge::Top | Edge::Right);
 
-fn trim_right(mut bb: BBox, hist: &Histogram, min_density: f64) -> BBox {
-    let total = hist.total as f64;
-    let lon_span = (hist.bb.max_lon - hist.bb.min_lon).max(f64::MIN_POSITIVE);
-    let bin_lon = lon_span / BIN_COUNT as f64;
+    let (origin, span) = if is_lat {
+        (hist.bb.min_lat, (hist.bb.max_lat - hist.bb.min_lat).max(f64::MIN_POSITIVE))
+    } else {
+        (hist.bb.min_lon, (hist.bb.max_lon - hist.bb.min_lon).max(f64::MIN_POSITIVE))
+    };
+    let bin_size = span / BIN_COUNT as f64;
+
+    // The opposite-edge value we must not cross.
+    let opposite = match (&edge, from_max) {
+        (_, true) => if is_lat { bb.min_lat } else { bb.min_lon },
+        _ => if is_lat { bb.max_lat } else { bb.max_lon },
+    };
+
+    let bin_sum = |i: usize| -> u32 {
+        if is_lat { hist.row_sum(i) } else { hist.col_sum(i) }
+    };
+
     let mut cum: f64 = 0.0;
-    for i in (0..BIN_COUNT).rev() {
-        let right_lon = hist.bb.min_lon + bin_lon * (i as f64 + 1.0);
-        if right_lon <= bb.min_lon {
-            break;
-        }
-        let next = cum + hist.col_sum(i) as f64 / total;
+
+    // Walk from the edge inward: max-side walks high→low, min-side
+    // walks low→high.
+    let mut it: Box<dyn Iterator<Item = usize>> = if from_max {
+        Box::new((0..BIN_COUNT).rev())
+    } else {
+        Box::new(0..BIN_COUNT)
+    };
+
+    for i in it.by_ref() {
+        let lo = origin + bin_size * i as f64;
+        let hi = origin + bin_size * (i as f64 + 1.0);
+
+        // Have we passed the opposite boundary?
+        let outer = if from_max { hi } else { lo };
+        if from_max { if outer <= opposite { break; } }
+        else        { if outer >= opposite { break; } }
+
+        let next = cum + bin_sum(i) as f64 / total;
         if next > min_density {
             break;
         }
         cum = next;
-        let left_lon = hist.bb.min_lon + bin_lon * i as f64;
-        bb.max_lon = left_lon;
+
+        // Move the edge inward to this bin's inner face.
+        let inner = if from_max { lo } else { hi };
+        match edge {
+            Edge::Top    => bb.max_lat = inner,
+            Edge::Bottom => bb.min_lat = inner,
+            Edge::Right  => bb.max_lon = inner,
+            Edge::Left   => bb.min_lon = inner,
+        }
     }
-    if bb.max_lon <= bb.min_lon {
-        bb.max_lon = hist.bb.max_lon;
+
+    // Guard against degenerate collapse.
+    match edge {
+        Edge::Top    if bb.max_lat <= bb.min_lat => bb.max_lat = hist.bb.max_lat,
+        Edge::Bottom if bb.min_lat >= bb.max_lat => bb.min_lat = hist.bb.min_lat,
+        Edge::Left   if bb.min_lon >= bb.max_lon => bb.min_lon = hist.bb.min_lon,
+        Edge::Right  if bb.max_lon <= bb.min_lon => bb.max_lon = hist.bb.max_lon,
+        _ => {}
     }
+
     bb
 }
 
@@ -305,11 +283,6 @@ fn constrain_aspect(mut bb: BBox, min_aspect: f64) -> BBox {
         }
     }
     bb
-}
-
-fn mercator_y(lat_deg: f64) -> f64 {
-    let lat = lat_deg.clamp(-85.0, 85.0).to_radians();
-    (std::f64::consts::FRAC_PI_4 + lat * 0.5).tan().ln()
 }
 
 fn inverse_mercator_y(y: f64) -> f64 {

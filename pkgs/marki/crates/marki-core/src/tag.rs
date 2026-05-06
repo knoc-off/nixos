@@ -9,8 +9,15 @@
 //!     to Anki as a standard tag
 
 use marki_macros::ParseTag;
+use regex::Regex;
 use std::str::FromStr;
+use std::sync::LazyLock;
 use strum::{Display, EnumString};
+
+/// Regex matching a `#tag` or `#tag(args)` token. Used by all parsers/renderers.
+pub static TAG_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"#([A-Za-z][\w:\-]*(?:\([^)]*\))?)").unwrap()
+});
 
 /// Our stable identity for a note. Completely independent of Anki's own
 /// `noteId` — we mint these as hex-encoded 128-bit random UUIDs and store
@@ -48,9 +55,10 @@ pub enum SystemTag {
     #[tag("id")]
     Id(NoteId),
 
-    /// `#model(basic|cloze)` — force a note type, overriding inference.
+    /// `#model(<name>)` — selects the Rhai model script. Built-in names:
+    /// `basic`, `cloze`. Any other string loads `models/<name>.rhai`.
     #[tag("model")]
-    Model(ModelKind),
+    Model(String),
 
     /// `#cloze` or `#cloze(duo|auto|increment)` — implies cloze model.
     #[tag("cloze")]
@@ -148,7 +156,15 @@ mod tests {
     fn model_arg() {
         assert_eq!(
             parse_token("#model(cloze)"),
-            Parsed::System(SystemTag::Model(ModelKind::Cloze))
+            Parsed::System(SystemTag::Model("cloze".into()))
+        );
+    }
+
+    #[test]
+    fn model_custom_name() {
+        assert_eq!(
+            parse_token("#model(geographic-location)"),
+            Parsed::System(SystemTag::Model("geographic-location".into()))
         );
     }
 

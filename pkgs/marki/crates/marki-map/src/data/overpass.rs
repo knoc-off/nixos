@@ -16,7 +16,7 @@
 //! daemon turns each into a card-level failure and continues.
 
 use crate::error::MapError;
-use crate::geometry::{Geometry, LonLat, Polygon};
+use crate::geometry::{best_outer_for, Geometry, LonLat, Polygon};
 use serde::Deserialize;
 use std::path::Path;
 use std::sync::Mutex;
@@ -366,51 +366,6 @@ fn stitch_rings(members: &[RelationMember], role: &str) -> Vec<Vec<LonLat>> {
 
 fn pt_eq(a: LonLat, b: LonLat) -> bool {
     (a.lon - b.lon).abs() < 1e-9 && (a.lat - b.lat).abs() < 1e-9
-}
-
-fn best_outer_for(inner: &[LonLat], polys: &[Polygon]) -> Option<usize> {
-    // Pick the smallest-area outer whose bbox contains the inner's
-    // bbox. Cheap heuristic; adequate for clean OSM relations.
-    let inner_bb = bbox(inner);
-    let mut best: Option<(usize, f64)> = None;
-    for (i, p) in polys.iter().enumerate() {
-        let outer_bb = bbox(&p.outer);
-        if outer_bb.0 <= inner_bb.0
-            && outer_bb.1 <= inner_bb.1
-            && outer_bb.2 >= inner_bb.2
-            && outer_bb.3 >= inner_bb.3
-        {
-            let area = (outer_bb.2 - outer_bb.0) * (outer_bb.3 - outer_bb.1);
-            match best {
-                None => best = Some((i, area)),
-                Some((_, prev)) if area < prev => best = Some((i, area)),
-                _ => {}
-            }
-        }
-    }
-    best.map(|(i, _)| i)
-}
-
-fn bbox(pts: &[LonLat]) -> (f64, f64, f64, f64) {
-    let mut min_x = f64::INFINITY;
-    let mut min_y = f64::INFINITY;
-    let mut max_x = f64::NEG_INFINITY;
-    let mut max_y = f64::NEG_INFINITY;
-    for p in pts {
-        if p.lon < min_x {
-            min_x = p.lon;
-        }
-        if p.lat < min_y {
-            min_y = p.lat;
-        }
-        if p.lon > max_x {
-            max_x = p.lon;
-        }
-        if p.lat > max_y {
-            max_y = p.lat;
-        }
-    }
-    (min_x, min_y, max_x, max_y)
 }
 
 #[cfg(test)]

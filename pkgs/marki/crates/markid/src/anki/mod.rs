@@ -14,6 +14,10 @@
 
 pub mod client;
 pub mod model;
+pub mod note_type;
+pub mod template_state;
 
 pub use client::{AnkiConnect, AnkiError};
 pub use model::{ManagedNote, ModelKind};
+pub use note_type::{NoteTypeSpec, ensure_note_type, push_model_styling, build_field_values};
+pub use template_state::TemplateState;

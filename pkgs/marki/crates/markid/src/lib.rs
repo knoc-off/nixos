@@ -5,6 +5,7 @@ pub mod config;
 pub mod fmt;
 pub mod render;
 pub mod scan;
+pub mod scripting;
 pub mod sync;
 pub mod watch;
 pub mod writeback;

@@ -26,7 +26,7 @@
 //! `split_at_wrap` cuts. The two operations are designed to be used
 //! together.
 
-use crate::geometry::{Geometry, LonLat, Polygon};
+use crate::geometry::{best_outer_for, Geometry, LonLat, Polygon};
 
 /// Rotate one longitude so its offset from `central` lies in
 /// `(-180°, 180°]`. The output may exceed `±180°` — that's fine for
@@ -343,44 +343,6 @@ fn interpolate_at(a_lon: f64, a_lat: f64, b_lon: f64, b_lat: f64, target_lon: f6
     }
     let t = (target_lon - a_lon) / dx;
     a_lat + t * (b_lat - a_lat)
-}
-
-/// Find the smallest-area outer fragment whose bbox contains `inner`'s
-/// bbox. Used to reassign holes to the correct outer fragment after a
-/// split. Returns `None` if no fragment encloses the inner ring.
-fn best_outer_for(inner: &[LonLat], polys: &[Polygon]) -> Option<usize> {
-    let inner_bb = ring_bbox(inner);
-    let mut best: Option<(usize, f64)> = None;
-    for (i, p) in polys.iter().enumerate() {
-        let outer_bb = ring_bbox(&p.outer);
-        if outer_bb.0 <= inner_bb.0
-            && outer_bb.1 <= inner_bb.1
-            && outer_bb.2 >= inner_bb.2
-            && outer_bb.3 >= inner_bb.3
-        {
-            let area = (outer_bb.2 - outer_bb.0) * (outer_bb.3 - outer_bb.1);
-            match best {
-                None => best = Some((i, area)),
-                Some((_, prev)) if area < prev => best = Some((i, area)),
-                _ => {}
-            }
-        }
-    }
-    best.map(|(i, _)| i)
-}
-
-fn ring_bbox(pts: &[LonLat]) -> (f64, f64, f64, f64) {
-    let mut min_lon = f64::INFINITY;
-    let mut min_lat = f64::INFINITY;
-    let mut max_lon = f64::NEG_INFINITY;
-    let mut max_lat = f64::NEG_INFINITY;
-    for p in pts {
-        if p.lon < min_lon { min_lon = p.lon; }
-        if p.lat < min_lat { min_lat = p.lat; }
-        if p.lon > max_lon { max_lon = p.lon; }
-        if p.lat > max_lat { max_lat = p.lat; }
-    }
-    (min_lon, min_lat, max_lon, max_lat)
 }
 
 #[cfg(test)]

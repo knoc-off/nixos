@@ -24,6 +24,7 @@ notify-debouncer-full = "0.6"
 pulldown-cmark = "0.13"
 regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
+rhai = { version = "1", features = ["sync", "internals"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 strum = { version = "0.27", features = ["derive"] }

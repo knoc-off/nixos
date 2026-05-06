@@ -23,6 +23,10 @@ path = "src/bin/plug_auto_off.rs"
 name = "sunrise-lights"
 path = "src/bin/sunrise_lights.rs"
 
+[[bin]]
+name = "color-temp-cycle"
+path = "src/bin/color_temp_cycle.rs"
+
 [dependencies]
 rumqttc = "0.24"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time", "sync"] }

@@ -117,6 +117,40 @@ impl BBox {
     }
 }
 
+/// Compute the axis-aligned bounding box of a ring (slice of LonLat points).
+pub fn ring_bbox(ring: &[LonLat]) -> BBox {
+    let mut bb = BBox::empty();
+    for p in ring {
+        bb.extend_point(*p);
+    }
+    bb
+}
+
+/// Find the smallest-area outer polygon whose bbox fully contains `inner`'s
+/// bbox. Used to reassign holes to the correct outer fragment after a split.
+/// Returns `None` if no polygon encloses the inner ring.
+pub fn best_outer_for(inner: &[LonLat], polys: &[Polygon]) -> Option<usize> {
+    let inner_bb = ring_bbox(inner);
+    let mut best: Option<(usize, f64)> = None;
+    for (i, p) in polys.iter().enumerate() {
+        let outer_bb = ring_bbox(&p.outer);
+        if outer_bb.min_lon <= inner_bb.min_lon
+            && outer_bb.min_lat <= inner_bb.min_lat
+            && outer_bb.max_lon >= inner_bb.max_lon
+            && outer_bb.max_lat >= inner_bb.max_lat
+        {
+            let area =
+                (outer_bb.max_lon - outer_bb.min_lon) * (outer_bb.max_lat - outer_bb.min_lat);
+            match best {
+                None => best = Some((i, area)),
+                Some((_, prev)) if area < prev => best = Some((i, area)),
+                _ => {}
+            }
+        }
+    }
+    best.map(|(i, _)| i)
+}
+
 impl Geometry {
     pub fn bbox(&self) -> BBox {
         let mut bb = BBox::empty();

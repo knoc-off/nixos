@@ -7,6 +7,7 @@
 
 use crate::geometry::{Geometry, LonLat};
 use crate::project::Projector;
+use marki_core::escape_html as escape_attr;
 use std::fmt::Write;
 
 /// One renderable feature on a layer.
@@ -205,20 +206,6 @@ fn path_data_closed(p: &dyn Projector, pts: &[LonLat]) -> String {
         s.push_str(" Z");
     }
     s
-}
-
-fn escape_attr(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '&' => out.push_str("&amp;"),
-            '"' => out.push_str("&quot;"),
-            c => out.push(c),
-        }
-    }
-    out
 }
 
 #[cfg(test)]

@@ -3,13 +3,16 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use markid::anki::AnkiConnect;
+use markid::anki::TemplateState;
 use markid::config::Config;
 use markid::fmt as fmt_mod;
 use markid::render::Registry;
-use markid::scan::{deck_for, scan_dir};
+use markid::scan::scan_dir_v2;
+use markid::scripting::engine::ScriptEngine;
 use markid::sync::reconcile;
 use markid::watch::{Tick, run as run_watch};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
 
@@ -95,18 +98,24 @@ fn main() -> Result<()> {
         Cmd::Fmt => cmd_fmt(&cfg),
         Cmd::Push => {
             let anki = AnkiConnect::new(&cfg.anki_endpoint).context("init AnkiConnect client")?;
-            let registry = build_registry(&cfg);
-            cmd_push(&anki, &cfg, &registry)
+            let registry = Arc::new(build_registry(&cfg));
+            let mut script_engine = build_script_engine(&cfg);
+            let mut template_state = load_template_state();
+            cmd_push(&anki, &cfg, &registry, &mut script_engine, &mut template_state)
         }
         Cmd::Status => {
             let anki = AnkiConnect::new(&cfg.anki_endpoint).context("init AnkiConnect client")?;
-            let registry = build_registry(&cfg);
-            cmd_status(&anki, &cfg, &registry)
+            let registry = Arc::new(build_registry(&cfg));
+            let mut script_engine = build_script_engine(&cfg);
+            let mut template_state = load_template_state();
+            cmd_status(&anki, &cfg, &registry, &mut script_engine, &mut template_state)
         }
         Cmd::Watch => {
             let anki = AnkiConnect::new(&cfg.anki_endpoint).context("init AnkiConnect client")?;
-            let registry = build_registry(&cfg);
-            cmd_watch(&anki, &cfg, &registry)
+            let registry = Arc::new(build_registry(&cfg));
+            let mut script_engine = build_script_engine(&cfg);
+            let mut template_state = load_template_state();
+            cmd_watch(&anki, &cfg, &registry, &mut script_engine, &mut template_state)
         }
         Cmd::RenderMap { .. } => unreachable!("handled above"),
     }
@@ -138,6 +147,22 @@ fn build_registry(cfg: &Config) -> Registry {
     reg
 }
 
+/// Build the Rhai script engine with models_dir and lib_dir from config.
+fn build_script_engine(cfg: &Config) -> ScriptEngine {
+    let models_dir = cfg.resolved_models_dir();
+    let lib_dir = cfg.resolved_lib_dir();
+    let lib = if lib_dir.exists() { Some(lib_dir) } else { None };
+    ScriptEngine::new(models_dir, lib)
+}
+
+/// Load template state from the standard config location.
+fn load_template_state() -> TemplateState {
+    let path = TemplateState::default_path(
+        &dirs::config_dir().unwrap_or_else(|| PathBuf::from(".")),
+    );
+    TemplateState::load(&path)
+}
+
 /// Cache directory used by external block renderers. We default to
 /// `$XDG_CACHE_HOME/marki/` and fall back to `$HOME/.cache/marki/`.
 fn render_cache_dir() -> PathBuf {
@@ -158,14 +183,7 @@ fn load_config(cli: &Cli) -> Result<Config> {
     let mut cfg = if path.exists() {
         Config::load_from(&path).with_context(|| format!("read config {}", path.display()))?
     } else {
-        Config {
-            cards_dir: PathBuf::new(),
-            anki_endpoint: "http://127.0.0.1:8765".into(),
-            sync_interval: Duration::from_secs(300),
-            debounce_ms: 250,
-            media_sources: Default::default(),
-            typst_binary: None,
-        }
+        Config::default()
     };
 
     if let Some(p) = &cli.cards_dir {
@@ -195,14 +213,7 @@ fn load_config_for_render(cli: &Cli) -> Result<Config> {
         Some(p) if p.exists() => {
             Config::load_from(&p).with_context(|| format!("read config {}", p.display()))?
         }
-        _ => Config {
-            cards_dir: PathBuf::new(),
-            anki_endpoint: "http://127.0.0.1:8765".into(),
-            sync_interval: Duration::from_secs(300),
-            debounce_ms: 250,
-            media_sources: Default::default(),
-            typst_binary: None,
-        },
+        _ => Config::default(),
     };
 
     if let Some(p) = &cli.media_dir {
@@ -219,13 +230,27 @@ fn load_config_for_render(cli: &Cli) -> Result<Config> {
 fn run_cycle(
     anki: &AnkiConnect,
     cfg: &Config,
-    registry: &Registry,
+    registry: &Arc<Registry>,
+    script_engine: &mut ScriptEngine,
+    template_state: &mut TemplateState,
+    dry_run: bool,
 ) -> Result<()> {
-    // Stock `Basic` and `Cloze` note types come with every Anki install;
-    // nothing to ensure.
-    let scanned = scan_dir(&cfg.cards_dir, registry.external_langs())?;
+    // Invalidate cached model scripts so edits to .rhai files are picked up.
+    script_engine.invalidate_all();
+    let notes = scan_dir_v2(&cfg.cards_dir)?;
     let cache_dir = render_cache_dir();
-    let outcome = reconcile(anki, &cfg.cards_dir, &scanned, registry, &cache_dir)?;
+    let models_dir = cfg.resolved_models_dir();
+    let outcome = reconcile(
+        anki,
+        &cfg.cards_dir,
+        &notes,
+        script_engine,
+        registry,
+        template_state,
+        &cache_dir,
+        &models_dir,
+        dry_run,
+    )?;
     tracing::info!(
         "cycle: +{} ~{} ->{} -{} (unformatted {}, {} errors)",
         outcome.added,
@@ -237,6 +262,13 @@ fn run_cycle(
     );
     for e in &outcome.errors {
         tracing::warn!("{e}");
+    }
+    // Persist template state after successful cycle.
+    let state_path = TemplateState::default_path(
+        &dirs::config_dir().unwrap_or_else(|| PathBuf::from(".")),
+    );
+    if let Err(e) = template_state.save(&state_path) {
+        tracing::warn!("save template state: {e}");
     }
     Ok(())
 }
@@ -256,124 +288,60 @@ fn cmd_fmt(cfg: &Config) -> Result<()> {
 fn cmd_push(
     anki: &AnkiConnect,
     cfg: &Config,
-    registry: &Registry,
+    registry: &Arc<Registry>,
+    script_engine: &mut ScriptEngine,
+    template_state: &mut TemplateState,
 ) -> Result<()> {
     anki.ping().context("AnkiConnect ping")?;
-    run_cycle(anki, cfg, registry)
+    run_cycle(anki, cfg, registry, script_engine, template_state, false)
 }
 
-fn cmd_status(anki: &AnkiConnect, cfg: &Config, registry: &Registry) -> Result<()> {
+fn cmd_status(
+    anki: &AnkiConnect,
+    cfg: &Config,
+    registry: &Arc<Registry>,
+    script_engine: &mut ScriptEngine,
+    template_state: &mut TemplateState,
+) -> Result<()> {
     anki.ping().context("AnkiConnect ping")?;
-    let scanned = scan_dir(&cfg.cards_dir, registry.external_langs())?;
-    let remote = anki.managed_notes()?;
-    let remote_by_id: std::collections::HashMap<&str, &markid::anki::ManagedNote> =
-        remote.iter().map(|n| (n.marki_id.as_str(), n)).collect();
-
-    let cache_dir = render_cache_dir();
-    let mut added = 0usize;
-    let mut updated = 0usize;
-    let mut moved = 0usize;
-    let mut unformatted = 0usize;
-    for sc in &scanned {
-        let card = &sc.parsed.card;
-        let deck = deck_for(&cfg.cards_dir, &sc.path);
-        match &card.id {
-            None => unformatted += 1,
-            Some(id) => match remote_by_id.get(id.as_str()) {
-                None => added += 1,
-                Some(r) => {
-                    // Dispatch blocks and recompute the hash over the
-                    // final HTML, matching what the sync engine stores.
-                    let html_hash = match markid::sync::dispatch_blocks(sc, registry, &cache_dir) {
-                        Ok(resolved) => marki_core::content_hash_html(
-                            &resolved.card.front_html,
-                            &resolved.card.back_html,
-                        ),
-                        Err(_) => card.current_hash.clone(),
-                    };
-                    let content_diff = r.hash != html_hash;
-                    let deck_diff = r.deck != deck;
-                    if content_diff {
-                        updated += 1;
-                    } else if deck_diff {
-                        moved += 1;
-                    }
-                }
-            },
-        }
-    }
-    let local_ids: std::collections::HashSet<String> = scanned
-        .iter()
-        .filter_map(|sc| sc.parsed.card.id.clone())
-        .collect();
-    let orphans = remote
-        .iter()
-        .filter(|r| !local_ids.contains(&r.marki_id))
-        .count();
-
-    println!(
-        "scan: {} cards ({} unformatted)\nanki: {} managed notes\n+{} ~{} ->{} -{} orphans",
-        scanned.len(),
-        unformatted,
-        remote.len(),
-        added,
-        updated,
-        moved,
-        orphans,
-    );
-    Ok(())
+    run_cycle(anki, cfg, registry, script_engine, template_state, true)
 }
 
 fn cmd_render_map(file: &Path, out: &Path, registry: &Registry) -> Result<()> {
     let source = std::fs::read_to_string(file)
         .with_context(|| format!("read {}", file.display()))?;
-    let parsed = marki_core::parser::parse_with_externals(&source, registry.external_langs());
-    if parsed.card.block_requests.is_empty() {
-        println!("(no external blocks in {})", file.display());
-    }
+    let note = marki_core::note_parser::parse_note(&source, file.to_path_buf());
+
     std::fs::create_dir_all(out)
         .with_context(|| format!("create {}", out.display()))?;
 
     let cache = render_cache_dir();
-    let mut front = parsed.card.front_html.clone();
-    let mut back = parsed.card.back_html.clone();
-    let mut total_assets = 0usize;
-    for req in &parsed.card.block_requests {
-        let placeholder = marki_core::placeholder_for(&req.id);
-        let target = match req.side {
-            marki_core::BlockSide::Front => &mut front,
-            marki_core::BlockSide::Back => &mut back,
-        };
-        match registry.dispatch(req, file, &cache) {
-            Ok(rb) => {
-                *target = target.replacen(&placeholder, &rb.front_html, 1);
-                if !rb.back_html_extras.is_empty() {
-                    if !back.is_empty() {
-                        back.push('\n');
-                    }
-                    back.push_str(&rb.back_html_extras);
-                }
-                for a in &rb.assets {
-                    let asset_path = out.join(&a.filename);
-                    std::fs::write(&asset_path, &a.bytes).with_context(|| {
-                        format!("write asset {}", asset_path.display())
-                    })?;
-                    total_assets += 1;
-                }
-                println!("rendered {} block, id={}", req.lang, req.id);
-            }
-            Err(e) => {
-                eprintln!("{} block {} failed: {e}", req.lang, req.id);
-                let stub = format!(
-                    "<div style=\"color:#a00;border:1px solid #a00;padding:0.5em;\
-                     font-family:monospace;font-size:0.85em;\">\
-                     <strong>{} block failed:</strong> {}</div>",
-                    req.lang, e
-                );
-                *target = target.replacen(&placeholder, &stub, 1);
-            }
-        }
+    let result = markid::sync::stock_render::render_stock(&note, registry, file, &cache);
+
+    // Extract front/back from fields.
+    let front = result.fields.iter()
+        .find(|(k, _)| k == "Front" || k == "Text")
+        .map(|(_, v)| v.as_str())
+        .unwrap_or("");
+    let back = result.fields.iter()
+        .find(|(k, _)| k == "Back" || k == "Back Extra")
+        .map(|(_, v)| v.as_str())
+        .unwrap_or("");
+
+    for e in &result.errors {
+        eprintln!("warning: {e}");
     }
+
+    // Write assets to output directory.
+    let mut total_assets = 0usize;
+    for a in &result.assets {
+        let asset_path = out.join(&a.filename);
+        std::fs::write(&asset_path, &a.bytes).with_context(|| {
+            format!("write asset {}", asset_path.display())
+        })?;
+        total_assets += 1;
+    }
+
     let html_path = out.join("preview.html");
     let document = format!(
         "<!doctype html><meta charset=\"utf-8\"><title>{name}</title>\
@@ -394,7 +362,13 @@ fn cmd_render_map(file: &Path, out: &Path, registry: &Registry) -> Result<()> {
     Ok(())
 }
 
-fn cmd_watch(anki: &AnkiConnect, cfg: &Config, registry: &Registry) -> Result<()> {
+fn cmd_watch(
+    anki: &AnkiConnect,
+    cfg: &Config,
+    registry: &Arc<Registry>,
+    script_engine: &mut ScriptEngine,
+    template_state: &mut TemplateState,
+) -> Result<()> {
     wait_for_anki(anki)?;
 
     let debounce = Duration::from_millis(cfg.debounce_ms);
@@ -412,7 +386,7 @@ fn cmd_watch(anki: &AnkiConnect, cfg: &Config, registry: &Registry) -> Result<()
             Tick::Filesystem => tracing::info!("cycle: triggered by filesystem change"),
             Tick::Heartbeat => tracing::info!("cycle: triggered by heartbeat"),
         }
-        if let Err(e) = run_cycle(anki, cfg, registry) {
+        if let Err(e) = run_cycle(anki, cfg, registry, script_engine, template_state, false) {
             tracing::error!("cycle failed: {e:#}");
         }
         Ok(true)

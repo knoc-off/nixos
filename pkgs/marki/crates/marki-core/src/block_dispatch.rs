@@ -177,7 +177,8 @@ pub trait BlockRenderer: Send + Sync {
 
 /// Mint a deterministic short id for a block at `index` of lang `lang`
 /// within a single parse. Format: 8 hex chars.
-pub(crate) fn mint_block_req_id(index: usize, lang: &str) -> BlockReqId {
+#[cfg(test)]
+fn mint_block_req_id(index: usize, lang: &str) -> BlockReqId {
     let mut hasher = blake3::Hasher::new();
     hasher.update(&(index as u64).to_le_bytes());
     hasher.update(lang.as_bytes());
@@ -187,6 +188,7 @@ pub(crate) fn mint_block_req_id(index: usize, lang: &str) -> BlockReqId {
 
 /// Produce the placeholder string the parser inserts and the daemon
 /// replaces. Centralised so tests can use it without copy-pasting.
+#[cfg(test)]
 pub fn placeholder_for(id: &BlockReqId) -> String {
     format!("<!--MARKI-BLOCK:{id}-->")
 }

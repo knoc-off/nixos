@@ -5,19 +5,34 @@
 
 use anyhow::{Context, Result};
 use ignore::WalkBuilder;
-use marki_core::parser::{ParseOutput, parse_with_externals};
+use marki_core::note::Note;
+use marki_core::note_parser::parse_note;
 use std::path::{Path, PathBuf};
 
-pub struct ScannedCard {
+/// A scanned note (structural parser pipeline).
+pub struct ScannedNote {
     pub path: PathBuf,
     pub source: String,
-    pub parsed: ParseOutput,
+    pub note: Note,
 }
 
-pub fn scan_dir(root: &Path, external_langs: &[&str]) -> Result<Vec<ScannedCard>> {
+/// Scan a directory of markdown files, producing structural `Note` objects.
+pub fn scan_dir_v2(root: &Path) -> Result<Vec<ScannedNote>> {
     let mut out = Vec::new();
+    for path in walk_md_files(root) {
+        let source = std::fs::read_to_string(&path)
+            .with_context(|| format!("read {}", path.display()))?;
+        let note = parse_note(&source, path.clone());
+        out.push(ScannedNote { path, source, note });
+    }
+    Ok(out)
+}
+
+/// Walk a directory tree returning all `.md`/`.markdown` file paths.
+fn walk_md_files(root: &Path) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
     for dent in WalkBuilder::new(root)
-        .standard_filters(true) // .gitignore, .ignore, hidden files
+        .standard_filters(true)
         .follow_links(false)
         .build()
     {
@@ -38,16 +53,9 @@ pub fn scan_dir(root: &Path, external_langs: &[&str]) -> Result<Vec<ScannedCard>
         {
             continue;
         }
-        let source = std::fs::read_to_string(path)
-            .with_context(|| format!("read {}", path.display()))?;
-        let parsed = parse_with_externals(&source, external_langs);
-        out.push(ScannedCard {
-            path: path.to_path_buf(),
-            source,
-            parsed,
-        });
+        paths.push(path.to_path_buf());
     }
-    Ok(out)
+    paths
 }
 
 /// Derive Anki deck path from a card file's location relative to the scan

@@ -29,14 +29,6 @@ impl ModelKind {
             ModelKind::Cloze => "Cloze",
         }
     }
-
-    /// Field names in the stock Anki models.
-    pub fn field_names(self) -> &'static [&'static str] {
-        match self {
-            ModelKind::Basic => &["Front", "Back"],
-            ModelKind::Cloze => &["Text", "Back Extra"],
-        }
-    }
 }
 
 /// Marker tag applied to every managed note. `findNotes "tag:marki"`
@@ -104,7 +96,7 @@ pub fn hash_from_tags(tags: &[String]) -> Option<String> {
 }
 
 fn is_marker_tag(tag: &str) -> bool {
-    tag == MARKER_TAG || tag.starts_with(&format!("{MARKER_TAG}::"))
+    tag == MARKER_TAG || tag.starts_with("marki::")
 }
 
 #[cfg(test)]

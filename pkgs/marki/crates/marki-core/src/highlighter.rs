@@ -9,6 +9,8 @@ use syntect::highlighting::{Theme, ThemeSet};
 use syntect::html::highlighted_html_for_string;
 use syntect::parsing::SyntaxSet;
 
+use crate::util::escape_html;
+
 static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_newlines);
 
 static THEME: LazyLock<Theme> = LazyLock::new(|| {
@@ -36,7 +38,7 @@ pub fn highlight_code(code: &str, language: &str) -> String {
         .unwrap_or_else(|_| {
             format!(
                 "<pre style=\"{CODE_BLOCK_EXTRA_STYLE}\">{}</pre>",
-                html_escape(code),
+                escape_html(code),
             )
         });
 
@@ -54,19 +56,5 @@ pub fn highlight_code(code: &str, language: &str) -> String {
         // Unexpected format — wrap in a styled <div> as fallback.
         format!("<div style=\"{CODE_BLOCK_EXTRA_STYLE}\">{raw}</div>")
     }
-}
-
-fn html_escape(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '&' => out.push_str("&amp;"),
-            '"' => out.push_str("&quot;"),
-            c => out.push(c),
-        }
-    }
-    out
 }
 

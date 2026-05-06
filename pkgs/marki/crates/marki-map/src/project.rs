@@ -92,7 +92,7 @@ struct ProjBBox {
 
 const MERC_MAX_LAT: f64 = 85.051_128_779_807;
 
-fn mercator_y(lat_deg: f64) -> f64 {
+pub fn mercator_y(lat_deg: f64) -> f64 {
     let lat = lat_deg.clamp(-MERC_MAX_LAT, MERC_MAX_LAT).to_radians();
     (std::f64::consts::FRAC_PI_4 + lat * 0.5).tan().ln()
 }

@@ -41,7 +41,7 @@
 //! *rendered* (their geometry is untouched); they just fall outside
 //! the SVG viewBox and clip naturally.
 
-use crate::geometry::{BBox, Geometry, LonLat};
+use crate::geometry::{ring_bbox, BBox, Geometry, LonLat};
 
 /// Default cluster threshold: outlying components within
 /// `0.15 × diagonal_of_largest` of the cluster join the viewport.
@@ -135,14 +135,6 @@ fn polygon_area(ring: &[LonLat]) -> f64 {
         acc += ring[i].lon * ring[j].lat - ring[j].lon * ring[i].lat;
     }
     acc * 0.5
-}
-
-fn ring_bbox(ring: &[LonLat]) -> BBox {
-    let mut bb = BBox::empty();
-    for v in ring {
-        bb.extend_point(*v);
-    }
-    bb
 }
 
 fn bbox_diagonal(b: BBox) -> f64 {

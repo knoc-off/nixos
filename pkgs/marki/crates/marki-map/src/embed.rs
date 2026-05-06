@@ -36,6 +36,7 @@
 
 use crate::dsl::{LayerSpec, RevealMode};
 use indexmap::IndexMap;
+use marki_core::escape_html as escape_attr;
 use std::collections::BTreeMap;
 
 /// One layer's emitted SVG, plus how it should reveal.
@@ -121,20 +122,6 @@ pub fn resolve_reveals(
         .iter()
         .map(|(name, spec)| (name.clone(), spec.effective_reveal(name)))
         .collect()
-}
-
-fn escape_attr(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '&' => out.push_str("&amp;"),
-            '"' => out.push_str("&quot;"),
-            c => out.push(c),
-        }
-    }
-    out
 }
 
 

@@ -2,5 +2,6 @@
 
 pub mod engine;
 pub mod media;
+pub mod stock_render;
 
-pub use engine::{Outcome, dispatch_blocks, reconcile};
+pub use engine::{Outcome, reconcile};

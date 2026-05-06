@@ -14,6 +14,16 @@ pub struct Config {
     /// markid itself never shells out to git.
     pub cards_dir: PathBuf,
 
+    /// Directory containing Rhai model scripts (`<name>.rhai` +
+    /// optional `<name>.css`). Default: `<config_dir>/models/`.
+    #[serde(default)]
+    pub models_dir: Option<PathBuf>,
+
+    /// Directory containing shared Rhai libraries importable via
+    /// `import "lib/..." as ...`. Default: `<config_dir>/lib/`.
+    #[serde(default)]
+    pub lib_dir: Option<PathBuf>,
+
     /// AnkiConnect URL. Default: `http://127.0.0.1:8765`.
     #[serde(default = "default_endpoint")]
     pub anki_endpoint: String,
@@ -90,6 +100,21 @@ mod duration_secs {
     }
 }
 
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            cards_dir: PathBuf::new(),
+            models_dir: None,
+            lib_dir: None,
+            anki_endpoint: "http://127.0.0.1:8765".into(),
+            sync_interval: Duration::from_secs(300),
+            debounce_ms: 250,
+            media_sources: Default::default(),
+            typst_binary: None,
+        }
+    }
+}
+
 impl Config {
     pub fn default_path() -> Option<PathBuf> {
         dirs::config_dir().map(|c| c.join("markid").join("config.toml"))
@@ -98,5 +123,23 @@ impl Config {
     pub fn load_from(path: &Path) -> anyhow::Result<Self> {
         let raw = std::fs::read_to_string(path)?;
         Ok(toml::from_str(&raw)?)
+    }
+
+    /// Resolved models directory. Falls back to `<config_dir>/models/`.
+    pub fn resolved_models_dir(&self) -> PathBuf {
+        self.models_dir.clone().unwrap_or_else(|| {
+            dirs::config_dir()
+                .map(|c| c.join("markid").join("models"))
+                .unwrap_or_else(|| PathBuf::from("models"))
+        })
+    }
+
+    /// Resolved lib directory. Falls back to `<config_dir>/lib/`.
+    pub fn resolved_lib_dir(&self) -> PathBuf {
+        self.lib_dir.clone().unwrap_or_else(|| {
+            dirs::config_dir()
+                .map(|c| c.join("markid").join("lib"))
+                .unwrap_or_else(|| PathBuf::from("lib"))
+        })
     }
 }

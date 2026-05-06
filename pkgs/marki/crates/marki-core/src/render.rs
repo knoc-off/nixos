@@ -26,18 +26,9 @@
 //! Idempotent: running the formatter twice on the same file yields
 //! byte-identical output.
 
-use crate::tag::NoteId;
+use crate::tag::{NoteId, TAG_REGEX};
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag, TagEnd};
-use regex::Regex;
 use std::ops::Range;
-use std::sync::LazyLock;
-
-/// Same tag shape as the parser: `#word` or `#word(args)`, where the word
-/// starts with an ASCII letter and may contain letters, digits, `_`, `-`,
-/// `:` (for Anki's `::` hierarchy).
-static TAG_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"#([A-Za-z][\w:\-]*(?:\([^)]*\))?)").expect("tag regex compiles")
-});
 
 /// Format a single `.md` file to the canonical shape.
 ///

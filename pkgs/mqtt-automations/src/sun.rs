@@ -18,6 +18,23 @@ pub fn sunset(lat: f64, lon: f64, date: NaiveDate, tz: &Tz) -> DateTime<Tz> {
     solar_event(lat, lon, date, tz, false)
 }
 
+/// Solar noon — the moment the sun reaches its highest point.
+///
+/// Only depends on longitude (not latitude) and the equation of time.
+pub fn solar_noon(lon: f64, date: NaiveDate, tz: &Tz) -> DateTime<Tz> {
+    let day_of_year = date.ordinal() as f64;
+    let gamma = 2.0 * PI / 365.0 * (day_of_year - 1.0);
+    let (eqtime, _) = solar_params(gamma);
+    let noon_minutes_utc = 720.0 - 4.0 * lon - eqtime;
+
+    let base = date
+        .and_hms_opt(0, 0, 0)
+        .expect("valid midnight")
+        .and_utc();
+    let utc = base + Duration::seconds((noon_minutes_utc * 60.0) as i64);
+    utc.with_timezone(tz)
+}
+
 /// Solar elevation angle (degrees above horizon) at a given instant.
 ///
 /// Negative values mean the sun is below the horizon.
@@ -180,6 +197,15 @@ mod tests {
                 NaiveDate::from_ymd_opt(2026, month, day).unwrap(), &tz);
             eprintln!("{label}: sunrise={} elev@08:00={:.1}°", rise.format("%H:%M"), elev);
         }
+    }
+
+    #[test]
+    fn solar_noon_is_reasonable() {
+        let tz = berlin();
+        let date = NaiveDate::from_ymd_opt(2025, 6, 21).unwrap();
+        let noon = solar_noon(BERLIN_LON, date, &tz);
+        // Berlin solar noon is ~13:15 CEST in summer
+        assert!(noon.hour() >= 13 && noon.hour() <= 14, "got {noon}");
     }
 
     #[test]

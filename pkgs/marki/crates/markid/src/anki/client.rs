@@ -1,7 +1,7 @@
 //! AnkiConnect HTTP client.
 
 use super::model::{
-    MARKER_TAG, ManagedNote, ModelKind, full_tag_set, hash_from_tags, id_from_tags, strip_marker,
+    MARKER_TAG, ManagedNote, full_tag_set, hash_from_tags, id_from_tags, strip_marker,
 };
 use serde_json::{Value, json};
 use std::time::Duration;
@@ -178,56 +178,6 @@ impl AnkiConnect {
 
     // ---------- note mutation ----------
 
-    /// Add a new note. The marki id + hash are stored as tags; no custom
-    /// fields. Returns the Anki-assigned noteId.
-    pub fn add_note(
-        &self,
-        deck: &str,
-        model: ModelKind,
-        fields: &[(&str, &str)],
-        user_tags: &[String],
-        marki_id: &str,
-        hash: &str,
-    ) -> Result<i64, AnkiError> {
-        let fields_obj: serde_json::Map<String, Value> = fields
-            .iter()
-            .map(|(k, v)| ((*k).to_string(), Value::String((*v).to_string())))
-            .collect();
-        let tags = full_tag_set(user_tags, marki_id, hash);
-        let v = self.call(
-            "addNote",
-            json!({
-                "note": {
-                    "deckName": deck,
-                    "modelName": model.model_name(),
-                    "fields": fields_obj,
-                    "tags": tags,
-                    "options": { "allowDuplicate": true }
-                }
-            }),
-        )?;
-        v.as_i64()
-            .ok_or_else(|| AnkiError::Shape(format!("addNote returned non-integer: {v}")))
-    }
-
-    pub fn update_note_fields(
-        &self,
-        anki_note_id: i64,
-        fields: &[(&str, &str)],
-    ) -> Result<(), AnkiError> {
-        let fields_obj: serde_json::Map<String, Value> = fields
-            .iter()
-            .map(|(k, v)| ((*k).to_string(), Value::String((*v).to_string())))
-            .collect();
-        self.call(
-            "updateNoteFields",
-            json!({
-                "note": { "id": anki_note_id, "fields": fields_obj }
-            }),
-        )?;
-        Ok(())
-    }
-
     /// Replace the full tag set on a note. Reapplies marker, id, and hash
     /// alongside the user tags.
     pub fn update_note_tags(
@@ -279,6 +229,55 @@ impl AnkiConnect {
         v.as_str()
             .map(String::from)
             .ok_or_else(|| AnkiError::Shape("storeMediaFile returned non-string".into()))
+    }
+
+    // ---------- note operations (dynamic model name) ----------
+
+    /// Add a note with a dynamic model name (supports custom marki note types).
+    pub fn add_note_dynamic(
+        &self,
+        deck: &str,
+        model_name: &str,
+        fields: &[(String, String)],
+        tags: &[String],
+    ) -> Result<i64, AnkiError> {
+        let fields_obj: serde_json::Map<String, Value> = fields
+            .iter()
+            .map(|(k, v)| (k.clone(), Value::String(v.clone())))
+            .collect();
+        let v = self.call(
+            "addNote",
+            json!({
+                "note": {
+                    "deckName": deck,
+                    "modelName": model_name,
+                    "fields": fields_obj,
+                    "tags": tags,
+                    "options": { "allowDuplicate": true }
+                }
+            }),
+        )?;
+        v.as_i64()
+            .ok_or_else(|| AnkiError::Shape(format!("addNote returned non-integer: {v}")))
+    }
+
+    /// Update fields on an existing note (dynamic field list).
+    pub fn update_note_fields_dynamic(
+        &self,
+        anki_note_id: i64,
+        fields: &[(String, String)],
+    ) -> Result<(), AnkiError> {
+        let fields_obj: serde_json::Map<String, Value> = fields
+            .iter()
+            .map(|(k, v)| (k.clone(), Value::String(v.clone())))
+            .collect();
+        self.call(
+            "updateNoteFields",
+            json!({
+                "note": { "id": anki_note_id, "fields": fields_obj }
+            }),
+        )?;
+        Ok(())
     }
 
 }

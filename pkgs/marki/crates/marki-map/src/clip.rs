@@ -26,7 +26,7 @@
 //!    The result is a proper closed polygon (or open polyline) with
 //!    new vertices interpolated at each crossing.
 
-use crate::geometry::{BBox, Geometry, LonLat, Polygon};
+use crate::geometry::{ring_bbox, BBox, Geometry, LonLat, Polygon};
 
 /// Clip a geometry to `clip`. Any component fully outside is dropped;
 /// any component that straddles is clipped to the bbox.
@@ -353,14 +353,6 @@ fn clip_against_edge(ring: &[LonLat], edge: Edge) -> Vec<LonLat> {
 
 fn point_in_bbox(p: LonLat, bb: BBox) -> bool {
     p.lon >= bb.min_lon && p.lon <= bb.max_lon && p.lat >= bb.min_lat && p.lat <= bb.max_lat
-}
-
-fn ring_bbox(pts: &[LonLat]) -> BBox {
-    let mut bb = BBox::empty();
-    for p in pts {
-        bb.extend_point(*p);
-    }
-    bb
 }
 
 #[cfg(test)]

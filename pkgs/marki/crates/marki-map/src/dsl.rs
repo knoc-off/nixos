@@ -188,6 +188,10 @@ pub enum DslError {
     NoLayers,
     #[error("size dimensions must be positive (got {0}x{1})")]
     BadSize(u32, u32),
+    #[error("size dimensions must be <= 10000 (got {0}x{1})")]
+    SizeTooLarge(u32, u32),
+    #[error("{field} must be between 0.0 and 1.0 (got {value})")]
+    OutOfRange { field: &'static str, value: f64 },
 }
 
 /// Parse a `map` block body as TOML and validate it.
@@ -198,6 +202,19 @@ pub fn parse_map_spec(src: &str) -> Result<MapSpec, DslError> {
     }
     if spec.size[0] == 0 || spec.size[1] == 0 {
         return Err(DslError::BadSize(spec.size[0], spec.size[1]));
+    }
+    if spec.size[0] > 10000 || spec.size[1] > 10000 {
+        return Err(DslError::SizeTooLarge(spec.size[0], spec.size[1]));
+    }
+    let vp = &spec.viewport;
+    if !(0.0..=1.0).contains(&vp.min_density) {
+        return Err(DslError::OutOfRange { field: "min_density", value: vp.min_density });
+    }
+    if !(0.0..=1.0).contains(&vp.min_aspect) {
+        return Err(DslError::OutOfRange { field: "min_aspect", value: vp.min_aspect });
+    }
+    if !(0.0..=1.0).contains(&vp.cluster_factor) {
+        return Err(DslError::OutOfRange { field: "cluster_factor", value: vp.cluster_factor });
     }
     Ok(spec)
 }
@@ -416,5 +433,95 @@ features = ["coastline"]
 "#;
         let err = parse_map_spec(src).unwrap_err();
         assert!(matches!(err, DslError::Toml(_)), "got: {err:?}");
+    }
+
+    // ---------- range validation ----------
+
+    #[test]
+    fn min_density_out_of_range() {
+        let src = r#"
+[viewport]
+min_density = 1.5
+
+[layers.base]
+features = ["coastline"]
+"#;
+        let err = parse_map_spec(src).unwrap_err();
+        assert!(matches!(err, DslError::OutOfRange { field: "min_density", .. }), "got: {err:?}");
+    }
+
+    #[test]
+    fn min_density_negative() {
+        let src = r#"
+[viewport]
+min_density = -0.1
+
+[layers.base]
+features = ["coastline"]
+"#;
+        let err = parse_map_spec(src).unwrap_err();
+        assert!(matches!(err, DslError::OutOfRange { field: "min_density", .. }), "got: {err:?}");
+    }
+
+    #[test]
+    fn min_aspect_out_of_range() {
+        let src = r#"
+[viewport]
+min_aspect = 2.0
+
+[layers.base]
+features = ["coastline"]
+"#;
+        let err = parse_map_spec(src).unwrap_err();
+        assert!(matches!(err, DslError::OutOfRange { field: "min_aspect", .. }), "got: {err:?}");
+    }
+
+    #[test]
+    fn cluster_factor_out_of_range() {
+        let src = r#"
+[viewport]
+cluster_factor = -0.5
+
+[layers.base]
+features = ["coastline"]
+"#;
+        let err = parse_map_spec(src).unwrap_err();
+        assert!(matches!(err, DslError::OutOfRange { field: "cluster_factor", .. }), "got: {err:?}");
+    }
+
+    #[test]
+    fn size_too_large() {
+        let src = r#"
+size = [20000, 400]
+
+[layers.base]
+features = ["coastline"]
+"#;
+        let err = parse_map_spec(src).unwrap_err();
+        assert!(matches!(err, DslError::SizeTooLarge(20000, 400)), "got: {err:?}");
+    }
+
+    #[test]
+    fn boundary_values_valid() {
+        // All at 1.0 boundary should be OK.
+        let src = r#"
+[viewport]
+min_density = 1.0
+min_aspect = 1.0
+cluster_factor = 1.0
+
+[layers.base]
+features = ["coastline"]
+"#;
+        parse_map_spec(src).unwrap();
+
+        // Size at 10000 boundary should be OK.
+        let src2 = r#"
+size = [10000, 10000]
+
+[layers.base]
+features = ["coastline"]
+"#;
+        parse_map_spec(src2).unwrap();
     }
 }

@@ -10,10 +10,11 @@
 
 use anyhow::Result;
 use marki_core::mint_id;
+use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use crate::scan::scan_dir;
+use crate::scan::scan_dir_v2;
 use crate::writeback::write_back;
 
 #[derive(Default)]
@@ -33,37 +34,31 @@ pub struct FmtOutcome {
 pub fn run(root: &Path) -> Result<FmtOutcome> {
     let mut outcome = FmtOutcome::default();
 
-    let scanned = scan_dir(root, &[])?;
+    let scanned = scan_dir_v2(root)?;
 
-    for sc in &scanned {
-        // Surface any parse warnings but keep going.
-        if !sc.parsed.errors.is_empty() {
-            outcome.errored += 1;
-            for e in &sc.parsed.errors {
-                outcome
-                    .errors
-                    .push(format!("{}: {e}", sc.path.display()));
-            }
-        }
+    // Collect IDs seen before formatting so we can detect duplicates
+    // without a second scan pass.
+    let mut seen_ids = HashMap::<String, PathBuf>::new();
 
-        let had_id = sc.parsed.card.id.is_some();
+    for sn in &scanned {
+        let had_id = sn.note.id.is_some();
         let minted_id = mint_id();
 
         // Read the current bytes so we can detect whether the formatter
         // actually changed anything.
-        let before = match fs::read_to_string(&sc.path) {
+        let before = match fs::read_to_string(&sn.path) {
             Ok(s) => s,
             Err(e) => {
                 outcome
                     .errors
-                    .push(format!("{}: read: {e}", sc.path.display()));
+                    .push(format!("{}: read: {e}", sn.path.display()));
                 continue;
             }
         };
 
-        match write_back(&sc.path, &minted_id) {
+        match write_back(&sn.path, &minted_id) {
             Ok(()) => {
-                let after = fs::read_to_string(&sc.path).unwrap_or_default();
+                let after = fs::read_to_string(&sn.path).unwrap_or_default();
                 if after == before {
                     outcome.unchanged += 1;
                 } else {
@@ -72,26 +67,26 @@ pub fn run(root: &Path) -> Result<FmtOutcome> {
                         outcome.minted += 1;
                     }
                 }
+
+                // Record the final ID for duplicate detection.
+                // If the file already had one, use that; otherwise use the minted one.
+                let final_id = if had_id {
+                    sn.note.id.clone().unwrap()
+                } else {
+                    minted_id
+                };
+                if let Some(other) = seen_ids.insert(final_id.clone(), sn.path.clone()) {
+                    outcome.errors.push(format!(
+                        "duplicate #id({final_id}) in {} and {}",
+                        other.display(),
+                        sn.path.display()
+                    ));
+                }
             }
             Err(e) => {
                 outcome
                     .errors
-                    .push(format!("{}: writeback: {e}", sc.path.display()));
-            }
-        }
-    }
-
-    // Sanity: after the pass, no two files should claim the same id.
-    let rescanned = scan_dir(root, &[])?;
-    let mut seen = std::collections::HashMap::<String, std::path::PathBuf>::new();
-    for sc in rescanned {
-        if let Some(id) = sc.parsed.card.id {
-            if let Some(other) = seen.insert(id.clone(), sc.path.clone()) {
-                outcome.errors.push(format!(
-                    "duplicate #id({id}) in {} and {}",
-                    other.display(),
-                    sc.path.display()
-                ));
+                    .push(format!("{}: writeback: {e}", sn.path.display()));
             }
         }
     }

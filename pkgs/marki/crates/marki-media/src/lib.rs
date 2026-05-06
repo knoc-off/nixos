@@ -28,6 +28,7 @@ pub mod error;
 use std::path::{Path, PathBuf};
 
 use marki_core::{AssetMime, BlockError, BlockRenderer, EmittedAsset, RenderCtx, RenderedBlock};
+use marki_core::escape_html as escape_attr;
 
 pub use error::MediaError;
 
@@ -339,20 +340,6 @@ fn lookup_with_ext(dir: &Path, stem: &str, ext: &str) -> Option<PathBuf> {
         }
     }
     None
-}
-
-fn escape_attr(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for c in s.chars() {
-        match c {
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '&' => out.push_str("&amp;"),
-            '"' => out.push_str("&quot;"),
-            c => out.push(c),
-        }
-    }
-    out
 }
 
 #[cfg(test)]
