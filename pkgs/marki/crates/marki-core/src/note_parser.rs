@@ -235,7 +235,7 @@ pub fn parse_note(source: &str, source_path: PathBuf) -> Note {
                 }
             }
             Event::End(TagEnd::Strong) => {
-                push_html(&mut state, if is_cloze { "}}}}" } else { "</strong>" });
+                push_html(&mut state, if is_cloze { "}}" } else { "</strong>" });
             }
             Event::Start(Tag::Emphasis) => {
                 if is_cloze {
@@ -246,7 +246,7 @@ pub fn parse_note(source: &str, source_path: PathBuf) -> Note {
                 }
             }
             Event::End(TagEnd::Emphasis) => {
-                push_html(&mut state, if is_cloze { "}}}}" } else { "</em>" });
+                push_html(&mut state, if is_cloze { "}}" } else { "</em>" });
             }
             Event::Start(Tag::Strikethrough) => {
                 push_html(&mut state, "<del>");

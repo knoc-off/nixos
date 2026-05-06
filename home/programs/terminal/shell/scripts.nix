@@ -291,151 +291,72 @@ in {
           #!${pkgs.bash}/bin/bash
           set -euo pipefail
 
-          PW_DUMP="${pkgs.pipewire}/bin/pw-dump"
-          PW_CLI="${pkgs.pipewire}/bin/pw-cli"
-          JQ="${pkgs.jq}/bin/jq"
-          PACTL="${pkgs.pulseaudio}/bin/pactl"
-          WPCTL="${pkgs.wireplumber}/bin/wpctl"
-          SLEEP="${pkgs.coreutils}/bin/sleep"
+          die() { echo "Error: $*" >&2; exit 1; }
 
-          usage() {
-            echo "Usage: $0 [OPTION]"
-            echo "  Interactively combine two PipeWire audio sinks."
-            echo
-            echo "Options:"
-            echo "  -c, --clean    Remove all existing combined sinks and exit."
-            echo "  -h, --help     Show this help message and exit."
-            exit 0
+          cleanup() {
+            mapfile -t ids < <(pactl list modules short | grep -w module-combine-sink | awk '{print $1}' || true)
+            [[ ''${#ids[@]} -eq 0 ]] && echo "No combined sinks found." && return
+            echo "Removing ''${#ids[@]} combined sink module(s)..."
+            for id in "''${ids[@]}"; do pactl unload-module "$id" 2>/dev/null || true; done
           }
 
-          remove_combined_sinks() {
-            echo "Cleaning old combined sinks..."
-            mapfile -t combined_ids < <(
-              "$PW_DUMP" | "$JQ" -r '
-                .[] | select(.type == "PipeWire:Interface:Node" and
-                             (.info.props["node.name"]? | test("combined"))) | .id'
-            )
-            if [ ''${#combined_ids[@]} -eq 0 ]; then
-               echo "No combined sinks found."
-               return
-            fi
-            echo "Removing ''${#combined_ids[@]} sink(s)..."
-            for id in "''${combined_ids[@]}"; do
-              "$PW_CLI" destroy "$id" || echo "Warn: Failed to remove $id" >&2
-            done
-            echo "Cleanup finished."
-          }
+          case "''${1:-}" in
+            -c|--clean) cleanup; exit 0 ;;
+            -h|--help)  echo "Usage: pipewire-combine-sinks [-c|--clean] [-h|--help]"; exit 0 ;;
+            "")         ;; # continue
+            *)          die "Unknown option: $1" ;;
+          esac
 
-          # Argument Parsing
-          if [ $# -gt 0 ]; then
-            case "$1" in
-              -c|--clean) remove_combined_sinks; exit 0 ;;
-              -h|--help)  usage ;;
-              *) echo "Unknown option: $1"; usage ;;
-            esac
-          fi
+          cleanup
 
-          # Main Logic
-          remove_combined_sinks # Clean before creating new
-
-          echo "Scanning for audio sinks..."
-          # Get sink ID, name, and description (fallback to name) in one go (TSV format)
-          mapfile -t sinks_data < <(
-            "$PW_DUMP" | "$JQ" -r '
-              .[] | select(.type == "PipeWire:Interface:Node" and
-                           .info.props["media.class"] == "Audio/Sink")
-              | [.id, .info.props["node.name"],
-                 (.info.props["node.description"]? // .info.props["node.name"])]
+          # Discover sinks (TSV: node.name, description)
+          mapfile -t raw < <(
+            pw-dump | jq -r '
+              .[] | select(.type == "PipeWire:Interface:Node"
+                      and .info.props["media.class"] == "Audio/Sink")
+              | [.info.props["node.name"],
+                 (.info.props["node.description"] // .info.props["node.name"])]
               | @tsv'
           )
+          [[ ''${#raw[@]} -lt 2 ]] && die "Need at least 2 sinks to combine."
 
-          if [ ''${#sinks_data[@]} -lt 2 ]; then
-            echo "Error: Need at least 2 sinks to combine." >&2; exit 1
-          fi
-
-          echo "Available Sinks:"
-          declare -a sink_ids sink_names sink_descs
-          for i in "''${!sinks_data[@]}"; do
-            # Parse TSV data directly into variables
-            IFS=$'\t' read -r id name desc <<< "''${sinks_data[$i]}"
-            sink_ids+=("$id")
-            sink_names+=("$name")
-            sink_descs+=("$desc")
-            printf "[%d] %s\n" "$((i+1))" "$desc" # Use printf for formatting
+          declare -a names descs
+          declare -A desc_to_idx
+          for i in "''${!raw[@]}"; do
+            IFS=$'\t' read -r name desc <<< "''${raw[$i]}"
+            names+=("$name"); descs+=("$desc"); desc_to_idx["$desc"]=$i
           done
 
-          # User Selection
-          select_sink() {
-            local prompt="$1"
-            local exclude_index="$2" # Optional index to exclude
-            local selection index
-            while true; do
-              read -rp "$prompt [1-''${#sink_ids[@]}]: " selection
-              if [[ "$selection" =~ ^[0-9]+$ ]] && \
-                 [ "$selection" -ge 1 ] && [ "$selection" -le ''${#sink_ids[@]} ]; then
-                index=$((selection - 1))
-                if [ -z "$exclude_index" ] || [ "$index" -ne "$exclude_index" ]; then
-                  echo "$index" # Return the selected index
-                  return
-                else
-                  echo "Cannot select the same device twice." >&2
-                fi
-              else
-                echo "Invalid selection." >&2
-              fi
-            done
-          }
+          # Select sinks
+          first=$(printf '%s\n' "''${descs[@]}" | gum choose --header "Select first device")
+          second=$(printf '%s\n' "''${descs[@]}" | grep -vxF "$first" | gum choose --header "Select second device")
+          idx1="''${desc_to_idx[$first]}"
+          idx2="''${desc_to_idx[$second]}"
 
-          idx1=$(select_sink "Select first device")
-          idx2=$(select_sink "Select second device" "$idx1") # Exclude first selection
+          # Name combined sink
+          sink_name=$(gum input --placeholder "combined" --header "Name for combined sink" --char-limit 64) || true
+          sink_name="''${sink_name:-combined}"
+          [[ "$sink_name" =~ ^[a-zA-Z0-9_-]+$ ]] || die "Invalid name — use [a-zA-Z0-9_-] only."
 
-          # Create Combined Sink
-          read -rp "Enter name for combined sink [combined]: " combined_name
-          combined_name=''${combined_name:-combined}
+          # Create & set default
+          echo "Creating '$sink_name': $first + $second"
+          pactl load-module module-combine-sink sink_name="$sink_name" slaves="''${names[$idx1]},''${names[$idx2]}"
+          gum spin --spinner dot --title "Waiting for registration..." -- sleep 2
 
-          echo "Creating '$combined_name' with:"
-          echo "  -> ''${sink_descs[$idx1]}"
-          echo "  -> ''${sink_descs[$idx2]}"
+          new_id=$(pw-dump | jq -r --arg n "$sink_name" '
+            [.[] | select(.type == "PipeWire:Interface:Node"
+                    and .info.props["node.name"] == $n)][0].id // empty')
+          [[ -z "$new_id" ]] && die "Sink '$sink_name' not found after creation."
 
-          "$PACTL" load-module module-combine-sink \
-            sink_name="$combined_name" \
-            slaves="''${sink_names[$idx1]},''${sink_names[$idx2]}"
-
-          echo "Combined sink created. Waiting for registration..."
-          "$SLEEP" 2 # Give PipeWire/PulseAudio time
-
-          # Set Default
-          # Find the ID of the newly created sink
-          new_sink_id=$("$PW_DUMP" | "$JQ" -r --arg name "$combined_name" '
-            [.[] | select(.type == "PipeWire:Interface:Node" and
-                          .info.props["node.name"] == $name)][0].id // empty'
-          )
-
-          if [ -z "$new_sink_id" ]; then
-             echo "Error: Could not find created sink '$combined_name'." >&2; exit 1
-          fi
-
-          echo "Setting '$combined_name' (ID: $new_sink_id) as default..."
-          "$WPCTL" set-default "$new_sink_id"
-
-          echo "Success! Audio should now play on both devices."
-          echo "Run '$0 --clean' to remove combined sinks."
+          wpctl set-default "$new_id"
+          echo "Done — '$sink_name' is now the default output."
         '';
 
-        # Grammar for command-line completion (simple options)
         grammar = ''
           pipewire-combine-sinks (-c | --clean | -h | --help)?;
         '';
 
-        # Runtime dependencies
-        runtimeDeps = [
-          pkgs.bash
-          pkgs.pipewire
-          pkgs.jq
-          pkgs.pulseaudio
-          pkgs.wireplumber
-          pkgs.coreutils
-        ];
+        runtimeDeps = with pkgs; [pipewire jq pulseaudio wireplumber coreutils gum gnugrep gawk];
       })
 
       (mkComplgenScript {

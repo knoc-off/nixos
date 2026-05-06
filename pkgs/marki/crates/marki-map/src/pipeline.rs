@@ -120,7 +120,7 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
     //      canvas so they're never visible, while cutting geometry
     //      close to the viewport boundary for maximum SVG size
     //      reduction.
-    let clip_bb = padded.padded(0.10);
+    let clip_bb = padded.padded(0.005);
     for layer in &mut resolved {
         for (g, _, _) in &mut layer.features {
             let old = std::mem::take(g);
@@ -152,18 +152,18 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
         // Apply per-layer highlight style overrides from the DSL.
         if let Some(ov) = &spec.layers[layer.name].style {
             if let Some(role) = layer_style.roles.iter_mut().find(|r| r.role == "highlight") {
-                if let Some(f) = &ov.fill { role.fill = f.clone(); }
-                if let Some(s) = &ov.stroke { role.stroke = s.clone(); }
-                if let Some(sw) = ov.stroke_width { role.stroke_width = sw; }
+                if let Some(f) = &ov.fill {
+                    role.fill = f.clone();
+                }
+                if let Some(s) = &ov.stroke {
+                    role.stroke = s.clone();
+                }
+                if let Some(sw) = ov.stroke_width {
+                    role.stroke_width = sw;
+                }
             }
         }
-        let svg = compose_layer(
-            render_w,
-            render_h,
-            &layer_style,
-            &*projector,
-            &features,
-        );
+        let svg = compose_layer(render_w, render_h, &layer_style, &*projector, &features);
         let cache_filename = format!("{}.svg", layer.name);
         svg_files.push((layer.name.to_string(), cache_filename, svg.into_bytes()));
     }
@@ -201,13 +201,7 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
     cache::write_atomic(cache_root, &key, &files)?;
 
     // ---- Build embed + assets.
-    Ok(build_block(
-        &key,
-        render_w,
-        render_h,
-        &reveals,
-        &svg_files,
-    ))
+    Ok(build_block(&key, render_w, render_h, &reveals, &svg_files))
 }
 
 /// Pick the largest `(w, h)` within `budget` whose aspect equals
@@ -260,10 +254,7 @@ fn resolve_all_layers<'a>(
             let g = resolve_one(h, cache_root)?;
             features.push((g, "highlight", false));
         }
-        out.push(ResolvedLayer {
-            name,
-            features,
-        });
+        out.push(ResolvedLayer { name, features });
     }
     Ok(out)
 }
@@ -361,8 +352,7 @@ fn viewport_bbox(layers: &[ResolvedLayer<'_>], cluster_factor: f64) -> Result<BB
     //    geometries (coastline) which have no polygon area.
     let mut bb = BBox::empty();
     for g in &focus {
-        let g_bb = cluster::main_cluster_bbox(&[*g], cluster_factor)
-            .unwrap_or_else(|| g.bbox());
+        let g_bb = cluster::main_cluster_bbox(&[*g], cluster_factor).unwrap_or_else(|| g.bbox());
         bb.extend(g_bb);
     }
 
@@ -372,8 +362,7 @@ fn viewport_bbox(layers: &[ResolvedLayer<'_>], cluster_factor: f64) -> Result<BB
     //    antimeridian) doesn't blow the bbox up to a 360°-wide span.
     //    Single-component highlights collapse to a normal bbox.
     for g in &highlights {
-        let g_bb = cluster::main_cluster_bbox(&[*g], cluster_factor)
-            .unwrap_or_else(|| g.bbox());
+        let g_bb = cluster::main_cluster_bbox(&[*g], cluster_factor).unwrap_or_else(|| g.bbox());
         bb.extend(g_bb);
     }
 
@@ -399,12 +388,7 @@ fn build_block(
 ) -> RenderedBlock {
     let media_files: Vec<(String, String)> = svg_files
         .iter()
-        .map(|(name, _cache_name, _)| {
-            (
-                name.clone(),
-                layer_media_filename(key, name),
-            )
-        })
+        .map(|(name, _cache_name, _)| (name.clone(), layer_media_filename(key, name)))
         .collect();
 
     let mut layers: Vec<EmbedLayer<'_>> = media_files
@@ -503,4 +487,3 @@ mod tests {
         assert!(w >= 1 && h >= 1);
     }
 }
-
