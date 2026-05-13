@@ -2,7 +2,6 @@
   pkgs,
   lib,
   self,
-  hostname,
   ...
 }: let
   config_dir = "/etc/nixos";
@@ -414,10 +413,6 @@ in {
           pkgs.gawk # GNU awk is robust for parsing
           pkgs.coreutils # For sort
         ];
-      })
-
-      (self.packages.${pkgs.stdenv.hostPlatform.system}.nx-script.override {
-        inherit config_dir hostname;
       })
 
       (pkgs.writeShellScriptBin "chrome" ''

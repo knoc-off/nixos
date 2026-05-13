@@ -197,6 +197,9 @@ fn load_config(cli: &Cli) -> Result<Config> {
             .entry("_default".into())
             .or_insert_with(|| p.clone());
     }
+    if let Some(p) = &cli.typst_binary {
+        cfg.typst_binary = Some(p.clone());
+    }
     if cfg.cards_dir.as_os_str().is_empty() {
         anyhow::bail!("cards_dir is required (set in config or pass --cards-dir)");
     }

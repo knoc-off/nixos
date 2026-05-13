@@ -28,6 +28,7 @@
 
     self.nixosModules.home
     self.nixosModules.nix
+    self.nixosModules.nh
     self.nixosModules.audio.pipewire
 
     self.nixosModules.misc

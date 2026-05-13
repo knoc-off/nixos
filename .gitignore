@@ -1,3 +1,4 @@
+AGENTS.md
 .remoteDeployOptions
 .remoteInstallOptions
 systems/hardware/fingerprint/calib-data.bin
@@ -38,3 +39,4 @@ niri-docs.md
 # Temporary/cache files
 *-cache.bin
 .cache/
+.opencode

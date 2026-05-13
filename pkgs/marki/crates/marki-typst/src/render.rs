@@ -80,7 +80,12 @@ fn compile(binary: &Path, src: &str, source_path: &Path) -> Result<Vec<u8>, Typs
     // Build the on-disk source: preamble + user body. We isolate this
     // in a per-invocation temp dir so `typst compile` doesn't pollute
     // the cwd or the cache dir.
-    let work = mktempdir()?;
+    // Create the temp dir inside the card's parent directory so that
+    // the input file is contained within `--root` (required by Typst
+    // ≥ 0.12) while still allowing `#image("foo.png")` to resolve
+    // relative to the card.
+    let root = source_path.parent().unwrap_or(Path::new("."));
+    let work = mktempdir_in(root)?;
     let input = work.join("input.typ");
     {
         let mut h = fs::File::create(&input)?;
@@ -93,10 +98,6 @@ fn compile(binary: &Path, src: &str, source_path: &Path) -> Result<Vec<u8>, Typs
         }
     }
     let output = work.join("output.svg");
-
-    // `--root` lets `#image("foo.png")` resolve relative to the card,
-    // not the temp dir.
-    let root = source_path.parent().unwrap_or(Path::new("."));
 
     let mut cmd = Command::new(binary);
     cmd.arg("compile")
@@ -195,20 +196,26 @@ fn build_block(svg: Vec<u8>) -> RenderedBlock {
     }
 }
 
-/// Make a fresh per-invocation temp directory under
-/// `$TMPDIR/marki-typst-{pid}-{counter}`. Removed by the caller after
-/// the subprocess returns (success or failure).
-fn mktempdir() -> Result<PathBuf, TypstError> {
+/// Make a fresh per-invocation temp directory under `parent`.
+/// Removed by the caller after the subprocess returns.
+fn mktempdir_in(parent: &Path) -> Result<PathBuf, TypstError> {
     use std::sync::atomic::{AtomicU64, Ordering};
     static N: AtomicU64 = AtomicU64::new(0);
 
-    let p = std::env::temp_dir().join(format!(
-        "marki-typst-{}-{}",
+    let p = parent.join(format!(
+        ".marki-typst-{}-{}",
         std::process::id(),
         N.fetch_add(1, Ordering::SeqCst)
     ));
     fs::create_dir_all(&p)?;
     Ok(p)
+}
+
+/// Make a fresh per-invocation temp directory under
+/// `$TMPDIR/marki-typst-{pid}-{counter}`. Removed by the caller after
+/// the subprocess returns (success or failure).
+fn mktempdir() -> Result<PathBuf, TypstError> {
+    mktempdir_in(&std::env::temp_dir())
 }
 
 #[cfg(test)]
