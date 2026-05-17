@@ -405,6 +405,7 @@ in {
       spotify
 
       upkgs.opencode
+      upkgs.prismlauncher
 
       upkgs.claude-code
       fabric-ai
