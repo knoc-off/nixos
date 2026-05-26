@@ -8,6 +8,7 @@
 in {
   imports = [
     ./mqtt-automations
+    ./sunrise-dashboard.nix
   ];
 
   services.mosquitto = {
@@ -40,7 +41,7 @@ in {
       frontend = {
         enabled = true;
         port = 7768;
-        host = "127.0.0.1"; # no auth on Z2M frontend
+        host = "0.0.0.0";
       };
 
       serial = {
@@ -53,6 +54,10 @@ in {
   services.home-assistant = {
     enable = true;
 
+    customLovelaceModules = with pkgs.home-assistant-custom-lovelace-modules; [
+      apexcharts-card
+    ];
+
     extraComponents = [
       "default_config"
       "met"
@@ -61,6 +66,11 @@ in {
 
     config = {
       default_config = {};
+
+      # Load custom card JS globally — no manual resource registration needed.
+      frontend.extra_module_url = [
+        "/local/nixos-lovelace-modules/apexcharts-card.js"
+      ];
 
       http = {
         server_host = "0.0.0.0";
@@ -94,7 +104,7 @@ in {
     };
   };
 
-  networking.firewall.allowedTCPPorts = [8123];
+  networking.firewall.allowedTCPPorts = [8123 7768];
 
   systemd.tmpfiles.rules = [
     "d /var/lib/zigbee2mqtt/external_converters 0755 zigbee2mqtt zigbee2mqtt -"

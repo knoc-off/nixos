@@ -31,6 +31,9 @@ async fn main() -> Result<()> {
     // Tolerance for manual color_temp changes (mireds).
     let ct_tolerance: u16 = rt.env_parse("CT_TOLERANCE", 15);
 
+    // Global enable/disable gate — controlled by HA toggle.
+    let mut enabled = rt.setting::<bool>("ENABLED_TOPIC", true).await?;
+
     let mut state_msgs = rt.subscribe(&state_topic).await?;
 
     tracing::info!(
@@ -85,8 +88,12 @@ async fn main() -> Result<()> {
         );
 
         'cycle: loop {
-            // Check for external changes.
+            // Check for external changes (only abort on manual override when enabled).
             while let Ok(msg) = state_msgs.try_recv() {
+                if !enabled.get() {
+                    continue;
+                }
+
                 let state = msg
                     .payload
                     .get("state")
@@ -159,8 +166,8 @@ async fn main() -> Result<()> {
             let ct = ct_warm as f64 - factor * (ct_warm as f64 - ct_cool as f64);
             let ct = ct.round() as u16;
 
-            // Only publish if the value actually changed.
-            if last_set_ct != Some(ct) {
+            // Only publish if the value actually changed and cycle is enabled.
+            if enabled.get() && last_set_ct != Some(ct) {
                 rt.publish(&set_topic, json!({ "color_temp": ct })).await?;
                 last_set_ct = Some(ct);
 

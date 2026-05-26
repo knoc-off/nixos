@@ -26,7 +26,9 @@ async fn main() -> Result<()> {
 
     // Gamma > 1 = starts slow, accelerates. 2.0 means at the halfway
     // time point you're only at 25% brightness, then it ramps up fast.
-    let gamma: f64 = rt.env_parse("GAMMA", 2.0);
+    // Controllable at runtime via an HA slider (GAMMA_TOPIC).
+    let gamma_init: f64 = rt.env_parse("GAMMA", 2.0);
+    let mut gamma = rt.setting::<f64>("GAMMA_TOPIC", gamma_init).await?;
     let interval: u64 = rt.env_parse("UPDATE_INTERVAL", 30);
     let tz_name = rt.env_or("TIMEZONE", "Europe/Berlin");
     let tz: Tz = tz_name.parse().unwrap_or_else(|_| {
@@ -34,16 +36,25 @@ async fn main() -> Result<()> {
         chrono_tz::UTC
     });
 
+    // Cap the ramp at this brightness percentage (0-100%).
+    // Can be overridden at runtime via an HA slider (MAX_BRIGHTNESS_TOPIC).
+    let max_bri_pct: u8 = rt.env_parse("MAX_BRIGHTNESS", 100);
+    let mut max_bri = rt.setting::<u8>("MAX_BRIGHTNESS_TOPIC", max_bri_pct).await?;
+
     // How much the reported brightness may differ from what we set before
     // we consider it a manual change (zigbee rounding, transitions, etc.).
     let brightness_tolerance: u8 = rt.env_parse("BRIGHTNESS_TOLERANCE", 5);
+
+    // Persistent delay (minutes) controlled from an HA slider.
+    let mut delay = rt.setting::<u64>("DELAY_TOPIC", 0).await?;
 
     // Subscribe to light state so we can detect external changes.
     let mut state_msgs = rt.subscribe(&state_topic).await?;
 
     tracing::info!(
         set = %set_topic, state = %state_topic,
-        %lat, %lon, elev_start, noon_offset_min, gamma,
+        %lat, %lon, elev_start, noon_offset_min, gamma = gamma_init,
+        max_brightness_pct = max_bri_pct,
         %tz_name, "sunrise-lights started"
     );
 
@@ -80,6 +91,17 @@ async fn main() -> Result<()> {
                 _ = tokio::time::sleep(std::time::Duration::from_millis(wait_ms)) => {}
                 _ = rt.shutdown_signal() => break,
             }
+
+            // Apply persistent delay from HA slider.
+            let delay_min = delay.get();
+            if delay_min > 0 {
+                tracing::info!(delay_min, "sunrise delay active, sleeping extra");
+                tokio::select! {
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(delay_min * 60)) => {}
+                    _ = rt.shutdown_signal() => break,
+                }
+            }
+
             continue;
         }
 
@@ -148,9 +170,10 @@ async fn main() -> Result<()> {
             // Time-based progress toward solar noon, then apply gamma.
             let elapsed = (now - ramp_start).num_seconds() as f64;
             let raw = (elapsed / ramp_duration).clamp(0.0, 1.0);
-            let progress = raw.powf(gamma);
+            let progress = raw.powf(gamma.get());
 
-            let brightness = (progress * 254.0).max(1.0) as u8;
+            let cap = (max_bri.get() as f64 / 100.0 * 254.0).max(1.0) as u8;
+            let brightness = (progress * cap as f64).max(1.0) as u8;
 
             if !light_on {
                 rt.publish(

@@ -8,6 +8,11 @@
   ...
 }: {
   imports = [
+    self.nixosModules.nix
+    {
+      # Pi runs a Nix version that lacks the wasm-builtin feature
+      nix.settings.experimental-features = lib.mkForce ["nix-command" "flakes" "pipe-operators"];
+    }
     inputs.sops-nix.nixosModules.sops
 
     ./services/home-assistant.nix

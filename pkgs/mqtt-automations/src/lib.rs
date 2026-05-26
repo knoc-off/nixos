@@ -17,6 +17,88 @@ pub struct Message {
     pub payload: serde_json::Value,
 }
 
+// -- Setting: bidirectional HA ↔ MQTT value -----------------------------------
+
+/// Types that can be parsed from MQTT JSON payloads and serialized back.
+pub trait FromMqttPayload: Copy + Serialize {
+    fn from_payload(value: &serde_json::Value) -> Option<Self>;
+}
+
+macro_rules! impl_from_mqtt_uint {
+    ($($t:ty),+) => { $(
+        impl FromMqttPayload for $t {
+            fn from_payload(v: &serde_json::Value) -> Option<Self> {
+                v.as_u64().and_then(|n| n.try_into().ok())
+                    .or_else(|| v.as_f64().and_then(|n| {
+                        let r = n.round();
+                        if r >= 0.0 && r <= Self::MAX as f64 { Some(r as Self) } else { None }
+                    }))
+                    .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+            }
+        }
+    )+ };
+}
+
+impl_from_mqtt_uint!(u8, u16, u64);
+
+impl FromMqttPayload for f64 {
+    fn from_payload(v: &serde_json::Value) -> Option<Self> {
+        v.as_f64()
+            .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+    }
+}
+
+impl FromMqttPayload for bool {
+    fn from_payload(v: &serde_json::Value) -> Option<Self> {
+        v.as_bool().or_else(|| match v.as_str()? {
+            "on" | "true" | "1" => Some(true),
+            "off" | "false" | "0" => Some(false),
+            _ => None,
+        })
+    }
+}
+
+/// A runtime-configurable value backed by an optional MQTT retained topic.
+///
+/// Created via [`Runtime::setting`]. If no topic is configured (env var
+/// empty/unset), the setting always returns its initial value.
+///
+/// Bidirectional: call [`.get()`](Self::get) to read the latest value from HA,
+/// or [`.set()`](Self::set) to push a new value back.
+pub struct Setting<T> {
+    rx: Option<mpsc::UnboundedReceiver<Message>>,
+    current: T,
+    topic: Option<String>,
+    client: Option<AsyncClient>,
+}
+
+impl<T: FromMqttPayload> Setting<T> {
+    /// Drain pending MQTT messages and return the latest value.
+    pub fn get(&mut self) -> T {
+        if let Some(ref mut rx) = self.rx {
+            while let Ok(msg) = rx.try_recv() {
+                if let Some(v) = T::from_payload(&msg.payload) {
+                    self.current = v;
+                }
+            }
+        }
+        self.current
+    }
+
+    /// Publish a new value to the MQTT topic (retained) so HA picks it up.
+    pub async fn set(&mut self, value: T) -> Result<()> {
+        if let (Some(ref client), Some(ref topic)) = (&self.client, &self.topic) {
+            let payload = serde_json::to_vec(&value)?;
+            client
+                .publish(topic, QoS::AtMostOnce, true, payload)
+                .await
+                .context("setting publish")?;
+            self.current = value;
+        }
+        Ok(())
+    }
+}
+
 type Subs = Arc<Mutex<HashMap<String, Vec<mpsc::UnboundedSender<Message>>>>>;
 
 /// Core runtime — owns the MQTT connection, env helpers, and shutdown coordination.
@@ -48,7 +130,11 @@ impl Runtime {
             .and_then(|v| v.parse().ok())
             .unwrap_or(1883);
 
-        let mut opts = MqttOptions::new(name, &host, port);
+        let mut opts = MqttOptions::new(
+            Self::env_var("MQTT_CLIENT_ID").unwrap_or_else(|| name.into()),
+            &host,
+            port,
+        );
         opts.set_keep_alive(Duration::from_secs(30));
 
         let (client, eventloop) = AsyncClient::new(opts, 32);
@@ -106,6 +192,18 @@ impl Runtime {
         Ok(())
     }
 
+    /// Publish a retained message (survives broker restarts, delivered to
+    /// future subscribers immediately).
+    pub async fn publish_retained(&self, topic: &str, payload: impl Serialize) -> Result<()> {
+        let json = serde_json::to_vec(&payload)?;
+        self.client
+            .publish(topic, QoS::AtMostOnce, true, json)
+            .await
+            .context("mqtt publish retained")?;
+        tracing::debug!(topic, "published (retained)");
+        Ok(())
+    }
+
     /// Subscribe to a topic and receive messages on a channel.
     pub async fn subscribe(&self, topic: &str) -> Result<mpsc::UnboundedReceiver<Message>> {
         let (tx, rx) = mpsc::unbounded_channel();
@@ -121,6 +219,35 @@ impl Runtime {
             .push(tx);
         tracing::info!(topic, "subscribed");
         Ok(rx)
+    }
+
+    /// Create a [`Setting`] backed by an MQTT retained topic.
+    ///
+    /// `topic_env` is the name of the env var holding the MQTT topic.
+    /// If the env var is empty or unset, the setting always returns `initial`
+    /// and `.set()` is a no-op.
+    pub async fn setting<T: FromMqttPayload>(
+        &self,
+        topic_env: &str,
+        initial: T,
+    ) -> Result<Setting<T>> {
+        let topic = self.env_or(topic_env, "");
+        if topic.is_empty() {
+            return Ok(Setting {
+                rx: None,
+                current: initial,
+                topic: None,
+                client: None,
+            });
+        }
+        tracing::info!(%topic, env = topic_env, "subscribed to setting");
+        let rx = self.subscribe(&topic).await?;
+        Ok(Setting {
+            rx: Some(rx),
+            current: initial,
+            topic: Some(topic),
+            client: Some(self.client.clone()),
+        })
     }
 
     // -- lifecycle ------------------------------------------------------------
