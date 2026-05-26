@@ -65,6 +65,9 @@ pub fn apply_request_rules_with_changes(
     // Step 6b: Append enhancement text to system prompt
     append_to_system_prompt(&mut req, rules, &mut changes);
 
+    // Step 6c: Append env-var-driven text (e.g. jail/sandbox context)
+    append_env_system_prompt(&mut req, &mut changes);
+
     // Step 7: Billing block injection (with SHA256 fingerprint)
     inject_billing_block(&mut req, rules, &mut changes);
 
@@ -527,6 +530,48 @@ fn append_to_system_prompt(
     changes.push(format!(
         "system prompt: appended {} chars",
         append_text.len()
+    ));
+}
+
+/// Append extra system-prompt text supplied via the `COMPAT_PROXY_APPEND_SYSTEM`
+/// environment variable.  Read once per request (cheap — the var is typically
+/// only set inside jailed / sandboxed environments).
+fn append_env_system_prompt(req: &mut MessagesRequest, changes: &mut Vec<String>) {
+    let text = match std::env::var("COMPAT_PROXY_APPEND_SYSTEM") {
+        Ok(v) if !v.is_empty() => v,
+        _ => return,
+    };
+
+    match &mut req.system {
+        Some(SystemPrompt::Blocks(blocks)) => {
+            blocks.push(SystemBlock::Text {
+                text: text.clone(),
+                cache_control: None,
+            });
+        }
+        Some(SystemPrompt::String(s)) => {
+            req.system = Some(SystemPrompt::Blocks(vec![
+                SystemBlock::Text {
+                    text: s.clone(),
+                    cache_control: None,
+                },
+                SystemBlock::Text {
+                    text: text.clone(),
+                    cache_control: None,
+                },
+            ]));
+        }
+        None => {
+            req.system = Some(SystemPrompt::Blocks(vec![SystemBlock::Text {
+                text: text.clone(),
+                cache_control: None,
+            }]));
+        }
+    }
+
+    changes.push(format!(
+        "system prompt: appended {} chars from env",
+        text.len()
     ));
 }
 

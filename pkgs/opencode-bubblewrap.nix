@@ -4,10 +4,29 @@
   pkgs,
   ...
 }: let
-  jail = inputs.jail-nix.lib.init pkgs;
+  jail = inputs.jail-nix.lib.init (pkgs.extend (_: prev: {
+    writeShellApplication = args: prev.writeShellApplication (args // {
+      excludeShellChecks = (args.excludeShellChecks or []) ++ ["SC2016"];
+    });
+  }));
   inherit (pkgs) lib;
 
   compatProxy = pkgs.callPackage ./compat-proxy {};
+  claudeMem = pkgs.callPackage ./claude-mem {};
+
+  # Jail-specific opencode overrides — merged on top of the global config.
+  # Permissions are relaxed because the sandbox already constrains blast radius.
+  jailConfig = pkgs.writeText "opencode-jail.json" (builtins.toJSON {
+    "$schema" = "https://opencode.ai/config.json";
+    permission = {
+      edit = "allow";
+      bash = "allow";
+    };
+  });
+
+  # Appended to the system prompt by the compat-proxy (via COMPAT_PROXY_APPEND_SYSTEM).
+  # Injected after the main CC prompt replacement, so the agent knows its constraints.
+  jailSystemContext = builtins.readFile ./jail-context.md;
 
   agentToolbelt = with pkgs; [
     # Shell essentials
@@ -119,10 +138,29 @@ in
 
       export OPENCODE_PROXY_URL="http://127.0.0.1:$PROJECT_PORT/v1"
 
-      # fucks startup time, but it will work
-      claude -p "say just 'ok'" --model 'haiku'
+      # Per-project claude-mem worker (separate memory instance per jail)
+      CLAUDE_MEM_PORT=$((19200 + 16#''${PROJECT_HASH:0:4} % 200))
 
-      ${lib.getExe upkgs.opencode} "$@" || true
+      CLAUDE_MEM_WORKER_PORT=$CLAUDE_MEM_PORT \
+      CLAUDE_MEM_WORKER_HOST=127.0.0.1 \
+      CLAUDE_MEM_DATA_DIR="$HOME/.claude-mem" \
+        ${lib.getExe claudeMem} > "$PROXY_LOG/claude-mem.log" 2>&1 &
+      CLAUDE_MEM_PID=$!
+      trap 'sleep 5; kill $PROXY_PID $CLAUDE_MEM_PID 2>/dev/null || true' EXIT
+
+      for _ in $(seq 1 20); do
+        if curl -sf http://127.0.0.1:$CLAUDE_MEM_PORT/api/health > /dev/null 2>&1; then
+          break
+        fi
+        sleep 0.25
+      done
+
+      export CLAUDE_MEM_WORKER_PORT=$CLAUDE_MEM_PORT
+
+      # fucks startup time, but it will work
+      # claude -p "say just 'ok'" --model 'haiku'
+
+      # ${lib.getExe upkgs.opencode} "$@" || true
 
       # fish
       ${entry}
@@ -138,6 +176,13 @@ in
     (rw-bind (noescape "\"$PROJECT_CLAUDE\"") (noescape "~/.claude"))
     (rw-bind (noescape "\"$PROJECT_SHARE\"") (noescape "~/.local/share/opencode"))
     (rw-bind (noescape "\"$PROJECT_STATE\"") (noescape "~/.local/state/opencode"))
+
+    # Per-project claude-mem data (isolated memory per jail)
+    (add-runtime ''
+      CLAUDE_MEM_JAIL_DIR="$HOME/.local/share/opencode-jails/$PROJECT_HASH/claude-mem"
+      ${pkgs.coreutils}/bin/mkdir -p "$CLAUDE_MEM_JAIL_DIR"
+    '')
+    (rw-bind (noescape "\"$CLAUDE_MEM_JAIL_DIR\"") (noescape "~/.claude-mem"))
 
     # Nix support — allows nix build/shell/run inside the jail.
     #
@@ -160,6 +205,9 @@ in
     (try-fwd-env "COMPAT_PROXY_UPSTREAM")
     (try-fwd-env "NIX_PATH")
     (set-env "NIX_REMOTE" "daemon")
+    (set-env "OPENCODE_CONFIG" "${jailConfig}")
+    (set-env "COMPAT_PROXY_APPEND_SYSTEM" jailSystemContext)
+    (try-fwd-env "CLAUDE_MEM_WORKER_PORT")
 
-    (add-pkg-deps (agentToolbelt ++ [compatProxy]))
+    (add-pkg-deps (agentToolbelt ++ [compatProxy claudeMem]))
   ])

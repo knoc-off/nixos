@@ -352,108 +352,100 @@ in {
       };
     };
 
-    settings = {
-      autoupdate = false;
-      provider = {
-        anthropic = {
-          options = {
-            baseURL = "{env:OPENCODE_PROXY_URL}";
-            apiKey = "not-needed";
-          };
+  };
+
+  # opencode v1.14+ reads opencode.json, not config.json.
+  # The HM module still writes config.json, so we bypass it.
+  xdg.configFile."opencode/opencode.json".text = builtins.toJSON {
+    "$schema" = "https://opencode.ai/config.json";
+    autoupdate = false;
+    provider = {
+      anthropic = {
+        options = {
+          baseURL = "{env:OPENCODE_PROXY_URL}";
+          apiKey = "not-needed";
         };
       };
-      agent = {
-        build.prompt = "[proxy:replace=build]";
-        plan.prompt = "[proxy:replace=plan]";
-        explore.prompt = "[proxy:replace=explore]";
-        general.prompt = "[proxy:replace=general]";
-        title.prompt = "[proxy:replace=title]";
-        summary.prompt = "[proxy:replace=summary]";
+    };
+    agent = {
+      build.prompt = "[proxy:replace=build]";
+      plan.prompt = "[proxy:replace=plan]";
+      explore.prompt = "[proxy:replace=explore]";
+      general.prompt = "[proxy:replace=general]";
+      title.prompt = "[proxy:replace=title]";
+      summary.prompt = "[proxy:replace=summary]";
+    };
+
+    permission = {
+      edit = "ask";
+      bash = "ask";
+    };
+    mcp = {
+      context7 = {
+        type = "remote";
+        url = "https://mcp.context7.com/mcp";
+        headers = {
+          CONTEXT7_API_KEY = "{env:CONTEXT7_API_KEY}";
+        };
+        enabled = true;
       };
-
-      permission = {
-        edit = "ask";
-        bash = "ask";
-      };
-      mcp = {
-        context7 = {
-          type = "remote";
-          url = "https://mcp.context7.com/mcp";
-          headers = {
-            CONTEXT7_API_KEY = "{env:CONTEXT7_API_KEY}";
-          };
-          enabled = true;
-        };
-        ddog = {
-          type = "remote";
-          url = "https://mcp.datadoghq.eu/api/unstable/mcp-server/mcp";
-          oauth = {
-            scope = "openid";
-          };
-        };
-
-        # need to generate the figma auth vars seperatly
-        # curl -s -X POST "https://api.figma.com/v1/oauth/mcp/register" \
-        #   -H "Content-Type: application/json" \
-        #   -d '{
-        # "client_name": "Claude Code (figma)",
-        # "redirect_uris": ["http://127.0.0.1:19876/mcp/oauth/callback"],
-        # "grant_types": ["authorization_code", "refresh_token"],
-        # "response_types": ["code"],
-        # "token_endpoint_auth_method": "none"
-        # }'
-        figma = {
-          type = "remote";
-          url = "https://mcp.figma.com/mcp";
-          enabled = true;
-          oauth = {
-            clientId = "{env:FIGMA_CLIENTID}";
-            clientSecret = "{env:FIGMA_CLIENTSECRET}";
-          };
-        };
-
-        grep = {
-          type = "remote";
-          url = "https://mcp.grep.app";
-        };
-        nixos = {
-          type = "local";
-          command = ["${upkgs.mcp-nixos}/bin/mcp-nixos"];
-        };
-        memory = {
-          type = "local";
-          command = [
-            "${pkgs.uv}/bin/uvx"
-            "basic-memory"
-            "mcp"
-          ];
-          environment = {
-            BASIC_MEMORY_NO_PROMOS = "1";
-            PATH = "${pkgs.stdenv.cc}/bin:${pkgs.curl}/bin:${pkgs.bash}/bin:/run/current-system/sw/bin";
-          };
+      ddog = {
+        type = "remote";
+        url = "https://mcp.datadoghq.eu/api/unstable/mcp-server/mcp";
+        oauth = {
+          scope = "openid";
         };
       };
 
-      lsp = {
-        qml = {
-          command = [
-            "${pkgs.kdePackages.qtdeclarative}/bin/qmlls"
-            "-E"
-            "--no-cmake-calls"
-            "--doc-dir"
-            qmlDocPath
-          ];
-          extensions = [".qml"];
-          env = {
-            QML_IMPORT_PATH = qmlImportPath;
-          };
+      # need to generate the figma auth vars seperatly
+      # curl -s -X POST "https://api.figma.com/v1/oauth/mcp/register" \
+      #   -H "Content-Type: application/json" \
+      #   -d '{
+      # "client_name": "Claude Code (figma)",
+      # "redirect_uris": ["http://127.0.0.1:19876/mcp/oauth/callback"],
+      # "grant_types": ["authorization_code", "refresh_token"],
+      # "response_types": ["code"],
+      # "token_endpoint_auth_method": "none"
+      # }'
+      figma = {
+        type = "remote";
+        url = "https://mcp.figma.com/mcp";
+        enabled = true;
+        oauth = {
+          clientId = "{env:FIGMA_CLIENTID}";
+          clientSecret = "{env:FIGMA_CLIENTSECRET}";
         };
-        rust = {
-          command = [
-            "${self.packages.${system}.lspmux}/bin/lspmux"
-            "client"
-          ];
+      };
+
+      grep = {
+        type = "remote";
+        url = "https://mcp.grep.app";
+      };
+      nixos = {
+        type = "local";
+        command = ["${upkgs.mcp-nixos}/bin/mcp-nixos"];
+      };
+    };
+
+    lsp = {
+      qml = {
+        command = [
+          "${pkgs.kdePackages.qtdeclarative}/bin/qmlls"
+          "-E"
+          "--no-cmake-calls"
+          "--doc-dir"
+          qmlDocPath
+        ];
+        extensions = [".qml"];
+        env = {
+          QML_IMPORT_PATH = qmlImportPath;
         };
+      };
+      rust = {
+        command = [
+          "${self.packages.${system}.lspmux}/bin/lspmux"
+          "client"
+        ];
       };
     };
   };
@@ -469,7 +461,7 @@ in {
       theme_list = "<leader>t";
       sidebar_toggle = "<leader>b";
       scrollbar_toggle = "none";
-      username_toggle = "none";
+
       status_view = "<leader>s";
       session_export = "<leader>x";
       session_new = "<leader>n";
