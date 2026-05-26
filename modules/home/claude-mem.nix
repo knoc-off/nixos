@@ -26,6 +26,8 @@ in {
   };
 
   config = lib.mkIf cfg.enable {
+    home.sessionVariables.CLAUDE_MEM_WORKER_PORT = toString cfg.port;
+
     # Worker daemon
     systemd.user.services.claude-mem-worker = {
       Unit = {

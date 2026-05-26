@@ -78,6 +78,9 @@
     # and doesn't emit warnings on every invocation.
     inputs.determinate.inputs.nix.packages.${pkgs.stdenv.hostPlatform.system}.nix-cli
 
+    # Python tooling (uvx needed by claude-mem for chroma vector search)
+    uv
+
     # Coding agents
     upkgs.claude-code
     upkgs.opencode
@@ -146,7 +149,7 @@ in
       CLAUDE_MEM_DATA_DIR="$HOME/.claude-mem" \
         ${lib.getExe claudeMem} > "$PROXY_LOG/claude-mem.log" 2>&1 &
       CLAUDE_MEM_PID=$!
-      trap 'sleep 5; kill $PROXY_PID $CLAUDE_MEM_PID 2>/dev/null || true' EXIT
+      trap 'kill $PROXY_PID $CLAUDE_MEM_PID 2>/dev/null || true' EXIT
 
       for _ in $(seq 1 20); do
         if curl -sf http://127.0.0.1:$CLAUDE_MEM_PORT/api/health > /dev/null 2>&1; then
@@ -168,6 +171,7 @@ in
 
     (try-rw-bind (noescape "\"$HOME/.config/opencode\"") (noescape "~/.config/opencode"))
     (try-rw-bind (noescape "\"$HOME/.cache/opencode\"") (noescape "~/.cache/opencode"))
+    (try-rw-bind (noescape "\"$HOME/.cache/uv\"") (noescape "~/.cache/uv"))
     (add-runtime ''
       COMPAT_PROXY_RULES_REAL=$(readlink -f "$HOME/.config/compat-proxy/rules" 2>/dev/null || true)
     '')

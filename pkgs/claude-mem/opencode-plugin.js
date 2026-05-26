@@ -1,5 +1,14 @@
-// OpenCode plugin for claude-mem worker
-// Uses OpenCode's flat-key plugin API to send observations to the claude-mem HTTP worker.
+// OpenCode plugin for claude-mem worker.
+// Sends observations and summaries to the claude-mem HTTP worker.
+//
+// Hook API: flat string keys, async (input, output) => void
+// Event API: async ({ event }) => void, event.type discriminant
+
+import { createRequire } from "node:module";
+const require = createRequire(
+  (process.env.HOME || "/root") + "/.config/opencode/package.json"
+);
+const { z } = require("zod");
 
 function resolveWorkerPort() {
   const fromEnv = process.env.CLAUDE_MEM_WORKER_PORT;
@@ -9,46 +18,48 @@ function resolveWorkerPort() {
   return 37700 + (uid % 100);
 }
 
-const WORKER_BASE = `http://127.0.0.1:${resolveWorkerPort()}`;
+const WORKER = `http://127.0.0.1:${resolveWorkerPort()}`;
 const MAX_LEN = 1000;
-const JSON_HEADERS = { "Content-Type": "application/json" };
+const HEADERS = { "Content-Type": "application/json" };
 
 function post(path, body) {
-  fetch(`${WORKER_BASE}${path}`, {
+  fetch(`${WORKER}${path}`, {
     method: "POST",
-    headers: JSON_HEADERS,
+    headers: HEADERS,
     body: JSON.stringify(body),
   }).catch(() => {});
 }
 
 async function getText(path) {
   try {
-    const r = await fetch(`${WORKER_BASE}${path}`, { headers: JSON_HEADERS });
+    const r = await fetch(`${WORKER}${path}`, { headers: HEADERS });
     return r.ok ? await r.text() : null;
   } catch {
     return null;
   }
 }
 
-const sessionIds = new Map();
-function sid(openCodeId) {
-  if (!sessionIds.has(openCodeId)) {
-    if (sessionIds.size >= 500) sessionIds.delete(sessionIds.keys().next().value);
-    sessionIds.set(openCodeId, `opencode-${openCodeId}-${Date.now()}`);
+const sessionMap = new Map();
+function contentId(sessionID) {
+  if (!sessionMap.has(sessionID)) {
+    if (sessionMap.size >= 500) sessionMap.delete(sessionMap.keys().next().value);
+    sessionMap.set(sessionID, `opencode-${sessionID}-${Date.now()}`);
   }
-  return sessionIds.get(openCodeId);
+  return sessionMap.get(sessionID);
 }
 
-// Track which sessions have been init'd
-const initedSessions = new Set();
-
-function ensureInit(sessionID, project, cwd) {
-  const id = sid(sessionID);
-  if (!initedSessions.has(id)) {
-    initedSessions.add(id);
+const inited = new Set();
+function ensureInit(sessionID, project) {
+  const id = contentId(sessionID);
+  if (!inited.has(id)) {
+    inited.add(id);
     post("/api/sessions/init", { contentSessionId: id, project, prompt: "" });
   }
   return id;
+}
+
+function clip(s) {
+  return typeof s === "string" && s.length > MAX_LEN ? s.slice(0, MAX_LEN) : (s || "");
 }
 
 export const ClaudeMemPlugin = async (ctx) => {
@@ -56,57 +67,115 @@ export const ClaudeMemPlugin = async (ctx) => {
   const cwd = ctx.directory;
 
   return {
-    // After each tool call, record an observation
-    "tool.execute.after": (input, output) => {
-      const id = ensureInit(input.sessionID, project, cwd);
-      let text = output.output || "";
-      if (text.length > MAX_LEN) text = text.slice(0, MAX_LEN);
-      post("/api/sessions/observations", {
-        contentSessionId: id,
-        tool_name: input.tool,
-        tool_input: input.args || {},
-        tool_response: text,
-        cwd,
-      });
-    },
-
-    // On compaction, send summarize to worker
-    "experimental.session.compacting": (input, output) => {
-      const sessionID = input.sessionID || input.session?.id;
-      if (sessionID) {
-        const id = ensureInit(sessionID, project, cwd);
-        // Push context so worker gets a chance to inject memory
-        // Also fire summarize in the background
-        post("/api/sessions/summarize", {
+    // Record tool observations
+    "tool.execute.after": async (input, output) => {
+      try {
+        const id = ensureInit(input.sessionID, project);
+        post("/api/sessions/observations", {
           contentSessionId: id,
-          last_assistant_message: output.prompt || "",
+          tool_name: input.tool,
+          tool_input: input.args || {},
+          tool_response: clip(output.output),
+          cwd,
         });
-      }
+      } catch {}
     },
 
-    // Custom search tool
+    // Inject memory context into compaction prompt
+    "experimental.session.compacting": async (input, output) => {
+      try {
+        const id = contentId(input.sessionID);
+        if (!id || !inited.has(id)) return;
+        const text = await getText(
+          `/api/observations?q=${encodeURIComponent(project)}&limit=5`
+        );
+        if (text) {
+          try {
+            const data = JSON.parse(text);
+            const items = Array.isArray(data.items) ? data.items : [];
+            if (items.length > 0) {
+              const mem = items.map((it, i) =>
+                `${i + 1}. ${it.title || it.subtitle || "Untitled"}`
+              ).join("\n");
+              output.context.push(`## Claude-mem observations\n${mem}`);
+            }
+          } catch {}
+        }
+      } catch {}
+    },
+
+    // Bus events
+    event: async ({ event }) => {
+      try {
+        const sid = event.properties?.sessionID;
+        if (!sid) return;
+
+        switch (event.type) {
+          case "session.created": {
+            ensureInit(sid, project);
+            break;
+          }
+          case "message.updated": {
+            if (event.properties?.role !== "assistant") break;
+            const id = contentId(sid);
+            if (!inited.has(id)) break;
+            post("/api/sessions/observations", {
+              contentSessionId: id,
+              tool_name: "assistant_message",
+              tool_input: {},
+              tool_response: clip(event.properties?.content),
+              cwd,
+            });
+            break;
+          }
+          case "file.edited": {
+            const id = contentId(sid);
+            if (!inited.has(id)) break;
+            post("/api/sessions/observations", {
+              contentSessionId: id,
+              tool_name: "file_edit",
+              tool_input: { path: event.properties?.path },
+              tool_response: clip(event.properties?.diff) || `File edited: ${event.properties?.path}`,
+              cwd,
+            });
+            break;
+          }
+          case "session.deleted": {
+            const cid = sessionMap.get(sid);
+            if (cid) inited.delete(cid);
+            sessionMap.delete(sid);
+            break;
+          }
+        }
+      } catch {}
+    },
+
+    // Search tool
     tool: {
       claude_mem_search: {
         description: "Search claude-mem memory database for past observations, sessions, and context",
         args: {
-          query: { type: "string", description: "Search query for memory observations" },
+          query: z.string().describe("Search query for memory observations"),
         },
         async execute(args) {
-          const q = String(args.query || "");
-          if (!q) return "Please provide a search query.";
-          const text = await getText(`/api/search/observations?query=${encodeURIComponent(q)}&limit=10`);
-          if (!text) return "claude-mem worker is not running.";
           try {
+            const q = String(args.query || "");
+            if (!q) return "Please provide a search query.";
+            const text = await getText(
+              `/api/observations?q=${encodeURIComponent(q)}&limit=10`
+            );
+            if (!text) return "claude-mem worker is not running.";
             const data = JSON.parse(text);
             const items = Array.isArray(data.items) ? data.items : [];
             if (!items.length) return `No results found for "${q}".`;
             return items.slice(0, 10).map((item, i) => {
               const title = String(item.title || item.subtitle || "Untitled");
-              const proj = item.project ? ` [${item.project}]` : "";
-              return `${i + 1}. ${title}${proj}`;
-            }).join("\n");
+              const body = item.narrative || item.text || "";
+              const snippet = body.length > 200 ? body.slice(0, 200) + "…" : body;
+              return `${i + 1}. **${title}**\n   ${snippet}`;
+            }).join("\n\n");
           } catch {
-            return "Failed to parse search results.";
+            return "Failed to search claude-mem.";
           }
         },
       },

@@ -55,17 +55,19 @@ pub struct Tool {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-    pub input_schema: InputSchema,
+    /// Opaque JSON Schema — passed through without validation so that
+    /// plugin/MCP tools with unusual schemas don't break deserialization.
+    pub input_schema: serde_json::Value,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub cache_control: Option<CacheControl>,
 }
 
-/// JSON Schema for tool input parameters.
+/// Typed JSON Schema for tool input parameters.
 ///
-/// `additional_properties` is `Option<serde_json::Value>` because in JSON
-/// Schema it can be a boolean (`false`) OR a schema object
-/// (`{"type": "string"}`, `{"type": "object", "properties": {...}}`).
-#[derive(Deserialize, Serialize, Debug, Clone)]
+/// Used by the schema registry (cc-schemas.toml) to construct override
+/// schemas. Not used for wire deserialization — `Tool::input_schema` is
+/// an opaque `serde_json::Value` so arbitrary schemas pass through.
+#[derive(Serialize, Debug, Clone)]
 pub struct InputSchema {
     #[serde(rename = "type")]
     pub schema_type: String,
@@ -76,6 +78,13 @@ pub struct InputSchema {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(rename = "additionalProperties")]
     pub additional_properties: Option<serde_json::Value>,
+}
+
+impl InputSchema {
+    /// Convert this typed schema into an opaque JSON value for the wire format.
+    pub fn to_value(&self) -> serde_json::Value {
+        serde_json::to_value(self).expect("InputSchema is always serializable")
+    }
 }
 
 /// Tool choice constraint.

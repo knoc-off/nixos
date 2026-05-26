@@ -4,6 +4,7 @@
   fetchFromGitHub,
   buildNpmPackage,
   bun,
+  uv,
   nodejs,
 
   makeWrapper,
@@ -76,7 +77,8 @@ in
       mkdir -p $out/bin
       makeWrapper ${bun}/bin/bun $out/bin/claude-mem-worker \
         --add-flags "$out/lib/claude-mem/plugin/scripts/worker-service.cjs" \
-        --set NODE_PATH "$out/lib/claude-mem/plugin/node_modules"
+        --set NODE_PATH "$out/lib/claude-mem/plugin/node_modules" \
+        --prefix PATH : ${lib.makeBinPath [ uv ]}
 
       runHook postInstall
     '';

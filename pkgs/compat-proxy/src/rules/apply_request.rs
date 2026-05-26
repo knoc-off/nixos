@@ -253,17 +253,25 @@ fn rename_tools(req: &mut MessagesRequest, rules: &RuleSet, changes: &mut Vec<St
                     canonical = %resolved.canonical_name,
                     "replacing client schema with registry override"
                 );
-                let client_required = tool.input_schema.required.take();
-                let client_additional_props = tool.input_schema.additional_properties.take();
+                // Extract client's required/additionalProperties for merge fallback
+                let client_required = tool.input_schema.get("required").cloned();
+                let client_additional_props =
+                    tool.input_schema.get("additionalProperties").cloned();
 
-                tool.input_schema = schema_override.clone();
+                tool.input_schema = schema_override.to_value();
 
                 // Merge: prefer registry values, fall back to client values
-                if tool.input_schema.required.is_none() {
-                    tool.input_schema.required = client_required;
-                }
-                if tool.input_schema.additional_properties.is_none() {
-                    tool.input_schema.additional_properties = client_additional_props;
+                if let serde_json::Value::Object(ref mut map) = tool.input_schema {
+                    if !map.contains_key("required") {
+                        if let Some(v) = client_required {
+                            map.insert("required".into(), v);
+                        }
+                    }
+                    if !map.contains_key("additionalProperties") {
+                        if let Some(v) = client_additional_props {
+                            map.insert("additionalProperties".into(), v);
+                        }
+                    }
                 }
                 changes.push(format!(
                     "tool schema override: {}",
@@ -860,12 +868,7 @@ mod tests {
             tools: vec![Tool {
                 name: "unknown_tool".into(),
                 description: None,
-                input_schema: InputSchema {
-                    schema_type: "object".into(),
-                    properties: None,
-                    required: None,
-                    additional_properties: None,
-                },
+                input_schema: serde_json::json!({"type": "object"}),
                 cache_control: None,
             }],
             tool_choice: None,
@@ -911,23 +914,13 @@ mod tests {
                 Tool {
                     name: "mcp_question".into(),
                     description: None,
-                    input_schema: InputSchema {
-                        schema_type: "object".into(),
-                        properties: None,
-                        required: None,
-                        additional_properties: None,
-                    },
+                    input_schema: serde_json::json!({"type": "object"}),
                     cache_control: None,
                 },
                 Tool {
                     name: "mcp_bash".into(),
                     description: None,
-                    input_schema: InputSchema {
-                        schema_type: "object".into(),
-                        properties: None,
-                        required: None,
-                        additional_properties: None,
-                    },
+                    input_schema: serde_json::json!({"type": "object"}),
                     cache_control: None,
                 },
             ],
@@ -989,12 +982,7 @@ mod tests {
             tools: vec![Tool {
                 name: "mcp_bash".into(),
                 description: None,
-                input_schema: InputSchema {
-                    schema_type: "object".into(),
-                    properties: None,
-                    required: None,
-                    additional_properties: None,
-                },
+                input_schema: serde_json::json!({"type": "object"}),
                 cache_control: None,
             }],
             tool_choice: None,
@@ -1059,7 +1047,7 @@ mod tests {
             tools: vec![Tool {
                 name: "mcp_todo".into(),
                 description: Some("Client description".into()),
-                input_schema: client_schema.clone(),
+                input_schema: client_schema.to_value(),
                 cache_control: None,
             }],
             tool_choice: None,
@@ -1080,13 +1068,63 @@ mod tests {
         assert_eq!(tool.description.as_deref(), Some("Write todos"));
 
         // Schema should be preserved from the client (including nested items)
-        let props = tool.input_schema.properties.as_ref().unwrap();
+        let props = tool.input_schema.get("properties").unwrap();
         assert!(props["todos"]["items"]["properties"]["content"].is_object());
         assert_eq!(
-            tool.input_schema.required.as_deref(),
-            Some(&["todos".to_string()][..])
+            tool.input_schema.get("required"),
+            Some(&serde_json::json!(["todos"]))
         );
-        assert_eq!(tool.input_schema.additional_properties, Some(serde_json::Value::Bool(false)));
+        assert_eq!(tool.input_schema.get("additionalProperties"), Some(&serde_json::Value::Bool(false)));
+    }
+
+    /// Plugin/MCP tools may send unusual input_schema shapes (missing "type",
+    /// extra fields like "$schema", etc.). The proxy must deserialize and
+    /// pass them through without error.
+    #[test]
+    fn test_plugin_tool_unusual_schema_passthrough() {
+        let mut rules = minimal_ruleset();
+        rules.unmapped_policy = UnmappedPolicy::Passthrough;
+
+        // Simulate what a plugin tool might send: no "type", just "properties"
+        let req: MessagesRequest = serde_json::from_value(serde_json::json!({
+            "model": "test",
+            "max_tokens": 1024,
+            "messages": [],
+            "tools": [
+                {
+                    "name": "claude_mem_search",
+                    "description": "Search memory",
+                    "input_schema": {
+                        "properties": {
+                            "query": {"type": "string", "description": "Search query"}
+                        }
+                    }
+                },
+                {
+                    "name": "normal_tool",
+                    "description": "Normal tool",
+                    "input_schema": {
+                        "type": "object",
+                        "properties": {
+                            "arg": {"type": "string"}
+                        },
+                        "required": ["arg"]
+                    }
+                }
+            ]
+        }))
+        .expect("request with unusual plugin tool schema should deserialize");
+
+        let result = apply_request_rules(req, &rules, "test-session", "test-device").unwrap();
+
+        // Both tools should pass through unchanged
+        assert_eq!(result.tools.len(), 2);
+        assert_eq!(result.tools[0].name, "claude_mem_search");
+        // The unusual schema should be preserved exactly
+        assert!(result.tools[0].input_schema.get("type").is_none());
+        assert!(result.tools[0].input_schema.get("properties").is_some());
+        // Normal tool should also be fine
+        assert_eq!(result.tools[1].input_schema.get("type"), Some(&serde_json::json!("object")));
     }
 
     #[test]
