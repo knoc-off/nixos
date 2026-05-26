@@ -13,19 +13,6 @@
 
     inputs.determinate.nixosModules.default
 
-    self.nixosModules.services.dagu
-    {
-      services.dagu = {
-        enable = true;
-        port = 9090;
-        settings = {
-          auth.mode = "none";
-          terminal.enabled = true;
-          ui.navbar_title = "Dagu";
-        };
-      };
-    }
-
     self.nixosModules.home
     self.nixosModules.nix
     self.nixosModules.nh
