@@ -19,7 +19,8 @@ function resolveWorkerPort() {
 }
 
 const WORKER = `http://127.0.0.1:${resolveWorkerPort()}`;
-const MAX_LEN = 1000;
+// Let the worker's LLM decide what's important — only clip extremely large outputs
+const MAX_LEN = 20_000;
 const HEADERS = { "Content-Type": "application/json" };
 
 function post(path, body) {
@@ -61,6 +62,10 @@ function ensureInit(sessionID, project) {
 function clip(s) {
   return typeof s === "string" && s.length > MAX_LEN ? s.slice(0, MAX_LEN) : (s || "");
 }
+
+// Debounce assistant message events — only send after streaming settles
+const msgTimers = new Map();
+const MSG_DEBOUNCE_MS = 2000;
 
 export const ClaudeMemPlugin = async (ctx) => {
   const project = ctx.project?.name || "opencode";
@@ -104,6 +109,35 @@ export const ClaudeMemPlugin = async (ctx) => {
       } catch {}
     },
 
+    // Inject recent memory context into messages (survives compat-proxy system prompt replacement)
+    "experimental.chat.messages.transform": async (_input, output) => {
+      try {
+        const text = await getText(
+          `/api/observations?q=${encodeURIComponent(project)}&limit=5`
+        );
+        if (!text) return;
+        const data = JSON.parse(text);
+        const items = Array.isArray(data.items) ? data.items : [];
+        if (items.length === 0) return;
+        const mem = items.map((it, i) => {
+          const title = it.title || it.subtitle || "Untitled";
+          const narrative = it.narrative || "";
+          const snippet = narrative.length > 150
+            ? narrative.slice(0, 150) + "…"
+            : narrative;
+          return `${i + 1}. **${title}** — ${snippet}`;
+        }).join("\n");
+        // Prepend as a synthetic system-context message
+        output.messages.unshift({
+          info: { role: "user" },
+          parts: [{
+            type: "text",
+            text: `<claude-mem>\nRecent observations from persistent memory:\n${mem}\n</claude-mem>`,
+          }],
+        });
+      } catch {}
+    },
+
     // Bus events
     event: async ({ event }) => {
       try {
@@ -115,35 +149,101 @@ export const ClaudeMemPlugin = async (ctx) => {
             ensureInit(sid, project);
             break;
           }
+
+          // Debounced assistant messages — only capture final content after streaming settles
           case "message.updated": {
-            if (event.properties?.role !== "assistant") break;
+            if (event.properties?.info?.role !== "assistant") break;
             const id = contentId(sid);
             if (!inited.has(id)) break;
-            post("/api/sessions/observations", {
-              contentSessionId: id,
-              tool_name: "assistant_message",
-              tool_input: {},
-              tool_response: clip(event.properties?.content),
-              cwd,
-            });
+
+            const timerKey = `${sid}:${event.properties?.messageID}`;
+            if (msgTimers.has(timerKey)) clearTimeout(msgTimers.get(timerKey));
+            msgTimers.set(timerKey, setTimeout(() => {
+              msgTimers.delete(timerKey);
+              const parts = event.properties?.info?.parts || [];
+              const textParts = parts
+                .filter(p => p.type === "text")
+                .map(p => p.text || p.content || "")
+                .join("\n");
+              if (!textParts) return;
+              post("/api/sessions/observations", {
+                contentSessionId: id,
+                tool_name: "assistant_message",
+                tool_input: {},
+                tool_response: clip(textParts),
+                cwd,
+              });
+            }, MSG_DEBOUNCE_MS));
             break;
           }
+
+          // File edits — correct property name is "file", not "path"
           case "file.edited": {
             const id = contentId(sid);
             if (!inited.has(id)) break;
+            const filePath = event.properties?.file || event.properties?.path || "unknown";
             post("/api/sessions/observations", {
               contentSessionId: id,
               tool_name: "file_edit",
-              tool_input: { path: event.properties?.path },
-              tool_response: clip(event.properties?.diff) || `File edited: ${event.properties?.path}`,
+              tool_input: { path: filePath },
+              tool_response: `File edited: ${filePath}`,
               cwd,
             });
             break;
           }
+
+          // Compaction completed — capture the distilled session summary
+          case "session.next.compaction.ended": {
+            const id = contentId(sid);
+            if (!inited.has(id)) break;
+            const summary = event.properties?.text || "";
+            if (!summary) break;
+            post("/api/sessions/observations", {
+              contentSessionId: id,
+              tool_name: "session_compaction_summary",
+              tool_input: { reason: "compaction" },
+              tool_response: clip(summary),
+              cwd,
+            });
+            break;
+          }
+
+          // LLM step completed — capture work unit with cost/token metadata
+          case "session.next.step.ended": {
+            const id = contentId(sid);
+            if (!inited.has(id)) break;
+            const props = event.properties || {};
+            const tokens = props.tokens || {};
+            const cost = props.cost;
+            const finish = props.finish || "unknown";
+            post("/api/sessions/observations", {
+              contentSessionId: id,
+              tool_name: "llm_step_completed",
+              tool_input: {
+                finish_reason: finish,
+                tokens_in: tokens.input || 0,
+                tokens_out: tokens.output || 0,
+                tokens_reasoning: tokens.reasoning || 0,
+                tokens_cache: tokens.cache || 0,
+                cost: cost || 0,
+              },
+              tool_response: `LLM step completed: ${finish} | in=${tokens.input || 0} out=${tokens.output || 0} reasoning=${tokens.reasoning || 0} cost=${cost || "?"}`,
+              cwd,
+            });
+            break;
+          }
+
           case "session.deleted": {
             const cid = sessionMap.get(sid);
             if (cid) inited.delete(cid);
             sessionMap.delete(sid);
+            // Clean up any pending message timers
+            for (const [key, timer] of msgTimers) {
+              if (key.startsWith(`${sid}:`)) {
+                clearTimeout(timer);
+                msgTimers.delete(key);
+              }
+            }
             break;
           }
         }
