@@ -3,15 +3,16 @@
   inputs,
   pkgs,
   self,
-  hostname,
-  user,
   config,
   ...
-}: {
+}:
+let
+  user = "default";
+in {
   imports = [
     ./hardware/hardware-configuration.nix
 
-    ./modules/shell/fish.nix
+    self.nixosModules.fish
     {
       services.openssh = {
         enable = true;

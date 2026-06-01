@@ -436,6 +436,36 @@ in {
             fg = "$bg2"; # subtle indent guides
           };
 
+          # Dimmed rainbow indent guides (parent scope hierarchy)
+          IblRainbowRed = {
+            fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base08}";
+            nocombine = true;
+          };
+          IblRainbowYellow = {
+            fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0A}";
+            nocombine = true;
+          };
+          IblRainbowBlue = {
+            fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0D}";
+            nocombine = true;
+          };
+          IblRainbowOrange = {
+            fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base09}";
+            nocombine = true;
+          };
+          IblRainbowGreen = {
+            fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0B}";
+            nocombine = true;
+          };
+          IblRainbowViolet = {
+            fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0E}";
+            nocombine = true;
+          };
+          IblRainbowCyan = {
+            fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0C}";
+            nocombine = true;
+          };
+
           # vim-matchup - bright active pair highlighting
           MatchWord = {
             fg = "$bright_cyan";

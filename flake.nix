@@ -24,7 +24,6 @@
 
     mkConfig = {
       hostname,
-      user,
       system,
       extraModules ? [],
       extraConfigs ? {},
@@ -41,10 +40,7 @@
             inherit
               self
               inputs
-              hostname
-              user
               ;
-            upkgs = unstablePkgs system;
           }
           // extraConfigs;
         modules =
@@ -58,14 +54,14 @@
       };
 
     # Host configuration
-    mkHost = hostname: user: system: {
+    mkHost = hostname: system: {
       name = hostname;
       value = mkConfig {
-        inherit hostname user system;
+        inherit hostname system;
       };
     };
 
-    mkImage = hostname: user: system: imageType: let
+    mkImage = hostname: system: imageType: let
       name = "${hostname}-${imageType}";
       imageOverrides =
         {
@@ -78,7 +74,7 @@
     in
       lib.nameValuePair name (
         (mkConfig {
-          inherit hostname user system;
+          inherit hostname system;
           extraModules =
             [./systems/modules/${imageType}.nix]
             ++ imageOverrides;
@@ -136,21 +132,21 @@
     images =
       listToAttrs
       [
-        (mkImage "minimal" "default" "x86_64-linux" "isoImage")
-        (mkImage "framework13" "knoff" "x86_64-linux" "isoImage")
-        (mkImage "rpi-4b-plus" "root" "aarch64-linux" "sdImage")
+        (mkImage "minimal" "x86_64-linux" "isoImage")
+        (mkImage "framework13" "x86_64-linux" "isoImage")
+        (mkImage "rpi-4b-plus" "aarch64-linux" "sdImage")
       ];
 
     # darwinConfigurations = listToAttrs [
-    #   # (mkHost "Nicholass-MacBook-Pro" "niko" "aarch64-darwin")
+    #   # (mkHost "Nicholass-MacBook-Pro" "aarch64-darwin")
     # ];
 
     nixosConfigurations = listToAttrs [
-      (mkHost "framework13" "knoff" "x86_64-linux")
-      (mkHost "thinkpad-work" "niko" "x86_64-linux")
-      (mkHost "nuci5" "tv" "x86_64-linux")
-      (mkHost "hetzner" "knoff" "x86_64-linux")
-      (mkHost "rpi-4b-plus" "root" "aarch64-linux")
+      (mkHost "framework13" "x86_64-linux")
+      (mkHost "thinkpad-work" "x86_64-linux")
+      (mkHost "nuci5" "x86_64-linux")
+      (mkHost "hetzner" "x86_64-linux")
+      (mkHost "rpi-4b-plus" "aarch64-linux")
     ];
   };
 

@@ -38,7 +38,7 @@
 #
 #  10. Set isoPath/autounattendFile to null and rebuild when done.
 { inputs, ... }: {
-  nixos = { user, 
+  nixos = {
     config,
     lib,
     pkgs,
@@ -194,6 +194,11 @@
     options.windows-vm = {
       enable = lib.mkEnableOption "declarative Windows 11 VM via NixVirt";
 
+      user = lib.mkOption {
+        type = lib.types.str;
+        description = "The host user who will run the VM (for SSH keys, libvirtd group, etc.).";
+      };
+
       isoPath = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
         default = "/var/lib/libvirt/isos/windows11.iso";
@@ -291,7 +296,7 @@
 
       sshIdentityFile = lib.mkOption {
         type = lib.types.str;
-        default = "/home/${user}/.ssh/id_ed25519";
+        default = "/home/${cfg.user}/.ssh/id_ed25519";
         description = "Path to the SSH private key for sshfs mount.";
       };
 
@@ -313,7 +318,9 @@
         onBoot = "ignore";
         onShutdown = "shutdown";
         qemu = {
-          package = pkgs.qemu_kvm;
+          package = pkgs.qemu_kvm.overrideAttrs (old: {
+            configureFlags = old.configureFlags ++ ["--enable-gtk-clipboard"];
+          });
           runAsRoot = false;
           swtpm.enable = true;
         };
@@ -321,7 +328,7 @@
 
       virtualisation.spiceUSBRedirection.enable = true;
       programs.virt-manager.enable = true;
-      users.users.${user}.extraGroups = ["libvirtd"];
+      users.users.${cfg.user}.extraGroups = ["libvirtd"];
 
       environment.systemPackages = with pkgs; [
         virt-viewer

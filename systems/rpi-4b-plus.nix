@@ -3,7 +3,6 @@
   lib,
   config,
   inputs,
-  hostname,
   pkgs,
   ...
 }: {
@@ -53,7 +52,7 @@
   ];
 
   sops = {
-    defaultSopsFile = ./secrets/${hostname}/default.yaml;
+    defaultSopsFile = ./secrets/rpi-4b-plus/default.yaml;
     age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
     secrets."wifi/home/fritz" = {};
     secrets."ha/api_token" = {};
@@ -98,7 +97,7 @@
   };
 
   networking = {
-    hostName = hostname;
+    hostName = "rpi-4b-plus";
     wireless = {
       enable = true;
       secretsFile = config.sops.secrets."wifi/home/fritz".path;

@@ -5,9 +5,11 @@
   ...
 }: let
   jail = inputs.jail-nix.lib.init (pkgs.extend (_: prev: {
-    writeShellApplication = args: prev.writeShellApplication (args // {
-      excludeShellChecks = (args.excludeShellChecks or []) ++ ["SC2016"];
-    });
+    writeShellApplication = args:
+      prev.writeShellApplication (args
+        // {
+          excludeShellChecks = (args.excludeShellChecks or []) ++ ["SC2016"];
+        });
   }));
   inherit (pkgs) lib;
 
@@ -43,9 +45,12 @@
       websearch = "allow";
 
       # Agent utilities — safe
-      task = "allow";
+      # NOTE: task and todowrite are intentionally omitted. The default
+      # "*": "allow" still lets the top-level agent use them, but opencode's
+      # exact-match checks (rule.permission === "task"/"todowrite") won't
+      # find explicit rules, so sub-agents get these tools disabled —
+      # preventing recursive spawning and todo list clobbering.
       question = "allow";
-      todowrite = "allow";
       repo_clone = "allow";
       skill = "allow";
       external_directory = "allow";
@@ -64,6 +69,8 @@
   # Appended to the system prompt by the compat-proxy (via COMPAT_PROXY_APPEND_SYSTEM).
   # Injected after the main CC prompt replacement, so the agent knows its constraints.
   jailSystemContext = builtins.readFile ./jail-context.md;
+
+  lspmux = pkgs.callPackage ./lspmux {};
 
   agentToolbelt = with pkgs; [
     # Shell essentials
@@ -121,6 +128,30 @@
 
     # Python tooling (uvx needed by claude-mem for chroma vector search)
     uv
+
+    # Language servers — opencode has built-in support for these.
+    # Pre-provided because the jail lacks node/npm so npm-based
+    # auto-install won't work, and pre-providing avoids runtime
+    # downloads from GitHub/HashiCorp for the rest.
+    nixd # .nix
+    bash-language-server # .sh .bash .zsh .ksh
+    yaml-language-server # .yaml .yml
+    pyright # .py .pyi
+    typescript-language-server # .ts .tsx .js .jsx .mjs .cjs .mts .cts
+    dockerfile-language-server # Dockerfile
+    svelte-language-server # .svelte
+    vue-language-server # .vue
+    astro-language-server # .astro
+    biome # .ts .tsx .js .jsx (linter)
+    lua-language-server # .lua
+    gopls # .go
+    terraform-ls # .tf .tfvars
+    texlab # .tex .bib
+    tinymist # .typ (typst)
+    gleam # .gleam
+    zls # .zig .zon
+    clojure-lsp                 # .clj .cljs .cljc .edn
+    lspmux                      # LSP multiplexer (rust LSP via lspmux client)
 
     # Coding agents
     upkgs.claude-code
@@ -205,13 +236,15 @@ in
         JAIL_STATE_DIR="$HOME/.local/state/opencode-jails/$JAIL_NAME"
         JAIL_CLAUDE_DIR="$JAIL_DIR/claude"
         JAIL_MEM_DIR="$JAIL_DIR/claude-mem"
+        JAIL_FISH_DIR="$JAIL_DIR/fish"
 
-        ${pkgs.coreutils}/bin/mkdir -p "$JAIL_CLAUDE_DIR" "$JAIL_STATE_DIR" "$JAIL_MEM_DIR"
+        ${pkgs.coreutils}/bin/mkdir -p "$JAIL_CLAUDE_DIR" "$JAIL_STATE_DIR" "$JAIL_MEM_DIR" "$JAIL_FISH_DIR"
 
         RUNTIME_ARGS+=(--bind "$JAIL_CLAUDE_DIR" "$HOME/.claude")
         RUNTIME_ARGS+=(--bind "$JAIL_DIR" "$HOME/.local/share/opencode")
         RUNTIME_ARGS+=(--bind "$JAIL_STATE_DIR" "$HOME/.local/state/opencode")
         RUNTIME_ARGS+=(--bind "$JAIL_MEM_DIR" "$HOME/.claude-mem")
+        RUNTIME_ARGS+=(--bind "$JAIL_FISH_DIR" "$HOME/.local/share/fish")
       else
         ${pkgs.coreutils}/bin/mkdir -p "$HOME/.claude" "$HOME/.local/share/opencode" "$HOME/.local/state/opencode"
         RUNTIME_ARGS+=(--bind "$HOME/.claude.json" "$HOME/.claude.json")
@@ -311,7 +344,7 @@ in
     # NixOS symlinks /etc/nix/{registry.json,nix.custom.conf} → /etc/static/…
     (try-ro-bind "/etc/static/nix" "/etc/static/nix")
 
-    (try-fwd-env "SHELL")
+    (set-env "SHELL" "${upkgs.fish}/bin/fish")
     (try-fwd-env "COMPAT_PROXY_LOG")
     (try-fwd-env "COMPAT_PROXY_RULES")
     (try-fwd-env "COMPAT_PROXY_DUMP")

@@ -3,17 +3,18 @@
   inputs,
   pkgs,
   self,
-  hostname,
-  user,
   config,
   ...
-}: {
+}:
+let
+  user = "knoff";
+in {
   imports = [
     # inputs.nixgl.packages.x86_64-linux.nixGLIntel
 
     inputs.determinate.nixosModules.default
 
-    self.nixosModules.home
+    self.nixosModules.users.knoff
     self.nixosModules.nix
     self.nixosModules.nh
     self.nixosModules.pipewire
@@ -152,7 +153,7 @@
     inputs.sops-nix.nixosModules.sops
     {
       sops = {
-        defaultSopsFile = ./secrets/${hostname}/default.yaml;
+        defaultSopsFile = ./secrets/framework13/default.yaml;
         age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
         secrets."shell_environment/OPENROUTER_API_KEY" = {
           mode = "0644";
@@ -191,7 +192,7 @@
       };
     }
 
-    ./modules/shell/fish.nix
+    self.nixosModules.fish
 
     #./modules/yubikey.nix
   ];
@@ -307,7 +308,7 @@
 
   programs.localsend.enable = true;
   networking = {
-    hostName = hostname;
+    hostName = "framework13";
 
     wireguard.interfaces.wg0 = {
       ips = ["10.100.0.4/24"];

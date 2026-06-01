@@ -1,13 +1,14 @@
 {
   inputs,
-  hostname,
   lib,
   pkgs,
   self,
-  user,
   config,
   ...
-} @ args: {
+}:
+let
+  user = "tv";
+in {
   imports = [
     inputs.disko.nixosModules.disko
     ./hardware/disks/simple-disk.nix
@@ -16,7 +17,7 @@
     inputs.determinate.nixosModules.default
 
     self.nixosModules.pipewire
-    self.nixosModules.home
+    self.nixosModules.users.tv
     self.nixosModules.nix
 
     {
@@ -192,7 +193,7 @@
 
   nix.settings.auto-optimise-store = true;
 
-  networking.hostName = hostname;
+  networking.hostName = "nuci5";
 
   networking.firewall = {
     enable = false;

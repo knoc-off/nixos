@@ -1,9 +1,16 @@
-{ inputs, self }: let
-  # Shared between NixOS and HM — single source of truth for hyprnix packages
+{
+  inputs,
+  self,
+}: let
   hyprnixPkgs = system: inputs.hyprnix.packages.${system};
   hyprqt6engine = system: inputs.hyprqt6engine.packages.${system}.default;
 in {
-  nixos = { config, lib, pkgs, ... }: let
+  nixos = {
+    config,
+    lib,
+    pkgs,
+    ...
+  }: let
     system = pkgs.stdenv.hostPlatform.system;
     hyprnix = hyprnixPkgs system;
   in {
@@ -23,8 +30,8 @@ in {
 
     xdg.portal = {
       enable = true;
-      extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
-      config.common.default = [ "hyprland" "gtk" ];
+      extraPortals = [pkgs.xdg-desktop-portal-gtk];
+      config.common.default = ["hyprland" "gtk"];
     };
 
     environment.sessionVariables.NIXOS_OZONE_WL = "1";
@@ -42,7 +49,14 @@ in {
     ];
   };
 
-  home = { inputs, config, lib, pkgs, self, ... }: let
+  home = {
+    inputs,
+    config,
+    lib,
+    pkgs,
+    self,
+    ...
+  }: let
     inherit (self.lib) color-lib theme;
     system = pkgs.stdenv.hostPlatform.system;
     hyprnix = hyprnixPkgs system;
@@ -182,7 +196,6 @@ in {
 
             scroll_factor = 0.25;
           };
-
         };
 
         device = {

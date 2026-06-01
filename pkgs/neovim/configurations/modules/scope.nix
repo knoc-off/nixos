@@ -1,10 +1,10 @@
 # Cohesive scope visualization
 # - Rainbow delimiters: vivid, depth-based brackets
-# - IBL indent: subtle single color
+# - IBL indent: dimmed rainbow per depth level
 # - IBL scope: depth-based using rainbow colors (language-aware)
 # - Matchup: bright active pair highlighting
 {lib, ...}: let
-  # Shared rainbow highlight groups (used by both rainbow-delimiters and IBL scope)
+  # Bright rainbow highlights (rainbow-delimiters + IBL active scope)
   rainbowHighlights = [
     "RainbowDelimiterRed"
     "RainbowDelimiterYellow"
@@ -13,6 +13,17 @@
     "RainbowDelimiterGreen"
     "RainbowDelimiterViolet"
     "RainbowDelimiterCyan"
+  ];
+
+  # Dimmed rainbow highlights (IBL indent guides showing parent scope hierarchy)
+  dimRainbowHighlights = [
+    "IblRainbowRed"
+    "IblRainbowYellow"
+    "IblRainbowBlue"
+    "IblRainbowOrange"
+    "IblRainbowGreen"
+    "IblRainbowViolet"
+    "IblRainbowCyan"
   ];
 
   # Language-aware treesitter node types for scope highlighting
@@ -193,7 +204,7 @@ in {
 
       indent = {
         char = "│";
-        highlight = ["IblIndent"];
+        highlight = dimRainbowHighlights;
       };
 
       scope = {
@@ -211,9 +222,5 @@ in {
   # Treesitter integration is automatic in Neovim
   plugins.vim-matchup.enable = true;
 
-  extraConfigLua = ''
-    -- Integrate IBL with rainbow-delimiters for consistent scope colors
-    local hooks = require("ibl.hooks")
-    hooks.register(hooks.type.SCOPE_HIGHLIGHT, hooks.builtin.scope_highlight_from_extmark)
-  '';
+
 }

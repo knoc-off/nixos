@@ -3,11 +3,12 @@
   inputs,
   pkgs,
   self,
-  hostname,
-  user,
   config,
   ...
-}: {
+}:
+let
+  user = "niko";
+in {
   imports = [
     inputs.determinate.nixosModules.default
     {
@@ -22,7 +23,7 @@
       );
     }
 
-    self.nixosModules.home
+    self.nixosModules.users.niko
     self.nixosModules.nix
     self.nixosModules.nh
     self.nixosModules.pipewire
@@ -43,6 +44,7 @@
     {
       windows-vm = {
         enable = true;
+        inherit user;
         mergeAutounattendFile = "${inputs.UnattendedWinstall}/autounattend.xml";
       };
     }
@@ -77,7 +79,7 @@
       # todo: setup a systemd service, that will initialize the sops stuff.
       # would need to generate a pub key and ideally write it to the file.
       sops = {
-        defaultSopsFile = ./secrets/${hostname}/default.yaml;
+        defaultSopsFile = ./secrets/thinkpad-work/default.yaml;
         age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
         # age.sshKeyPaths = ["/home/niko/.ssh/id_ed25519"];
         secrets."shell_environment/_ANTHROPIC_API_KEY" = {
@@ -120,7 +122,7 @@
       };
     }
 
-    ./modules/shell/fish.nix
+    self.nixosModules.fish
 
     #./modules/yubikey.nix
   ];
@@ -231,7 +233,7 @@
     "0.0.0.0" = ["sfrclak.com"];
   };
   networking = {
-    hostName = hostname;
+    hostName = "thinkpad-work";
     firewall = {
       enable = true;
       allowedTCPPorts = [
