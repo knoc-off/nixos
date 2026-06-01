@@ -18,7 +18,9 @@
 
     inherit (lib) nixosSystem listToAttrs;
 
-    inherit (import ./lib {inherit lib;}) discoverModules discoverPackages;
+    inherit (import ./lib {inherit lib;}) discoverModules discoverPackages discoverAspects;
+
+    aspects = discoverAspects {inherit inputs self;} ./modules;
 
     mkConfig = {
       hostname,
@@ -123,9 +125,9 @@
       preferShell pkgs
     );
 
-    nixosModules = discoverModules ./modules/nixos;
-    homeModules = discoverModules ./modules/home;
-    darwinModules = discoverModules ./modules/darwin;
+    nixosModules = aspects.nixos;
+    homeModules = aspects.home;
+    # darwinModules removed — darwin configs commented out
 
     overlays = import ./overlays {inherit inputs;};
 

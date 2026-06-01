@@ -6,7 +6,7 @@
 }: let
   trustedIps = lib.concatStringsSep " " config.services.wireguard-network.trustedSubnets;
 in {
-  imports = [self.nixosModules.services.caddy-common];
+  imports = [self.nixosModules.caddy-common];
 
   services.caddy = {
     enable = true;

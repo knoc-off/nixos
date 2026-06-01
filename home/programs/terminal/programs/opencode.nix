@@ -351,7 +351,6 @@ in {
         };
       };
     };
-
   };
 
   # opencode v1.14+ reads opencode.json, not config.json.

@@ -47,8 +47,8 @@
       };
     }
 
-    self.nixosModules.services.cert-sync
-    self.nixosModules.services.markid
+    self.nixosModules.cert-sync
+    self.nixosModules.markid
     # Ship ACME-issued certs to the Pi over WireGuard whenever Caddy
     # renews them. The Pi's local Caddy terminates TLS for home-LAN
     # clients (home.niko.ink directly to HA, kitchenowl/notes via

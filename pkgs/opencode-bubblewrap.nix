@@ -140,7 +140,7 @@ in
       JAIL_PROJECTS=()
       while [[ $# -gt 0 ]]; do
         case "$1" in
-          --name) JAIL_NAME="$2"; shift 2 ;;
+          --name) [[ $# -ge 2 ]] || { echo "jailed-opencode: --name requires a value" >&2; exit 1; }; JAIL_NAME="$2"; shift 2 ;;
           --) shift; break ;;
           -*) echo "jailed-opencode: unknown option: $1" >&2; exit 1 ;;
           *) JAIL_PROJECTS+=("$(${pkgs.coreutils}/bin/realpath "$1")"); shift ;;
@@ -184,6 +184,8 @@ in
 
       # ── Host-query service (runs on host, outside jail) ──────
       ${pkgs.coreutils}/bin/mkdir -p "$HOME/.local/state/opencode"
+      # Kill stale host-query from a previous crashed session
+      ${pkgs.procps}/bin/fuser -k "$HOST_QUERY_PORT/tcp" 2>/dev/null || true
       ${lib.getExe hostQuery} "$HOST_QUERY_PORT" \
         > "$HOME/.local/state/opencode/host-query.log" 2>&1 &
       HOST_QUERY_PID=$!
@@ -193,28 +195,25 @@ in
         fi
         sleep 0.25
       done
+      if ! ${pkgs.curl}/bin/curl -sf "http://127.0.0.1:$HOST_QUERY_PORT/health" > /dev/null 2>&1; then
+        echo "WARNING: host-query failed to start (host_exec tool will be unavailable)" >&2
+      fi
 
       # ── State mounting (named = isolated, unnamed = host) ────
       if [[ -n "$JAIL_NAME" ]]; then
         JAIL_DIR="$HOME/.local/share/opencode-jails/$JAIL_NAME"
         JAIL_STATE_DIR="$HOME/.local/state/opencode-jails/$JAIL_NAME"
         JAIL_CLAUDE_DIR="$JAIL_DIR/claude"
-        JAIL_CLAUDE_JSON="$JAIL_DIR/claude.json"
         JAIL_MEM_DIR="$JAIL_DIR/claude-mem"
 
         ${pkgs.coreutils}/bin/mkdir -p "$JAIL_CLAUDE_DIR" "$JAIL_STATE_DIR" "$JAIL_MEM_DIR"
 
-        [ -f "$JAIL_CLAUDE_JSON" ] || echo '{"hasCompletedOnboarding":true,"migrationVersion":11,"opusProMigrationComplete":true,"sonnet1m45MigrationComplete":true}' > "$JAIL_CLAUDE_JSON"
-
-        RUNTIME_ARGS+=(--bind "$JAIL_CLAUDE_JSON" "$HOME/.claude.json")
         RUNTIME_ARGS+=(--bind "$JAIL_CLAUDE_DIR" "$HOME/.claude")
         RUNTIME_ARGS+=(--bind "$JAIL_DIR" "$HOME/.local/share/opencode")
         RUNTIME_ARGS+=(--bind "$JAIL_STATE_DIR" "$HOME/.local/state/opencode")
         RUNTIME_ARGS+=(--bind "$JAIL_MEM_DIR" "$HOME/.claude-mem")
-        # Always share host credentials into isolated .claude
-        [ -f "$HOME/.claude/.credentials.json" ] && \
-          RUNTIME_ARGS+=(--ro-bind "$HOME/.claude/.credentials.json" "$HOME/.claude/.credentials.json")
       else
+        ${pkgs.coreutils}/bin/mkdir -p "$HOME/.claude" "$HOME/.local/share/opencode" "$HOME/.local/state/opencode"
         RUNTIME_ARGS+=(--bind "$HOME/.claude.json" "$HOME/.claude.json")
         RUNTIME_ARGS+=(--bind "$HOME/.claude" "$HOME/.claude")
         RUNTIME_ARGS+=(--bind "$HOME/.local/share/opencode" "$HOME/.local/share/opencode")
@@ -254,6 +253,10 @@ in
         fi
         sleep 0.25
       done
+      if ! curl -sf "http://127.0.0.1:$JAIL_PROXY_PORT/health" > /dev/null 2>&1; then
+        echo "FATAL: compat-proxy failed to start (check $PROXY_LOG/compat-proxy.log)" >&2
+        exit 1
+      fi
 
       export OPENCODE_PROXY_URL="http://127.0.0.1:$JAIL_PROXY_PORT/v1"
 

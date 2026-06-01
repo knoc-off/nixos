@@ -1,6 +1,6 @@
 # Shared VPN topology. Per-host overrides set inline.
 {self, ...}: {
-  imports = [self.nixosModules.services.wireguard-network];
+  imports = [self.nixosModules.wireguard-network];
 
   services.wireguard-network = {
     enable = true;

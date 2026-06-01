@@ -14,6 +14,8 @@ niri-docs.md
 .aider*
 *.qcow2
 
+.Trash-1000/
+
 *.db
 *.sqlite
 *.sqlite3

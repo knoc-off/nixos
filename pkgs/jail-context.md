@@ -3,7 +3,8 @@
 You are running inside a bubblewrap (bwrap) sandbox. This changes how you should operate:
 
 ## Permissions
-- File edits and shell commands are **pre-approved** — no confirmation needed
+- Shell commands (`bash`) are **pre-approved** — no confirmation needed
+- File edits require **your approval** — you'll be prompted before each modification
 - The sandbox filesystem constrains your blast radius; you cannot affect files outside the project
 
 ## Filesystem

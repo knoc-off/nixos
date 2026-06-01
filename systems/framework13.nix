@@ -16,7 +16,7 @@
     self.nixosModules.home
     self.nixosModules.nix
     self.nixosModules.nh
-    self.nixosModules.audio.pipewire
+    self.nixosModules.pipewire
 
     self.nixosModules.misc
     self.nixosModules.console
@@ -32,7 +32,7 @@
     ./hardware/fingerprint
 
     self.nixosModules.hyprland
-    self.nixosModules.desktop.noctalia
+    self.nixosModules.noctalia
 
     inputs.hardware.nixosModules.framework-13-7040-amd
     {
@@ -44,10 +44,10 @@
       services.mullvad-vpn.enable = true;
     }
 
-    self.nixosModules.services.lspmux
+    self.nixosModules.lspmux
     {services.lspmux.enable = true;}
 
-    self.nixosModules.services.logiops
+    self.nixosModules.logiops
     {
       services.logiops = {
         enable = true;

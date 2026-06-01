@@ -15,7 +15,7 @@
 
     inputs.determinate.nixosModules.default
 
-    self.nixosModules.audio.pipewire
+    self.nixosModules.pipewire
     self.nixosModules.home
     self.nixosModules.nix
 
@@ -81,7 +81,7 @@
     }
 
     self.nixosModules.hyprland
-    self.nixosModules.desktop.noctalia
+    self.nixosModules.noctalia
     {
       hardware.graphics = {
         enable = true;

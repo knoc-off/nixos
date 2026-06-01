@@ -35,7 +35,7 @@
       };
     }
 
-    self.nixosModules.services.cert-receiver
+    self.nixosModules.cert-receiver
     {
       # Receive home.niko.ink cert from the hub's cert-sync. The
       # dispatch script accepts either an rsync drop (enforced by

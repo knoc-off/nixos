@@ -25,19 +25,19 @@
     self.nixosModules.home
     self.nixosModules.nix
     self.nixosModules.nh
-    self.nixosModules.audio.pipewire
+    self.nixosModules.pipewire
 
     self.nixosModules.misc
     self.nixosModules.console
 
-    self.nixosModules.disks."btrfs-luks"
+    self.nixosModules.btrfs-luks
 
     ./hardware/hardware-configuration-thinkpad-work.nix
     ./hardware/bluetooth.nix
     ./hardware/fingerprint
 
     self.nixosModules.hyprland
-    self.nixosModules.desktop.noctalia
+    self.nixosModules.noctalia
 
     self.nixosModules.windows-vm
     {
@@ -67,7 +67,7 @@
       hardware.uinput.enable = true;
     }
 
-    self.nixosModules.services.lspmux
+    self.nixosModules.lspmux
     {services.lspmux.enable = true;}
 
     self.nixosModules.boot

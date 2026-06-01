@@ -25,6 +25,7 @@
     ./modules/languages/rust.nix
     ./modules/languages/nix.nix
     ./modules/languages/typescript.nix
+    ./modules/languages/lua.nix
     # ./modules/languages/github-actions.nix
 
     # ./modules/opencode.nix

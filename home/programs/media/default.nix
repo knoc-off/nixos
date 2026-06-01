@@ -1,6 +1,0 @@
-{...}: {
-  imports = [
-    ./video
-    ./audio
-  ];
-}
