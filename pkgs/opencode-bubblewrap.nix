@@ -13,14 +13,51 @@
 
   compatProxy = pkgs.callPackage ./compat-proxy {};
   claudeMem = pkgs.callPackage ./claude-mem {};
+  hostQuery = pkgs.callPackage ./host-query {};
+
+  # Safe rm/rmdir — shadows coreutils inside the jail so agent deletions
+  # land in the FreeDesktop trash (~/.local/share/Trash/) instead of being
+  # permanent.  Uses rmtrash which accepts all GNU rm/rmdir flags.
+  rmSafe = pkgs.symlinkJoin {
+    name = "rm-safe";
+    paths = [
+      (pkgs.writeShellScriptBin "rm" ''exec ${pkgs.rmtrash}/bin/rmtrash "$@"'')
+      (pkgs.writeShellScriptBin "rmdir" ''exec ${pkgs.rmtrash}/bin/rmdirtrash "$@"'')
+    ];
+  };
 
   # Jail-specific opencode overrides — merged on top of the global config.
   # Permissions are relaxed because the sandbox already constrains blast radius.
   jailConfig = pkgs.writeText "opencode-jail.json" (builtins.toJSON {
     "$schema" = "https://opencode.ai/config.json";
     permission = {
-      edit = "allow";
+      # Read/explore — always allowed, no side effects
+      read = "allow";
+      glob = "allow";
+      grep = "allow";
+      list = "allow";
+      lsp = "allow";
+      repo_overview = "allow";
+      codesearch = "allow";
+      webfetch = "allow";
+      websearch = "allow";
+
+      # Agent utilities — safe
+      task = "allow";
+      question = "allow";
+      todowrite = "allow";
+      repo_clone = "allow";
+      skill = "allow";
+      external_directory = "allow";
+
+      # Bash — sandbox + trash-backed rm constrain damage
       bash = "allow";
+
+      # Edit — user approves each file modification
+      edit = "ask";
+
+      # Host exec — user approves each host command
+      host_exec = "ask";
     };
   });
 
@@ -69,6 +106,10 @@
     # Patching
     gnupatch
 
+    # Safe deletion (trash-cli provides trash-put, used by rmtrash)
+    trash-cli
+    rmtrash
+
     # Process inspection
     procps # ps, top, pgrep, etc.
 
@@ -90,30 +131,106 @@ in
     network
     time-zone
     no-new-session
-    mount-cwd
+    (set-argv [])
+    (add-cleanup ''kill $HOST_QUERY_PID 2>/dev/null || true'')
 
     (add-runtime ''
-      GIT_ROOT=$(${pkgs.git}/bin/git -C "$(pwd -P)" rev-parse --show-toplevel 2>/dev/null || pwd -P)
-      PROJECT_HASH=$(echo "$GIT_ROOT" | ${pkgs.coreutils}/bin/sha256sum | ${pkgs.coreutils}/bin/head -c7)
-      PROJECT_SHARE="$HOME/.local/share/opencode-jails/$PROJECT_HASH"
-      PROJECT_STATE="$HOME/.local/state/opencode-jails/$PROJECT_HASH"
-      PROJECT_CLAUDE="$HOME/.local/share/opencode-jails/$PROJECT_HASH/claude"
-      PROJECT_CLAUDE_JSON="$HOME/.local/share/opencode-jails/$PROJECT_HASH/claude.json"
+      # ── Parse CLI arguments ──────────────────────────────────
+      JAIL_NAME=""
+      JAIL_PROJECTS=()
+      while [[ $# -gt 0 ]]; do
+        case "$1" in
+          --name) JAIL_NAME="$2"; shift 2 ;;
+          --) shift; break ;;
+          -*) echo "jailed-opencode: unknown option: $1" >&2; exit 1 ;;
+          *) JAIL_PROJECTS+=("$(${pkgs.coreutils}/bin/realpath "$1")"); shift ;;
+        esac
+      done
+      while [[ $# -gt 0 ]]; do
+        JAIL_PROJECTS+=("$(${pkgs.coreutils}/bin/realpath "$1")"); shift
+      done
 
-      ${pkgs.coreutils}/bin/mkdir -p "$PROJECT_SHARE" "$PROJECT_STATE" "$PROJECT_CLAUDE"
-      echo "$GIT_ROOT" > "$PROJECT_SHARE/.project-path"
+      # ── Project mounting ─────────────────────────────────────
+      if [[ ''${#JAIL_PROJECTS[@]} -eq 0 ]]; then
+        RUNTIME_ARGS+=(--bind "$PWD" "$PWD")
+        JAIL_START_DIR="$PWD"
+      else
+        RUNTIME_ARGS+=(--dir "$HOME/projects")
+        declare -A SEEN_NAMES
+        for proj in "''${JAIL_PROJECTS[@]}"; do
+          bname=$(${pkgs.coreutils}/bin/basename "$proj")
+          if [[ -n "''${SEEN_NAMES[$bname]+x}" ]]; then
+            echo "jailed-opencode: duplicate project basename '$bname'" >&2
+            echo "  previous: ''${SEEN_NAMES[$bname]}" >&2
+            echo "  conflict: $proj" >&2
+            exit 1
+          fi
+          SEEN_NAMES[$bname]="$proj"
+          RUNTIME_ARGS+=(--bind "$proj" "$HOME/projects/$bname")
+        done
+        JAIL_START_DIR="$HOME/projects"
+      fi
 
-      # Each jail gets its own .claude.json; seed with onboarding-complete so
-      # claude-code doesn't re-run setup on every launch (auth happens separately)
-      [ -f "$PROJECT_CLAUDE_JSON" ] || echo '{"hasCompletedOnboarding":true,"migrationVersion":11,"opusProMigrationComplete":true,"sonnet1m45MigrationComplete":true}' > "$PROJECT_CLAUDE_JSON"
+      # ── Port derivation (deterministic per identity) ─────────
+      if [[ -n "$JAIL_NAME" ]]; then
+        PORT_SEED="$JAIL_NAME"
+      else
+        PORT_SEED="''${JAIL_PROJECTS[0]:-$PWD}"
+      fi
+      PORT_HASH=$(echo "$PORT_SEED" | ${pkgs.coreutils}/bin/sha256sum | ${pkgs.coreutils}/bin/head -c7)
+      JAIL_PROXY_PORT=$((18800 + 16#''${PORT_HASH:0:4} % 200))
+      JAIL_MEM_PORT=$((19200 + 16#''${PORT_HASH:0:4} % 200))
+      HOST_QUERY_PORT=$((19600 + 16#''${PORT_HASH:0:4} % 200))
+
+      # ── Host-query service (runs on host, outside jail) ──────
+      ${pkgs.coreutils}/bin/mkdir -p "$HOME/.local/state/opencode"
+      ${lib.getExe hostQuery} "$HOST_QUERY_PORT" \
+        > "$HOME/.local/state/opencode/host-query.log" 2>&1 &
+      HOST_QUERY_PID=$!
+      for _ in $(seq 1 20); do
+        if ${pkgs.curl}/bin/curl -sf "http://127.0.0.1:$HOST_QUERY_PORT/health" > /dev/null 2>&1; then
+          break
+        fi
+        sleep 0.25
+      done
+
+      # ── State mounting (named = isolated, unnamed = host) ────
+      if [[ -n "$JAIL_NAME" ]]; then
+        JAIL_DIR="$HOME/.local/share/opencode-jails/$JAIL_NAME"
+        JAIL_STATE_DIR="$HOME/.local/state/opencode-jails/$JAIL_NAME"
+        JAIL_CLAUDE_DIR="$JAIL_DIR/claude"
+        JAIL_CLAUDE_JSON="$JAIL_DIR/claude.json"
+        JAIL_MEM_DIR="$JAIL_DIR/claude-mem"
+
+        ${pkgs.coreutils}/bin/mkdir -p "$JAIL_CLAUDE_DIR" "$JAIL_STATE_DIR" "$JAIL_MEM_DIR"
+
+        [ -f "$JAIL_CLAUDE_JSON" ] || echo '{"hasCompletedOnboarding":true,"migrationVersion":11,"opusProMigrationComplete":true,"sonnet1m45MigrationComplete":true}' > "$JAIL_CLAUDE_JSON"
+
+        RUNTIME_ARGS+=(--bind "$JAIL_CLAUDE_JSON" "$HOME/.claude.json")
+        RUNTIME_ARGS+=(--bind "$JAIL_CLAUDE_DIR" "$HOME/.claude")
+        RUNTIME_ARGS+=(--bind "$JAIL_DIR" "$HOME/.local/share/opencode")
+        RUNTIME_ARGS+=(--bind "$JAIL_STATE_DIR" "$HOME/.local/state/opencode")
+        RUNTIME_ARGS+=(--bind "$JAIL_MEM_DIR" "$HOME/.claude-mem")
+        # Always share host credentials into isolated .claude
+        [ -f "$HOME/.claude/.credentials.json" ] && \
+          RUNTIME_ARGS+=(--ro-bind "$HOME/.claude/.credentials.json" "$HOME/.claude/.credentials.json")
+      else
+        RUNTIME_ARGS+=(--bind "$HOME/.claude.json" "$HOME/.claude.json")
+        RUNTIME_ARGS+=(--bind "$HOME/.claude" "$HOME/.claude")
+        RUNTIME_ARGS+=(--bind "$HOME/.local/share/opencode" "$HOME/.local/share/opencode")
+        RUNTIME_ARGS+=(--bind "$HOME/.local/state/opencode" "$HOME/.local/state/opencode")
+        [ -d "$HOME/.claude-mem" ] && RUNTIME_ARGS+=(--bind "$HOME/.claude-mem" "$HOME/.claude-mem")
+      fi
+
+      # ── Pass computed values into the jail ───────────────────
+      RUNTIME_ARGS+=(--setenv JAIL_PROXY_PORT "$JAIL_PROXY_PORT")
+      RUNTIME_ARGS+=(--setenv JAIL_MEM_PORT "$JAIL_MEM_PORT")
+      RUNTIME_ARGS+=(--setenv HOST_QUERY_PORT "$HOST_QUERY_PORT")
+      RUNTIME_ARGS+=(--setenv JAIL_START_DIR "$JAIL_START_DIR")
+      RUNTIME_ARGS+=(--setenv JAIL_NAME "''${JAIL_NAME:-}")
     '')
 
     (wrap-entry (entry: ''
-      # Per-project port from git root hash (avoids collisions across jails)
-      GIT_ROOT=$(git -C "$(pwd -P)" rev-parse --show-toplevel 2>/dev/null || pwd -P)
-      PROJECT_HASH=$(echo "$GIT_ROOT" | sha256sum | head -c7)
-      PROJECT_PORT=$((18800 + 16#''${PROJECT_HASH:0:4} % 200))
-
       PROXY_LOG="$HOME/.local/state/opencode"
       mkdir -p "$PROXY_LOG"
 
@@ -124,27 +241,23 @@ in
         --rules-dir "$RULES_DIR" \
         --schema-registry "$RULES_DIR/cc-schemas.toml" \
         --credentials-path "$HOME/.claude/.credentials.json" \
-        --port $PROJECT_PORT \
+        --port "$JAIL_PROXY_PORT" \
         --log-level "$COMPAT_PROXY_LOG" \
         ''${COMPAT_PROXY_DUMP:+--dump-requests} \
         > "$PROXY_LOG/compat-proxy.log" 2>&1 &
       PROXY_PID=$!
       trap 'kill $PROXY_PID 2>/dev/null || true' EXIT
 
-      # Wait for proxy to be ready
       for _ in $(seq 1 20); do
-        if curl -sf http://127.0.0.1:$PROJECT_PORT/health > /dev/null 2>&1; then
+        if curl -sf "http://127.0.0.1:$JAIL_PROXY_PORT/health" > /dev/null 2>&1; then
           break
         fi
         sleep 0.25
       done
 
-      export OPENCODE_PROXY_URL="http://127.0.0.1:$PROJECT_PORT/v1"
+      export OPENCODE_PROXY_URL="http://127.0.0.1:$JAIL_PROXY_PORT/v1"
 
-      # Per-project claude-mem worker (separate memory instance per jail)
-      CLAUDE_MEM_PORT=$((19200 + 16#''${PROJECT_HASH:0:4} % 200))
-
-      CLAUDE_MEM_WORKER_PORT=$CLAUDE_MEM_PORT \
+      CLAUDE_MEM_WORKER_PORT=$JAIL_MEM_PORT \
       CLAUDE_MEM_WORKER_HOST=127.0.0.1 \
       CLAUDE_MEM_DATA_DIR="$HOME/.claude-mem" \
         ${lib.getExe claudeMem} > "$PROXY_LOG/claude-mem.log" 2>&1 &
@@ -152,42 +265,35 @@ in
       trap 'kill $PROXY_PID $CLAUDE_MEM_PID 2>/dev/null || true' EXIT
 
       for _ in $(seq 1 20); do
-        if curl -sf http://127.0.0.1:$CLAUDE_MEM_PORT/api/health > /dev/null 2>&1; then
+        if curl -sf "http://127.0.0.1:$JAIL_MEM_PORT/api/health" > /dev/null 2>&1; then
           break
         fi
         sleep 0.25
       done
 
-      export CLAUDE_MEM_WORKER_PORT=$CLAUDE_MEM_PORT
+      export CLAUDE_MEM_WORKER_PORT=$JAIL_MEM_PORT
 
-      # fucks startup time, but it will work
-      # claude -p "say just 'ok'" --model 'haiku'
-
-      # ${lib.getExe upkgs.opencode} "$@" || true
-
-      # fish
+      cd "$JAIL_START_DIR"
       ${entry}
     ''))
 
     (try-rw-bind (noescape "\"$HOME/.config/opencode\"") (noescape "~/.config/opencode"))
     (try-rw-bind (noescape "\"$HOME/.cache/opencode\"") (noescape "~/.cache/opencode"))
     (try-rw-bind (noescape "\"$HOME/.cache/uv\"") (noescape "~/.cache/uv"))
+
+    # Persist trash across jail sessions — shared with the host's FreeDesktop trash.
+    (add-runtime ''
+      ${pkgs.coreutils}/bin/mkdir -p "$HOME/.local/share/Trash"
+    '')
+    (rw-bind (noescape "\"$HOME/.local/share/Trash\"") (noescape "~/.local/share/Trash"))
+
+    # Shadow coreutils rm/rmdir with trash-backed versions inside the jail.
+    # Deferred so it prepends to PATH *after* add-pkg-deps has built it.
+    (defer (add-path "${rmSafe}/bin"))
     (add-runtime ''
       COMPAT_PROXY_RULES_REAL=$(readlink -f "$HOME/.config/compat-proxy/rules" 2>/dev/null || true)
     '')
     (try-ro-bind (noescape "\"$COMPAT_PROXY_RULES_REAL\"") (noescape "~/.config/compat-proxy/rules"))
-    (rw-bind (noescape "\"$PROJECT_CLAUDE_JSON\"") (noescape "~/.claude.json"))
-    (rw-bind (noescape "\"$PROJECT_CLAUDE\"") (noescape "~/.claude"))
-    (rw-bind (noescape "\"$PROJECT_SHARE\"") (noescape "~/.local/share/opencode"))
-    (rw-bind (noescape "\"$PROJECT_STATE\"") (noescape "~/.local/state/opencode"))
-
-    # Per-project claude-mem data (isolated memory per jail)
-    (add-runtime ''
-      CLAUDE_MEM_JAIL_DIR="$HOME/.local/share/opencode-jails/$PROJECT_HASH/claude-mem"
-      ${pkgs.coreutils}/bin/mkdir -p "$CLAUDE_MEM_JAIL_DIR"
-    '')
-    (rw-bind (noescape "\"$CLAUDE_MEM_JAIL_DIR\"") (noescape "~/.claude-mem"))
-
     # Nix support — allows nix build/shell/run inside the jail.
     #
     # The jail's /nix/store is per-path bind mounts (from add-pkg-deps), so
@@ -211,7 +317,6 @@ in
     (set-env "NIX_REMOTE" "daemon")
     (set-env "OPENCODE_CONFIG" "${jailConfig}")
     (set-env "COMPAT_PROXY_APPEND_SYSTEM" jailSystemContext)
-    (try-fwd-env "CLAUDE_MEM_WORKER_PORT")
 
     (add-pkg-deps (agentToolbelt ++ [compatProxy claudeMem]))
   ])
