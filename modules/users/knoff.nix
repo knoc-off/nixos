@@ -1,4 +1,7 @@
-{inputs, self}: {
+{
+  inputs,
+  self,
+}: {
   nixos = {
     pkgs,
     lib,
@@ -115,7 +118,12 @@
       useUserPackages = true;
       extraSpecialArgs = {inherit self inputs;};
 
-      users.${user} = {pkgs, lib, config, ...}: {
+      users.${user} = {
+        pkgs,
+        lib,
+        config,
+        ...
+      }: {
         imports = [
           self.homeModules.cli-tools
           self.homeModules.ghostty
@@ -505,8 +513,6 @@
             upkgs.prismlauncher
 
             upkgs.claude-code
-            fabric-ai
-            upkgs.gemini-cli
 
             gnome-calculator
 

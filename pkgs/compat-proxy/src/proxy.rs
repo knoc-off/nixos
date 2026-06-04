@@ -87,6 +87,11 @@ pub async fn health() -> &'static str {
     "ok"
 }
 
+/// Rate-limit usage endpoint — returns cached utilization from upstream headers.
+pub async fn handle_usage(State(state): State<AppState>) -> impl IntoResponse {
+    Json(state.usage.snapshot())
+}
+
 /// Build Stainless SDK headers matching real Claude Code's Anthropic JS SDK.
 fn stainless_headers(cc_version: &str, session_id: &str) -> Vec<(&'static str, String)> {
     let os_name = if cfg!(target_os = "macos") {
@@ -312,6 +317,9 @@ async fn handle_messages_inner(
             return Err(ProxyError::Upstream(e.to_string()));
         }
     };
+
+    // Capture rate-limit headers before consuming the response body.
+    state.usage.update_from_headers(upstream_resp.headers());
 
     let status = upstream_resp.status();
     if let Some(txn) = txn_owned.as_mut() {
@@ -665,6 +673,7 @@ pub fn build_router(state: AppState) -> axum::Router {
             "/{name}/v1/messages",
             axum::routing::post(handle_messages_named),
         )
+        .route("/v1/usage", axum::routing::get(handle_usage))
         .route("/health", axum::routing::get(health))
         .fallback(fallback)
         .with_state(state)

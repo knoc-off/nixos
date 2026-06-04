@@ -9,7 +9,6 @@
     system = pkgs.stdenv.hostPlatform.system;
     qs = lib.getExe cfg.quickshellPackage;
     jsonFormat = pkgs.formats.json {};
-    hyprlandEnabled = config.wayland.windowManager.hyprland.enable;
   in {
     options.programs.quickshell-overview = {
       enable = lib.mkEnableOption "quickshell-overview, a Hyprland workspace overview using Quickshell";
@@ -82,11 +81,7 @@
         Install.WantedBy = ["graphical-session.target"];
       };
 
-      wayland.windowManager.hyprland.settings = lib.mkIf hyprlandEnabled {
-        bind = [
-          "${cfg.keybind}, exec, ${qs} ipc -c overview call overview toggle"
-        ];
-      };
+      # Keybind is now managed in hyprland.lua via nix-env.lua
     };
   };
 }

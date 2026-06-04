@@ -9,6 +9,7 @@ use clap::Parser;
 use crate::creds::CredentialReader;
 use crate::rules::RuleSet;
 use crate::session_log::SessionLogPool;
+use crate::usage::UsageState;
 
 /// Compatibility proxy — translates client API requests into
 /// upstream-compatible format using TOML rule files.
@@ -145,4 +146,7 @@ pub struct AppState {
 
     /// Persistent device ID (random 64-char hex, generated once at startup).
     pub device_id: String,
+
+    /// Cached rate-limit utilization from upstream response headers.
+    pub usage: Arc<UsageState>,
 }

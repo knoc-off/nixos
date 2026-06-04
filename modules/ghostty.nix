@@ -1,15 +1,109 @@
-{ self, ... }: {
-  home = { lib, pkgs, ... }: let
+{self, ...}: {
+  home = {
+    lib,
+    pkgs,
+    ...
+  }: let
     inherit (self.lib) color-lib theme;
-    inherit (color-lib) setOkhslLightness setOkhslSaturation;
+    inherit (color-lib) setOkhslLightness setOkhslSaturation adjustOkhslHue;
+    inherit (theme) mkTheme;
+    inherit (lib.lists) genList;
+    inherit (lib) elemAt concatStringsSep;
     lighten = setOkhslLightness 0.7;
     saturate = setOkhslSaturation 0.9;
 
     sa = hex: lighten (saturate hex);
+
+    # --- Rotating color scheme generation ---
+    numSchemes = 16;
+
+    variants =
+      genList (
+        i: let
+          offset = i * 1.0 / numSchemes;
+          # Intense bg: boost saturation so hue rotation produces visibly tinted backgrounds
+          bgTinted = adjustOkhslHue offset (setOkhslSaturation 0.25 "1b2429");
+          # Subtler fg: near-white gets a gentle tint to complement bg
+          fgTinted = adjustOkhslHue (offset * 0.3) "ECEFF1";
+        in
+          mkTheme {
+            bg = bgTinted;
+            fg = fgTinted;
+            hueOffset = offset;
+            accentS = 0.95;
+            accentStartL = 0.55;
+            minContrast = 4.5;
+          }
+      )
+      numSchemes;
+
+    # "AABBCC" → "AA/BB/CC" for OSC rgb: color format
+    hexRgb = hex: let
+      h = lib.removePrefix "#" hex;
+    in "${builtins.substring 0 2 h}/${builtins.substring 2 2 h}/${builtins.substring 4 2 h}";
+
+    # Build the OSC escape sequence block for one theme variant.
+    # Sets: fg, bg, cursor, selection bg/fg, and all 16 palette entries.
+    mkOscSnippet = v: let
+      osc = code: color: "printf '\\e]${code};rgb:${hexRgb color}\\e\\\\'";
+    in
+      concatStringsSep "\n      " [
+        (osc "10" v.base05) # foreground
+        (osc "11" v.base00) # background
+        (osc "12" v.base09) # cursor
+        (osc "17" v.base02) # selection background
+        (osc "19" v.base06) # selection foreground
+        (osc "4;0" v.base00) # palette 0:  black
+        (osc "4;1" (sa v.base08)) # palette 1:  red (saturated/lightened)
+        (osc "4;2" (sa v.base0B)) # palette 2:  green
+        (osc "4;3" (sa v.base0A)) # palette 3:  yellow
+        (osc "4;4" (sa v.base0D)) # palette 4:  blue
+        (osc "4;5" (sa v.base0E)) # palette 5:  magenta
+        (osc "4;6" (sa v.base0C)) # palette 6:  cyan
+        (osc "4;7" v.base06) # palette 7:  white
+        (osc "4;8" v.base03) # palette 8:  bright black (gray)
+        (osc "4;9" v.base08) # palette 9:  bright red
+        (osc "4;10" v.base0B) # palette 10: bright green
+        (osc "4;11" v.base0A) # palette 11: bright yellow
+        (osc "4;12" v.base0D) # palette 12: bright blue
+        (osc "4;13" v.base0E) # palette 13: bright magenta
+        (osc "4;14" v.base0C) # palette 14: bright cyan
+        (osc "4;15" v.base07) # palette 15: bright white
+      ];
+
+    # Case branch for each variant index
+    caseBranches = concatStringsSep "\n    " (genList (
+        i: "${toString i})\n      ${mkOscSnippet (elemAt variants i)}\n      ;;"
+      )
+      numSchemes);
+
+    ghostty-theme-rotate = pkgs.writeShellScript "ghostty-theme-rotate" ''
+      STATE_FILE="''${XDG_STATE_HOME:-$HOME/.local/state}/ghostty-theme-index"
+      mkdir -p "$(dirname "$STATE_FILE")"
+
+      # Atomic read-increment with flock for global cross-process rotation
+      exec 9>"$STATE_FILE.lock"
+      flock 9
+      INDEX=$(cat "$STATE_FILE" 2>/dev/null || echo 0)
+      NEXT=$(( (INDEX + 1) % ${toString numSchemes} ))
+      echo "$NEXT" > "$STATE_FILE"
+      exec 9>&-
+
+      case "$INDEX" in
+        ${caseBranches}
+      esac
+    '';
+
+    # Variant 0 for the base Ghostty config (chrome defaults, initial render)
+    base = elemAt variants 0;
   in {
     home.sessionVariables = {
       TERMINAL = "ghostty";
     };
+
+    home.packages = [
+      # ghostty-theme-rotate
+    ];
 
     programs.ghostty = {
       enable = true;
@@ -23,39 +117,39 @@
         window-padding-x = 2;
         window-padding-y = 2;
 
-        command = ""; # Disable bell command
+        # command = "${ghostty-theme-rotate}";
 
         focus-follows-mouse = true;
 
         palette = [
-          "0=#${theme.dark.base00}" # black
-          "1=#${sa theme.dark.base08}" # red (saturated/lightened)
-          "2=#${sa theme.dark.base0B}" # green (saturated/lightened)
-          "3=#${sa theme.dark.base0A}" # yellow (saturated/lightened)
-          "4=#${sa theme.dark.base0D}" # blue (saturated/lightened)
-          "5=#${sa theme.dark.base0E}" # magenta (saturated/lightened)
-          "6=#${sa theme.dark.base0C}" # cyan (saturated/lightened)
-          "7=#${theme.dark.base06}" # white
-          "8=#${theme.dark.base03}" # bright black (gray)
-          "9=#${theme.dark.base08}" # bright red
-          "10=#${theme.dark.base0B}" # bright green
-          "11=#${theme.dark.base0A}" # bright yellow
-          "12=#${theme.dark.base0D}" # bright blue
-          "13=#${theme.dark.base0E}" # bright magenta
-          "14=#${theme.dark.base0C}" # bright cyan
-          "15=#${theme.dark.base07}" # bright white
+          "0=#${base.base00}" # black
+          "1=#${sa base.base08}" # red (saturated/lightened)
+          "2=#${sa base.base0B}" # green (saturated/lightened)
+          "3=#${sa base.base0A}" # yellow (saturated/lightened)
+          "4=#${sa base.base0D}" # blue (saturated/lightened)
+          "5=#${sa base.base0E}" # magenta (saturated/lightened)
+          "6=#${sa base.base0C}" # cyan (saturated/lightened)
+          "7=#${base.base06}" # white
+          "8=#${base.base03}" # bright black (gray)
+          "9=#${base.base08}" # bright red
+          "10=#${base.base0B}" # bright green
+          "11=#${base.base0A}" # bright yellow
+          "12=#${base.base0D}" # bright blue
+          "13=#${base.base0E}" # bright magenta
+          "14=#${base.base0C}" # bright cyan
+          "15=#${base.base07}" # bright white
         ];
 
-        background = "${theme.dark.base00}";
-        foreground = "${theme.dark.base06}";
+        background = "${base.base00}";
+        foreground = "${base.base06}";
 
-        cursor-color = "${theme.dark.base09}";
+        cursor-color = "${base.base09}";
         cursor-style = "bar";
         cursor-style-blink = false;
         adjust-cursor-thickness = "200%";
 
-        selection-background = "${theme.dark.base02}";
-        selection-foreground = "${theme.dark.base06}";
+        selection-background = "${base.base02}";
+        selection-foreground = "${base.base06}";
 
         background-opacity = 0.9;
         background-blur = 20;

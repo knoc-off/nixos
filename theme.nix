@@ -33,11 +33,6 @@ let
     mixColors
     ensureTextContrast;
 
-  # Hue Offset
-  # Rotates all accent + workspace hues uniformly (0.0-1.0, wraps).
-  # 0.0 = canonical red/orange/yellow/green/cyan/blue/purple/magenta.
-  hueOffset = 0.0;
-
   # Float modulo 1.0 -- wraps hue values into [0, 1).
   mod1 = x: x - builtins.floor x;
 
@@ -62,6 +57,7 @@ let
     accentS,       # Okhsl saturation for accents (0.0-1.0)
     accentStartL,  # starting lightness before contrast adjustment
     minContrast,   # minimum WCAG 2.1 contrast ratio (e.g. 4.5 for AA text)
+    hueOffset ? 0.0, # rotates all accent + workspace hues uniformly (0.0-1.0, wraps)
   }: let
 
     l_bg = getOkhslLightness bg;
@@ -136,6 +132,8 @@ let
   };
 
 in {
+  inherit mkTheme;
+
   # Dark theme -- vivid accents, per-hue lightness for WCAG AA (4.5:1)
   dark = mkTheme {
     bg = "1b2429";

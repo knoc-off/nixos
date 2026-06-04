@@ -63,16 +63,26 @@ in {
     noctaliaCmd = lib.getExe config.programs.noctalia-shell.package;
     noctalia = cmd: "${noctaliaCmd} ipc call ${cmd}";
 
-    mainMod = "SUPER";
-    workspaces = builtins.genList (i: i + 1) 9;
     displayScale = 1.171339564;
-  in {
-    imports = [
-      # ./plugins/hyprspace.nix        # needs upstream update for 0.54
-      # ./plugins/xtra-dispatchers.nix  # hyprland-plugins lagging behind 0.54 API
-      ./plugins/kinetic-scroll.nix
-    ];
 
+    kinetic-scroll = import ./plugins/kinetic-scroll.nix {inherit inputs pkgs lib;};
+    confined-floats = import ./plugins/confined-floats.nix {inherit inputs pkgs lib;};
+    scroll-overview = import ./plugins/scroll-overview.nix {inherit inputs pkgs lib;};
+
+    nixEnvLua = pkgs.writeText "nix-env.lua" ''
+      local M = {}
+      M.noctalia = "${noctaliaCmd}"
+      M.wpctl = "${pkgs.wireplumber}/bin/wpctl"
+      M.brightnessctl = "${lib.getExe pkgs.brightnessctl}"
+      M.playerctl = "${lib.getExe pkgs.playerctl}"
+      M.kinetic_scroll_so = "${kinetic-scroll}/lib/libhypr-kinetic-scroll.so"
+      M.confined_floats_so = "${confined-floats}/lib/libconfined-floats.so"
+      M.scroll_overview_so = "${scroll-overview}/lib/libscrolloverview.so"
+      M.qs_overview_cmd = "echo 'no'"
+      M.display_scale = ${toString displayScale}
+      return M
+    '';
+  in {
     # XWayland renders at 96 DPI without this -- compositor upscales (blurry)
     xresources.properties."Xft.dpi" = builtins.floor (96 * displayScale);
 
@@ -121,188 +131,17 @@ in {
       enable = true;
       package = hyprnix.hyprland;
       systemd.enable = false; # UWSM handles session/systemd integration
-
-      settings = {
-        ecosystem.no_update_news = true;
-
-        exec-once = [
-        ];
-
-        monitor = [
-          "eDP-1, preferred, 0x0, ${toString displayScale}"
-          ", preferred, auto-center-up, 1"
-        ];
-
-        general = {
-          layout = "scrolling";
-          gaps_out = "10 30 10 10";
-        };
-
-        scrolling = {
-          direction = "down";
-          column_width = 1.0;
-        };
-
-        cursor = {
-          warp_on_change_workspace = true;
-        };
-
-        misc = {
-          disable_hyprland_logo = true;
-          force_default_wallpaper = 0;
-          focus_on_activate = true;
-        };
-
-        gestures.gesture = [
-          "3, horizontal, workspace"
-          "3, up, dispatcher, layoutmsg, move +col"
-          "3, down, dispatcher, layoutmsg, move -col"
-        ];
-
-        decoration = {
-          rounding = 6;
-          blur = {
-            enabled = true;
-            size = 5;
-            passes = 2;
-          };
-        };
-
-        animations = {
-          enabled = true;
-          bezier = [
-            "snap, 0.2, 1, 0.3, 1"
-            "smooth, 0.25, 0.8, 0.25, 1"
-          ];
-          animation = [
-            "global, 1, 2, snap"
-            "windowsMove, 1, 4, smooth"
-            "workspaces, 1, 2, snap, slide"
-          ];
-        };
-
-        input = {
-          follow_mouse = 1;
-
-          repeat_rate = 25;
-          repeat_delay = 200;
-          touchpad = {
-            natural_scroll = true;
-            tap-to-click = true;
-            middle_button_emulation = true;
-
-            # maybe
-            # disable_while_typing = true;
-
-            scroll_factor = 0.25;
-          };
-        };
-
-        device = {
-          name = "logitech-usb-receiver-mouse";
-          accel_profile = "flat";
-        };
-
-        workspace = [
-          "w[tv1], gapsout:0, gapsin:0"
-          "f[1], gapsout:0, gapsin:0"
-        ];
-
-        windowrule = [
-          # No borders/rounding when single tiled window or fullscreen
-          "match:float 0, match:workspace w[tv1], border_size 0, rounding 0"
-          "match:float 0, match:workspace f[1], border_size 0, rounding 0"
-
-          "match:class org.gnome.Calculator, float on"
-          "match:class org.gnome.Settings, float on"
-          "match:class pavucontrol, float on"
-          "match:class nm-connection-editor, float on"
-          "match:class blueberry.py, float on"
-          "match:class xdg-desktop-portal, float on"
-          "match:class xdg-desktop-portal-gnome, float on"
-          "match:class xdg-desktop-portal-hyprland, float on"
-          "match:class org.gnome.Nautilus, float on"
-
-          # FreeCad:
-          "match:initial_class ^org\\.freecad\\.FreeCAD$, match:initial_title ^Customize$, float on, center on, size (monitor_w*0.75) (monitor_h*0.75), no_max_size on"
-          "match:class org\\.freecad\\.FreeCAD, match:title Expression editor, stay_focused on"
-          "match:class org\\.freecad\\.FreeCAD, match:title Expression Editor, stay_focused on"
-          # Freecad fixes transparency issue: https://github.com/hyprwm/Hyprland/discussions/13060
-          "match:class org\\.freecad\\.FreeCAD, force_rgbx on"
-          "match:class org\\.freecad\\.FreeCAD, opaque on"
-          "match:class org\\.freecad\\.FreeCAD, opacity 1.0 override 1.0 override"
-          "match:class org\\.freecad\\.FreeCAD, no_blur on"
-          # "match:class org\\.freecad\\.FreeCAD, match:title Preferences, stay_focused on"
-
-          # dragon-drop: sticky bottom-right drag-and-drop widget
-          "match:class dragon-drop, float on"
-          "match:class dragon-drop, pin on"
-          "match:class dragon-drop, no_initial_focus on"
-          "match:class dragon-drop, move (monitor_w-window_w-20) (monitor_h-window_h-20)"
-        ];
-
-        bind =
-          [
-            "${mainMod}, W, killactive"
-            "${mainMod} SHIFT, L, exec, ${noctalia "lockScreen lock"}"
-
-            "${mainMod}, left, movefocus, l"
-            "${mainMod}, right, movefocus, r"
-            "${mainMod}, up, layoutmsg, focus u"
-            "${mainMod}, down, layoutmsg, focus d"
-
-            "${mainMod}, h, movefocus, l"
-            "${mainMod}, l, movefocus, r"
-            "${mainMod}, k, layoutmsg, move -col"
-            "${mainMod}, j, layoutmsg, move +col"
-
-            # Scrolling layout
-            "${mainMod}, period, layoutmsg, move +col"
-            "${mainMod}, comma, layoutmsg, move -col"
-            "${mainMod} SHIFT, period, layoutmsg, swapcol r"
-            "${mainMod} SHIFT, comma, layoutmsg, swapcol l"
-            "${mainMod}, bracketright, layoutmsg, colresize +conf"
-            "${mainMod}, bracketleft, layoutmsg, colresize -conf"
-            "${mainMod}, f, layoutmsg, fit visible"
-            "${mainMod} SHIFT, f, layoutmsg, fit all"
-            # promote,
-            "${mainMod}, p, layoutmsg, promote"
-
-            # Runtime layout switching
-            "${mainMod} ALT, s, layoutmsg, setlayout, scrolling"
-            "${mainMod} ALT, d, layoutmsg, setlayout, dwindle"
-            "${mainMod} ALT, m, layoutmsg, setlayout, master"
-          ]
-          ++ (map (i: "${mainMod}, ${toString i}, focusworkspaceoncurrentmonitor, ${toString i}") workspaces)
-          ++ (map (i: "${mainMod} SHIFT, ${toString i}, movetoworkspace, ${toString i}") workspaces);
-
-        bindle = let
-          wpctl = "${pkgs.wireplumber}/bin/wpctl";
-          brightnessctl = lib.getExe pkgs.brightnessctl;
-        in [
-          ", XF86AudioRaiseVolume, exec, ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ 5%+ -l 1.0"
-          ", XF86AudioLowerVolume, exec, ${wpctl} set-volume @DEFAULT_AUDIO_SINK@ 5%-"
-          ", XF86MonBrightnessUp, exec, ${brightnessctl} set +5%"
-          ", XF86MonBrightnessDown, exec, ${brightnessctl} set 5%-"
-        ];
-
-        bindl = let
-          wpctl = "${pkgs.wireplumber}/bin/wpctl";
-        in [
-          ", XF86AudioMute, exec, ${wpctl} set-mute @DEFAULT_AUDIO_SINK@ toggle"
-          # Media
-          ", XF86AudioNext, exec, ${lib.getExe pkgs.playerctl} next"
-          ", XF86AudioPrev, exec, ${lib.getExe pkgs.playerctl} previous"
-          ", XF86AudioPlay, exec, ${lib.getExe pkgs.playerctl} play-pause"
-          ", XF86AudioPause, exec, ${lib.getExe pkgs.playerctl} play-pause"
-        ];
-
-        bindm = [
-          "${mainMod}, mouse:272, movewindow"
-          "${mainMod}, mouse:273, resizewindow"
-        ];
-      };
     };
+
+    xdg.configFile."hypr/hyprland.lua".source = ./hyprland.lua;
+    xdg.configFile."hypr/nix-env.lua".source = nixEnvLua;
+
+    home.activation.seedHyprUserConfig = lib.hm.dag.entryAfter ["writeBoundary"] ''
+      target="$HOME/.config/hypr/user.lua"
+      if [ ! -f "$target" ]; then
+        install -Dm644 ${./user-default.lua} "$target"
+      fi
+    '';
 
     systemd.user.services.workspace-wallpaper-daemon = let
       inherit (color-lib) setOkhslLightness setOkhslSaturation adjustOkhslHue;

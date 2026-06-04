@@ -444,6 +444,9 @@
       };
     };
 
+    xdg.configFile."opencode/plugins/ghostty-progress.js".source =
+      "${self}/pkgs/ghostty-progress/opencode-plugin.js";
+
     xdg.configFile."opencode/tui.json".text = builtins.toJSON {
       "$schema" = "https://opencode.ai/tui.json";
       theme = "customtheme";

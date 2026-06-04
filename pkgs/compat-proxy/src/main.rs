@@ -17,6 +17,7 @@ use compat_proxy::creds::CredentialReader;
 use compat_proxy::proxy;
 use compat_proxy::rules::{validate_rules, RuleSet, SchemaRegistry};
 use compat_proxy::session_log::{default_log_dir, SessionLogPool};
+use compat_proxy::usage::UsageState;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -120,6 +121,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         session_log,
         session_id,
         device_id,
+        usage: Arc::new(UsageState::default()),
     };
 
     // Set up SIGHUP handler for hot reload

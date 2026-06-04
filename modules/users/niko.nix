@@ -435,8 +435,6 @@
           upkgs.opencode
 
           upkgs.claude-code
-          fabric-ai
-          upkgs.gemini-cli
 
           gnome-calculator
 

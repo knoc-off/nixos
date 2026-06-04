@@ -1,0 +1,1 @@
+-- User overrides — edit freely, reload with: hyprctl reload
