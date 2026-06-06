@@ -20,6 +20,8 @@ in
       hash = "sha256-F3Jf47XuRWtXPeesImFnlJG5uiKdOcAYJNqQw6Uljlc=";
     };
 
+    patches = [./fix-overview-animation-save.patch];
+
     nativeBuildInputs = with pkgs; [cmake];
 
     buildInputs = with pkgs; [pango cairo lua5_4];

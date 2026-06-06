@@ -1,4 +1,5 @@
 local env = require("nix-env")
+local mainMod = "SUPER"
 
 -- Plugins
 -- hl.plugin.load(env.kinetic_scroll_so) -- disabled: crashes with Hyprland 0.55.2
@@ -89,6 +90,11 @@ hl.device({
 -- Gestures
 hl.gesture({ fingers = 3, direction = "horizontal", action = "scroll_move", scale = 1.0 })
 hl.gesture({ fingers = 3, direction = "vertical", action = "workspace" })
+hl.gesture({ fingers = 4, direction = "u", action = function()
+	if hl.plugin.scrolloverview then
+		hl.plugin.scrolloverview.overview("toggle")
+	end
+end })
 
 -- Auto-stack: if the previously focused window is alone in its column,
 -- stack the new window on top of it instead of creating a new column.
@@ -114,9 +120,6 @@ hl.on("window.open", function(window)
 		hl.dispatch(hl.dsp.layout("consume_or_expel prev"))
 	end
 end)
-
--- Keybind modifier
-local mainMod = "SUPER"
 
 -- Dropdown terminal (Ghostty)
 do
@@ -310,7 +313,7 @@ for i = 1, 9 do
 	hl.bind(mainMod .. " + SHIFT + " .. i, hl.dsp.window.move({ workspace = i }))
 end
 
--- Quickshell overview
+-- Overview
 hl.bind(mainMod .. " + TAB", function()
 	if hl.plugin.scrolloverview then
 		hl.plugin.scrolloverview.overview("toggle")
@@ -339,7 +342,7 @@ hl.bind("XF86AudioPlay", hl.dsp.exec_cmd(env.playerctl .. " play-pause"), { lock
 hl.bind("XF86AudioPause", hl.dsp.exec_cmd(env.playerctl .. " play-pause"), { locked = true })
 
 -- Mouse binds
-hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(),   { mouse = true })
+hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 -- Source mutable user overrides

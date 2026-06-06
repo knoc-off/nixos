@@ -186,7 +186,7 @@ in {
           capsuleColorKey = "none";
           backgroundOpacity = layerOpacity;
           useSeparateOpacity = true;
-          floating = true;
+          floating = false;
           marginVertical = 4;
           marginHorizontal = 4;
           frameThickness = 9;

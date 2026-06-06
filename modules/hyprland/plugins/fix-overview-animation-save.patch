@@ -1,0 +1,39 @@
+Split animation config save and override into two passes.
+
+applyWorkspaceAnimationOverrides() processes {workspaces, workspacesIn,
+workspacesOut} in a single loop that reads then overwrites each node.
+Because workspacesIn/workspacesOut inherit from workspaces via pValues,
+overwriting the parent on the first iteration corrupts the inherited
+values that children read on subsequent iterations -- they save style=""
+instead of the configured style.
+
+Fix by snapshotting all configs before overwriting any of them.
+
+--- a/scrollOverview.cpp
++++ b/scrollOverview.cpp
+@@ -2317,7 +2317,9 @@
+ 
+     savedWorkspaceAnimationConfigs.clear();
+ 
+-    for (const std::string name : {"workspaces", "workspacesIn", "workspacesOut"}) {
++    // Save all configs before overwriting any. Children inherit from parent
++    // via pValues, so overwriting the parent first corrupts child reads.
++    for (const std::string& name : {"workspaces", "workspacesIn", "workspacesOut"}) {
+         const auto CONFIG = Config::animationTree()->getAnimationPropertyConfig(name);
+         if (!CONFIG)
+             continue;
+@@ -2332,10 +2334,12 @@
+         saved.speed   = VALUES->internalSpeed > 0.F ? VALUES->internalSpeed : 1.F;
+         saved.bezier  = !VALUES->internalBezier.empty() ? VALUES->internalBezier : "default";
+         saved.style   = VALUES->internalStyle;
+-
+-        Config::animationTree()->setConfigForNode(name, false, 1.F, "default", "");
+     }
+ 
++    // Disable workspace animations now that all values are safely captured.
++    for (const auto& saved : savedWorkspaceAnimationConfigs)
++        Config::animationTree()->setConfigForNode(saved.name, false, 1.F, "default", "");
++
+     workspaceAnimationsOverridden = true;
+ }
+ 
