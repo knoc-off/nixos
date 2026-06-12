@@ -105,6 +105,20 @@ in {
   in {
     imports = [inputs.noctalia.homeModules.default];
 
+    # Double-tap caps -> toggle the noctalia launcher. The `dbl` alias is
+    # consumed by the keyLayers-generated kanata config (cap-<layer>), so this
+    # is the canonical home for the noctalia caps keybind. keyLayers options are
+    # declared by the keylayers module (imported in the user config).
+    keyLayers.extraAliases = lib.mkIf config.keyLayers.enable (let
+      noctalia' = cmd:
+        lib.concatStringsSep " " (
+          ["noctalia-shell" "ipc" "call"] ++ (lib.splitString " " cmd)
+        );
+    in ''
+      launcher (cmd ${noctalia' "launcher toggle"})
+      dbl (tap-dance-eager 250 (XX @launcher))
+    '');
+
     # Seed a mutable colors.json so noctalia can overwrite it at runtime
     # (the noctalia module's managed symlink is disabled below)
     home.activation.noctaliaColors = lib.hm.dag.entryAfter ["writeBoundary"] ''

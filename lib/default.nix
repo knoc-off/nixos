@@ -4,6 +4,9 @@ in {
   inherit color-lib;
   theme = import ../theme.nix {inherit lib color-lib;};
 
+  # Per-window kanata/hyprkan key layers: { mkKeyLayers; presets; }
+  keyLayers = import ./key-layers.nix {inherit lib;};
+
   # Recursively discover packages from a directory tree.
   # - foo.nix (not default.nix) -> { foo = pkgs.callPackage ./foo.nix {}; }
   # - bar/ with default.nix     -> { bar = pkgs.callPackage ./bar {}; }   (leaf package)

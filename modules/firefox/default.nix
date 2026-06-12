@@ -1,6 +1,7 @@
 { inputs, self, ... }:
 let
   inherit (self.lib) color-lib theme;
+  inherit (self.lib.keyLayers) presets;
 in {
   home = { pkgs, lib, config, ... }:
   let
@@ -57,6 +58,17 @@ in {
       ];
   in rec {
     home.sessionVariables = {BROWSER = "firefox";};
+
+    # caps-held shortcuts when a browser window is focused. The keyLayers
+    # option is declared once by the keylayers module (imported in the user
+    # config); this module only contributes its layer.
+    keyLayers.layers.browser = lib.mkIf config.keyLayers.enable {
+      classes = ["firefox" "chromium-browser"];
+      capsbinds = {
+        ctrl = presets.appCtrlKeys;
+        keys = presets.navKeys // {g = presets.docNavG;};
+      };
+    };
 
     programs.firefox = {
       enable = true;

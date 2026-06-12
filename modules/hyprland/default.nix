@@ -66,7 +66,7 @@ in {
     displayScale = 1.171339564;
 
     kinetic-scroll = import ./plugins/kinetic-scroll.nix {inherit inputs pkgs lib;};
-    confined-floats = import ./plugins/confined-floats.nix {inherit inputs pkgs lib;};
+    # confined-floats = import ./plugins/confined-floats.nix {inherit inputs pkgs lib;};
     scroll-overview = import ./plugins/scroll-overview.nix {inherit inputs pkgs lib;};
 
     nixEnvLua = pkgs.writeText "nix-env.lua" ''
@@ -76,7 +76,6 @@ in {
       M.brightnessctl = "${lib.getExe pkgs.brightnessctl}"
       M.playerctl = "${lib.getExe pkgs.playerctl}"
       M.kinetic_scroll_so = "${kinetic-scroll}/lib/libhypr-kinetic-scroll.so"
-      M.confined_floats_so = "${confined-floats}/lib/libconfined-floats.so"
       M.scroll_overview_so = "${scroll-overview}/lib/libscrolloverview.so"
       M.qs_overview_cmd = "echo 'no'"
       M.display_scale = ${toString displayScale}

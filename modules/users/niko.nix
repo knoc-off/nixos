@@ -14,12 +14,7 @@
       config = {allowUnfree = true;};
     };
 
-    mkKeyLayers = import ../../lib/key-layers.nix {inherit lib;};
-
-    noctalia' = cmd:
-      lib.concatStringsSep " " (
-        ["noctalia-shell" "ipc" "call"] ++ (lib.splitString " " cmd)
-      );
+    inherit (self.lib.keyLayers) presets;
 
     type-date = pkgs.writeShellApplication {
       name = "type-date";
@@ -30,82 +25,6 @@
         sleep 0.05
         wtype -M ctrl v -m ctrl
       '';
-    };
-
-    # Not ideal with how its handled because it will act like caps is being clicked, and not held.
-    navKeys = {
-      h = {key = "left";};
-      j = {key = "down";};
-      k = {key = "up";};
-      l = {key = "right";};
-      d = {raw = "(multi (release-key rmet) (mwheel-accel-down 50 150 1.05 0.80))";};
-      u = {raw = "(multi (release-key rmet) (mwheel-accel-up 50 150 1.05 0.80))";};
-    };
-
-    keyLayers = mkKeyLayers {
-      base = {
-        capsbinds = {
-          ctrl = ["a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
-          keys = navKeys;
-        };
-      };
-      slack = {
-        classes = ["Slack"];
-        capsbinds = {
-          ctrl = ["enter" "tab" "a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
-          keys =
-            navKeys
-            // {
-              g = {raw = "(tap-dance 200 ((multi (release-key rmet) C-end) (multi (release-key rmet) C-home)))";};
-            };
-        };
-      };
-      browser = {
-        classes = ["firefox" "chromium-browser"];
-        capsbinds = {
-          ctrl = ["enter" "tab" "a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
-          keys =
-            navKeys
-            // {
-              g = {raw = "(tap-dance 200 ((multi (release-key rmet) C-end) (multi (release-key rmet) C-home)))";};
-            };
-        };
-      };
-      freecadExprEditor = {
-        matchers = [
-          {
-            class = "org.freecad.FreeCAD";
-            title = "Expression editor";
-          }
-        ];
-        capsbinds = {
-          ctrl = ["enter" "tab" "a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
-          keys =
-            navKeys
-            // {
-              g = {raw = "(tap-dance 200 ((multi (release-key rmet) C-end) (multi (release-key rmet) C-home)))";};
-            };
-        };
-        binds = {
-          tab = {
-            default = "down";
-            shift = "up";
-          };
-        };
-      };
-      terminal = {
-        classes = ["com.mitchellh.ghostty" "foot"];
-        capsbinds = {
-          alt = ["e"];
-          shift = [";"];
-          keys =
-            navKeys
-            // {
-              d = {raw = "(multi (release-key rmet) (mwheel-down 50 1 ))";};
-              u = {raw = "(multi (release-key rmet) (mwheel-up 50 1 ))";};
-            };
-        };
-      };
     };
   in {
     imports = [inputs.home-manager.nixosModules.home-manager];
@@ -276,6 +195,18 @@
 
           self.homeModules.kanata
           self.homeModules.hyprkan
+          self.homeModules.keylayers
+          self.homeModules.slack
+          self.homeModules.freecad
+          {
+            keyLayers = {
+              enable = true;
+              layers.base.capsbinds = {
+                ctrl = presets.baseCtrlKeys;
+                keys = presets.navKeys;
+              };
+            };
+          }
           {
             programs.hyprkan = {
               package = self.packages.${pkgs.stdenv.hostPlatform.system}.hyprkan;
@@ -286,8 +217,6 @@
                 "--port"
                 "52545"
               ];
-
-              rules = keyLayers.hyprkanRules;
             };
           }
 
@@ -303,11 +232,6 @@
                 ];
                 port = 52545;
                 extraDefCfg = "danger-enable-cmd yes process-unmapped-keys yes";
-
-                config = keyLayers.kanataConfig ''
-                  launcher (cmd ${noctalia' "launcher toggle"})
-                  dbl (tap-dance-eager 250 (XX @launcher))
-                '';
               };
             };
           }
@@ -401,6 +325,12 @@
         home.sessionVariables = {
           LINEAR_TEAM_ID = "int";
           LINEAR_ISSUE_SORT = "priority";
+
+          # Build Rust artifacts in RAM (tmpfs at /cargo-ram, defined in the
+          # thinkpad-work system config) to keep the build write storm off the
+          # encrypted btrfs NVMe. rust-analyzer is unaffected: it has its own
+          # on-disk targetDir and CARGO_TARGET_DIR isn't in lspmux pass_environment.
+          CARGO_TARGET_DIR = "/cargo-ram/target";
         };
 
         services = {
@@ -423,8 +353,6 @@
         home.packages = with pkgs; [
           upkgs.foliate
           upkgs.readest
-
-          upkgs.slack
 
           self.packages.${pkgs.stdenv.hostPlatform.system}.opencode-bubblewrap
           self.packages.${pkgs.stdenv.hostPlatform.system}.neovim.default
@@ -450,8 +378,6 @@
           piper
 
           sops # should maybe source this package somewhere common.
-
-          upkgs.freecad-wayland
         ];
 
         home.stateVersion = "23.05";

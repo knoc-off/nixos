@@ -313,6 +313,14 @@ in
       ${entry}
     ''))
 
+    # Persist git identity, aliases, and global ignores into the jail.
+    # Read-only: the agent gets your config but can't rewrite it to add a
+    # remote/credential or change identity. No SSH key or credential helper
+    # is ever mounted, so authenticated pushes to real remotes remain
+    # impossible — the credential boundary is the enforcement, not config.
+    (try-ro-bind (noescape "\"$HOME/.config/git\"") (noescape "~/.config/git"))
+    (try-ro-bind (noescape "\"$HOME/.gitignore\"") (noescape "~/.gitignore"))
+
     (try-rw-bind (noescape "\"$HOME/.config/opencode\"") (noescape "~/.config/opencode"))
     (try-rw-bind (noescape "\"$HOME/.cache/opencode\"") (noescape "~/.cache/opencode"))
     (try-rw-bind (noescape "\"$HOME/.cache/uv\"") (noescape "~/.cache/uv"))

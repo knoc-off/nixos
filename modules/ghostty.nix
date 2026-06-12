@@ -2,9 +2,11 @@
   home = {
     lib,
     pkgs,
+    config,
     ...
   }: let
     inherit (self.lib) color-lib theme;
+    inherit (self.lib.keyLayers) presets;
     inherit (color-lib) setOkhslLightness setOkhslSaturation adjustOkhslHue;
     inherit (theme) mkTheme;
     inherit (lib.lists) genList;
@@ -101,6 +103,22 @@
       TERMINAL = "ghostty";
     };
 
+    # caps-held shortcuts when a terminal window is focused. d/u scroll the
+    # terminal buffer instead of the accelerated mouse wheel used elsewhere.
+    keyLayers.layers.terminal = lib.mkIf config.keyLayers.enable {
+      classes = ["com.mitchellh.ghostty" "foot"];
+      capsbinds = {
+        alt = ["e"];
+        shift = [";"];
+        keys =
+          presets.navKeys
+          // {
+            d = {raw = "(multi (release-key rmet) (mwheel-down 50 1 ))";};
+            u = {raw = "(multi (release-key rmet) (mwheel-up 50 1 ))";};
+          };
+      };
+    };
+
     home.packages = [
       # ghostty-theme-rotate
     ];
@@ -163,7 +181,7 @@
             "clear"
             "super+c=copy_to_clipboard"
             "super+v=paste_from_clipboard"
-            "super+a=select_all"
+            "super+a=select_all" # change: end-of-line or select last cmd output?
             "super+q=quit"
           ]
           ++ lib.optionals isLinux [

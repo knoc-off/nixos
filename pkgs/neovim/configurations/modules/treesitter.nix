@@ -5,6 +5,19 @@
     settings = {
       highlight.enable = true;
       indent.enable = true;
+
+      # Grow/shrink a visual selection along the treesitter tree.
+      # <CR> selects the current node and expands node-by-node; + jumps to the
+      # enclosing scope; <BS> shrinks. Closest match to the IBL scope highlight.
+      incremental_selection = {
+        enable = true;
+        keymaps = {
+          init_selection = "<CR>";
+          node_incremental = "<CR>";
+          scope_incremental = "+";
+          node_decremental = "<BS>";
+        };
+      };
     };
   };
 

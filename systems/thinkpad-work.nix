@@ -132,8 +132,25 @@ in {
   disks.btrfsLuks = {
     enable = true;
     device = "/dev/nvme0n1";
-    swapSize = "32G";
-    hibernation = true;
+    # Small disk swap as an OOM fallback only; zram (below) is the primary swap.
+    swapSize = "8G";
+    hibernation = false;
+  };
+
+  # Compressed in-RAM swap. Primary swap path now that hibernation is disabled --
+  # keeps swap traffic off the NVMe (which stalls waking from deep power states).
+  zramSwap = {
+    enable = true;
+    algorithm = "zstd";
+    memoryPercent = 50;
+    priority = 100;
+  };
+
+  # Throwaway cargo build artifacts in RAM -- keeps the ~100 MB/s build write
+  # storm off the encrypted btrfs NVMe. Volatile: lost on reboot (full rebuild).
+  fileSystems."/cargo-ram" = {
+    fsType = "tmpfs";
+    options = ["size=32G" "uid=1000" "gid=100" "mode=0755"];
   };
 
   programs = {
@@ -170,10 +187,6 @@ in {
 
   programs.steam.enable = true;
 
-  # Suspend-then-hibernate: suspend to RAM first, auto-hibernate after 30 min
-  systemd.sleep.extraConfig = ''
-    HibernateDelaySec=30min
-  '';
   services = {
     gvfs.enable = true;
     devmon.enable = true;
@@ -182,7 +195,7 @@ in {
     accounts-daemon.enable = true;
 
     logind.settings.Login = {
-      HandleLidSwitch = "suspend-then-hibernate";
+      HandleLidSwitch = "suspend";
       HandlePowerKey = "lock";
       HandlePowerKeyLongPress = "poweroff";
     };
@@ -321,18 +334,17 @@ in {
     kernelPackages = pkgs.linuxPackages_latest;
     kernelParams = [
       "usbcore.autosuspend=-1"
-      "resume=/dev/mapper/crypted"
-      # Physical offset of /.swapvol/swapfile within the btrfs filesystem.
-      # Obtain with: sudo btrfs inspect-internal map-swapfile -r /.swapvol/swapfile
-      # Must be updated if the swapfile is ever recreated (e.g. swapSize changes).
-      "resume_offset=533760"
+      # SK Hynix HFS001TFM9X179N hangs for seconds waking from deep NVMe power
+      # states (APST); disable them to stop intermittent whole-system freezes
+      # (notably during bursty git I/O after the drive has gone idle).
+      "nvme_core.default_ps_max_latency_us=0"
       # Let i915 claim the Arrow Lake-P GPU normally no force_probe
       "i915.enable_psr=0" # Disable Panel Self Refresh - mitigates atomic update failures and freezes on Arrow Lake-P
     ];
     kernel.sysctl = {
-      # Minimize swap usage -- plenty of RAM available; only swap under real
-      # memory pressure.  Keeps the slow btrfs swap file for hibernation only.
-      "vm.swappiness" = 1;
+      # zram is fast RAM-backed swap, so prefer swapping to it readily rather
+      # than holding cold anonymous pages in RAM. (Higher = use swap sooner.)
+      "vm.swappiness" = 100;
       # Reclaim vfs caches less aggressively (default 100 = equal pressure on
       # page-cache vs dentries/inodes; 50 = keep more dentries/inodes cached)
       "vm.vfs_cache_pressure" = 50;

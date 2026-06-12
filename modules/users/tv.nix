@@ -7,42 +7,9 @@
       config = { allowUnfree = true; };
     };
 
-    noctalia' = cmd:
-      lib.concatStringsSep " " (
-        ["noctalia-shell" "ipc" "call"] ++ (lib.splitString " " cmd)
-      );
-
-    mkKeyLayers = import ../../lib/key-layers.nix { inherit lib; };
-
-    navKeys = {
-      h = { key = "left"; };
-      j = { key = "down"; };
-      k = { key = "up"; };
-      l = { key = "right"; };
-      d = { raw = "(multi (release-key rmet) (mwheel-accel-down 50 150 1.05 0.80))"; };
-      u = { raw = "(multi (release-key rmet) (mwheel-accel-up 50 150 1.05 0.80))"; };
-    };
+    inherit (self.lib.keyLayers) presets;
 
     # maybe add things to spawn certain programs, etc?
-    keyLayers = mkKeyLayers {
-      base = {
-        capsbinds = {
-          ctrl = ["a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
-          keys = navKeys;
-        };
-      };
-      browser = {
-        classes = ["firefox" "chromium-browser"];
-        capsbinds = {
-          ctrl = ["enter" "tab" "a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
-          keys =
-            navKeys
-            // {
-              g = { raw = "(tap-dance 200 ((multi (release-key rmet) C-end) (multi (release-key rmet) C-home)))"; };
-            };
-        };
-      };
-    };
 
     toMimeApps = attrs:
       builtins.foldl' (acc: topLevelName: let
@@ -80,6 +47,25 @@
 
           self.homeModules.kanata
           self.homeModules.hyprkan
+          self.homeModules.keylayers
+          {
+            keyLayers = {
+              enable = true;
+              layers.base.capsbinds = {
+                ctrl = presets.baseCtrlKeys;
+                keys = presets.navKeys;
+              };
+              # tv uses native programs.firefox (not the custom firefox module
+              # that owns the browser layer), so declare it here.
+              layers.browser = {
+                classes = ["firefox" "chromium-browser"];
+                capsbinds = {
+                  ctrl = presets.appCtrlKeys;
+                  keys = presets.navKeys // {g = presets.docNavG;};
+                };
+              };
+            };
+          }
           {
             programs.hyprkan = {
               package = self.packages.${pkgs.stdenv.hostPlatform.system}.hyprkan;
@@ -90,8 +76,6 @@
                 "--port"
                 "52545"
               ];
-
-              rules = keyLayers.hyprkanRules;
             };
           }
 
@@ -107,11 +91,6 @@
                 ];
                 port = 52545;
                 extraDefCfg = "danger-enable-cmd yes process-unmapped-keys yes";
-
-                config = keyLayers.kanataConfig ''
-                  launcher (cmd ${noctalia' "launcher toggle"})
-                  dbl (tap-dance-eager 250 (XX @launcher))
-                '';
               };
             };
           }

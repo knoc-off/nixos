@@ -61,12 +61,6 @@
       action = lib.nixvim.mkRaw "function() require('gitsigns').blame_line({ full = true }) end";
       options = { silent = true; desc = "Blame line"; };
     }
-    {
-      mode = "n";
-      key = "<leader>gd";
-      action = lib.nixvim.mkRaw "function() require('gitsigns').diffthis() end";
-      options = { silent = true; desc = "Diff buffer"; };
-    }
 
     # GitState comparison controls
     {

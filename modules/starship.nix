@@ -1,6 +1,11 @@
-{ self, ... }: {
+{ self, inputs, ... }: {
   home = { pkgs, lib, ... }:
   let
+    gitBin = "${pkgs.git}/bin/git";
+    jqBin = "${pkgs.jq}/bin/jq";
+    grepBin = "${pkgs.gnugrep}/bin/grep";
+    sedBin = "${pkgs.gnused}/bin/sed";
+    linearBin = "${inputs.nelly.packages.${pkgs.stdenv.hostPlatform.system}.linear-cli}/bin/linear";
     branchColors = [
       "#e06c75"
       "#98c379"
@@ -31,7 +36,7 @@
 
       my @colors = ${colorArrayPerl};
 
-      my $gitdir = `git rev-parse --git-dir 2>/dev/null`;
+      my $gitdir = `${gitBin} rev-parse --git-dir 2>/dev/null`;
       chomp $gitdir;
       exit 1 unless length $gitdir;
 
@@ -69,13 +74,13 @@
     '';
 
     linearTicket = pkgs.writeShellScriptBin "linear-ticket" ''
-      branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
-      ticket=$(echo "$branch" | grep -oiP '^[A-Z]+-\d+') || exit 0
+      branch=$(${gitBin} rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
+      ticket=$(echo "$branch" | ${grepBin} -oiP '^[A-Z]+-\d+') || exit 0
 
-      json=$(linear i v "$ticket" -j 2>/dev/null) || exit 0
+      json=$(${linearBin} i v "$ticket" -j 2>/dev/null) || exit 0
 
-      state_color=$(echo "$json" | jq -r '.state.color // empty')
-      linear_url=$(echo "$json" | jq -r '.url // empty')
+      state_color=$(echo "$json" | ${jqBin} -r '.state.color // empty')
+      linear_url=$(echo "$json" | ${jqBin} -r '.url // empty')
       [ -z "$state_color" ] || [ -z "$linear_url" ] && exit 0
 
       r=$(printf '%d' "0x''${state_color:1:2}")
@@ -87,9 +92,9 @@
     '';
 
     upstreamLink = pkgs.writeShellScriptBin "upstream-link" ''
-      branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
-      remote_url=$(git remote get-url origin 2>/dev/null) || exit 0
-      repo=$(echo "$remote_url" | sed -E 's|.*github\.com[:/]||; s|\.git$||')
+      branch=$(${gitBin} rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
+      remote_url=$(${gitBin} remote get-url origin 2>/dev/null) || exit 0
+      repo=$(echo "$remote_url" | ${sedBin} -E 's|.*github\.com[:/]||; s|\.git$||')
 
       json=$(${pkgs.gh}/bin/gh pr view --json url,state 2>/dev/null) || {
         create_url="https://github.com/$repo/compare/$branch?expand=1"
@@ -97,8 +102,8 @@
         exit 0
       }
 
-      url=$(echo "$json" | jq -r '.url' | tr -d '\n')
-      state=$(echo "$json" | jq -r '.state' | tr -d '\n')
+      url=$(echo "$json" | ${jqBin} -r '.url' | tr -d '\n')
+      state=$(echo "$json" | ${jqBin} -r '.state' | tr -d '\n')
       case "$state" in
         MERGED) color="38;2;163;113;247" ;;
         OPEN)   color="38;2;63;185;80"   ;;
@@ -137,7 +142,7 @@
             };
             linear_ticket = {
               run = "${linearTicket}/bin/linear-ticket"; # or the resolved store path;
-              check = "git rev-parse --abbrev-ref HEAD";
+              check = "${gitBin} rev-parse --abbrev-ref HEAD";
               check_interval = "5m";
               watch = [".git/HEAD"];
               env = ["CWD"];
@@ -146,7 +151,7 @@
             };
             upstream_link = {
               run = "${upstreamLink}/bin/upstream-link";
-              check = "git rev-parse --abbrev-ref HEAD";
+              check = "${gitBin} rev-parse --abbrev-ref HEAD";
               check_interval = "5m";
               interval = "5m"; # also poll — PR might be created while on the same branch;
               watch = [".git/HEAD"];

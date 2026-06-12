@@ -218,6 +218,14 @@ in {
     };
   };
 
+  # Sync IBL bright scope highlight to the rainbow-delimiters bracket color at
+  # the scope boundary, so the scope guide shifts through the rainbow per depth
+  # instead of always using the first list entry (red).
+  extraConfigLua = ''
+    local hooks = require("ibl.hooks")
+    hooks.register(hooks.type.SCOPE_HIGHLIGHT, hooks.builtin.scope_highlight_from_extmark)
+  '';
+
   # vim-matchup - enhanced % matching with highlighting
   # Treesitter integration is automatic in Neovim
   plugins.vim-matchup.enable = true;

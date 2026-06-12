@@ -221,8 +221,31 @@
   in
     # keys takes priority over bulk
     bulkEntries // keyEntries;
-in
-  layers: let
+
+  # Shared building blocks reused across user/app layers. Exported as
+  # `presets` so app modules can compose layers without copy-pasting.
+  presets = {
+    # caps-held navigation: hjkl arrows + d/u accelerated mouse wheel.
+    navKeys = {
+      h = {key = "left";};
+      j = {key = "down";};
+      k = {key = "up";};
+      l = {key = "right";};
+      d = {raw = "(multi (release-key rmet) (mwheel-accel-down 50 150 1.05 0.80))";};
+      u = {raw = "(multi (release-key rmet) (mwheel-accel-up 50 150 1.05 0.80))";};
+    };
+
+    # Standard ctrl-shortcut letters for the base (fallback) layer.
+    baseCtrlKeys = ["a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
+
+    # App layers also forward ctrl+enter and ctrl+tab.
+    appCtrlKeys = ["enter" "tab" "a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
+
+    # caps+g tap-dance: single -> C-end, double -> C-home (doc top/bottom).
+    docNavG = {raw = "(tap-dance 200 ((multi (release-key rmet) C-end) (multi (release-key rmet) C-home)))";};
+  };
+
+  mkKeyLayers = layers: let
     layerNames = builtins.attrNames layers;
 
     # Normalize capsbinds for all layers
@@ -366,4 +389,7 @@ in
 
       ${lib.concatStringsSep "\n    " (map (n: "(deflayermap (shortcuts-${n})\n      ${mkCapsLayermap normalizedCaps.${n}}\n    )") layerNames)}
     '';
-  }
+  };
+in {
+  inherit mkKeyLayers presets;
+}

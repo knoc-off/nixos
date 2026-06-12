@@ -27,7 +27,7 @@ hl.config({
 
 	scrolling = {
 		direction = "right",
-		column_width = 1.0,
+		column_width = 0.5,
 	},
 
 	cursor = {
@@ -90,36 +90,212 @@ hl.device({
 -- Gestures
 hl.gesture({ fingers = 3, direction = "horizontal", action = "scroll_move", scale = 1.0 })
 hl.gesture({ fingers = 3, direction = "vertical", action = "workspace" })
-hl.gesture({ fingers = 4, direction = "u", action = function()
-	if hl.plugin.scrolloverview then
-		hl.plugin.scrolloverview.overview("toggle")
-	end
-end })
+hl.gesture({
+	fingers = 4,
+	direction = "u",
+	action = function()
+		if hl.plugin.scrolloverview then
+			hl.plugin.scrolloverview.overview("toggle")
+		end
+	end,
+})
 
--- Auto-stack: if the previously focused window is alone in its column,
--- stack the new window on top of it instead of creating a new column.
+-- Window stacking: when a new window stacks into the focused column, stack it
+-- onto the lone neighbour AND cancel the spurious viewport slide that 0.55.2's
+-- re-fit causes (this version has no inhibit_scroll to suppress it). The anchor
+-- window's tape position never changes when something stacks below it, so any
+-- change in its on-screen x IS exactly the unwanted offset delta -- and since it
+-- all happens in one frame, correcting it leaves zero visible movement. New
+-- windows that get their own column are left alone (that shift is wanted).
+local pendingAnchor = nil
+
+hl.on("window.open_early", function(w)
+	pendingAnchor = nil
+	if not w or w.floating then
+		return
+	end
+	local a = hl.get_active_window()
+	if not a or a.floating or not a.at then
+		return
+	end
+	pendingAnchor = { win = a, x = a.at.x }
+end)
+
 hl.on("window.open", function(window)
+	local anchor = pendingAnchor
+	pendingAnchor = nil
 	if window.floating then
 		return
 	end
 
+	-- Auto-stack: if the previously focused window is alone in its column,
+	-- stack the new window on top of it instead of creating a new column.
 	local prev = hl.get_last_window()
-	if not prev or prev.floating then
-		return
+	if prev and not prev.floating then
+		local pl = prev.layout
+		if pl and pl.name == "scrolling" and pl.column and #pl.column.windows == 1 then
+			hl.dispatch(hl.dsp.layout("consume_or_expel prev"))
+		end
 	end
 
-	local layout = prev.layout
-	if not layout or layout.name ~= "scrolling" then
+	-- No-shift: only when the new window actually stacked into an existing
+	-- column, cancel the offset the re-fit introduced.
+	if not anchor then
 		return
 	end
-	if not layout.column then
+	local nl = window.layout
+	if not nl or nl.name ~= "scrolling" or not nl.column or #nl.column.windows < 2 then
 		return
 	end
-
-	if #layout.column.windows == 1 then
-		hl.dispatch(hl.dsp.layout("consume_or_expel prev"))
+	local at = anchor.win.at
+	if not at then
+		return
+	end
+	local delta = at.x - anchor.x
+	if delta ~= 0 then
+		hl.dispatch(hl.dsp.layout("move " .. -delta))
 	end
 end)
+
+-- Fraction of a window visible horizontally on its own monitor. Scrolling is
+-- horizontal and tiled windows always span the monitor height, so vertical
+-- can't clip them. Window .size uses keys x=width, y=height; monitor exposes
+-- .x and .width.
+local function visibleFraction(w)
+	if not w then
+		return 0
+	end
+	local at, sz, mon = w.at, w.size, w.monitor
+	if not at or not sz or not mon then
+		return 0
+	end
+	local width = sz.x
+	if width <= 0 then
+		return 0
+	end
+	local left = math.max(at.x, mon.x)
+	local right = math.min(at.x + width, mon.x + mon.width)
+	return (right - left) / width
+end
+
+-- hl.dsp.focus warps the cursor to the window's middle (CA::focus ->
+-- warpCursor, force=false), which would yank the pointer mid-motion. no_warps
+-- honours that for non-forced warps, so force it on just for the redirect and
+-- restore the user's value immediately after.
+local function focusNoWarp(target)
+	local prevNoWarps = hl.get_config("cursor:no_warps")
+	hl.config({ cursor = { no_warps = true } })
+	hl.dispatch(hl.dsp.focus({ window = target }))
+	hl.config({ cursor = { no_warps = prevNoWarps } })
+end
+
+-- Bar-hover refocus (1/2): as the cursor moves toward the left noctalia bar it
+-- crosses a window that's ~99% off-screen; follow-mouse focuses it
+-- (window.active, reason FFM) without scrolling to it. The next click
+-- HARD-focuses that active window and yanks the viewport to it. Fix: the moment
+-- follow-mouse makes a mostly-off-screen window active, hand focus back to the
+-- previous window. Pointer (FFM) only; keyboard nav still scrolls. The later
+-- click re-focus emits no window.active (same window), so FFM is the only hook.
+local FOCUS_REASON_FFM = 1 -- Desktop::eFocusReason: 0=UNKNOWN 1=FFM 2=KEYBIND ...
+
+hl.on("window.active", function(w, reason)
+	if reason ~= FOCUS_REASON_FFM then
+		return
+	end
+	if not w or w.floating or visibleFraction(w) >= 0.1 then -- >10% visible = not "mostly off"
+		return
+	end
+	local prev = hl.get_last_window()
+	if not prev then
+		return
+	end
+	focusNoWarp(prev)
+end)
+
+-- Bar-hover refocus (2/2): the click-recenter only jumps when the focused
+-- window is (mostly) off-screen -- the click hard-focuses it and yanks the
+-- viewport over. A fully on-screen window has nothing to chase, so recentering
+-- it is a no-op. Watch for the cursor crossing onto a shell region and, on that
+-- off->on transition, if the active window isn't fully on-screen, hand focus to
+-- one that is. Fires once on entry; once a widget popup (an xdg_popup invisible
+-- to get_layers) grabs input the compositor suppresses follow-mouse anyway.
+local SHELL_NS = {
+	"noctalia-bar-content-",
+	"noctalia-bar-trigger-",
+	"noctalia-bar-exclusion-",
+	"noctalia-popupmenu-",
+	"noctalia-dock",
+	"noctalia-notifications-",
+	"noctalia-osd-",
+	"noctalia-toast-",
+}
+local SHELL_MARGIN = 12 -- px slop so the bar's inner edge doesn't flicker detection
+
+local function matchesAny(ns, set)
+	for _, pfx in ipairs(set) do
+		if ns:sub(1, #pfx) == pfx then
+			return true
+		end
+	end
+	return false
+end
+
+local function cursorOnShell()
+	local c = hl.get_cursor_pos()
+	if not c then
+		return false
+	end
+	for _, ls in ipairs(hl.get_layers()) do
+		if
+			ls.mapped
+			and matchesAny(ls.namespace or "", SHELL_NS)
+			and c.x >= ls.x - SHELL_MARGIN
+			and c.x < ls.x + ls.w + SHELL_MARGIN
+			and c.y >= ls.y - SHELL_MARGIN
+			and c.y < ls.y + ls.h + SHELL_MARGIN
+		then
+			return true
+		end
+	end
+	return false
+end
+
+-- Prefer the last-focused window if it's fully on-screen; otherwise any
+-- fully-on-screen tiled window on the active workspace. get_windows defaults to
+-- mapped=true, and the workspace filter keeps us to the focused monitor's
+-- current workspace -- so hidden/other-workspace windows can never be picked.
+local function pickOnScreen(active)
+	local prev = hl.get_last_window()
+	if prev and not prev.floating and prev.visible and prev.address ~= active.address and visibleFraction(prev) >= 0.99 then
+		return prev
+	end
+	local ws = hl.get_active_workspace()
+	local cands = ws and hl.get_windows({ floating = false, workspace = ws }) or hl.get_windows({ floating = false })
+	for _, w in ipairs(cands) do
+		if w.address ~= active.address and visibleFraction(w) >= 0.99 then
+			return w
+		end
+	end
+	return nil
+end
+
+local wasOnShell = false
+
+hl.timer(function()
+	local onShell = cursorOnShell()
+	-- Only act on the off->on transition: the moment the cursor first enters a
+	-- shell region. While it lingers, do nothing.
+	if onShell and not wasOnShell then
+		local active = hl.get_active_window()
+		if active and not active.floating and visibleFraction(active) < 0.99 then
+			local target = pickOnScreen(active)
+			if target then
+				focusNoWarp(target)
+			end
+		end
+	end
+	wasOnShell = onShell
+end, { timeout = 50, type = "repeat" })
 
 -- Dropdown terminal (Ghostty)
 do
