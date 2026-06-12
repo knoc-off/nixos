@@ -21,6 +21,7 @@
         secrets = {
           "services/website/env" = {};
           "services/kitchenowl/jwt-secret" = {};
+          "services/ntfy/env" = {};
           "wireguard/private-key" = {};
           "cert-sync/ssh-key" = {
             owner = "root";
@@ -37,6 +38,7 @@
     ./services/oauth2-proxy.nix
     ./services/kitchenowl.nix
     ./services/trilium.nix
+    ./services/ntfy.nix
 
     ./services/wireguard.nix
     {
@@ -94,6 +96,7 @@
     dates = "weekly";
     options = "--delete-older-than 30d";
   };
+  nix.settings.experimental-features = ["nix-command" "flakes"];
 
   networking.hostName = "oink";
   networking.firewall = {
@@ -130,6 +133,11 @@
     import security-headers
     import lan-only
     reverse_proxy 10.100.0.2:8123
+  '';
+
+  services.caddy.virtualHosts."ntfy.niko.ink".extraConfig = ''
+    import security-headers
+    reverse_proxy localhost:2586
   '';
 
   # Cap journal size so it doesn't eat disk over time

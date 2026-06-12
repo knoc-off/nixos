@@ -1,6 +1,14 @@
-{config, pkgs, ...}: {
+{
+  config,
+  pkgs,
+  inputs,
+  ...
+}: let
+  upkgs = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system};
+in {
   services.crowdsec = {
     enable = true;
+    package = upkgs.crowdsec;
     autoUpdateService = true;
 
     settings = {

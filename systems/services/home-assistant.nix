@@ -90,17 +90,8 @@ in {
 
       # MQTT configured via HA UI -- declarative config conflicts with it
 
-      notify = [
-        {
-          name = "all_phones";
-          platform = "group";
-          services = [
-            {service = "mobile_app_pixel_10";}
-            {service = "mobile_app_pixel_7a";}
-            {service = "mobile_app_eileens_iphone";}
-          ];
-        }
-      ];
+      # Notifications are sent directly to individual mobile apps
+      # by the cat-doorbell service (NOTIFY_SERVICES env var).
     };
   };
 

@@ -9,7 +9,12 @@ async fn main() -> Result<()> {
 
     let sensor = rt.env_or("SENSOR_TOPIC", "zigbee2mqtt/motion_sensor");
     let ha_url = rt.env_or("HA_URL", "http://localhost:8123");
-    let notify_service = rt.env_or("NOTIFY_SERVICE", "notify.mobile_app_phone");
+    let notify_services: Vec<String> = rt
+        .env_or("NOTIFY_SERVICES", "notify.mobile_app_phone")
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
     let cooldown: u64 = rt.env_parse("COOLDOWN_SECONDS", 300);
     let title = rt.env_or("NOTIFICATION_TITLE", "Cat Doorbell");
 
@@ -52,13 +57,19 @@ async fn main() -> Result<()> {
                     }
 
                     let message = format!("Movement detected ({motion})");
-                    match send_notification(&ha_url, &ha_token, &notify_service, &title, &message) {
-                        Ok(()) => {
-                            last_notification = Some(Instant::now());
-                            notified_this_session = true;
-                            tracing::info!(%message, "notification sent");
+                    let mut any_ok = false;
+                    for svc in &notify_services {
+                        match send_notification(&ha_url, &ha_token, svc, &title, &message) {
+                            Ok(()) => {
+                                tracing::info!(service = %svc, %message, "notification sent");
+                                any_ok = true;
+                            }
+                            Err(e) => tracing::warn!(service = %svc, "notification failed: {e}"),
                         }
-                        Err(e) => tracing::error!("notification failed: {e}"),
+                    }
+                    if any_ok {
+                        last_notification = Some(Instant::now());
+                        notified_this_session = true;
                     }
                 }
             }

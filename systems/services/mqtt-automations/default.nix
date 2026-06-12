@@ -222,7 +222,7 @@
       env = {
         SENSOR_TOPIC = "zigbee2mqtt/motion_sensor";
         HA_URL = "http://localhost:8123";
-        NOTIFY_SERVICE = "notify.all_phones";
+        NOTIFY_SERVICES = "notify.mobile_app_pixel_10,notify.mobile_app_pixelsticks2,notify.mobile_app_pixel_7a,notify.mobile_app_eileens_iphone";
         COOLDOWN_SECONDS = "300";
         NOTIFICATION_TITLE = "Cat Doorbell";
         HA_TOKEN_FILE = config.sops.secrets."ha/api_token".path;
