@@ -22,11 +22,6 @@
           "services/website/env" = {};
           "services/kitchenowl/jwt-secret" = {};
           "services/ntfy/env" = {};
-          "wireguard/private-key" = {};
-          "cert-sync/ssh-key" = {
-            owner = "root";
-            mode = "0400";
-          };
         };
       };
     }
@@ -40,47 +35,10 @@
     ./services/trilium.nix
     ./services/ntfy.nix
 
-    ./services/wireguard.nix
-    {
-      services.wireguard-network.dns = {
-        enable = true;
-        localOnly = true;
-        listenAddress = "10.100.0.1";
-      };
-    }
+    ./services/headscale.nix
+    ./services/tailscale.nix
 
-    self.nixosModules.cert-sync
     self.nixosModules.markid
-    # Ship ACME-issued certs to the Pi over WireGuard whenever Caddy
-    # renews them. The Pi's local Caddy terminates TLS for home-LAN
-    # clients (home.niko.ink directly to HA, kitchenowl/notes via
-    # transparent reverse-proxy back through WG to here). The cert
-    # list is derived from lanServices so adding a new LAN-accelerated
-    # service is a single-line change in wireguard.nix.
-    (
-      {
-        config,
-        lib,
-        ...
-      }: let
-        hubCertDir = "/var/lib/caddy/.local/share/caddy/certificates/acme-v02.api.letsencrypt.org-directory";
-        mkCertEntry = host: _svc: {
-          name = host;
-          certFile = "${hubCertDir}/${host}/${host}.crt";
-          keyFile = "${hubCertDir}/${host}/${host}.key";
-        };
-      in {
-        services.cert-sync = {
-          enable = true;
-          destination = {
-            host = "10.100.0.2";
-            sshKeyFile = config.sops.secrets."cert-sync/ssh-key".path;
-            reloadCommand = "reload-caddy";
-          };
-          certs = lib.mapAttrsToList mkCertEntry config.services.wireguard-network.lanServices;
-        };
-      }
-    )
   ];
 
   # ─────────────────────────────────────────────────────────────────────
@@ -102,37 +60,14 @@
   networking.firewall = {
     enable = true;
     allowedTCPPorts = [80 443];
-    allowedUDPPorts = [51820];
+    # UDP 3478: STUN for the embedded Headscale DERP relay.
+    allowedUDPPorts = [3478];
     logRefusedConnections = true;
   };
 
-  networking.wireguard.interfaces.wg0 = {
-    ips = ["10.100.0.1/24"];
-    listenPort = 51820;
-    privateKeyFile = config.sops.secrets."wireguard/private-key".path;
-    peers = [
-      {
-        # Pi -- gateway for home LAN
-        publicKey = "7tiH8n6rpPN6U2+xJ58Fd9lhkVeS+jduVPA1Uq7IzR0=";
-        allowedIPs = ["10.100.0.2/32" "192.168.178.0/24"];
-      }
-      {
-        # Android phone
-        publicKey = "E3rALFimpj/yG1JrxemcfYEMwp5neGd7c5EDMoWXS1Q=";
-        allowedIPs = ["10.100.0.3/32"];
-      }
-      {
-        # Framework 13 laptop
-        publicKey = "Ad+7eq4h0eIrGyFTsziEU+mB5q0/cwat2gW6iVOEtzc=";
-        allowedIPs = ["10.100.0.4/32"];
-      }
-    ];
-  };
-
-  services.caddy.virtualHosts."home.niko.ink".extraConfig = ''
+  services.caddy.virtualHosts."headscale.niko.ink".extraConfig = ''
     import security-headers
-    import lan-only
-    reverse_proxy 10.100.0.2:8123
+    reverse_proxy localhost:8080
   '';
 
   services.caddy.virtualHosts."ntfy.niko.ink".extraConfig = ''

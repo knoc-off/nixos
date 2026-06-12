@@ -29,6 +29,17 @@ in {
     ];
 
     localConfig = {
+      parsers.s02Enrich = [
+        {
+          name = "custom/tailnet-whitelist";
+          description = "Whitelist trusted tailnet subnets";
+          whitelist = {
+            reason = "Trusted tailnet peer";
+            cidr = ["100.64.0.0/10" "fd7a:115c:a1e0::/48"];
+          };
+        }
+      ];
+
       acquisitions = [
         {
           filenames = ["/var/log/caddy/access-*.log"];

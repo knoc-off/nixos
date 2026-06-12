@@ -221,11 +221,11 @@
       description = "Notify phone on motion detection (cat doorbell)";
       env = {
         SENSOR_TOPIC = "zigbee2mqtt/motion_sensor";
-        HA_URL = "http://localhost:8123";
-        NOTIFY_SERVICES = "notify.mobile_app_pixel_10,notify.mobile_app_pixelsticks2,notify.mobile_app_pixel_7a,notify.mobile_app_eileens_iphone";
+        NTFY_URL = "https://ntfy.niko.ink";
+        NTFY_TOPIC = "cat-doorbell";
         COOLDOWN_SECONDS = "300";
         NOTIFICATION_TITLE = "Cat Doorbell";
-        HA_TOKEN_FILE = config.sops.secrets."ha/api_token".path;
+        NTFY_TOKEN_FILE = config.sops.secrets."ntfy/token".path;
       };
     }
     {

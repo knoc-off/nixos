@@ -8,20 +8,14 @@ async fn main() -> Result<()> {
     let rt = Runtime::from_env("cat-doorbell").await?;
 
     let sensor = rt.env_or("SENSOR_TOPIC", "zigbee2mqtt/motion_sensor");
-    let ha_url = rt.env_or("HA_URL", "http://localhost:8123");
-    let notify_services: Vec<String> = rt
-        .env_or("NOTIFY_SERVICES", "notify.mobile_app_phone")
-        .split(',')
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect();
+    let ntfy_url = rt.env_or("NTFY_URL", "https://ntfy.niko.ink");
+    let ntfy_topic = rt.env_or("NTFY_TOPIC", "cat-doorbell");
     let cooldown: u64 = rt.env_parse("COOLDOWN_SECONDS", 300);
     let title = rt.env_or("NOTIFICATION_TITLE", "Cat Doorbell");
 
-    // Read HA token from file (sops-decrypted at runtime).
-    let ha_token = read_token(&rt)?;
-    if ha_token.is_empty() {
-        tracing::error!("no HA token configured — set HA_TOKEN_FILE or HA_TOKEN");
+    let token = read_token(&rt)?;
+    if token.is_empty() {
+        tracing::error!("no ntfy token configured — set NTFY_TOKEN_FILE or NTFY_TOKEN");
     }
 
     let mut msgs = rt.subscribe(&sensor).await?;
@@ -38,7 +32,6 @@ async fn main() -> Result<()> {
                     .and_then(|v| v.as_str())
                     .unwrap_or("none");
 
-                // Reset when presence ends.
                 if !presence {
                     if notified_this_session {
                         tracing::info!("presence ended, resetting");
@@ -47,7 +40,6 @@ async fn main() -> Result<()> {
                     continue;
                 }
 
-                // Notify once per session on real movement.
                 if !notified_this_session && matches!(motion, "large" | "small") {
                     if let Some(last) = last_notification {
                         if last.elapsed().as_secs() < cooldown {
@@ -57,19 +49,13 @@ async fn main() -> Result<()> {
                     }
 
                     let message = format!("Movement detected ({motion})");
-                    let mut any_ok = false;
-                    for svc in &notify_services {
-                        match send_notification(&ha_url, &ha_token, svc, &title, &message) {
-                            Ok(()) => {
-                                tracing::info!(service = %svc, %message, "notification sent");
-                                any_ok = true;
-                            }
-                            Err(e) => tracing::warn!(service = %svc, "notification failed: {e}"),
+                    match send_notification(&ntfy_url, &ntfy_topic, &token, &title, &message) {
+                        Ok(()) => {
+                            last_notification = Some(Instant::now());
+                            notified_this_session = true;
+                            tracing::info!(%message, "notification sent");
                         }
-                    }
-                    if any_ok {
-                        last_notification = Some(Instant::now());
-                        notified_this_session = true;
+                        Err(e) => tracing::error!("notification failed: {e}"),
                     }
                 }
             }
@@ -80,7 +66,7 @@ async fn main() -> Result<()> {
 }
 
 fn read_token(rt: &Runtime) -> Result<String> {
-    let token_file = rt.env_or("HA_TOKEN_FILE", "");
+    let token_file = rt.env_or("NTFY_TOKEN_FILE", "");
     if !token_file.is_empty() {
         let token = std::fs::read_to_string(&token_file)
             .map(|s| s.trim().to_string())
@@ -89,41 +75,29 @@ fn read_token(rt: &Runtime) -> Result<String> {
                 String::new()
             });
         if !token.is_empty() {
-            tracing::info!("loaded HA token from {token_file}");
+            tracing::info!("loaded ntfy token from {token_file}");
             return Ok(token);
         }
     }
-    Ok(rt.env_or("HA_TOKEN", ""))
+    Ok(rt.env_or("NTFY_TOKEN", ""))
 }
 
 fn send_notification(
-    ha_url: &str,
+    url: &str,
+    topic: &str,
     token: &str,
-    service: &str,
     title: &str,
     message: &str,
 ) -> Result<()> {
-    let service_path = service.replace('.', "/");
-    let url = format!("{ha_url}/api/services/{service_path}");
-
-    let resp = ureq::post(&url)
+    let resp = ureq::post(&format!("{url}/{topic}"))
         .set("Authorization", &format!("Bearer {token}"))
-        .set("Content-Type", "application/json")
-        .send_json(serde_json::json!({
-            "message": message,
-            "title": title,
-            "data": {
-                "ttl": 0,
-                "priority": "high",
-                "push": {
-                    "expiration": 0,
-                    "interruption-level": "active"
-                }
-            }
-        }))?;
+        .set("Title", title)
+        .set("Priority", "high")
+        .set("Tags", "cat")
+        .send_string(message)?;
 
     if resp.status() >= 400 {
-        anyhow::bail!("HA returned {}", resp.status());
+        anyhow::bail!("ntfy returned {}", resp.status());
     }
     Ok(())
 }

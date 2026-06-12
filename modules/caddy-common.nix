@@ -1,14 +1,27 @@
 # Shared Caddy configuration usable by any host that enables Caddy.
-# Today just provides the (security-headers) snippet so both the hub
-# and LAN-local Caddy instances apply identical headers without copying
-# the block into each host's config.
+# Provides the (security-headers) snippet plus the Cloudflare DNS-01
+# wiring so every node self-issues its own *.niko.ink certificates
+# (no public IP / port-80 reachability required). The CLOUDFLARE_API_TOKEN
+# referenced by acme_dns is supplied per host via
+# services.caddy.environmentFile (a sops secret).
 { ... }: {
   nixos = {
     config,
     lib,
+    pkgs,
     ...
   }: {
     config = lib.mkIf config.services.caddy.enable {
+      services.caddy.package = pkgs.caddy.withPlugins {
+        plugins = ["github.com/caddy-dns/cloudflare@v0.2.4"];
+        # TOFU: first build fails and prints the correct hash; paste it here.
+        hash = lib.fakeHash;
+      };
+
+      services.caddy.globalConfig = ''
+        acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+      '';
+
       # mkBefore so the snippet is declared earlier in the generated
       # Caddyfile than any vhost that `import`s it.
       services.caddy.extraConfig = lib.mkBefore ''

@@ -1,16 +1,20 @@
 {
   self,
   config,
-  lib,
   ...
 }: let
-  trustedIps = lib.concatStringsSep " " config.services.wireguard-network.trustedSubnets;
+  # Tailnet source ranges (Headscale defaults). Requests arriving from these
+  # skip the public OAuth gate; everything else is treated as WAN.
+  trustedIps = "100.64.0.0/10 fd7a:115c:a1e0::/48";
 in {
   imports = [self.nixosModules.caddy-common];
+
+  sops.secrets."services/caddy/cloudflare-env" = {};
 
   services.caddy = {
     enable = true;
     email = "acme@niko.ink";
+    environmentFile = config.sops.secrets."services/caddy/cloudflare-env".path;
 
     logFormat = ''
       output file /var/log/caddy/access.log {

@@ -1,30 +1,14 @@
-# LAN-local Caddy so clients on home WiFi can reach services without
-# running WireGuard themselves. Vhosts are derived from the shared
-# wireguard-network.lanServices attrset: services with a localBackend
-# are reverse-proxied locally; the rest go through the (hub-proxy)
-# snippet which forwards them transparently over WG so they arrive
-# at the hub from a trusted source IP and skip public OAuth. All
-# client-facing certs are synced from the hub by cert-sync.
+# LAN-local Caddy on the Pi. It terminates TLS for home.niko.ink (Home
+# Assistant runs here) using a self-issued DNS-01 wildcard-capable cert
+# (via caddy-common). Tailnet clients resolve home.niko.ink to this node's
+# tailnet IP through Headscale MagicDNS; the other service names resolve
+# straight to the hub, so the Pi no longer proxies anything.
 {
   self,
   config,
   lib,
   ...
-}: let
-  cfg = config.services.wireguard-network;
-
-  mkVhost = host: svc: {
-    extraConfig = ''
-      import lan-cert ${host}
-      import security-headers
-      ${
-        if svc.localBackend != null
-        then "reverse_proxy ${svc.localBackend}"
-        else "import hub-proxy"
-      }
-    '';
-  };
-in {
+}: {
   imports = [self.nixosModules.caddy-common];
 
   services.caddy = {
@@ -39,36 +23,20 @@ in {
       format json
     '';
 
-    # {host} resolves to the incoming request's Host header at request
-    # time, so one hub-proxy snippet serves every proxied vhost. lan-cert
-    # uses the snippet-arg placeholder {args.0} which is substituted
-    # from `import lan-cert <hostname>` at each call site.
-    extraConfig = ''
-      (hub-proxy) {
-        reverse_proxy https://${cfg.hubIp} {
-          header_up Host {host}
-          transport http {
-            tls_server_name {host}
-          }
-        }
-      }
+    virtualHosts."home.niko.ink".extraConfig = ''
+      import security-headers
+      reverse_proxy localhost:8123
+    '';
 
-      (lan-cert) {
-        tls /var/lib/caddy-certs/{args.0}.crt /var/lib/caddy-certs/{args.0}.key
-      }
+    # Drop anything else that hits port 443.
+    virtualHosts.":443".extraConfig = ''
+      tls internal
+      abort
     '';
   };
 
-  services.caddy.virtualHosts = lib.mkMerge [
-    (lib.mapAttrs mkVhost cfg.lanServices)
-    {
-      # Drop anything else that hits port 443 on the gateway
-      ":443".extraConfig = ''
-        tls internal
-        abort
-      '';
-    }
-  ];
+  services.caddy.environmentFile = config.sops.secrets."services/caddy/cloudflare-env".path;
+  sops.secrets."services/caddy/cloudflare-env" = {};
 
   systemd.tmpfiles.rules = [
     "d /var/log/caddy 0750 caddy caddy -"
