@@ -67,7 +67,7 @@
 
   services.caddy.virtualHosts."headscale.niko.ink".extraConfig = ''
     import security-headers
-    reverse_proxy localhost:8080
+    reverse_proxy localhost:8085
   '';
 
   services.caddy.virtualHosts."ntfy.niko.ink".extraConfig = ''

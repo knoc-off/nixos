@@ -10,7 +10,7 @@
   services.headscale = {
     enable = true;
     address = "127.0.0.1";
-    port = 8080;
+    port = 8085;
 
     settings = {
       server_url = "https://headscale.niko.ink";

@@ -61,10 +61,6 @@ in {
       reverse_proxy localhost:4180
     '';
 
-    virtualHosts.":443".extraConfig = ''
-      tls internal
-      abort
-    '';
     virtualHosts."http://".extraConfig = ''
       abort
     '';

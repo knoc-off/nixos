@@ -4,7 +4,7 @@
 # (no public IP / port-80 reachability required). The CLOUDFLARE_API_TOKEN
 # referenced by acme_dns is supplied per host via
 # services.caddy.environmentFile (a sops secret).
-{ ... }: {
+{...}: {
   nixos = {
     config,
     lib,
@@ -14,8 +14,7 @@
     config = lib.mkIf config.services.caddy.enable {
       services.caddy.package = pkgs.caddy.withPlugins {
         plugins = ["github.com/caddy-dns/cloudflare@v0.2.4"];
-        # TOFU: first build fails and prints the correct hash; paste it here.
-        hash = lib.fakeHash;
+        hash = "sha256-vNSHU7txQLs0m0UChuszURXjEoMj4r1902+1ei0/DaI=";
       };
 
       services.caddy.globalConfig = ''

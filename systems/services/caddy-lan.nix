@@ -27,12 +27,6 @@
       import security-headers
       reverse_proxy localhost:8123
     '';
-
-    # Drop anything else that hits port 443.
-    virtualHosts.":443".extraConfig = ''
-      tls internal
-      abort
-    '';
   };
 
   services.caddy.environmentFile = config.sops.secrets."services/caddy/cloudflare-env".path;
