@@ -1,6 +1,7 @@
 { self, inputs, ... }: {
-  home = { pkgs, lib, ... }:
+  home = { pkgs, lib, config, ... }:
   let
+    cfg = config.programs.starshipLinear;
     gitBin = "${pkgs.git}/bin/git";
     jqBin = "${pkgs.jq}/bin/jq";
     grepBin = "${pkgs.gnugrep}/bin/grep";
@@ -113,6 +114,9 @@
       printf '\e[%sm\e]8;;%s\e\\󰘬\e]8;;\e\\\e[0m' "$color" "$url"
     '';
   in {
+    options.programs.starshipLinear.enable =
+      lib.mkEnableOption "Linear ticket integration in the starship prompt (requires the nelly linear-cli)";
+
     imports = [
       self.homeModules.prompt-daemon
       {
@@ -140,7 +144,7 @@
               env = ["CWD" "PATH"];
               exec_in_cwd = true;
             };
-            linear_ticket = {
+            linear_ticket = lib.mkIf cfg.enable {
               run = "${linearTicket}/bin/linear-ticket"; # or the resolved store path;
               check = "${gitBin} rev-parse --abbrev-ref HEAD";
               check_interval = "5m";
@@ -164,14 +168,14 @@
       }
     ];
 
-    programs.starship = {
+    config.programs.starship = {
       enable = true;
       enableFishIntegration = true;
       settings = {
         add_newline = false;
 
         # format = "((($python )(\${custom.rust} )$nix_shell )(\${custom.upstream_link} (\${custom.linear_ticket}-)\${custom.git_branch} )\n)$directory( $cmd_duration)$line_break$character";
-        format = "((($python )(\${custom.rust} )$nix_shell )(\${custom.upstream_link} (\${custom.linear_ticket}-)\${custom.git_branch} )\n)$directory( $cmd_duration)$line_break$character";
+        format = "((($python )(\${custom.rust} )$nix_shell )(\${custom.upstream_link} ${lib.optionalString cfg.enable "(\${custom.linear_ticket}-)"}\${custom.git_branch} )\n)$directory( $cmd_duration)$line_break$character";
         command_timeout = 500;
 
         character = {
@@ -254,7 +258,7 @@
           symbol = "";
           format = "$output";
         };
-        custom.linear_ticket = {
+        custom.linear_ticket = lib.mkIf cfg.enable {
           command = "linear_ticket";
           use_stdin = false;
           shell = ["${self.packages.${pkgs.stdenv.hostPlatform.system}.prompt-daemon}/bin/prompt-client"];

@@ -4,11 +4,12 @@
     config,
     lib,
     pkgs,
+    upkgs,
     ...
   }: let
     inherit (self.lib.keyLayers) presets;
   in {
-    home.packages = [pkgs.upkgs.slack];
+    home.packages = [upkgs.slack];
 
     # caps-held shortcuts when a Slack window is focused.
     keyLayers.layers.slack = lib.mkIf config.keyLayers.enable {

@@ -28,7 +28,6 @@
         wtype -M ctrl v -m ctrl
       '';
     };
-
   in {
     imports = [inputs.home-manager.nixosModules.home-manager];
 
@@ -275,7 +274,6 @@
           self.homeModules.kanata
           self.homeModules.hyprkan
           self.homeModules.keylayers
-          self.homeModules.slack
           self.homeModules.freecad
           {
             programs.freecad.package = upkgs.freecad;

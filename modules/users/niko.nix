@@ -83,17 +83,17 @@
                   preset = "framework-speakers";
                   description = "Ryzen HD Audio Controller Analog Stereo";
                 };
-                # Wired headphones — no processing
+                # Wired headphones
                 "alsa_output.pci-0000_c1_00.6.analog-stereo:Headphones" = {
                   preset = "passthrough";
                   description = "Ryzen HD Audio Controller Analog Stereo";
                 };
-                # AirPods Pro 2 (A2DP) — no processing
+                # AirPods Pro 2 (A2DP)
                 "bluez_output.F0_04_E1_D9_23_73.1:Headphone" = {
                   preset = "passthrough";
                   description = "AirPods Pro";
                 };
-                # AirPods Pro 2 (HFP/handsfree) — no processing
+                # AirPods Pro 2 (HFP/handsfree)
                 "bluez_output.F0_04_E1_D9_23_73.1:Handsfree" = {
                   preset = "passthrough";
                   description = "AirPods Pro";
@@ -192,12 +192,12 @@
             };
           }
           self.homeModules.starship
+          {programs.starshipLinear.enable = true;}
 
           self.homeModules.kanata
           self.homeModules.hyprkan
           self.homeModules.keylayers
           self.homeModules.slack
-          self.homeModules.freecad
           {
             keyLayers = {
               enable = true;
@@ -235,8 +235,6 @@
               };
             };
           }
-
-          self.homeModules.thunderbird
 
           self.homeModules.xdg
         ];
