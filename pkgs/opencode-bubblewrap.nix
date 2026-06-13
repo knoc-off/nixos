@@ -148,7 +148,7 @@
     terraform-ls # .tf .tfvars
     texlab # .tex .bib
     tinymist # .typ (typst)
-    gleam # .gleam
+    upkgs.gleam # .gleam — unstable skips network test escript_success_with_dependency (stable nixos-26.05 lags)
     zls # .zig .zon
     clojure-lsp                 # .clj .cljs .cljc .edn
     lspmux                      # LSP multiplexer (rust LSP via lspmux client)

@@ -275,7 +275,7 @@
             fabric -p cli "$@" --stream
           '';
           grammar = ''
-            cli <COMMAND> "Command to run" ...;
+            cli <_>...;
           '';
           runtimeDeps = [pkgs.fabric-ai];
         })

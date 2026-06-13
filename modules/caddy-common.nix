@@ -14,7 +14,7 @@
     config = lib.mkIf config.services.caddy.enable {
       services.caddy.package = pkgs.caddy.withPlugins {
         plugins = ["github.com/caddy-dns/cloudflare@v0.2.4"];
-        hash = "sha256-vNSHU7txQLs0m0UChuszURXjEoMj4r1902+1ei0/DaI=";
+        hash = "sha256-8yZDrejNKsaUnUaTUFYbarWNmxafqp2z2rWo+XRsxV8=";
       };
 
       services.caddy.globalConfig = ''

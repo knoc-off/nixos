@@ -227,6 +227,12 @@
 
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
 
+    minecraft-modpack = {
+      url = "github:knoc-off/minecraft-modpack";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+      inputs.nix-minecraft.follows = "nix-minecraft";
+    };
+
     # nix-darwin.url = "github:nix-darwin/nix-darwin/nix-darwin-26.05";
     # nix-darwin.inputs.nixpkgs.follows = "nixpkgs-darwin";
 
