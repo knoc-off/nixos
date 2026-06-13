@@ -94,40 +94,9 @@ async fn main() -> Result<()> {
                     continue;
                 }
 
-                let state = msg
-                    .payload
-                    .get("state")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
-
-                if state == "OFF" {
-                    tracing::info!("light turned off externally, pausing cycle");
-                    last_set_ct = None;
-                    // Wait for it to come back ON or for shutdown.
-                    'wait_on: loop {
-                        tokio::select! {
-                            _ = tokio::time::sleep(std::time::Duration::from_secs(interval)) => {
-                                while let Ok(m) = state_msgs.try_recv() {
-                                    let s = m.payload.get("state")
-                                        .and_then(|v| v.as_str()).unwrap_or("");
-                                    if s == "ON" {
-                                        tracing::info!("light back on, resuming cycle");
-                                        break 'wait_on;
-                                    }
-                                }
-                                // Check if we've passed sunset.
-                                let n = Local::now().with_timezone(&tz);
-                                if n >= sunset {
-                                    break 'cycle;
-                                }
-                            }
-                            _ = rt.shutdown_signal() => return Ok(()),
-                        }
-                    }
-                    continue 'cycle;
-                }
-
-                // Detect manual color_temp change.
+                // Detect manual color_temp change. The bulb stays on the Zigbee
+                // network when "off", so color_temp is still set regardless of
+                // on/off state — no need to pause when the light is off.
                 if let Some(expected) = last_set_ct {
                     if let Some(reported) = msg
                         .payload
