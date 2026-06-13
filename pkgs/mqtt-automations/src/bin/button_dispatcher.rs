@@ -6,16 +6,40 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
 struct Config {
-    buttons: HashMap<String, HashMap<String, Action>>,
+    buttons: HashMap<String, HashMap<String, ActionSpec>>,
+    #[serde(default)]
+    groups: HashMap<String, Group>,
+}
+
+/// What a button action does. Untagged so the JSON stays terse:
+///   {"topic": "...", "payload": {...}}   -> Direct
+///   {"group": "living_room"}             -> Group
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum ActionSpec {
+    Group {
+        group: String,
+    },
+    Direct {
+        topic: String,
+        payload: serde_json::Value,
+    },
+}
+
+/// A group of devices toggled together via a shared internal on/off state.
+#[derive(Debug, Deserialize)]
+struct Group {
+    members: Vec<GroupMember>,
 }
 
 #[derive(Debug, Deserialize)]
-struct Action {
+struct GroupMember {
     topic: String,
-    payload: serde_json::Value,
+    on: serde_json::Value,
+    off: serde_json::Value,
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let config_path = std::env::args()
         .nth(1)
@@ -36,6 +60,9 @@ async fn main() -> Result<()> {
         tracing::info!(topic, actions = actions.len(), "registered button");
         receivers.push((topic.clone(), rx));
     }
+
+    // Internal on/off state per group. Starts off; resets on restart.
+    let mut group_states: HashMap<String, bool> = HashMap::new();
 
     loop {
         // Wait for any button message across all subscriptions.
@@ -68,13 +95,39 @@ async fn main() -> Result<()> {
 
         if let Some(actions) = config.buttons.get(&msg.topic) {
             if let Some(action) = actions.get(&action_key) {
-                tracing::info!(
-                    button = %msg.topic,
-                    action = %action_key,
-                    target = %action.topic,
-                    "dispatching"
-                );
-                rt.publish(&action.topic, &action.payload).await?;
+                match action {
+                    ActionSpec::Direct { topic, payload } => {
+                        tracing::info!(
+                            button = %msg.topic,
+                            action = %action_key,
+                            target = %topic,
+                            "dispatching"
+                        );
+                        rt.publish(topic, payload).await?;
+                    }
+                    ActionSpec::Group { group } => {
+                        let Some(grp) = config.groups.get(group) else {
+                            tracing::warn!(group, "unknown group referenced");
+                            continue;
+                        };
+                        // Flip the group's internal state and broadcast an
+                        // explicit on/off to every member so they stay in sync.
+                        let on = !group_states.get(group).copied().unwrap_or(false);
+                        group_states.insert(group.clone(), on);
+                        tracing::info!(
+                            button = %msg.topic,
+                            action = %action_key,
+                            %group,
+                            state = if on { "ON" } else { "OFF" },
+                            members = grp.members.len(),
+                            "dispatching group"
+                        );
+                        for member in &grp.members {
+                            let payload = if on { &member.on } else { &member.off };
+                            rt.publish(&member.topic, payload).await?;
+                        }
+                    }
+                }
             }
         }
     }

@@ -109,16 +109,20 @@
       discoverPackages pkgs ./pkgs;
   in {
     packages = forAllSystems mkPkgs;
-    devShells = forAllSystems (system: let
-      pkgs = mkPkgs system;
-      # Recursively prefer passthru.devShell where available.
-      preferShell = lib.mapAttrs (_: v:
-        if v ? devShell then v.devShell
-        else if lib.isAttrs v && !(lib.isDerivation v) then preferShell v
-        else v
-      );
-    in
-      preferShell pkgs
+    devShells = forAllSystems (
+      system: let
+        pkgs = mkPkgs system;
+        # Recursively prefer passthru.devShell where available.
+        preferShell = lib.mapAttrs (
+          _: v:
+            if v ? devShell
+            then v.devShell
+            else if lib.isAttrs v && !(lib.isDerivation v)
+            then preferShell v
+            else v
+        );
+      in
+        preferShell pkgs
     );
 
     nixosModules = aspects.nixos;
@@ -151,10 +155,10 @@
   };
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05";
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
-    nixpkgs-darwin.url = "github:NixOS/nixpkgs/nixpkgs-25.11-darwin";
+    # nixpkgs-darwin.url = "github:NixOS/nixpkgs/nixpkgs-26.05-darwin";
 
     nixos-cli.url = "github:water-sucks/nixos";
 
@@ -168,7 +172,7 @@
     };
 
     home-manager = {
-      url = "github:nix-community/home-manager/release-25.11";
+      url = "github:nix-community/home-manager/release-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
@@ -223,8 +227,8 @@
 
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
 
-    nix-darwin.url = "github:nix-darwin/nix-darwin/nix-darwin-25.11";
-    nix-darwin.inputs.nixpkgs.follows = "nixpkgs-darwin";
+    # nix-darwin.url = "github:nix-darwin/nix-darwin/nix-darwin-26.05";
+    # nix-darwin.inputs.nixpkgs.follows = "nixpkgs-darwin";
 
     zen-browser = {
       url = "github:0xc000022070/zen-browser-flake";
@@ -236,7 +240,7 @@
     };
 
     stylix = {
-      url = "github:nix-community/stylix/release-25.11";
+      url = "github:nix-community/stylix/release-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

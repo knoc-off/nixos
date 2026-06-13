@@ -1,10 +1,10 @@
 use anyhow::Result;
-use chrono::{Local, TimeDelta};
+use chrono::{Local, NaiveDate, TimeDelta};
 use chrono_tz::Tz;
 use mqtt_automations::Runtime;
 use serde_json::json;
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let rt = Runtime::from_env("sunrise-lights").await?;
 
@@ -60,6 +60,11 @@ async fn main() -> Result<()> {
 
     // -- main loop: one cycle per day ----------------------------------------
 
+    // Once the ramp ends for the day (completed OR pre-empted by an external
+    // change) we record the date and refuse to ramp again until tomorrow, so
+    // we never fight a manual override.
+    let mut bowed_out: Option<NaiveDate> = None;
+
     loop {
         let now = Local::now().with_timezone(&tz);
         let today = now.date_naive();
@@ -67,8 +72,9 @@ async fn main() -> Result<()> {
         let noon = mqtt_automations::sun::solar_noon(lon, today, &tz)
             + TimeDelta::minutes(noon_offset_min);
 
-        // If we're past noon or before start elevation, sleep until next pre-dawn.
-        if now >= noon || elev < elev_start {
+        // If we've already bowed out today, or we're past noon or before the
+        // start elevation, sleep until next pre-dawn.
+        if bowed_out == Some(today) || now >= noon || elev < elev_start {
             let rise = mqtt_automations::sun::sunrise(lat, lon, today, &tz);
             let next_rise = if now > rise {
                 let tomorrow = today + TimeDelta::days(1);
@@ -123,16 +129,19 @@ async fn main() -> Result<()> {
         );
 
         'ramp: loop {
-            // Check for external changes while ramping.
+            // Check for external changes. Any manual touch of brightness or
+            // on/off state means something else is driving the light, so we
+            // bow out for the rest of the day instead of competing.
             while let Ok(msg) = state_msgs.try_recv() {
+                let state = msg
+                    .payload
+                    .get("state")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+
                 if light_on {
-                    let state = msg
-                        .payload
-                        .get("state")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or("");
                     if state == "OFF" {
-                        tracing::info!("light turned off externally, aborting ramp");
+                        tracing::info!("light turned off externally, bowing out for today");
                         break 'ramp;
                     }
                     // Check if brightness was changed manually.
@@ -147,12 +156,17 @@ async fn main() -> Result<()> {
                             if diff > brightness_tolerance {
                                 tracing::info!(
                                     expected, reported, diff,
-                                    "brightness changed externally, aborting ramp"
+                                    "brightness changed externally, bowing out for today"
                                 );
                                 break 'ramp;
                             }
                         }
                     }
+                } else if state == "ON" {
+                    // We haven't started the ramp yet, so any external "ON"
+                    // means someone else (button, HA, etc.) took the light.
+                    tracing::info!("light turned on externally before ramp, bowing out for today");
+                    break 'ramp;
                 }
             }
 
@@ -216,8 +230,10 @@ async fn main() -> Result<()> {
             }
         }
 
-        // Done for today. Small pause, then loop back — the outer check
-        // will see we're past noon and sleep until next pre-dawn.
+        // Ramp ended (completed or pre-empted) — don't ramp again until
+        // tomorrow. Small pause, then loop back; the outer check will sleep
+        // until next pre-dawn.
+        bowed_out = Some(today);
         tokio::select! {
             _ = tokio::time::sleep(std::time::Duration::from_secs(60)) => {}
             _ = rt.shutdown_signal() => break,

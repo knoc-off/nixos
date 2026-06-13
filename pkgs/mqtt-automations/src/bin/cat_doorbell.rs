@@ -3,7 +3,7 @@ use std::time::Instant;
 use anyhow::Result;
 use mqtt_automations::Runtime;
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let rt = Runtime::from_env("cat-doorbell").await?;
 
@@ -12,6 +12,8 @@ async fn main() -> Result<()> {
     let ntfy_topic = rt.env_or("NTFY_TOPIC", "cat-doorbell");
     let cooldown: u64 = rt.env_parse("COOLDOWN_SECONDS", 300);
     let title = rt.env_or("NOTIFICATION_TITLE", "Cat Doorbell");
+
+    let curl_bin = rt.env_or("CURL_BIN", "curl");
 
     let token = read_token(&rt)?;
     if token.is_empty() {
@@ -49,7 +51,7 @@ async fn main() -> Result<()> {
                     }
 
                     let message = format!("Movement detected ({motion})");
-                    match send_notification(&ntfy_url, &ntfy_topic, &token, &title, &message) {
+                    match send_notification(&curl_bin, &ntfy_url, &ntfy_topic, &token, &title, &message) {
                         Ok(()) => {
                             last_notification = Some(Instant::now());
                             notified_this_session = true;
@@ -83,21 +85,28 @@ fn read_token(rt: &Runtime) -> Result<String> {
 }
 
 fn send_notification(
+    curl_bin: &str,
     url: &str,
     topic: &str,
     token: &str,
     title: &str,
     message: &str,
 ) -> Result<()> {
-    let resp = ureq::post(&format!("{url}/{topic}"))
-        .set("Authorization", &format!("Bearer {token}"))
-        .set("Title", title)
-        .set("Priority", "high")
-        .set("Tags", "cat")
-        .send_string(message)?;
+    let output = std::process::Command::new(curl_bin)
+        .arg("--silent")
+        .arg("--show-error")
+        .arg("--fail")
+        .args(["--max-time", "10"])
+        .args(["-H", &format!("Authorization: Bearer {token}")])
+        .args(["-H", &format!("Title: {title}")])
+        .args(["-H", "Priority: high"])
+        .args(["-H", "Tags: cat"])
+        .args(["--data-binary", message])
+        .arg(format!("{url}/{topic}"))
+        .output()?;
 
-    if resp.status() >= 400 {
-        anyhow::bail!("ntfy returned {}", resp.status());
+    if !output.status.success() {
+        anyhow::bail!("curl failed: {}", String::from_utf8_lossy(&output.stderr).trim());
     }
     Ok(())
 }

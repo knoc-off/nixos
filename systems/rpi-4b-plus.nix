@@ -26,6 +26,11 @@
     secrets."ntfy/token" = {};
   };
 
+  # Without this the running system falls back to UTC (the Europe/Berlin
+  # setting in sdImage.nix only applies to the image build, not the switched
+  # system) — making journald/logs read 2h behind local time.
+  time.timeZone = "Europe/Berlin";
+
   boot = {
     kernelPackages = pkgs.linuxPackages_rpi4;
     loader = {

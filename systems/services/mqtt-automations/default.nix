@@ -191,15 +191,31 @@
           topic = "zigbee2mqtt/light_1/set";
           payload = {state = "TOGGLE";};
         };
-        double = {
-          topic = "zigbee2mqtt/light_1/set";
-          payload = {brightness = 254;};
-        };
-        hold = {
-          topic = "zigbee2mqtt/light_1/set";
-          payload = {state = "OFF";};
-        };
+        double = {group = "living_room";};
+        hold = {group = "living_room";};
       };
+    };
+    groups = {
+      living_room.members = [
+        {
+          topic = "zigbee2mqtt/light_1/set";
+          on = {
+            state = "ON";
+            brightness = 254;
+          };
+          off = {state = "OFF";};
+        }
+        {
+          topic = "zigbee2mqtt/plug_2/set";
+          on = {state = "ON";};
+          off = {state = "OFF";};
+        }
+        {
+          topic = "zigbee2mqtt/plug_3/set";
+          on = {state = "ON";};
+          off = {state = "OFF";};
+        }
+      ];
     };
   });
 
@@ -226,6 +242,7 @@
         COOLDOWN_SECONDS = "300";
         NOTIFICATION_TITLE = "Cat Doorbell";
         NTFY_TOKEN_FILE = config.sops.secrets."ntfy/token".path;
+        CURL_BIN = "${pkgs.curl}/bin/curl";
       };
     }
     {
@@ -254,6 +271,20 @@
       bin = "button-dispatcher";
       description = "Button action dispatcher";
       args = ["${buttonConfig}"];
+    }
+    {
+      name = "bedtime-button";
+      bin = "bedtime-button";
+      description = "button_2: evening bedtime fade / daytime toggle for light_3";
+      env = {
+        BUTTON_TOPIC = "zigbee2mqtt/button_2/action";
+        LIGHT_TOPIC = "zigbee2mqtt/light_3/set";
+        BEDTIME_HOUR = "19";
+        FADE_MINUTES = "10";
+        FADE_STEP_SECONDS = "20";
+        TOGGLE_BRIGHTNESS = "254";
+        TIMEZONE = "Europe/Berlin";
+      };
     }
     {
       name = "color-temp-cycle";

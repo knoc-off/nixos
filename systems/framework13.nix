@@ -5,8 +5,7 @@
   self,
   config,
   ...
-}:
-let
+}: let
   user = "knoff";
 in {
   imports = [
@@ -47,106 +46,6 @@ in {
 
     self.nixosModules.lspmux
     {services.lspmux.enable = true;}
-
-    self.nixosModules.logiops
-    {
-      services.logiops = {
-        enable = true;
-        config = ''
-          io_timeout: 60000.0;
-
-          devices: (
-          {
-              name: "MX Master 3S";
-              smartshift: // when scrolling fast it goes to different mode.
-              {
-                  on: false;
-                  threshold: 30;
-                  torque: 50;
-              };
-              dpi: 1000;
-              scroll:
-              {
-                  hires: true;
-                  invert: false;
-                  target: false;
-              };
-              thumbwheel:
-              {
-                  divert: false;
-                  invert: false;
-                  proxy:
-                  {
-                      type: "Keypress";
-                      keys: ["KEY_F21"];
-                  };
-                  touch:
-                  {
-                      type: "Keypress";
-                      keys: ["KEY_F22"];
-                  };
-                  tap:
-                  {
-                      type: "Keypress";
-                      keys: ["KEY_F23"];
-                  };
-              };
-              buttons: (
-                  {
-                      cid: 0x52;
-                      action:
-                      {
-                          type: "Keypress";
-                          keys: ["KEY_F13"];
-                      };
-                  },
-                  {
-                      cid: 0x53;
-                      action:
-                      {
-                          type: "Keypress";
-                          keys: ["KEY_F14"];
-                      };
-                  },
-                  {
-                      cid: 0x56;
-                      action:
-                      {
-                          type: "Keypress";
-                          keys: ["KEY_F15"];
-                      };
-                  },
-                  {
-                      cid: 0xc3;
-                      action:
-                      {
-                          type: "Keypress";
-                          keys: ["KEY_F16"];
-                      };
-                  },
-                  {
-                      cid: 0xc4;
-                      action:
-                      {
-                          type: "Keypress";
-                          keys: ["KEY_F17"];
-                      };
-                  },
-                  {
-                      cid: 0xd7;
-                      action:
-                      {
-                          type: "Keypress";
-                          keys: ["KEY_F18"];
-                      };
-                  }
-              );
-          }
-          );
-
-        '';
-      };
-    }
 
     ./hardware/boot.nix
 

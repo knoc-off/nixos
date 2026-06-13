@@ -5,7 +5,7 @@ use mqtt_automations::Runtime;
 use serde_json::json;
 use std::f64::consts::PI;
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let rt = Runtime::from_env("color-temp-cycle").await?;
 

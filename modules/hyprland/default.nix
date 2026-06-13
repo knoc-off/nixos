@@ -130,6 +130,8 @@ in {
       enable = true;
       package = hyprnix.hyprland;
       systemd.enable = false; # UWSM handles session/systemd integration
+
+      configType = "lua";
     };
 
     xdg.configFile."hypr/hyprland.lua".source = ./hyprland.lua;

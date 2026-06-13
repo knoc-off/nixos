@@ -10,12 +10,17 @@
 
   craneLib = (inputs.crane.mkLib pkgs).overrideToolchain toolchain;
 
-  src = lib.cleanSource ./.;
+  src = craneLib.cleanCargoSource ./.;
 
   commonArgs = {
     inherit src;
     pname = "mqtt-automations";
     version = "0.1.0-unstable";
+    strictDeps = true;
+
+    # Only build the timezones we actually use — chrono-tz otherwise codegens
+    # the entire IANA database, which dominates compile time under emulation.
+    CHRONO_TZ_TIMEZONE_FILTER = "Europe/Berlin|UTC";
   };
 
   # Dependencies-only build -- cached until Cargo.lock changes.

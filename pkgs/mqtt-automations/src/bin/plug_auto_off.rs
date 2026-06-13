@@ -2,7 +2,7 @@ use anyhow::Result;
 use mqtt_automations::Runtime;
 use serde_json::json;
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
     let rt = Runtime::from_env("plug-auto-off").await?;
     let plug = rt.env_or("PLUG_TOPIC", "zigbee2mqtt/plug_1");

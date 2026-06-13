@@ -1,4 +1,4 @@
-{ ... }: {
+{...}: {
   nixos = {pkgs, ...}: {
     services.pulseaudio.enable = false;
     security.rtkit.enable = true; # Realtime priority management
@@ -64,7 +64,7 @@
     environment.systemPackages = with pkgs; [
       # Control
       pavucontrol # Volume mixer
-      helvum # Patchbay for routing
+      crosspipe
       qjackctl # JACK control panel
 
       # Diagnostics

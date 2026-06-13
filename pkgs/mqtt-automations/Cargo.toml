@@ -27,14 +27,21 @@ path = "src/bin/sunrise_lights.rs"
 name = "color-temp-cycle"
 path = "src/bin/color_temp_cycle.rs"
 
+[[bin]]
+name = "bedtime-button"
+path = "src/bin/bedtime_button.rs"
+
 [dependencies]
-rumqttc = "0.24"
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "time", "sync"] }
+rumqttc = { version = "0.24", default-features = false }
+tokio = { version = "1", features = ["rt", "macros", "signal", "time", "sync"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1"
 chrono = { version = "0.4", features = ["serde"] }
-chrono-tz = "0.10"
-ureq = { version = "2", features = ["json"] }
+chrono-tz = { version = "0.10", features = ["filter-by-regex"] }
+
+[profile.release]
+opt-level = 1
+codegen-units = 16

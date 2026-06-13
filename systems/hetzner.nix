@@ -84,7 +84,7 @@
     algorithm = "zstd";
   };
 
-  systemd.coredump.extraConfig = ''
+  systemd.coredump.settings.Coredump.settings = ''
     Storage=none
     ProcessSizeMax=0
   '';
@@ -117,7 +117,6 @@
       }
     ];
   };
-
 
   boot.kernel.sysctl = {
     "net.ipv4.tcp_syncookies" = 1;
