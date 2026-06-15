@@ -1999,6 +1999,29 @@
         "type": "github"
       }
     },
+    "minecraft-modpack": {
+      "inputs": {
+        "nix-minecraft": [
+          "nix-minecraft"
+        ],
+        "nixpkgs": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1781427730,
+        "narHash": "sha256-SFgrrKH0uWzpyIT0vTpALQyBNiXD4vTen7LUTTiQ3Ho=",
+        "ref": "refs/heads/main",
+        "rev": "9b9b1b37888a222725e363612d316ef0f712bf49",
+        "revCount": 4,
+        "type": "git",
+        "url": "ssh://git@github.com/knoc-off/minecraft-modpack.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "ssh://git@github.com/knoc-off/minecraft-modpack.git"
+      }
+    },
     "nelly": {
       "inputs": {
         "NixVirt": "NixVirt_2",
@@ -2921,6 +2944,7 @@
         "hyprqt6engine": "hyprqt6engine",
         "jail-nix": "jail-nix",
         "lanzaboote": "lanzaboote",
+        "minecraft-modpack": "minecraft-modpack",
         "nelly": "nelly",
         "neovim": "neovim",
         "nix-minecraft": "nix-minecraft",

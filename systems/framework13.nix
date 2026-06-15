@@ -20,7 +20,8 @@ in {
 
     self.nixosModules.misc
     self.nixosModules.console
-    self.nixosModules.minecraft
+
+    ./services/minecraft.nix
 
     inputs.disko.nixosModules.disko
     {disko.devices.disk.vdb.device = "/dev/nvme0n1";}
@@ -57,6 +58,10 @@ in {
         secrets."shell_environment/OPENROUTER_API_KEY" = {
           mode = "0644";
         };
+        # RCON password for the Minecraft server, as an env file
+        # (RCON_PASSWORD=...). Read by systemd (root) for EnvironmentFile, so
+        # the default 0400 root owner is sufficient.
+        secrets."services/minecraft/env" = {};
         # secrets."shell_environment/ANTHROPIC_API_KEY" = {
         #   mode = "0644";
         # };
