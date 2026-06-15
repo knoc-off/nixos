@@ -18,7 +18,7 @@
 
     inherit (lib) nixosSystem listToAttrs;
 
-    inherit (import ./lib {inherit lib;}) discoverModules discoverPackages discoverAspects;
+    inherit (import ./lib {inherit lib;}) discoverPackages discoverAspects;
 
     aspects = discoverAspects {inherit inputs self;} ./modules;
 
@@ -40,12 +40,14 @@
             inherit
               self
               inputs
+              hostname
               ;
           }
           // extraConfigs;
         modules =
           [
             ./systems/${hostname}.nix
+            {networking.hostName = lib.mkDefault hostname;}
           ]
           ++ lib.optionals (!lib.strings.hasSuffix "darwin" system) [
             ./systems/modules/commit_message.nix
@@ -151,6 +153,7 @@
       (mkHost "nuci5" "x86_64-linux")
       (mkHost "hetzner" "x86_64-linux")
       (mkHost "rpi-4b-plus" "aarch64-linux")
+      (mkHost "home-server-pc" "x86_64-linux")
     ];
   };
 

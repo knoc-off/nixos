@@ -4,9 +4,9 @@
   pkgs,
   self,
   config,
+  hostname,
   ...
-}:
-let
+}: let
   user = "niko";
 in {
   imports = [
@@ -40,15 +40,6 @@ in {
     self.nixosModules.hyprland
     self.nixosModules.noctalia
 
-    self.nixosModules.windows-vm
-    {
-      windows-vm = {
-        enable = true;
-        inherit user;
-        mergeAutounattendFile = "${inputs.UnattendedWinstall}/autounattend.xml";
-      };
-    }
-
     inputs.hardware.nixosModules.lenovo-thinkpad
     inputs.hardware.nixosModules.common-cpu-intel
     inputs.hardware.nixosModules.common-gpu-intel
@@ -79,7 +70,7 @@ in {
       # todo: setup a systemd service, that will initialize the sops stuff.
       # would need to generate a pub key and ideally write it to the file.
       sops = {
-        defaultSopsFile = ./secrets/thinkpad-work/default.yaml;
+        defaultSopsFile = ./secrets/${hostname}/default.yaml;
         age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
         # age.sshKeyPaths = ["/home/niko/.ssh/id_ed25519"];
         secrets."shell_environment/_ANTHROPIC_API_KEY" = {
@@ -246,7 +237,6 @@ in {
     "0.0.0.0" = ["sfrclak.com"];
   };
   networking = {
-    hostName = "thinkpad-work";
     firewall = {
       enable = true;
       allowedTCPPorts = [

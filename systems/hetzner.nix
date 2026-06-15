@@ -6,6 +6,7 @@
   lib,
   pkgs,
   self,
+  hostname,
   ...
 }: {
   imports = [
@@ -15,7 +16,7 @@
     inputs.sops-nix.nixosModules.sops
     {
       sops = {
-        defaultSopsFile = ./secrets/hetzner/default.yaml;
+        defaultSopsFile = ./secrets/${hostname}/default.yaml;
         age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
 
         secrets = {
@@ -36,7 +37,8 @@
     ./services/ntfy.nix
 
     ./services/headscale.nix
-    ./services/tailscale.nix
+    self.nixosModules.tailnet
+    {services.tailnet.enable = true;}
 
     self.nixosModules.markid
   ];

@@ -4,6 +4,7 @@
   pkgs,
   self,
   config,
+  hostname,
   ...
 }: let
   user = "knoff";
@@ -12,6 +13,15 @@ in {
     # inputs.nixgl.packages.x86_64-linux.nixGLIntel
 
     inputs.determinate.nixosModules.default
+
+    self.nixosModules.tailnet
+    {
+      # Laptop client: enroll declaratively and keep MagicDNS on.
+      services.tailnet = {
+        enable = true;
+        acceptDns = true;
+      };
+    }
 
     self.nixosModules.users.knoff
     self.nixosModules.nix
@@ -53,7 +63,7 @@ in {
     inputs.sops-nix.nixosModules.sops
     {
       sops = {
-        defaultSopsFile = ./secrets/framework13/default.yaml;
+        defaultSopsFile = ./secrets/${hostname}/default.yaml;
         age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
         secrets."shell_environment/OPENROUTER_API_KEY" = {
           mode = "0644";
@@ -209,18 +219,7 @@ in {
 
   programs.localsend.enable = true;
 
-  # Tailnet client. Enroll once interactively:
-  #   sudo tailscale up --login-server https://headscale.niko.ink
-  # MagicDNS (accept-dns defaults on) resolves the niko.ink service names
-  # to their tailnet IPs, replacing the old wg0 resolvectl split DNS.
-  services.tailscale = {
-    enable = true;
-    openFirewall = true;
-  };
-
   networking = {
-    hostName = "framework13";
-
     firewall = {
       enable = true;
       allowedTCPPorts = [

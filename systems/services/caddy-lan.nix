@@ -2,11 +2,10 @@
 # Assistant runs here) using a self-issued DNS-01 wildcard-capable cert
 # (via caddy-common). Tailnet clients resolve home.niko.ink to this node's
 # tailnet IP through Headscale MagicDNS; the other service names resolve
-# straight to the hub, so the Pi no longer proxies anything.
+# straight to the hub
 {
   self,
   config,
-  lib,
   ...
 }: {
   imports = [self.nixosModules.caddy-common];

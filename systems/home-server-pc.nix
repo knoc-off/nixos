@@ -9,44 +9,40 @@
 }: {
   imports = [
     self.nixosModules.nix
-    {
-      # Pi runs a Nix version that lacks the wasm-builtin feature
-      nix.settings.experimental-features = lib.mkForce ["nix-command" "flakes" "pipe-operators"];
-    }
     inputs.sops-nix.nixosModules.sops
 
-    ./services/home-assistant.nix
-    ./services/caddy-lan.nix
+    # ./services/caddy-lan.nix # makes sense for minecraft server?
     self.nixosModules.tailnet
     {services.tailnet.enable = true;}
+
+    inputs.disko.nixosModules.disko
+    {disko.devices.disk.vdb.device = "/dev/nvme0n1";}
+
+    self.nixosModules.boot
+    {
+      boot.custom = {
+        enable = true;
+        # After first install: enroll secure boot keys with `sbctl`, then switch to "lanzaboote"
+        # type = "lanzaboote";
+        type = "systemd-boot";
+        efiSupport = true;
+      };
+    }
   ];
 
   sops = {
     defaultSopsFile = ./secrets/${hostname}/default.yaml;
     age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
     secrets."wifi/home/fritz" = {};
-    secrets."ntfy/token" = {};
   };
 
   time.timeZone = "Europe/Berlin";
-
-  boot = {
-    kernelPackages = pkgs.linuxPackages_rpi4;
-    loader = {
-      grub.enable = false;
-      generic-extlinux-compatible.enable = true;
-    };
-    blacklistedKernelModules = ["btsdio" "hci_uart" "bluetooth"]; # fails every boot
-  };
 
   hardware = {
     enableRedistributableFirmware = true;
     bluetooth.enable = false;
   };
 
-  # gpu_mem=16 set manually in /dev/mmcblk0p1/config.txt -- must re-apply after re-flash
-
-  # in-RAM compressed swap, faster than SD card
   zramSwap = {
     enable = true;
     memoryPercent = 50;
@@ -54,7 +50,6 @@
     priority = 100;
   };
 
-  # systemd-oomd unavailable (no PSI support on this kernel)
   services.earlyoom = {
     enable = true;
     freeMemThreshold = 5;
@@ -62,14 +57,9 @@
     enableNotifications = false;
   };
 
-  fileSystems."/" = {
-    device = "/dev/disk/by-label/NIXOS_SD";
-    fsType = "ext4";
-  };
-
   networking = {
     wireless = {
-      enable = true;
+      enable = false;
       secretsFile = config.sops.secrets."wifi/home/fritz".path;
       networks."FRITZ!Box 7590 SI".pskRaw = "ext:PSK0";
     };
@@ -80,13 +70,6 @@
     };
   };
 
-  swapDevices = [
-    {
-      device = "/var/lib/swapfile";
-      size = 1024;
-    }
-  ];
-
   services.openssh = {
     enable = true;
     settings.PasswordAuthentication = false;
@@ -95,7 +78,6 @@
   environment.systemPackages = map lib.lowPrio [
     pkgs.curl
     pkgs.gitMinimal
-    pkgs.libraspberrypi
   ];
 
   users.users = {

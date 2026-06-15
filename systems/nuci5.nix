@@ -193,8 +193,6 @@ in {
 
   nix.settings.auto-optimise-store = true;
 
-  networking.hostName = "nuci5";
-
   networking.firewall = {
     enable = false;
     allowedTCPPortRanges = [

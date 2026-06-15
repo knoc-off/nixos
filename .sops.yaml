@@ -34,3 +34,7 @@ creation_rules:
           - *framework13h
           - *work
           - *work2
+  - path_regex: systems/secrets/home-server-pc/[^/]+\.(yaml|json|env|ini)$
+    key_groups:
+      - age:
+          - *framework13h
