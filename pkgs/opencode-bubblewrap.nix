@@ -10,6 +10,11 @@
         // {
           excludeShellChecks = (args.excludeShellChecks or []) ++ ["SC2016"];
         });
+    # Use Determinate's nix so jail-nix's internal `nix-store --query`
+    # (in runtime-deep-ro-bind, invoked by the network combinator) doesn't
+    # warn about eval-cores / lazy-trees / wasm-builtin from /etc/nix/nix.conf
+    # on every startup.
+    nix = inputs.determinate.inputs.nix.packages.${prev.stdenv.hostPlatform.system}.nix-cli;
   }));
   inherit (pkgs) lib;
 
@@ -150,8 +155,8 @@
     tinymist # .typ (typst)
     upkgs.gleam # .gleam — unstable skips network test escript_success_with_dependency (stable nixos-26.05 lags)
     zls # .zig .zon
-    clojure-lsp                 # .clj .cljs .cljc .edn
-    lspmux                      # LSP multiplexer (rust LSP via lspmux client)
+    clojure-lsp # .clj .cljs .cljc .edn
+    lspmux # LSP multiplexer (rust LSP via lspmux client)
 
     # Coding agents
     upkgs.claude-code

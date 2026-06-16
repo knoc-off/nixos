@@ -38,50 +38,58 @@ function writeOsc(state, pct) {
 }
 
 function clearProgress() {
+  lastState = null;
+  lastPct = null;
   if (!ttyWriter) return;
   ttyWriter.write(`\x1b]9;4;0\x1b\\`);
 }
 
+// Last known good value. The heartbeat re-emits this every poll so Ghostty's
+// 15s stale timeout never clears the bar, even when usage is steady or the
+// proxy is briefly unavailable.
 let lastState = null;
 let lastPct = null;
 let eventDebounce = null;
+
+// Re-assert the current value to the terminal. No change-gate: Ghostty removes
+// the progress bar 15s after the last OSC 9;4, so we must keep emitting.
+function emit() {
+  if (lastState === null) return;
+  writeOsc(lastState, lastPct);
+}
 
 async function updateProgress() {
   try {
     const resp = await fetch(USAGE_URL, {
       signal: AbortSignal.timeout(3000),
     });
-    if (!resp.ok) return;
-    const data = await resp.json();
+    if (resp.ok) {
+      const data = await resp.json();
 
-    const fiveH = data.five_hour_utilization ?? null;
-    const sevenD = data.seven_day_utilization ?? null;
+      const fiveH = data.five_hour_utilization ?? null;
+      const sevenD = data.seven_day_utilization ?? null;
 
-    if (fiveH === null && sevenD === null) return;
+      if (fiveH !== null || sevenD !== null) {
+        const fivePct = fiveH !== null ? fiveH * 100 : 0;
+        const sevenPct = sevenD !== null ? sevenD * 100 : 0;
 
-    const fivePct = fiveH !== null ? fiveH * 100 : 0;
-    const sevenPct = sevenD !== null ? sevenD * 100 : 0;
-
-    let state, pct;
-    if (sevenPct > fivePct) {
-      // 7d window is the limiter → yellow (paused state)
-      state = 4;
-      pct = sevenPct;
-    } else {
-      // 5h window is the limiter (or equal) → blue (in progress state)
-      state = 1;
-      pct = fivePct;
-    }
-
-    // Only write if changed (avoid unnecessary writes)
-    if (state !== lastState || Math.round(pct) !== Math.round(lastPct ?? -1)) {
-      writeOsc(state, pct);
-      lastState = state;
-      lastPct = pct;
+        if (sevenPct > fivePct) {
+          // 7d window is the limiter → yellow (paused state)
+          lastState = 4;
+          lastPct = sevenPct;
+        } else {
+          // 5h window is the limiter (or equal) → blue (in progress state)
+          lastState = 1;
+          lastPct = fivePct;
+        }
+      }
     }
   } catch {
-    // Proxy not available — no-op
+    // Proxy not available — fall through and re-emit the last known value.
   }
+
+  // Always re-assert (holds the last value through hiccups, keeps bar alive).
+  emit();
 }
 
 function debouncedUpdate() {

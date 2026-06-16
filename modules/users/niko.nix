@@ -33,7 +33,7 @@
       backupFileExtension = "bak";
       useGlobalPkgs = true;
       useUserPackages = true;
-      extraSpecialArgs = {inherit self inputs;};
+      extraSpecialArgs = {inherit self inputs upkgs;};
 
       users.${user} = {
         pkgs,
@@ -333,10 +333,6 @@
 
         services = {
           playerctld.enable = true;
-          emailManager = {
-            enable = true;
-            profile = "${user}";
-          };
 
           batsignal.enable = true;
         };

@@ -31,8 +31,6 @@ in {
     self.nixosModules.misc
     self.nixosModules.console
 
-    ./services/minecraft.nix
-
     inputs.disko.nixosModules.disko
     {disko.devices.disk.vdb.device = "/dev/nvme0n1";}
 
@@ -68,13 +66,6 @@ in {
         secrets."shell_environment/OPENROUTER_API_KEY" = {
           mode = "0644";
         };
-        # RCON password for the Minecraft server, as an env file
-        # (RCON_PASSWORD=...). Read by systemd (root) for EnvironmentFile, so
-        # the default 0400 root owner is sufficient.
-        secrets."services/minecraft/env" = {};
-        # secrets."shell_environment/ANTHROPIC_API_KEY" = {
-        #   mode = "0644";
-        # };
       };
     }
 
@@ -109,7 +100,7 @@ in {
   ];
 
   programs = {
-    virt-manager.enable = true;
+    virt-manager.enable = true; # needed for what?
     direnv = {
       enable = true;
       silent = true;
@@ -117,26 +108,12 @@ in {
   };
 
   virtualisation = {
-    waydroid.enable = false;
-
     libvirtd = {
       enable = true;
 
       qemu.swtpm.enable = true;
     };
   };
-
-  security.sudo.extraRules = [
-    {
-      users = [user];
-      commands = [
-        {
-          command = "${pkgs.wgnord}/bin/wgnord";
-          options = ["NOPASSWD"];
-        }
-      ];
-    }
-  ];
 
   programs = {
     nix-ld = {

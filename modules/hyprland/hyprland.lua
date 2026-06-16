@@ -485,7 +485,7 @@ hl.bind(mainMod .. " + ALT + m", hl.dsp.layout("setlayout, master"))
 
 -- Workspaces
 for i = 1, 9 do
-	hl.bind(mainMod .. " + " .. i, hl.dsp.exec_raw("focusworkspaceoncurrentmonitor " .. i))
+	hl.bind(mainMod .. " + " .. i, hl.dsp.focus({ workspace = i }))
 	hl.bind(mainMod .. " + SHIFT + " .. i, hl.dsp.window.move({ workspace = i }))
 end
 

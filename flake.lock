@@ -24,26 +24,6 @@
     "NixVirt": {
       "inputs": {
         "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1774166436,
-        "narHash": "sha256-Lr1R+tx8ZMiB+aBWyvCaeDaFGivhMMQEq9iGp4F43bI=",
-        "owner": "AshleyYakeley",
-        "repo": "NixVirt",
-        "rev": "bf291972bec36018f39e61b0915940628ba9054c",
-        "type": "github"
-      },
-      "original": {
-        "owner": "AshleyYakeley",
-        "repo": "NixVirt",
-        "type": "github"
-      }
-    },
-    "NixVirt_2": {
-      "inputs": {
-        "nixpkgs": [
           "nelly",
           "nixpkgs"
         ]
@@ -59,22 +39,6 @@
       "original": {
         "owner": "AshleyYakeley",
         "repo": "NixVirt",
-        "type": "github"
-      }
-    },
-    "UnattendedWinstall": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1780518744,
-        "narHash": "sha256-w1DGJ7M3H/BbJjSqzO2K+ICMrnnFXmNf0u1ol21LAQg=",
-        "owner": "memstechtips",
-        "repo": "UnattendedWinstall",
-        "rev": "cca752363772a845eb0fed9d3a5b89b5d0a10d20",
-        "type": "github"
-      },
-      "original": {
-        "owner": "memstechtips",
-        "repo": "UnattendedWinstall",
         "type": "github"
       }
     },
@@ -2024,7 +1988,7 @@
     },
     "nelly": {
       "inputs": {
-        "NixVirt": "NixVirt_2",
+        "NixVirt": "NixVirt",
         "nixpkgs": [
           "nixpkgs"
         ],
@@ -2924,8 +2888,6 @@
     "root": {
       "inputs": {
         "Hyprspace": "Hyprspace",
-        "NixVirt": "NixVirt",
-        "UnattendedWinstall": "UnattendedWinstall",
         "claude-code-system-prompts": "claude-code-system-prompts",
         "crane": "crane",
         "determinate": "determinate",

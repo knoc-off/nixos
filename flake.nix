@@ -265,16 +265,6 @@
       flake = false;
     };
 
-    NixVirt = {
-      url = "github:AshleyYakeley/NixVirt";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    UnattendedWinstall = {
-      url = "github:memstechtips/UnattendedWinstall";
-      flake = false;
-    };
-
     determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
 
     firefox-csshacks = {

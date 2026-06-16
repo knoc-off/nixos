@@ -53,6 +53,31 @@
         };
       in
         regular // swap;
+
+      btrfsContent = {
+        type = "btrfs";
+        extraArgs = ["-f"];
+        subvolumes = buildSubvolumes;
+      };
+
+      # The full-disk partition holding the btrfs filesystem. When encryption is
+      # on it is a LUKS container wrapping btrfs; when off, btrfs sits directly
+      # on the partition (required for unattended boot -- no passphrase prompt).
+      rootPartition = {
+        size = "100%";
+        content =
+          if cfg.encryption
+          then {
+            type = "luks";
+            name = cfg.luksName;
+            passwordFile = cfg.luksPasswordFile;
+            settings = {
+              allowDiscards = cfg.allowDiscards;
+            };
+            content = btrfsContent;
+          }
+          else btrfsContent;
+      };
     in {
       imports = [
         inputs.disko.nixosModules.disko
@@ -60,6 +85,18 @@
 
       options.disks.btrfsLuks = {
         enable = mkEnableOption "BTRFS on LUKS encrypted disk layout";
+
+        encryption = mkOption {
+          type = types.bool;
+          default = true;
+          description = ''
+            Whether to encrypt the BTRFS volume with LUKS. Disable for headless
+            hosts that must boot unattended (e.g. Wake-on-LAN boot-on-demand),
+            where an interactive passphrase prompt at every boot is unacceptable.
+            With encryption off, btrfs is created directly on the partition and
+            the luks* / passwordFile options are ignored.
+          '';
+        };
 
         device = mkOption {
           type = types.str;
@@ -159,6 +196,10 @@
             assertion = cfg.hibernation -> cfg.swapSize != null;
             message = "disks.btrfsLuks: hibernation requires swap. Set swapSize to enable swap.";
           }
+          {
+            assertion = cfg.hibernation -> cfg.encryption;
+            message = "disks.btrfsLuks: hibernation resume is only wired for the encrypted layout (resumeDevice points at the LUKS mapper). Set encryption = true or disable hibernation.";
+          }
         ];
 
         boot.resumeDevice = mkIf cfg.hibernation "/dev/mapper/${cfg.luksName}";
@@ -179,23 +220,12 @@
                   mountOptions = ["defaults"];
                 };
               };
-              luks = {
-                size = "100%";
-                content = {
-                  type = "luks";
-                  name = cfg.luksName;
-                  passwordFile = cfg.luksPasswordFile;
-                  settings = {
-                    allowDiscards = cfg.allowDiscards;
-                  };
-                  content = {
-                    type = "btrfs";
-                    extraArgs = ["-f"];
-                    subvolumes = buildSubvolumes;
-                  };
-                };
-              };
-            };
+            }
+            // (
+              if cfg.encryption
+              then {luks = rootPartition;}
+              else {root = rootPartition;}
+            );
           };
         };
       };
