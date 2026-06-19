@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### Changed
+
+- **Breaking (map data source)**: `marki-map` now resolves country and
+  administrative boundaries from **geoBoundaries gbOpen** instead of
+  Natural Earth. Natural Earth is retained only for `coastline`.
+  `RENDER_VERSION_MAP` bumped to `21` (cache invalidation).
+  - New reference vocabulary: `country/<ISO3>`,
+    `adm1|adm2|adm3/<ISO3>/<NAME>`, `neighbors/<ISO3>`,
+    `continent/<NAME>`, `subregion/<NAME>`, `coastline`.
+  - **Removed**: `admin1/<ISO3>/<NAME>` and `region/<ISO3>/<NAME>`. Use
+    the raw geoBoundaries level (`adm1`/`adm2`/`adm3`) that matches the
+    division you want — geoBoundaries levels are not uniform across
+    countries (e.g. Italian regioni are `adm2/ITA/<name>`, not `adm1`).
+  - Names are now **local-language `shapeName`** (`adm1/DEU/Bayern`,
+    not `admin1/DEU/Bavaria`; `adm2/ITA/Lazio`). One-shot card migration
+    will be needed for any `admin1/`/`region/` references.
+  - New `geoboundaries-data` Nix derivation provides the dataset via the
+    `GEOBOUNDARIES_DATA` env var (ADM0/1/2 simplified geometry + the
+    open metadata CSV). The `markid` module gains a `geoBoundariesData`
+    option alongside `naturalEarthData`.
+  - Known caveat: gbOpen country polygons are sourced independently per
+    country, so `neighbors/` mostly relies on the coarser bbox-intersect
+    fallback rather than exact topological adjacency.
+
 ### Added
 
 - New `marki-media` crate (replaces `marki-flag`): renders fenced

@@ -7,6 +7,7 @@
 { inputs, self }: let
   markidPkg = system: self.packages.${system}.marki;
   naturalEarthPkg = system: self.packages.${system}.natural-earth-data or null;
+  geoBoundariesPkg = system: self.packages.${system}.geoboundaries-data or null;
 in {
   nixos = { config, lib, pkgs, ... }:
   with lib; let
@@ -120,12 +121,27 @@ in {
         type = types.nullOr types.package;
         default = naturalEarthPkg pkgs.stdenv.hostPlatform.system;
         description = ''
-          Natural Earth shapefile bundle used by `marki-map` to resolve
-          `country/<iso>`, `admin1/<iso>/<name>`, `coastline`, and
-          `neighbors/<iso>` feature references in `map` blocks.
+          Natural Earth coastline bundle used by `marki-map` to resolve
+          the `coastline` feature reference in `map` blocks.
 
           Exposed to the daemon via the `NATURAL_EARTH_DATA` env var.
-          Set to `null` to disable; map blocks referencing offline
+          Set to `null` to disable; map blocks referencing `coastline`
+          will then fail with a `block failed` stub on the rendered card
+          (the daemon never aborts the corpus).
+        '';
+      };
+
+      geoBoundariesData = mkOption {
+        type = types.nullOr types.package;
+        default = geoBoundariesPkg pkgs.stdenv.hostPlatform.system;
+        description = ''
+          geoBoundaries gbOpen bundle used by `marki-map` to resolve
+          `country/<iso>`, `adm1|adm2|adm3/<iso>/<name>`,
+          `neighbors/<iso>`, `continent/<name>`, and `subregion/<name>`
+          feature references in `map` blocks.
+
+          Exposed to the daemon via the `GEOBOUNDARIES_DATA` env var.
+          Set to `null` to disable; map blocks referencing those
           features will then fail with a `block failed` stub on the
           rendered card (the daemon never aborts the corpus).
         '';
@@ -285,6 +301,9 @@ in {
             }
             // lib.optionalAttrs (cfg.naturalEarthData != null) {
               NATURAL_EARTH_DATA = "${cfg.naturalEarthData}";
+            }
+            // lib.optionalAttrs (cfg.geoBoundariesData != null) {
+              GEOBOUNDARIES_DATA = "${cfg.geoBoundariesData}";
             };
 
           serviceConfig = {
@@ -600,14 +619,29 @@ in {
         type = types.nullOr types.package;
         default = naturalEarthPkg pkgs.stdenv.hostPlatform.system;
         description = ''
-          Natural Earth shapefile bundle used by `marki-map` to resolve
-          `country/<iso>`, `admin1/<iso>/<name>`, `coastline`, and
-          `neighbors/<iso>` feature references in `map` blocks.
+          Natural Earth coastline bundle used by `marki-map` to resolve
+          the `coastline` feature reference in `map` blocks.
 
           The package's output directory is exposed to the daemon via the
           `NATURAL_EARTH_DATA` environment variable. Set to `null` to
-          disable (any map blocks referencing offline features will fail
-          with a `block failed` stub on the rendered card).
+          disable (map blocks referencing `coastline` will fail with a
+          `block failed` stub on the rendered card).
+        '';
+      };
+
+      geoBoundariesData = mkOption {
+        type = types.nullOr types.package;
+        default = geoBoundariesPkg pkgs.stdenv.hostPlatform.system;
+        description = ''
+          geoBoundaries gbOpen bundle used by `marki-map` to resolve
+          `country/<iso>`, `adm1|adm2|adm3/<iso>/<name>`,
+          `neighbors/<iso>`, `continent/<name>`, and `subregion/<name>`
+          feature references in `map` blocks.
+
+          The package's output directory is exposed to the daemon via the
+          `GEOBOUNDARIES_DATA` environment variable. Set to `null` to
+          disable (map blocks referencing those features will fail with a
+          `block failed` stub on the rendered card).
         '';
       };
 
@@ -826,6 +860,8 @@ in {
               ]
               ++ optional (cfg.naturalEarthData != null)
               "NATURAL_EARTH_DATA=${cfg.naturalEarthData}"
+              ++ optional (cfg.geoBoundariesData != null)
+              "GEOBOUNDARIES_DATA=${cfg.geoBoundariesData}"
               ++ optional (cfg.mediaDir != null)
               "MARKID_MEDIA_DIR=${cfg.mediaDir}"
               ++ optional (cfg.typstPackage != null)

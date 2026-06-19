@@ -7,6 +7,7 @@
   version = cargoToml.workspace.package.version;
 
   naturalEarthData = pkgs.callPackage ../natural-earth-data {};
+  geoBoundariesData = pkgs.callPackage ../geoboundaries-data {};
 
   markid = pkgs.rustPlatform.buildRustPackage {
     pname = "markid";
@@ -39,9 +40,11 @@
         pkgs.jq
       ];
       NATURAL_EARTH_DATA = "${naturalEarthData}";
+      GEOBOUNDARIES_DATA = "${geoBoundariesData}";
       shellHook = ''
         echo "marki dev shell"
         echo "  NATURAL_EARTH_DATA=$NATURAL_EARTH_DATA"
+        echo "  GEOBOUNDARIES_DATA=$GEOBOUNDARIES_DATA"
       '';
     };
   };

@@ -11,7 +11,7 @@
 //! context = ["neighbors/DEU"]
 //!
 //! [layers.answer]
-//! highlights = ["admin1/DEU/Bavaria"]
+//! highlights = ["adm1/DEU/Bayern"]
 //! reveal = "fade"           # optional; non-base layers default to fade
 //! ```
 //!
@@ -115,7 +115,7 @@ fn default_cluster_factor() -> f64 { 0.15 }
 pub struct LayerSpec {
     /// Geometry references to draw on this layer. Each entry is a
     /// short string like `coastline`, `country/DEU`,
-    /// `admin1/DEU/Bavaria`, or `relation/2145268`.
+    /// `adm1/DEU/Bayern`, or `relation/2145268`.
     /// These features **define the viewport** (bounding box) as well
     /// as being drawn.
     #[serde(default)]
@@ -246,11 +246,11 @@ size = [400, 300]
 features = ["country/DEU"]
 
 [layers.answer]
-highlights = ["admin1/DEU/Bavaria"]
+highlights = ["adm1/DEU/Bayern"]
 "#;
         let s = parse_map_spec(src).unwrap();
         let answer = &s.layers["answer"];
-        assert_eq!(answer.highlights, vec!["admin1/DEU/Bavaria"]);
+        assert_eq!(answer.highlights, vec!["adm1/DEU/Bayern"]);
         assert!(answer.features.is_empty());
     }
 
@@ -337,7 +337,7 @@ features = ["coastline"]
 [layers.base]
 features = ["country/ITA"]
 [layers.answer]
-highlights = ["region/ITA/Piemonte", "region/ITA/Lombardia", "region/ITA/Liguria"]
+highlights = ["adm2/ITA/Piemonte", "adm2/ITA/Lombardia", "adm2/ITA/Liguria"]
 "#;
         let s = parse_map_spec(src).unwrap();
         assert_eq!(s.layers["answer"].highlights.len(), 3);
@@ -349,7 +349,7 @@ highlights = ["region/ITA/Piemonte", "region/ITA/Lombardia", "region/ITA/Liguria
 [layers.base]
 features = ["country/DEU"]
 [layers.answer]
-highlights = ["admin1/DEU/Bavaria"]
+highlights = ["adm1/DEU/Bayern"]
 [layers.answer.style]
 fill = "#3388ff"
 stroke = "#1a5599"
@@ -367,7 +367,7 @@ stroke = "#1a5599"
 [layers.base]
 features = ["country/DEU"]
 [layers.answer]
-highlights = ["admin1/DEU/Bavaria"]
+highlights = ["adm1/DEU/Bayern"]
 [layers.answer.style]
 bogus = true
 "#;

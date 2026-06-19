@@ -126,30 +126,30 @@
           }
           self.homeModules.starship
 
-          self.homeModules.markid
-          {
-            services.markid = {
-              enable = true;
-              settings.cards_dir = "/home/knoff/projects/flashcards";
-              mediaSources = {
-                circle = "${pkgs.circle-flags}/share/circle-flags-svg";
-                flags = "${hayleox-flags}/share/hayleox-flags";
-              };
-              typstPackage = pkgs.typst.withPackages (p:
-                with p; [
-                  circuiteria
-                  cetz
-                  cetz_0_3_4
-                  oxifmt_0_2_1
-                  zap
-                ]);
-            };
-            # Anki with AnkiConnect pre-installed — launch as a normal desktop app,
-            # markid connects via wait_for_anki() once it's open.
-            home.packages = [
-              (pkgs.anki.withAddons (with pkgs.ankiAddons; [anki-connect]))
-            ];
-          }
+          # self.homeModules.markid
+          # {
+          #   services.markid = {
+          #     enable = true;
+          #     settings.cards_dir = "/home/knoff/projects/flashcards";
+          #     mediaSources = {
+          #       circle = "${pkgs.circle-flags}/share/circle-flags-svg";
+          #       flags = "${hayleox-flags}/share/hayleox-flags";
+          #     };
+          #     typstPackage = pkgs.typst.withPackages (p:
+          #       with p; [
+          #         circuiteria
+          #         cetz
+          #         cetz_0_3_4
+          #         oxifmt_0_2_1
+          #         zap
+          #       ]);
+          #   };
+          #   # Anki with AnkiConnect pre-installed — launch as a normal desktop app,
+          #   # markid connects via wait_for_anki() once it's open.
+          #   home.packages = [
+          #     (pkgs.anki.withAddons (with pkgs.ankiAddons; [anki-connect]))
+          #   ];
+          # }
 
           self.homeModules.compat-proxy
           {

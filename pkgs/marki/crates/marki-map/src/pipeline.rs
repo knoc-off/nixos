@@ -22,7 +22,7 @@ use crate::cache::{self, CacheFile};
 use crate::clip;
 use crate::cluster;
 use crate::compose::{Feature, compose_layer};
-use crate::data::{natural_earth, overpass};
+use crate::data::{geoboundaries, natural_earth, overpass};
 use crate::dsl::{MapSpec, RevealMode};
 use crate::embed::{EmbedLayer, embed_layers, resolve_reveals};
 use crate::error::MapError;
@@ -260,17 +260,20 @@ fn resolve_all_layers<'a>(
 }
 
 /// Resolve one feature reference. Centralised here so future sources
-/// (Overpass, etc.) can be added without touching natural_earth.rs.
+/// can be added without touching the per-source loaders.
 fn resolve_one(r: &str, cache_root: &Path) -> Result<Geometry, MapError> {
-    if r == "coastline"
-        || r.starts_with("country/")
-        || r.starts_with("admin1/")
-        || r.starts_with("region/")
+    if r == "coastline" {
+        return natural_earth::resolve_feature(r);
+    }
+    if r.starts_with("country/")
+        || r.starts_with("adm1/")
+        || r.starts_with("adm2/")
+        || r.starts_with("adm3/")
         || r.starts_with("neighbors/")
         || r.starts_with("continent/")
         || r.starts_with("subregion/")
     {
-        return natural_earth::resolve_feature(r);
+        return geoboundaries::resolve_feature(r);
     }
     if r.starts_with("relation/") || r.starts_with("way/") {
         return overpass::resolve(r, cache_root);

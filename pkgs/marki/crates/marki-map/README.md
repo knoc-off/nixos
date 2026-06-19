@@ -15,7 +15,7 @@ features = ["country/DEU"]
 context = ["neighbors/DEU"]
 
 [layers.answer]
-highlights = ["admin1/DEU/Bavaria"]
+highlights = ["adm1/DEU/Bayern"]
 ```
 
 ---
@@ -29,7 +29,7 @@ That's the whole authoring loop for the most common pattern
 (country-outline-with-region-highlight):
 
 1. The `base` layer draws Germany and its neighbours.
-2. The `answer` layer highlights Bavaria.
+2. The `answer` layer highlights Bavaria (geoBoundaries ADM1 `Bayern`).
 3. The renderer emits `base.svg` and `answer.svg` and embeds both
    `<img>`s in the card.
 4. CSS hides the answer layer on the front (`opacity: 0`) and
@@ -79,7 +79,7 @@ active theme.
 
 ```toml
 [layers.answer]
-highlights = ["admin1/DEU/Bavaria"]
+highlights = ["adm1/DEU/Bayern"]
 [layers.answer.style]
 fill = "#3388ff"
 stroke = "#1a5599"
@@ -92,34 +92,41 @@ The renderer understands these reference shapes:
 
 - `coastline` — every coastline polyline from Natural Earth.
 - `country/<ISO_A3>` — one country by three-letter ISO code (`DEU`,
-  `FRA`, `JPN`, …). Source: Natural Earth `ne_10m_admin_0_countries`.
-  Always returns the full geometry; outlying components (Alaska,
-  French Guiana, Chatham Islands, …) are drawn but the viewport is
-  auto-focused on the main cluster — see "Auto-focus" below.
-- `admin1/<ISO_A3>/<NAME>` — one admin-1 entry inside a country
-  (province, state, oblast, …). Indexed by both `name_en` and
-  `name` (case-insensitive). Source: Natural Earth
-  `ne_10m_admin_1_states_provinces`.
-- `region/<ISO_A3>/<NAME>` — composite of all admin-1 entries whose
-  NE `region` column matches `<NAME>` (case-insensitive). Use this
-  for Italian regioni (`region/ITA/Sicily`), French régions
-  (`region/FRA/Île-de-France`), etc. Not all countries populate this
-  column; see "admin1 vs. region" below.
+  `FRA`, `JPN`, …). Source: geoBoundaries gbOpen ADM0. Always returns
+  the full geometry; outlying components (Alaska, French Guiana,
+  Chatham Islands, …) are drawn but the viewport is auto-focused on
+  the main cluster — see "Auto-focus" below.
+- `adm1/<ISO_A3>/<NAME>`, `adm2/<ISO_A3>/<NAME>`, `adm3/<ISO_A3>/<NAME>`
+  — one administrative unit at the given geoBoundaries level, keyed by
+  the **local** `shapeName` (case-insensitive: `Bayern`, not
+  `Bavaria`). Source: geoBoundaries gbOpen ADM1/ADM2/ADM3.
+
+  **Levels are not uniform across countries.** geoBoundaries follows
+  each country's own administrative hierarchy, so the same level maps
+  to different real-world divisions:
+
+  | Country | ADM1 | ADM2 | ADM3 |
+  |---------|------|------|------|
+  | Germany | Länder | Kreise | — |
+  | USA | states | counties | — |
+  | Italy | macroregions (5) | regioni (20) | province (107) |
+
+  Pick the level that matches the division you want — e.g.
+  `adm1/DEU/Bayern` for a German state, but `adm2/ITA/Lazio` for an
+  Italian region. See "Finding feature IDs" below.
 - `neighbors/<ISO_A3>` — every country that shares a border with
   the target (topological adjacency). Falls back to bbox-intersect
-  for island nations with no shared edges. Source: Natural Earth.
-- `continent/<NAME>` — composite of all countries whose NE
-  `CONTINENT` column matches (case-insensitive). Values: `Africa`,
-  `Antarctica`, `Asia`, `Europe`, `North America`, `Oceania`,
-  `South America`.
-- `subregion/<NAME>` — composite of all countries whose NE
-  `SUBREGION` column matches (case-insensitive). Values include
+  for island nations with no shared edges. Source: geoBoundaries ADM0.
+- `continent/<NAME>` — composite of all countries whose geoBoundaries
+  `Continent` matches (case-insensitive). Values include `Africa`,
+  `Asia`, `Europe`, `Oceania`, `South America`, `Northern America`.
+- `subregion/<NAME>` — composite of all countries whose geoBoundaries
+  `UNSDG-subregion` matches (case-insensitive). Values include
   `Western Europe`, `Eastern Europe`, `Southern Europe`,
-  `Northern Europe`, `Northern Africa`, `Central America`,
-  `South-Eastern Asia`, etc. (~20 UN subregions).
+  `Northern Africa`, `South-Eastern Asia`, etc.
 - `relation/<N>` and `way/<N>` — fetched from
   [Overpass](https://overpass-api.de/) and cached
-  content-addressably. Use this when Natural Earth's admin-1
+  content-addressably. Use this when geoBoundaries' admin
   boundaries don't match the political boundary you want.
 
 ## Auto-focus
@@ -142,7 +149,7 @@ Concretely:
 - `subregion/Western Europe` → mainland Europe + UK + Ireland (Svalbard, Iceland drawn but clipped).
 
 If you explicitly highlight an outlying region — say
-`highlights = ["admin1/USA/Alaska"]` over a `country/USA` base — the
+`highlights = ["adm1/USA/Alaska"]` over a `country/USA` base — the
 viewport stretches to include the highlight, so your answer never
 gets clipped.
 
@@ -158,21 +165,25 @@ canvas with empty ocean. Authors don't need to think about this;
 write `features = ["country/NZL", "country/FJI"]` and you'll get a
 tight Pacific view.
 
-### admin1 vs. region
+### Choosing an admin level
 
-NE's `ne_10m_admin_1_states_provinces` has two useful name tiers:
+geoBoundaries names every administrative unit by its **local**
+`shapeName` and slots it into a per-country level hierarchy
+(`ADM1` → `ADM2` → `ADM3`). The catch is that the *meaning* of a level
+varies by country, so you choose the level that lines up with the
+division you're after:
 
-- **`admin1/<ISO>/<NAME>`** resolves a single entry (e.g. one
-  Italian province like `admin1/ITA/Milan` or one US state like
-  `admin1/USA/Texas`).
-- **`region/<ISO>/<NAME>`** merges every entry whose `region`
-  column matches — giving you the *composite outline* of e.g.
-  all Sicilian provinces (`region/ITA/Sicily`).
+- **`adm1/<ISO>/<NAME>`** is the first-order division for most
+  countries — German `Länder` (`adm1/DEU/Bayern`), US states
+  (`adm1/USA/Texas`), French régions (`adm1/FRA/Île-de-France`).
+- For countries whose first administrative tier is a statistical
+  grouping, the political division you expect sits one level deeper:
+  Italian regioni are `adm2/ITA/Lazio`; Italian province are
+  `adm3/ITA/Roma`.
 
-Use `admin1` for federal first-order divisions (US states, German
-Länder, Russian oblasts — NE doesn't populate `region` for these).
-Use `region` for sub-national groupings (Italian regioni, French
-régions, Spanish autonomous communities).
+Names are matched case-insensitively against `shapeName` and are
+**local-language** — `Bayern` not `Bavaria`, `Roma` not `Rome`,
+`München` not `Munich`.
 
 See **Finding feature IDs** below for how to look these up in practice.
 
@@ -183,8 +194,7 @@ of references. Here's how to find each.
 
 ### `country/<ISO_A3>`
 
-Three-letter codes from ISO 3166-1 alpha-3 (with a few Natural-Earth
-extras for unrecognised territories).
+Three-letter codes from ISO 3166-1 alpha-3.
 
 - Quick reference: <https://en.wikipedia.org/wiki/ISO_3166-1_alpha-3>
 - Cheatsheet for common ones:
@@ -192,38 +202,31 @@ extras for unrecognised territories).
   `SWE NOR FIN DNK IRL PRT GRC TUR UKR RUS`
   `USA CAN MEX BRA ARG CHL JPN CHN KOR IND IDN AUS NZL ZAF EGY`
 
-### `admin1/<ISO_A3>/<NAME>` and `region/<ISO_A3>/<NAME>`
+### `adm1|adm2|adm3/<ISO_A3>/<NAME>`
 
-`<NAME>` matches NE's `name_en` or `name` (case-insensitive, both
-are tried). For many countries that's the standard English name —
-`Bavaria`, not `Bayern`; `Hesse`, not `Hessen`. Local names (e.g.
-`Hovedstaden` for the Capital Region of Denmark) also work because
-the `name` column is indexed.
-
-To list entries for a given country (inside `nix develop .#marki`
-where gdal + `NATURAL_EARTH_DATA` are available):
+`<NAME>` matches geoBoundaries' local `shapeName` (case-insensitive).
+To list the units at a given level for a country (inside
+`nix develop .#marki`, where gdal + `GEOBOUNDARIES_DATA` are
+available):
 
 ```sh
-# Admin-1 entries (provinces, states, …):
-ogrinfo -geom=NO -where "adm0_a3='ITA'" \
-  "$NATURAL_EARTH_DATA/ne_10m_admin_1_states_provinces.shp" \
-  ne_10m_admin_1_states_provinces \
-  | grep -E "^  (name_en|name) "
+# Units at ADM1 for Germany:
+ogrinfo -geom=NO "$GEOBOUNDARIES_DATA/DEU_ADM1.geojson" \
+  | grep "shapeName (String)"
 
-# Region groupings:
-ogrinfo -geom=NO -where "adm0_a3='ITA'" \
-  "$NATURAL_EARTH_DATA/ne_10m_admin_1_states_provinces.shp" \
-  ne_10m_admin_1_states_provinces \
-  | grep -E "^  region " | sort -u
+# Units at ADM2 for Italy (the regioni):
+ogrinfo -geom=NO "$GEOBOUNDARIES_DATA/ITA_ADM2.geojson" \
+  | grep "shapeName (String)"
 ```
 
-Swap `ITA` for whichever country you're after.
+Swap the ISO and `ADM<n>` for whichever country/level you're after.
+If a file is missing, that country has no boundaries at that level.
 
 ### `relation/<N>` and `way/<M>`
 
 These come straight from OpenStreetMap. Use them when you need a
-boundary NE doesn't carry — a city, a neighbourhood, a lake, a park,
-a custom multipolygon.
+boundary geoBoundaries doesn't carry — a city, a neighbourhood, a
+lake, a park, a custom multipolygon.
 
 The fastest workflow:
 
@@ -291,9 +294,9 @@ fiddling with theme TOML — no AnkiConnect / sync round-trip needed.
 nix develop .#marki
 ```
 
-Gives you `cargo`, `gdal` (for `ogrinfo`), `curl`, `jq`, and
-`NATURAL_EARTH_DATA` pre-set. Useful for exploring admin-1 names and
-regions without installing anything globally.
+Gives you `cargo`, `gdal` (for `ogrinfo`), `curl`, `jq`,
+`GEOBOUNDARIES_DATA`, and `NATURAL_EARTH_DATA` pre-set. Useful for
+exploring admin unit names without installing anything globally.
 
 ## Caching
 
@@ -304,14 +307,15 @@ Three layers of caching keep things fast and offline-friendly:
    On a hit, no resolve / project / compose work runs at all.
 2. **Overpass cache** at `$XDG_CACHE_HOME/marki/net/overpass/`.
    Key = blake3(query string). Entries don't expire.
-3. **Natural Earth bundle** delivered by Nix derivation
-   (`pkgs.natural-earth-data`); the path is passed in via
-   `NATURAL_EARTH_DATA`.
+3. **Offline boundary bundles** delivered by Nix derivations:
+   `pkgs.geoboundaries-data` (admin boundaries, via
+   `GEOBOUNDARIES_DATA`) and `pkgs.natural-earth-data` (coastline, via
+   `NATURAL_EARTH_DATA`).
 
 ## Failure modes
 
 The daemon never aborts the corpus on one bad map. When something
-goes wrong (NE env unset, bad TOML, OSM 404, network down, …) the
+goes wrong (data env unset, bad TOML, OSM 404, network down, …) the
 renderer returns an error and the daemon splices a small red-bordered
 `block failed:` `<div>` into the card so the issue is visible during
 study without blocking unrelated cards.
@@ -325,7 +329,11 @@ study without blocking unrelated cards.
 - Mercator (Web Mercator) only. The DSL doesn't yet allow choosing
   other projections; the equirectangular code path remains in tree
   for unit-test scaffolding but isn't a runtime option.
-- The `region` column isn't populated for all countries in NE
-  (e.g. US, Germany). For those, use `admin1` directly.
+- geoBoundaries admin levels are not uniform across countries (e.g.
+  Italian regioni are at ADM2, not ADM1). Pick the level that matches
+  the division you want.
+- The bundled dataset ships geoBoundaries ADM0/ADM1/ADM2 only; ADM3+
+  references won't resolve until those levels are added to the
+  `geoboundaries-data` derivation.
 
 These are deliberate M1 cuts; see the RFC for the full vocabulary.

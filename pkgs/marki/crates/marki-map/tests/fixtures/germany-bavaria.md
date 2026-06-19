@@ -7,7 +7,7 @@ size = [600, 400]
 features = ["country/DEU", "neighbors/DEU"]
 
 [layers.answer]
-highlights = ["admin1/DEU/Bavaria"]
+highlights = ["adm1/DEU/Bayern"]
 ```
 
 ---

@@ -44,5 +44,11 @@
 //!   (`min_density = 0.0`, `min_aspect = 0.0`); the machinery is
 //!   kept in place for opt-in use, but defaults preserve the natural
 //!   Mercator framing of country geometry.
+//! - `21` — Admin boundary source switched from Natural Earth to
+//!   geoBoundaries gbOpen. Reference vocabulary is now `country/<iso>`,
+//!   `adm1|adm2|adm3/<iso>/<name>` (raw geoBoundaries levels, local
+//!   `shapeName`), `neighbors/<iso>`, `continent/<name>`,
+//!   `subregion/<name>`. The old `admin1/` and `region/` references are
+//!   gone. Natural Earth is retained only for `coastline`.
 
-pub const RENDER_VERSION_MAP: u32 = 20;
+pub const RENDER_VERSION_MAP: u32 = 21;

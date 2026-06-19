@@ -56,7 +56,14 @@ enum Cmd {
     /// no Anki needed. Meant to be run in CI or as a pre-commit step.
     Fmt,
     /// Run a single reconcile cycle and exit.
-    Push,
+    Push {
+        /// Wait (with capped backoff) for AnkiConnect to become
+        /// reachable before running the cycle, instead of failing fast.
+        /// Useful for one-shot invocations (cron, systemd oneshot) where
+        /// Anki may still be starting up.
+        #[arg(long, env = "MARKID_WAIT_FOR_ANKI")]
+        wait_for_anki: bool,
+    },
     /// Long-running daemon: watch the cards directory and push on change.
     Watch,
     /// Read-only diff view (added / updated / moved / deleted / unformatted).
@@ -96,12 +103,19 @@ fn main() -> Result<()> {
 
     match cli.cmd {
         Cmd::Fmt => cmd_fmt(&cfg),
-        Cmd::Push => {
+        Cmd::Push { wait_for_anki } => {
             let anki = AnkiConnect::new(&cfg.anki_endpoint).context("init AnkiConnect client")?;
             let registry = Arc::new(build_registry(&cfg));
             let mut script_engine = build_script_engine(&cfg);
             let mut template_state = load_template_state();
-            cmd_push(&anki, &cfg, &registry, &mut script_engine, &mut template_state)
+            cmd_push(
+                &anki,
+                &cfg,
+                &registry,
+                &mut script_engine,
+                &mut template_state,
+                wait_for_anki,
+            )
         }
         Cmd::Status => {
             let anki = AnkiConnect::new(&cfg.anki_endpoint).context("init AnkiConnect client")?;
@@ -294,8 +308,13 @@ fn cmd_push(
     registry: &Arc<Registry>,
     script_engine: &mut ScriptEngine,
     template_state: &mut TemplateState,
+    wait_for_anki_first: bool,
 ) -> Result<()> {
-    anki.ping().context("AnkiConnect ping")?;
+    if wait_for_anki_first {
+        wait_for_anki(anki)?;
+    } else {
+        anki.ping().context("AnkiConnect ping")?;
+    }
     run_cycle(anki, cfg, registry, script_engine, template_state, false)
 }
 

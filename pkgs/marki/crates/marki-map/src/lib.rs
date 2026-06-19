@@ -42,8 +42,9 @@ pub const MAP_LANG: &str = "map";
 /// Map block renderer. Construct with [`MapRenderer::new`] and register
 /// against the markid daemon's [`crate::Registry`].
 pub struct MapRenderer {
-    // Hooks for natural-earth path / overpass client / theme cache go
-    // here as the pipeline lands. For the stub renderer this is empty.
+    // Hooks for geoBoundaries / natural-earth path / overpass client /
+    // theme cache go here as the pipeline lands. For the stub renderer
+    // this is empty.
 }
 
 impl Default for MapRenderer {
