@@ -41,6 +41,33 @@ impl LayerStyle {
     }
 }
 
+/// Detail-reduction knobs for one compose pass, in rendered pixels.
+#[derive(Clone, Copy)]
+pub struct RenderDetail {
+    /// Minimum projected area, in px², below which a polygon component
+    /// is a candidate for culling. The threshold is `min_island_px²`.
+    /// `0.0` disables culling.
+    pub min_island_px2: f64,
+    /// Relative-size escape hatch: a component whose area is at least
+    /// this fraction of the feature's largest component is kept even
+    /// when below `min_island_px2`.
+    pub island_rel_frac: f64,
+    /// Douglas-Peucker simplification tolerance in px. `0.0` disables.
+    pub simplify_px: f64,
+}
+
+impl Default for RenderDetail {
+    /// No culling, 1 px simplification — the historical behaviour, used
+    /// by tests that don't exercise detail reduction.
+    fn default() -> Self {
+        Self {
+            min_island_px2: 0.0,
+            island_rel_frac: 0.0,
+            simplify_px: 1.0,
+        }
+    }
+}
+
 /// Render one layer to a self-contained SVG document.
 ///
 /// Features whose role is `"hull"` are not drawn as outlines: each is
@@ -51,6 +78,10 @@ impl LayerStyle {
 /// smooth, padded region. `hull_radius_px` (in SVG pixels) is the corner
 /// radius / outward padding; it is ignored for every other role and may
 /// be `0.0` on non-hull layers.
+///
+/// `detail` controls per-feature small-landmass culling and outline
+/// simplification (see [`RenderDetail`]); culling never touches the
+/// hull, which always wraps the feature's full extent.
 pub fn compose_layer(
     width: u32,
     height: u32,
@@ -58,6 +89,7 @@ pub fn compose_layer(
     projector: &dyn Projector,
     features: &[Feature<'_>],
     hull_radius_px: f64,
+    detail: RenderDetail,
 ) -> String {
     let mut out = String::with_capacity(4096);
     let _ = write!(
@@ -107,7 +139,7 @@ pub fn compose_layer(
             if role == "hull" {
                 write_hull(&mut out, projector, f.geom, hull_radius_px);
             } else {
-                write_feature(&mut out, projector, f.geom);
+                write_feature(&mut out, projector, f.geom, detail);
             }
         }
         out.push_str("</g>");
@@ -326,14 +358,15 @@ fn write_capsule(out: &mut String, a: (f64, f64), b: (f64, f64), pad: f64) {
     );
 }
 
-fn write_feature(out: &mut String, p: &dyn Projector, g: &Geometry) {
+fn write_feature(out: &mut String, p: &dyn Projector, g: &Geometry, detail: RenderDetail) {
+    let eps = detail.simplify_px;
     match g {
         Geometry::Point(pt) => {
             let (x, y) = p.project(*pt);
             let _ = write!(out, "<circle cx=\"{x:.2}\" cy=\"{y:.2}\" r=\"2\"/>");
         }
         Geometry::LineString(line) => {
-            let d = path_data_open(p, line);
+            let d = path_data_open(p, line, eps);
             if !d.is_empty() {
                 let _ = write!(out, "<path d=\"{d}\" fill=\"none\"/>");
             }
@@ -341,7 +374,7 @@ fn write_feature(out: &mut String, p: &dyn Projector, g: &Geometry) {
         Geometry::MultiLineString(lines) => {
             let mut combined = String::new();
             for l in lines {
-                let d = path_data_open(p, l);
+                let d = path_data_open(p, l, eps);
                 if !d.is_empty() {
                     if !combined.is_empty() {
                         combined.push(' ');
@@ -354,25 +387,30 @@ fn write_feature(out: &mut String, p: &dyn Projector, g: &Geometry) {
             }
         }
         Geometry::Polygon { outer, holes } => {
-            let mut d = path_data_closed(p, outer);
+            // A single component is the whole feature — never culled.
+            let mut d = path_data_closed(p, outer, eps);
             for h in holes {
                 d.push(' ');
-                d.push_str(&path_data_closed(p, h));
+                d.push_str(&path_data_closed(p, h, eps));
             }
             if !d.is_empty() {
                 let _ = write!(out, "<path d=\"{d}\" fill-rule=\"evenodd\"/>");
             }
         }
         Geometry::MultiPolygon(polys) => {
+            let keep = cull_components(p, polys, detail);
             let mut d = String::new();
-            for poly in polys {
+            for (poly, keep_it) in polys.iter().zip(keep) {
+                if !keep_it {
+                    continue;
+                }
                 if !d.is_empty() {
                     d.push(' ');
                 }
-                d.push_str(&path_data_closed(p, &poly.outer));
+                d.push_str(&path_data_closed(p, &poly.outer, eps));
                 for h in &poly.holes {
                     d.push(' ');
-                    d.push_str(&path_data_closed(p, h));
+                    d.push_str(&path_data_closed(p, h, eps));
                 }
             }
             if !d.is_empty() {
@@ -382,16 +420,60 @@ fn write_feature(out: &mut String, p: &dyn Projector, g: &Geometry) {
     }
 }
 
-/// Sub-pixel simplification tolerance. Points that deviate less than
-/// this many pixels from the simplified line are removed. Because
-/// coordinates are in projected pixels, this auto-adapts to zoom:
-/// a 600 px Germany keeps fine detail; a 600 px world map simplifies
-/// aggressively. 1.0 px is imperceptible at card viewing distance.
-const SIMPLIFY_EPSILON: f64 = 1.0;
+/// Decide which components of a multipolygon survive detail culling.
+///
+/// Returns one flag per input polygon. The largest component is always
+/// kept so a feature never fully vanishes (a tiny island that is itself
+/// the answer survives even zoomed far out). Every other component
+/// survives if it is individually visible (`area ≥ min_island_px²`) or
+/// comparable to the feature's largest mass (`area ≥ rel_frac × max`),
+/// so clusters of roughly equal islands stay intact while sub-pixel
+/// specks beside one dominant landmass are dropped. Culling is skipped
+/// entirely when `min_island_px²` is zero or the feature has ≤1 part.
+fn cull_components(p: &dyn Projector, polys: &[crate::geometry::Polygon], detail: RenderDetail) -> Vec<bool> {
+    let n = polys.len();
+    if n <= 1 || detail.min_island_px2 <= 0.0 {
+        return vec![true; n];
+    }
+    let areas: Vec<f64> = polys
+        .iter()
+        .map(|poly| projected_ring_area(p, &poly.outer))
+        .collect();
+    let mut max_idx = 0;
+    let mut max_area = 0.0;
+    for (i, &a) in areas.iter().enumerate() {
+        if a > max_area {
+            max_area = a;
+            max_idx = i;
+        }
+    }
+    let rel_thresh = detail.island_rel_frac * max_area;
+    areas
+        .iter()
+        .enumerate()
+        .map(|(i, &a)| i == max_idx || a >= detail.min_island_px2 || a >= rel_thresh)
+        .collect()
+}
 
-fn path_data_open(p: &dyn Projector, pts: &[LonLat]) -> String {
+/// Unsigned area of a ring in projected (pixel) space via the shoelace
+/// formula. Rings with fewer than three points have zero area.
+fn projected_ring_area(p: &dyn Projector, ring: &[LonLat]) -> f64 {
+    if ring.len() < 3 {
+        return 0.0;
+    }
+    let pts: Vec<(f64, f64)> = ring.iter().map(|pt| p.project(*pt)).collect();
+    let mut a2 = 0.0;
+    for i in 0..pts.len() {
+        let (x0, y0) = pts[i];
+        let (x1, y1) = pts[(i + 1) % pts.len()];
+        a2 += x0 * y1 - x1 * y0;
+    }
+    (a2 * 0.5).abs()
+}
+
+fn path_data_open(p: &dyn Projector, pts: &[LonLat], eps: f64) -> String {
     let projected: Vec<(f64, f64)> = pts.iter().map(|pt| p.project(*pt)).collect();
-    let simplified = crate::simplify::simplify(&projected, SIMPLIFY_EPSILON);
+    let simplified = crate::simplify::simplify(&projected, eps);
     let mut s = String::with_capacity(simplified.len() * 12);
     let mut first = true;
     for &(x, y) in &simplified {
@@ -405,8 +487,8 @@ fn path_data_open(p: &dyn Projector, pts: &[LonLat]) -> String {
     s
 }
 
-fn path_data_closed(p: &dyn Projector, pts: &[LonLat]) -> String {
-    let mut s = path_data_open(p, pts);
+fn path_data_closed(p: &dyn Projector, pts: &[LonLat], eps: f64) -> String {
+    let mut s = path_data_open(p, pts, eps);
     if !s.is_empty() {
         s.push_str(" Z");
     }
@@ -429,7 +511,7 @@ mod tests {
         };
         let p = Equirectangular::fit(bb, (100.0, 100.0));
         let style = LayerStyle::default();
-        let svg = compose_layer(100, 100, &style, &p, &[], 0.0);
+        let svg = compose_layer(100, 100, &style, &p, &[], 0.0, RenderDetail::default());
         assert!(svg.contains("<svg"));
         assert!(svg.contains("</svg>"));
     }
@@ -463,6 +545,7 @@ mod tests {
                 role: "outline",
             }],
             0.0,
+            RenderDetail::default(),
         );
         assert!(svg.contains("<path"), "{svg}");
         assert!(svg.contains("M"), "{svg}");
@@ -513,6 +596,7 @@ mod tests {
             &p,
             &[Feature { geom: &g, role: "hull" }],
             12.0,
+            RenderDetail::default(),
         );
         assert!(svg.contains("<path"), "hull must draw a path: {svg}");
         assert!(!svg.contains("<circle"), "extended hull is not a circle: {svg}");
@@ -550,6 +634,7 @@ mod tests {
             &p,
             &[Feature { geom: &g, role: "hull" }],
             4.0,
+            RenderDetail::default(),
         );
         // A single closed path spanning both corners of the canvas.
         assert_eq!(svg.matches("<path").count(), 1, "one combined hull: {svg}");
@@ -581,6 +666,7 @@ mod tests {
             &p,
             &[Feature { geom: &g, role: "hull" }],
             12.0,
+            RenderDetail::default(),
         );
         assert!(svg.contains("<circle"), "single point → circle: {svg}");
         assert!(svg.contains("r=\"12.00\""), "{svg}");
@@ -606,6 +692,7 @@ mod tests {
             &p,
             &[Feature { geom: &g, role: "hull" }],
             12.0,
+            RenderDetail::default(),
         );
         assert!(!svg.contains("<circle"), "no area → no halo: {svg}");
         // The hull <g> wrapper is the only path-free path-less group.
@@ -630,5 +717,136 @@ mod tests {
         for corner in [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)] {
             assert!(hull.contains(&corner), "missing {corner:?} in {hull:?}");
         }
+    }
+
+    // ---------- detail culling ----------
+
+    fn cull_proj() -> Equirectangular {
+        let bb = BBox {
+            min_lon: 0.0,
+            min_lat: 0.0,
+            max_lon: 100.0,
+            max_lat: 100.0,
+        };
+        Equirectangular::fit(bb, (100.0, 100.0))
+    }
+
+    fn cull_square(lon: f64, lat: f64, side: f64) -> crate::geometry::Polygon {
+        crate::geometry::Polygon {
+            outer: vec![
+                LonLat { lon, lat },
+                LonLat { lon: lon + side, lat },
+                LonLat { lon: lon + side, lat: lat + side },
+                LonLat { lon, lat: lat + side },
+            ],
+            holes: vec![],
+        }
+    }
+
+    #[test]
+    fn cull_drops_tiny_islands_beside_dominant_mass() {
+        let p = cull_proj();
+        let polys = vec![
+            cull_square(0.0, 0.0, 40.0), // dominant landmass
+            cull_square(60.0, 0.0, 1.0), // speck
+            cull_square(70.0, 0.0, 1.0), // speck
+        ];
+        let detail = RenderDetail {
+            min_island_px2: 9.0, // 3×3 px floor; specks are ~1 px²
+            island_rel_frac: 0.05,
+            simplify_px: 1.0,
+        };
+        let keep = cull_components(&p, &polys, detail);
+        assert_eq!(keep, vec![true, false, false], "specks beside a big mass drop");
+    }
+
+    #[test]
+    fn cull_keeps_clusters_of_equal_islands() {
+        let p = cull_proj();
+        // Five equal small islands — none dominates, so the relative
+        // escape hatch keeps them all even below the absolute floor.
+        let polys: Vec<_> = (0..5).map(|i| cull_square(i as f64 * 5.0, 0.0, 1.0)).collect();
+        let detail = RenderDetail {
+            min_island_px2: 9.0,
+            island_rel_frac: 0.05,
+            simplify_px: 1.0,
+        };
+        let keep = cull_components(&p, &polys, detail);
+        assert_eq!(keep, vec![true; 5], "comparable islands all survive");
+    }
+
+    #[test]
+    fn cull_keeps_individually_visible_island() {
+        let p = cull_proj();
+        let polys = vec![
+            cull_square(0.0, 0.0, 40.0), // dominant
+            cull_square(60.0, 0.0, 5.0), // 25 px² — visible
+            cull_square(80.0, 0.0, 1.0), // 1 px² — speck
+        ];
+        let detail = RenderDetail {
+            min_island_px2: 9.0,
+            island_rel_frac: 0.05,
+            simplify_px: 1.0,
+        };
+        let keep = cull_components(&p, &polys, detail);
+        assert_eq!(keep, vec![true, true, false], "visible island stays, speck drops");
+    }
+
+    #[test]
+    fn cull_always_keeps_largest_even_if_sub_threshold() {
+        let p = cull_proj();
+        // A single tiny island that is itself the answer: zoomed far
+        // out it's below the floor, but the largest is always kept.
+        let polys = vec![cull_square(0.0, 0.0, 1.0)];
+        let detail = RenderDetail {
+            min_island_px2: 9.0,
+            island_rel_frac: 0.05,
+            simplify_px: 1.0,
+        };
+        let keep = cull_components(&p, &polys, detail);
+        assert_eq!(keep, vec![true], "lone tiny island never GC'd");
+    }
+
+    #[test]
+    fn cull_disabled_when_floor_zero() {
+        let p = cull_proj();
+        let polys = vec![
+            cull_square(0.0, 0.0, 40.0),
+            cull_square(60.0, 0.0, 1.0),
+        ];
+        let detail = RenderDetail {
+            min_island_px2: 0.0,
+            island_rel_frac: 0.05,
+            simplify_px: 1.0,
+        };
+        let keep = cull_components(&p, &polys, detail);
+        assert_eq!(keep, vec![true, true], "floor 0 disables culling");
+    }
+
+    #[test]
+    fn cull_reduces_multipolygon_subpaths() {
+        let p = cull_proj();
+        let mut polys = vec![cull_square(0.0, 0.0, 40.0)];
+        for i in 0..50 {
+            polys.push(cull_square(50.0 + (i % 10) as f64, (i / 10) as f64, 0.5));
+        }
+        let g = Geometry::MultiPolygon(polys);
+        let detail = RenderDetail {
+            min_island_px2: 4.0,
+            island_rel_frac: 0.05,
+            simplify_px: 1.0,
+        };
+        let mut culled = String::new();
+        write_feature(&mut culled, &p, &g, detail);
+        let mut full = String::new();
+        write_feature(&mut full, &p, &g, RenderDetail::default());
+        assert!(
+            culled.matches('M').count() < full.matches('M').count(),
+            "culling drops subpaths: culled={} full={}",
+            culled.matches('M').count(),
+            full.matches('M').count()
+        );
+        // The dominant mass survives.
+        assert!(culled.contains("<path"), "main landmass kept: {culled}");
     }
 }

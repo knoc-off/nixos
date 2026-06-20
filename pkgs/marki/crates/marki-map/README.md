@@ -197,8 +197,50 @@ If you explicitly highlight an outlying region — say
 viewport stretches to include the highlight, so your answer never
 gets clipped.
 
-Geometry is **never thrown away**. Outlying islands always render;
-they just fall outside the SVG viewBox in the unfocused case.
+Geometry is **never thrown away** by auto-focus. Outlying islands
+always render; they just fall outside the SVG viewBox in the unfocused
+case. (Sub-pixel specks *are* dropped at draw time — see
+[Detail reduction](#detail-reduction).)
+
+## Detail reduction
+
+Archipelago and subregion features (e.g. `subregion/Melanesia`, which
+flattens every member country into one geometry) can carry hundreds of
+tiny disconnected islands. At regional zoom these become sub-pixel
+specks — visual noise that bloats the SVG. The renderer culls them
+**per feature, in rendered-pixel space**, with a rule that protects
+small features that are themselves the answer:
+
+A polygon component is **kept** when **any** of these holds:
+
+- its projected area is at least `min_island_px²` (individually
+  visible — keeps small, medium and large islands), or
+- its area is at least `island_rel_frac ×` the feature's largest
+  component (comparable to the main mass — keeps clusters of roughly
+  equal islands intact), or
+- it is the largest component (so a tiny island nation that *is* the
+  answer is never garbage-collected, even zoomed far out).
+
+Because a feature's granularity follows its reference, this does the
+right thing automatically: on a `subregion/Melanesia` **base** layer
+New Guinea dominates, so distant Fiji specks drop; on a `country/FJI`
+**answer** layer Fiji *is* the feature, so all its islands stay (and
+the hull, computed from the full geometry, always wraps the whole
+region regardless).
+
+Outline detail is also simplified with Douglas-Peucker at `simplify_px`
+pixels. All three knobs live in `[viewport]`:
+
+```toml
+[viewport]
+min_island_px = 2.0     # cull landmasses smaller than 2×2 px (0 = off)
+island_rel_frac = 0.05  # …unless ≥ 5% of the feature's largest mass
+simplify_px = 1.5        # Douglas-Peucker tolerance in px (0 = off)
+```
+
+The defaults are gentle: only sub-2px specks are removed and small/
+medium/large islands are kept. Set `min_island_px = 0` to disable
+culling, or raise it for cleaner regional overviews.
 
 ## World-wrapping
 

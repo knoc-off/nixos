@@ -211,6 +211,27 @@ impl AnkiConnect {
         Ok(())
     }
 
+    /// Suspend the given cards so they drop out of review without losing
+    /// their scheduling history. Used to quarantine orphaned notes instead
+    /// of deleting them.
+    pub fn suspend(&self, card_ids: &[i64]) -> Result<(), AnkiError> {
+        if card_ids.is_empty() {
+            return Ok(());
+        }
+        self.call("suspend", json!({ "cards": card_ids }))?;
+        Ok(())
+    }
+
+    /// Add a space-separated tag string to the given notes. Idempotent:
+    /// AnkiConnect ignores tags a note already carries.
+    pub fn add_tags(&self, note_ids: &[i64], tags: &str) -> Result<(), AnkiError> {
+        if note_ids.is_empty() {
+            return Ok(());
+        }
+        self.call("addTags", json!({ "notes": note_ids, "tags": tags }))?;
+        Ok(())
+    }
+
     // ---------- media ----------
 
     pub fn store_media_file(

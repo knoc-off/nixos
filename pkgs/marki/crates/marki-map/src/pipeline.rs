@@ -21,7 +21,7 @@
 use crate::cache::{self, CacheFile};
 use crate::clip;
 use crate::cluster;
-use crate::compose::{Feature, compose_layer};
+use crate::compose::{Feature, RenderDetail, compose_layer};
 use crate::data::{geoboundaries, natural_earth, overpass};
 use crate::dsl::{MapSpec, RevealMode};
 use crate::embed::{EmbedLayer, embed_layers, resolve_reveals};
@@ -155,6 +155,11 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
     );
 
     // ---- Compose: one SVG per layer.
+    let detail = RenderDetail {
+        min_island_px2: spec.viewport.min_island_px * spec.viewport.min_island_px,
+        island_rel_frac: spec.viewport.island_rel_frac,
+        simplify_px: spec.viewport.simplify_px,
+    };
     let mut svg_files: Vec<(String, String, Vec<u8>)> = Vec::new();
     let reveals = resolve_reveals(&spec.layers);
     for layer in &resolved {
@@ -209,6 +214,7 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
             &*projector,
             &features,
             hull_radius_px,
+            detail,
         );
         tracing::trace!(
             layer = %layer.name,

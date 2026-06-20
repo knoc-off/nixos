@@ -2,6 +2,29 @@
 
 ## Unreleased
 
+### Fixed
+
+- **Critical data-loss bug: render failures no longer delete studied
+  notes.** The reconcile engine dropped any card whose render/script
+  failed (e.g. a transient geo-data error) from the desired set, then
+  Phase 4 deleted every Anki note "missing" from that set — destroying
+  the note and all its scheduling history. A single broken data env could
+  wipe an entire deck. Now an id seen on disk is recorded *before* render
+  and is never treated as an orphan, so a failed render leaves the note
+  untouched (`is_orphan` + `seen_source_ids`).
+
+### Changed
+
+- **Orphan handling is non-destructive by default.** Notes with no
+  matching `.md` are now *soft-deleted*: suspended and tagged
+  `marki::orphan` (recoverable) instead of `deleteNotes`. Hard deletion is
+  opt-in via `markid push --prune`, and the new `markid prune` command
+  purges quarantined notes once you've confirmed.
+- **Safety valve**: no orphan is pruned or quarantined during a cycle that
+  recorded any error — re-run after fixing.
+- `markid push` now exits non-zero when the cycle had errors, so
+  cron/systemd surfaces failures instead of silently succeeding.
+
 ### Changed
 
 - **Breaking (map data source)**: `marki-map` now resolves country and

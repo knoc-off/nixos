@@ -69,11 +69,26 @@ enum Cmd {
         /// Anki may still be starting up.
         #[arg(long, env = "MARKID_WAIT_FOR_ANKI")]
         wait_for_anki: bool,
+
+        /// Hard-delete orphaned notes (Anki notes with no matching `.md`)
+        /// instead of the default soft-delete (suspend + `marki::orphan`
+        /// tag). Irreversible — destroys scheduling history. Even with this
+        /// flag, nothing is pruned during a cycle that had render errors.
+        #[arg(long)]
+        prune: bool,
     },
     /// Long-running daemon: watch the cards directory and push on change.
     Watch,
     /// Read-only diff view (added / updated / moved / deleted / unformatted).
     Status,
+    /// Permanently delete notes previously quarantined (soft-deleted):
+    /// every note tagged `marki::orphan`. Run this once you've confirmed
+    /// the suspended notes really should be gone.
+    Prune {
+        /// Show what would be deleted without touching Anki.
+        #[arg(long)]
+        dry_run: bool,
+    },
     /// Render every external block in a single .md file to disk and
     /// print the resulting HTML on stdout. No Anki round-trip — useful
     /// for theme iteration.
@@ -126,7 +141,7 @@ fn main() -> Result<()> {
 
     match cli.cmd {
         Cmd::Fmt => cmd_fmt(&cfg),
-        Cmd::Push { wait_for_anki } => {
+        Cmd::Push { wait_for_anki, prune } => {
             let anki = AnkiConnect::new(&cfg.anki_endpoint).context("init AnkiConnect client")?;
             let registry = Arc::new(build_registry(&cfg));
             let mut script_engine = build_script_engine(&cfg);
@@ -138,6 +153,7 @@ fn main() -> Result<()> {
                 &mut script_engine,
                 &mut template_state,
                 wait_for_anki,
+                prune,
             )
         }
         Cmd::Status => {
@@ -146,6 +162,10 @@ fn main() -> Result<()> {
             let mut script_engine = build_script_engine(&cfg);
             let mut template_state = load_template_state();
             cmd_status(&anki, &cfg, &registry, &mut script_engine, &mut template_state)
+        }
+        Cmd::Prune { dry_run } => {
+            let anki = AnkiConnect::new(&cfg.anki_endpoint).context("init AnkiConnect client")?;
+            cmd_prune(&anki, dry_run)
         }
         Cmd::Watch => {
             let anki = AnkiConnect::new(&cfg.anki_endpoint).context("init AnkiConnect client")?;
@@ -274,7 +294,8 @@ fn run_cycle(
     script_engine: &mut ScriptEngine,
     template_state: &mut TemplateState,
     dry_run: bool,
-) -> Result<()> {
+    prune: bool,
+) -> Result<markid::sync::Outcome> {
     // Invalidate cached model scripts so edits to .rhai files are picked up.
     script_engine.invalidate_all();
     let notes = scan_dir_v2(&cfg.cards_dir)?;
@@ -285,6 +306,7 @@ fn run_cycle(
         cards_dir = %cfg.cards_dir.display(),
         cache_dir = %cache_dir.display(),
         dry_run,
+        prune,
         "starting reconcile cycle"
     );
     let outcome = reconcile(
@@ -297,13 +319,16 @@ fn run_cycle(
         &cache_dir,
         &models_dir,
         dry_run,
+        prune,
     )?;
     tracing::info!(
-        "cycle: +{} ~{} ->{} -{} (unformatted {}, {} errors)",
+        "cycle: +{} ~{} ->{} -{} (quarantined {}, skipped-prune {}, unformatted {}, {} errors)",
         outcome.added,
         outcome.updated,
         outcome.moved,
         outcome.deleted,
+        outcome.quarantined,
+        outcome.skipped_prune,
         outcome.unformatted,
         outcome.errors.len(),
     );
@@ -317,7 +342,7 @@ fn run_cycle(
     if let Err(e) = template_state.save(&state_path) {
         tracing::warn!("save template state: {e}");
     }
-    Ok(())
+    Ok(outcome)
 }
 
 fn cmd_fmt(cfg: &Config) -> Result<()> {
@@ -339,13 +364,23 @@ fn cmd_push(
     script_engine: &mut ScriptEngine,
     template_state: &mut TemplateState,
     wait_for_anki_first: bool,
+    prune: bool,
 ) -> Result<()> {
     if wait_for_anki_first {
         wait_for_anki(anki)?;
     } else {
         anki.ping().context("AnkiConnect ping")?;
     }
-    run_cycle(anki, cfg, registry, script_engine, template_state, false)
+    let outcome = run_cycle(anki, cfg, registry, script_engine, template_state, false, prune)?;
+    // Surface failures with a non-zero exit so cron/systemd notices, instead
+    // of silently "succeeding" while notes failed to render.
+    if !outcome.errors.is_empty() {
+        anyhow::bail!(
+            "cycle completed with {} error(s); no orphans were pruned",
+            outcome.errors.len()
+        );
+    }
+    Ok(())
 }
 
 fn cmd_status(
@@ -356,7 +391,27 @@ fn cmd_status(
     template_state: &mut TemplateState,
 ) -> Result<()> {
     anki.ping().context("AnkiConnect ping")?;
-    run_cycle(anki, cfg, registry, script_engine, template_state, true)
+    run_cycle(anki, cfg, registry, script_engine, template_state, true, false)?;
+    Ok(())
+}
+
+/// Permanently delete every note quarantined by a prior soft-delete
+/// (`tag:marki::orphan`). Separate, explicit, opt-in step.
+fn cmd_prune(anki: &AnkiConnect, dry_run: bool) -> Result<()> {
+    anki.ping().context("AnkiConnect ping")?;
+    let query = format!("tag:{}", markid::anki::model::ORPHAN_TAG);
+    let note_ids = anki.find_notes(&query).context("find quarantined notes")?;
+    if note_ids.is_empty() {
+        println!("prune: no quarantined notes (tag:{})", markid::anki::model::ORPHAN_TAG);
+        return Ok(());
+    }
+    if dry_run {
+        println!("prune (dry-run): would delete {} quarantined note(s)", note_ids.len());
+        return Ok(());
+    }
+    anki.delete_notes(&note_ids).context("delete quarantined notes")?;
+    println!("prune: deleted {} quarantined note(s)", note_ids.len());
+    Ok(())
 }
 
 fn cmd_render_map(file: &Path, out: &Path, to_stdout: bool, registry: &Registry) -> Result<()> {
@@ -464,7 +519,7 @@ fn cmd_watch(
             Tick::Filesystem => tracing::info!("cycle: triggered by filesystem change"),
             Tick::Heartbeat => tracing::info!("cycle: triggered by heartbeat"),
         }
-        if let Err(e) = run_cycle(anki, cfg, registry, script_engine, template_state, false) {
+        if let Err(e) = run_cycle(anki, cfg, registry, script_engine, template_state, false, false) {
             tracing::error!("cycle failed: {e:#}");
         }
         Ok(true)

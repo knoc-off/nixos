@@ -41,6 +41,14 @@ pub const ID_TAG_PREFIX: &str = "marki::id:";
 /// Prefix of the content-hash tag: full form is `marki::hash:<16 hex>`.
 pub const HASH_TAG_PREFIX: &str = "marki::hash:";
 
+/// Tag applied to a note that has been quarantined (soft-deleted): it no
+/// longer has a matching `.md` source, so it was suspended and tagged
+/// rather than deleted. `findNotes "tag:marki::orphan"` lists them, and
+/// `markid prune` purges them. Because it lives in the `marki::` namespace
+/// it is stripped from user-visible tags and cleared automatically if the
+/// source file reappears and the note is updated.
+pub const ORPHAN_TAG: &str = "marki::orphan";
+
 /// Subset of `notesInfo` / `cardsInfo` output we care about.
 #[derive(Debug, Clone)]
 pub struct ManagedNote {

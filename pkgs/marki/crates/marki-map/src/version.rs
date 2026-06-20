@@ -66,5 +66,13 @@
 //!   extent (every island of an archipelago) in one smooth region
 //!   instead of marking only its centre. Single-point features still
 //!   degenerate to the old circle.
+//! - `25` — Detail reduction. Small disconnected landmasses are culled
+//!   per feature in projected pixel space: a component is dropped only
+//!   when it is both sub-threshold (`min_island_px²`) and small relative
+//!   to the feature's largest mass (`island_rel_frac`), and the largest
+//!   component is always kept — so archipelago/subregion features stop
+//!   emitting hundreds of sub-pixel specks without GC-ing a small-island
+//!   answer. Outline simplification is now tunable (`simplify_px`,
+//!   default raised 1.0 → 1.5). All three knobs live in `[viewport]`.
 
-pub const RENDER_VERSION_MAP: u32 = 24;
+pub const RENDER_VERSION_MAP: u32 = 25;

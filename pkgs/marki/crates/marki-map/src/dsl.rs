@@ -75,6 +75,8 @@ fn default_size() -> [u32; 2] {
 /// min_density = 0.10     # crop more aggressively
 /// min_aspect = 0.8       # never go narrower than 4:5
 /// cluster_factor = 0.3   # include far islands (Alaska, Iceland) in viewport
+/// min_island_px = 0.0    # disable small-landmass culling
+/// simplify_px = 0.0      # disable outline simplification
 /// ```
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -102,6 +104,35 @@ pub struct ViewportSpec {
     /// fall outside the viewport. Default `0.15`.
     #[serde(default = "default_cluster_factor")]
     pub cluster_factor: f64,
+
+    /// Cull threshold for tiny disconnected landmasses, as a side
+    /// length in rendered pixels (the area threshold is its square).
+    /// A polygon component of a feature is dropped only when it is
+    /// *both* smaller than `min_island_px²` *and* small relative to
+    /// the feature's largest component (see `island_rel_frac`); the
+    /// largest component of every feature is always kept. This removes
+    /// the hundreds of sub-pixel specks that archipelago/subregion
+    /// features otherwise emit, without garbage-collecting a small
+    /// island that is itself the answer. Default `2.0`; set `0.0` to
+    /// disable culling entirely.
+    #[serde(default = "default_min_island_px")]
+    pub min_island_px: f64,
+
+    /// Relative-size escape hatch for culling: a component is kept,
+    /// regardless of `min_island_px`, when its area is at least this
+    /// fraction of the feature's largest component. Keeps clusters of
+    /// roughly equal-sized islands intact while still dropping small
+    /// islands that sit next to one dominant landmass. Default `0.05`.
+    #[serde(default = "default_island_rel_frac")]
+    pub island_rel_frac: f64,
+
+    /// Douglas-Peucker simplification tolerance in rendered pixels.
+    /// Vertices deviating less than this from the simplified outline
+    /// are removed. Because coordinates are projected pixels this
+    /// auto-adapts to zoom. Default `1.5`; set `0.0` to disable
+    /// simplification and keep full vertex detail.
+    #[serde(default = "default_simplify_px")]
+    pub simplify_px: f64,
 }
 
 impl Default for ViewportSpec {
@@ -110,6 +141,9 @@ impl Default for ViewportSpec {
             min_density: default_min_density(),
             min_aspect: default_min_aspect(),
             cluster_factor: default_cluster_factor(),
+            min_island_px: default_min_island_px(),
+            island_rel_frac: default_island_rel_frac(),
+            simplify_px: default_simplify_px(),
         }
     }
 }
@@ -117,6 +151,9 @@ impl Default for ViewportSpec {
 fn default_min_density() -> f64 { 0.0 }
 fn default_min_aspect() -> f64 { 0.0 }
 fn default_cluster_factor() -> f64 { 0.15 }
+fn default_min_island_px() -> f64 { 2.0 }
+fn default_island_rel_frac() -> f64 { 0.05 }
+fn default_simplify_px() -> f64 { 1.5 }
 
 /// One named layer inside a map block.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -286,6 +323,15 @@ pub fn parse_map_spec(src: &str) -> Result<MapSpec, DslError> {
     }
     if !(0.0..=1.0).contains(&vp.cluster_factor) {
         return Err(DslError::OutOfRange { field: "cluster_factor", value: vp.cluster_factor });
+    }
+    if vp.min_island_px < 0.0 {
+        return Err(DslError::OutOfRange { field: "min_island_px", value: vp.min_island_px });
+    }
+    if !(0.0..=1.0).contains(&vp.island_rel_frac) {
+        return Err(DslError::OutOfRange { field: "island_rel_frac", value: vp.island_rel_frac });
+    }
+    if vp.simplify_px < 0.0 {
+        return Err(DslError::OutOfRange { field: "simplify_px", value: vp.simplify_px });
     }
     for lspec in spec.layers.values() {
         if let Some(hull) = &lspec.hull {
@@ -477,6 +523,61 @@ features = ["coastline"]
         assert_eq!(s.viewport.min_density, 0.0);
         assert_eq!(s.viewport.min_aspect, 0.0);
         assert!((s.viewport.cluster_factor - 0.15).abs() < 1e-9);
+        assert!((s.viewport.min_island_px - 2.0).abs() < 1e-9);
+        assert!((s.viewport.island_rel_frac - 0.05).abs() < 1e-9);
+        assert!((s.viewport.simplify_px - 1.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn viewport_detail_fields_parse() {
+        let src = r#"
+[viewport]
+min_island_px = 4.0
+island_rel_frac = 0.1
+simplify_px = 0.0
+[layers.base]
+features = ["coastline"]
+"#;
+        let s = parse_map_spec(src).unwrap();
+        assert!((s.viewport.min_island_px - 4.0).abs() < 1e-9);
+        assert!((s.viewport.island_rel_frac - 0.1).abs() < 1e-9);
+        assert_eq!(s.viewport.simplify_px, 0.0);
+    }
+
+    #[test]
+    fn min_island_px_negative_rejected() {
+        let src = r#"
+[viewport]
+min_island_px = -1.0
+[layers.base]
+features = ["coastline"]
+"#;
+        let err = parse_map_spec(src).unwrap_err();
+        assert!(matches!(err, DslError::OutOfRange { field: "min_island_px", .. }), "got: {err:?}");
+    }
+
+    #[test]
+    fn island_rel_frac_out_of_range_rejected() {
+        let src = r#"
+[viewport]
+island_rel_frac = 1.5
+[layers.base]
+features = ["coastline"]
+"#;
+        let err = parse_map_spec(src).unwrap_err();
+        assert!(matches!(err, DslError::OutOfRange { field: "island_rel_frac", .. }), "got: {err:?}");
+    }
+
+    #[test]
+    fn simplify_px_negative_rejected() {
+        let src = r#"
+[viewport]
+simplify_px = -0.5
+[layers.base]
+features = ["coastline"]
+"#;
+        let err = parse_map_spec(src).unwrap_err();
+        assert!(matches!(err, DslError::OutOfRange { field: "simplify_px", .. }), "got: {err:?}");
     }
 
     #[test]

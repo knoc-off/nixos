@@ -7,10 +7,14 @@
 //! Identity: `#id(hex)` → `marki::id:<hex>` tag on Anki note.
 //! Hash: blake3 over all rendered field values.
 //!
-//! Policy (destructive):
-//!   * disk is authoritative
-//!   * Anki notes without a matching `.md` file get `deleteNotes`
-//!   * Anki-side edits are silently overwritten
+//! Policy:
+//!   * disk is authoritative for *content*: Anki-side edits are overwritten
+//!   * a note is an orphan only when its `#id()` is absent from disk; a card
+//!     that exists on disk but fails to render is preserved untouched, never
+//!     deleted (see `is_orphan` + `seen_source_ids`)
+//!   * orphans are soft-deleted by default (suspend + `marki::orphan` tag),
+//!     hard-deleted only with `--prune`
+//!   * nothing is pruned at all during a cycle that had render errors
 
 use anyhow::{Context, Result};
 use marki_core::EmittedAsset;
@@ -20,7 +24,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::anki::client::AnkiConnect;
-use crate::anki::model::{ManagedNote, ModelKind, full_tag_set};
+use crate::anki::model::{ManagedNote, ModelKind, ORPHAN_TAG, full_tag_set};
 use crate::anki::note_type::{NoteTypeSpec, build_field_values, ensure_note_type, push_model_styling};
 use crate::anki::template_state::TemplateState;
 use crate::render::Registry;
@@ -36,6 +40,10 @@ pub struct Outcome {
     pub updated: usize,
     pub moved: usize,
     pub deleted: usize,
+    /// Orphans suspended + tagged `marki::orphan` instead of deleted.
+    pub quarantined: usize,
+    /// Orphans left untouched because the cycle had errors (safety valve).
+    pub skipped_prune: usize,
     pub unformatted: usize,
     pub errors: Vec<String>,
 }
@@ -96,12 +104,19 @@ pub fn reconcile(
     cache_dir: &Path,
     models_dir: &Path,
     dry_run: bool,
+    prune: bool,
 ) -> Result<Outcome> {
     let mut outcome = Outcome::default();
 
     // ---- Phase 1: Build local index.
     let mut local: HashMap<String, Local> = HashMap::new();
     let mut ensured_models: HashSet<String> = HashSet::new();
+
+    // Every marki id that exists on disk this cycle, recorded *before* and
+    // independent of render success. A card that fails to render is dropped
+    // from `local`, but its id stays here so Phase 4 never mistakes a render
+    // failure for a deletion. This is the core data-loss guard.
+    let mut seen_source_ids: HashSet<String> = HashSet::new();
 
     for sn in notes {
         let note = &sn.note;
@@ -114,6 +129,9 @@ pub fn reconcile(
                 continue;
             }
         };
+
+        // Record the id as present on disk regardless of what happens next.
+        seen_source_ids.insert(marki_id.clone());
 
         let result = if is_stock_model(&note.model) {
             build_stock_local(sn, &marki_id, root, registry, cache_dir, &mut outcome)
@@ -252,19 +270,69 @@ pub fn reconcile(
         }
     }
 
-    // ---- Phase 4: Delete orphans.
-    let orphan_ids: Vec<i64> = remote
+    // ---- Phase 4: Handle orphans (Anki notes with no matching .md).
+    //
+    // An orphan is a managed note whose id is absent from disk. Critically
+    // we filter by `seen_source_ids`, NOT merely "leftover in `remote`":
+    // a note whose source file exists but failed to render this cycle is
+    // still in `remote` (it was never matched into `local`), yet it must be
+    // preserved. Only ids that are genuinely gone from disk are orphans.
+    let orphans: Vec<&ManagedNote> = remote
         .values()
-        .map(|r| r.anki_note_id)
+        .filter(|r| is_orphan(&r.marki_id, &seen_source_ids))
         .collect();
-    if !orphan_ids.is_empty() {
-        if dry_run {
-            outcome.deleted += orphan_ids.len();
-        } else {
-            tracing::debug!(count = orphan_ids.len(), "deleting orphaned notes");
-            match anki.delete_notes(&orphan_ids) {
-                Ok(()) => outcome.deleted += orphan_ids.len(),
+
+    if !orphans.is_empty() {
+        let note_ids: Vec<i64> = orphans.iter().map(|r| r.anki_note_id).collect();
+
+        if !outcome.errors.is_empty() {
+            // Safety valve: a cycle that hit errors may have failed to render
+            // live notes; never prune in that state. Re-run once clean.
+            tracing::warn!(
+                count = note_ids.len(),
+                errors = outcome.errors.len(),
+                "skipping prune of {} orphan(s) because the cycle had {} error(s); \
+                 re-run after fixing the errors",
+                note_ids.len(),
+                outcome.errors.len()
+            );
+            outcome.skipped_prune = note_ids.len();
+        } else if dry_run {
+            // Report intent without touching Anki.
+            if prune {
+                outcome.deleted = note_ids.len();
+            } else {
+                outcome.quarantined = note_ids.len();
+            }
+        } else if prune {
+            // Explicit hard delete (`--prune`). Irreversible.
+            tracing::debug!(count = note_ids.len(), "deleting orphaned notes");
+            match anki.delete_notes(&note_ids) {
+                Ok(()) => outcome.deleted = note_ids.len(),
                 Err(e) => outcome.errors.push(format!("deleteNotes: {e}")),
+            }
+        } else {
+            // Default: soft-delete. Suspend the cards and tag the notes so
+            // they leave review but keep all scheduling history, recoverable
+            // via `markid prune` or by restoring the source file.
+            let card_ids: Vec<i64> =
+                orphans.iter().flat_map(|r| r.card_ids.clone()).collect();
+            tracing::debug!(
+                notes = note_ids.len(),
+                cards = card_ids.len(),
+                "quarantining orphaned notes (suspend + tag)"
+            );
+            let mut ok = true;
+            if let Err(e) = anki.add_tags(&note_ids, ORPHAN_TAG) {
+                outcome.errors.push(format!("addTags {ORPHAN_TAG}: {e}"));
+                ok = false;
+            }
+            if let Err(e) = anki.suspend(&card_ids) {
+                outcome.errors.push(format!("suspend: {e}"));
+                ok = false;
+            }
+            if ok {
+                outcome.quarantined = note_ids.len();
             }
         }
     }
@@ -435,6 +503,15 @@ fn push_update(anki: &AnkiConnect, l: &Local, r: &ManagedNote) -> Result<()> {
     Ok(())
 }
 
+/// Decide whether an Anki-side managed note is a true orphan: its id is
+/// absent from disk this cycle. A note whose source `.md` still exists but
+/// merely *failed to render* keeps its id in `seen_source_ids` and is NOT
+/// an orphan -- this is the invariant that prevents render errors from
+/// deleting studied notes.
+fn is_orphan(marki_id: &str, seen_source_ids: &HashSet<String>) -> bool {
+    !seen_source_ids.contains(marki_id)
+}
+
 /// Hash over all field values.
 fn compute_hash(fields: &[(String, String)]) -> String {
     let mut hasher = blake3::Hasher::new();
@@ -481,5 +558,24 @@ mod tests {
         assert!(is_stock_model("cloze"));
         assert!(!is_stock_model("geographic-location"));
         assert!(!is_stock_model("custom"));
+    }
+
+    #[test]
+    fn failed_render_note_is_not_an_orphan() {
+        // The whole point of the data-loss fix: a card whose source file
+        // exists on disk -- recorded in seen_source_ids -- must NEVER be
+        // treated as an orphan, even if it failed to render and so never
+        // made it into `local`.
+        let mut seen = HashSet::new();
+        seen.insert("studied-but-failed-render".to_string());
+        seen.insert("rendered-fine".to_string());
+
+        assert!(
+            !is_orphan("studied-but-failed-render", &seen),
+            "a note still present on disk must be protected from deletion"
+        );
+        assert!(!is_orphan("rendered-fine", &seen));
+        // Only an id that is genuinely gone from disk is an orphan.
+        assert!(is_orphan("deleted-off-disk", &seen));
     }
 }
