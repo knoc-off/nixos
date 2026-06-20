@@ -44,9 +44,13 @@ impl LayerStyle {
 /// Render one layer to a self-contained SVG document.
 ///
 /// Features whose role is `"hull"` are not drawn as outlines: each is
-/// collapsed to its area-weighted centroid and emitted as a circle of
-/// radius `hull_radius_px` (in SVG pixels). `hull_radius_px` is ignored
-/// for every other role and may be `0.0` on non-hull layers.
+/// wrapped in a rounded convex hull — the convex hull of the feature's
+/// vertices, expanded outward by `hull_radius_px` with rounded corners
+/// (the Minkowski sum of the hull with a disk). This encloses the
+/// feature's entire extent (e.g. every island of an archipelago) in one
+/// smooth, padded region. `hull_radius_px` (in SVG pixels) is the corner
+/// radius / outward padding; it is ignored for every other role and may
+/// be `0.0` on non-hull layers.
 pub fn compose_layer(
     width: u32,
     height: u32,
@@ -132,32 +136,26 @@ fn default_role_style(role: &str) -> RoleStyle {
     }
 }
 
+/// Wrap a feature in a rounded convex hull, sized by `radius_px`.
+///
+/// Computes the convex hull of the feature's projected vertices and
+/// emits its outward offset (Minkowski sum with a disk of radius
+/// `radius_px`): straight offset edges joined by corner arcs. Degenerate
+/// inputs fall back gracefully — a single point becomes a circle, two
+/// points a capsule — so genuinely tiny specks still get a visible halo.
 fn write_hull(out: &mut String, p: &dyn Projector, g: &Geometry, radius_px: f64) {
-    if let Some((cx, cy)) = projected_area_weighted_centroid(p, g) {
-        let _ = write!(
-            out,
-            "<circle cx=\"{cx:.2}\" cy=\"{cy:.2}\" r=\"{radius_px:.2}\"/>"
-        );
-    }
+    let pts = gather_projected_vertices(p, g);
+    let hull = convex_hull(&pts);
+    write_rounded_hull(out, &hull, radius_px);
 }
 
-/// Area-weighted centroid of a geometry's polygon components, in
-/// projected (SVG-pixel) space. Returns `None` for geometries with no
-/// polygon area (points, lines, empty) — hull halos only make sense for
-/// areal features.
-fn projected_area_weighted_centroid(
-    p: &dyn Projector,
-    g: &Geometry,
-) -> Option<(f64, f64)> {
-    let mut acc_area = 0.0;
-    let mut acc_x = 0.0;
-    let mut acc_y = 0.0;
+/// Project every outer-ring vertex of a geometry's polygon components.
+/// Returns an empty vec for geometries with no polygon area (points,
+/// lines) — hull halos only make sense for areal features.
+fn gather_projected_vertices(p: &dyn Projector, g: &Geometry) -> Vec<(f64, f64)> {
+    let mut pts = Vec::new();
     let mut add_ring = |ring: &[LonLat]| {
-        let pts: Vec<(f64, f64)> = ring.iter().map(|pt| p.project(*pt)).collect();
-        let (a, cx, cy) = ring_centroid(&pts);
-        acc_area += a;
-        acc_x += cx * a;
-        acc_y += cy * a;
+        pts.extend(ring.iter().map(|pt| p.project(*pt)));
     };
     match g {
         Geometry::Polygon { outer, .. } => add_ring(outer),
@@ -168,34 +166,164 @@ fn projected_area_weighted_centroid(
         }
         _ => {}
     }
-    if acc_area.abs() < 1e-9 {
-        return None;
-    }
-    Some((acc_x / acc_area, acc_y / acc_area))
+    pts
 }
 
-/// Magnitude of signed area and centroid of a projected ring via the
-/// shoelace formula. Returns `(area, cx, cy)` where `area` is the
-/// unsigned area used as the area-weight by the caller.
-fn ring_centroid(pts: &[(f64, f64)]) -> (f64, f64, f64) {
+/// Convex hull of a point set via Andrew's monotone chain, O(n log n).
+/// Output is the hull vertices in counter-clockwise order (in standard
+/// math axes; note SVG y points down, so this reads clockwise on screen)
+/// without the closing duplicate. Returns the input (deduplicated) when
+/// fewer than three distinct points are given.
+fn convex_hull(points: &[(f64, f64)]) -> Vec<(f64, f64)> {
+    let mut pts: Vec<(f64, f64)> = points.to_vec();
+    pts.sort_by(|a, b| {
+        a.0.partial_cmp(&b.0)
+            .unwrap()
+            .then(a.1.partial_cmp(&b.1).unwrap())
+    });
+    pts.dedup();
     if pts.len() < 3 {
-        return (0.0, 0.0, 0.0);
+        return pts;
     }
-    let mut a2 = 0.0; // 2×signed area
-    let mut cx = 0.0;
-    let mut cy = 0.0;
-    for i in 0..pts.len() {
-        let (x0, y0) = pts[i];
-        let (x1, y1) = pts[(i + 1) % pts.len()];
-        let cross = x0 * y1 - x1 * y0;
-        a2 += cross;
-        cx += (x0 + x1) * cross;
-        cy += (y0 + y1) * cross;
+    // Cross product of OA × OB; > 0 means counter-clockwise turn.
+    let cross = |o: (f64, f64), a: (f64, f64), b: (f64, f64)| {
+        (a.0 - o.0) * (b.1 - o.1) - (a.1 - o.1) * (b.0 - o.0)
+    };
+    let mut hull: Vec<(f64, f64)> = Vec::with_capacity(pts.len() + 1);
+    // Lower hull.
+    for &pt in &pts {
+        while hull.len() >= 2
+            && cross(hull[hull.len() - 2], hull[hull.len() - 1], pt) <= 0.0
+        {
+            hull.pop();
+        }
+        hull.push(pt);
     }
-    if a2.abs() < 1e-12 {
-        return (0.0, 0.0, 0.0);
+    // Upper hull.
+    let lower_len = hull.len() + 1;
+    for &pt in pts.iter().rev() {
+        while hull.len() >= lower_len
+            && cross(hull[hull.len() - 2], hull[hull.len() - 1], pt) <= 0.0
+        {
+            hull.pop();
+        }
+        hull.push(pt);
     }
-    ((a2 * 0.5).abs(), cx / (3.0 * a2), cy / (3.0 * a2))
+    hull.pop(); // last point equals the first
+    hull
+}
+
+/// Emit the outward offset of a convex hull as an SVG path: each edge is
+/// pushed out by `pad` along its outward normal, and consecutive offset
+/// edges are joined by a circular arc of radius `pad` centered on the
+/// original hull vertex. Degenerate hulls fall back to a circle (one
+/// point) or a capsule (two points).
+fn write_rounded_hull(out: &mut String, hull: &[(f64, f64)], pad: f64) {
+    let pad = pad.max(0.0);
+    match hull.len() {
+        0 => {}
+        1 => {
+            let (x, y) = hull[0];
+            let _ = write!(out, "<circle cx=\"{x:.2}\" cy=\"{y:.2}\" r=\"{pad:.2}\"/>");
+        }
+        2 => write_capsule(out, hull[0], hull[1], pad),
+        _ => {
+            if pad <= 0.0 {
+                // No padding: just stroke the bare hull polygon.
+                let mut d = String::new();
+                for (i, &(x, y)) in hull.iter().enumerate() {
+                    let _ = write!(d, "{}{x:.2} {y:.2}", if i == 0 { "M" } else { " L" });
+                }
+                d.push_str(" Z");
+                let _ = write!(out, "<path d=\"{d}\"/>");
+                return;
+            }
+            write_rounded_polygon(out, hull, pad);
+        }
+    }
+}
+
+/// Outward-offset path for a convex polygon with >= 3 vertices. Orients
+/// the hull clockwise in screen space so the offset normal (a 90° turn)
+/// always points outward, then walks the vertices emitting offset edge
+/// endpoints connected by corner arcs.
+fn write_rounded_polygon(out: &mut String, hull: &[(f64, f64)], pad: f64) {
+    // Signed area (shoelace) in screen coordinates. Positive here means
+    // clockwise on screen (y-down); flip to a known orientation so the
+    // outward normal is consistent.
+    let mut area2 = 0.0;
+    for i in 0..hull.len() {
+        let (x0, y0) = hull[i];
+        let (x1, y1) = hull[(i + 1) % hull.len()];
+        area2 += x0 * y1 - x1 * y0;
+    }
+    let mut poly: Vec<(f64, f64)> = hull.to_vec();
+    if area2 < 0.0 {
+        poly.reverse();
+    }
+    // With clockwise (on-screen) winding, the outward normal of edge
+    // (a -> b) is the edge direction rotated +90°: (dy, -dx) normalized.
+    let n = poly.len();
+    let mut d = String::new();
+    for i in 0..n {
+        let a = poly[i];
+        let b = poly[(i + 1) % n];
+        let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+        let len = (dx * dx + dy * dy).sqrt();
+        if len < 1e-9 {
+            continue;
+        }
+        let (nx, ny) = (dy / len, -dx / len);
+        let a_off = (a.0 + nx * pad, a.1 + ny * pad);
+        let b_off = (b.0 + nx * pad, b.1 + ny * pad);
+        if d.is_empty() {
+            let _ = write!(d, "M{:.2} {:.2}", a_off.0, a_off.1);
+        } else {
+            // Arc around vertex `a` from the previous edge's offset end
+            // to this edge's offset start. sweep-flag 1 = clockwise.
+            let _ = write!(
+                d,
+                " A{pad:.2} {pad:.2} 0 0 1 {:.2} {:.2}",
+                a_off.0, a_off.1
+            );
+        }
+        let _ = write!(d, " L{:.2} {:.2}", b_off.0, b_off.1);
+    }
+    // Closing arc around the first vertex.
+    let first = poly[0];
+    let last_edge = poly[n - 1];
+    let (dx, dy) = (first.0 - last_edge.0, first.1 - last_edge.1);
+    let len = (dx * dx + dy * dy).sqrt();
+    if len >= 1e-9 {
+        let (nx, ny) = (dy / len, -dx / len);
+        let start = (first.0 + nx * pad, first.1 + ny * pad);
+        let _ = write!(d, " A{pad:.2} {pad:.2} 0 0 1 {:.2} {:.2}", start.0, start.1);
+    }
+    d.push_str(" Z");
+    let _ = write!(out, "<path d=\"{d}\"/>");
+}
+
+/// Stadium/capsule outline around the segment a–b, offset by `pad` on
+/// both sides with semicircular caps.
+fn write_capsule(out: &mut String, a: (f64, f64), b: (f64, f64), pad: f64) {
+    let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+    let len = (dx * dx + dy * dy).sqrt();
+    if len < 1e-9 {
+        let _ = write!(out, "<circle cx=\"{:.2}\" cy=\"{:.2}\" r=\"{pad:.2}\"/>", a.0, a.1);
+        return;
+    }
+    let (nx, ny) = (dy / len * pad, -dx / len * pad);
+    // Offset endpoints on the +normal side and -normal side.
+    let a1 = (a.0 + nx, a.1 + ny);
+    let b1 = (b.0 + nx, b.1 + ny);
+    let b2 = (b.0 - nx, b.1 - ny);
+    let a2 = (a.0 - nx, a.1 - ny);
+    let _ = write!(
+        out,
+        "<path d=\"M{:.2} {:.2} L{:.2} {:.2} A{pad:.2} {pad:.2} 0 0 1 {:.2} {:.2} \
+         L{:.2} {:.2} A{pad:.2} {pad:.2} 0 0 1 {:.2} {:.2} Z\"/>",
+        a1.0, a1.1, b1.0, b1.1, b2.0, b2.1, a2.0, a2.1, a1.0, a1.1
+    );
 }
 
 fn write_feature(out: &mut String, p: &dyn Projector, g: &Geometry) {
@@ -357,9 +485,10 @@ mod tests {
     }
 
     #[test]
-    fn hull_feature_emits_circle_at_centroid() {
-        // 0–10° square on a 100×100 equirect canvas: centroid lands at
-        // canvas centre (50, 50). Radius passed through verbatim.
+    fn hull_feature_wraps_extent_with_rounded_path() {
+        // 0–10° square on a 100×100 equirect canvas projects to the full
+        // canvas square. The hull is that square, offset outward by the
+        // padding with rounded corners — a <path>, not a centroid dot.
         let bb = BBox {
             min_lon: 0.0,
             min_lat: 0.0,
@@ -385,10 +514,75 @@ mod tests {
             &[Feature { geom: &g, role: "hull" }],
             12.0,
         );
-        assert!(svg.contains("<circle"), "{svg}");
-        assert!(!svg.contains("<path"), "hull must not draw a path: {svg}");
-        assert!(svg.contains("cx=\"50.00\""), "{svg}");
-        assert!(svg.contains("cy=\"50.00\""), "{svg}");
+        assert!(svg.contains("<path"), "hull must draw a path: {svg}");
+        assert!(!svg.contains("<circle"), "extended hull is not a circle: {svg}");
+        assert!(svg.contains("A12.00 12.00"), "corner arcs at pad radius: {svg}");
+        // Offset reaches 12px beyond the 0..100 square on every side.
+        assert!(svg.contains("112.00"), "padded past max edge: {svg}");
+        assert!(svg.contains("-12.00"), "padded past min edge: {svg}");
+    }
+
+    #[test]
+    fn hull_wraps_multiple_islands_in_one_region() {
+        // Two far-apart squares (an "archipelago") share a single hull
+        // that encloses both, not one blob each.
+        let bb = BBox {
+            min_lon: 0.0,
+            min_lat: 0.0,
+            max_lon: 100.0,
+            max_lat: 100.0,
+        };
+        let p = Equirectangular::fit(bb, (100.0, 100.0));
+        let square = |x: f64, y: f64| crate::geometry::Polygon {
+            outer: vec![
+                LonLat { lon: x, lat: y },
+                LonLat { lon: x + 5.0, lat: y },
+                LonLat { lon: x + 5.0, lat: y + 5.0 },
+                LonLat { lon: x, lat: y + 5.0 },
+            ],
+            holes: vec![],
+        };
+        let g = Geometry::MultiPolygon(vec![square(0.0, 0.0), square(90.0, 90.0)]);
+        let svg = compose_layer(
+            100,
+            100,
+            &LayerStyle::default(),
+            &p,
+            &[Feature { geom: &g, role: "hull" }],
+            4.0,
+        );
+        // A single closed path spanning both corners of the canvas.
+        assert_eq!(svg.matches("<path").count(), 1, "one combined hull: {svg}");
+        assert!(svg.contains("A4.00 4.00"), "rounded corners: {svg}");
+    }
+
+    #[test]
+    fn hull_degenerates_to_circle_for_single_point() {
+        let bb = BBox {
+            min_lon: 0.0,
+            min_lat: 0.0,
+            max_lon: 10.0,
+            max_lat: 10.0,
+        };
+        let p = Equirectangular::fit(bb, (100.0, 100.0));
+        // A polygon collapsed to a single coordinate → 1-point hull.
+        let g = Geometry::Polygon {
+            outer: vec![
+                LonLat { lon: 5.0, lat: 5.0 },
+                LonLat { lon: 5.0, lat: 5.0 },
+                LonLat { lon: 5.0, lat: 5.0 },
+            ],
+            holes: vec![],
+        };
+        let svg = compose_layer(
+            100,
+            100,
+            &LayerStyle::default(),
+            &p,
+            &[Feature { geom: &g, role: "hull" }],
+            12.0,
+        );
+        assert!(svg.contains("<circle"), "single point → circle: {svg}");
         assert!(svg.contains("r=\"12.00\""), "{svg}");
     }
 
@@ -414,14 +608,27 @@ mod tests {
             12.0,
         );
         assert!(!svg.contains("<circle"), "no area → no halo: {svg}");
+        // The hull <g> wrapper is the only path-free path-less group.
+        assert!(
+            !svg.contains("A12.00"),
+            "no hull arcs for a bare line: {svg}"
+        );
     }
 
     #[test]
-    fn ring_centroid_of_square_is_center() {
-        let pts = vec![(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)];
-        let (area, cx, cy) = ring_centroid(&pts);
-        assert!((area - 100.0).abs() < 1e-9, "area={area}");
-        assert!((cx - 5.0).abs() < 1e-9, "cx={cx}");
-        assert!((cy - 5.0).abs() < 1e-9, "cy={cy}");
+    fn convex_hull_of_square_with_interior_points() {
+        // Interior point must be discarded; hull is the 4 corners.
+        let pts = vec![
+            (0.0, 0.0),
+            (10.0, 0.0),
+            (10.0, 10.0),
+            (0.0, 10.0),
+            (5.0, 5.0), // interior
+        ];
+        let hull = convex_hull(&pts);
+        assert_eq!(hull.len(), 4, "interior point dropped: {hull:?}");
+        for corner in [(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)] {
+            assert!(hull.contains(&corner), "missing {corner:?} in {hull:?}");
+        }
     }
 }

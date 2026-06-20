@@ -60,5 +60,11 @@
 //!   (Melanesia + Polynesia, Fiji, Kiribati, …) get a tight Pacific
 //!   viewport instead of a globe-spanning strip. Near-global data is
 //!   left un-rotated.
+//! - `24` — Hull geometry upgraded from a centroid circle to a rounded
+//!   convex hull: the convex hull of a feature's vertices, expanded
+//!   outward with rounded corners. A hull now wraps the feature's whole
+//!   extent (every island of an archipelago) in one smooth region
+//!   instead of marking only its centre. Single-point features still
+//!   degenerate to the old circle.
 
-pub const RENDER_VERSION_MAP: u32 = 23;
+pub const RENDER_VERSION_MAP: u32 = 24;

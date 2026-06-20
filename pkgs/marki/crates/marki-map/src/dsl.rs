@@ -15,13 +15,13 @@
 //! reveal = "fade"           # optional; non-base layers default to fade
 //! ```
 //!
-//! A *hull layer* draws scale-aware halo circles around hard-to-spot
-//! landmasses instead of outlines:
+//! A *hull layer* wraps hard-to-spot landmasses in a rounded convex
+//! hull instead of drawing outlines:
 //!
 //! ```toml
 //! [layers.halo]
 //! [layers.halo.hull]
-//! features = ["country/FJI"]   # halo at each feature's centroid
+//! features = ["country/FJI"]   # rounded hull around the whole feature
 //! ```
 //!
 //! Fields and shapes are deliberately minimal — the renderer rejects
@@ -155,8 +155,10 @@ pub struct LayerSpec {
     pub style: Option<HighlightStyle>,
 
     /// Makes this a *hull layer*: instead of drawing outlines, each
-    /// referenced feature renders as a scale-aware halo circle centred
-    /// on its area-weighted centroid. Use it to make hard-to-spot
+    /// referenced feature is wrapped in a rounded convex hull — the
+    /// convex hull of its vertices, expanded outward with rounded
+    /// corners — enclosing the feature's whole extent (every island of
+    /// an archipelago) in one smooth region. Use it to make hard-to-spot
     /// landmasses (tiny Pacific/Caribbean island nations) findable.
     /// Stacking and reveal follow the normal layer rules — place the
     /// hull layer wherever you want it in TOML source order.
@@ -164,31 +166,32 @@ pub struct LayerSpec {
     pub hull: Option<HullSpec>,
 }
 
-/// Configuration for a hull layer. The halo radius is computed at
-/// render time as `clamp(radius × viewport_diagonal, min_px,
-/// max_frac × viewport_diagonal)`, so it stays a roughly constant,
-/// always-spottable on-screen size with `min_px` as a hard floor.
+/// Configuration for a hull layer. The outward padding (and corner
+/// radius) is computed at render time as `clamp(radius ×
+/// viewport_diagonal, min_px, max_frac × viewport_diagonal)`, so the
+/// hull keeps a roughly constant, always-spottable margin around the
+/// feature with `min_px` as a hard floor.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct HullSpec {
-    /// Feature references to draw halos around. Polygon features only;
+    /// Feature references to wrap in a hull. Polygon features only;
     /// line/point references (e.g. `coastline`) have no area and are
     /// skipped.
     #[serde(default)]
     pub features: Vec<String>,
 
-    /// Halo radius as a fraction of the viewport diagonal. Default
-    /// `0.04`.
+    /// Outward padding (and corner radius) as a fraction of the viewport
+    /// diagonal. Default `0.04`.
     #[serde(default = "default_hull_radius")]
     pub radius: f64,
 
-    /// Hard pixel floor for the radius, so tiny islands on a zoomed-out
-    /// map still get a visible halo. Default `10.0`.
+    /// Hard pixel floor for the padding, so tiny islands on a zoomed-out
+    /// map still get a visible hull. Default `10.0`.
     #[serde(default = "default_hull_min_px")]
     pub min_px: f64,
 
-    /// Cap on the radius as a fraction of the viewport diagonal, so a
-    /// feature that fills the canvas doesn't get a giant halo. Default
+    /// Cap on the padding as a fraction of the viewport diagonal, so a
+    /// feature that fills the canvas doesn't get a giant margin. Default
     /// `0.20`.
     #[serde(default = "default_hull_max_frac")]
     pub max_frac: f64,
