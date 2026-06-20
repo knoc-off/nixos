@@ -15,6 +15,15 @@
 //! reveal = "fade"           # optional; non-base layers default to fade
 //! ```
 //!
+//! A *hull layer* draws scale-aware halo circles around hard-to-spot
+//! landmasses instead of outlines:
+//!
+//! ```toml
+//! [layers.halo]
+//! [layers.halo.hull]
+//! features = ["country/FJI"]   # halo at each feature's centroid
+//! ```
+//!
 //! Fields and shapes are deliberately minimal — the renderer rejects
 //! anything it doesn't understand so authors get fast feedback.
 
@@ -140,10 +149,65 @@ pub struct LayerSpec {
     pub reveal: Option<RevealMode>,
 
     /// Optional per-layer overrides for the highlight role's styling.
-    /// Unset fields inherit from the active theme.
+    /// Unset fields inherit from the active theme. On a hull layer the
+    /// same overrides apply to the `hull` role.
     #[serde(default)]
     pub style: Option<HighlightStyle>,
+
+    /// Makes this a *hull layer*: instead of drawing outlines, each
+    /// referenced feature renders as a scale-aware halo circle centred
+    /// on its area-weighted centroid. Use it to make hard-to-spot
+    /// landmasses (tiny Pacific/Caribbean island nations) findable.
+    /// Stacking and reveal follow the normal layer rules — place the
+    /// hull layer wherever you want it in TOML source order.
+    #[serde(default)]
+    pub hull: Option<HullSpec>,
 }
+
+/// Configuration for a hull layer. The halo radius is computed at
+/// render time as `clamp(radius × viewport_diagonal, min_px,
+/// max_frac × viewport_diagonal)`, so it stays a roughly constant,
+/// always-spottable on-screen size with `min_px` as a hard floor.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct HullSpec {
+    /// Feature references to draw halos around. Polygon features only;
+    /// line/point references (e.g. `coastline`) have no area and are
+    /// skipped.
+    #[serde(default)]
+    pub features: Vec<String>,
+
+    /// Halo radius as a fraction of the viewport diagonal. Default
+    /// `0.04`.
+    #[serde(default = "default_hull_radius")]
+    pub radius: f64,
+
+    /// Hard pixel floor for the radius, so tiny islands on a zoomed-out
+    /// map still get a visible halo. Default `10.0`.
+    #[serde(default = "default_hull_min_px")]
+    pub min_px: f64,
+
+    /// Cap on the radius as a fraction of the viewport diagonal, so a
+    /// feature that fills the canvas doesn't get a giant halo. Default
+    /// `0.20`.
+    #[serde(default = "default_hull_max_frac")]
+    pub max_frac: f64,
+}
+
+impl Default for HullSpec {
+    fn default() -> Self {
+        Self {
+            features: Vec::new(),
+            radius: default_hull_radius(),
+            min_px: default_hull_min_px(),
+            max_frac: default_hull_max_frac(),
+        }
+    }
+}
+
+fn default_hull_radius() -> f64 { 0.04 }
+fn default_hull_min_px() -> f64 { 10.0 }
+fn default_hull_max_frac() -> f64 { 0.20 }
 
 /// Per-layer overrides for highlight styling. Any field left `None`
 /// inherits from the active theme's `highlight` role.
@@ -192,6 +256,10 @@ pub enum DslError {
     SizeTooLarge(u32, u32),
     #[error("{field} must be between 0.0 and 1.0 (got {value})")]
     OutOfRange { field: &'static str, value: f64 },
+    #[error("hull min_px must be >= 0 (got {0})")]
+    HullMinPx(f64),
+    #[error("hull radius ({radius}) must not exceed max_frac ({max_frac})")]
+    HullRadiusOverMax { radius: f64, max_frac: f64 },
 }
 
 /// Parse a `map` block body as TOML and validate it.
@@ -215,6 +283,25 @@ pub fn parse_map_spec(src: &str) -> Result<MapSpec, DslError> {
     }
     if !(0.0..=1.0).contains(&vp.cluster_factor) {
         return Err(DslError::OutOfRange { field: "cluster_factor", value: vp.cluster_factor });
+    }
+    for lspec in spec.layers.values() {
+        if let Some(hull) = &lspec.hull {
+            if !(0.0..=1.0).contains(&hull.radius) {
+                return Err(DslError::OutOfRange { field: "hull radius", value: hull.radius });
+            }
+            if !(0.0..=1.0).contains(&hull.max_frac) {
+                return Err(DslError::OutOfRange { field: "hull max_frac", value: hull.max_frac });
+            }
+            if hull.min_px < 0.0 {
+                return Err(DslError::HullMinPx(hull.min_px));
+            }
+            if hull.radius > hull.max_frac {
+                return Err(DslError::HullRadiusOverMax {
+                    radius: hull.radius,
+                    max_frac: hull.max_frac,
+                });
+            }
+        }
     }
     Ok(spec)
 }
@@ -523,5 +610,110 @@ size = [10000, 10000]
 features = ["coastline"]
 "#;
         parse_map_spec(src2).unwrap();
+    }
+
+    // ---------- hull ----------
+
+    #[test]
+    fn hull_layer_parses_with_defaults() {
+        let src = r#"
+[layers.base]
+features = ["coastline"]
+
+[layers.halo.hull]
+features = ["country/FJI"]
+"#;
+        let s = parse_map_spec(src).unwrap();
+        let hull = s.layers["halo"].hull.as_ref().unwrap();
+        assert_eq!(hull.features, vec!["country/FJI".to_string()]);
+        assert!((hull.radius - 0.04).abs() < 1e-9);
+        assert!((hull.min_px - 10.0).abs() < 1e-9);
+        assert!((hull.max_frac - 0.20).abs() < 1e-9);
+    }
+
+    #[test]
+    fn hull_absent_by_default() {
+        let src = r#"
+[layers.base]
+features = ["coastline"]
+"#;
+        let s = parse_map_spec(src).unwrap();
+        assert!(s.layers["base"].hull.is_none());
+    }
+
+    #[test]
+    fn hull_knobs_parse() {
+        let src = r#"
+[layers.base]
+features = ["coastline"]
+
+[layers.halo.hull]
+features = ["country/TON"]
+radius = 0.06
+min_px = 14
+max_frac = 0.3
+"#;
+        let s = parse_map_spec(src).unwrap();
+        let hull = s.layers["halo"].hull.as_ref().unwrap();
+        assert!((hull.radius - 0.06).abs() < 1e-9);
+        assert!((hull.min_px - 14.0).abs() < 1e-9);
+        assert!((hull.max_frac - 0.3).abs() < 1e-9);
+    }
+
+    #[test]
+    fn hull_unknown_field_rejected() {
+        let src = r#"
+[layers.base]
+features = ["coastline"]
+
+[layers.halo.hull]
+features = ["country/FJI"]
+bogus = 1
+"#;
+        let err = parse_map_spec(src).unwrap_err();
+        assert!(matches!(err, DslError::Toml(_)), "got: {err:?}");
+    }
+
+    #[test]
+    fn hull_radius_out_of_range() {
+        let src = r#"
+[layers.base]
+features = ["coastline"]
+
+[layers.halo.hull]
+features = ["country/FJI"]
+radius = 1.5
+"#;
+        let err = parse_map_spec(src).unwrap_err();
+        assert!(matches!(err, DslError::OutOfRange { field: "hull radius", .. }), "got: {err:?}");
+    }
+
+    #[test]
+    fn hull_min_px_negative() {
+        let src = r#"
+[layers.base]
+features = ["coastline"]
+
+[layers.halo.hull]
+features = ["country/FJI"]
+min_px = -1
+"#;
+        let err = parse_map_spec(src).unwrap_err();
+        assert!(matches!(err, DslError::HullMinPx(_)), "got: {err:?}");
+    }
+
+    #[test]
+    fn hull_radius_over_max_frac_rejected() {
+        let src = r#"
+[layers.base]
+features = ["coastline"]
+
+[layers.halo.hull]
+features = ["country/FJI"]
+radius = 0.3
+max_frac = 0.2
+"#;
+        let err = parse_map_spec(src).unwrap_err();
+        assert!(matches!(err, DslError::HullRadiusOverMax { .. }), "got: {err:?}");
     }
 }

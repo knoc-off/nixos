@@ -58,6 +58,17 @@ stdenvNoCC.mkDerivation {
       -o "$out/meta.csv" \
       "https://github.com/wmgeolab/geoBoundaries/raw/${metaCommit}/releaseData/geoBoundariesOpen-meta.csv"
 
+    # 1b. Workaround for geoBoundaries issue #4265: India's ADM0 record is
+    #     corrupted upstream. Its meta row (boundaryID IND-ADM0-*) is
+    #     mislabeled boundaryType=ADM1 (a single Union Territory) and India
+    #     is dropped from the gbOpen ALL composite entirely. Left as-is,
+    #     India has no ADM0 row, so it vanishes from the continent/
+    #     subregion composites the loader builds from ADM0 rows. Only the
+    #     boundaryType column is wrong here -- Continent (Asia) and
+    #     UNSDG-subregion (Southern Asia) are already correct -- so promote
+    #     it back to ADM0. (The ADM0 geojson itself is injected in step 2b.)
+    sed -i -E 's#^("IND-ADM0-[0-9]+","India","IND","[0-9]+"),"ADM1"#\1,"ADM0"#' "$out/meta.csv"
+
     # 2. Extract the commit-pinned per-(ISO, level) download links from
     #    the CSV's staticDownloadLink column, restricted to the desired
     #    levels. Regex filtering avoids fragile positional CSV parsing.
@@ -66,6 +77,18 @@ stdenvNoCC.mkDerivation {
       "$out/meta.csv" | sort -u > urls.txt
 
     echo "geoboundaries: $(wc -l < urls.txt) boundary files to fetch"
+
+    # 2b. Issue #4265 (cont.): the IND/ADM0 download link is absent from
+    #     the CSV (the corrupted row points at the ADM1 zip), so the grep
+    #     above never picks it up. The per-country ADM0 data still exists
+    #     at the pinned commit -- full-India geometry, though its feature
+    #     properties are themselves mislabeled "Puducherry"/"IN-PY"; the
+    #     loader keys ADM0 by filename so that is harmless. Inject the link
+    #     pinned to the same metaCommit so IND_ADM0.geojson gets fetched.
+    if ! grep -q '/IND/ADM0/' urls.txt; then
+      echo "https://github.com/wmgeolab/geoBoundaries/raw/${metaCommit}/releaseData/gbOpen/IND/ADM0/geoBoundaries-IND-ADM0-all.zip" >> urls.txt
+      sort -u -o urls.txt urls.txt
+    fi
 
     # 3. Build a tab-separated (url, dest) worklist: each `-all.zip` link
     #    maps to its sibling `_simplified.geojson`, saved as
@@ -92,7 +115,7 @@ stdenvNoCC.mkDerivation {
   # Fixed-output: content is fully determined by the pinned metaCommit.
   outputHashMode = "recursive";
   outputHashAlgo = "sha256";
-  outputHash = "sha256-1hPTD1U+tD6DoA/9KlBlSqP2r3HXelrmq3FqN8+qFMY=";
+  outputHash = "sha256-iopBMM+yVG4dLG/9/1wG0+ndx4kgHYV3Dg4FqoocKL0=";
 
   meta = with lib; {
     description = "geoBoundaries gbOpen ADM0/1/2 simplified boundaries + metadata for marki-map";

@@ -149,9 +149,14 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
         if layer.name != "base" {
             layer_style.background = None;
         }
-        // Apply per-layer highlight style overrides from the DSL.
+        // Apply per-layer highlight style overrides from the DSL. On a
+        // hull layer the same overrides target the `hull` role.
         if let Some(ov) = &spec.layers[layer.name].style {
-            if let Some(role) = layer_style.roles.iter_mut().find(|r| r.role == "highlight") {
+            for role in layer_style
+                .roles
+                .iter_mut()
+                .filter(|r| r.role == "highlight" || r.role == "hull")
+            {
                 if let Some(f) = &ov.fill {
                     role.fill = f.clone();
                 }
@@ -163,7 +168,28 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
                 }
             }
         }
-        let svg = compose_layer(render_w, render_h, &layer_style, &*projector, &features);
+        // Scale-aware halo radius: a fraction of the viewport diagonal,
+        // floored at `min_px` and capped at `max_frac` of the diagonal.
+        // Zero on non-hull layers (ignored by the composer).
+        let hull_radius_px = match &spec.layers[layer.name].hull {
+            Some(h) => {
+                let diag =
+                    ((render_w as f64).powi(2) + (render_h as f64).powi(2)).sqrt();
+                // Cap at max_frac of the diagonal, then apply the min_px
+                // floor last so the "always visible" guarantee wins even
+                // on a tiny canvas where the cap would fall below it.
+                (h.radius * diag).min(h.max_frac * diag).max(h.min_px)
+            }
+            None => 0.0,
+        };
+        let svg = compose_layer(
+            render_w,
+            render_h,
+            &layer_style,
+            &*projector,
+            &features,
+            hull_radius_px,
+        );
         let cache_filename = format!("{}.svg", layer.name);
         svg_files.push((layer.name.to_string(), cache_filename, svg.into_bytes()));
     }
@@ -254,6 +280,12 @@ fn resolve_all_layers<'a>(
             let g = resolve_one(h, cache_root)?;
             features.push((g, "highlight", false));
         }
+        if let Some(hull) = &lspec.hull {
+            for r in &hull.features {
+                let g = resolve_one(r, cache_root)?;
+                features.push((g, "hull", false));
+            }
+        }
         out.push(ResolvedLayer { name, features });
     }
     Ok(out)
@@ -307,7 +339,7 @@ fn collect_focus_geoms<'a>(layers: &'a [ResolvedLayer<'_>]) -> Vec<&'a Geometry>
     let mut out = Vec::new();
     for l in layers {
         for (g, role, is_context) in &l.features {
-            if *is_context || *role == "highlight" {
+            if *is_context || *role == "highlight" || *role == "hull" {
                 continue;
             }
             out.push(g);
@@ -337,7 +369,7 @@ fn viewport_bbox(layers: &[ResolvedLayer<'_>], cluster_factor: f64) -> Result<BB
             if *is_context {
                 continue;
             }
-            if *role == "highlight" {
+            if *role == "highlight" || *role == "hull" {
                 highlights.push(g);
             } else {
                 focus.push(g);

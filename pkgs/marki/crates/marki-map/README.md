@@ -70,6 +70,7 @@ Each entry in `[layers.<name>]`:
 | `highlights` | `[string]`     | Feature references drawn with the theme's `highlight` role       |
 | `reveal`     | `none`/`fade`  | Default: base layer = none, others = fade                       |
 | `style`      | table          | Optional per-layer highlight style override (see below)         |
+| `hull`       | table          | Makes this a *hull layer* — draws halo circles (see below)      |
 
 ### Per-layer style override
 
@@ -85,6 +86,46 @@ fill = "#3388ff"
 stroke = "#1a5599"
 stroke_width = 2.0
 ```
+
+### Hull layers (hard-to-spot landmasses)
+
+Tiny island nations (Fiji, Tonga, Kiribati, the eastern-Caribbean
+microstates) are almost invisible on a regional map. A **hull layer**
+draws a scale-aware halo circle at each referenced feature's
+area-weighted centroid so the answer is easy to find.
+
+A hull layer is an ordinary layer: it stacks by TOML source order and
+reveals like any overlay (`fade` by default). Place it where you want
+it — typically above the base and below the real answer, so the island
+draws on top of its halo.
+
+```toml
+[layers.base]
+features = ["coastline"]
+
+[layers.halo]
+[layers.halo.hull]
+features = ["country/FJI"]
+# radius   = 0.04   # halo radius as a fraction of the viewport diagonal
+# min_px   = 10     # hard pixel floor — keeps tiny islands visible
+# max_frac = 0.20   # cap as a fraction of the diagonal
+[layers.halo.style]            # optional; reuses the style override
+fill = "#c64f3f55"             # translucent so the coast reads through
+
+[layers.answer]
+highlights = ["country/FJI"]   # the real island draws over its halo
+```
+
+The radius is computed at render time as
+`clamp(radius × diagonal, min_px, max_frac × diagonal)`, so the halo
+stays a roughly constant, always-spottable on-screen size with `min_px`
+as a hard floor. Antimeridian-spanning features (Fiji, Kiribati) are
+handled by the same frame-rotation the rest of the pipeline uses. Hull
+references must be polygon features; lines/points (e.g. `coastline`)
+have no area and are skipped.
+
+The hull `style` override and the `hull` theme role both control halo
+fill/stroke; the bundled `atlas` theme ships a translucent default.
 
 ## Feature references
 

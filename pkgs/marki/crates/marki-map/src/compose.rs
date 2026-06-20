@@ -42,12 +42,18 @@ impl LayerStyle {
 }
 
 /// Render one layer to a self-contained SVG document.
+///
+/// Features whose role is `"hull"` are not drawn as outlines: each is
+/// collapsed to its area-weighted centroid and emitted as a circle of
+/// radius `hull_radius_px` (in SVG pixels). `hull_radius_px` is ignored
+/// for every other role and may be `0.0` on non-hull layers.
 pub fn compose_layer(
     width: u32,
     height: u32,
     style: &LayerStyle,
     projector: &dyn Projector,
     features: &[Feature<'_>],
+    hull_radius_px: f64,
 ) -> String {
     let mut out = String::with_capacity(4096);
     let _ = write!(
@@ -94,7 +100,11 @@ pub fn compose_layer(
             sw = role_style.stroke_width,
         );
         for f in feats {
-            write_feature(&mut out, projector, f.geom);
+            if role == "hull" {
+                write_hull(&mut out, projector, f.geom, hull_radius_px);
+            } else {
+                write_feature(&mut out, projector, f.geom);
+            }
         }
         out.push_str("</g>");
     }
@@ -108,6 +118,7 @@ fn default_role_style(role: &str) -> RoleStyle {
     // invisibly. Themes are expected to override.
     let (fill, stroke) = match role {
         "highlight" => ("#d33", "#900"),
+        "hull" => ("#d33a", "#900a"),
         "outline" => ("#eee", "#333"),
         "neighbor" => ("#ddd", "#888"),
         "coast" => ("none", "#36b"),
@@ -119,6 +130,72 @@ fn default_role_style(role: &str) -> RoleStyle {
         stroke: stroke.to_string(),
         stroke_width: 1.0,
     }
+}
+
+fn write_hull(out: &mut String, p: &dyn Projector, g: &Geometry, radius_px: f64) {
+    if let Some((cx, cy)) = projected_area_weighted_centroid(p, g) {
+        let _ = write!(
+            out,
+            "<circle cx=\"{cx:.2}\" cy=\"{cy:.2}\" r=\"{radius_px:.2}\"/>"
+        );
+    }
+}
+
+/// Area-weighted centroid of a geometry's polygon components, in
+/// projected (SVG-pixel) space. Returns `None` for geometries with no
+/// polygon area (points, lines, empty) — hull halos only make sense for
+/// areal features.
+fn projected_area_weighted_centroid(
+    p: &dyn Projector,
+    g: &Geometry,
+) -> Option<(f64, f64)> {
+    let mut acc_area = 0.0;
+    let mut acc_x = 0.0;
+    let mut acc_y = 0.0;
+    let mut add_ring = |ring: &[LonLat]| {
+        let pts: Vec<(f64, f64)> = ring.iter().map(|pt| p.project(*pt)).collect();
+        let (a, cx, cy) = ring_centroid(&pts);
+        acc_area += a;
+        acc_x += cx * a;
+        acc_y += cy * a;
+    };
+    match g {
+        Geometry::Polygon { outer, .. } => add_ring(outer),
+        Geometry::MultiPolygon(polys) => {
+            for poly in polys {
+                add_ring(&poly.outer);
+            }
+        }
+        _ => {}
+    }
+    if acc_area.abs() < 1e-9 {
+        return None;
+    }
+    Some((acc_x / acc_area, acc_y / acc_area))
+}
+
+/// Magnitude of signed area and centroid of a projected ring via the
+/// shoelace formula. Returns `(area, cx, cy)` where `area` is the
+/// unsigned area used as the area-weight by the caller.
+fn ring_centroid(pts: &[(f64, f64)]) -> (f64, f64, f64) {
+    if pts.len() < 3 {
+        return (0.0, 0.0, 0.0);
+    }
+    let mut a2 = 0.0; // 2×signed area
+    let mut cx = 0.0;
+    let mut cy = 0.0;
+    for i in 0..pts.len() {
+        let (x0, y0) = pts[i];
+        let (x1, y1) = pts[(i + 1) % pts.len()];
+        let cross = x0 * y1 - x1 * y0;
+        a2 += cross;
+        cx += (x0 + x1) * cross;
+        cy += (y0 + y1) * cross;
+    }
+    if a2.abs() < 1e-12 {
+        return (0.0, 0.0, 0.0);
+    }
+    ((a2 * 0.5).abs(), cx / (3.0 * a2), cy / (3.0 * a2))
 }
 
 fn write_feature(out: &mut String, p: &dyn Projector, g: &Geometry) {
@@ -224,7 +301,7 @@ mod tests {
         };
         let p = Equirectangular::fit(bb, (100.0, 100.0));
         let style = LayerStyle::default();
-        let svg = compose_layer(100, 100, &style, &p, &[]);
+        let svg = compose_layer(100, 100, &style, &p, &[], 0.0);
         assert!(svg.contains("<svg"));
         assert!(svg.contains("</svg>"));
     }
@@ -257,6 +334,7 @@ mod tests {
                 geom: &g,
                 role: "outline",
             }],
+            0.0,
         );
         assert!(svg.contains("<path"), "{svg}");
         assert!(svg.contains("M"), "{svg}");
@@ -276,5 +354,74 @@ mod tests {
         };
         assert!(s.role("highlight").is_some());
         assert!(s.role("missing").is_none());
+    }
+
+    #[test]
+    fn hull_feature_emits_circle_at_centroid() {
+        // 0–10° square on a 100×100 equirect canvas: centroid lands at
+        // canvas centre (50, 50). Radius passed through verbatim.
+        let bb = BBox {
+            min_lon: 0.0,
+            min_lat: 0.0,
+            max_lon: 10.0,
+            max_lat: 10.0,
+        };
+        let p = Equirectangular::fit(bb, (100.0, 100.0));
+        let g = Geometry::Polygon {
+            outer: vec![
+                LonLat { lon: 0.0, lat: 0.0 },
+                LonLat { lon: 10.0, lat: 0.0 },
+                LonLat { lon: 10.0, lat: 10.0 },
+                LonLat { lon: 0.0, lat: 10.0 },
+                LonLat { lon: 0.0, lat: 0.0 },
+            ],
+            holes: vec![],
+        };
+        let svg = compose_layer(
+            100,
+            100,
+            &LayerStyle::default(),
+            &p,
+            &[Feature { geom: &g, role: "hull" }],
+            12.0,
+        );
+        assert!(svg.contains("<circle"), "{svg}");
+        assert!(!svg.contains("<path"), "hull must not draw a path: {svg}");
+        assert!(svg.contains("cx=\"50.00\""), "{svg}");
+        assert!(svg.contains("cy=\"50.00\""), "{svg}");
+        assert!(svg.contains("r=\"12.00\""), "{svg}");
+    }
+
+    #[test]
+    fn hull_skips_line_geometry() {
+        let bb = BBox {
+            min_lon: 0.0,
+            min_lat: 0.0,
+            max_lon: 10.0,
+            max_lat: 10.0,
+        };
+        let p = Equirectangular::fit(bb, (100.0, 100.0));
+        let g = Geometry::LineString(vec![
+            LonLat { lon: 0.0, lat: 0.0 },
+            LonLat { lon: 10.0, lat: 10.0 },
+        ]);
+        let svg = compose_layer(
+            100,
+            100,
+            &LayerStyle::default(),
+            &p,
+            &[Feature { geom: &g, role: "hull" }],
+            12.0,
+        );
+        assert!(!svg.contains("<circle"), "no area → no halo: {svg}");
+    }
+
+    #[test]
+    fn ring_centroid_of_square_is_center() {
+        let pts = vec![(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)];
+        let (area, cx, cy) = ring_centroid(&pts);
+        assert!((area - 100.0).abs() < 1e-9, "area={area}");
+        assert!((cx - 5.0).abs() < 1e-9, "cx={cx}");
+        assert!((cy - 5.0).abs() < 1e-9, "cy={cy}");
     }
 }

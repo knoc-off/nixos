@@ -50,5 +50,9 @@
 //!   `shapeName`), `neighbors/<iso>`, `continent/<name>`,
 //!   `subregion/<name>`. The old `admin1/` and `region/` references are
 //!   gone. Natural Earth is retained only for `coastline`.
+//! - `22` — Hull layers. A layer with a `[layers.<name>.hull]` table
+//!   draws scale-aware halo circles around its features' centroids
+//!   instead of outlines, making hard-to-spot island nations findable.
+//!   New `hull` theme role.
 
-pub const RENDER_VERSION_MAP: u32 = 21;
+pub const RENDER_VERSION_MAP: u32 = 22;

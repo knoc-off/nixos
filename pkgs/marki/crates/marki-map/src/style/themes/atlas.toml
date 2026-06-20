@@ -3,6 +3,7 @@
 # Roles map to feature kinds the pipeline emits:
 #   - outline   : country outlines, default emphasis
 #   - highlight : the answer / focus feature
+#   - hull      : scale-aware halo around hard-to-spot landmasses
 #   - neighbor  : adjacent regions drawn for context
 #   - coast     : coastline polylines
 #
@@ -21,6 +22,14 @@ stroke_width = 1.0
 role = "highlight"
 fill = "#c64f3f"
 stroke = "#7a2818"
+stroke_width = 1.5
+
+# Translucent so the underlying coastline / landmass still reads
+# through the halo.
+[[role]]
+role = "hull"
+fill = "#c64f3f55"
+stroke = "#7a281888"
 stroke_width = 1.5
 
 [[role]]
