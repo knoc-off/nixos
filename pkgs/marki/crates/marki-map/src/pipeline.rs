@@ -26,7 +26,7 @@ use crate::data::{geoboundaries, natural_earth, overpass};
 use crate::dsl::{MapSpec, RevealMode};
 use crate::embed::{EmbedLayer, embed_layers, resolve_reveals};
 use crate::error::MapError;
-use crate::geometry::{BBox, Geometry};
+use crate::geometry::{BBox, Geometry, LonLat};
 use crate::hash::cache_key;
 use crate::project::{Mercator, Projector};
 use crate::sidecar::{Sidecar, SidecarLayer};
@@ -58,24 +58,36 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
     let key = cache_key(spec, &theme.bytes)?;
 
     if cache::is_ready(cache_root, &key) {
+        tracing::debug!(key, "map cache hit");
         return load_from_cache(spec, cache_root, &key);
     }
+    tracing::debug!(
+        key,
+        layers = spec.layers.len(),
+        style = %spec.style,
+        "map cache miss; rendering"
+    );
 
     // ---- Resolve.
     let mut resolved = resolve_all_layers(spec, cache_root)?;
+    if tracing::enabled!(tracing::Level::TRACE) {
+        for l in &resolved {
+            tracing::trace!(layer = %l.name, features = l.features.len(), "resolved layer");
+        }
+    }
 
     // ---- Pick the optimal central meridian.
     //
-    // We do this in two passes so outlying components (French
-    // Polynesia, Hawaii, Chatham Islands, …) don't pollute the
-    // choice of frame. The cluster heuristic in `viewport_bbox`
-    // already filters them out by area; we just call it first on
-    // the unrotated coordinates and use the resulting bbox's
-    // longitude midpoint as the central meridian. The wrap meridian
-    // (central ± 180°) ends up safely on the far side of the globe
-    // from the data we care about.
-    let rough_bb = viewport_bbox(&resolved, spec.viewport.cluster_factor)?;
-    let central = (rough_bb.min_lon + rough_bb.max_lon) * 0.5;
+    // We choose the meridian that puts every non-context feature in the
+    // smallest contiguous longitude window — i.e. the wrap meridian
+    // (`central ± 180°`, where rings get cut) falls in the emptiest part
+    // of the globe rather than through the data. A naive
+    // midpoint-of-raw-bbox fails badly across the antimeridian: a card
+    // spanning Melanesia (≈140°E) and Polynesia (≈−150°W) would pick a
+    // central meridian in the Atlantic and smear the Pacific across
+    // ~340° of canvas. See [`choose_central_meridian`].
+    let central = choose_central_meridian(&resolved).unwrap_or(0.0);
+    tracing::debug!(central, "chose central meridian");
 
     // ---- Rotate every geometry into the chosen frame, then split
     //      any rings that cross the wrap meridian. After this, no
@@ -133,6 +145,14 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
     let projector: Box<dyn Projector> =
         Box::new(Mercator::fit(padded, (render_w as f64, render_h as f64)));
     let projection_name = "mercator";
+    tracing::debug!(
+        bbox_lon = format!("{:.2}..{:.2}", padded.min_lon, padded.max_lon),
+        bbox_lat = format!("{:.2}..{:.2}", padded.min_lat, padded.max_lat),
+        lon_span = format!("{:.1}", padded.max_lon - padded.min_lon),
+        aspect = format!("{aspect:.3}"),
+        canvas = format!("{render_w}x{render_h}"),
+        "viewport + canvas resolved"
+    );
 
     // ---- Compose: one SVG per layer.
     let mut svg_files: Vec<(String, String, Vec<u8>)> = Vec::new();
@@ -189,6 +209,13 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
             &*projector,
             &features,
             hull_radius_px,
+        );
+        tracing::trace!(
+            layer = %layer.name,
+            features = features.len(),
+            hull_radius_px,
+            svg_bytes = svg.len(),
+            "composed layer"
         );
         let cache_filename = format!("{}.svg", layer.name);
         svg_files.push((layer.name.to_string(), cache_filename, svg.into_bytes()));
@@ -414,6 +441,98 @@ fn viewport_bbox(layers: &[ResolvedLayer<'_>], cluster_factor: f64) -> Result<BB
     Ok(bb)
 }
 
+/// Largest empty longitude gap below which a feature set is treated as
+/// effectively global, so we don't rotate it. A world coastline (whose
+/// Antarctica spans every meridian) has only sub-degree gaps; a Pacific
+/// regional card has a gap of well over 200° across the Americas and
+/// Atlantic. 60° comfortably separates the two.
+const GLOBAL_GAP_THRESHOLD: f64 = 60.0;
+
+/// Pick the central meridian that places every non-context feature in
+/// the smallest contiguous longitude window.
+///
+/// Algorithm: collect every vertex longitude from focus/highlight/hull
+/// features, find the largest circular gap between consecutive
+/// longitudes, and put the wrap meridian in the middle of that gap. The
+/// central meridian is then the antipode of the gap midpoint — the
+/// centre of the occupied arc.
+///
+/// Returns `None` when there are no non-context vertices, or when the
+/// data is effectively global (largest gap `< GLOBAL_GAP_THRESHOLD`);
+/// the caller then falls back to `central = 0` (no rotation), which
+/// preserves the natural framing of world maps.
+///
+/// Reduces to the raw-bbox midpoint for ordinary non-wrapping regions
+/// (Europe → ≈15°E, CONUS → ≈−96°W).
+fn choose_central_meridian(layers: &[ResolvedLayer<'_>]) -> Option<f64> {
+    let mut lons: Vec<f64> = Vec::new();
+    for l in layers {
+        for (g, _role, is_context) in &l.features {
+            if *is_context {
+                continue;
+            }
+            for_each_vertex(g, &mut |p| lons.push(norm360(p.lon)));
+        }
+    }
+    if lons.is_empty() {
+        return None;
+    }
+    lons.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Largest circular gap between consecutive (sorted) longitudes,
+    // including the wrap-around gap from the last back to the first.
+    let n = lons.len();
+    let mut max_gap = 0.0;
+    let mut gap_mid = 0.0;
+    for i in 0..n {
+        let cur = lons[i];
+        let next = if i + 1 < n { lons[i + 1] } else { lons[0] + 360.0 };
+        let gap = next - cur;
+        if gap > max_gap {
+            max_gap = gap;
+            gap_mid = cur + gap * 0.5;
+        }
+    }
+    if max_gap < GLOBAL_GAP_THRESHOLD {
+        // Data wraps most of the globe — no meaningful frame to centre.
+        return None;
+    }
+    // Centre of the occupied arc is the antipode of the gap's middle.
+    Some(norm180(gap_mid + 180.0))
+}
+
+/// Normalise a longitude to `[0, 360)`.
+fn norm360(lon: f64) -> f64 {
+    lon.rem_euclid(360.0)
+}
+
+/// Normalise a longitude to `(-180, 180]`.
+fn norm180(lon: f64) -> f64 {
+    let x = lon.rem_euclid(360.0);
+    if x > 180.0 { x - 360.0 } else { x }
+}
+
+/// Visit every vertex of a geometry (all rings, all components).
+fn for_each_vertex(g: &Geometry, f: &mut dyn FnMut(LonLat)) {
+    match g {
+        Geometry::Point(p) => f(*p),
+        Geometry::LineString(line) => line.iter().for_each(|p| f(*p)),
+        Geometry::MultiLineString(lines) => {
+            lines.iter().flatten().for_each(|p| f(*p))
+        }
+        Geometry::Polygon { outer, holes } => {
+            outer.iter().for_each(|p| f(*p));
+            holes.iter().flatten().for_each(|p| f(*p));
+        }
+        Geometry::MultiPolygon(polys) => {
+            for poly in polys {
+                poly.outer.iter().for_each(|p| f(*p));
+                poly.holes.iter().flatten().for_each(|p| f(*p));
+            }
+        }
+    }
+}
+
 fn build_block(
     key: &str,
     render_w: u32,
@@ -485,6 +604,120 @@ fn load_from_cache(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Build a one-layer resolved set from `(geom, role, is_context)`
+    /// triples for the central-meridian tests.
+    fn layer_with(
+        feats: Vec<(Geometry, &'static str, bool)>,
+    ) -> Vec<ResolvedLayer<'static>> {
+        vec![ResolvedLayer {
+            name: "base",
+            features: feats,
+        }]
+    }
+
+    fn box_poly(min_lon: f64, max_lon: f64) -> Geometry {
+        Geometry::Polygon {
+            outer: vec![
+                LonLat { lon: min_lon, lat: 0.0 },
+                LonLat { lon: max_lon, lat: 0.0 },
+                LonLat { lon: max_lon, lat: 5.0 },
+                LonLat { lon: min_lon, lat: 5.0 },
+                LonLat { lon: min_lon, lat: 0.0 },
+            ],
+            holes: vec![],
+        }
+    }
+
+    #[test]
+    fn central_meridian_europe_is_midpoint() {
+        // −10°…40° → ≈15°E, same as the old raw-midpoint behaviour.
+        let layers = layer_with(vec![(box_poly(-10.0, 40.0), "outline", false)]);
+        let c = choose_central_meridian(&layers).unwrap();
+        assert!((c - 15.0).abs() < 1.0, "got {c}");
+    }
+
+    #[test]
+    fn central_meridian_conus_is_midpoint() {
+        let layers = layer_with(vec![(box_poly(-125.0, -67.0), "outline", false)]);
+        let c = choose_central_meridian(&layers).unwrap();
+        assert!((c - -96.0).abs() < 1.0, "got {c}");
+    }
+
+    #[test]
+    fn central_meridian_pacific_avoids_thin_strip() {
+        // Melanesia (≈140–180°E) + Polynesia (≈−175…−150°W). The raw
+        // midpoint would land near −10°E (Atlantic) and cut through the
+        // Pacific. Largest-gap must instead centre on the Pacific so the
+        // occupied window is small and contiguous.
+        let layers = layer_with(vec![
+            (box_poly(140.0, 180.0), "outline", false),
+            (box_poly(-175.0, -150.0), "outline", false),
+        ]);
+        let c = choose_central_meridian(&layers).unwrap();
+        // Centre of the occupied arc sits in the Pacific, ~175–185°E.
+        let c360 = norm360(c);
+        assert!(
+            (c360 - 182.5).abs() < 10.0,
+            "central {c} (norm360 {c360}) not Pacific-centred"
+        );
+        // And after rotating, the occupied span must be tight (< 180°),
+        // not a globe-spanning strip.
+        let occupied: Vec<f64> = [140.0, 180.0, -175.0, -150.0]
+            .iter()
+            .map(|&lon| norm180(lon - c))
+            .collect();
+        let span = occupied.iter().cloned().fold(f64::MIN, f64::max)
+            - occupied.iter().cloned().fold(f64::MAX, f64::min);
+        assert!(span < 180.0, "rotated span {span} still wraps the world");
+    }
+
+    #[test]
+    fn central_meridian_single_fiji_is_pacific() {
+        // Fiji straddles the dateline: bulk at ~178°E, a few at ~−178°W.
+        let layers = layer_with(vec![(box_poly(177.0, 180.0), "highlight", false)]);
+        let c = choose_central_meridian(&layers).unwrap();
+        assert!((norm360(c) - 178.5).abs() < 5.0, "got {c}");
+    }
+
+    #[test]
+    fn central_meridian_global_data_returns_none() {
+        // A ring spanning every longitude (like a world coastline with
+        // Antarctica) has only tiny gaps → no meaningful frame.
+        let mut outer = Vec::new();
+        let mut lon = -180.0;
+        while lon < 180.0 {
+            outer.push(LonLat { lon, lat: -80.0 });
+            lon += 5.0;
+        }
+        outer.push(LonLat { lon: 175.0, lat: -70.0 });
+        outer.push(LonLat { lon: -180.0, lat: -80.0 });
+        let layers = layer_with(vec![(
+            Geometry::Polygon { outer, holes: vec![] },
+            "outline",
+            false,
+        )]);
+        assert!(choose_central_meridian(&layers).is_none());
+    }
+
+    #[test]
+    fn central_meridian_ignores_context() {
+        // Only context features → no frame.
+        let layers = layer_with(vec![(box_poly(0.0, 10.0), "outline", true)]);
+        assert!(choose_central_meridian(&layers).is_none());
+    }
+
+    #[test]
+    fn norm_helpers() {
+        assert!((norm360(-10.0) - 350.0).abs() < 1e-9);
+        assert!((norm360(370.0) - 10.0).abs() < 1e-9);
+        assert!((norm180(190.0) - -170.0).abs() < 1e-9);
+        assert!((norm180(185.0) - -175.0).abs() < 1e-9);
+        assert!((norm180(-190.0) - 170.0).abs() < 1e-9);
+        assert!((norm180(45.0) - 45.0).abs() < 1e-9);
+        // 180 stays 180 (inclusive upper bound).
+        assert!((norm180(180.0) - 180.0).abs() < 1e-9);
+    }
 
     #[test]
     fn role_for_feature_ref_assignments() {

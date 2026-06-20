@@ -217,6 +217,7 @@ pub fn reconcile(
                             }
                         }
                     }
+                    tracing::debug!(path = %l.path.display(), deck_changed, "update");
                     outcome.updated += 1;
                 } else if deck_changed {
                     if !dry_run {
@@ -228,6 +229,7 @@ pub fn reconcile(
                             continue;
                         }
                     }
+                    tracing::debug!(path = %l.path.display(), to = %l.deck, "move (deck change)");
                     outcome.moved += 1;
                 }
             }
@@ -236,7 +238,10 @@ pub fn reconcile(
                     outcome.added += 1;
                 } else {
                     match push_add(anki, l) {
-                        Ok(_) => outcome.added += 1,
+                        Ok(_) => {
+                            tracing::debug!(path = %l.path.display(), id = %id, "add");
+                            outcome.added += 1;
+                        }
                         Err(e) => outcome.errors.push(format!(
                             "{}: add: {e}",
                             l.path.display()
@@ -256,6 +261,7 @@ pub fn reconcile(
         if dry_run {
             outcome.deleted += orphan_ids.len();
         } else {
+            tracing::debug!(count = orphan_ids.len(), "deleting orphaned notes");
             match anki.delete_notes(&orphan_ids) {
                 Ok(()) => outcome.deleted += orphan_ids.len(),
                 Err(e) => outcome.errors.push(format!("deleteNotes: {e}")),

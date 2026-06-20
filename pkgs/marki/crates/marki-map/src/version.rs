@@ -54,5 +54,11 @@
 //!   draws scale-aware halo circles around its features' centroids
 //!   instead of outlines, making hard-to-spot island nations findable.
 //!   New `hull` theme role.
+//! - `23` — Central-meridian selection rewritten. The frame is now
+//!   chosen by the largest empty longitude gap (smallest enclosing arc)
+//!   instead of the raw bbox midpoint, so antimeridian-spanning cards
+//!   (Melanesia + Polynesia, Fiji, Kiribati, …) get a tight Pacific
+//!   viewport instead of a globe-spanning strip. Near-global data is
+//!   left un-rotated.
 
-pub const RENDER_VERSION_MAP: u32 = 22;
+pub const RENDER_VERSION_MAP: u32 = 23;

@@ -46,6 +46,12 @@ struct Cli {
     #[arg(long, env = "MARKID_TYPST", global = true)]
     typst_binary: Option<PathBuf>,
 
+    /// Increase log verbosity. Repeat for more detail: `-v` enables
+    /// `debug`, `-vv` enables `trace`. Overridden by an explicit
+    /// `RUST_LOG`/env filter when one is set.
+    #[arg(short = 'v', long = "verbose", global = true, action = clap::ArgAction::Count)]
+    verbose: u8,
+
     #[command(subcommand)]
     cmd: Cmd,
 }
@@ -77,26 +83,43 @@ enum Cmd {
         /// Directory to write asset files into. Created if missing.
         #[arg(long, default_value = "out")]
         out: PathBuf,
+        /// Dump rendered assets (SVGs etc.) to stdout instead of writing
+        /// files. Logs still go to stderr, so `markid -v render-map
+        /// card.md --stdout > map.svg` gives a clean SVG plus debug
+        /// trace. With multiple assets each is prefixed by an
+        /// `<!-- asset: NAME -->` comment.
+        #[arg(long)]
+        stdout: bool,
     },
 }
 
 fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
-        )
-        .with_target(false)
-        .init();
-
     let cli = Cli::parse();
+
+    // Verbosity: an explicit RUST_LOG/env filter always wins; otherwise
+    // `-v` bumps the default level. Logs go to stderr so stdout stays
+    // clean for `render-map --stdout`.
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+        let level = match cli.verbose {
+            0 => "info",
+            1 => "debug",
+            _ => "trace",
+        };
+        EnvFilter::new(level)
+    });
+    tracing_subscriber::fmt()
+        .with_env_filter(env_filter)
+        .with_target(false)
+        .with_writer(std::io::stderr)
+        .init();
 
     // RenderMap doesn't need a working AnkiConnect — but it does want
     // the same renderer registry the daemon uses, which in turn wants
     // config (for `media_dir`). Load the config the same way as below.
-    if let Cmd::RenderMap { file, out } = &cli.cmd {
+    if let Cmd::RenderMap { file, out, stdout } = &cli.cmd {
         let cfg = load_config_for_render(&cli)?;
         let registry = build_registry(&cfg);
-        return cmd_render_map(file, out, &registry);
+        return cmd_render_map(file, out, *stdout, &registry);
     }
 
     let cfg = load_config(&cli)?;
@@ -257,6 +280,13 @@ fn run_cycle(
     let notes = scan_dir_v2(&cfg.cards_dir)?;
     let cache_dir = render_cache_dir();
     let models_dir = cfg.resolved_models_dir();
+    tracing::debug!(
+        notes = notes.len(),
+        cards_dir = %cfg.cards_dir.display(),
+        cache_dir = %cache_dir.display(),
+        dry_run,
+        "starting reconcile cycle"
+    );
     let outcome = reconcile(
         anki,
         &cfg.cards_dir,
@@ -329,16 +359,43 @@ fn cmd_status(
     run_cycle(anki, cfg, registry, script_engine, template_state, true)
 }
 
-fn cmd_render_map(file: &Path, out: &Path, registry: &Registry) -> Result<()> {
+fn cmd_render_map(file: &Path, out: &Path, to_stdout: bool, registry: &Registry) -> Result<()> {
+    use std::io::Write;
+
     let source = std::fs::read_to_string(file)
         .with_context(|| format!("read {}", file.display()))?;
     let note = marki_core::note_parser::parse_note(&source, file.to_path_buf());
 
-    std::fs::create_dir_all(out)
-        .with_context(|| format!("create {}", out.display()))?;
-
     let cache = render_cache_dir();
     let result = markid::sync::stock_render::render_stock(&note, registry, file, &cache);
+
+    for e in &result.errors {
+        eprintln!("warning: {e}");
+    }
+
+    // --stdout: dump each rendered asset to stdout (SVG XML etc.) and
+    // skip file writing entirely. Logs and warnings already went to
+    // stderr, so the stream stays clean.
+    if to_stdout {
+        let stdout = std::io::stdout();
+        let mut w = stdout.lock();
+        let multi = result.assets.len() > 1;
+        for a in &result.assets {
+            if multi {
+                writeln!(w, "<!-- asset: {} -->", a.filename)?;
+            }
+            w.write_all(&a.bytes)?;
+            if !a.bytes.ends_with(b"\n") {
+                writeln!(w)?;
+            }
+        }
+        tracing::info!(
+            assets = result.assets.len(),
+            "rendered {} to stdout",
+            file.display()
+        );
+        return Ok(());
+    }
 
     // Extract front/back from fields.
     let front = result.fields.iter()
@@ -350,9 +407,8 @@ fn cmd_render_map(file: &Path, out: &Path, registry: &Registry) -> Result<()> {
         .map(|(_, v)| v.as_str())
         .unwrap_or("");
 
-    for e in &result.errors {
-        eprintln!("warning: {e}");
-    }
+    std::fs::create_dir_all(out)
+        .with_context(|| format!("create {}", out.display()))?;
 
     // Write assets to output directory.
     let mut total_assets = 0usize;
