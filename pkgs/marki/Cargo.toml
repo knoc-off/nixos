@@ -18,6 +18,7 @@ authors = ["knoff"]
 [workspace.dependencies]
 anyhow = "1"
 blake3 = "1"
+globset = "0.4"
 clap = { version = "4", features = ["derive", "env"] }
 notify = "8"
 notify-debouncer-full = "0.6"

@@ -18,16 +18,23 @@ use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
 #[command(
-    name = "markid",
+    name = "marki",
     version,
-    about = "Sync a markdown directory with Anki via AnkiConnect"
+    about = "Sync a markdown card repo with Anki — a one-shot CLI (optional watch daemon).",
+    long_about = "marki keeps a directory of markdown flashcards in sync with Anki via \
+AnkiConnect.\n\nIt is repo-centric: run it from inside a flashcard repo and it discovers a \
+hidden `.markid/` directory (git-style, walking up from the current directory) holding the \
+config, models, libraries and media that define your cards. `marki init` scaffolds one.\n\n\
+With no subcommand, marki runs a single `push` (scan → reconcile → push) and exits."
 )]
 struct Cli {
-    /// Path to a config file. Defaults to `$XDG_CONFIG_HOME/markid/config.toml`.
+    /// Path to a config file. By default marki discovers the nearest
+    /// `.markid/config.toml` (walking up from the current directory),
+    /// then falls back to `$XDG_CONFIG_HOME/markid/config.toml`.
     #[arg(long, env = "MARKID_CONFIG", global = true)]
     config: Option<PathBuf>,
 
-    /// Override the cards directory from the config file.
+    /// Override the cards directory (default: the repo root).
     #[arg(long, global = true)]
     cards_dir: Option<PathBuf>,
 
@@ -53,15 +60,20 @@ struct Cli {
     verbose: u8,
 
     #[command(subcommand)]
-    cmd: Cmd,
+    cmd: Option<Cmd>,
 }
 
 #[derive(Subcommand)]
 enum Cmd {
+    /// Scaffold a `.markid/` project (config, models/, lib/, media/) in
+    /// the current directory. Idempotent — never overwrites existing
+    /// files. Run this once to turn a folder of cards into a marki repo.
+    Init,
     /// Mint `#id(...)` for any card that doesn't have one. Pure disk op;
     /// no Anki needed. Meant to be run in CI or as a pre-commit step.
     Fmt,
-    /// Run a single reconcile cycle and exit.
+    /// Run a single reconcile cycle and exit. This is the default when
+    /// no subcommand is given.
     Push {
         /// Wait (with capped backoff) for AnkiConnect to become
         /// reachable before running the cycle, instead of failing fast.
@@ -130,22 +142,31 @@ fn main() -> Result<()> {
 
     // RenderMap doesn't need a working AnkiConnect — but it does want
     // the same renderer registry the daemon uses, which in turn wants
-    // config (for `media_dir`). Load the config the same way as below.
-    if let Cmd::RenderMap { file, out, stdout } = &cli.cmd {
+    // config (for media sources). Load the config the same way as below.
+    if let Some(Cmd::RenderMap { file, out, stdout }) = &cli.cmd {
         let cfg = load_config_for_render(&cli)?;
         let registry = build_registry(&cfg);
         return cmd_render_map(file, out, *stdout, &registry);
     }
 
+    // `init` only scaffolds the current directory; no config load needed.
+    if let Some(Cmd::Init) = &cli.cmd {
+        return cmd_init();
+    }
+
     let cfg = load_config(&cli)?;
 
-    match cli.cmd {
+    // No subcommand → run a single push (one-shot first).
+    let cmd = cli.cmd.unwrap_or(Cmd::Push { wait_for_anki: false, prune: false });
+
+    match cmd {
+        Cmd::Init => unreachable!("handled above"),
         Cmd::Fmt => cmd_fmt(&cfg),
         Cmd::Push { wait_for_anki, prune } => {
             let anki = AnkiConnect::new(&cfg.anki_endpoint).context("init AnkiConnect client")?;
             let registry = Arc::new(build_registry(&cfg));
             let mut script_engine = build_script_engine(&cfg);
-            let mut template_state = load_template_state();
+            let mut template_state = load_template_state(&cfg);
             cmd_push(
                 &anki,
                 &cfg,
@@ -160,7 +181,7 @@ fn main() -> Result<()> {
             let anki = AnkiConnect::new(&cfg.anki_endpoint).context("init AnkiConnect client")?;
             let registry = Arc::new(build_registry(&cfg));
             let mut script_engine = build_script_engine(&cfg);
-            let mut template_state = load_template_state();
+            let mut template_state = load_template_state(&cfg);
             cmd_status(&anki, &cfg, &registry, &mut script_engine, &mut template_state)
         }
         Cmd::Prune { dry_run } => {
@@ -171,7 +192,7 @@ fn main() -> Result<()> {
             let anki = AnkiConnect::new(&cfg.anki_endpoint).context("init AnkiConnect client")?;
             let registry = Arc::new(build_registry(&cfg));
             let mut script_engine = build_script_engine(&cfg);
-            let mut template_state = load_template_state();
+            let mut template_state = load_template_state(&cfg);
             cmd_watch(&anki, &cfg, &registry, &mut script_engine, &mut template_state)
         }
         Cmd::RenderMap { .. } => unreachable!("handled above"),
@@ -179,19 +200,34 @@ fn main() -> Result<()> {
 }
 
 /// Build the external block-renderer registry. The media renderer is
-/// only registered when at least one media source is configured —
-/// otherwise ```media``` blocks fall through to plain code rendering.
-/// Likewise, the typst renderer is only registered when a typst binary
-/// is configured.
+/// registered when at least one media source exists — the built-in
+/// git-tracked `.markid/media/` directory (searched first) plus any
+/// `[media_sources]` from config. Otherwise ```media``` blocks fall
+/// through to plain code rendering. Likewise, the typst renderer is only
+/// registered when a typst binary is configured.
 fn build_registry(cfg: &Config) -> Registry {
     let mut reg = Registry::new();
-    reg.register(Box::new(marki_map::MapRenderer::new()));
+    let map_renderer =
+        match marki_map::MapRenderer::with_defaults(cfg.map.clone(), cfg.resolved_cards_dir()) {
+            Ok(r) => r,
+            Err(e) => {
+                tracing::warn!("invalid [map] rule in config ({e}); ignoring map defaults");
+                marki_map::MapRenderer::new()
+            }
+        };
+    reg.register(Box::new(map_renderer));
 
-    let sources: Vec<(String, std::path::PathBuf)> = cfg
-        .media_sources
-        .iter()
-        .map(|(name, dir)| (name.clone(), dir.clone()))
-        .collect();
+    let mut sources: Vec<(String, std::path::PathBuf)> = Vec::new();
+    // Built-in primary media dir, searched first when it exists.
+    let builtin = cfg.builtin_media_dir();
+    if builtin.is_dir() {
+        sources.push(("media".to_string(), builtin));
+    }
+    sources.extend(
+        cfg.media_sources
+            .iter()
+            .map(|(name, dir)| (name.clone(), dir.clone())),
+    );
 
     if !sources.is_empty() {
         reg.register(Box::new(marki_media::MediaRenderer::new(sources)));
@@ -212,12 +248,9 @@ fn build_script_engine(cfg: &Config) -> ScriptEngine {
     ScriptEngine::new(models_dir, lib)
 }
 
-/// Load template state from the standard config location.
-fn load_template_state() -> TemplateState {
-    let path = TemplateState::default_path(
-        &dirs::config_dir().unwrap_or_else(|| PathBuf::from(".")),
-    );
-    TemplateState::load(&path)
+/// Load template state from the project's `.markid/model_state.json`.
+fn load_template_state(cfg: &Config) -> TemplateState {
+    TemplateState::load(&cfg.state_path())
 }
 
 /// Cache directory used by external block renderers. We default to
@@ -231,18 +264,36 @@ fn render_cache_dir() -> PathBuf {
 }
 
 fn load_config(cli: &Cli) -> Result<Config> {
-    let path = cli
-        .config
-        .clone()
-        .or_else(Config::default_path)
-        .ok_or_else(|| anyhow::anyhow!("no config path; pass --config or set XDG_CONFIG_HOME"))?;
-
-    let mut cfg = if path.exists() {
-        Config::load_from(&path).with_context(|| format!("read config {}", path.display()))?
+    let cwd = std::env::current_dir().context("get current directory")?;
+    let disc = Config::discover(&cwd, cli.config.as_deref());
+    if let Some(p) = &disc.config_path {
+        tracing::debug!(config = %p.display(), anchor = %disc.anchor_dir.display(), "loaded config");
     } else {
-        Config::default()
-    };
+        tracing::debug!(anchor = %disc.anchor_dir.display(), "no config file; using defaults");
+    }
+    let mut cfg = Config::load(&disc)?;
 
+    apply_cli_overrides(&mut cfg, cli)?;
+    // Resolve cards_dir to an absolute path (project root by default).
+    cfg.cards_dir = cfg.resolved_cards_dir();
+    Ok(cfg)
+}
+
+/// Like [`load_config`] but tolerates a missing project — used by the
+/// offline `render-map` subcommand which only needs the renderer
+/// registry config (media sources, typst).
+fn load_config_for_render(cli: &Cli) -> Result<Config> {
+    let cwd = std::env::current_dir().context("get current directory")?;
+    let disc = Config::discover(&cwd, cli.config.as_deref());
+    let mut cfg = Config::load(&disc)?;
+    apply_cli_overrides(&mut cfg, cli)?;
+    Ok(cfg)
+}
+
+/// Apply `--cards-dir`, `--anki-endpoint`, `--media-dir`, `--typst-binary`
+/// overrides on top of the loaded config. `--media-dir` adds a single
+/// source searched after both the built-in media dir and config sources.
+fn apply_cli_overrides(cfg: &mut Config, cli: &Cli) -> Result<()> {
     if let Some(p) = &cli.cards_dir {
         cfg.cards_dir = p.clone();
     }
@@ -257,34 +308,7 @@ fn load_config(cli: &Cli) -> Result<Config> {
     if let Some(p) = &cli.typst_binary {
         cfg.typst_binary = Some(p.clone());
     }
-    if cfg.cards_dir.as_os_str().is_empty() {
-        anyhow::bail!("cards_dir is required (set in config or pass --cards-dir)");
-    }
-    Ok(cfg)
-}
-
-/// Like [`load_config`] but doesn't require `cards_dir` — used by the
-/// offline `render-map` subcommand which only needs the renderer
-/// registry config (e.g. `media_dir`).
-fn load_config_for_render(cli: &Cli) -> Result<Config> {
-    let path = cli.config.clone().or_else(Config::default_path);
-
-    let mut cfg = match path {
-        Some(p) if p.exists() => {
-            Config::load_from(&p).with_context(|| format!("read config {}", p.display()))?
-        }
-        _ => Config::default(),
-    };
-
-    if let Some(p) = &cli.media_dir {
-        cfg.media_sources
-            .entry("_default".into())
-            .or_insert_with(|| p.clone());
-    }
-    if let Some(p) = &cli.typst_binary {
-        cfg.typst_binary = Some(p.clone());
-    }
-    Ok(cfg)
+    Ok(())
 }
 
 fn run_cycle(
@@ -336,13 +360,23 @@ fn run_cycle(
         tracing::warn!("{e}");
     }
     // Persist template state after successful cycle.
-    let state_path = TemplateState::default_path(
-        &dirs::config_dir().unwrap_or_else(|| PathBuf::from(".")),
-    );
+    let state_path = cfg.state_path();
     if let Err(e) = template_state.save(&state_path) {
         tracing::warn!("save template state: {e}");
     }
     Ok(outcome)
+}
+
+/// Scaffold a `.markid/` project in the current directory.
+fn cmd_init() -> Result<()> {
+    let cwd = std::env::current_dir().context("get current directory")?;
+    let anchor = markid::config::init_project(&cwd)?;
+    println!("initialized marki project at {}", anchor.display());
+    println!("  - edit {}/config.toml", anchor.display());
+    println!("  - add models to {}/models/", anchor.display());
+    println!("  - add committed media to {}/media/", anchor.display());
+    println!("then run `marki` (or `marki push`) from this repo to sync.");
+    Ok(())
 }
 
 fn cmd_fmt(cfg: &Config) -> Result<()> {

@@ -130,6 +130,46 @@ and are skipped.
 The hull `style` override and the `hull` theme role both control the
 hull fill/stroke; the bundled `atlas` theme ships a translucent default.
 
+## Project defaults & path rules
+
+A marki project can set DSL defaults for every `map` block in its
+`.markid/config.toml`, and override them per directory. This keeps cards
+terse — set a theme or viewport tuning once, not in every block.
+
+```toml
+# Applies to every map card in the project.
+[map.defaults]
+style = "atlas"
+[map.defaults.viewport]
+simplify_px = 1.0
+
+# Scope overrides to a glob, matched against the card path RELATIVE to
+# cards_dir. Several matching rules layer in declaration order.
+[[map.rules]]
+match = "Geography/**"
+[map.rules.defaults.viewport]
+cluster_factor = 0.3
+
+[[map.rules]]
+match = "Geography/Africa/**"
+[map.rules.defaults.viewport]
+simplify_px = 0.8
+```
+
+**Precedence** (low → high): built-in DSL defaults → `[map.defaults]` →
+every matching `[[map.rules]]` in order → the card's own `map` block. The
+author always wins; a rule only fills in fields the card didn't set.
+
+Merging is a recursive table merge: nested tables (`viewport`,
+`layers.<name>.style`, …) merge key-wise, while scalars and arrays
+(`size`, feature lists) replace wholesale. Because the merge feeds the
+same `MapSpec` deserializer, an unknown key in a default is a hard error
+that names the offending field — and changing a default re-renders the
+affected cards (the render cache keys off the merged spec).
+
+`match` uses [globset](https://docs.rs/globset) syntax: `**` spans
+directories, so `Geography/**` matches every card under `Geography/`.
+
 ## Feature references
 
 The renderer understands these reference shapes:

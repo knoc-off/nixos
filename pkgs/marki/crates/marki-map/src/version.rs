@@ -74,5 +74,21 @@
 //!   emitting hundreds of sub-pixel specks without GC-ing a small-island
 //!   answer. Outline simplification is now tunable (`simplify_px`,
 //!   default raised 1.0 → 1.5). All three knobs live in `[viewport]`.
+//! - `26` — Cleaner borders and outlines. Multi-country composites
+//!   (`continent/`, `subregion/`, `neighbors/`) are now boolean-unioned
+//!   (i_overlay) so shared internal borders dissolve instead of drawing
+//!   as double lines from independently-digitized neighbours. Closed
+//!   rings that simplify below a triangle are dropped, and sub-pixel
+//!   holes are area-culled, removing the "dotted" speckle from messy
+//!   source geometry. Default `simplify_px` lowered 1.5 → 1.0.
+//! - `27` — Single-source border data. The boundary set switched from
+//!   gbOpen (per-country, independently digitized) to geoBoundaries
+//!   CGAZ, which shares identical vertices along every shared edge, so
+//!   composites draw one border per edge with no boolean union. The
+//!   runtime dissolve (i_overlay) is gone; composite features
+//!   (`continent/`, `subregion/`, `neighbors/`) instead render
+//!   faithfully — no per-feature simplification or island culling —
+//!   which would otherwise split those coincident borders or drop small
+//!   member countries.
 
-pub const RENDER_VERSION_MAP: u32 = 25;
+pub const RENDER_VERSION_MAP: u32 = 27;

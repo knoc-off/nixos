@@ -26,10 +26,18 @@
     # reqwest with rustls-tls needs no system OpenSSL; keep nativeBuildInputs minimal.
     nativeBuildInputs = [pkgs.pkg-config];
 
+    # The binary is now `marki` (one-shot-first CLI). Keep `markid` as a
+    # back-compat alias so existing systemd units / scripts keep working.
+    postInstall = ''
+      if [ -e "$out/bin/marki" ] && [ ! -e "$out/bin/markid" ]; then
+        ln -s marki "$out/bin/markid"
+      fi
+    '';
+
     meta = {
-      description = "Daemon that syncs a directory of markdown cards with Anki via AnkiConnect";
+      description = "One-shot CLI (with optional watch daemon) that syncs a repo of markdown cards with Anki via AnkiConnect";
       license = lib.licenses.mit;
-      mainProgram = "markid";
+      mainProgram = "marki";
     };
 
     passthru.devShell = pkgs.mkShell {

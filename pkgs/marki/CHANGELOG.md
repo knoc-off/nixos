@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+### Added
+
+- **Repo-centric, one-shot-first CLI.** `marki` (renamed from `markid`;
+  `markid` kept as a back-compat alias) now discovers a hidden
+  `.markid/` directory by walking up from the current directory
+  (git-style). That directory holds everything that defines and renders
+  the cards — `config.toml`, `models/`, `lib/`, a git-tracked primary
+  `media/` source (searched first), and the now-in-repo
+  `model_state.json` — so a flashcard repo is fully self-contained.
+- **`marki init`** scaffolds `.markid/` (config + `models/`, `lib/`,
+  `media/`) in the current directory; idempotent, never clobbers.
+- **Bare `marki` runs a single `push`** (scan → reconcile → push) and
+  exits. The watch daemon is now an explicit, optional mode.
+- **`cards_dir` defaults to the repo root** and is no longer required;
+  relative config paths resolve against it.
+- **Environment interpolation in config values.** `cards_dir`,
+  `models_dir`, `lib_dir`, `typst_binary`, `anki_endpoint`, and every
+  `[media_sources]` value expand `$VAR`, `${VAR}`, `${VAR:-default}` and
+  a leading `~`. An undefined variable with no `:-default` is a
+  fail-fast error naming the variable and config key. This keeps
+  volatile `/nix/store` paths out of committed config — inject them via
+  `nix shell`:
+  ```toml
+  [media_sources]
+  circle = "${CIRCLE_FLAGS}/share/circle-flags-svg"
+  ```
+
 ### Fixed
 
 - **Critical data-loss bug: render failures no longer delete studied
@@ -27,9 +54,30 @@
 
 ### Changed
 
-- **Breaking (map data source)**: `marki-map` now resolves country and
-  administrative boundaries from **geoBoundaries gbOpen** instead of
-  Natural Earth. Natural Earth is retained only for `coastline`.
+- **Breaking (map data source)**: boundary data switched from
+  geoBoundaries **gbOpen** (per-country, independently digitized) to
+  geoBoundaries **CGAZ** (the Comprehensive Global Administrative Zones
+  composite, ADM0/1/2). CGAZ is clipped to a single shared international
+  boundary with gaps filled, so adjacent units share *identical* border
+  vertices — composites (`continent/`, `subregion/`, `neighbors/`) draw
+  one border per shared edge instead of double lines or slivers, from a
+  single source. `RENDER_VERSION_MAP` bumped to `27` (cache
+  invalidation).
+  - The runtime boolean-union dissolve (`i_overlay`) that v26 used to
+    paper over gbOpen's double borders is **removed**, along with its
+    dependency. Composite features now render *faithfully* — per-feature
+    outline simplification and small-island culling are skipped for them,
+    since either would split the now-coincident shared borders apart or
+    drop small member countries from a continent map.
+  - The `geoboundaries-data` derivation now topology-aware simplifies
+    CGAZ at build time (`shapely.coverage_simplify`, GEOS) — which
+    decimates each shared edge once while keeping neighbours coincident —
+    then splits it back into the per-country `<ISO>_ADM<n>.geojson`
+    layout the loader reads. The reference vocabulary is unchanged.
+
+- **Breaking (map data source)** *(superseded by the CGAZ switch above)*:
+  `marki-map` previously moved from Natural Earth to **geoBoundaries
+  gbOpen**. Natural Earth is retained only for `coastline`.
   `RENDER_VERSION_MAP` bumped to `21` (cache invalidation).
   - New reference vocabulary: `country/<ISO3>`,
     `adm1|adm2|adm3/<ISO3>/<NAME>`, `neighbors/<ISO3>`,

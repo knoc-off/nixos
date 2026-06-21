@@ -40,9 +40,13 @@ use std::path::Path;
 /// One resolved layer with its resolved geometry features.
 struct ResolvedLayer<'a> {
     name: &'a str,
-    /// (geometry, role, is_context) triples. `is_context` features are
-    /// drawn but excluded from the viewport bbox computation.
-    features: Vec<(Geometry, &'static str, bool)>,
+    /// (geometry, role, is_context, faithful) tuples. `is_context`
+    /// features are drawn but excluded from the viewport bbox
+    /// computation. `faithful` features (composites — continent /
+    /// subregion / neighbours) skip per-feature simplification and
+    /// island culling, which would otherwise break the coincident
+    /// borders shared by adjacent member units.
+    features: Vec<(Geometry, &'static str, bool, bool)>,
 }
 
 /// Run the full pipeline for one [`MapSpec`].
@@ -95,13 +99,13 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
     //      composer can draw clean paths.
     if central.abs() > f64::EPSILON {
         for layer in &mut resolved {
-            for (g, _, _) in &mut layer.features {
+        for (g, _, _, _) in &mut layer.features {
                 unwrap::rotate_geometry(g, central);
             }
         }
     }
     for layer in &mut resolved {
-        for (g, _, _) in &mut layer.features {
+        for (g, _, _, _) in &mut layer.features {
             let old = std::mem::take(g);
             *g = unwrap::split_at_wrap(old, central);
         }
@@ -134,7 +138,7 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
     //      reduction.
     let clip_bb = padded.padded(0.005);
     for layer in &mut resolved {
-        for (g, _, _) in &mut layer.features {
+        for (g, _, _, _) in &mut layer.features {
             let old = std::mem::take(g);
             *g = clip::clip_geometry(old, clip_bb);
         }
@@ -166,7 +170,11 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError>
         let features: Vec<Feature<'_>> = layer
             .features
             .iter()
-            .map(|(g, role, _is_context)| Feature { geom: g, role })
+            .map(|(g, role, _is_context, faithful)| Feature {
+                geom: g,
+                role,
+                faithful: *faithful,
+            })
             .collect();
         // Only the base layer gets the opaque background; overlay
         // layers must be transparent so the base shows through.
@@ -298,30 +306,42 @@ fn resolve_all_layers<'a>(
 ) -> Result<Vec<ResolvedLayer<'a>>, MapError> {
     let mut out = Vec::with_capacity(spec.layers.len());
     for (name, lspec) in &spec.layers {
-        let mut features: Vec<(Geometry, &'static str, bool)> = Vec::new();
+        let mut features: Vec<(Geometry, &'static str, bool, bool)> = Vec::new();
         for r in &lspec.features {
             let role = role_for_feature_ref(r, name);
             let g = resolve_one(r, cache_root)?;
-            features.push((g, role, false));
+            features.push((g, role, false, is_composite_ref(r)));
         }
         for r in &lspec.context {
             let role = role_for_feature_ref(r, name);
             let g = resolve_one(r, cache_root)?;
-            features.push((g, role, true));
+            features.push((g, role, true, is_composite_ref(r)));
         }
         for h in &lspec.highlights {
             let g = resolve_one(h, cache_root)?;
-            features.push((g, "highlight", false));
+            features.push((g, "highlight", false, is_composite_ref(h)));
         }
         if let Some(hull) = &lspec.hull {
             for r in &hull.features {
                 let g = resolve_one(r, cache_root)?;
-                features.push((g, "hull", false));
+                features.push((g, "hull", false, is_composite_ref(r)));
             }
         }
         out.push(ResolvedLayer { name, features });
     }
     Ok(out)
+}
+
+/// Whether a feature ref is a composite — a continent, subregion or
+/// neighbour set, each a concatenation of independently-keyed but
+/// border-coincident member units (CGAZ). Composites must render
+/// faithfully (no per-feature simplification or island culling), which
+/// would split their shared internal borders into double lines or drop
+/// small member countries entirely.
+fn is_composite_ref(r: &str) -> bool {
+    r.starts_with("continent/")
+        || r.starts_with("subregion/")
+        || r.starts_with("neighbors/")
 }
 
 /// Resolve one feature reference. Centralised here so future sources
@@ -371,7 +391,7 @@ fn role_for_feature_ref(r: &str, layer_name: &str) -> &'static str {
 fn collect_focus_geoms<'a>(layers: &'a [ResolvedLayer<'_>]) -> Vec<&'a Geometry> {
     let mut out = Vec::new();
     for l in layers {
-        for (g, role, is_context) in &l.features {
+        for (g, role, is_context, _) in &l.features {
             if *is_context || *role == "highlight" || *role == "hull" {
                 continue;
             }
@@ -398,7 +418,7 @@ fn viewport_bbox(layers: &[ResolvedLayer<'_>], cluster_factor: f64) -> Result<BB
     let mut focus: Vec<&Geometry> = Vec::new();
     let mut highlights: Vec<&Geometry> = Vec::new();
     for l in layers {
-        for (g, role, is_context) in &l.features {
+        for (g, role, is_context, _) in &l.features {
             if *is_context {
                 continue;
             }
@@ -473,7 +493,7 @@ const GLOBAL_GAP_THRESHOLD: f64 = 60.0;
 fn choose_central_meridian(layers: &[ResolvedLayer<'_>]) -> Option<f64> {
     let mut lons: Vec<f64> = Vec::new();
     for l in layers {
-        for (g, _role, is_context) in &l.features {
+        for (g, _role, is_context, _) in &l.features {
             if *is_context {
                 continue;
             }
@@ -612,10 +632,15 @@ mod tests {
     use super::*;
 
     /// Build a one-layer resolved set from `(geom, role, is_context)`
-    /// triples for the central-meridian tests.
+    /// triples for the central-meridian tests. Composites aren't
+    /// exercised here, so `faithful` is always `false`.
     fn layer_with(
         feats: Vec<(Geometry, &'static str, bool)>,
     ) -> Vec<ResolvedLayer<'static>> {
+        let feats = feats
+            .into_iter()
+            .map(|(g, role, ctx)| (g, role, ctx, false))
+            .collect();
         vec![ResolvedLayer {
             name: "base",
             features: feats,

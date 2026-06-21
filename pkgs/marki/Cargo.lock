@@ -938,6 +938,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "blake3",
+ "globset",
  "indexmap",
  "marki-core",
  "regex",

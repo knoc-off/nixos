@@ -25,8 +25,8 @@
 //! lookups are in-memory.
 
 use crate::data::geo_common::{
-    build_neighbor_graph, fold_into_composites, normalize_antimeridian, stitch_dateline_polygons,
-    Feature,
+    build_neighbor_graph, fold_into_composites, normalize_antimeridian,
+    stitch_dateline_polygons, Feature,
 };
 use crate::error::MapError;
 use crate::geometry::{BBox, Geometry, LonLat, Polygon};

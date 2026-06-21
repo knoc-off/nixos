@@ -129,7 +129,7 @@ pub struct ViewportSpec {
     /// Douglas-Peucker simplification tolerance in rendered pixels.
     /// Vertices deviating less than this from the simplified outline
     /// are removed. Because coordinates are projected pixels this
-    /// auto-adapts to zoom. Default `1.5`; set `0.0` to disable
+    /// auto-adapts to zoom. Default `1.0`; set `0.0` to disable
     /// simplification and keep full vertex detail.
     #[serde(default = "default_simplify_px")]
     pub simplify_px: f64,
@@ -153,7 +153,7 @@ fn default_min_aspect() -> f64 { 0.0 }
 fn default_cluster_factor() -> f64 { 0.15 }
 fn default_min_island_px() -> f64 { 2.0 }
 fn default_island_rel_frac() -> f64 { 0.05 }
-fn default_simplify_px() -> f64 { 1.5 }
+fn default_simplify_px() -> f64 { 1.0 }
 
 /// One named layer inside a map block.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
@@ -525,7 +525,7 @@ features = ["coastline"]
         assert!((s.viewport.cluster_factor - 0.15).abs() < 1e-9);
         assert!((s.viewport.min_island_px - 2.0).abs() < 1e-9);
         assert!((s.viewport.island_rel_frac - 0.05).abs() < 1e-9);
-        assert!((s.viewport.simplify_px - 1.5).abs() < 1e-9);
+        assert!((s.viewport.simplify_px - 1.0).abs() < 1e-9);
     }
 
     #[test]

@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "markid"
+name = "marki"
 path = "src/main.rs"
 
 [lib]

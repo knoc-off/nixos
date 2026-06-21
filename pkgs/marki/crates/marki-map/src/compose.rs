@@ -18,6 +18,12 @@ pub struct Feature<'a> {
     /// `"coast"`, `"neighbor"`, …). The theme maps each role to
     /// stroke/fill values.
     pub role: &'a str,
+    /// Render faithfully: skip per-feature simplification and island
+    /// culling. Set for composites (continent / subregion / neighbours)
+    /// whose member units share coincident borders — decimating each
+    /// independently would split those borders into double lines and
+    /// culling would drop small member countries.
+    pub faithful: bool,
 }
 
 /// Per-layer styling resolved from the theme.
@@ -54,6 +60,19 @@ pub struct RenderDetail {
     pub island_rel_frac: f64,
     /// Douglas-Peucker simplification tolerance in px. `0.0` disables.
     pub simplify_px: f64,
+}
+
+impl RenderDetail {
+    /// Detail settings for a faithful render: no culling and no
+    /// simplification, so coincident borders between adjacent units stay
+    /// exactly coincident. Used for composite features.
+    fn faithful() -> Self {
+        Self {
+            min_island_px2: 0.0,
+            island_rel_frac: 0.0,
+            simplify_px: 0.0,
+        }
+    }
 }
 
 impl Default for RenderDetail {
@@ -139,7 +158,12 @@ pub fn compose_layer(
             if role == "hull" {
                 write_hull(&mut out, projector, f.geom, hull_radius_px);
             } else {
-                write_feature(&mut out, projector, f.geom, detail);
+                let fdetail = if f.faithful {
+                    RenderDetail::faithful()
+                } else {
+                    detail
+                };
+                write_feature(&mut out, projector, f.geom, fdetail);
             }
         }
         out.push_str("</g>");
@@ -390,8 +414,14 @@ fn write_feature(out: &mut String, p: &dyn Projector, g: &Geometry, detail: Rend
             // A single component is the whole feature — never culled.
             let mut d = path_data_closed(p, outer, eps);
             for h in holes {
-                d.push(' ');
-                d.push_str(&path_data_closed(p, h, eps));
+                if !keep_hole(p, h, detail) {
+                    continue;
+                }
+                let hd = path_data_closed(p, h, eps);
+                if !hd.is_empty() {
+                    d.push(' ');
+                    d.push_str(&hd);
+                }
             }
             if !d.is_empty() {
                 let _ = write!(out, "<path d=\"{d}\" fill-rule=\"evenodd\"/>");
@@ -404,13 +434,23 @@ fn write_feature(out: &mut String, p: &dyn Projector, g: &Geometry, detail: Rend
                 if !keep_it {
                     continue;
                 }
+                let outer = path_data_closed(p, &poly.outer, eps);
+                if outer.is_empty() {
+                    continue;
+                }
                 if !d.is_empty() {
                     d.push(' ');
                 }
-                d.push_str(&path_data_closed(p, &poly.outer, eps));
+                d.push_str(&outer);
                 for h in &poly.holes {
-                    d.push(' ');
-                    d.push_str(&path_data_closed(p, h, eps));
+                    if !keep_hole(p, h, detail) {
+                        continue;
+                    }
+                    let hd = path_data_closed(p, h, eps);
+                    if !hd.is_empty() {
+                        d.push(' ');
+                        d.push_str(&hd);
+                    }
                 }
             }
             if !d.is_empty() {
@@ -418,6 +458,15 @@ fn write_feature(out: &mut String, p: &dyn Projector, g: &Geometry, detail: Rend
             }
         }
     }
+}
+
+/// Keep a hole only if it encloses a visible area. Tiny holes (sliver
+/// artifacts in the source boundaries, or specks left over from a
+/// boolean union) below `min_island_px²` are dropped so they don't
+/// render as pinprick notches. Culling is skipped when the threshold is
+/// zero, so unculled renders (`min_island_px = 0`) keep every hole.
+fn keep_hole(p: &dyn Projector, hole: &[LonLat], detail: RenderDetail) -> bool {
+    detail.min_island_px2 <= 0.0 || projected_ring_area(p, hole) >= detail.min_island_px2
 }
 
 /// Decide which components of a multipolygon survive detail culling.
@@ -471,12 +520,17 @@ fn projected_ring_area(p: &dyn Projector, ring: &[LonLat]) -> f64 {
     (a2 * 0.5).abs()
 }
 
-fn path_data_open(p: &dyn Projector, pts: &[LonLat], eps: f64) -> String {
+/// Project and simplify a ring/line into screen-space points.
+fn project_simplify(p: &dyn Projector, pts: &[LonLat], eps: f64) -> Vec<(f64, f64)> {
     let projected: Vec<(f64, f64)> = pts.iter().map(|pt| p.project(*pt)).collect();
-    let simplified = crate::simplify::simplify(&projected, eps);
+    crate::simplify::simplify(&projected, eps)
+}
+
+/// Serialize projected points to an SVG `M/L` path fragment (no close).
+fn points_to_path(simplified: &[(f64, f64)]) -> String {
     let mut s = String::with_capacity(simplified.len() * 12);
     let mut first = true;
-    for &(x, y) in &simplified {
+    for &(x, y) in simplified {
         if first {
             let _ = write!(s, "M{x:.2} {y:.2}");
             first = false;
@@ -487,11 +541,33 @@ fn path_data_open(p: &dyn Projector, pts: &[LonLat], eps: f64) -> String {
     s
 }
 
+/// Count points that remain distinct at the 2-decimal precision we emit.
+/// A closed ring with fewer than three such vertices encloses no visible
+/// area and would render as a stray dot or hairline.
+fn distinct_points(simplified: &[(f64, f64)]) -> usize {
+    let mut v: Vec<(i64, i64)> = simplified
+        .iter()
+        .map(|&(x, y)| ((x * 100.0).round() as i64, (y * 100.0).round() as i64))
+        .collect();
+    v.sort_unstable();
+    v.dedup();
+    v.len()
+}
+
+fn path_data_open(p: &dyn Projector, pts: &[LonLat], eps: f64) -> String {
+    points_to_path(&project_simplify(p, pts, eps))
+}
+
 fn path_data_closed(p: &dyn Projector, pts: &[LonLat], eps: f64) -> String {
-    let mut s = path_data_open(p, pts, eps);
-    if !s.is_empty() {
-        s.push_str(" Z");
+    let simplified = project_simplify(p, pts, eps);
+    // Drop rings that collapse below a triangle: a sliver hole or speck
+    // that simplifies to one or two distinct pixels is just visual noise
+    // (the "dotted" artifact from messy source boundaries).
+    if distinct_points(&simplified) < 3 {
+        return String::new();
     }
+    let mut s = points_to_path(&simplified);
+    s.push_str(" Z");
     s
 }
 
@@ -543,6 +619,7 @@ mod tests {
             &[Feature {
                 geom: &g,
                 role: "outline",
+                faithful: false,
             }],
             0.0,
             RenderDetail::default(),
@@ -594,7 +671,7 @@ mod tests {
             100,
             &LayerStyle::default(),
             &p,
-            &[Feature { geom: &g, role: "hull" }],
+            &[Feature { geom: &g, role: "hull", faithful: false }],
             12.0,
             RenderDetail::default(),
         );
@@ -632,7 +709,7 @@ mod tests {
             100,
             &LayerStyle::default(),
             &p,
-            &[Feature { geom: &g, role: "hull" }],
+            &[Feature { geom: &g, role: "hull", faithful: false }],
             4.0,
             RenderDetail::default(),
         );
@@ -664,7 +741,7 @@ mod tests {
             100,
             &LayerStyle::default(),
             &p,
-            &[Feature { geom: &g, role: "hull" }],
+            &[Feature { geom: &g, role: "hull", faithful: false }],
             12.0,
             RenderDetail::default(),
         );
@@ -690,7 +767,7 @@ mod tests {
             100,
             &LayerStyle::default(),
             &p,
-            &[Feature { geom: &g, role: "hull" }],
+            &[Feature { geom: &g, role: "hull", faithful: false }],
             12.0,
             RenderDetail::default(),
         );
@@ -741,6 +818,25 @@ mod tests {
             ],
             holes: vec![],
         }
+    }
+
+    #[test]
+    fn keep_hole_drops_subpixel_but_keeps_visible() {
+        let p = cull_proj(); // 1 lon/lat unit == 1 px
+        let detail = RenderDetail {
+            min_island_px2: 9.0,
+            island_rel_frac: 0.05,
+            simplify_px: 1.0,
+        };
+        // 1×1 deg hole ≈ 1 px² — below the 9 px² floor → dropped.
+        let tiny = cull_square(10.0, 10.0, 1.0).outer;
+        assert!(!keep_hole(&p, &tiny, detail));
+        // 5×5 deg hole = 25 px² — visible → kept.
+        let big = cull_square(10.0, 10.0, 5.0).outer;
+        assert!(keep_hole(&p, &big, detail));
+        // Threshold of zero keeps everything.
+        let off = RenderDetail { min_island_px2: 0.0, ..detail };
+        assert!(keep_hole(&p, &tiny, off));
     }
 
     #[test]
@@ -827,12 +923,14 @@ mod tests {
     fn cull_reduces_multipolygon_subpaths() {
         let p = cull_proj();
         let mut polys = vec![cull_square(0.0, 0.0, 40.0)];
-        for i in 0..50 {
-            polys.push(cull_square(50.0 + (i % 10) as f64, (i / 10) as f64, 0.5));
+        // 3 px specks: big enough to survive the degenerate-ring drop, so
+        // this test isolates *area* culling rather than simplification.
+        for i in 0..20 {
+            polys.push(cull_square(50.0 + (i % 5) as f64 * 4.0, (i / 5) as f64 * 4.0, 3.0));
         }
         let g = Geometry::MultiPolygon(polys);
         let detail = RenderDetail {
-            min_island_px2: 4.0,
+            min_island_px2: 16.0, // 4 px floor; specks are 9 px²
             island_rel_frac: 0.05,
             simplify_px: 1.0,
         };

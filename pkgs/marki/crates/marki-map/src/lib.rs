@@ -18,6 +18,7 @@ pub mod clip;
 pub mod cluster;
 pub mod compose;
 pub mod data;
+pub mod defaults;
 pub mod dsl;
 pub mod embed;
 pub mod error;
@@ -34,17 +35,19 @@ pub mod version;
 
 use marki_core::{BlockError, BlockRenderer, RenderCtx, RenderedBlock};
 
+pub use defaults::MapDefaults;
 pub use error::MapError;
 
 /// Lang token this renderer handles: `map`.
 pub const MAP_LANG: &str = "map";
 
-/// Map block renderer. Construct with [`MapRenderer::new`] and register
-/// against the markid daemon's [`crate::Registry`].
+/// Map block renderer. Construct with [`MapRenderer::new`] (no project
+/// defaults) or [`MapRenderer::with_defaults`], and register against the
+/// markid daemon's [`crate::Registry`].
 pub struct MapRenderer {
-    // Hooks for geoBoundaries / natural-earth path / overpass client /
-    // theme cache go here as the pipeline lands. For the stub renderer
-    // this is empty.
+    /// Project-level DSL defaults + path rules, merged underneath each
+    /// card's own block. Empty for a bare [`MapRenderer::new`].
+    defaults: defaults::CompiledDefaults,
 }
 
 impl Default for MapRenderer {
@@ -55,7 +58,21 @@ impl Default for MapRenderer {
 
 impl MapRenderer {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            defaults: defaults::CompiledDefaults::empty(),
+        }
+    }
+
+    /// Construct a renderer that merges project-level [`MapDefaults`]
+    /// underneath every card. `cards_dir` anchors the relative paths
+    /// that rule globs match against. Errors only on a malformed glob.
+    pub fn with_defaults(
+        defs: MapDefaults,
+        cards_dir: std::path::PathBuf,
+    ) -> Result<Self, String> {
+        Ok(Self {
+            defaults: defaults::CompiledDefaults::compile(defs, cards_dir)?,
+        })
     }
 }
 
@@ -65,7 +82,19 @@ impl BlockRenderer for MapRenderer {
     }
 
     fn render(&self, src: &str, ctx: &mut RenderCtx<'_>) -> Result<RenderedBlock, BlockError> {
-        let spec = dsl::parse_map_spec(src).map_err(|e| BlockError::Parse(e.to_string()))?;
+        let spec = if self.defaults.is_empty() {
+            dsl::parse_map_spec(src).map_err(|e| BlockError::Parse(e.to_string()))?
+        } else {
+            // Merge: project defaults (global + matching rules) underneath
+            // the card's own block, then build the spec from the result.
+            let mut merged = self.defaults.effective_table(ctx.source_path);
+            let card: toml::Table =
+                toml::from_str(src).map_err(|e| BlockError::Parse(e.to_string()))?;
+            defaults::deep_merge(&mut merged, &card);
+            toml::Value::Table(merged)
+                .try_into()
+                .map_err(|e| BlockError::Parse(e.to_string()))?
+        };
         Ok(pipeline::run(&spec, ctx.cache_dir)?)
     }
 }
