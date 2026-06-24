@@ -90,5 +90,12 @@
 //!   faithfully — no per-feature simplification or island culling —
 //!   which would otherwise split those coincident borders or drop small
 //!   member countries.
+//! - `28` — Restore island culling for composites. Only per-feature
+//!   outline *simplification* splits coincident shared borders into
+//!   double lines, so that alone is disabled for composites; small-
+//!   island culling — which drops whole disconnected specks (offshore
+//!   islands) and never touches a shared land border — is back on,
+//!   removing the noisy speckle that `27` reintroduced (e.g. Chile's
+//!   southern archipelago).
 
-pub const RENDER_VERSION_MAP: u32 = 27;
+pub const RENDER_VERSION_MAP: u32 = 28;

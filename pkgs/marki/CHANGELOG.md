@@ -65,10 +65,12 @@
   invalidation).
   - The runtime boolean-union dissolve (`i_overlay`) that v26 used to
     paper over gbOpen's double borders is **removed**, along with its
-    dependency. Composite features now render *faithfully* — per-feature
-    outline simplification and small-island culling are skipped for them,
-    since either would split the now-coincident shared borders apart or
-    drop small member countries from a continent map.
+    dependency. Composite features now skip per-feature outline
+    *simplification* (which would split the now-coincident shared
+    borders into double lines by decimating each member's copy of the
+    edge independently). Small-island culling stays on for them — it
+    only drops whole disconnected specks (offshore islands), never a
+    shared land border.
   - The `geoboundaries-data` derivation now topology-aware simplifies
     CGAZ at build time (`shapely.coverage_simplify`, GEOS) — which
     decimates each shared edge once while keeping neighbours coincident —

@@ -18,11 +18,11 @@ pub struct Feature<'a> {
     /// `"coast"`, `"neighbor"`, …). The theme maps each role to
     /// stroke/fill values.
     pub role: &'a str,
-    /// Render faithfully: skip per-feature simplification and island
-    /// culling. Set for composites (continent / subregion / neighbours)
-    /// whose member units share coincident borders — decimating each
-    /// independently would split those borders into double lines and
-    /// culling would drop small member countries.
+    /// Render the shared borders faithfully: skip per-feature outline
+    /// simplification (but keep island culling). Set for composites
+    /// (continent / subregion / neighbours) whose member units share
+    /// coincident borders — decimating each independently would split
+    /// those borders into double lines.
     pub faithful: bool,
 }
 
@@ -63,14 +63,16 @@ pub struct RenderDetail {
 }
 
 impl RenderDetail {
-    /// Detail settings for a faithful render: no culling and no
-    /// simplification, so coincident borders between adjacent units stay
-    /// exactly coincident. Used for composite features.
-    fn faithful() -> Self {
+    /// Detail settings for a composite (continent / subregion /
+    /// neighbours): keep small-island culling — it only removes whole
+    /// disconnected components (offshore specks), never a shared land
+    /// border — but disable outline simplification, which would re-split
+    /// the now-coincident shared borders into double lines by decimating
+    /// each member's copy of the edge independently.
+    fn composite(detail: RenderDetail) -> Self {
         Self {
-            min_island_px2: 0.0,
-            island_rel_frac: 0.0,
             simplify_px: 0.0,
+            ..detail
         }
     }
 }
@@ -159,7 +161,7 @@ pub fn compose_layer(
                 write_hull(&mut out, projector, f.geom, hull_radius_px);
             } else {
                 let fdetail = if f.faithful {
-                    RenderDetail::faithful()
+                    RenderDetail::composite(detail)
                 } else {
                     detail
                 };

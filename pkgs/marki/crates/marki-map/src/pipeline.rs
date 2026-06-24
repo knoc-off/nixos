@@ -43,9 +43,9 @@ struct ResolvedLayer<'a> {
     /// (geometry, role, is_context, faithful) tuples. `is_context`
     /// features are drawn but excluded from the viewport bbox
     /// computation. `faithful` features (composites — continent /
-    /// subregion / neighbours) skip per-feature simplification and
-    /// island culling, which would otherwise break the coincident
-    /// borders shared by adjacent member units.
+    /// subregion / neighbours) skip per-feature outline simplification,
+    /// which would otherwise re-split the coincident borders shared by
+    /// adjacent member units into double lines.
     features: Vec<(Geometry, &'static str, bool, bool)>,
 }
 
@@ -334,10 +334,10 @@ fn resolve_all_layers<'a>(
 
 /// Whether a feature ref is a composite — a continent, subregion or
 /// neighbour set, each a concatenation of independently-keyed but
-/// border-coincident member units (CGAZ). Composites must render
-/// faithfully (no per-feature simplification or island culling), which
-/// would split their shared internal borders into double lines or drop
-/// small member countries entirely.
+/// border-coincident member units (CGAZ). Composites must skip
+/// per-feature outline simplification, which would split their shared
+/// internal borders into double lines. (Island culling stays on — it
+/// only drops whole disconnected specks, never a shared land border.)
 fn is_composite_ref(r: &str) -> bool {
     r.starts_with("continent/")
         || r.starts_with("subregion/")
