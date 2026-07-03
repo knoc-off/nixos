@@ -8,6 +8,9 @@
 
   "fission.autostart" = true;
 
+  # Auto-discard idle tabs when the system is under memory pressure.
+  "browser.tabs.unloadOnLowMemory" = true;
+
   "gfx.webrender.all" = true;
 
   "layers.async-pan-zoom.enabled" = true;

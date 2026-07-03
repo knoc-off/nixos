@@ -252,11 +252,23 @@ in {
     binfmt.emulatedSystems = ["aarch64-linux"];
     kernelParams = ["usbcore.autosuspend=-1"];
     kernel.sysctl = {
-      "vm.swappiness" = 20;
+      # zram is RAM-speed, so be eager to use it before reclaiming caches.
+      # The disk swapfile stays as a low-priority overflow only.
+      "vm.swappiness" = 150;
       # Increase inotify limits for rust-analyzer and other file watchers
       "fs.inotify.max_user_watches" = 524288;
       "fs.inotify.max_user_instances" = 1024;
     };
+  };
+
+  # Compressed in-RAM swap. zstd compresses typical app memory ~3:1 at
+  # RAM speed, which absorbs pressure spikes without thrashing the slow
+  # btrfs disk swapfile (kept as a lower-priority overflow).
+  zramSwap = {
+    enable = true;
+    algorithm = "zstd";
+    memoryPercent = 50;
+    priority = 100;
   };
 
   users = {
