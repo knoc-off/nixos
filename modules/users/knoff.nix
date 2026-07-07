@@ -28,6 +28,37 @@
         wtype -M ctrl v -m ctrl
       '';
     };
+
+    # On-demand PA monitor: routes the EasyEffects-processed mic
+    # (easyeffects_source, i.e. the pa-voice chain) into the current default
+    # sink via pw-loopback. Foreground; Ctrl-C tears it down cleanly. Choose the
+    # output with the normal default-sink controls (wpctl / audio applet).
+    pa-monitor = pkgs.writeShellApplication {
+      name = "pa-monitor";
+      runtimeInputs = with pkgs; [pipewire jq];
+      text = ''
+        src="easyeffects_source"
+
+        if ! pw-cli info "$src" >/dev/null 2>&1; then
+          echo "pa-monitor: source '$src' not found -- is easyeffects running?" >&2
+          echo "            (start easyeffects and select the mic as its input)" >&2
+          exit 1
+        fi
+
+        sink=$(pw-dump | jq -r '
+          [ .[] | select(.props."metadata.name"=="default")
+                | .metadata[]? | select(.key=="default.audio.sink") | .value.name ]
+          | first // empty')
+
+        if [ -z "$sink" ]; then
+          echo "pa-monitor: no default sink found." >&2
+          exit 1
+        fi
+
+        echo "pa-monitor: $src -> $sink  (Ctrl-C to stop)"
+        exec pw-loopback -n pa-monitor -C "$src" -P "$sink"
+      '';
+    };
   in {
     imports = [inputs.home-manager.nixosModules.home-manager];
 
@@ -105,10 +136,15 @@
               };
 
               autoload.input = {
-                # Built-in mic gets noise suppression
-                "alsa_input.pci-0000_c1_00.6.analog-stereo:Internal Microphone" = {
-                  preset = "mic-denoise";
-                  description = "Ryzen HD Audio Controller Analog Stereo";
+                # External mic on the C-Media USB adapter gets the live-voice/PA chain.
+                # NOTE: the internal analog mic is intentionally left unprocessed. An
+                # always-on `mic-denoise` (rnnoise) autoload here keeps the internal mic
+                # permanently capturing and makes it the graph clock driver at a 256-frame
+                # quantum, which starved the shared speaker-output graph and caused constant
+                # playback crackle. rnnoise on the internal mic is not worth that cost.
+                "alsa_input.usb-0d8c_Generic_USB_Audio_Device-00.mono-fallback:Microphone" = {
+                  preset = "pa-voice";
+                  description = "Audio Adapter (Planet UP-100, Genius G-Talk) Mono";
                 };
               };
             };
@@ -429,6 +465,9 @@
 
             self.packages.${pkgs.stdenv.hostPlatform.system}.neovim.default
             self.packages.${pkgs.stdenv.hostPlatform.system}.opencode-bubblewrap
+
+            pa-monitor
+            self.packages.${pkgs.stdenv.hostPlatform.system}.pa-sweep
 
             #inputs.nelly.packages.${pkgs.stdenv.hostPlatform.system}.linear-cli
             spotify
