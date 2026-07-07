@@ -3,7 +3,7 @@
   lib,
 }: {
   force = lib.mkOverride 1000 true;
-  default = "duckduckgo";
+  default = "kagi";
   # order = [
   #   "Annas-Archive"
   #   "NixOS Wiki"
@@ -15,6 +15,21 @@
   #   "fmhy"
   # ];
   engines = {
+    "Kagi" = {
+      urls = [
+        {
+          template = "https://kagi.com/search";
+          params = [
+            {
+              name = "q";
+              value = "{searchTerms}";
+            }
+          ];
+        }
+      ];
+      #icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/package.svg";
+      definedAliases = ["!p"];
+    };
     "Nix Packages" = {
       urls = [
         {

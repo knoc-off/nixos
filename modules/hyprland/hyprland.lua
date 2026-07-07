@@ -266,7 +266,13 @@ end
 -- current workspace -- so hidden/other-workspace windows can never be picked.
 local function pickOnScreen(active)
 	local prev = hl.get_last_window()
-	if prev and not prev.floating and prev.visible and prev.address ~= active.address and visibleFraction(prev) >= 0.99 then
+	if
+		prev
+		and not prev.floating
+		and prev.visible
+		and prev.address ~= active.address
+		and visibleFraction(prev) >= 0.99
+	then
 		return prev
 	end
 	local ws = hl.get_active_workspace()
@@ -315,6 +321,7 @@ do
 		animation = "slidevert",
 	})
 
+	-- TODO: firefox, dropdown
 	hl.bind(mainMod .. " + grave", function()
 		local wins = hl.get_windows({ class = drop_class })
 		if #wins == 0 then
