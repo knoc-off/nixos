@@ -1,4 +1,4 @@
-{ ... }: {
+{...}: {
   home = {
     config,
     lib,
@@ -109,45 +109,145 @@
 
           "equalizer#0" = let
             bands = {
-              band0 = {frequency = 80.0; gain = 0.0; mode = "RLC (BT)"; mute = false; q = 0.7; slope = "x2"; solo = false; type = "Hi-pass"; width = 4.0;};
-              band1 = {frequency = 220.0; gain = -2.0; mode = "RLC (MT)"; mute = false; q = 0.7; slope = "x1"; solo = false; type = "Bell"; width = 4.0;};
-              band2 = {frequency = 350.0; gain = -2.0; mode = "BWC (MT)"; mute = false; q = 1.2; slope = "x2"; solo = false; type = "Bell"; width = 4.0;};
-              band3 = {frequency = 3500.0; gain = 2.0; mode = "BWC (BT)"; mute = false; q = 0.9; slope = "x2"; solo = false; type = "Bell"; width = 4.0;};
-              band4 = {frequency = 10000.0; gain = 2.0; mode = "LRX (MT)"; mute = false; q = 0.7; slope = "x1"; solo = false; type = "Hi-shelf"; width = 4.0;};
+              band0 = {
+                frequency = 80.0;
+                gain = 0.0;
+                mode = "RLC (BT)";
+                mute = false;
+                q = 0.7;
+                slope = "x2";
+                solo = false;
+                type = "Hi-pass";
+                width = 4.0;
+              };
+              band1 = {
+                frequency = 220.0;
+                gain = -2.0;
+                mode = "RLC (MT)";
+                mute = false;
+                q = 0.7;
+                slope = "x1";
+                solo = false;
+                type = "Bell";
+                width = 4.0;
+              };
+              band2 = {
+                frequency = 350.0;
+                gain = -2.0;
+                mode = "BWC (MT)";
+                mute = false;
+                q = 1.2;
+                slope = "x2";
+                solo = false;
+                type = "Bell";
+                width = 4.0;
+              };
+              band3 = {
+                frequency = 3500.0;
+                gain = 2.0;
+                mode = "BWC (BT)";
+                mute = false;
+                q = 0.9;
+                slope = "x2";
+                solo = false;
+                type = "Bell";
+                width = 4.0;
+              };
+              band4 = {
+                frequency = 10000.0;
+                gain = 2.0;
+                mode = "LRX (MT)";
+                mute = false;
+                q = 0.7;
+                slope = "x1";
+                solo = false;
+                type = "Hi-shelf";
+                width = 4.0;
+              };
             };
           in {
-            balance = 0.1; bypass = false; "input-gain" = 0.0;
-            left = bands; right = bands;
-            mode = "IIR"; "num-bands" = 5; "output-gain" = 0.0;
-            "pitch-left" = 0.0; "pitch-right" = 0.0; "split-channels" = false;
+            balance = 0.1;
+            bypass = false;
+            "input-gain" = 0.0;
+            left = bands;
+            right = bands;
+            mode = "IIR";
+            "num-bands" = 5;
+            "output-gain" = 0.0;
+            "pitch-left" = 0.0;
+            "pitch-right" = 0.0;
+            "split-channels" = false;
           };
 
           "compressor#0" = {
-            attack = 15.0; "boost-amount" = 0.0; "boost-threshold" = -72.0;
-            bypass = false; dry = -80.01; "hpf-frequency" = 10.0; "hpf-mode" = "Off";
-            "input-gain" = 0.0; knee = -6.0; "lpf-frequency" = 20000.0; "lpf-mode" = "Off";
-            makeup = 3.0; mode = "Downward"; "output-gain" = 0.0; ratio = 3.0;
-            release = 200.0; "release-threshold" = -40.0;
+            attack = 15.0;
+            "boost-amount" = 0.0;
+            "boost-threshold" = -72.0;
+            bypass = false;
+            dry = -80.01;
+            "hpf-frequency" = 10.0;
+            "hpf-mode" = "Off";
+            "input-gain" = 0.0;
+            knee = -6.0;
+            "lpf-frequency" = 20000.0;
+            "lpf-mode" = "Off";
+            makeup = 3.0;
+            mode = "Downward";
+            "output-gain" = 0.0;
+            ratio = 3.0;
+            release = 200.0;
+            "release-threshold" = -40.0;
             sidechain = {
-              lookahead = 0.0; mode = "RMS"; preamp = 0.0; reactivity = 10.0;
-              source = "Middle"; "stereo-split-source" = "Left/Right"; type = "Feed-forward";
+              lookahead = 0.0;
+              mode = "RMS";
+              preamp = 0.0;
+              reactivity = 10.0;
+              source = "Middle";
+              "stereo-split-source" = "Left/Right";
+              type = "Feed-forward";
             };
-            "stereo-split" = false; threshold = -18.0; wet = 0.0;
+            "stereo-split" = false;
+            threshold = -18.0;
+            wet = 0.0;
           };
 
           "deesser#0" = {
-            bypass = false; detection = "RMS"; "f1-freq" = 4000.0; "f1-level" = -6.0;
-            "f2-freq" = 8000.0; "f2-level" = -6.0; "f2-q" = 1.5; "input-gain" = 0.0;
-            laxity = 15; makeup = 0.0; mode = "Split"; "output-gain" = 0.0;
-            ratio = 3.0; "sc-listen" = false; threshold = -22.0;
+            bypass = false;
+            detection = "RMS";
+            "f1-freq" = 4000.0;
+            "f1-level" = -6.0;
+            "f2-freq" = 8000.0;
+            "f2-level" = -6.0;
+            "f2-q" = 1.5;
+            "input-gain" = 0.0;
+            laxity = 15;
+            makeup = 0.0;
+            mode = "Split";
+            "output-gain" = 0.0;
+            ratio = 3.0;
+            "sc-listen" = false;
+            threshold = -22.0;
           };
 
           "limiter#0" = {
-            alr = false; "alr-attack" = 5.0; "alr-knee" = 0.0; "alr-release" = 50.0;
-            attack = 2.0; bypass = false; dithering = "16bit"; "gain-boost" = false;
-            "input-gain" = 0.0; lookahead = 2.0; mode = "Herm Wide"; "output-gain" = 0.0;
-            oversampling = "None"; release = 5.0; "sidechain-preamp" = 0.0;
-            "sidechain-type" = "Internal"; "stereo-link" = 100.0; threshold = -1.5;
+            alr = false;
+            "alr-attack" = 5.0;
+            "alr-knee" = 0.0;
+            "alr-release" = 50.0;
+            attack = 2.0;
+            bypass = false;
+            dithering = "16bit";
+            "gain-boost" = false;
+            "input-gain" = 0.0;
+            lookahead = 2.0;
+            mode = "Herm Wide";
+            "output-gain" = 0.0;
+            oversampling = "None";
+            release = 5.0;
+            "sidechain-preamp" = 0.0;
+            "sidechain-type" = "Internal";
+            "stereo-link" = 100.0;
+            threshold = -1.5;
           };
         };
       };
@@ -229,58 +329,159 @@
           # expect 2-3 notches. Retune whenever the mic or speaker moves, and
           # save the tuned values back into this file per room.
           "equalizer#0" = let
-            band = {freq, gain, q, type, slope ? "x1", mode ? "RLC (BT)"}: {
-              frequency = freq; inherit gain q type slope mode;
-              mute = false; solo = false; width = 4.0;
+            band = {
+              freq,
+              gain,
+              q,
+              type,
+              slope ? "x1",
+              mode ? "RLC (BT)",
+            }: {
+              frequency = freq;
+              inherit gain q type slope mode;
+              mute = false;
+              solo = false;
+              width = 4.0;
             };
             bands = {
-              band0 = band {freq = 100.0; gain = 0.0; q = 0.7; type = "Hi-pass"; slope = "x2";};
-              band1 = band {freq = 404.0; gain = -8.0; q = 10.0; type = "Bell";};
-              band2 = band {freq = 530.0; gain = -6.0; q = 10.0; type = "Bell";};
-              band3 = band {freq = 814.0; gain = -8.0; q = 10.0; type = "Bell";};
-              band4 = band {freq = 2000.0; gain = -8.0; q = 10.0; type = "Bell";};
-              band5 = band {freq = 2400.0; gain = -8.0; q = 12.0; type = "Bell";};
-              band6 = band {freq = 2666.0; gain = -8.0; q = 12.0; type = "Bell";};
-              band7 = band {freq = 8000.0; gain = 2.0; q = 0.7; type = "Hi-shelf";};
+              band0 = band {
+                freq = 100.0;
+                gain = 0.0;
+                q = 0.7;
+                type = "Hi-pass";
+                slope = "x2";
+              };
+              band1 = band {
+                freq = 404.0;
+                gain = -8.0;
+                q = 10.0;
+                type = "Bell";
+              };
+              band2 = band {
+                freq = 530.0;
+                gain = -6.0;
+                q = 10.0;
+                type = "Bell";
+              };
+              band3 = band {
+                freq = 814.0;
+                gain = -8.0;
+                q = 10.0;
+                type = "Bell";
+              };
+              band4 = band {
+                freq = 2000.0;
+                gain = -8.0;
+                q = 10.0;
+                type = "Bell";
+              };
+              band5 = band {
+                freq = 2400.0;
+                gain = -8.0;
+                q = 12.0;
+                type = "Bell";
+              };
+              band6 = band {
+                freq = 2666.0;
+                gain = -8.0;
+                q = 12.0;
+                type = "Bell";
+              };
+              band7 = band {
+                freq = 8000.0;
+                gain = 2.0;
+                q = 0.7;
+                type = "Hi-shelf";
+              };
             };
           in {
-            balance = 0.0; bypass = false; "input-gain" = 0.0;
-            left = bands; right = bands;
-            mode = "IIR"; "num-bands" = 8; "output-gain" = 0.0;
-            "pitch-left" = 0.0; "pitch-right" = 0.0; "split-channels" = false;
+            balance = 0.0;
+            bypass = false;
+            "input-gain" = 0.0;
+            left = bands;
+            right = bands;
+            mode = "IIR";
+            "num-bands" = 8;
+            "output-gain" = 0.0;
+            "pitch-left" = 0.0;
+            "pitch-right" = 0.0;
+            "split-channels" = false;
           };
 
           # Light de-essing -- cheap electret capsules can be harsh. Bypass if
           # sibilance isn't a problem.
           "deesser#0" = {
-            bypass = false; detection = "RMS"; "f1-freq" = 4000.0; "f1-level" = -6.0;
-            "f2-freq" = 8000.0; "f2-level" = -6.0; "f2-q" = 1.5; "input-gain" = 0.0;
-            laxity = 15; makeup = 0.0; mode = "Split"; "output-gain" = 0.0;
-            ratio = 3.0; "sc-listen" = false; threshold = -22.0;
+            bypass = false;
+            detection = "RMS";
+            "f1-freq" = 4000.0;
+            "f1-level" = -6.0;
+            "f2-freq" = 8000.0;
+            "f2-level" = -6.0;
+            "f2-q" = 1.5;
+            "input-gain" = 0.0;
+            laxity = 15;
+            makeup = 0.0;
+            mode = "Split";
+            "output-gain" = 0.0;
+            ratio = 3.0;
+            "sc-listen" = false;
+            threshold = -22.0;
           };
 
           # Gentle leveling only. Over-compressing raises the noise floor
           # between words and increases feedback risk.
           "compressor#0" = {
-            attack = 15.0; "boost-amount" = 0.0; "boost-threshold" = -72.0;
-            bypass = false; dry = -80.01; "hpf-frequency" = 10.0; "hpf-mode" = "Off";
-            "input-gain" = 0.0; knee = -6.0; "lpf-frequency" = 20000.0; "lpf-mode" = "Off";
-            makeup = 3.0; mode = "Downward"; "output-gain" = 0.0; ratio = 3.0;
-            release = 200.0; "release-threshold" = -40.0;
+            attack = 15.0;
+            "boost-amount" = 0.0;
+            "boost-threshold" = -72.0;
+            bypass = false;
+            dry = -80.01;
+            "hpf-frequency" = 10.0;
+            "hpf-mode" = "Off";
+            "input-gain" = 0.0;
+            knee = -6.0;
+            "lpf-frequency" = 20000.0;
+            "lpf-mode" = "Off";
+            makeup = 3.0;
+            mode = "Downward";
+            "output-gain" = 0.0;
+            ratio = 3.0;
+            release = 200.0;
+            "release-threshold" = -40.0;
             sidechain = {
-              lookahead = 0.0; mode = "RMS"; preamp = 0.0; reactivity = 10.0;
-              source = "Middle"; "stereo-split-source" = "Left/Right"; type = "Feed-forward";
+              lookahead = 0.0;
+              mode = "RMS";
+              preamp = 0.0;
+              reactivity = 10.0;
+              source = "Middle";
+              "stereo-split-source" = "Left/Right";
+              type = "Feed-forward";
             };
-            "stereo-split" = false; threshold = -18.0; wet = 0.0;
+            "stereo-split" = false;
+            threshold = -18.0;
+            wet = 0.0;
           };
 
           # Brick-wall to protect the speaker and catch peaks.
           "limiter#0" = {
-            alr = false; "alr-attack" = 5.0; "alr-knee" = 0.0; "alr-release" = 50.0;
-            attack = 2.0; bypass = false; dithering = "16bit"; "gain-boost" = false;
-            "input-gain" = 0.0; lookahead = 2.0; mode = "Herm Wide"; "output-gain" = 0.0;
-            oversampling = "None"; release = 5.0; "sidechain-preamp" = 0.0;
-            "sidechain-type" = "Internal"; "stereo-link" = 100.0; threshold = -1.5;
+            alr = false;
+            "alr-attack" = 5.0;
+            "alr-knee" = 0.0;
+            "alr-release" = 50.0;
+            attack = 2.0;
+            bypass = false;
+            dithering = "16bit";
+            "gain-boost" = false;
+            "input-gain" = 0.0;
+            lookahead = 2.0;
+            mode = "Herm Wide";
+            "output-gain" = 0.0;
+            oversampling = "None";
+            release = 5.0;
+            "sidechain-preamp" = 0.0;
+            "sidechain-type" = "Internal";
+            "stereo-link" = 100.0;
+            threshold = -1.5;
           };
         };
       };
@@ -296,23 +497,69 @@
           blocklist = [];
           plugins_order = ["equalizer#0"];
           "equalizer#0" = let
-            mkBand = {freq, gain, q, type ? "Bell", mute ? false}: {
-              frequency = freq; inherit gain mute q;
-              mode = "RLC (BT)"; slope = "x1"; solo = false; inherit type;
+            mkBand = {
+              freq,
+              gain,
+              q,
+              type ? "Bell",
+              mute ? false,
+            }: {
+              frequency = freq;
+              inherit gain mute q;
+              mode = "RLC (BT)";
+              slope = "x1";
+              solo = false;
+              inherit type;
             };
             bands = {
-              band0 = mkBand {freq = 80.0; gain = 0.0; q = 4.36; type = "Hi-pass";};
-              band1 = mkBand {freq = 600.0; gain = -8.0; q = 4.0; type = "Notch";};
-              band2 = mkBand {freq = 1250.0; gain = -3.49; q = 4.17;};
-              band3 = mkBand {freq = 2016.0; gain = 4.85; q = 0.67;};
-              band4 = mkBand {freq = 5272.0; gain = 3.83; q = 2.64; type = "Notch";};
-              band5 = mkBand {freq = 6000.0; gain = 4.85; q = 4.36; type = "Hi-shelf"; mute = true;};
+              band0 = mkBand {
+                freq = 80.0;
+                gain = 0.0;
+                q = 4.36;
+                type = "Hi-pass";
+              };
+              band1 = mkBand {
+                freq = 600.0;
+                gain = -8.0;
+                q = 4.0;
+                type = "Notch";
+              };
+              band2 = mkBand {
+                freq = 1250.0;
+                gain = -3.49;
+                q = 4.17;
+              };
+              band3 = mkBand {
+                freq = 2016.0;
+                gain = 4.85;
+                q = 0.67;
+              };
+              band4 = mkBand {
+                freq = 5272.0;
+                gain = 3.83;
+                q = 2.64;
+                type = "Notch";
+              };
+              band5 = mkBand {
+                freq = 6000.0;
+                gain = 4.85;
+                q = 4.36;
+                type = "Hi-shelf";
+                mute = true;
+              };
             };
           in {
-            balance = 0.0; bypass = false; "input-gain" = 0.0;
-            left = bands; right = bands;
-            mode = "IIR"; "num-bands" = 6; "output-gain" = 0.0;
-            "pitch-left" = 0.0; "pitch-right" = 0.0; "split-channels" = false;
+            balance = 0.0;
+            bypass = false;
+            "input-gain" = 0.0;
+            left = bands;
+            right = bands;
+            mode = "IIR";
+            "num-bands" = 6;
+            "output-gain" = 0.0;
+            "pitch-left" = 0.0;
+            "pitch-right" = 0.0;
+            "split-channels" = false;
           };
         };
       };
@@ -323,88 +570,241 @@
         output = {
           blocklist = [];
           plugins_order = [
-            "gate#0" "compressor#0" "multiband_compressor#0" "equalizer#0" "limiter#0"
+            "gate#0"
+            "compressor#0"
+            "multiband_compressor#0"
+            "equalizer#0"
+            "limiter#0"
           ];
 
           "gate#0" = {
-            attack = 2000.0; bypass = false; "curve-threshold" = -40.0; "curve-zone" = -40.0;
-            dry = -80.01; "hpf-frequency" = 10.0; "hpf-mode" = "Off"; hysteresis = false;
-            "hysteresis-threshold" = -12.0; "hysteresis-zone" = -6.0; "input-gain" = 0.0;
-            "lpf-frequency" = 20000.0; "lpf-mode" = "Off"; makeup = 0.0; "output-gain" = 0.0;
-            reduction = -30.0; release = 2000.0;
+            attack = 2000.0;
+            bypass = false;
+            "curve-threshold" = -40.0;
+            "curve-zone" = -40.0;
+            dry = -80.01;
+            "hpf-frequency" = 10.0;
+            "hpf-mode" = "Off";
+            hysteresis = false;
+            "hysteresis-threshold" = -12.0;
+            "hysteresis-zone" = -6.0;
+            "input-gain" = 0.0;
+            "lpf-frequency" = 20000.0;
+            "lpf-mode" = "Off";
+            makeup = 0.0;
+            "output-gain" = 0.0;
+            reduction = -30.0;
+            release = 2000.0;
             sidechain = {
-              lookahead = 0.0; mode = "Peak"; preamp = 0.0; reactivity = 10.0;
-              source = "Middle"; "stereo-split-source" = "Left/Right"; type = "Internal";
+              lookahead = 0.0;
+              mode = "Peak";
+              preamp = 0.0;
+              reactivity = 10.0;
+              source = "Middle";
+              "stereo-split-source" = "Left/Right";
+              type = "Internal";
             };
-            "stereo-split" = false; wet = 0.0;
+            "stereo-split" = false;
+            wet = 0.0;
           };
 
           "compressor#0" = {
-            attack = 130.0; "boost-amount" = 6.0; "boost-threshold" = -60.0;
-            bypass = false; dry = -80.01; "hpf-frequency" = 10.0; "hpf-mode" = "Off";
-            "input-gain" = 0.0; knee = -24.0; "lpf-frequency" = 20000.0; "lpf-mode" = "Off";
-            makeup = 0.0; mode = "Upward"; "output-gain" = 0.0; ratio = 5.0;
-            release = 600.0; "release-threshold" = -80.01;
+            attack = 130.0;
+            "boost-amount" = 6.0;
+            "boost-threshold" = -60.0;
+            bypass = false;
+            dry = -80.01;
+            "hpf-frequency" = 10.0;
+            "hpf-mode" = "Off";
+            "input-gain" = 0.0;
+            knee = -24.0;
+            "lpf-frequency" = 20000.0;
+            "lpf-mode" = "Off";
+            makeup = 0.0;
+            mode = "Upward";
+            "output-gain" = 0.0;
+            ratio = 5.0;
+            release = 600.0;
+            "release-threshold" = -80.01;
             sidechain = {
-              lookahead = 0.0; mode = "RMS"; preamp = 0.0; reactivity = 10.0;
-              source = "Middle"; "stereo-split-source" = "Left/Right"; type = "Feed-forward";
+              lookahead = 0.0;
+              mode = "RMS";
+              preamp = 0.0;
+              reactivity = 10.0;
+              source = "Middle";
+              "stereo-split-source" = "Left/Right";
+              type = "Feed-forward";
             };
-            "stereo-split" = false; threshold = -10.0; wet = 0.0;
+            "stereo-split" = false;
+            threshold = -10.0;
+            wet = 0.0;
           };
 
           "multiband_compressor#0" = let
-            mkBand = {attackTime, releaseTime, enable ? true, splitFreq ? null, hcFreq ? 20000.0, lcFreq ? 10.0}:
+            mkBand = {
+              attackTime,
+              releaseTime,
+              enable ? true,
+              splitFreq ? null,
+              hcFreq ? 20000.0,
+              lcFreq ? 10.0,
+            }:
               {
-                "attack-threshold" = -30.0; "attack-time" = attackTime; "boost-amount" = 6.0;
-                "boost-threshold" = -72.0; "compression-mode" = "Downward"; "compressor-enable" = true;
-                "knee" = -24.0; "makeup" = 0.0; "mute" = false; "ratio" = 1.7;
-                "release-threshold" = -80.01; "release-time" = releaseTime;
-                "sidechain-custom-highcut-filter" = false; "sidechain-custom-lowcut-filter" = false;
-                "sidechain-highcut-frequency" = hcFreq; "sidechain-lookahead" = 0.0;
-                "sidechain-lowcut-frequency" = lcFreq; "sidechain-mode" = "RMS";
-                "sidechain-preamp" = 0.0; "sidechain-reactivity" = 10.0;
-                "sidechain-source" = "Middle"; "sidechain-type" = "Internal";
-                "solo" = false; "stereo-split-source" = "Left/Right";
+                "attack-threshold" = -30.0;
+                "attack-time" = attackTime;
+                "boost-amount" = 6.0;
+                "boost-threshold" = -72.0;
+                "compression-mode" = "Downward";
+                "compressor-enable" = true;
+                "knee" = -24.0;
+                "makeup" = 0.0;
+                "mute" = false;
+                "ratio" = 1.7;
+                "release-threshold" = -80.01;
+                "release-time" = releaseTime;
+                "sidechain-custom-highcut-filter" = false;
+                "sidechain-custom-lowcut-filter" = false;
+                "sidechain-highcut-frequency" = hcFreq;
+                "sidechain-lookahead" = 0.0;
+                "sidechain-lowcut-frequency" = lcFreq;
+                "sidechain-mode" = "RMS";
+                "sidechain-preamp" = 0.0;
+                "sidechain-reactivity" = 10.0;
+                "sidechain-source" = "Middle";
+                "sidechain-type" = "Internal";
+                "solo" = false;
+                "stereo-split-source" = "Left/Right";
               }
-              // lib.optionalAttrs (splitFreq != null) {"split-frequency" = splitFreq; "enable-band" = enable;};
+              // lib.optionalAttrs (splitFreq != null) {
+                "split-frequency" = splitFreq;
+                "enable-band" = enable;
+              };
           in {
-            band0 = mkBand {attackTime = 50.0; releaseTime = 600.0; hcFreq = 250.0;};
-            band1 = mkBand {attackTime = 30.0; releaseTime = 450.0; splitFreq = 250.0; hcFreq = 1250.0; lcFreq = 250.0;};
-            band2 = mkBand {attackTime = 10.0; releaseTime = 250.0; splitFreq = 1250.0; hcFreq = 5000.0; lcFreq = 1250.0;};
-            band3 = mkBand {attackTime = 5.0; releaseTime = 100.0; splitFreq = 5000.0; hcFreq = 20000.0; lcFreq = 5000.0;};
-            band4 = mkBand {attackTime = 20.0; releaseTime = 100.0; enable = false; splitFreq = 4000.0; hcFreq = 8000.0; lcFreq = 4000.0;};
-            band5 = mkBand {attackTime = 20.0; releaseTime = 100.0; enable = false; splitFreq = 8000.0; hcFreq = 12000.0; lcFreq = 8000.0;};
-            band6 = mkBand {attackTime = 20.0; releaseTime = 100.0; enable = false; splitFreq = 12000.0; hcFreq = 16000.0; lcFreq = 12000.0;};
-            band7 = mkBand {attackTime = 20.0; releaseTime = 100.0; enable = false; splitFreq = 16000.0; hcFreq = 20000.0; lcFreq = 16000.0;};
-            bypass = false; "compressor-mode" = "Modern"; dry = -80.01;
-            "envelope-boost" = "None"; "input-gain" = 0.0; "output-gain" = 0.0;
-            "stereo-split" = false; wet = 0.0;
+            band0 = mkBand {
+              attackTime = 50.0;
+              releaseTime = 600.0;
+              hcFreq = 250.0;
+            };
+            band1 = mkBand {
+              attackTime = 30.0;
+              releaseTime = 450.0;
+              splitFreq = 250.0;
+              hcFreq = 1250.0;
+              lcFreq = 250.0;
+            };
+            band2 = mkBand {
+              attackTime = 10.0;
+              releaseTime = 250.0;
+              splitFreq = 1250.0;
+              hcFreq = 5000.0;
+              lcFreq = 1250.0;
+            };
+            band3 = mkBand {
+              attackTime = 5.0;
+              releaseTime = 100.0;
+              splitFreq = 5000.0;
+              hcFreq = 20000.0;
+              lcFreq = 5000.0;
+            };
+            band4 = mkBand {
+              attackTime = 20.0;
+              releaseTime = 100.0;
+              enable = false;
+              splitFreq = 4000.0;
+              hcFreq = 8000.0;
+              lcFreq = 4000.0;
+            };
+            band5 = mkBand {
+              attackTime = 20.0;
+              releaseTime = 100.0;
+              enable = false;
+              splitFreq = 8000.0;
+              hcFreq = 12000.0;
+              lcFreq = 8000.0;
+            };
+            band6 = mkBand {
+              attackTime = 20.0;
+              releaseTime = 100.0;
+              enable = false;
+              splitFreq = 12000.0;
+              hcFreq = 16000.0;
+              lcFreq = 12000.0;
+            };
+            band7 = mkBand {
+              attackTime = 20.0;
+              releaseTime = 100.0;
+              enable = false;
+              splitFreq = 16000.0;
+              hcFreq = 20000.0;
+              lcFreq = 16000.0;
+            };
+            bypass = false;
+            "compressor-mode" = "Modern";
+            dry = -80.01;
+            "envelope-boost" = "None";
+            "input-gain" = 0.0;
+            "output-gain" = 0.0;
+            "stereo-split" = false;
+            wet = 0.0;
           };
 
           "equalizer#0" = let
             mkBand = freq: gain: {
-              frequency = freq; inherit gain; mode = "RLC (BT)"; mute = false;
-              q = 1.6; slope = "x1"; solo = false; type = "Bell"; width = 4.0;
+              frequency = freq;
+              inherit gain;
+              mode = "RLC (BT)";
+              mute = false;
+              q = 1.6;
+              slope = "x1";
+              solo = false;
+              type = "Bell";
+              width = 4.0;
             };
             bands = {
-              band0 = mkBand 32.0 3.5; band1 = mkBand 64.0 2.0; band2 = mkBand 128.0 1.0;
-              band3 = mkBand 256.0 0.0; band4 = mkBand 512.0 (-0.5); band5 = mkBand 1024.0 (-1.5);
-              band6 = mkBand 2048.0 (-0.25); band7 = mkBand 4096.0 1.25;
-              band8 = mkBand 8192.0 2.75; band9 = mkBand 16384.0 3.0;
+              band0 = mkBand 32.0 3.5;
+              band1 = mkBand 64.0 2.0;
+              band2 = mkBand 128.0 1.0;
+              band3 = mkBand 256.0 0.0;
+              band4 = mkBand 512.0 (-0.5);
+              band5 = mkBand 1024.0 (-1.5);
+              band6 = mkBand 2048.0 (-0.25);
+              band7 = mkBand 4096.0 1.25;
+              band8 = mkBand 8192.0 2.75;
+              band9 = mkBand 16384.0 3.0;
             };
           in {
-            balance = 0.0; bypass = false; "input-gain" = 0.0;
-            left = bands; right = bands;
-            mode = "IIR"; "num-bands" = 10; "output-gain" = 0.0;
-            "pitch-left" = 0.0; "pitch-right" = 0.0; "split-channels" = false;
+            balance = 0.0;
+            bypass = false;
+            "input-gain" = 0.0;
+            left = bands;
+            right = bands;
+            mode = "IIR";
+            "num-bands" = 10;
+            "output-gain" = 0.0;
+            "pitch-left" = 0.0;
+            "pitch-right" = 0.0;
+            "split-channels" = false;
           };
 
           "limiter#0" = {
-            alr = false; "alr-attack" = 5.0; "alr-knee" = 0.0; "alr-knee-smooth" = -5.0;
-            "alr-release" = 50.0; attack = 5.0; bypass = false; dithering = "None";
-            "gain-boost" = false; "input-gain" = 0.0; lookahead = 5.0; mode = "Herm Thin";
-            "output-gain" = 0.0; oversampling = "True Peak/16 bit"; release = 10.0;
-            "sidechain-preamp" = 0.0; "sidechain-type" = "Internal"; "stereo-link" = 100.0;
+            alr = false;
+            "alr-attack" = 5.0;
+            "alr-knee" = 0.0;
+            "alr-knee-smooth" = -5.0;
+            "alr-release" = 50.0;
+            attack = 5.0;
+            bypass = false;
+            dithering = "None";
+            "gain-boost" = false;
+            "input-gain" = 0.0;
+            lookahead = 5.0;
+            mode = "Herm Thin";
+            "output-gain" = 0.0;
+            oversampling = "True Peak/16 bit";
+            release = 10.0;
+            "sidechain-preamp" = 0.0;
+            "sidechain-type" = "Internal";
+            "stereo-link" = 100.0;
             threshold = -1.0;
           };
         };
@@ -438,17 +838,21 @@
     # Generate xdg.dataFile entries
 
     # Preset files: ~/.local/share/easyeffects/{input,output}/<name>.json
-    outputPresetFiles = lib.listToAttrs (map (name:
-      lib.nameValuePair "easyeffects/output/${name}.json" {
-        source = jsonFormat.generate "output-${name}.json" (resolvePreset "output" name);
-      }
-    ) referencedOutputPresets);
+    outputPresetFiles = lib.listToAttrs (map (
+        name:
+          lib.nameValuePair "easyeffects/output/${name}.json" {
+            source = jsonFormat.generate "output-${name}.json" (resolvePreset "output" name);
+          }
+      )
+      referencedOutputPresets);
 
-    inputPresetFiles = lib.listToAttrs (map (name:
-      lib.nameValuePair "easyeffects/input/${name}.json" {
-        source = jsonFormat.generate "input-${name}.json" (resolvePreset "input" name);
-      }
-    ) referencedInputPresets);
+    inputPresetFiles = lib.listToAttrs (map (
+        name:
+          lib.nameValuePair "easyeffects/input/${name}.json" {
+            source = jsonFormat.generate "input-${name}.json" (resolvePreset "input" name);
+          }
+      )
+      referencedInputPresets);
 
     # Autoload profiles: ~/.local/share/easyeffects/autoload/{input,output}/<node:route>.json
     mkAutoloadFile = direction: key: value: let
@@ -488,7 +892,6 @@
         };
       };
     };
-
   in {
     options.services.easyeffects = {
       presets = {
