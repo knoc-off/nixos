@@ -338,14 +338,20 @@
       callback = clearCache,
     })
 
-    -- Map <CR> to go_in: open file (and close explorer) or enter directory
+    -- Buffer-local mappings for the explorer window
     autocmd("User", {
       group = augroup,
       pattern = "MiniFilesBufferCreate",
       callback = function(args)
+        local buf = args.data.buf_id
+        -- <CR> go_in: open file (and close explorer) or enter directory
         vim.keymap.set("n", "<CR>", function()
           require("mini.files").go_in({ close_on_file = true })
-        end, { buffer = args.data.buf_id, desc = "Open file or enter directory" })
+        end, { buffer = buf, desc = "Open file or enter directory" })
+        -- <Esc> closes the explorer (in addition to the default `q`)
+        vim.keymap.set("n", "<Esc>", function()
+          require("mini.files").close()
+        end, { buffer = buf, desc = "Close file explorer" })
       end,
     })
   '';

@@ -196,8 +196,7 @@ in {
           "help"
           "man"
           "gitcommit"
-          "TelescopePrompt"
-          "TelescopeResults"
+          "minipick"
           "''"
         ];
       };

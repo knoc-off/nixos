@@ -40,8 +40,8 @@
     {
       mode = "n";
       key = "<leader>gu";
-      action = lib.nixvim.mkRaw "function() require('gitsigns').undo_stage_hunk() end";
-      options = { silent = true; desc = "Undo stage hunk"; };
+      action = lib.nixvim.mkRaw "function() require('gitsigns').stage_hunk() end";
+      options = { silent = true; desc = "Unstage hunk (toggle on staged sign)"; };
     }
     {
       mode = "n";
@@ -70,7 +70,7 @@
         function()
           local merge_base = _G.GitState.set_merge_base()
           if merge_base then
-            vim.cmd('Gitsigns change_base ' .. merge_base)
+            require('gitsigns').change_base(merge_base, true)
             vim.notify("Comparing against merge-base: " .. merge_base:sub(1, 7), vim.log.levels.INFO)
           end
         end
@@ -83,7 +83,7 @@
       action = lib.nixvim.mkRaw ''
         function()
           _G.GitState.reset_base()
-          vim.cmd('Gitsigns reset_base')
+          require('gitsigns').reset_base(true)
           vim.notify("Reset to HEAD", vim.log.levels.INFO)
         end
       '';

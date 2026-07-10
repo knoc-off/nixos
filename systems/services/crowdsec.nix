@@ -5,7 +5,7 @@
   inputs,
   ...
 }: let
-  upkgs = inputs.nixpkgs-unstable.legacyPackages.${pkgs.system};
+  upkgs = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system};
 in {
   services.crowdsec = {
     enable = true;

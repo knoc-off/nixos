@@ -139,10 +139,10 @@ in {
 
   # Throwaway cargo build artifacts in RAM -- keeps the ~100 MB/s build write
   # storm off the encrypted btrfs NVMe. Volatile: lost on reboot (full rebuild).
-  fileSystems."/cargo-ram" = {
-    fsType = "tmpfs";
-    options = ["size=32G" "uid=1000" "gid=100" "mode=0755"];
-  };
+  # fileSystems."/cargo-ram" = {
+  #   fsType = "tmpfs";
+  #   options = ["size=32G" "uid=1000" "gid=100" "mode=0755"];
+  # };
 
   programs = {
     direnv = {

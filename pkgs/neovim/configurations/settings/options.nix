@@ -33,6 +33,10 @@
     smartcase = true;
     scrolloff = 5;
     scroll = 8;
+
+    # Jumplist: browser-style Back/Forward (new jumps truncate forward history)
+    # and restore scroll position, not just the cursor line, on <C-o>/<C-i>.
+    jumpoptions = "stack,view";
     cursorcolumn = false;
     signcolumn = "yes";
     colorcolumn = "100";

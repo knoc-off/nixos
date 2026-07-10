@@ -1,10 +1,5 @@
-{ config, inputs, pkgs, lib, ... }:
-let
-  upkgs = import inputs.nixpkgs-unstable {
-    inherit (pkgs) system;
-    config = { allowUnfree = true; };
-  };
-in {
+{ config, inputs, pkgs, lib, upkgs, ... }:
+{
   hardware.bluetooth = {
     enable = true;
     powerOnBoot = true;

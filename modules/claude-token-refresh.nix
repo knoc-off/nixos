@@ -1,7 +1,6 @@
 { inputs, ... }: {
-  home = { pkgs, ... }:
+  home = { pkgs, upkgs, ... }:
   let
-    upkgs = import inputs.nixpkgs-unstable { inherit (pkgs) system; config = pkgs.config; };
     claude = "${upkgs.claude-code}/bin/claude";
     jq = "${pkgs.jq}/bin/jq";
     systemctl = "${pkgs.systemd}/bin/systemctl";

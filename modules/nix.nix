@@ -1,6 +1,13 @@
 { inputs, ... }: {
   nixos = {...}: {
     nixpkgs.config.allowUnfree = true;
+
+    # Pre-size the Boehm GC heap for Nix evaluation. A full system eval grows the
+    # heap to ~4.3GB and triggers 2 GC cycles; starting at 6GB avoids one of them
+    # (~5-10% faster eval). Untouched pages cost no physical RAM (demand-paged),
+    # so small nix commands are unaffected.
+    environment.variables.GC_INITIAL_HEAP_SIZE = "6442450944"; # 6 GiB
+
     nix = {
       registry = {
         nixpkgs.flake = inputs.nixpkgs;

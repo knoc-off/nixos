@@ -35,12 +35,7 @@
       };
 
       lspBuf = {
-        gd = "definition";
         gD = "declaration";
-        gi = "implementation";
-        gr = "references";
-        gt = "type_definition";
-        "<leader>ca" = "code_action";
         "<leader>rn" = "rename";
       };
     };
@@ -54,15 +49,27 @@
           border = border,
           source = true,
         },
-        virtual_text = {
-          prefix = "",
-          spacing = 2,
+        -- Full diagnostics as virtual lines below the current line only; keeps
+        -- other lines uncluttered. Gutter signs still flag every affected line.
+        virtual_text = false,
+        virtual_lines = {
+          current_line = true,
         },
         signs = true,
         underline = true,
         update_in_insert = false,
         severity_sort = true,
       })
+
+      -- Toggle between current-line-only and all-lines virtual diagnostics,
+      -- for surveying every diagnostic in a file then collapsing back.
+      vim.keymap.set("n", "<leader>dl", function()
+        local cfg = vim.diagnostic.config()
+        local all = type(cfg.virtual_lines) == "table" and cfg.virtual_lines.current_line == nil
+        vim.diagnostic.config({
+          virtual_lines = all and { current_line = true } or true,
+        })
+      end, { silent = true, desc = "Toggle diagnostic virtual lines (all/current)" })
     '';
 
     onAttach = ''
@@ -70,6 +77,17 @@
       if client.server_capabilities.inlayHintProvider then
         vim.lsp.inlay_hint.enable(true, { bufnr = bufnr })
       end
+
+      -- List-based navigation via mini.pick (fuzzy + preview when multiple results)
+      local function map(lhs, scope, desc)
+        vim.keymap.set("n", lhs, function()
+          require("mini.extra").pickers.lsp({ scope = scope })
+        end, { buffer = bufnr, silent = true, desc = desc })
+      end
+      map("gd", "definition", "Definition")
+      map("gr", "references", "References")
+      map("gi", "implementation", "Implementation")
+      map("gt", "type_definition", "Type definition")
     '';
   };
 
@@ -111,4 +129,15 @@
     }
   ];
 
+  # Remove Neovim's built-in `gr`-prefix LSP maps (grn/gra/grr/gri/grt/grx).
+  # They turn `gr` into a prefix, so our `gr` (references) waits for `timeoutlen`
+  # and pops a which-key submenu on slow entry -- the exact speed-dependent
+  # behavior we want to avoid. Our scheme already covers all of them:
+  #   gd/gr/gi/gt navigation + <leader>ca (code action) + <leader>rn (rename).
+  extraConfigLua = ''
+    for _, key in ipairs({ "grn", "grr", "gri", "grt", "grx", "gra" }) do
+      pcall(vim.keymap.del, "n", key)
+      pcall(vim.keymap.del, "x", key)
+    end
+  '';
 }

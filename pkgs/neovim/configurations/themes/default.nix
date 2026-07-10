@@ -117,6 +117,10 @@ in {
           Visual = {
             bg = "$bg3";
           };
+          Cursor = {
+            fg = "$bg0";
+            bg = "$bright_cyan";
+          };
           VisualNOS = {
             bg = "$bg3";
           };
@@ -346,50 +350,45 @@ in {
             fg = "$red";
           };
 
-          # Telescope customizations (from your original config)
-          TelescopeMatching = {
-            fg = "$orange";
-          };
-          TelescopeSelection = {
+          # mini.pick fuzzy finder
+          MiniPickNormal = {
             fg = "$fg";
-            bg = "$bg3";
-            bold = true;
-          };
-          TelescopePromptPrefix = {
             bg = "$bg1";
           };
-          TelescopePromptNormal = {
-            bg = "$bg1";
-          };
-          TelescopeResultsNormal = {
-            bg = "$bg1";
-          };
-          TelescopePreviewNormal = {
-            bg = "$bg1";
-          };
-          TelescopePromptBorder = {
+          MiniPickBorder = {
             fg = "$bg3";
             bg = "$bg1";
           };
-          TelescopeResultsBorder = {
-            fg = "$bg3";
-            bg = "$bg1";
-          };
-          TelescopePreviewBorder = {
-            fg = "$bg3";
-            bg = "$bg1";
-          };
-          TelescopePromptTitle = {
-            fg = "$bg0";
-            bg = "$purple";
-          };
-          TelescopeResultsTitle = {
+          MiniPickBorderText = {
             fg = "$purple";
             bg = "$bg1";
           };
-          TelescopePreviewTitle = {
-            fg = "$bg0";
-            bg = "$green";
+          MiniPickPrompt = {
+            fg = "$blue";
+            bg = "$bg1";
+          };
+          MiniPickMatchCurrent = {
+            fg = "$fg";
+            bg = "$bg3";
+            fmt = "bold";
+          };
+          MiniPickMatchMarked = {
+            fg = "$orange";
+          };
+          MiniPickMatchRanges = {
+            fg = "$orange";
+          };
+          MiniPickPreviewLine = {
+            bg = "$bg2";
+          };
+          MiniPickPreviewRegion = {
+            bg = "$bg3";
+          };
+          MiniPickIconFile = {
+            fg = "$fg";
+          };
+          MiniPickIconDirectory = {
+            fg = "$blue";
           };
           # Blink.cmp completion menu
           BlinkCmpMenu = {

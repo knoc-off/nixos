@@ -6,13 +6,10 @@
     pkgs,
     lib,
     config,
+    upkgs,
     ...
   }: let
     user = "niko";
-    upkgs = import inputs.nixpkgs-unstable {
-      inherit (pkgs) system;
-      config = {allowUnfree = true;};
-    };
 
     inherit (self.lib.keyLayers) presets;
 
@@ -328,7 +325,7 @@
           # thinkpad-work system config) to keep the build write storm off the
           # encrypted btrfs NVMe. rust-analyzer is unaffected: it has its own
           # on-disk targetDir and CARGO_TARGET_DIR isn't in lspmux pass_environment.
-          CARGO_TARGET_DIR = "/cargo-ram/target";
+          # CARGO_TARGET_DIR = "/cargo-ram/target";
         };
 
         services = {
@@ -345,6 +342,10 @@
         };
 
         home.packages = with pkgs; [
+          (qemu.overrideAttrs (old: {
+            configureFlags = old.configureFlags ++ ["--enable-gtk-clipboard"];
+          }))
+
           upkgs.foliate
           upkgs.readest
 

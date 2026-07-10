@@ -72,6 +72,10 @@ in {
 
     programs.firefox = {
       enable = true;
+      # TODO: migrate to the new XDG config path
+      # ("${config.xdg.configHome}/mozilla/firefox"). Keeping the legacy
+      # ".mozilla/firefox" default for now until ready to move the profile dir.
+      configPath = ".mozilla/firefox";
       profiles = {
         "main" = {
           isDefault = true;

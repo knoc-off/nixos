@@ -42,6 +42,7 @@
               inputs
               hostname
               ;
+            upkgs = unstablePkgs system;
           }
           // extraConfigs;
         modules =
@@ -194,11 +195,6 @@
     nixos-generators = {
       url = "github:nix-community/nixos-generators";
       inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    neovim = {
-      url = "github:knoc-off/neovim-config";
-      inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
 
     firefox-addons = {

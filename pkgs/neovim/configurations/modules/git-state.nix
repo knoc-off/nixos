@@ -8,7 +8,7 @@
       -- Current comparison base (nil = HEAD, or a commit/ref like "origin/main")
       base = nil,
 
-      -- Cached merge-base with origin/main (computed on demand)
+      -- Cached merge-base with the default branch (computed on demand)
       _merge_base_cache = nil,
       _merge_base_time = 0,
 
@@ -17,34 +17,42 @@
         return _G.GitState.base or "HEAD"
       end,
 
-      -- Get merge-base with origin/main (cached for 30s)
+      -- Get merge-base with the branch's integration target (cached for 30s).
+      -- Resolves the target dynamically so repos using master/trunk/etc work:
+      --   1. the current branch's upstream (@{u})
+      --   2. origin's default branch (origin/HEAD)
+      --   3. common fallbacks (origin/main, origin/master, main, master)
       get_merge_base = function()
         local now = os.time()
         if _G.GitState._merge_base_cache and (now - _G.GitState._merge_base_time) < 30 then
           return _G.GitState._merge_base_cache
         end
 
-        local result = vim.system(
-          { "git", "merge-base", "HEAD", "origin/main" },
-          { text = true }
-        ):wait()
-
-        if result.code == 0 then
-          _G.GitState._merge_base_cache = vim.trim(result.stdout)
-          _G.GitState._merge_base_time = now
-          return _G.GitState._merge_base_cache
+        local function run(cmd)
+          local result = vim.system(cmd, { text = true }):wait()
+          if result.code == 0 then
+            return vim.trim(result.stdout)
+          end
+          return nil
         end
 
-        -- Fallback: try just "main"
-        result = vim.system(
-          { "git", "merge-base", "HEAD", "main" },
-          { text = true }
-        ):wait()
+        -- Build the ordered list of candidate refs to compare against
+        local candidates = {}
+        local upstream = run({ "git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}" })
+        if upstream then table.insert(candidates, upstream) end
+        local origin_head = run({ "git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD" })
+        if origin_head then table.insert(candidates, origin_head) end
+        vim.list_extend(candidates, { "origin/main", "origin/master", "main", "master" })
 
-        if result.code == 0 then
-          _G.GitState._merge_base_cache = vim.trim(result.stdout)
-          _G.GitState._merge_base_time = now
-          return _G.GitState._merge_base_cache
+        for _, ref in ipairs(candidates) do
+          if ref ~= "" then
+            local merge_base = run({ "git", "merge-base", "HEAD", ref })
+            if merge_base then
+              _G.GitState._merge_base_cache = merge_base
+              _G.GitState._merge_base_time = now
+              return merge_base
+            end
+          end
         end
 
         return nil
@@ -72,7 +80,7 @@
           _G.GitState.set_base(merge_base)
           return merge_base
         else
-          vim.notify("Could not determine merge-base with origin/main", vim.log.levels.WARN)
+          vim.notify("Could not determine merge-base with the default branch", vim.log.levels.WARN)
           return nil
         end
       end,

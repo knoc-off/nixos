@@ -58,8 +58,6 @@
         "N" = ":<C-U>call search(@/, 'bW')<CR>";
 
         # Yank word under cursor and set it as search pattern
-        "<S-#>" = ''yiw:let @/ = @"<CR>:set hlsearch<CR>'';
-
         "*" = lib.nixvim.mkRaw ''
           function()
             local w = vim.fn.expand("<cword>")
