@@ -6,9 +6,11 @@
   config,
   hostname,
   ...
-}: let
+}:
+let
   user = "niko";
-in {
+in
+{
   imports = [
     inputs.determinate.nixosModules.default
     {
@@ -61,7 +63,7 @@ in {
     }
 
     self.nixosModules.lspmux
-    {services.lspmux.enable = true;}
+    { services.lspmux.enable = true; }
 
     self.nixosModules.boot
 
@@ -71,7 +73,7 @@ in {
       # would need to generate a pub key and ideally write it to the file.
       sops = {
         defaultSopsFile = ./secrets/${hostname}/default.yaml;
-        age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
+        age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
         # age.sshKeyPaths = ["/home/niko/.ssh/id_ed25519"];
         secrets."shell_environment/_ANTHROPIC_API_KEY" = {
           mode = "0644";
@@ -95,25 +97,53 @@ in {
           nixpkgs.flake = inputs.nixpkgs;
           nixos-hardware.flake = inputs.hardware;
         };
-        nixPath = ["nixpkgs=${inputs.nixpkgs}"];
+        nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
       };
     }
 
     {
-      services.greetd = let
-        tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
-      in {
-        enable = true;
-        settings = {
-          default_session = {
-            command = "${tuigreet} --time --remember --cmd 'uwsm start hyprland-uwsm.desktop'";
-            user = "greeter";
+      services.greetd =
+        let
+          tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
+        in
+        {
+          enable = true;
+          settings = {
+            default_session = {
+              command = "${tuigreet} --time --remember --cmd 'uwsm start hyprland-uwsm.desktop'";
+              user = "greeter";
+            };
           };
         };
-      };
     }
 
     self.nixosModules.fish
+
+    {
+      systemd.timers.claude-ping = {
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnCalendar = [
+            "07:00"
+            "12:00"
+          ];
+          WakeSystem = true;
+        };
+      };
+
+      systemd.services.claude-ping = {
+        path = [ pkgs.claude-code ];
+        serviceConfig = {
+          Type = "oneshot";
+          User = "niko";
+        };
+        script = ''
+          systemd-inhibit --what=sleep --why="claude ping" \
+            claude -p "say just 'ok'" --model 'haiku'
+          systemctl suspend
+        '';
+      };
+    }
 
     #./modules/yubikey.nix
   ];
@@ -153,11 +183,11 @@ in {
 
   security.sudo.extraRules = [
     {
-      users = [user];
+      users = [ user ];
       commands = [
         {
           command = "${pkgs.wgnord}/bin/wgnord";
-          options = ["NOPASSWD"];
+          options = [ "NOPASSWD" ];
         }
       ];
     }
@@ -234,7 +264,7 @@ in {
 
   programs.localsend.enable = true;
   networking.hosts = {
-    "0.0.0.0" = ["sfrclak.com"];
+    "0.0.0.0" = [ "sfrclak.com" ];
   };
   networking = {
     firewall = {
@@ -260,7 +290,7 @@ in {
   };
 
   console = {
-    packages = with pkgs; [terminus_font];
+    packages = with pkgs; [ terminus_font ];
     font = "${pkgs.terminus_font}/share/consolefonts/ter-i22b.psf.gz";
     useXkbConfig = true;
   };
@@ -280,11 +310,11 @@ in {
       pkgs.nerd-fonts.fira-code
     ];
     fontconfig.defaultFonts = {
-      monospace = ["FiraCode Nerd Font Mono"];
+      monospace = [ "FiraCode Nerd Font Mono" ];
     };
   };
 
-  systemd.tmpfiles.rules = ["d /var/secrets 0750 root root -"];
+  systemd.tmpfiles.rules = [ "d /var/secrets 0750 root root -" ];
 
   networking.wg-quick.interfaces.wg0 = {
     configFile = "/var/secrets/wg0-tunnel-work.conf";
@@ -348,26 +378,17 @@ in {
     users.${user} = {
       shell = pkgs.fish;
       isNormalUser = lib.mkDefault true;
-      extraGroups =
-        [
-          "wheel"
-          "audio"
-          "video"
-          "dialout"
-          "uinput"
-          "input"
-          "lp"
-        ]
-        ++ (
-          if config.virtualisation.libvirtd.enable
-          then ["libvirtd"]
-          else []
-        )
-        ++ (
-          if config.networking.networkmanager.enable
-          then ["networkmanager"]
-          else []
-        );
+      extraGroups = [
+        "wheel"
+        "audio"
+        "video"
+        "dialout"
+        "uinput"
+        "input"
+        "lp"
+      ]
+      ++ (if config.virtualisation.libvirtd.enable then [ "libvirtd" ] else [ ])
+      ++ (if config.networking.networkmanager.enable then [ "networkmanager" ] else [ ]);
       initialPassword = "password";
       openssh.authorizedKeys.keys = [
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID7HocV04erAJfAT9swZ/PBsrVkwySxkX5b6rGRaTXAh niko@mac"

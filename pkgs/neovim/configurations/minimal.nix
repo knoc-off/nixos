@@ -30,6 +30,7 @@
     ./modules/languages/formatters.nix
     ./modules/languages/lint.nix
     ./modules/languages/data.nix
+    ./modules/languages/spell.nix
     ./modules/languages/c.nix
     ./modules/languages/rust.nix
     ./modules/languages/nix.nix
@@ -40,6 +41,8 @@
     # ./modules/opencode.nix
 
     ./themes
+
+    ./modules/precognition.nix
 
     # Custom plugins
     ../plugins/smart-paste/module.nix
