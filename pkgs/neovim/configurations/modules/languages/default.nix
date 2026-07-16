@@ -27,10 +27,6 @@
       silent = true;
 
       diagnostic = {
-        "<leader>j" = "goto_next";
-        "<leader>k" = "goto_prev";
-        "]d" = "goto_next";
-        "[d" = "goto_prev";
         "<leader>e" = "open_float";
       };
 
@@ -126,6 +122,33 @@
         silent = true;
         desc = "Format buffer";
       };
+    }
+    # Diagnostic navigation via the modern vim.diagnostic.jump API
+    # (goto_next/goto_prev are deprecated in Neovim 0.11+). Quiet: no float
+    # popup on landing -- the current-line virtual_lines already show it.
+    {
+      mode = "n";
+      key = "<leader>j";
+      action = lib.nixvim.mkRaw "function() vim.diagnostic.jump({ count = 1 }) end";
+      options = { silent = true; desc = "Next diagnostic"; };
+    }
+    {
+      mode = "n";
+      key = "<leader>k";
+      action = lib.nixvim.mkRaw "function() vim.diagnostic.jump({ count = -1 }) end";
+      options = { silent = true; desc = "Prev diagnostic"; };
+    }
+    {
+      mode = "n";
+      key = "]d";
+      action = lib.nixvim.mkRaw "function() vim.diagnostic.jump({ count = 1 }) end";
+      options = { silent = true; desc = "Next diagnostic"; };
+    }
+    {
+      mode = "n";
+      key = "[d";
+      action = lib.nixvim.mkRaw "function() vim.diagnostic.jump({ count = -1 }) end";
+      options = { silent = true; desc = "Prev diagnostic"; };
     }
   ];
 

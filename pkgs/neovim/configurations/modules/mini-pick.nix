@@ -13,6 +13,13 @@
         move_down = "<C-j>";
         move_up = "<C-k>";
       };
+      # Span the full terminal width (edge-to-edge); leave default height/anchor.
+      # Callable so it recomputes on terminal resize.
+      window.config = lib.nixvim.mkRaw ''
+        function()
+          return { width = vim.o.columns, col = 0 }
+        end
+      '';
     };
     # Registers the extended pickers (oldfiles, diagnostic, lsp, ...) into
     # MiniPick.registry, also exposing them as `:Pick <name>` for discovery.

@@ -33,6 +33,34 @@
     ];
   };
 
+  # Windows VM helpers — thin wrappers around sshpass+ssh/scp for the local
+  # QEMU Windows VM (SSH forwarded to 127.0.0.1:2223). The jail shares the host
+  # net namespace, so 127.0.0.1 reaches the same forwarded port as on the host.
+  # Args pass straight through, so the caller controls the ssh/scp command line
+  # (e.g. the dynamic 'C:/Users/vmadmin.TEMPLATE--XXXX/Desktop/' path).
+  # Port/password are hardcoded (non-sensitive, local dev VM).
+  windowsVmHelpers = let
+    vmPort = "2223";
+    vmPass = "admin";
+    vmUser = "vmadmin";
+  in pkgs.symlinkJoin {
+    name = "windows-vm-helpers";
+    paths = [
+      (pkgs.writeShellScriptBin "windows-vm-ssh" ''
+        exec ${pkgs.sshpass}/bin/sshpass -p ${vmPass} \
+          ${pkgs.openssh}/bin/ssh -p ${vmPort} \
+          -o StrictHostKeyChecking=no -4 \
+          ${vmUser}@127.0.0.1 "$@"
+      '')
+      (pkgs.writeShellScriptBin "windows-vm-scp" ''
+        exec ${pkgs.sshpass}/bin/sshpass -p ${vmPass} \
+          ${pkgs.openssh}/bin/scp -P ${vmPort} \
+          -o StrictHostKeyChecking=no -4 \
+          "$@"
+      '')
+    ];
+  };
+
   # Jail-specific opencode overrides — merged on top of the global config.
   # Permissions are relaxed because the sandbox already constrains blast radius.
   jailConfig = pkgs.writeText "opencode-jail.json" (builtins.toJSON {
@@ -77,6 +105,28 @@
 
   lspmux = pkgs.callPackage ./lspmux {};
 
+  # Determinate nix — same one added to the toolbelt below. Used as
+  # nix-direnv's fallback nix so it doesn't reach for a pinned older nix.
+  determinateNix =
+    inputs.determinate.inputs.nix.packages.${pkgs.stdenv.hostPlatform.system}.nix-cli;
+
+  # direnv integration for the jail's fish shell.
+  #
+  # direnv is a shell hook (not a daemon), so nothing needs mounting from the
+  # host — we just install the hook and nix-direnv's rc. The jail's home is a
+  # tmpfs with no fish config, so we bind these generated files read-only:
+  #   * fish conf.d snippet installs `direnv hook fish`
+  #   * ~/.config/direnv/direnvrc sources nix-direnv (enables `use flake`)
+  # The agent can still run `direnv allow` — that writes allow-state to
+  # ~/.local/share/direnv (a persistent rw bind), not to these read-only files.
+  direnvFishHook = pkgs.writeText "direnv-hook.fish" ''
+    ${lib.getExe pkgs.direnv} hook fish | source
+  '';
+  direnvRc = pkgs.writeText "direnvrc" ''
+    export NIX_DIRENV_FALLBACK_NIX=${lib.getExe determinateNix}
+    source ${pkgs.nix-direnv}/share/nix-direnv/direnvrc
+  '';
+
   agentToolbelt = with pkgs; [
     # Shell essentials
     bashInteractive
@@ -88,6 +138,9 @@
     # Version control
     git
     openssh # git over SSH, scp
+
+    # Non-interactive SSH auth (used by the windows-vm-* helper scripts).
+    sshpass
 
     # Search & navigation
     ripgrep
@@ -122,6 +175,10 @@
     trash-cli
     rmtrash
 
+    # Per-directory environments — direnv hook + nix-direnv (`use flake`).
+    direnv
+    nix-direnv
+
     # Process inspection
     procps # ps, top, pgrep, etc.
 
@@ -129,7 +186,7 @@
     # Use Determinate's nix-cli (instead of pkgs.nix) so it recognizes
     # the eval-cores / lazy-trees settings present in /etc/nix/nix.conf
     # and doesn't emit warnings on every invocation.
-    inputs.determinate.inputs.nix.packages.${pkgs.stdenv.hostPlatform.system}.nix-cli
+    determinateNix
 
     # Python tooling (uvx needed by claude-mem for chroma vector search)
     uv
@@ -170,6 +227,17 @@ in
     (set-argv [])
     (add-cleanup ''kill $HOST_QUERY_PID 2>/dev/null || true'')
 
+    # Remove the empty mountpoint stubs bwrap created in the persistent
+    # ~/projects backing dir for each mounted project. Uses rmdir (empty-only),
+    # so real scratch dirs and any project that somehow got content are never
+    # touched — only the throwaway empty stubs this session created.
+    (add-cleanup ''
+      for _bname in "''${JAIL_MOUNTED_BASENAMES[@]-}"; do
+        [ -n "$_bname" ] || continue
+        rmdir "$JAIL_PROJECTS_BACKING/$_bname" 2>/dev/null || true
+      done
+    '')
+
     (add-runtime ''
       # ── Parse CLI arguments ──────────────────────────────────
       JAIL_NAME=""
@@ -186,13 +254,38 @@ in
         JAIL_PROJECTS+=("$(${pkgs.coreutils}/bin/realpath "$1")"); shift
       done
 
+      # ── Persist-dir prefix (named = isolated, unnamed = shared) ──
+      # Backs the writable ~/projects scratch area and direnv allow-state.
+      # Named jails get an isolated dir; unnamed jails share one "_shared"
+      # dir (kept separate from your real host ~, so the agent can't clobber it).
+      if [[ -n "$JAIL_NAME" ]]; then
+        JAIL_PERSIST_DIR="$HOME/.local/share/opencode-jails/$JAIL_NAME"
+      else
+        JAIL_PERSIST_DIR="$HOME/.local/share/opencode-jails/_shared"
+      fi
+      JAIL_PROJECTS_BACKING="$JAIL_PERSIST_DIR/projects"
+      JAIL_DIRENV_DIR="$JAIL_PERSIST_DIR/direnv"
+      ${pkgs.coreutils}/bin/mkdir -p "$JAIL_PROJECTS_BACKING" "$JAIL_DIRENV_DIR"
+
       # ── Project mounting ─────────────────────────────────────
+      # ~/projects is always backed by a persistent host dir so scratch work,
+      # clones, and generated artifacts survive across sessions. Explicitly
+      # passed projects are bind-mounted *on top* at ~/projects/<basename>
+      # (bwrap applies binds in order; nested binds layer over the backing dir).
+      RUNTIME_ARGS+=(--bind "$JAIL_PROJECTS_BACKING" "$HOME/projects")
+      # Persist direnv allow-state so authorized .envrc files stay allowed.
+      RUNTIME_ARGS+=(--bind "$JAIL_DIRENV_DIR" "$HOME/.local/share/direnv")
       if [[ ''${#JAIL_PROJECTS[@]} -eq 0 ]]; then
+        # No explicit project: work on the current dir (bound at its real path),
+        # but keep the persistent ~/projects available for scratch/clones.
         RUNTIME_ARGS+=(--bind "$PWD" "$PWD")
         JAIL_START_DIR="$PWD"
       else
-        RUNTIME_ARGS+=(--dir "$HOME/projects")
         declare -A SEEN_NAMES
+        # Track the mountpoint stubs we ask bwrap to create inside the
+        # persistent backing dir, so add-cleanup can remove the (empty) stubs
+        # on exit — otherwise every mounted project leaves an empty dir forever.
+        JAIL_MOUNTED_BASENAMES=()
         for proj in "''${JAIL_PROJECTS[@]}"; do
           bname=$(${pkgs.coreutils}/bin/basename "$proj")
           if [[ -n "''${SEEN_NAMES[$bname]+x}" ]]; then
@@ -202,6 +295,7 @@ in
             exit 1
           fi
           SEEN_NAMES[$bname]="$proj"
+          JAIL_MOUNTED_BASENAMES+=("$bname")
           RUNTIME_ARGS+=(--bind "$proj" "$HOME/projects/$bname")
         done
         JAIL_START_DIR="$HOME/projects"
@@ -237,7 +331,7 @@ in
 
       # ── State mounting (named = isolated, unnamed = host) ────
       if [[ -n "$JAIL_NAME" ]]; then
-        JAIL_DIR="$HOME/.local/share/opencode-jails/$JAIL_NAME"
+        JAIL_DIR="$JAIL_PERSIST_DIR"
         JAIL_STATE_DIR="$HOME/.local/state/opencode-jails/$JAIL_NAME"
         JAIL_CLAUDE_DIR="$JAIL_DIR/claude"
         JAIL_MEM_DIR="$JAIL_DIR/claude-mem"
@@ -330,6 +424,12 @@ in
     (try-rw-bind (noescape "\"$HOME/.cache/opencode\"") (noescape "~/.cache/opencode"))
     (try-rw-bind (noescape "\"$HOME/.cache/uv\"") (noescape "~/.cache/uv"))
 
+    # direnv hook + nix-direnv rc (read-only — agent can't disable the hook).
+    # `direnv allow` still works: it writes to ~/.local/share/direnv, which is
+    # bind-mounted read-write and persisted (see JAIL_DIRENV_DIR above).
+    (ro-bind "${direnvFishHook}" (noescape "~/.config/fish/conf.d/direnv.fish"))
+    (ro-bind "${direnvRc}" (noescape "~/.config/direnv/direnvrc"))
+
     # Persist trash across jail sessions — shared with the host's FreeDesktop trash.
     (add-runtime ''
       ${pkgs.coreutils}/bin/mkdir -p "$HOME/.local/share/Trash"
@@ -339,6 +439,8 @@ in
     # Shadow coreutils rm/rmdir with trash-backed versions inside the jail.
     # Deferred so it prepends to PATH *after* add-pkg-deps has built it.
     (defer (add-path "${rmSafe}/bin"))
+    # Windows VM helper scripts (windows-vm-ssh / windows-vm-scp).
+    (defer (add-path "${windowsVmHelpers}/bin"))
     (add-runtime ''
       COMPAT_PROXY_RULES_REAL=$(readlink -f "$HOME/.config/compat-proxy/rules" 2>/dev/null || true)
     '')

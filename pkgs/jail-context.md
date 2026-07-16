@@ -13,8 +13,32 @@ You are running inside a bubblewrap (bwrap) sandbox. This changes how you should
 - **Inaccessible**: the rest of the host filesystem
 - When launched with explicit project paths, they are mounted under `~/projects/`
 
+## Scratch workspace — `~/projects/`
+- `~/projects/` is **persistent across sessions**: anything you write there survives
+  restarts of this jail (per-`--name`, or a shared dir for unnamed jails).
+- `/tmp` is a tmpfs and is **wiped every session** — do NOT use it for anything you
+  want to keep.
+- Put throwaway scripts, experiments, clones, notes, and generated artifacts under
+  `~/projects/` (e.g. `~/projects/scratch/`) instead of `/tmp`, so useful work persists.
+
+## Per-directory environments — direnv
+- direnv is active in the shell. `cd`-ing into a project dir containing an `.envrc`
+  auto-loads its environment (nix-direnv's `use flake` is supported).
+- For a new/edited `.envrc`, run `direnv allow` to authorize it. Authorizations are
+  persisted across sessions, so you only allow once per project.
+
 ## Available tools
 git, ripgrep, fd, jq, curl, bat, sed, awk, grep, tree, tar, nix (build/shell/run via daemon)
+
+## Windows VM helpers (explicit use only)
+- `windows-vm-ssh [cmd...]` — run a command on (or open a shell into) the local
+  Windows VM over SSH. Thin wrapper around `sshpass + ssh` to 127.0.0.1:2223.
+- `windows-vm-scp <src> <dst>` — copy files to/from the Windows VM. Thin wrapper
+  around `sshpass + scp`; args pass straight through, so you supply the full
+  destination, e.g.
+  `windows-vm-scp ./app.exe vmadmin@127.0.0.1:'C:/Users/vmadmin.TEMPLATE--XXXX/Desktop/'`
+- **Only use these when the user explicitly asks you to interact with the Windows
+  VM.** Do not use them otherwise.
 
 ## Tool preferences
 - Prefer your **native built-in tools** (Read, Grep, Glob, Edit, Task) over shelling out

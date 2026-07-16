@@ -2,7 +2,7 @@
 // Shows the 5h/7d rate-limit utilization as Ghostty's native progress bar.
 //
 // Blue (state 1) = 5h window is the limiter
-// Yellow/paused (state 4) = 7d window is the limiter
+// Red (state 2) = 7d window is the limiter
 // State 0 = clear (no data yet)
 
 import { createWriteStream } from "node:fs";
@@ -74,8 +74,8 @@ async function updateProgress() {
         const sevenPct = sevenD !== null ? sevenD * 100 : 0;
 
         if (sevenPct > fivePct) {
-          // 7d window is the limiter → yellow (paused state)
-          lastState = 4;
+          // 7d window is the limiter → red (error state)
+          lastState = 2;
           lastPct = sevenPct;
         } else {
           // 5h window is the limiter (or equal) → blue (in progress state)
