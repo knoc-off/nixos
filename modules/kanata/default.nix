@@ -160,8 +160,12 @@
             ++ optional (keyboard.port != null) "--port ${toString keyboard.port}"
             ++ keyboard.extraArgs);
 
-          Restart = "on-failure";
-          RestartSec = "5s";
+          # Restart on ANY exit, not just failures. The native kanata panic
+          # combo (lctl+spc+esc) exits cleanly (status 0) to release a wedged
+          # device grab; "always" ensures the remapper comes right back after
+          # that emergency exit instead of leaving the keyboard un-remapped.
+          Restart = "always";
+          RestartSec = "1s";
           Type = "simple";
         };
 

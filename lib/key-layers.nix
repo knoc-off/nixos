@@ -82,6 +82,14 @@
   };
   modNames = builtins.attrNames modPrefix;
 
+  # Actual key name for each modifier, used when a chord must be split into
+  # component keys (e.g. inside `unmod`, which rejects output-chord syntax).
+  modKey = {
+    ctrl = "lctl";
+    shift = "lsft";
+    alt = "lalt";
+  };
+
   # Fork configuration
   # Check order determines priority: shift > ctrl > alt
   modCheckOrder = ["shift" "ctrl" "alt"];
@@ -125,14 +133,32 @@
       then "${modPrefix.${action.mod}}-${targetKey}"
       else targetKey;
 
-  # Caps: wraps non-raw/cmd expressions with (multi (release-key rmet) ...)
-  # because caps/rmet is physically held during these actions.
-  compileCapsAction = keyName: action: let
-    base = compileKeyExpr keyName action;
-  in
+  # Caps: wraps non-raw/cmd expressions with (unmod (rmet) ...) because
+  # caps/rmet is physically held during these actions and must be suppressed
+  # for the output, then re-engaged.
+  #
+  # We use `unmod` rather than the older `(multi (release-key rmet) ...)`:
+  # release-key emits a one-shot release *edge* that is decoupled from the
+  # action's lifecycle. If a layer switch (e.g. hyprkan sending one over TCP)
+  # swaps out the `layer-while-held` parent that is holding rmet while this
+  # edge is mid-flight, the release can be lost and rmet strands as a
+  # logically-held Super on the virtual device -- a dead keyboard with a
+  # "stuck" modifier. `unmod` deactivates rmet for the duration of the output
+  # and re-engages it on release as a matched pair, so it cannot strand.
+  #
+  # `unmod` rejects output-chord syntax (e.g. `C-a`); it only accepts bare key
+  # names. So when the action carries a modifier we emit the component keys
+  # (`lctl a`) rather than the chord (`C-a`).
+  compileCapsAction = keyName: action:
     if action ? raw || action ? cmd
-    then base
-    else "(multi (release-key rmet) ${base})";
+    then compileKeyExpr keyName action
+    else let
+      targetKey = action.key or keyName;
+      keys =
+        if action ? mod
+        then "${modKey.${action.mod}} ${targetKey}"
+        else targetKey;
+    in "(unmod (rmet) ${keys})";
 
   # Normalization
   # In capsbinds, string shorthand = modifier name: "ctrl" -> { mod = "ctrl"; }
@@ -226,13 +252,19 @@
   # `presets` so app modules can compose layers without copy-pasting.
   presets = {
     # caps-held navigation: hjkl arrows + d/u accelerated mouse wheel.
+    #
+    # `unmod` only outputs bare key names, so the mouse-wheel actions can't be
+    # wrapped in it directly. Instead we pair `(unmod (rmet) nop0)` -- which
+    # releases rmet for the duration and re-presses it on release as a matched
+    # pair (no stranding, unlike bare `release-key`) -- with the wheel action
+    # inside a single `multi`, so the wheel scrolls while Super is suppressed.
     navKeys = {
       h = {key = "left";};
       j = {key = "down";};
       k = {key = "up";};
       l = {key = "right";};
-      d = {raw = "(multi (release-key rmet) (mwheel-accel-down 50 150 1.05 0.80))";};
-      u = {raw = "(multi (release-key rmet) (mwheel-accel-up 50 150 1.05 0.80))";};
+      d = {raw = "(multi (unmod (rmet) nop0) (mwheel-accel-down 50 150 1.05 0.80))";};
+      u = {raw = "(multi (unmod (rmet) nop0) (mwheel-accel-up 50 150 1.05 0.80))";};
     };
 
     # Standard ctrl-shortcut letters for the base (fallback) layer.
@@ -242,7 +274,7 @@
     appCtrlKeys = ["enter" "tab" "a" "b" "c" "f" "i" "n" "o" "p" "q" "r" "s" "t" "v" "w" "x" "y" "z"];
 
     # caps+g tap-dance: single -> C-end, double -> C-home (doc top/bottom).
-    docNavG = {raw = "(tap-dance 200 ((multi (release-key rmet) C-end) (multi (release-key rmet) C-home)))";};
+    docNavG = {raw = "(tap-dance 200 ((unmod (rmet) lctl end) (unmod (rmet) lctl home)))";};
   };
 
   mkKeyLayers = layers: let
@@ -370,18 +402,42 @@
       hasBinds = n: (layers.${n}.binds or {}) != {};
       bindEntries = n: mkBindEntries layers.${n};
     in ''
+      ;; Force-release every modifier. Used both as a manual panic escape
+      ;; (see the lctl+lalt+spc chord below) and as an automatic self-heal
+      ;; via on-physical-idle. Modifiers can only strand while a key is held,
+      ;; so releasing them whenever the keyboard goes physically idle makes any
+      ;; stray stuck-modifier state self-clearing without a reboot.
+      (defvirtualkeys
+        relall (multi
+          (release-key lsft) (release-key rsft)
+          (release-key lctl) (release-key rctl)
+          (release-key lalt) (release-key ralt)
+          (release-key lmet) (release-key rmet)))
+
       (defalias
         ${extraAliases}
 
-        ${lib.concatStringsSep "\n      " (map (n: "cap-${n} (multi rmet @dbl (layer-while-held shortcuts-${n}))") layerNames)}
+        ;; Auto self-heal: once all physical keys are up, release any modifier
+        ;; that may have stranded. 200ms after idle so it never fights a real
+        ;; chord mid-press.
+        heal (on-physical-idle 200 tap-vkey relall)
+
+        ;; Manual panic escape. Hold lctl+lalt+spc to force-release all
+        ;; modifiers WITHOUT quitting kanata (unlike the native lctl+spc+esc
+        ;; which exits the process). Keys are in defsrc so this works even if
+        ;; the active layer's remapping logic has wedged.
+        panic (on-press tap-vkey relall)
+
+        ${lib.concatStringsSep "\n      " (map (n: "cap-${n} (multi @heal rmet @dbl (layer-while-held shortcuts-${n}))") layerNames)}
 
         ${lib.concatStringsSep "\n      " allAliasLines}
       )
 
-      (defsrc caps)
+      (defsrc caps lctl lalt spc)
       ${lib.concatStringsSep "\n    " (map (
           n:
             "(deflayermap (${n})\n      caps @cap-${n}"
+            + "\n      spc (fork spc @panic (lctl lalt))"
             + lib.optionalString (hasBinds n) "\n      ${bindEntries n}"
             + "\n    )"
         )

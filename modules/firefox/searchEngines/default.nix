@@ -1,9 +1,10 @@
 {
   pkgs,
   lib,
-}: {
+}:
+{
   force = lib.mkOverride 1000 true;
-  default = "kagi";
+  default = "Kagi";
   # order = [
   #   "Annas-Archive"
   #   "NixOS Wiki"
@@ -27,8 +28,6 @@
           ];
         }
       ];
-      #icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/package.svg";
-      definedAliases = ["!p"];
     };
     "Nix Packages" = {
       urls = [
@@ -55,7 +54,7 @@
         }
       ];
       #icon = "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/package.svg";
-      definedAliases = ["!p"];
+      definedAliases = [ "!p" ];
     };
 
     "Nix Options" = {
@@ -85,7 +84,7 @@
 
       #icon =
       #  "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/cm_options.svg";
-      definedAliases = ["!o"];
+      definedAliases = [ "!o" ];
     };
 
     "NixOS Wiki" = {
@@ -104,7 +103,7 @@
       #updateInterval = 24 * 60 * 60 * 1000; # every day
       #icon =
       #  "${pkgs.nixos-icons}/share/icons/hicolor/scalable/apps/nix-snowflake.svg";
-      definedAliases = ["!n"];
+      definedAliases = [ "!n" ];
     };
     "Home-Manager" = {
       urls = [
@@ -115,7 +114,7 @@
       updateInterval = 24 * 60 * 60 * 1000; # every day
       #icon =
       #  "${pkgs.kora-icon-theme}/share/icons/kora/actions/16/twitter-home.svg";
-      definedAliases = ["!h"];
+      definedAliases = [ "!h" ];
     };
 
     "StackOverflow" = {
@@ -132,7 +131,7 @@
       ];
       # icon =
       #   "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/stackoverflow.svg";
-      definedAliases = ["!s"];
+      definedAliases = [ "!s" ];
     };
 
     "Github" = {
@@ -149,7 +148,7 @@
       ];
       # icon =
       #   "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/github.svg";
-      definedAliases = ["!g"];
+      definedAliases = [ "!g" ];
     };
 
     "NixDots" = {
@@ -170,7 +169,7 @@
       ];
       # icon =
       #   "${pkgs.super-tiny-icons}/share/icons/SuperTinyIcons/svg/github.svg";
-      definedAliases = ["!nd"];
+      definedAliases = [ "!nd" ];
     };
 
     "fmhy" = {
@@ -186,7 +185,7 @@
         }
       ];
       # icon = "${pkgs.circle-flags}/share/circle-flags-svg/other/pirate.svg";
-      definedAliases = ["!f"];
+      definedAliases = [ "!f" ];
     };
 
     "bing".metaData.hidden = true;

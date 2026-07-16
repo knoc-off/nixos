@@ -228,7 +228,7 @@
                   "Logitech USB Receiver"
                 ];
                 port = 52545;
-                extraDefCfg = "danger-enable-cmd yes process-unmapped-keys yes";
+                extraDefCfg = "danger-enable-cmd yes process-unmapped-keys yes override-release-on-activation yes";
               };
             };
           }
