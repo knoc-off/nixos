@@ -1,6 +1,7 @@
 {
   config,
   pkgs,
+  lib,
   inputs,
   ...
 }: let
@@ -94,5 +95,40 @@ in {
 
   systemd.services.crowdsec.serviceConfig.SupplementaryGroups = [
     "caddy"
+  ];
+
+  # ────────────────────────────────────────────────────────────────────────
+  # Fix a nixpkgs incompatibility between the crowdsec agent and the firewall
+  # bouncer's auto-register unit.
+  #
+  # The agent creates /var/lib/crowdsec as a *real* directory via tmpfiles and
+  # writes to it as uid 988 through ReadWritePaths + PrivateUsers=true (no
+  # StateDirectory). The register unit instead declares
+  # `StateDirectory = "crowdsec-firewall-bouncer-register crowdsec"`; that
+  # second `crowdsec` entry, with DynamicUser=yes, makes systemd convert
+  # /var/lib/crowdsec into a /var/lib/private/crowdsec symlink and re-own the
+  # whole tree (including crowdsec.db) — crash-looping the agent with
+  # "mkdir /var/lib/crowdsec: permission denied".
+  #
+  # Give the register DB access the same way the agent has it: drop the
+  # `crowdsec` StateDirectory entry (keeping only its own), grant write via
+  # ReadWritePaths, and map crowdsec -> uid 988 with PrivateUsers=true.
+  systemd.services.crowdsec-firewall-bouncer-register.serviceConfig = {
+    StateDirectory = lib.mkForce "crowdsec-firewall-bouncer-register";
+    ReadWritePaths = ["/var/lib/crowdsec"];
+    PrivateUsers = true;
+  };
+
+  # cscli defaults to reading /etc/crowdsec/config.yaml, but the agent module
+  # runs with `-c <store>/crowdsec.yaml` and never creates that file — so the
+  # register unit's raw `cscli bouncers add/list` calls can't find the LAPI DB
+  # path. Symlink the config (byte-identical to what the agent runs) at the
+  # default path. A tmpfiles symlink drops in just this one file without taking
+  # over the crowdsec-owned /etc/crowdsec directory (which holds writable hub
+  # data).
+  systemd.tmpfiles.rules = [
+    "L+ /etc/crowdsec/config.yaml - - - - ${
+      (pkgs.formats.yaml {}).generate "crowdsec.yaml" config.services.crowdsec.settings.general
+    }"
   ];
 }

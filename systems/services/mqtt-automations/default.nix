@@ -206,6 +206,11 @@
           off = {state = "OFF";};
         }
         {
+          topic = "zigbee2mqtt/plug_1/set";
+          on = {state = "ON";};
+          off = {state = "OFF";};
+        }
+        {
           topic = "zigbee2mqtt/plug_2/set";
           on = {state = "ON";};
           off = {state = "OFF";};
@@ -222,15 +227,6 @@
   # -- service definitions -----------------------------------------------------
 
   automations = [
-    {
-      name = "plug-auto-off";
-      bin = "plug-auto-off";
-      description = "Auto-set 1hr countdown when plug turns on";
-      env = {
-        PLUG_TOPIC = "zigbee2mqtt/plug_1";
-        COUNTDOWN_SECONDS = "3600";
-      };
-    }
     {
       name = "cat-doorbell";
       bin = "cat-doorbell";
@@ -275,14 +271,15 @@
     {
       name = "bedtime-button";
       bin = "bedtime-button";
-      description = "button_2: evening bedtime fade / daytime toggle for light_3";
+      description = "button_2: time-aware low-light toggle for light_3, hold for auto-off";
       env = {
         BUTTON_TOPIC = "zigbee2mqtt/button_2/action";
         LIGHT_TOPIC = "zigbee2mqtt/light_3/set";
-        BEDTIME_HOUR = "19";
-        FADE_MINUTES = "10";
-        FADE_STEP_SECONDS = "20";
-        TOGGLE_BRIGHTNESS = "254";
+        LOW_BRIGHTNESS = "25";
+        DAY_BRIGHTNESS = "254";
+        EVENING_START_HOUR = "21";
+        DAY_START_HOUR = "6";
+        HOLD_OFF_MINUTES = "5";
         TIMEZONE = "Europe/Berlin";
       };
     }

@@ -22,7 +22,9 @@
         secrets = {
           "services/website/env" = {};
           "services/kitchenowl/jwt-secret" = {};
+          "services/kitchenowl/api-token" = {};
           "services/ntfy/env" = {};
+          "services/ntfy/shopping-list-publish-token" = {};
         };
       };
     }
@@ -33,22 +35,23 @@
     ./services/crowdsec.nix
     ./services/oauth2-proxy.nix
     ./services/kitchenowl.nix
+    ./services/kitchenowl-notify.nix
     ./services/trilium.nix
     ./services/ntfy.nix
 
     ./services/headscale.nix
     self.nixosModules.tailnet
     {services.tailnet.enable = true;}
-
-    self.nixosModules.markid
   ];
 
-  # ─────────────────────────────────────────────────────────────────────
-  # markid — disabled on this host; runs locally on the Framework 13
-  # via the home-manager module. Left in imports for the module to be
-  # available if re-enabled later.
-  # ─────────────────────────────────────────────────────────────────────
-  services.markid.enable = false;
+  # KitchenOwl shopping-list -> ntfy change notifier.
+  services.kitchenowl-notify = {
+    enable = true;
+    householdId = 1; # TODO: set to your KitchenOwl household ("home") id
+    ntfy.topic = "shopping-list";
+    apiTokenFile = config.sops.secrets."services/kitchenowl/api-token".path;
+    ntfyTokenFile = config.sops.secrets."services/ntfy/shopping-list-publish-token".path;
+  };
 
   nix.optimise.automatic = true;
   nix.gc = {
