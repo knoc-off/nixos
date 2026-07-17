@@ -23,8 +23,10 @@
           "services/website/env" = {};
           "services/kitchenowl/jwt-secret" = {};
           "services/kitchenowl/api-token" = {};
-          "services/ntfy/env" = {};
-          "services/ntfy/shopping-list-publish-token" = {};
+          "services/ntfy/admin-hash" = {};
+          "services/ntfy/normal-hash" = {};
+          "services/ntfy/publisher-hash" = {};
+          "services/ntfy/publish-token" = {};
         };
       };
     }
@@ -50,7 +52,7 @@
     householdId = 1; # TODO: set to your KitchenOwl household ("home") id
     ntfy.topic = "shopping-list";
     apiTokenFile = config.sops.secrets."services/kitchenowl/api-token".path;
-    ntfyTokenFile = config.sops.secrets."services/ntfy/shopping-list-publish-token".path;
+    ntfyTokenFile = config.sops.secrets."services/ntfy/publish-token".path;
   };
 
   nix.optimise.automatic = true;
