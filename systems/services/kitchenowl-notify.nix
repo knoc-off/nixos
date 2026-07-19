@@ -39,13 +39,20 @@ with lib; let
         )
         with urllib.request.urlopen(req, timeout=20) as resp:
             data = json.load(resp)
-        # A set of (list_name, item_name) pairs across all lists.
+        # A set of (list_name, item_name) pairs across all lists, plus the
+        # name of the default list (lowest id) so it can be omitted in output.
         items = set()
+        default_list_name = None
+        min_id = None
         for lst in data:
             list_name = lst.get("name", "")
+            list_id = lst.get("id")
+            if list_id is not None and (min_id is None or list_id < min_id):
+                min_id = list_id
+                default_list_name = list_name
             for item in lst.get("items") or []:
                 items.add((list_name, item.get("name", "")))
-        return items
+        return items, default_list_name
 
 
     def load_state(path):
@@ -62,11 +69,16 @@ with lib; let
         os.replace(tmp, path)
 
 
-    def publish(ntfy_url, topic, title, token, message):
+    def publish(ntfy_url, topic, title, token, message, click_url):
         req = urllib.request.Request(
             f"{ntfy_url}/{topic}",
             data=message.encode("utf-8"),
-            headers={"Authorization": f"Bearer {token}", "Title": title},
+            headers={
+                "Authorization": f"Bearer {token}",
+                "Title": title,
+                "Click": click_url,
+                "Tags": "shopping_cart",
+            },
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=20) as resp:
@@ -87,7 +99,9 @@ with lib; let
         api_token = read_credential("api-token")
         ntfy_token = read_credential("ntfy-token")
 
-        current = fetch_items(api_base, household_id, api_token)
+        current, default_list = fetch_items(api_base, household_id, api_token)
+
+        click_url = f"https://app.kitchenowl.org/household/{household_id}/items"
 
         baseline = load_state(baseline_path)
         if baseline is None:
@@ -105,10 +119,18 @@ with lib; let
         if settled and current != baseline:
             added = current - baseline
             removed = baseline - current
-            lines = [f"+ {item} ({lst})" for lst, item in sorted(added)]
-            lines += [f"- {item} ({lst})" for lst, item in sorted(removed)]
+
+            def fmt(prefix, lst, item):
+                if lst and lst != default_list:
+                    return f"{prefix} {item} ({lst})"
+                return f"{prefix} {item}"
+
+            lines = [fmt("🟢", lst, item) for lst, item in sorted(added)]
+            lines += [fmt("🔴", lst, item) for lst, item in sorted(removed)]
             if lines:
-                publish(ntfy_url, topic, title, ntfy_token, "\n".join(lines))
+                publish(
+                    ntfy_url, topic, title, ntfy_token, "\n".join(lines), click_url
+                )
                 print("kitchenowl-notify: summary sent")
             save_state(baseline_path, current)
 
