@@ -24,11 +24,14 @@ def parse_date(raw):
     if raw is None:
         return None
 
-    # Unix timestamp (seconds or milliseconds)
+    # KitchenOwl always serialises datetimes as milliseconds since epoch.
+    # Unscheduled ("planned, no date") entries use a date.min sentinel,
+    # which serialises to a huge negative value - not a real date.
     if isinstance(raw, (int, float)):
-        if raw > 1e12:  # milliseconds
-            raw /= 1000
-        return datetime.fromtimestamp(raw).date()
+        try:
+            return datetime.fromtimestamp(raw / 1000).date()
+        except (OverflowError, OSError, ValueError):
+            return None
 
     # ISO-8601 date
     if isinstance(raw, str):
