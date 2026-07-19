@@ -15,9 +15,9 @@ in {
       # overrides server.yml per-key). admin needs no entry (role = all topics).
       auth-access = [
         "normal:cat-doorbell:ro"
-        "normal:shopping-list:ro"
+        "normal:kitchenowl:ro"
         "publisher:cat-doorbell:wo"
-        "publisher:shopping-list:wo"
+        "publisher:kitchenowl:wo"
       ];
     };
 

@@ -38,6 +38,7 @@
     ./services/oauth2-proxy.nix
     ./services/kitchenowl.nix
     ./services/kitchenowl-notify.nix
+    ./services/kitchenowl-meal-plan.nix
     ./services/trilium.nix
     ./services/ntfy.nix
 
@@ -50,7 +51,14 @@
   services.kitchenowl-notify = {
     enable = true;
     householdId = 1; # TODO: set to your KitchenOwl household ("home") id
-    ntfy.topic = "shopping-list";
+    apiTokenFile = config.sops.secrets."services/kitchenowl/api-token".path;
+    ntfyTokenFile = config.sops.secrets."services/ntfy/publish-token".path;
+  };
+
+  # KitchenOwl meal-plan -> ntfy notifier (additions + today's-meal reminders).
+  services.kitchenowl-meal-plan = {
+    enable = true;
+    householdId = 1; # TODO: set to your KitchenOwl household ("home") id
     apiTokenFile = config.sops.secrets."services/kitchenowl/api-token".path;
     ntfyTokenFile = config.sops.secrets."services/ntfy/publish-token".path;
   };
@@ -62,6 +70,8 @@
     options = "--delete-older-than 30d";
   };
   nix.settings.experimental-features = ["nix-command" "flakes"];
+
+  time.timeZone = "Europe/Berlin";
 
   networking.hostName = "oink";
   networking.firewall = {

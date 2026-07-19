@@ -76,6 +76,7 @@ with lib; let
             headers={
                 "Authorization": f"Bearer {token}",
                 "Title": title,
+                "Priority": "3",
                 "Click": click_url,
                 "Tags": "shopping_cart",
             },
@@ -170,7 +171,7 @@ in {
       };
       topic = mkOption {
         type = types.str;
-        default = "shopping-list";
+        default = "kitchenowl";
         description = "ntfy topic to publish shopping-list change summaries to.";
       };
       title = mkOption {
