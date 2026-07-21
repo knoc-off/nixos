@@ -1,3 +1,4 @@
+photos
 .minecraft-flake-modpack
 AGENTS.md
 .remoteDeployOptions
@@ -43,3 +44,5 @@ niri-docs.md
 *-cache.bin
 .cache/
 .opencode
+__pycache__/
+*.pyc

@@ -211,6 +211,8 @@ in {
         38071
         53317
       ];
+      interfaces.tailscale0.allowedTCPPorts = [8080];
+      interfaces.wlp1s0.allowedTCPPorts = [8080];
       #extraCommands = ''
       #  iptables -A INPUT -p tcp --dport 22000 -s niko.ink -j ACCEPT
       #  iptables -A INPUT -p udp --dport 21027 -s niko.ink -j ACCEPT
