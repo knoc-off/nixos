@@ -32,9 +32,12 @@
       };
 
       completion = {
+        # Nothing selected by default: <CR> stays a real Enter (the "enter"
+        # preset binds <CR> = { accept, fallback }, and accept only fires when an
+        # item is actually selected). Select explicitly with <Tab>/arrows first.
         list.selection = {
-          preselect = true;
-          auto_insert = true;
+          preselect = false;
+          auto_insert = false;
         };
 
         accept.auto_brackets.enabled = true;
