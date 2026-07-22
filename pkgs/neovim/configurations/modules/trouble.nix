@@ -6,6 +6,8 @@
 #     that stays open while you walk through every result methodically.
 # Also provides the call hierarchy (incoming/outgoing) that has no usable raw UI.
 {lib, ...}: {
+  whichKeyGroups = [{__unkeyed = "<leader>t"; group = "Trouble";}];
+
   plugins.trouble.enable = true;
 
   keymaps = let

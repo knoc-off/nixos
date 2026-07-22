@@ -15,6 +15,7 @@
     ./modules/completion.nix
     ./modules/mini-files.nix
     ./modules/which-key.nix
+    ./modules/which-key-groups.nix
     ./modules/tiny-code-action.nix
     ./modules/trouble.nix
     ./modules/flash.nix
@@ -43,6 +44,7 @@
     ./themes
 
     ./modules/precognition.nix
+    ./modules/prompt-reference.nix
 
     # Custom plugins
     ../plugins/smart-paste/module.nix

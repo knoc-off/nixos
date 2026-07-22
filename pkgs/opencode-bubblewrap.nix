@@ -18,6 +18,11 @@
   }));
   inherit (pkgs) lib;
 
+  # flock (from util-linux) — used host-side to gate cleanup of shared project
+  # mountpoint stubs behind a last-holder lock. util-linux splits outputs, so
+  # pull the binary from its "bin" output explicitly.
+  flockBin = lib.getExe' pkgs.util-linux "flock";
+
   compatProxy = pkgs.callPackage ./compat-proxy {};
   claudeMem = pkgs.callPackage ./claude-mem {};
   hostQuery = pkgs.callPackage ./host-query {};
@@ -228,13 +233,30 @@ in
     (add-cleanup ''kill $HOST_QUERY_PID 2>/dev/null || true'')
 
     # Remove the empty mountpoint stubs bwrap created in the persistent
-    # ~/projects backing dir for each mounted project. Uses rmdir (empty-only),
-    # so real scratch dirs and any project that somehow got content are never
-    # touched — only the throwaway empty stubs this session created.
+    # ~/projects backing dir for each mounted project — but only if this is the
+    # *last* session using each stub. Concurrent sessions mounting the same
+    # project share one stub; rmdir'ing it out from under another session's
+    # live bind-mount tears that session's mount down. We gate the rmdir behind
+    # a per-stub flock: each session holds a shared lock for its lifetime (see
+    # add-runtime), and on exit we try to upgrade to an exclusive lock. That
+    # only succeeds when no other session holds the shared lock, i.e. we're the
+    # last one out. Doing the rmdir while holding the exclusive lock also blocks
+    # a concurrently-starting session (which must take its shared lock before
+    # relying on the stub), closing the rmdir-vs-new-session race. rmdir is
+    # empty-only, so real content is never touched.
     (add-cleanup ''
       for _bname in "''${JAIL_MOUNTED_BASENAMES[@]-}"; do
         [ -n "$_bname" ] || continue
-        rmdir "$JAIL_PROJECTS_BACKING/$_bname" 2>/dev/null || true
+        # Release our own shared lock first, otherwise the exclusive upgrade
+        # below would see this very process as another holder and never fire.
+        _fd="''${JAIL_STUB_LOCK_FDS[$_bname]-}"
+        [ -n "$_fd" ] && eval "exec $_fd>&-"
+        _lockf="$JAIL_PROJECTS_BACKING/.$_bname.lock"
+        if exec {_xfd}>"$_lockf" && ${flockBin} -n -x "$_xfd"; then
+          rmdir "$JAIL_PROJECTS_BACKING/$_bname" 2>/dev/null || true
+          rm -f "$_lockf" 2>/dev/null || true
+          eval "exec $_xfd>&-"
+        fi
       done
     '')
 
@@ -286,6 +308,12 @@ in
         # persistent backing dir, so add-cleanup can remove the (empty) stubs
         # on exit — otherwise every mounted project leaves an empty dir forever.
         JAIL_MOUNTED_BASENAMES=()
+        # Per-stub shared flock fds, held for the whole session lifetime. This
+        # lets add-cleanup detect whether it's the *last* session using a stub
+        # before removing it — concurrent sessions mounting the same project
+        # share one stub in the persistent backing dir, and deleting it out from
+        # under a live bind-mount tears that session's mount down. See cleanup.
+        declare -A JAIL_STUB_LOCK_FDS
         for proj in "''${JAIL_PROJECTS[@]}"; do
           bname=$(${pkgs.coreutils}/bin/basename "$proj")
           if [[ -n "''${SEEN_NAMES[$bname]+x}" ]]; then
@@ -296,6 +324,13 @@ in
           fi
           SEEN_NAMES[$bname]="$proj"
           JAIL_MOUNTED_BASENAMES+=("$bname")
+          # Take a shared lock on the stub's lockfile before bwrap binds over
+          # it. Held via a tracked fd until this process exits (or crashes —
+          # the kernel releases it either way, so no stale-lock bookkeeping).
+          _lockf="$JAIL_PROJECTS_BACKING/.$bname.lock"
+          exec {_fd}>"$_lockf"
+          ${flockBin} -s "$_fd"
+          JAIL_STUB_LOCK_FDS[$bname]=$_fd
           RUNTIME_ARGS+=(--bind "$proj" "$HOME/projects/$bname")
         done
         JAIL_START_DIR="$HOME/projects"

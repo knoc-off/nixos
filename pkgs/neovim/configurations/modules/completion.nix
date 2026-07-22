@@ -86,8 +86,12 @@
       cmdline = {
         enabled = true;
         sources = ["cmdline" "buffer"];
+        # Stock cmdline preset: <Tab> reveals+inserts then cycles (menu stays
+        # open), <S-Tab> cycles back, arrows / <C-n>/<C-p> navigate, <C-y> accept,
+        # <C-e> cancel. We layer <CR> on top: accept the selection if the menu is
+        # open, otherwise run the command (a second <CR> then runs it).
         keymap = {
-          "<Tab>" = ["accept"];
+          preset = "cmdline";
           "<CR>" = ["accept_and_enter" "fallback"];
         };
         completion.menu.auto_show = true;

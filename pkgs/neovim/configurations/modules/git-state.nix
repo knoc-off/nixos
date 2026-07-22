@@ -18,10 +18,18 @@
       end,
 
       -- Get merge-base with the branch's integration target (cached for 30s).
-      -- Resolves the target dynamically so repos using master/trunk/etc work:
-      --   1. the current branch's upstream (@{u})
-      --   2. origin's default branch (origin/HEAD)
-      --   3. common fallbacks (origin/main, origin/master, main, master)
+      -- Resolves the target dynamically so repos using master/trunk/etc work.
+      --
+      -- IMPORTANT: the integration branch (origin/main, master, ...) is tried
+      -- BEFORE the branch's own upstream (@{u}). On a pushed feature branch
+      -- @{u} == origin/<same-branch> ~= HEAD, so using it would yield HEAD as
+      -- the "base" and show zero hunks. We also skip any candidate whose
+      -- merge-base equals HEAD (nothing to diff), so the first base that is
+      -- strictly behind HEAD wins.
+      --   1. origin's default branch (origin/HEAD -> origin/main|master|...)
+      --   2. common fallbacks (origin/main, origin/master, main, master)
+      --   3. the current branch's upstream (@{u}) -- last resort, and only if
+      --      it is NOT this branch's own remote (origin/<current-branch>)
       get_merge_base = function()
         local now = os.time()
         if _G.GitState._merge_base_cache and (now - _G.GitState._merge_base_time) < 30 then
@@ -31,23 +39,32 @@
         local function run(cmd)
           local result = vim.system(cmd, { text = true }):wait()
           if result.code == 0 then
-            return vim.trim(result.stdout)
+            local out = vim.trim(result.stdout)
+            if out ~= "" then return out end
           end
           return nil
         end
 
-        -- Build the ordered list of candidate refs to compare against
+        local head = run({ "git", "rev-parse", "HEAD" })
+        local branch = run({ "git", "rev-parse", "--abbrev-ref", "HEAD" })
+
+        -- Build the ordered list of candidate refs: integration branch first.
         local candidates = {}
-        local upstream = run({ "git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}" })
-        if upstream then table.insert(candidates, upstream) end
         local origin_head = run({ "git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD" })
         if origin_head then table.insert(candidates, origin_head) end
         vim.list_extend(candidates, { "origin/main", "origin/master", "main", "master" })
+        -- Self-upstream last, and only if it isn't this branch's own remote.
+        local upstream = run({ "git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}" })
+        if upstream and upstream ~= ("origin/" .. (branch or "")) then
+          table.insert(candidates, upstream)
+        end
 
         for _, ref in ipairs(candidates) do
           if ref ~= "" then
             local merge_base = run({ "git", "merge-base", "HEAD", ref })
-            if merge_base then
+            -- Skip bases that equal HEAD (candidate is a descendant/equal ->
+            -- nothing to diff). Keep looking for one strictly behind HEAD.
+            if merge_base and merge_base ~= head then
               _G.GitState._merge_base_cache = merge_base
               _G.GitState._merge_base_time = now
               return merge_base
@@ -56,6 +73,40 @@
         end
 
         return nil
+      end,
+
+      -- Resolve the point where the current branch diverged from the
+      -- integration branch (origin/main|master|...), NOT its own remote. Uses a
+      -- reflog-aware fork-point against the integration target, then a plain
+      -- merge-base, then falls back to get_merge_base(). Returns a commit sha,
+      -- or nil if it can't be determined.
+      get_branch_point = function()
+        local function run(cmd)
+          local result = vim.system(cmd, { text = true }):wait()
+          if result.code == 0 then
+            local out = vim.trim(result.stdout)
+            if out ~= "" then return out end
+          end
+          return nil
+        end
+
+        local head = run({ "git", "rev-parse", "HEAD" })
+
+        -- Resolve the integration branch (origin's default), not @{u}.
+        local target = run({ "git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD" })
+        for _, ref in ipairs({ target, "origin/main", "origin/master", "main", "master" }) do
+          if ref and ref ~= "" then
+            -- Reflog-aware fork point off the integration branch.
+            local fork = run({ "git", "merge-base", "--fork-point", ref, "HEAD" })
+            if fork and fork ~= head then return fork end
+            -- Plain merge-base with the integration branch.
+            local mb = run({ "git", "merge-base", "HEAD", ref })
+            if mb and mb ~= head then return mb end
+          end
+        end
+
+        -- Fall back to the shared heuristics (also skips base == HEAD).
+        return _G.GitState.get_merge_base()
       end,
 
       -- Set the comparison base and notify all consumers
@@ -80,7 +131,11 @@
           _G.GitState.set_base(merge_base)
           return merge_base
         else
-          vim.notify("Could not determine merge-base with the default branch", vim.log.levels.WARN)
+          vim.notify(
+            "No divergence from the integration branch (nothing to diff). " ..
+            "Are you on the default branch, or is it not fetched?",
+            vim.log.levels.WARN
+          )
           return nil
         end
       end,

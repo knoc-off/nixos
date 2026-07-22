@@ -124,22 +124,24 @@ in
         wantedBy = [ "timers.target" ];
         timerConfig = {
           OnCalendar = [
-            "07:00"
-            "12:00"
+            "Mon..Fri 07:00"
+            "Mon..Fri 12:00"
           ];
           WakeSystem = true;
         };
       };
 
       systemd.services.claude-ping = {
-        path = [ pkgs.claude-code ];
+        path = [ pkgs.claude-code pkgs.networkmanager ];
+        after = [ "network-online.target" ];
+        wants = [ "network-online.target" ];
         serviceConfig = {
           Type = "oneshot";
           User = "niko";
         };
         script = ''
-          systemd-inhibit --what=sleep --why="claude ping" \
-            claude -p "say just 'ok'" --model 'haiku'
+          nm-online -q -t 60 || true
+          claude -p "say just 'ok'" --model 'haiku' || true
           systemctl suspend
         '';
       };

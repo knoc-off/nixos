@@ -1,4 +1,8 @@
-# which-key: popup showing available keybinds after pressing a prefix
+# which-key: popup showing available keybinds after pressing a prefix.
+#
+# Group labels are NOT declared here -- each feature module contributes its own
+# via the `whichKeyGroups` option (see which-key-groups.nix), so the group list
+# self-assembles from whatever modules are imported.
 {...}: {
   plugins.which-key = {
     enable = true;
@@ -9,21 +13,6 @@
         separator = "->";
         group = "+";
       };
-      spec = [
-        # Bare `g` prefix: LSP navigation (gd/gr/gi/gt), buffer-local on LSP attach
-        { __unkeyed = "g"; group = "Go"; }
-        { __unkeyed = "<leader>b"; group = "Buffers"; }
-        { __unkeyed = "<leader>c"; group = "Code"; }
-        { __unkeyed = "<leader>d"; group = "Diagnostics"; }
-        { __unkeyed = "<leader>f"; group = "Find"; }
-        { __unkeyed = "<leader>g"; group = "Git"; }
-        { __unkeyed = "<leader>l"; group = "LSP"; }
-        { __unkeyed = "<leader>r"; group = "Rust"; }
-        { __unkeyed = "<leader>s"; group = "Session/Split"; }
-        { __unkeyed = "<leader>S"; group = "Sessions (load)"; }
-        { __unkeyed = "<leader>t"; group = "Trouble"; }
-        { __unkeyed = "<leader>v"; group = "Visits"; }
-      ];
     };
   };
 }

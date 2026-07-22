@@ -105,7 +105,7 @@ in {
         general = {
           lock_cmd = "${noctaliaCmd} ipc call lockScreen lock"; # triggered by loginctl lock-session
           before_sleep_cmd = "loginctl lock-session"; # always lock before sleep
-          after_sleep_cmd = "hyprctl dispatch dpms on"; # restore monitors after wake
+          after_sleep_cmd = "hyprctl dispatch 'hl.dsp.dpms({ action = \"enable\" })'"; # restore monitors after wake
         };
 
         listener = [
@@ -115,8 +115,8 @@ in {
           }
           {
             timeout = 600; # 10 minutes
-            on-timeout = "hyprctl dispatch dpms off";
-            on-resume = "hyprctl dispatch dpms on";
+            on-timeout = "hyprctl dispatch 'hl.dsp.dpms({ action = \"disable\" })'";
+            on-resume = "hyprctl dispatch 'hl.dsp.dpms({ action = \"enable\" })'";
           }
           {
             timeout = 1800; # 30 minutes

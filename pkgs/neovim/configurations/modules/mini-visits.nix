@@ -9,6 +9,8 @@
 #   <leader>vd  remove a label from the current file
 #   <leader>vn / <leader>vp  jump to next / previous file by frecency
 {lib, ...}: {
+  whichKeyGroups = [{__unkeyed = "<leader>v"; group = "Visits";}];
+
   plugins.mini.modules.visits = {};
 
   keymaps = let

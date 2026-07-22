@@ -419,6 +419,17 @@ end
 hl.bind(mainMod .. " + W", hl.dsp.window.close())
 hl.bind(mainMod .. " + SHIFT + L", hl.dsp.exec_cmd(env.noctalia .. " ipc call lockScreen lock"))
 
+-- Force displays back on. Recovery for a DPMS-off state where the screens are
+-- black but the session is alive (e.g. an errant dpms toggle, or idle DPMS not
+-- waking). Locked so it fires even while displays are off / session idle.
+-- Deferred via a oneshot timer: binding DPMS directly can cause undefined
+-- behavior, so dispatch it just after the keybind handler returns.
+hl.bind(mainMod .. " + SHIFT + D", function()
+	hl.timer(function()
+		hl.dispatch(hl.dsp.dpms({ action = "enable" }))
+	end, { timeout = 100, type = "oneshot" })
+end, { locked = true })
+
 -- Focus movement
 hl.bind(mainMod .. " + left", hl.dsp.focus({ direction = "left" }))
 hl.bind(mainMod .. " + right", hl.dsp.focus({ direction = "right" }))

@@ -1,6 +1,8 @@
 # Git integration - gitsigns with hunk navigation, staging, and blame
 # Uses GitState as source of truth (from git-state.nix)
 {lib, ...}: {
+  whichKeyGroups = [{__unkeyed = "<leader>g"; group = "Git";}];
+
   plugins.gitsigns = {
     enable = true;
     settings = {
@@ -14,14 +16,26 @@
     {
       mode = "n";
       key = "]h";
-      action = lib.nixvim.mkRaw "function() require('gitsigns').nav_hunk('next') end";
+      action = lib.nixvim.mkRaw "function() require('gitsigns').nav_hunk('next', { target = 'all' }) end";
       options = { silent = true; desc = "Next git hunk"; };
     }
     {
       mode = "n";
       key = "[h";
-      action = lib.nixvim.mkRaw "function() require('gitsigns').nav_hunk('prev') end";
+      action = lib.nixvim.mkRaw "function() require('gitsigns').nav_hunk('prev', { target = 'all' }) end";
       options = { silent = true; desc = "Previous git hunk"; };
+    }
+    {
+      mode = "n";
+      key = "<leader>gj";
+      action = lib.nixvim.mkRaw "function() require('gitsigns').nav_hunk('next', { target = 'all' }) end";
+      options = { silent = true; desc = "Next hunk"; };
+    }
+    {
+      mode = "n";
+      key = "<leader>gk";
+      action = lib.nixvim.mkRaw "function() require('gitsigns').nav_hunk('prev', { target = 'all' }) end";
+      options = { silent = true; desc = "Prev hunk"; };
     }
 
     # Hunk actions
@@ -103,6 +117,49 @@
         end
       '';
       options = { silent = true; desc = "Show git comparison info"; };
+    }
+    {
+      mode = "n";
+      key = "<leader>gl";
+      action = lib.nixvim.mkRaw ''
+        function()
+          local root = vim.fs.root(0, '.git') or vim.fn.getcwd()
+          -- git-syntax preview of the full commit (body + diff).
+          local preview = function(buf_id, item)
+            local hash = item:match('^(%S+)')
+            if not hash then return end
+            if not pcall(vim.treesitter.start, buf_id, 'git') then
+              vim.bo[buf_id].syntax = 'git'
+            end
+            local out = vim.system(
+              { 'git', '-C', root, '--no-pager', 'show', hash },
+              { text = true }
+            ):wait()
+            local lines = vim.split(out.stdout or "", '\n')
+            vim.api.nvim_buf_set_lines(buf_id, 0, -1, false, lines)
+          end
+          -- Selecting commit X sets the diff base to its PARENT (X~1) so the
+          -- diff is inclusive of X's own changes. Applies to all buffers.
+          local choose = function(item)
+            local hash = item:match('^(%S+)')
+            if not hash then return end
+            local base = hash .. '~1'
+            -- Root-commit guard: X~1 doesn't exist for the initial commit.
+            local ok = vim.system(
+              { 'git', '-C', root, 'rev-parse', '--verify', '--quiet', base }
+            ):wait().code == 0
+            if not ok then base = hash end
+            _G.GitState.set_base(base)
+            require('gitsigns').change_base(base, true)
+            vim.notify("Comparing since (incl.) " .. hash, vim.log.levels.INFO)
+          end
+          require('mini.pick').builtin.cli(
+            { command = { 'git', 'log', '-n', '300', '--format=format:%h %s' } },
+            { source = { name = 'Git log', cwd = root, preview = preview, choose = choose } }
+          )
+        end
+      '';
+      options = { silent = true; desc = "Git log (pick commit as diff base)"; };
     }
   ];
 

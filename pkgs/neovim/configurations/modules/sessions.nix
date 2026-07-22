@@ -34,6 +34,11 @@
     options = { silent = true; desc = "Load session slot ${n}"; };
   }) 3;
 in {
+  whichKeyGroups = [
+    {__unkeyed = "<leader>s"; group = "Session/Split";}
+    {__unkeyed = "<leader>S"; group = "Sessions (load)";}
+  ];
+
   plugins.mini-sessions = {
     enable = true;
     settings = {

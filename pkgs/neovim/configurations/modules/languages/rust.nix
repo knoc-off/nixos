@@ -7,6 +7,8 @@
   pkgs,
   ...
 }: {
+  whichKeyGroups = [{__unkeyed = "<leader>r"; group = "Rust";}];
+
   plugins.rustaceanvim = {
     enable = true;
 

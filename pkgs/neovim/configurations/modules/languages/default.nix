@@ -1,6 +1,15 @@
 # Shared LSP infrastructure, common keymaps, and formatting base
 # Import this alongside specific language modules (rust.nix, nix.nix, etc.)
 {lib, pkgs, ...}: {
+  # LSP-general which-key groups (owned here, since these prefixes are provided
+  # by the shared LSP layer rather than any single language module).
+  whichKeyGroups = [
+    {__unkeyed = "g"; group = "Go";}
+    {__unkeyed = "<leader>c"; group = "Code";}
+    {__unkeyed = "<leader>d"; group = "Diagnostics";}
+    {__unkeyed = "<leader>l"; group = "LSP";}
+  ];
+
   plugins.fidget = {
     enable = true;
     settings = {

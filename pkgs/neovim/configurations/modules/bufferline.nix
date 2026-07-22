@@ -12,6 +12,11 @@
     };
   }) 9;
 in {
+  whichKeyGroups =
+    [{__unkeyed = "<leader>b"; group = "Buffers";}]
+    # Keep the <leader>1..9 buffer-switch keymaps but hide them from the which-key popup.
+    ++ builtins.genList (i: {__unkeyed = "<leader>${toString (i + 1)}"; hidden = true;}) 9;
+
   plugins.bufferline = {
     enable = true;
     settings.options = {
