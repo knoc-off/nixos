@@ -228,6 +228,4 @@ in {
   # vim-matchup - enhanced % matching with highlighting
   # Treesitter integration is automatic in Neovim
   plugins.vim-matchup.enable = true;
-
-
 }

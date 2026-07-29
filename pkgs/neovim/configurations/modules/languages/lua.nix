@@ -1,7 +1,11 @@
 # Lua development environment
 # - lua_ls (Lua Language Server)
 # - stylua formatting
-{lib, pkgs, ...}: {
+{
+  lib,
+  pkgs,
+  ...
+}: {
   plugins.lsp.servers.lua_ls = {
     enable = true;
     settings.Lua = {

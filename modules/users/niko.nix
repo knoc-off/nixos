@@ -354,6 +354,8 @@
                 configureFlags = old.configureFlags ++ [ "--enable-gtk-clipboard" ];
               }))
 
+              upkgs.gh
+
               upkgs.foliate
               upkgs.readest
 

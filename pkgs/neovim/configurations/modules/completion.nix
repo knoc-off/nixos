@@ -91,13 +91,24 @@
         sources = ["cmdline" "buffer"];
         # Stock cmdline preset: <Tab> reveals+inserts then cycles (menu stays
         # open), <S-Tab> cycles back, arrows / <C-n>/<C-p> navigate, <C-y> accept,
-        # <C-e> cancel. We layer <CR> on top: accept the selection if the menu is
-        # open, otherwise run the command (a second <CR> then runs it).
+        # <C-e> cancel. <CR> is "accept" (not accept_and_enter): if an item is
+        # selected it just fills the command line without running it, so a typo
+        # or an auto-picked match never gets executed by accident -- press <CR>
+        # again to actually run it. With nothing selected, <CR> falls back to a
+        # normal Enter and runs the typed command immediately.
         keymap = {
           preset = "cmdline";
-          "<CR>" = ["accept_and_enter" "fallback"];
+          "<CR>" = ["accept" "fallback"];
         };
-        completion.menu.auto_show = true;
+        completion = {
+          menu.auto_show = true;
+          # Nothing pre-highlighted: selecting is explicit (<Tab>/arrows), so a
+          # single <CR> never fills+runs something you didn't choose.
+          list.selection = {
+            preselect = false;
+            auto_insert = false;
+          };
+        };
       };
 
       appearance = {

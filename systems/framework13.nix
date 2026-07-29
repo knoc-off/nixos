@@ -6,9 +6,11 @@
   config,
   hostname,
   ...
-}: let
+}:
+let
   user = "knoff";
-in {
+in
+{
   imports = [
     # inputs.nixgl.packages.x86_64-linux.nixGLIntel
 
@@ -21,6 +23,20 @@ in {
         enable = true;
         acceptDns = true;
       };
+
+    }
+
+    self.nixosModules.claude-ping
+    {
+      services.claude-ping = {
+        enable = true;
+        user = user;
+        # Personal machine: ping every day, not just workdays.
+        schedule = [
+          "07:00"
+          "12:00"
+        ];
+      };
     }
 
     self.nixosModules.users.knoff
@@ -32,7 +48,7 @@ in {
     self.nixosModules.console
 
     inputs.disko.nixosModules.disko
-    {disko.devices.disk.vdb.device = "/dev/nvme0n1";}
+    { disko.devices.disk.vdb.device = "/dev/nvme0n1"; }
 
     ./hardware/disks/btrfs-luks.nix
 
@@ -54,7 +70,7 @@ in {
     }
 
     self.nixosModules.lspmux
-    {services.lspmux.enable = true;}
+    { services.lspmux.enable = true; }
 
     ./hardware/boot.nix
 
@@ -62,7 +78,7 @@ in {
     {
       sops = {
         defaultSopsFile = ./secrets/${hostname}/default.yaml;
-        age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
+        age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
         secrets."shell_environment/OPENROUTER_API_KEY" = {
           mode = "0644";
         };
@@ -76,22 +92,24 @@ in {
           nixpkgs.flake = inputs.nixpkgs;
           nixos-hardware.flake = inputs.hardware;
         };
-        nixPath = ["nixpkgs=${inputs.nixpkgs}"];
+        nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
       };
     }
 
     {
-      services.greetd = let
-        tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
-      in {
-        enable = true;
-        settings = {
-          default_session = {
-            command = "${tuigreet} --time --remember --cmd 'uwsm start hyprland-uwsm.desktop'";
-            user = "greeter";
+      services.greetd =
+        let
+          tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
+        in
+        {
+          enable = true;
+          settings = {
+            default_session = {
+              command = "${tuigreet} --time --remember --cmd 'uwsm start hyprland-uwsm.desktop'";
+              user = "greeter";
+            };
           };
         };
-      };
     }
 
     self.nixosModules.fish
@@ -211,8 +229,8 @@ in {
         38071
         53317
       ];
-      interfaces.tailscale0.allowedTCPPorts = [8080];
-      interfaces.wlp1s0.allowedTCPPorts = [8080];
+      interfaces.tailscale0.allowedTCPPorts = [ 8080 ];
+      interfaces.wlp1s0.allowedTCPPorts = [ 8080 ];
       #extraCommands = ''
       #  iptables -A INPUT -p tcp --dport 22000 -s niko.ink -j ACCEPT
       #  iptables -A INPUT -p udp --dport 21027 -s niko.ink -j ACCEPT
@@ -221,7 +239,7 @@ in {
   };
 
   console = {
-    packages = with pkgs; [terminus_font];
+    packages = with pkgs; [ terminus_font ];
     font = "${pkgs.terminus_font}/share/consolefonts/ter-i22b.psf.gz";
     useXkbConfig = true;
   };
@@ -241,7 +259,7 @@ in {
       pkgs.nerd-fonts.fira-code
     ];
     fontconfig.defaultFonts = {
-      monospace = ["FiraCode Nerd Font Mono"];
+      monospace = [ "FiraCode Nerd Font Mono" ];
     };
   };
 
@@ -251,8 +269,8 @@ in {
   };
 
   boot = {
-    binfmt.emulatedSystems = ["aarch64-linux"];
-    kernelParams = ["usbcore.autosuspend=-1"];
+    binfmt.emulatedSystems = [ "aarch64-linux" ];
+    kernelParams = [ "usbcore.autosuspend=-1" ];
     kernel.sysctl = {
       # zram is RAM-speed, so be eager to use it before reclaiming caches.
       # The disk swapfile stays as a low-priority overflow only.
@@ -277,28 +295,19 @@ in {
     users.${user} = {
       shell = pkgs.fish;
       isNormalUser = lib.mkDefault true;
-      extraGroups =
-        [
-          "wheel"
-          "audio"
-          "video"
-          "dialout"
-          "uinput"
-          "input"
-          "lp"
-        ]
-        ++ (
-          if config.virtualisation.libvirtd.enable
-          then ["libvirtd"]
-          else []
-        )
-        ++ (
-          if config.networking.networkmanager.enable
-          then ["networkmanager"]
-          else []
-        );
+      extraGroups = [
+        "wheel"
+        "audio"
+        "video"
+        "dialout"
+        "uinput"
+        "input"
+        "lp"
+      ]
+      ++ (if config.virtualisation.libvirtd.enable then [ "libvirtd" ] else [ ])
+      ++ (if config.networking.networkmanager.enable then [ "networkmanager" ] else [ ]);
       initialPassword = "password";
-      openssh.authorizedKeys.keys = [];
+      openssh.authorizedKeys.keys = [ ];
     };
   };
 

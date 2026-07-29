@@ -7,7 +7,12 @@
   pkgs,
   ...
 }: {
-  whichKeyGroups = [{__unkeyed = "<leader>r"; group = "Rust";}];
+  whichKeyGroups = [
+    {
+      __unkeyed = "<leader>r";
+      group = "Rust";
+    }
+  ];
 
   plugins.rustaceanvim = {
     enable = true;
@@ -305,6 +310,23 @@
     }
     {
       mode = "n";
+      key = "<leader>dd";
+      action = lib.nixvim.mkRaw ''
+        function()
+          if vim.bo.filetype ~= "rust" then
+            vim.notify("Debug-at-cursor is Rust-only for now", vim.log.levels.WARN)
+            return
+          end
+          vim.cmd.RustLsp('debug')
+        end
+      '';
+      options = {
+        silent = true;
+        desc = "Rust: Debug target at cursor";
+      };
+    }
+    {
+      mode = "n";
       key = "<leader>rT";
       action = lib.nixvim.mkRaw ''
         function()
@@ -362,12 +384,32 @@
         local prev = vim.env.RA_TARGET
         vim.env.RA_TARGET = target
 
+        -- rust-analyzer serves *pull* diagnostics, which live in a namespace
+        -- keyed by client id ("nvim.lsp.rust-analyzer.<id>.<pull_id>"). Neovim
+        -- only clears those on LspDetach when no other attached client supports
+        -- textDocument/diagnostic -- typos_lsp does, so the outgoing client's
+        -- namespace survives and its diagnostics get layered under the new
+        -- target's. Match by name to catch both the push ("nvim.lsp.<name>.<id>")
+        -- and pull namespaces without having to know the server's pull_id.
+        local stale_ns = {}
+        for _, client in ipairs(vim.lsp.get_clients({ name = "rust-analyzer" })) do
+          local base = ("nvim.lsp.%s.%d"):format(client.name, client.id)
+          for id, ns in pairs(vim.diagnostic.get_namespaces()) do
+            if ns.name == base or vim.startswith(ns.name, base .. ".") then
+              table.insert(stale_ns, id)
+            end
+          end
+        end
+
         -- Stop tears down the lspmux client pipe, start spawns a new one
         -- that inherits the updated RA_TARGET env -> lspmux routes to the
         -- matching instance (or spawns a fresh one). The server.settings
         -- function reads RA_TARGET on each start to keep cargo.target in sync.
         vim.cmd("RustAnalyzer stop")
         vim.defer_fn(function()
+          for _, ns in ipairs(stale_ns) do
+            vim.diagnostic.reset(ns)
+          end
           vim.cmd("RustAnalyzer start")
           local display = target or "native"
           local verb = prev and "Switched" or "Set"

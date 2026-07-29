@@ -7,7 +7,11 @@
 # because the plugin's optional `previewers.snacks` module fails the packaging
 # require-check when snacks isn't present. We use picker=buffer + backend=delta,
 # so that optional previewer is irrelevant -- disable the check.
-{pkgs, lib, ...}: {
+{
+  pkgs,
+  lib,
+  ...
+}: {
   extraPackages = [pkgs.delta];
   extraPlugins = [
     (pkgs.vimUtils.buildVimPlugin {
@@ -35,7 +39,10 @@
       mode = ["n" "x"];
       key = "<leader>ca";
       action = lib.nixvim.mkRaw "function() require('tiny-code-action').code_action() end";
-      options = { silent = true; desc = "Code action"; };
+      options = {
+        silent = true;
+        desc = "Code action";
+      };
     }
   ];
 }

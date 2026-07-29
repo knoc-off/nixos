@@ -621,6 +621,22 @@
         "type": "github"
       }
     },
+    "fx-autoconfig": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1784800794,
+        "narHash": "sha256-bpOt/fD8zZiKbb2sRQHl7eobuGklY9c2QI/jmYi9WE4=",
+        "owner": "MrOtherGuy",
+        "repo": "fx-autoconfig",
+        "rev": "dfdab5684faffc112b76ccb1d8cab7f75da0102c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "MrOtherGuy",
+        "repo": "fx-autoconfig",
+        "type": "github"
+      }
+    },
     "git-hooks-nix": {
       "inputs": {
         "flake-compat": "flake-compat",
@@ -2501,6 +2517,7 @@
         "fenix": "fenix",
         "firefox-addons": "firefox-addons",
         "firefox-csshacks": "firefox-csshacks",
+        "fx-autoconfig": "fx-autoconfig",
         "hardware": "hardware",
         "home-manager": "home-manager",
         "hyprland": [

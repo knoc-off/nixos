@@ -2,20 +2,31 @@
 # Provides visual buffer tabs and navigation keybindings
 {lib, ...}: let
   # Generate <leader>N keymaps for buffer 1-9
-  goToBufferKeymaps = builtins.genList (i: {
-    mode = "n";
-    key = "<leader>${toString (i + 1)}";
-    action = "<cmd>BufferLineGoToBuffer ${toString (i + 1)}<cr>";
-    options = {
-      silent = true;
-      desc = "Go to buffer ${toString (i + 1)}";
-    };
-  }) 9;
+  goToBufferKeymaps =
+    builtins.genList (i: {
+      mode = "n";
+      key = "<leader>${toString (i + 1)}";
+      action = "<cmd>BufferLineGoToBuffer ${toString (i + 1)}<cr>";
+      options = {
+        silent = true;
+        desc = "Go to buffer ${toString (i + 1)}";
+      };
+    })
+    9;
 in {
   whichKeyGroups =
-    [{__unkeyed = "<leader>b"; group = "Buffers";}]
+    [
+      {
+        __unkeyed = "<leader>b";
+        group = "Buffers";
+      }
+    ]
     # Keep the <leader>1..9 buffer-switch keymaps but hide them from the which-key popup.
-    ++ builtins.genList (i: {__unkeyed = "<leader>${toString (i + 1)}"; hidden = true;}) 9;
+    ++ builtins.genList (i: {
+      __unkeyed = "<leader>${toString (i + 1)}";
+      hidden = true;
+    })
+    9;
 
   plugins.bufferline = {
     enable = true;
@@ -55,55 +66,82 @@ in {
         mode = "n";
         key = "<Tab>";
         action = "<cmd>BufferLineCycleNext<cr>";
-        options = { silent = true; desc = "Next buffer"; };
+        options = {
+          silent = true;
+          desc = "Next buffer";
+        };
       }
       {
         mode = "n";
         key = "<S-Tab>";
         action = "<cmd>BufferLineCyclePrev<cr>";
-        options = { silent = true; desc = "Previous buffer"; };
+        options = {
+          silent = true;
+          desc = "Previous buffer";
+        };
       }
       {
         mode = "n";
         key = "<leader>bp";
         action = "<cmd>BufferLinePick<cr>";
-        options = { silent = true; desc = "Pick buffer"; };
+        options = {
+          silent = true;
+          desc = "Pick buffer";
+        };
       }
       {
         mode = "n";
         key = "<leader>bc";
         action = "<cmd>BufferLinePickClose<cr>";
-        options = { silent = true; desc = "Pick buffer to close"; };
+        options = {
+          silent = true;
+          desc = "Pick buffer to close";
+        };
       }
       {
         mode = "n";
         key = "<leader>bD";
         action = "<cmd>BufferLineCloseOthers<cr>";
-        options = { silent = true; desc = "Close other buffers"; };
+        options = {
+          silent = true;
+          desc = "Close other buffers";
+        };
       }
       {
         mode = "n";
         key = "<leader>bh";
         action = "<cmd>BufferLineCloseLeft<cr>";
-        options = { silent = true; desc = "Close buffers to the left"; };
+        options = {
+          silent = true;
+          desc = "Close buffers to the left";
+        };
       }
       {
         mode = "n";
         key = "<leader>bl";
         action = "<cmd>BufferLineCloseRight<cr>";
-        options = { silent = true; desc = "Close buffers to the right"; };
+        options = {
+          silent = true;
+          desc = "Close buffers to the right";
+        };
       }
       {
         mode = "n";
         key = "<leader>b>";
         action = "<cmd>BufferLineMoveNext<cr>";
-        options = { silent = true; desc = "Move buffer right"; };
+        options = {
+          silent = true;
+          desc = "Move buffer right";
+        };
       }
       {
         mode = "n";
         key = "<leader>b<";
         action = "<cmd>BufferLineMovePrev<cr>";
-        options = { silent = true; desc = "Move buffer left"; };
+        options = {
+          silent = true;
+          desc = "Move buffer left";
+        };
       }
       {
         mode = "n";
@@ -115,7 +153,10 @@ in {
             vim.cmd('bdelete! ' .. bufnr)
           end
         '';
-        options = { silent = true; desc = "Close current buffer"; };
+        options = {
+          silent = true;
+          desc = "Close current buffer";
+        };
       }
     ]
     ++ goToBufferKeymaps;

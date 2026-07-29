@@ -1,7 +1,12 @@
 # Git integration - gitsigns with hunk navigation, staging, and blame
 # Uses GitState as source of truth (from git-state.nix)
 {lib, ...}: {
-  whichKeyGroups = [{__unkeyed = "<leader>g"; group = "Git";}];
+  whichKeyGroups = [
+    {
+      __unkeyed = "<leader>g";
+      group = "Git";
+    }
+  ];
 
   plugins.gitsigns = {
     enable = true;
@@ -17,25 +22,37 @@
       mode = "n";
       key = "]h";
       action = lib.nixvim.mkRaw "function() require('gitsigns').nav_hunk('next', { target = 'all' }) end";
-      options = { silent = true; desc = "Next git hunk"; };
+      options = {
+        silent = true;
+        desc = "Next git hunk";
+      };
     }
     {
       mode = "n";
       key = "[h";
       action = lib.nixvim.mkRaw "function() require('gitsigns').nav_hunk('prev', { target = 'all' }) end";
-      options = { silent = true; desc = "Previous git hunk"; };
+      options = {
+        silent = true;
+        desc = "Previous git hunk";
+      };
     }
     {
       mode = "n";
       key = "<leader>gj";
       action = lib.nixvim.mkRaw "function() require('gitsigns').nav_hunk('next', { target = 'all' }) end";
-      options = { silent = true; desc = "Next hunk"; };
+      options = {
+        silent = true;
+        desc = "Next hunk";
+      };
     }
     {
       mode = "n";
       key = "<leader>gk";
       action = lib.nixvim.mkRaw "function() require('gitsigns').nav_hunk('prev', { target = 'all' }) end";
-      options = { silent = true; desc = "Prev hunk"; };
+      options = {
+        silent = true;
+        desc = "Prev hunk";
+      };
     }
 
     # Hunk actions
@@ -43,37 +60,55 @@
       mode = "n";
       key = "<leader>gs";
       action = lib.nixvim.mkRaw "function() require('gitsigns').stage_hunk() end";
-      options = { silent = true; desc = "Stage hunk"; };
+      options = {
+        silent = true;
+        desc = "Stage hunk";
+      };
     }
     {
       mode = "v";
       key = "<leader>gs";
       action = lib.nixvim.mkRaw "function() require('gitsigns').stage_hunk({ vim.fn.line('.'), vim.fn.line('v') }) end";
-      options = { silent = true; desc = "Stage selected lines"; };
+      options = {
+        silent = true;
+        desc = "Stage selected lines";
+      };
     }
     {
       mode = "n";
       key = "<leader>gu";
       action = lib.nixvim.mkRaw "function() require('gitsigns').stage_hunk() end";
-      options = { silent = true; desc = "Unstage hunk (toggle on staged sign)"; };
+      options = {
+        silent = true;
+        desc = "Unstage hunk (toggle on staged sign)";
+      };
     }
     {
       mode = "n";
       key = "<leader>gr";
       action = lib.nixvim.mkRaw "function() require('gitsigns').reset_hunk() end";
-      options = { silent = true; desc = "Reset hunk"; };
+      options = {
+        silent = true;
+        desc = "Reset hunk";
+      };
     }
     {
       mode = "n";
       key = "<leader>gp";
       action = lib.nixvim.mkRaw "function() require('gitsigns').preview_hunk() end";
-      options = { silent = true; desc = "Preview hunk"; };
+      options = {
+        silent = true;
+        desc = "Preview hunk";
+      };
     }
     {
       mode = "n";
       key = "<leader>gb";
       action = lib.nixvim.mkRaw "function() require('gitsigns').blame_line({ full = true }) end";
-      options = { silent = true; desc = "Blame line"; };
+      options = {
+        silent = true;
+        desc = "Blame line";
+      };
     }
 
     # GitState comparison controls
@@ -89,7 +124,10 @@
           end
         end
       '';
-      options = { silent = true; desc = "Diff against merge-base"; };
+      options = {
+        silent = true;
+        desc = "Diff against merge-base";
+      };
     }
     {
       mode = "n";
@@ -101,7 +139,10 @@
           vim.notify("Reset to HEAD", vim.log.levels.INFO)
         end
       '';
-      options = { silent = true; desc = "Reset to HEAD"; };
+      options = {
+        silent = true;
+        desc = "Reset to HEAD";
+      };
     }
     {
       mode = "n";
@@ -116,7 +157,10 @@
           vim.notify(msg, vim.log.levels.INFO)
         end
       '';
-      options = { silent = true; desc = "Show git comparison info"; };
+      options = {
+        silent = true;
+        desc = "Show git comparison info";
+      };
     }
     {
       mode = "n";
@@ -159,7 +203,10 @@
           )
         end
       '';
-      options = { silent = true; desc = "Git log (pick commit as diff base)"; };
+      options = {
+        silent = true;
+        desc = "Git log (pick commit as diff base)";
+      };
     }
   ];
 

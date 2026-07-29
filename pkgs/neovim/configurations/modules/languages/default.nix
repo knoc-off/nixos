@@ -1,13 +1,25 @@
 # Shared LSP infrastructure, common keymaps, and formatting base
 # Import this alongside specific language modules (rust.nix, nix.nix, etc.)
-{lib, pkgs, ...}: {
+{
+  lib,
+  pkgs,
+  ...
+}: {
   # LSP-general which-key groups (owned here, since these prefixes are provided
   # by the shared LSP layer rather than any single language module).
   whichKeyGroups = [
-    {__unkeyed = "g"; group = "Go";}
-    {__unkeyed = "<leader>c"; group = "Code";}
-    {__unkeyed = "<leader>d"; group = "Diagnostics";}
-    {__unkeyed = "<leader>l"; group = "LSP";}
+    {
+      __unkeyed = "g";
+      group = "Go";
+    }
+    {
+      __unkeyed = "<leader>c";
+      group = "Code";
+    }
+    {
+      __unkeyed = "<leader>l";
+      group = "LSP";
+    }
   ];
 
   plugins.fidget = {
@@ -68,7 +80,8 @@
 
       -- Toggle between current-line-only and all-lines virtual diagnostics,
       -- for surveying every diagnostic in a file then collapsing back.
-      vim.keymap.set("n", "<leader>dl", function()
+      -- (<leader>dl was reassigned: <leader>d is now the Debug/DAP group.)
+      vim.keymap.set("n", "<leader>lv", function()
         local cfg = vim.diagnostic.config()
         local all = type(cfg.virtual_lines) == "table" and cfg.virtual_lines.current_line == nil
         vim.diagnostic.config({
@@ -117,7 +130,10 @@
       mode = "n";
       key = "K";
       action = lib.nixvim.mkRaw ''function() vim.lsp.buf.hover({ border = "rounded" }) end'';
-      options = { silent = true; desc = "Hover"; };
+      options = {
+        silent = true;
+        desc = "Hover";
+      };
     }
     {
       mode = "n";
@@ -139,25 +155,37 @@
       mode = "n";
       key = "<leader>j";
       action = lib.nixvim.mkRaw "function() vim.diagnostic.jump({ count = 1 }) end";
-      options = { silent = true; desc = "Next diagnostic"; };
+      options = {
+        silent = true;
+        desc = "Next diagnostic";
+      };
     }
     {
       mode = "n";
       key = "<leader>k";
       action = lib.nixvim.mkRaw "function() vim.diagnostic.jump({ count = -1 }) end";
-      options = { silent = true; desc = "Prev diagnostic"; };
+      options = {
+        silent = true;
+        desc = "Prev diagnostic";
+      };
     }
     {
       mode = "n";
       key = "]d";
       action = lib.nixvim.mkRaw "function() vim.diagnostic.jump({ count = 1 }) end";
-      options = { silent = true; desc = "Next diagnostic"; };
+      options = {
+        silent = true;
+        desc = "Next diagnostic";
+      };
     }
     {
       mode = "n";
       key = "[d";
       action = lib.nixvim.mkRaw "function() vim.diagnostic.jump({ count = -1 }) end";
-      options = { silent = true; desc = "Prev diagnostic"; };
+      options = {
+        silent = true;
+        desc = "Prev diagnostic";
+      };
     }
   ];
 

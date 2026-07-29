@@ -1,0 +1,13 @@
+[package]
+name = "rhizome-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+blake3.workspace = true
+html5ever.workspace = true
+markup5ever_rcdom.workspace = true
+pulldown-cmark.workspace = true
+serde = { workspace = true }
+thiserror.workspace = true

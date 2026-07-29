@@ -1,7 +1,11 @@
 # Shared formatters for web-adjacent filetypes
 # - biome: JS/TS/JSX/TSX, JSON
 # - prettier: YAML, Markdown (biome doesn't support these yet)
-{lib, pkgs, ...}: {
+{
+  lib,
+  pkgs,
+  ...
+}: {
   plugins.conform-nvim.settings = {
     formatters_by_ft = {
       javascript = ["biome"];

@@ -1,7 +1,11 @@
 # C/C++ development environment
 # - clangd via clangd-extensions (AST, memory usage, hierarchy)
 # - clang-format formatting
-{lib, pkgs, ...}: {
+{
+  lib,
+  pkgs,
+  ...
+}: {
   plugins.clangd-extensions = {
     enable = true;
     enableOffsetEncodingWorkaround = true; # Fixes "multiple different client offset_encodings" warning

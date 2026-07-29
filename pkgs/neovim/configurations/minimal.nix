@@ -11,6 +11,7 @@
     ./modules/scope.nix
     ./modules/textobjects.nix
     ./modules/mini-pick.nix
+    ./modules/pick-scope.nix
     ./modules/mini-visits.nix
     ./modules/completion.nix
     ./modules/mini-files.nix
@@ -26,6 +27,7 @@
     ./modules/git.nix
     ./modules/diffview.nix
     ./modules/sessions.nix
+    ./modules/dap.nix
 
     ./modules/languages/default.nix
     ./modules/languages/formatters.nix
@@ -50,6 +52,19 @@
     ../plugins/smart-paste/module.nix
     {
       plugins.smart-paste.enable = true;
+    }
+
+    ../plugins/rhizome/module.nix
+    {
+      plugins.rhizome = {
+        enable = true;
+        url = "https://notes.niko.ink";
+        # The token is read from this variable at startup. How it gets into the
+        # environment is deliberately not nixvim's concern -- on NixOS hosts a
+        # sops secret under `shell_environment/` is exported automatically (see
+        # modules/shell.nix).
+        tokenEnv = "RHIZOME_TOKEN";
+      };
     }
   ];
 

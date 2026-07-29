@@ -16,8 +16,17 @@
 # The plugin's own persistent bottom-right panel is patched out (see postPatch);
 # visibility is entirely via this peek picker + the notify on add + a small
 # "AI:N" count in the statusline (see statusline.nix).
-{pkgs, lib, ...}: {
-  whichKeyGroups = [{__unkeyed = "<leader>a"; group = "AI review";}];
+{
+  pkgs,
+  lib,
+  ...
+}: {
+  whichKeyGroups = [
+    {
+      __unkeyed = "<leader>a";
+      group = "AI review";
+    }
+  ];
 
   extraPlugins = [
     (pkgs.vimUtils.buildVimPlugin {
@@ -38,24 +47,24 @@
       # exact strings the BUILD FAILS LOUDLY (by design). If that happens after
       # bumping `rev`, re-read lua/prompt-reference/init.lua and re-derive these.
       postPatch = ''
-        # 1. Expose staged data so mini.pick can index it and the statusline can
-        #    show a count. Copies are returned so the picker can't mutate state.
-        substituteInPlace lua/prompt-reference/init.lua \
-          --replace-fail 'function M.setup(opts)' \
-        'function M.count() return #staged end
+                # 1. Expose staged data so mini.pick can index it and the statusline can
+                #    show a count. Copies are returned so the picker can't mutate state.
+                substituteInPlace lua/prompt-reference/init.lua \
+                  --replace-fail 'function M.setup(opts)' \
+                'function M.count() return #staged end
 
-function M.items() return vim.deepcopy(staged) end
+        function M.items() return vim.deepcopy(staged) end
 
-function M.format_item(ctx) return format_ctx(ctx) end
+        function M.format_item(ctx) return format_ctx(ctx) end
 
-function M.setup(opts)'
+        function M.setup(opts)'
 
-        # 2. Kill the persistent bottom-right panel: neutralise refresh_panel so
-        #    it never opens a float. review()/add_selection()/copy_all() still
-        #    work; they just no longer pop the overlapping window.
-        substituteInPlace lua/prompt-reference/init.lua \
-          --replace-fail 'local function refresh_panel()' \
-                         'local function refresh_panel() do return end'
+                # 2. Kill the persistent bottom-right panel: neutralise refresh_panel so
+                #    it never opens a float. review()/add_selection()/copy_all() still
+                #    work; they just no longer pop the overlapping window.
+                substituteInPlace lua/prompt-reference/init.lua \
+                  --replace-fail 'local function refresh_panel()' \
+                                 'local function refresh_panel() do return end'
       '';
       meta = {
         description = "Stage code references with prompts into a review, copy for an LLM";
@@ -76,7 +85,10 @@ function M.setup(opts)'
       mode = "x";
       key = "<leader>aa";
       action = lib.nixvim.mkRaw "function() require('prompt-reference').add_selection() end";
-      options = { silent = true; desc = "Add selection to review"; };
+      options = {
+        silent = true;
+        desc = "Add selection to review";
+      };
     }
     {
       mode = "n";
@@ -113,13 +125,19 @@ function M.setup(opts)'
           })
         end
       '';
-      options = { silent = true; desc = "Peek review (mini.pick)"; };
+      options = {
+        silent = true;
+        desc = "Peek review (mini.pick)";
+      };
     }
     {
       mode = "n";
       key = "<leader>ac";
       action = lib.nixvim.mkRaw "function() require('prompt-reference').copy_all() end";
-      options = { silent = true; desc = "Copy review"; };
+      options = {
+        silent = true;
+        desc = "Copy review";
+      };
     }
   ];
 }

@@ -10,7 +10,11 @@
 #
 # Formatting: nixfmt-rfc-style (the current standard) via conform.
 # Linting (statix, deadnix) lives in languages/lint.nix via nvim-lint.
-{lib, pkgs, ...}: let
+{
+  lib,
+  pkgs,
+  ...
+}: let
   nixfmt = lib.getExe pkgs.nixfmt-rfc-style;
   # Host whose evaluated options power nixd's NixOS option completion/docs.
   # Change if you primarily edit a different machine's config.
@@ -24,11 +28,9 @@ in {
         # Flake-native sources so completion works without relying on channels
         # / NIX_PATH. nixpkgs packages and NixOS options both come from this
         # flake's own inputs and evaluated host config.
-        nixpkgs.expr =
-          "(builtins.getFlake (toString ./.)).inputs.nixpkgs-unstable.legacyPackages.\${builtins.currentSystem}";
+        nixpkgs.expr = "(builtins.getFlake (toString ./.)).inputs.nixpkgs-unstable.legacyPackages.\${builtins.currentSystem}";
         formatting.command = [nixfmt];
-        options.nixos.expr =
-          "(builtins.getFlake (toString ./.)).nixosConfigurations.${optionsHost}.options";
+        options.nixos.expr = "(builtins.getFlake (toString ./.)).nixosConfigurations.${optionsHost}.options";
         # nil owns diagnostics; keep nixd from emitting overlapping ones.
         diagnostic.suppress = ["sema-escaping-with"];
       };

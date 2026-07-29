@@ -1,8 +1,17 @@
 # Fuzzy finder via mini.pick + mini.extra (replaces telescope)
 # Also routes vim.ui.select (code actions, rust target, session pickers) through
 # mini.pick for a consistent picker UX across the whole config.
-{lib, pkgs, ...}: {
-  whichKeyGroups = [{__unkeyed = "<leader>f"; group = "Find";}];
+{
+  lib,
+  pkgs,
+  ...
+}: {
+  whichKeyGroups = [
+    {
+      __unkeyed = "<leader>f";
+      group = "Find";
+    }
+  ];
 
   # Guarantee the CLI tools mini.pick shells out to are always present,
   # independent of the ambient system PATH. mini.pick prefers rg > fd > git.
@@ -169,9 +178,11 @@
       };
     };
   in [
-    (mk "<leader>ff" "require('mini.pick').builtin.files()" "Find files")
-    (mk "<leader>fg" "require('mini.pick').builtin.grep_live()" "Live grep")
-    (mk "<C-f>" "require('mini.pick').builtin.grep_live()" "Live grep")
+    # Scoped to _G.PickScope.get() — auto-narrows to the current crate/package
+    # (see pick-scope.nix) unless pinned via <leader>fs/<leader>fS.
+    (mk "<leader>ff" "require('mini.pick').builtin.files({}, { source = { cwd = _G.PickScope.get() } })" "Find files (scoped)")
+    (mk "<leader>fg" "require('mini.pick').builtin.grep_live({}, { source = { cwd = _G.PickScope.get() } })" "Live grep (scoped)")
+    (mk "<C-f>" "require('mini.pick').builtin.grep_live({}, { source = { cwd = _G.PickScope.get() } })" "Live grep (scoped)")
     (mk "<leader>fh" "require('mini.pick').builtin.help()" "Help tags")
     (mk "<leader>fr" "require('mini.pick').builtin.resume()" "Resume last picker")
     (mk "<C-p>" "require('mini.extra').pickers.git_files()" "Git files")
@@ -200,12 +211,49 @@
           end)
         end
       '';
-      options = { silent = true; desc = "Diff range → changed files"; };
+      options = {
+        silent = true;
+        desc = "Diff range → changed files";
+      };
     }
     (mk "<leader>fc" "require('mini.extra').pickers.commands()" "Commands")
     (mk "<leader>fk" "require('mini.extra').pickers.keymaps()" "Keymaps")
     (mk "<leader>ls" "require('mini.extra').pickers.lsp({ scope = 'document_symbol' })" "Document symbols")
     (mk "<leader>lS" "require('mini.extra').pickers.lsp({ scope = 'workspace_symbol' })" "Workspace symbols")
+
+    # New buffer + immediately start a scoped file picker.
+    (mk "<leader>n" "vim.cmd('enew'); require('mini.pick').builtin.files({}, { source = { cwd = _G.PickScope.get() } })" "New buffer + find files")
+
+    # Whole-repo escape hatches: ignore any pinned/auto scope entirely.
+    (mk "<leader>fF" "require('mini.pick').builtin.files({}, { source = { cwd = _G.PickScope.get_repo_root() } })" "Find files (whole repo)")
+    (mk "<leader>fG" "require('mini.pick').builtin.grep_live({}, { source = { cwd = _G.PickScope.get_repo_root() } })" "Live grep (whole repo)")
+
+    # Clear any pinned scope override, falling back to auto-detection again.
+    (mk "<leader>fu" "_G.PickScope.clear(); vim.notify('Scope cleared (back to auto)', vim.log.levels.INFO)" "Clear scope override")
+
+    # Pin the scope to the current file's directory.
+    {
+      mode = "n";
+      key = "<leader>fS";
+      action = lib.nixvim.mkRaw ''
+        function()
+          local name = vim.api.nvim_buf_get_name(0)
+          if name == "" then
+            vim.notify("No file in current buffer", vim.log.levels.WARN)
+            return
+          end
+          local dir = vim.fs.dirname(name)
+          _G.PickScope.set(dir, { global = true })
+          vim.notify("Scope: " .. dir, vim.log.levels.INFO)
+        end
+      '';
+      options = { silent = true; desc = "Scope to current file's dir"; };
+    }
+
+    # Pick a project root from the marker ladder (nearest package -> workspace ->
+    # repo root) and pin the scope to it. Every option is a real project-root
+    # marker directory, so you can't scope to a meaningless subdir.
+    (mk "<leader>fs" "_G.PickScope.pick()" "Pick project root")
 
     # Cheatsheet: query "dorking" sigils + in-picker actions. Shown in a small
     # scratch float so it's discoverable without leaving the editor.
@@ -234,6 +282,14 @@
             "",
             "  Live grep (<leader>fg): prompt goes to ripgrep, so",
             "  ripgrep regex works directly.",
+            "",
+            "  Scope (auto-narrows <leader>ff/<leader>fg to the current",
+            "  crate/package; shown in the statusline when active):",
+            "    <leader>fs   pick a project root, pin scope",
+            "    <leader>fS   pin scope to current file's dir",
+            "    <leader>fu   clear pin (back to auto)",
+            "    <leader>fF   find files, whole repo (ignores scope)",
+            "    <leader>fG   live grep, whole repo (ignores scope)",
           }
           local buf = vim.api.nvim_create_buf(false, true)
           vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
@@ -255,7 +311,10 @@
           vim.keymap.set("n", "<Esc>", "<cmd>close<cr>", { buffer = buf, nowait = true })
         end
       '';
-      options = { silent = true; desc = "Picker search help"; };
+      options = {
+        silent = true;
+        desc = "Picker search help";
+      };
     }
 
     # Buffers picker with <C-d> to wipeout the buffer under the cursor.

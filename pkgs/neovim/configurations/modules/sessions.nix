@@ -1,42 +1,58 @@
 # Session management via mini.sessions
 # Slots 1-3 for quick save/load, plus named sessions with picker
 {lib, ...}: let
-  saveSlotKeymaps = builtins.genList (i: let
-    n = toString (i + 1);
-  in {
-    mode = "n";
-    key = "<leader>s${n}";
-    action = lib.nixvim.mkRaw ''
-      function()
-        require('mini.sessions').write("slot_${n}")
-        vim.notify("Session saved to slot ${n}", vim.log.levels.INFO)
-      end
-    '';
-    options = { silent = true; desc = "Save session slot ${n}"; };
-  }) 3;
-
-  loadSlotKeymaps = builtins.genList (i: let
-    n = toString (i + 1);
-  in {
-    mode = "n";
-    key = "<leader>S${n}";
-    action = lib.nixvim.mkRaw ''
-      function()
-        local MiniSessions = require('mini.sessions')
-        if MiniSessions.detected["slot_${n}"] then
-          MiniSessions.read("slot_${n}")
-          vim.notify("Session loaded from slot ${n}", vim.log.levels.INFO)
-        else
-          vim.notify("No session in slot ${n}", vim.log.levels.WARN)
+  saveSlotKeymaps =
+    builtins.genList (i: let
+      n = toString (i + 1);
+    in {
+      mode = "n";
+      key = "<leader>s${n}";
+      action = lib.nixvim.mkRaw ''
+        function()
+          require('mini.sessions').write("slot_${n}")
+          vim.notify("Session saved to slot ${n}", vim.log.levels.INFO)
         end
-      end
-    '';
-    options = { silent = true; desc = "Load session slot ${n}"; };
-  }) 3;
+      '';
+      options = {
+        silent = true;
+        desc = "Save session slot ${n}";
+      };
+    })
+    3;
+
+  loadSlotKeymaps =
+    builtins.genList (i: let
+      n = toString (i + 1);
+    in {
+      mode = "n";
+      key = "<leader>S${n}";
+      action = lib.nixvim.mkRaw ''
+        function()
+          local MiniSessions = require('mini.sessions')
+          if MiniSessions.detected["slot_${n}"] then
+            MiniSessions.read("slot_${n}")
+            vim.notify("Session loaded from slot ${n}", vim.log.levels.INFO)
+          else
+            vim.notify("No session in slot ${n}", vim.log.levels.WARN)
+          end
+        end
+      '';
+      options = {
+        silent = true;
+        desc = "Load session slot ${n}";
+      };
+    })
+    3;
 in {
   whichKeyGroups = [
-    {__unkeyed = "<leader>s"; group = "Session/Split";}
-    {__unkeyed = "<leader>S"; group = "Sessions (load)";}
+    {
+      __unkeyed = "<leader>s";
+      group = "Session/Split";
+    }
+    {
+      __unkeyed = "<leader>S";
+      group = "Sessions (load)";
+    }
   ];
 
   plugins.mini-sessions = {
@@ -74,7 +90,10 @@ in {
             end)
           end
         '';
-        options = { silent = true; desc = "Save session (named)"; };
+        options = {
+          silent = true;
+          desc = "Save session (named)";
+        };
       }
       {
         mode = "n";
@@ -93,7 +112,10 @@ in {
             end)
           end
         '';
-        options = { silent = true; desc = "Load session (pick)"; };
+        options = {
+          silent = true;
+          desc = "Load session (pick)";
+        };
       }
       {
         mode = "n";
@@ -115,7 +137,10 @@ in {
             end)
           end
         '';
-        options = { silent = true; desc = "Delete session"; };
+        options = {
+          silent = true;
+          desc = "Delete session";
+        };
       }
     ]
     ++ saveSlotKeymaps

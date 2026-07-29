@@ -16,7 +16,12 @@
 # conflict. See `:h diffview-config-keymaps`.
 {lib, ...}: {
   # Also an owner of the <leader>g "Git" group; deduplicated against git.nix.
-  whichKeyGroups = [{__unkeyed = "<leader>g"; group = "Git";}];
+  whichKeyGroups = [
+    {
+      __unkeyed = "<leader>g";
+      group = "Git";
+    }
+  ];
 
   plugins.diffview = {
     enable = true;
@@ -66,7 +71,10 @@
           end
         end
       '';
-      options = { silent = true; desc = "Diff view / merge conflicts"; };
+      options = {
+        silent = true;
+        desc = "Diff view / merge conflicts";
+      };
     }
     (mk "<leader>gh" "DiffviewFileHistory" "Branch history")
     (mk "<leader>gH" "DiffviewFileHistory %" "File history")

@@ -29,9 +29,25 @@
             if n > 0 then ai = "AI:" .. n end
           end
 
+          -- pick-scope indicator: hidden at repo root, "*" suffix when pinned
+          -- (vs auto-detected from crate/package markers).
+          local scope = ""
+          if _G.PickScope then
+            local label = _G.PickScope.label()
+            if label then scope = "[" .. label .. (_G.PickScope.is_pinned() and "*" or "") .. "]" end
+          end
+
+          -- DAP session indicator: shown only while a debug session is live.
+          local dbg = ""
+          local ok_dap, dap = pcall(require, 'dap')
+          if ok_dap and dap.session() ~= nil then
+            local status = dap.status()
+            dbg = "● DBG" .. (status ~= "" and (" " .. status) or "")
+          end
+
           return MiniStatusline.combine_groups({
             { hl = mode_hl,                 strings = { mode } },
-            { hl = 'MiniStatuslineDevinfo', strings = { git, diff, diagnostics, lsp, ai } },
+            { hl = 'MiniStatuslineDevinfo', strings = { git, diff, diagnostics, lsp, ai, scope, dbg } },
             '%<',
             { hl = 'MiniStatuslineFilename', strings = { filename } },
             '%=',

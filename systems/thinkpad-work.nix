@@ -119,31 +119,11 @@ in
 
     self.nixosModules.fish
 
+    self.nixosModules.claude-ping
     {
-      systemd.timers.claude-ping = {
-        wantedBy = [ "timers.target" ];
-        timerConfig = {
-          OnCalendar = [
-            "Mon..Fri 07:00"
-            "Mon..Fri 12:00"
-          ];
-          WakeSystem = true;
-        };
-      };
-
-      systemd.services.claude-ping = {
-        path = [ pkgs.claude-code pkgs.networkmanager ];
-        after = [ "network-online.target" ];
-        wants = [ "network-online.target" ];
-        serviceConfig = {
-          Type = "oneshot";
-          User = "niko";
-        };
-        script = ''
-          nm-online -q -t 60 || true
-          claude -p "say just 'ok'" --model 'haiku' || true
-          systemctl suspend
-        '';
+      services.claude-ping = {
+        enable = true;
+        user = user;
       };
     }
 

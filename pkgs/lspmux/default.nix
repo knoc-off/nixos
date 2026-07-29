@@ -14,8 +14,8 @@
     domain = "codeberg.org";
     owner = "p2502";
     repo = "lspmux";
-    rev = "c096923d20d69a7679b4a0e6c9624fb15070525d";
-    hash = "sha256-50j8swerZNwtybIR7wRKZxQlJDipi20ouVTCvyKfE8g=";
+    rev = "18861f9d59e74ece8d867772cf07fa302c2dae98";
+    hash = "sha256-OchqUe8GdBPL6tE3zpdaThfhzYZhYluagz1yXiexFT0=";
   };
 in
   rustPlatform.buildRustPackage {

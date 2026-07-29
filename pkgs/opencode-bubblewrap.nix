@@ -54,13 +54,13 @@
       (pkgs.writeShellScriptBin "windows-vm-ssh" ''
         exec ${pkgs.sshpass}/bin/sshpass -p ${vmPass} \
           ${pkgs.openssh}/bin/ssh -p ${vmPort} \
-          -o StrictHostKeyChecking=no -4 \
+          -o StrictHostKeyChecking=no -o WarnWeakCrypto=no -4 \
           ${vmUser}@127.0.0.1 "$@"
       '')
       (pkgs.writeShellScriptBin "windows-vm-scp" ''
         exec ${pkgs.sshpass}/bin/sshpass -p ${vmPass} \
           ${pkgs.openssh}/bin/scp -P ${vmPort} \
-          -o StrictHostKeyChecking=no -4 \
+          -o StrictHostKeyChecking=no -o WarnWeakCrypto=no -4 \
           "$@"
       '')
     ];
@@ -458,6 +458,15 @@ in
     (try-rw-bind (noescape "\"$HOME/.config/opencode\"") (noescape "~/.config/opencode"))
     (try-rw-bind (noescape "\"$HOME/.cache/opencode\"") (noescape "~/.cache/opencode"))
     (try-rw-bind (noescape "\"$HOME/.cache/uv\"") (noescape "~/.cache/uv"))
+
+    # lspmux client config (read-only). Without it the in-jail client falls back
+    # to the default `pass_environment = ["*"]`, which drags jail-specific vars
+    # (JAIL_NAME, derived ports, the injected system prompt) into the instance
+    # fingerprint — so every session with different ports mints a fresh
+    # rust-analyzer instead of reusing one. Note this does *not* let the jail
+    # share the host's instance: PATH is part of the fingerprint and the jail's
+    # PATH is its own toolbelt.
+    (try-ro-bind (noescape "\"$HOME/.config/lspmux\"") (noescape "~/.config/lspmux"))
 
     # direnv hook + nix-direnv rc (read-only — agent can't disable the hook).
     # `direnv allow` still works: it writes to ~/.local/share/direnv, which is

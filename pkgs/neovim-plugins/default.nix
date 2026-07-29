@@ -12,11 +12,18 @@
     smart-paste-nvim = import ../neovim/plugins/smart-paste/package.nix {
       inherit vimUtils fetchFromGitHub;
     };
+
+    # rhizome builds its own Vim plugin as `passthru.plugin`, so it is pulled in
+    # whole rather than as a bare plugin derivation.
+    rhizome = import ../rhizome {
+      inherit (super) lib;
+      pkgs = super;
+    };
   };
 
-  # Export the smart-paste nixvim module for use in configurations
+  # Export the nixvim modules for use in configurations
   modules = {
     smart-paste = ../neovim/plugins/smart-paste/module.nix;
+    rhizome = ../neovim/plugins/rhizome/module.nix;
   };
 }
-

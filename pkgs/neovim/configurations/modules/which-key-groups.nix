@@ -9,7 +9,11 @@
 # <leader>g = "Git"). The sink below deduplicates by the group's key, so
 # redefining a shared group in each owning module is safe and collapses to one
 # entry (last definition wins on the label, which is fine for identical labels).
-{lib, config, ...}: {
+{
+  lib,
+  config,
+  ...
+}: {
   options.whichKeyGroups = lib.mkOption {
     type = with lib.types; listOf attrs;
     default = [];

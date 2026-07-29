@@ -27,6 +27,12 @@
   # actionlint only makes sense for GitHub workflow files, not arbitrary YAML.
   # Run it as an extra, filename-guarded linter on save for those paths only.
   extraConfigLua = ''
+    -- markdownlint's MD013 (line-length, 80 cols) fires constantly on prose and
+    -- is mostly noise. Disable just that rule; every other markdownlint rule
+    -- still runs. NOTE: upstream default args are { "--stdin" } (nvim-lint/lua/
+    -- lint/linters/markdownlint.lua) -- re-sync this list if that ever changes.
+    require("lint").linters.markdownlint.args = { "--stdin", "--disable", "MD013" }
+
     vim.api.nvim_create_autocmd("BufWritePost", {
       pattern = { "*/.github/workflows/*.yml", "*/.github/workflows/*.yaml" },
       callback = function()

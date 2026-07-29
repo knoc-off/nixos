@@ -16,13 +16,19 @@
       mode = "n";
       key = "<leader>fR";
       action = lib.nixvim.mkRaw "function() require('grug-far').open() end";
-      options = { silent = true; desc = "Find & replace (project)"; };
+      options = {
+        silent = true;
+        desc = "Find & replace (project)";
+      };
     }
     {
       mode = "x";
       key = "<leader>fR";
       action = lib.nixvim.mkRaw "function() require('grug-far').with_visual_selection() end";
-      options = { silent = true; desc = "Find & replace selection (project)"; };
+      options = {
+        silent = true;
+        desc = "Find & replace selection (project)";
+      };
     }
   ];
 }

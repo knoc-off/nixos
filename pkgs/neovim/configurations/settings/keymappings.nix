@@ -6,18 +6,36 @@
 
   keymaps = let
     misc = [
-      { mode = "n"; key = "q:"; action = "<Nop>"; }
+      {
+        mode = "n";
+        key = "q:";
+        action = "<Nop>";
+      }
       {
         mode = "n";
         key = "<leader>q";
-        action = lib.nixvim.mkRaw "function() vim.cmd('bdelete') end";
-        options = { silent = true; desc = "Close buffer"; };
+        action = lib.nixvim.mkRaw ''
+          function()
+            local ok, err = pcall(vim.cmd, "bdelete")
+            if not ok then
+              local reason = err:match("E%d+:.*") or err
+              vim.notify("Cannot close buffer: " .. reason, vim.log.levels.WARN)
+            end
+          end
+        '';
+        options = {
+          silent = true;
+          desc = "Close buffer";
+        };
       }
       {
         mode = "n";
         key = "<leader>w";
         action = "<cmd>w<cr>";
-        options = { silent = true; desc = "Save"; };
+        options = {
+          silent = true;
+          desc = "Save";
+        };
       }
     ];
     normal =
@@ -141,7 +159,10 @@
             vim.fn.setreg('"', old)
           end
         '';
-        options = { silent = true; desc = "Search selection"; };
+        options = {
+          silent = true;
+          desc = "Search selection";
+        };
       }
     ];
 

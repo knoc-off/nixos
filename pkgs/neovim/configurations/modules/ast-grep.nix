@@ -7,7 +7,11 @@
 #               the project; language is inferred from the current filetype.
 #
 # Pattern syntax: https://ast-grep.github.io/guide/pattern-syntax.html
-{lib, pkgs, ...}: {
+{
+  lib,
+  pkgs,
+  ...
+}: {
   extraPackages = [pkgs.ast-grep];
 
   keymaps = [
@@ -88,7 +92,10 @@
           })
         end
       '';
-      options = { silent = true; desc = "AST search (ast-grep)"; };
+      options = {
+        silent = true;
+        desc = "AST search (ast-grep)";
+      };
     }
   ];
 }

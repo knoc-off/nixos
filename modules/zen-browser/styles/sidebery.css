@@ -1,0 +1,409 @@
+/*
+ * Sidebery sidebar styles, forked from modules/firefox/settings/extensionSettings.nix
+ * (the "{3c078156-979c-498b-8990-85f7987dd929}".settings.sidebarCSS value).
+ *
+ * Delivered through the fx-autoconfig userstyles namespace instead of
+ * extension storage -- see sidebery-integration.uc.js, which loads this as
+ * chrome://userstyles/skin/sidebery.css into the reparented sidebar browser.
+ * That sidesteps the IndexedDB storage migration that makes the Firefox
+ * profile's copy of this CSS effectively one-shot (see project notes).
+ *
+ * The ten .Tab[data-lvl="N"] blocks at the bottom were originally generated
+ * by a Nix `tabDepthStyle` function over depths 0-9, hueRot = depth * 40.
+ * Rendered flat here since this is a plain CSS file, not a Nix string.
+ *
+ * Expect overlap with the integration script's own style mods
+ * (transparentByDefault, zenStylesByDefault) -- both are independently
+ * solving "make Sidebery look native to the host browser". Reconcile once
+ * both are visible together rather than guessing blind.
+ */
+
+#root.root {
+  --nav-btn-width: 37px;
+  --nav-btn-height: 37px;
+  --tabs-height: 28px;
+  --bookmarks-folder-height: 32px;
+  --bookmarks-bookmark-height: 30px;
+
+  /* Clean technical sans-serif fonts - NO SERIF! */
+  --tabs-count-font: 0.5625rem "JetBrains Mono", "Fira Code", "Source Code Pro", "Roboto Mono", monospace;
+  --tabs-font: 0.9375rem "JetBrains Mono", "Fira Code", "Source Code Pro", "Roboto Mono", monospace;
+  --ctx-menu-font: 0.875rem "JetBrains Mono", "Fira Code", "Source Code Pro", "Roboto Mono", monospace;
+  --bookmarks-bookmark-font: 0.9375rem "JetBrains Mono", "Fira Code", "Source Code Pro", "Roboto Mono", monospace;
+  --bookmarks-folder-font: 0.9375rem "JetBrains Mono", "Fira Code", "Source Code Pro", "Roboto Mono", monospace;
+
+  /* Alternative clean geometric sans-serif option: */
+  /*
+  --tabs-count-font: 0.5625rem "Helvetica Neue", "Arial", "Roboto", sans-serif;
+  --tabs-font: 0.9375rem "Helvetica Neue", "Arial", "Roboto", sans-serif;
+  --ctx-menu-font: 0.875rem "Helvetica Neue", "Arial", "Roboto", sans-serif;
+  --bookmarks-bookmark-font: 0.9375rem "Helvetica Neue", "Arial", "Roboto", sans-serif;
+  --bookmarks-folder-font: 0.9375rem "Helvetica Neue", "Arial", "Roboto", sans-serif;
+  */
+
+  --tabs-lvl-opacity: 0.16;
+  --button-n-tab-colour: rgb(0, 0, 0, 0);
+  --button-tab-color: rgba(0, 0, 0, 0);
+  --transition-duration: 0.2s;
+  --transition-ease: ease;
+  --tabs-lvl-color: rgba(128, 128, 128, var(--tabs-lvl-opacity, 0.16));
+}
+
+/* Make text super crisp and clean */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.005em; /* Slightly tighter for cleaner look */
+}
+
+/* Ensure consistent sans-serif rendering */
+.Tab .title,
+.BookmarkNode .title,
+.nav-item {
+  font-family: inherit;
+  font-weight: 400;
+}
+
+.TabsPanel,
+.bookmarks-tree {
+  padding-left: 5px;
+  padding-right: 4px;
+  transition: padding var(--transition-duration) var(--transition-ease);
+}
+
+.NavigationBar,
+.nav-item,
+.static-btns,
+.main-items > .nav-item {
+  transition: none !important;
+}
+
+#root:not(.NavigationBar),
+.TabsPanel,
+.bookmarks-tree,
+.close,
+.BookmarkNode > .body::before,
+.BookmarkNode {
+  transition: all var(--transition-duration) var(--transition-ease);
+}
+
+.Tab {
+  transition: none !important;
+}
+
+.ctx {
+  box-shadow: 0 1px 10px 1px var(--color);
+  transition: box-shadow var(--transition-duration) var(--transition-ease);
+}
+
+.Tab[data-audible="true"] .audio {
+  height: 15px;
+  width: 15px;
+  top: 0px;
+  left: 14px;
+  border-radius: 50%;
+  transition: all var(--transition-duration) var(--transition-ease);
+}
+
+.Tab[data-audible="true"] .t-box {
+  --audio-btn-offset: 0px;
+  transition: all var(--transition-duration) var(--transition-ease);
+}
+
+.nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.main-items > .nav-item[data-active="true"] {
+  transform: scale(1.05);
+}
+
+.Tab > .body {
+  position: relative;
+}
+
+@media screen and (max-width: 50px) {
+  /* Hide all text elements */
+  .Tab .t-box,
+  .Tab .close,
+  .Tab .exp,
+  .Tab .body::after,
+  .BookmarkNode .title,
+  .static-btns,
+  .nav-item .label {
+    display: none !important;
+  }
+
+  .main-items > .nav-item[data-active="true"] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  /* Center the favicon/icon */
+  .Tab .body {
+    justify-content: center;
+  }
+
+  .Tab .fav {
+    margin: 0 auto;
+  }
+
+  /* Remove indentation completely */
+  #root {
+    --tabs-indent: 0px !important;
+    --bookmarks-indent: 0px !important;
+  }
+
+  /* Minimal padding */
+  .TabsPanel {
+    padding-left: 2px;
+    padding-right: 2px;
+  }
+
+  /* Maybe shrink the color bar too */
+  .Tab[data-colorized="true"] .color-layer {
+    width: 2px !important;
+  }
+
+  /* Search bar: icon only, centered */
+  .SearchBar .placeholder,
+  .SearchBar .input {
+    display: none !important;
+  }
+
+  .SearchBar {
+    justify-content: center;
+  }
+
+  .SearchBar .search-icon {
+    margin: 0 auto;
+  }
+
+  /* Notifications: icon only, centered */
+  .notification .title,
+  .notification .ctrls {
+    display: none !important;
+  }
+
+  .notification {
+    min-width: 32px;
+    min-height: 32px;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .notification .header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+  }
+
+  .notification .icon {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .notification .icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+}
+
+@media screen and (max-width: 55px) {
+  #root {
+    --tabs-indent: 0px !important;
+    --bookmarks-indent: 0px !important;
+  }
+
+  .TabsPanel {
+    padding-left: 3px;
+    padding-right: 3px;
+  }
+
+  .static-btns {
+    visibility: collapse;
+  }
+
+  .main-items > .nav-item[data-active="true"] {
+    opacity: 100 !important;
+    transform: initial !important;
+  }
+
+  .BookmarkNode > .body::before {
+    left: -2px;
+    width: calc(100% + 0.5em);
+  }
+
+  .close {
+    display: none !important;
+  }
+}
+
+/* \/ These are semi redundant styles. \/ */
+
+/* Restyle the color layer as a left-side bar */
+.Tab[data-colorized="true"] .color-layer {
+  width: 3px !important;
+  height: 100%;
+  border-radius: 2px 0 0 2px !important;
+  background-color: oklch(from var(--tab-color) 70% 0.25 h) !important;
+  opacity: 1 !important;
+}
+
+/* Collapsed/folded trees: dimmer color */
+.Tab[data-colorized="true"][data-folded="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 45% 0.12 h) !important;
+}
+
+/* Non-parent tabs: half height */
+.Tab[data-colorized="true"]:not([data-parent="true"]) .color-layer {
+  height: 50%;
+}
+
+/* Highlight unread tabs */
+.Tab[data-unread="true"] .title {
+  font-weight: 600;
+  opacity: 1;
+}
+
+.Tab[data-unread="true"]::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--tab-color, #4a9eff);
+  filter: saturate(2) brightness(1.5);
+}
+
+.Tab[data-lvl="0"][data-colorized="true"][data-parent="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 0)) !important;
+  height: 100%;
+}
+.Tab[data-lvl="0"][data-colorized="true"][data-parent="true"][data-folded="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 45% 0.12 calc(h + 0)) !important;
+}
+.Tab[data-lvl="0"][data-colorized="true"]:not([data-parent="true"]) .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 0)) !important;
+  height: 50%;
+}
+
+.Tab[data-lvl="1"][data-colorized="true"][data-parent="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 40)) !important;
+  height: 100%;
+}
+.Tab[data-lvl="1"][data-colorized="true"][data-parent="true"][data-folded="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 45% 0.12 calc(h + 40)) !important;
+}
+.Tab[data-lvl="1"][data-colorized="true"]:not([data-parent="true"]) .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 40)) !important;
+  height: 50%;
+}
+
+.Tab[data-lvl="2"][data-colorized="true"][data-parent="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 80)) !important;
+  height: 100%;
+}
+.Tab[data-lvl="2"][data-colorized="true"][data-parent="true"][data-folded="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 45% 0.12 calc(h + 80)) !important;
+}
+.Tab[data-lvl="2"][data-colorized="true"]:not([data-parent="true"]) .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 80)) !important;
+  height: 50%;
+}
+
+.Tab[data-lvl="3"][data-colorized="true"][data-parent="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 120)) !important;
+  height: 100%;
+}
+.Tab[data-lvl="3"][data-colorized="true"][data-parent="true"][data-folded="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 45% 0.12 calc(h + 120)) !important;
+}
+.Tab[data-lvl="3"][data-colorized="true"]:not([data-parent="true"]) .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 120)) !important;
+  height: 50%;
+}
+
+.Tab[data-lvl="4"][data-colorized="true"][data-parent="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 160)) !important;
+  height: 100%;
+}
+.Tab[data-lvl="4"][data-colorized="true"][data-parent="true"][data-folded="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 45% 0.12 calc(h + 160)) !important;
+}
+.Tab[data-lvl="4"][data-colorized="true"]:not([data-parent="true"]) .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 160)) !important;
+  height: 50%;
+}
+
+.Tab[data-lvl="5"][data-colorized="true"][data-parent="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 200)) !important;
+  height: 100%;
+}
+.Tab[data-lvl="5"][data-colorized="true"][data-parent="true"][data-folded="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 45% 0.12 calc(h + 200)) !important;
+}
+.Tab[data-lvl="5"][data-colorized="true"]:not([data-parent="true"]) .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 200)) !important;
+  height: 50%;
+}
+
+.Tab[data-lvl="6"][data-colorized="true"][data-parent="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 240)) !important;
+  height: 100%;
+}
+.Tab[data-lvl="6"][data-colorized="true"][data-parent="true"][data-folded="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 45% 0.12 calc(h + 240)) !important;
+}
+.Tab[data-lvl="6"][data-colorized="true"]:not([data-parent="true"]) .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 240)) !important;
+  height: 50%;
+}
+
+.Tab[data-lvl="7"][data-colorized="true"][data-parent="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 280)) !important;
+  height: 100%;
+}
+.Tab[data-lvl="7"][data-colorized="true"][data-parent="true"][data-folded="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 45% 0.12 calc(h + 280)) !important;
+}
+.Tab[data-lvl="7"][data-colorized="true"]:not([data-parent="true"]) .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 280)) !important;
+  height: 50%;
+}
+
+.Tab[data-lvl="8"][data-colorized="true"][data-parent="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 320)) !important;
+  height: 100%;
+}
+.Tab[data-lvl="8"][data-colorized="true"][data-parent="true"][data-folded="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 45% 0.12 calc(h + 320)) !important;
+}
+.Tab[data-lvl="8"][data-colorized="true"]:not([data-parent="true"]) .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 320)) !important;
+  height: 50%;
+}
+
+.Tab[data-lvl="9"][data-colorized="true"][data-parent="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 360)) !important;
+  height: 100%;
+}
+.Tab[data-lvl="9"][data-colorized="true"][data-parent="true"][data-folded="true"] .color-layer {
+  background-color: oklch(from var(--tab-color) 45% 0.12 calc(h + 360)) !important;
+}
+.Tab[data-lvl="9"][data-colorized="true"]:not([data-parent="true"]) .color-layer {
+  background-color: oklch(from var(--tab-color) 70% 0.25 calc(h + 360)) !important;
+  height: 50%;
+}

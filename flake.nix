@@ -1,42 +1,43 @@
 {
   description = "A declarative Nix config";
-  outputs = inputs @ {
-    self,
-    nixpkgs,
-    nixpkgs-unstable,
-    ...
-  }: let
-    systems = [
-      "aarch64-linux"
-      "x86_64-linux"
-      "aarch64-darwin"
-    ];
+  outputs =
+    inputs@{
+      self,
+      nixpkgs,
+      nixpkgs-unstable,
+      ...
+    }:
+    let
+      systems = [
+        "aarch64-linux"
+        "x86_64-linux"
+        "aarch64-darwin"
+      ];
 
-    forAllSystems = nixpkgs.lib.genAttrs systems;
+      forAllSystems = nixpkgs.lib.genAttrs systems;
 
-    inherit (nixpkgs) lib;
+      inherit (nixpkgs) lib;
 
-    inherit (lib) nixosSystem listToAttrs;
+      inherit (lib) nixosSystem listToAttrs;
 
-    inherit (import ./lib {inherit lib;}) discoverPackages discoverAspects;
+      inherit (import ./lib { inherit lib; }) discoverPackages discoverAspects;
 
-    aspects = discoverAspects {inherit inputs self;} ./modules;
+      aspects = discoverAspects { inherit inputs self; } ./modules;
 
-    mkConfig = {
-      hostname,
-      system,
-      extraModules ? [],
-      extraConfigs ? {},
-    }: let
-      mkSystem =
-        if lib.strings.hasSuffix "darwin" system
-        then inputs.nix-darwin.lib.darwinSystem
-        else nixosSystem;
-    in
-      mkSystem {
-        inherit system;
-        specialArgs =
-          {
+      mkConfig =
+        {
+          hostname,
+          system,
+          extraModules ? [ ],
+          extraConfigs ? { },
+        }:
+        let
+          mkSystem =
+            if lib.strings.hasSuffix "darwin" system then inputs.nix-darwin.lib.darwinSystem else nixosSystem;
+        in
+        mkSystem {
+          inherit system;
+          specialArgs = {
             inherit
               self
               inputs
@@ -45,118 +46,118 @@
             upkgs = unstablePkgs system;
           }
           // extraConfigs;
-        modules =
-          [
+          modules = [
             ./systems/${hostname}.nix
-            {networking.hostName = lib.mkDefault hostname;}
+            { networking.hostName = lib.mkDefault hostname; }
           ]
           ++ lib.optionals (!lib.strings.hasSuffix "darwin" system) [
             ./systems/modules/commit_message.nix
           ]
           ++ extraModules;
-      };
+        };
 
-    # Host configuration
-    mkHost = hostname: system: {
-      name = hostname;
-      value = mkConfig {
-        inherit hostname system;
-      };
-    };
-
-    mkImage = hostname: system: imageType: let
-      name = "${hostname}-${imageType}";
-      imageOverrides =
-        {
-          isoImage = [{image.fileName = lib.mkForce name;}];
-          sdImage = [];
-        }.${
-          imageType
-        } or [
-        ];
-    in
-      lib.nameValuePair name (
-        (mkConfig {
+      # Host configuration
+      mkHost = hostname: system: {
+        name = hostname;
+        value = mkConfig {
           inherit hostname system;
-          extraModules =
-            [./systems/modules/${imageType}.nix]
-            ++ imageOverrides;
-        }).config.system.build.${
-          imageType
-        }
+        };
+      };
+
+      mkImage =
+        hostname: system: imageType:
+        let
+          name = "${hostname}-${imageType}";
+          imageOverrides =
+            {
+              isoImage = [ { image.fileName = lib.mkForce name; } ];
+              sdImage = [ ];
+            }
+            .${imageType} or [
+            ];
+        in
+        lib.nameValuePair name (
+          (mkConfig {
+            inherit hostname system;
+            extraModules = [ ./systems/modules/${imageType}.nix ] ++ imageOverrides;
+          }).config.system.build.${imageType}
+        );
+
+      unstablePkgs =
+        system:
+        import nixpkgs-unstable {
+          inherit system;
+          config = {
+            allowUnfree = true;
+            android_sdk.accept_license = true;
+          };
+        };
+
+      mkPkgs =
+        system:
+        let
+          upkgs = unstablePkgs system;
+          pkgs = import nixpkgs {
+            inherit system;
+            config = {
+              allowUnfree = true;
+              android_sdk.accept_license = true;
+            };
+            overlays = [
+              inputs.fenix.overlays.default
+              (_final: _prev: { inherit inputs upkgs; })
+            ];
+          };
+        in
+        discoverPackages pkgs ./pkgs;
+    in
+    {
+      packages = forAllSystems mkPkgs;
+      devShells = forAllSystems (
+        system:
+        let
+          pkgs = mkPkgs system;
+          # Recursively prefer passthru.devShell where available.
+          preferShell = lib.mapAttrs (
+            _: v:
+            if v ? devShell then
+              v.devShell
+            else if lib.isAttrs v && !(lib.isDerivation v) then
+              preferShell v
+            else
+              v
+          );
+        in
+        preferShell pkgs
       );
 
-    unstablePkgs = system:
-      import nixpkgs-unstable {
-        inherit system;
-        config = {
-          allowUnfree = true;
-          android_sdk.accept_license = true;
-        };
-      };
+      nixosModules = aspects.nixos;
+      homeModules = aspects.home;
+      # darwinModules removed — darwin configs commented out
 
-    mkPkgs = system: let
-      upkgs = unstablePkgs system;
-      pkgs = import nixpkgs {
-        inherit system;
-        config = {
-          allowUnfree = true;
-          android_sdk.accept_license = true;
-        };
-        overlays = [
-          inputs.fenix.overlays.default
-          (_final: _prev: {inherit inputs upkgs;})
-        ];
-      };
-    in
-      discoverPackages pkgs ./pkgs;
-  in {
-    packages = forAllSystems mkPkgs;
-    devShells = forAllSystems (
-      system: let
-        pkgs = mkPkgs system;
-        # Recursively prefer passthru.devShell where available.
-        preferShell = lib.mapAttrs (
-          _: v:
-            if v ? devShell
-            then v.devShell
-            else if lib.isAttrs v && !(lib.isDerivation v)
-            then preferShell v
-            else v
-        );
-      in
-        preferShell pkgs
-    );
+      overlays = import ./overlays { inherit inputs; };
 
-    nixosModules = aspects.nixos;
-    homeModules = aspects.home;
-    # darwinModules removed — darwin configs commented out
+      lib = import ./lib { inherit lib; };
 
-    overlays = import ./overlays {inherit inputs;};
-
-    lib = import ./lib {inherit lib;};
-
-    images =
-      listToAttrs
-      [
+      images = listToAttrs [
         (mkImage "minimal" "x86_64-linux" "isoImage")
         (mkImage "framework13" "x86_64-linux" "isoImage")
         (mkImage "rpi-4b-plus" "aarch64-linux" "sdImage")
       ];
 
-    # darwinConfigurations = listToAttrs [
-    #   # (mkHost "Nicholass-MacBook-Pro" "aarch64-darwin")
-    # ];
+      # darwinConfigurations = listToAttrs [
+      #   # (mkHost "Nicholass-MacBook-Pro" "aarch64-darwin")
+      # ];
 
-    nixosConfigurations = listToAttrs [
-      (mkHost "framework13" "x86_64-linux")
-      (mkHost "thinkpad-work" "x86_64-linux")
-      (mkHost "nuci5" "x86_64-linux")
-      (mkHost "hetzner" "x86_64-linux")
-      (mkHost "rpi-4b-plus" "aarch64-linux")
-      (mkHost "home-server-pc" "x86_64-linux")
-    ];
-  };
+      nixosConfigurations = listToAttrs [
+        (mkHost "framework13" "x86_64-linux")
+        (mkHost "thinkpad-work" "x86_64-linux")
+        (mkHost "nuci5" "x86_64-linux")
+        (mkHost "hetzner" "x86_64-linux")
+        (mkHost "rpi-4b-plus" "aarch64-linux")
+        (mkHost "home-server-pc" "x86_64-linux")
+      ];
+    };
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05";
@@ -197,11 +198,6 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    firefox-addons = {
-      url = "gitlab:rycee/nur-expressions?dir=pkgs/firefox-addons";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
     nixgl.url = "github:nix-community/nixGL";
 
     hyprnix.url = "github:hyprwm/hyprnix";
@@ -235,15 +231,6 @@
     # nix-darwin.url = "github:nix-darwin/nix-darwin/nix-darwin-26.05";
     # nix-darwin.inputs.nixpkgs.follows = "nixpkgs-darwin";
 
-    zen-browser = {
-      url = "github:0xc000022070/zen-browser-flake";
-      inputs = {
-        # IMPORTANT: To ensure compatibility with the latest Firefox version, use nixpkgs-unstable.
-        nixpkgs.follows = "nixpkgs";
-        home-manager.follows = "home-manager";
-      };
-    };
-
     stylix = {
       url = "github:nix-community/stylix/release-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -263,9 +250,25 @@
 
     determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
 
+    zen-browser = {
+      url = "github:0xc000022070/zen-browser-flake";
+      inputs = {
+        # IMPORTANT: To ensure compatibility with the latest Firefox version, use nixpkgs-unstable.
+        nixpkgs.follows = "nixpkgs";
+        home-manager.follows = "home-manager";
+      };
+    };
     firefox-csshacks = {
       url = "github:MrOtherGuy/firefox-csshacks";
       flake = false;
+    };
+    fx-autoconfig = {
+      url = "github:MrOtherGuy/fx-autoconfig";
+      flake = false;
+    };
+    firefox-addons = {
+      url = "gitlab:rycee/nur-expressions?dir=pkgs/firefox-addons";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
 
     nelly = {
