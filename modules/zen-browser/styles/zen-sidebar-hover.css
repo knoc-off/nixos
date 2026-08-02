@@ -1,0 +1,79 @@
+/*
+ * Hover-to-expand for Zen's collapsed sidebar, adapted from the commented-out
+ * "Future feature" stub at the bottom of sidebery-integration.uc.js (upstream
+ * left it disabled and never finished it).
+ *
+ * This is chrome-level CSS (targets #navigator-toolbox, a browser.xhtml
+ * element), so it is delivered through userChrome.css rather than through
+ * fx-autoconfig's userStyles namespace, which only reaches documents loaded
+ * inside the reparented Sidebery <browser> (see styles/sidebery.css for
+ * that half).
+ *
+ * Zen's own compact mode (zen.view.compact.*) also does hover-to-expand, but
+ * it hides the sidebar entirely between hovers and takes #navigator-toolbox
+ * out of layout via `position: fixed`. That is not what this does: the
+ * sidebar stays visible at its normal collapsed width (Zen's built-in
+ * :not([zen-sidebar-expanded="true"]) rules already shrink it to ~60px,
+ * which is exactly the width styles/sidebery.css's max-width:50px/55px
+ * breakpoints are written for -- see that file), and only grows on hover.
+ *
+ * The collapsed/expanded split is driven by Zen's own zen-sidebar-expanded
+ * attribute on the root element, which is neither a pref nor XULStore-
+ * persisted (verified against Zen 1.20.1b: absent from browser.xhtml's
+ * `persist=` lists and never set from any zen-components/*.mjs). It is
+ * toggled by Zen's own UI (dragging the splitter past a threshold, or a
+ * dedicated toggle) and normally stays wherever you last left it. This
+ * stylesheet reads that attribute rather than driving it, so it composes
+ * with Zen's own toggle instead of fighting it: collapse the sidebar once
+ * through Zen's UI, and hover-to-expand takes over from there.
+ *
+ * Known risk, untested as of writing: whether #navigator-toolbox:hover
+ * stays true while the pointer is inside the *remote* Sidebery <browser>
+ * (remote="true", separate content process) reparented into it by the
+ * userscript. Zen's own compact-mode hover logic needed a deliberate delay
+ * to work around a similar issue (HOVER_HACK_DELAY, citing
+ * https://bugzilla.mozilla.org/show_bug.cgi?id=1979340). If hovering the
+ * Sidebery frame itself doesn't keep the toolbox in :hover state, this will
+ * flicker or collapse under the cursor -- the fallback is a small JS shim
+ * in the userscript toggling an attribute on mouseenter/mouseleave instead
+ * of relying on native :hover.
+ */
+
+:root:not([zen-sidebar-expanded="true"]):not([zen-right-side="true"])
+  #navigator-toolbox:hover {
+  /* Zen sets max-width/min-width with !important when collapsed
+     (:not([zen-sidebar-expanded="true"]) in zen-tabs.css), so both have to
+     be overridden or the collapsed rule wins the cascade. */
+  max-width: 250px !important;
+  min-width: 250px !important;
+
+  /* --browser-area-z-index-toolbox is the current name; upstream's stub used
+     --browser-area-z-index-toolbox-while-animating, which no longer exists
+     in Zen 1.20.1b (0 hits across the shipped zen-styles). Without a raised
+     z-index the expanded toolbox would be painted under the page content it
+     now overlaps. */
+  z-index: var(--browser-area-z-index-toolbox);
+
+  /* Cancel the width growth from the perspective of layout, so #nav-bar and
+     everything else to the right (back/forward buttons, the URL bar) stays
+     put instead of being pushed over -- this is the actual fix for the
+     toolbar-reflow behaviour manual dragging has. */
+  margin-right: calc(0px - (250px - var(--zen-toolbox-max-width)));
+
+  transition:
+    max-width 0.15s ease,
+    min-width 0.15s ease,
+    margin-right 0.15s ease;
+}
+
+:root[zen-right-side="true"]:not([zen-sidebar-expanded="true"])
+  #navigator-toolbox:hover {
+  max-width: 250px !important;
+  min-width: 250px !important;
+  z-index: var(--browser-area-z-index-toolbox);
+  margin-left: calc(0px - (250px - var(--zen-toolbox-max-width)));
+  transition:
+    max-width 0.15s ease,
+    min-width 0.15s ease,
+    margin-left 0.15s ease;
+}

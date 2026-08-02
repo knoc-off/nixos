@@ -72,6 +72,11 @@ in
           userStyles = {
             "sidebery.css" = ./styles/sidebery.css;
           };
+
+          # Chrome-level CSS (targets #navigator-toolbox in browser.xhtml, not
+          # a document inside the Sidebery frame), so this goes through
+          # userChrome rather than fx-autoconfig's userStyles namespace.
+          userChrome = ./styles/zen-sidebar-hover.css;
         };
       };
 
