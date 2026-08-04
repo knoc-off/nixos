@@ -23,6 +23,20 @@
         # The client shim passes the environment to lspmux server, which spawns
         # the correct per-project rust-analyzer from your devshell
         # Requires: services.lspmux.enable = true in NixOS config
+        #
+        # NOTE: rustaceanvim has its own lspmux support (server.lspmux.enable,
+        # on by default when server.cmd is unset) but it is NOT usable here: it
+        # connects over TCP and sends `lspMux = {version, method, server}` with
+        # no `env` field, so lspmux spawns rust-analyzer from the systemd user
+        # service environment and the direnv PATH is lost. The client shim is
+        # what carries the environment across (filtered by pass_environment).
+        #
+        # Consequence: `:RustAnalyzer target <triple>` does not work. Use
+        # `:RustTarget` / <leader>rT instead -- see M.switch below. (The builtin
+        # is broken upstream anyway: it notifies an already-stopped client and
+        # then restarts from a freshly-built config, so the target is dropped.
+        # Even if it worked, the `settings` function below would overwrite
+        # cargo.target from RA_TARGET on the next start.)
         cmd = ["lspmux" "client"];
 
         default_settings = {
@@ -384,6 +398,13 @@
         local prev = vim.env.RA_TARGET
         vim.env.RA_TARGET = target
 
+        -- :RustAnalyzer is a *buffer-local* command (created by rustaceanvim's
+        -- ftplugin), and focus may move while we wait for the old client to
+        -- exit -- so pin the buffer we issue it from.
+        local bufnr = vim.api.nvim_get_current_buf()
+
+        local outgoing = vim.lsp.get_clients({ name = "rust-analyzer" })
+
         -- rust-analyzer serves *pull* diagnostics, which live in a namespace
         -- keyed by client id ("nvim.lsp.rust-analyzer.<id>.<pull_id>"). Neovim
         -- only clears those on LspDetach when no other attached client supports
@@ -392,7 +413,7 @@
         -- target's. Match by name to catch both the push ("nvim.lsp.<name>.<id>")
         -- and pull namespaces without having to know the server's pull_id.
         local stale_ns = {}
-        for _, client in ipairs(vim.lsp.get_clients({ name = "rust-analyzer" })) do
+        for _, client in ipairs(outgoing) do
           local base = ("nvim.lsp.%s.%d"):format(client.name, client.id)
           for id, ns in pairs(vim.diagnostic.get_namespaces()) do
             if ns.name == base or vim.startswith(ns.name, base .. ".") then
@@ -401,16 +422,13 @@
           end
         end
 
-        -- Stop tears down the lspmux client pipe, start spawns a new one
-        -- that inherits the updated RA_TARGET env -> lspmux routes to the
-        -- matching instance (or spawns a fresh one). The server.settings
-        -- function reads RA_TARGET on each start to keep cargo.target in sync.
-        vim.cmd("RustAnalyzer stop")
-        vim.defer_fn(function()
+        local function start()
           for _, ns in ipairs(stale_ns) do
             vim.diagnostic.reset(ns)
           end
-          vim.cmd("RustAnalyzer start")
+          vim.api.nvim_buf_call(bufnr, function()
+            vim.cmd("RustAnalyzer start")
+          end)
           local display = target or "native"
           local verb = prev and "Switched" or "Set"
           if not target then
@@ -418,7 +436,41 @@
             display = "native"
           end
           vim.notify(verb .. " rust-analyzer target -> " .. display, vim.log.levels.INFO)
-        end, 200)
+        end
+
+        -- Stop tears down the lspmux client pipe, start spawns a new one
+        -- that inherits the updated RA_TARGET env -> lspmux routes to the
+        -- matching instance (or spawns a fresh one). The server.settings
+        -- function reads RA_TARGET on each start to keep cargo.target in sync.
+        vim.api.nvim_buf_call(bufnr, function()
+          vim.cmd("RustAnalyzer stop")
+        end)
+
+        -- client:stop() is async. Starting on a fixed delay races the shutdown:
+        -- if the old client is still alive, vim.lsp.start's default reuse_client
+        -- (name + root_dir match) hands it back and the switch silently no-ops.
+        -- Poll until every outgoing client has actually exited.
+        local attempts = 0
+        local max_attempts = 50
+        local function wait()
+          for _, client in ipairs(outgoing) do
+            if not client:is_stopped() then
+              attempts = attempts + 1
+              if attempts > max_attempts then
+                vim.notify(
+                  "rust-analyzer did not stop; target not switched",
+                  vim.log.levels.ERROR
+                )
+                vim.env.RA_TARGET = prev
+                return
+              end
+              vim.defer_fn(wait, 100)
+              return
+            end
+          end
+          start()
+        end
+        vim.defer_fn(wait, 100)
       end
 
       function M.pick()

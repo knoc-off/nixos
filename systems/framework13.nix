@@ -79,8 +79,13 @@ in
       sops = {
         defaultSopsFile = ./secrets/${hostname}/default.yaml;
         age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
-        secrets."shell_environment/OPENROUTER_API_KEY" = {
-          mode = "0644";
+        secrets = {
+          "shell_environment/OPENROUTER_API_KEY" = {
+            mode = "0644";
+          };
+          "shell_environment/RHIZOME_TOKEN" = {
+            mode = "0644";
+          };
         };
       };
     }

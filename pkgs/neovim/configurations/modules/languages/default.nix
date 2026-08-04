@@ -4,7 +4,8 @@
   lib,
   pkgs,
   ...
-}: {
+}:
+{
   # LSP-general which-key groups (owned here, since these prefixes are provided
   # by the shared LSP layer rather than any single language module).
   whichKeyGroups = [
@@ -119,8 +120,8 @@
       };
 
       formatters_by_ft = {
-        "*" = ["trim_whitespace"];
-        "_" = ["trim_newlines"];
+        "*" = [ "trim_whitespace" ];
+        "_" = [ "trim_newlines" ];
       };
     };
   };

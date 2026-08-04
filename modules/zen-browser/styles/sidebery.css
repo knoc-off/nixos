@@ -124,7 +124,11 @@
   position: relative;
 }
 
-@media screen and (max-width: 50px) {
+/* Breakpoints sized to the 60px collapsed rail (sidebery-collapse.css
+   --sidebery-collapsed-width) and the 300px hover-expanded width, with
+   headroom on both sides so drift in padding/scrollbar width can't push
+   the frame's real size to the wrong side of the line. */
+@media screen and (max-width: 90px) {
   /* Hide all text elements */
   .Tab .t-box,
   .Tab .close,
@@ -218,7 +222,7 @@
 
 }
 
-@media screen and (max-width: 55px) {
+@media screen and (max-width: 100px) {
   #root {
     --tabs-indent: 0px !important;
     --bookmarks-indent: 0px !important;

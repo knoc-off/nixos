@@ -265,7 +265,10 @@
     tabsTreeLimit = "none";
     autoFoldTabs = false;
     autoFoldTabsExcept = 2;
-    autoExpandTabs = true;
+    # false so a manually-folded branch stays folded -- true re-expands it
+    # the instant you activate any tab inside it, making the fold arrow
+    # (hover a parent tab's favicon) look broken.
+    autoExpandTabs = false;
     autoExpandTabsOnNew = true;
     rmChildTabs = "folded";
     tabsLvlDots = true;

@@ -63,7 +63,17 @@ async function setupSideberyPanel(win) {
     win.sidebery_browser.setAttribute("disablehistory", "true");
     win.sidebery_browser.setAttribute("disablesecurity", "true");
     win.sidebery_browser.setAttribute("messagemanagergroup", "webext-browsers");
-    //win.sidebery_browser.setAttribute("webextension-view-type", "sidebar"); // needed?
+    // LOCAL: upstream left this commented out ("needed?"). It is required.
+    // ExtensionParent.sys.mjs's GlobalManager._onExtensionBrowser reads this
+    // attribute off the browser element when "extension-browser-inserted"
+    // fires (below, in afterSideberyLoads) and only registers the frame's
+    // viewType if it is set; "sidebar" is the value that maps to a valid
+    // contextType ("SIDE_PANEL"). Without it, every IPC-backed WebExtension
+    // API (tabs.*, storage.*, windows.*) hangs forever on this frame -- only
+    // synchronous calls like runtime.getManifest() work -- which is why the
+    // panel rendered its shell but never any tabs: Sidebery's init call to
+    // browser.tabs.query() never resolved.
+    win.sidebery_browser.setAttribute("webextension-view-type", "sidebar");
     win.sidebery_browser.setAttribute("context", "tabContextMenu"); // replace with tab are context menu?
     win.sidebery_browser.setAttribute("tooltip", "tabbrowser-tab-tooltip"); //replace with tab area tooltip?
     win.sidebery_browser.setAttribute("autocompletepopup", "PopupAutoComplete");
@@ -169,53 +179,6 @@ function getZenCSSVariables() {
     return `:root {\n${css}\n}`;
 }
 
-const adaptiveColorIntegration =
-    `
-#nav-bar, #urlbar-background, #zen-sidebar-web-panel {
-    background-color:  var(--lwt-accent-color) !important;
-}
-
-panel {
-    --panel-background: var(--lwt-accent-color) !important;
-}
-
-#browser {
-        background-image: none !important;
-        background-color:  var(--lwt-accent-color) !important;
-        opacity: 1 !important;
-}
-
-:root:not([inDOMFullscreen="true"]):not([chromehidden~="location"]):not([chromehidden~="toolbar"]) {
-    & #tabbrowser-tabbox #tabbrowser-tabpanels .browserSidebarContainer {
-      box-shadow: 0 0 1px 1px light-dark(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)) !important;
-    }
-  }
-
-#zen-sidebar-web-panel {
-    border: none !important;
-    box-shadow: 0 0 1px 1px light-dark(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2)) !important;
-}
-
-#zen-sidebar-web-header, #zen-sidebar-panels-wrapper {
-    border-bottom: 0 !important;
-    border-top: 0 !important;
-}
-
-@media (-moz-bool-pref: "zen.view.compact") {
-    :root:not([customizing]):not([inDOMFullscreen="true"]) {
-      @media (-moz-bool-pref: "zen.view.compact.hide-tabbar") {
-        & #titlebar {
-          background: var(--lwt-accent-color) !important;
-        }
-      }
-    }
-}
-
-#titlebar {
-  background: var(--lwt-accent-color) !important;
-}
-`
-
 
 const fixNoGrabbingCursorOnDrag = // attempt to fix bug #3
     `
@@ -258,9 +221,9 @@ const fixInheritBadBrowserStyles = // some zen/ff styles make things worse, put 
 `
 
 
-const handleCompactMode = //collapsed toolbar goes down to 48px - hide nesting
+const handleCompactMode = //collapsed toolbar goes down to 60px (see sidebery-collapse.css) - hide nesting
     `
-@media screen and (max-width: 50px) {
+@media screen and (max-width: 90px) {
     .Tab[data-lvl] {
         padding-left: 0;
     }
@@ -269,7 +232,23 @@ const handleCompactMode = //collapsed toolbar goes down to 48px - hide nesting
         flex-direction: column;
     }
 
-    .NavigationBar .main-items {
+    /* Sidebery lays the panel buttons out left-aligned, which is off-centre in
+       a 60px rail. Centre them instead. Sidebery's own width-based CSS already
+       hides the text label (.name-box) at this width, so only the icon
+       remains -- this is purely about where that icon sits. */
+    .NavigationBar .main-items,
+    .NavigationBar .static-btns {
+        justify-content: center;
+    }
+
+    .NavigationBar .nav-item {
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    /* The search bar is just a magnifier glyph at this width -- 32px of the
+       rail spent on something unusable until it is expanded. */
+    #search_bar {
         display: none;
     }
 
@@ -289,6 +268,31 @@ const handleCompactMode = //collapsed toolbar goes down to 48px - hide nesting
 // }
 // `
 
+
+// Sidebery reads --tabs-margin back out of computed style with a naive
+// "first number in the string" parser, and derives the drag/drop row pitch as
+// --tabs-height + --tabs-margin (chunk-NZV6P7I6.js: `Ig()` walks the tab list
+// accumulating `c += n + i`). CSS resolves calc() properly, but that parser
+// does not: `calc(2px * 2)` renders as 4px yet parses as 2. The drop-indicator
+// rows then advance 2px less than the tabs actually do, so the insertion
+// marker drifts further out of place the further down the list you drag.
+// Emitting a literal keeps both readers in agreement.
+//
+// --tabs-height is deliberately left as var(--tab-min-height): a bare var()
+// resolves to a plain "28px" that the same parser handles correctly. It is
+// also NOT safe to bake in here -- getZenCSSVariables() snapshots Zen's
+// variables once at startup, and --tab-min-height drifts afterwards (measured
+// 28px in the snapshot vs 36px live mid-session), so resolving it eagerly
+// would silently change tab height rather than just fixing the pitch.
+function zenNumericVar(prop, fallback) {
+    const probe = window.document.getElementById("tabbrowser-tabs");
+    if (!probe) return fallback;
+    const raw = getComputedStyle(probe).getPropertyValue(prop).trim();
+    const parsed = parseFloat(raw);
+    return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+const tabsMarginPx = zenNumericVar("--tab-block-margin", 2) * 2;
 
 const zenStylesByDefault = // fixes bug #4
     `
@@ -315,7 +319,7 @@ const zenStylesByDefault = // fixes bug #4
     --tab-hover-background-color: var(--active-el-overlay-hover-bg);
     --tabs-font: message-box;
     --tabs-height: var(--tab-min-height);
-    --tabs-margin: calc(var(--tab-block-margin) * 2);
+    --tabs-margin: ${tabsMarginPx}px;
 
 
     }
@@ -336,8 +340,6 @@ const zenStylesByDefault = // fixes bug #4
     div.BottomBar, div.bottom-bar-space {
         display: none; /* Hide for now */
     }
-
-}
 `
 
 

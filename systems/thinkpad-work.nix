@@ -8,6 +8,32 @@
   ...
 }:
 let
+
+  windowsVmHelpers =
+    let
+      vmPort = "2223";
+      vmPass = "admin";
+      vmUser = "vmadmin";
+    in
+    pkgs.symlinkJoin {
+      name = "windows-vm-helpers";
+      paths = [
+        (pkgs.writeShellScriptBin "windows-vm-ssh" ''
+          exec ${pkgs.sshpass}/bin/sshpass -p ${vmPass} \
+            ${pkgs.openssh}/bin/ssh -p ${vmPort} \
+            -o StrictHostKeyChecking=no -o WarnWeakCrypto=no -4 \
+            ${vmUser}@127.0.0.1 "$@"
+        '')
+        (pkgs.writeShellScriptBin "windows-vm-scp" ''
+          exec ${pkgs.sshpass}/bin/sshpass -p ${vmPass} \
+            ${pkgs.openssh}/bin/scp -P ${vmPort} \
+            -o StrictHostKeyChecking=no -o WarnWeakCrypto=no -4 \
+            "$@"
+        '')
+      ];
+    };
+
+  # should maybe change how this works here
   user = "niko";
 in
 {
@@ -75,17 +101,22 @@ in
         defaultSopsFile = ./secrets/${hostname}/default.yaml;
         age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
         # age.sshKeyPaths = ["/home/niko/.ssh/id_ed25519"];
-        secrets."shell_environment/_ANTHROPIC_API_KEY" = {
-          mode = "0644";
-        };
-        secrets."shell_environment/FIGMA_CLIENTID" = {
-          mode = "0644";
-        };
-        secrets."shell_environment/FIGMA_CLIENTSECRET" = {
-          mode = "0644";
-        };
-        secrets."shell_environment/GOOGLE_TOTP_KEY" = {
-          mode = "0644";
+        secrets = {
+          "shell_environment/_ANTHROPIC_API_KEY" = {
+            mode = "0644";
+          };
+          "shell_environment/RHIZOME_TOKEN" = {
+            mode = "0644";
+          };
+          "shell_environment/FIGMA_CLIENTID" = {
+            mode = "0644";
+          };
+          "shell_environment/FIGMA_CLIENTSECRET" = {
+            mode = "0644";
+          };
+          "shell_environment/GOOGLE_TOTP_KEY" = {
+            mode = "0644";
+          };
         };
       };
     }
@@ -393,6 +424,8 @@ in
   };
 
   environment.systemPackages = with pkgs; [
+    windowsVmHelpers
+
     awscli2
     podman-compose
     postgresql

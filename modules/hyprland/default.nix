@@ -65,9 +65,20 @@ in {
 
     displayScale = 1.171339564;
 
-    kinetic-scroll = import ./plugins/kinetic-scroll.nix {inherit inputs pkgs lib;};
-    # confined-floats = import ./plugins/confined-floats.nix {inherit inputs pkgs lib;};
-    scroll-overview = import ./plugins/scroll-overview.nix {inherit inputs pkgs lib;};
+    mainMod = "SUPER";
+
+    # Each plugin file is self-contained: it builds its package and owns its
+    # Lua (load + settings + binds/gestures). We concatenate the fragments into
+    # hypr/plugins.lua, which hyprland.lua requires.
+    hyprPlugins = [
+      (import ./plugins/kinetic-scroll.nix {inherit inputs pkgs lib;})
+      # (import ./plugins/confined-floats.nix {inherit inputs pkgs lib;})
+      (import ./plugins/scroll-overview.nix {inherit inputs pkgs lib mainMod;})
+    ];
+
+    pluginsLua = pkgs.writeText "plugins.lua" (
+      lib.concatMapStringsSep "\n" (p: p.lua) hyprPlugins
+    );
 
     nixEnvLua = pkgs.writeText "nix-env.lua" ''
       local M = {}
@@ -75,8 +86,6 @@ in {
       M.wpctl = "${pkgs.wireplumber}/bin/wpctl"
       M.brightnessctl = "${lib.getExe pkgs.brightnessctl}"
       M.playerctl = "${lib.getExe pkgs.playerctl}"
-      M.kinetic_scroll_so = "${kinetic-scroll}/lib/libhypr-kinetic-scroll.so"
-      M.scroll_overview_so = "${scroll-overview}/lib/libscrolloverview.so"
       M.qs_overview_cmd = "echo 'no'"
       M.display_scale = ${toString displayScale}
       return M
@@ -136,6 +145,7 @@ in {
 
     xdg.configFile."hypr/hyprland.lua".source = ./hyprland.lua;
     xdg.configFile."hypr/nix-env.lua".source = nixEnvLua;
+    xdg.configFile."hypr/plugins.lua".source = pluginsLua;
 
     home.activation.seedHyprUserConfig = lib.hm.dag.entryAfter ["writeBoundary"] ''
       target="$HOME/.config/hypr/user.lua"

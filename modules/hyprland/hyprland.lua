@@ -1,14 +1,9 @@
 local env = require("nix-env")
 local mainMod = "SUPER"
 
--- Plugins
--- hl.plugin.load(env.kinetic_scroll_so) -- disabled: crashes with Hyprland 0.55.2
-if env.confined_floats_so then
-	hl.plugin.load(env.confined_floats_so)
-end
-if env.scroll_overview_so then
-	hl.plugin.load(env.scroll_overview_so)
-end
+-- Plugins: each self-contained plugin loads itself and applies its own
+-- settings/binds/gestures. Generated from the Nix plugin modules.
+require("plugins")
 
 -- Monitors
 hl.monitor({ output = "eDP-1", mode = "preferred", position = "0x0", scale = env.display_scale })
@@ -90,15 +85,6 @@ hl.device({
 -- Gestures
 hl.gesture({ fingers = 3, direction = "horizontal", action = "scroll_move", scale = 1.0 })
 hl.gesture({ fingers = 3, direction = "vertical", action = "workspace" })
-hl.gesture({
-	fingers = 4,
-	direction = "u",
-	action = function()
-		if hl.plugin.scrolloverview then
-			hl.plugin.scrolloverview.overview("toggle")
-		end
-	end,
-})
 
 -- Window stacking: when a new window stacks into the focused column, stack it
 -- onto the lone neighbour AND cancel the spurious viewport slide that 0.55.2's
@@ -387,34 +373,6 @@ if hl.plugin.confined_floats ~= nil then
 	})
 end
 
--- Plugin settings (disabled: kinetic-scroll needs update for Hyprland 0.55)
---[[ hl.config({
-    ["plugin:kinetic-scroll"] = {
-        enabled               = 1,
-        friction              = 0.009,
-        decel                 = 0.99,
-        min_velocity          = 0.45,
-        interval_ms           = 8,
-        delta_multiplier      = 1.0,
-        velocity_relevance_ms = 70,
-        min_sample_ms         = 6,
-        max_velocity_samples  = 6,
-        disable_in_browser    = 1,
-        stop_on_target_change = 1,
-        stop_on_click         = 1,
-        stop_on_focus         = 1,
-        debug                 = 0,
-    },
-}) --]]
-
-if hl.plugin.scrolloverview then
-	hl.plugin.scrolloverview.configure({
-		gesture_distance = 300,
-		scale = 0.5,
-		workspace_gap = 100,
-	})
-end
-
 -- Keybinds
 hl.bind(mainMod .. " + W", hl.dsp.window.close())
 hl.bind(mainMod .. " + SHIFT + L", hl.dsp.exec_cmd(env.noctalia .. " ipc call lockScreen lock"))
@@ -506,13 +464,6 @@ for i = 1, 9 do
 	hl.bind(mainMod .. " + " .. i, hl.dsp.focus({ workspace = i }))
 	hl.bind(mainMod .. " + SHIFT + " .. i, hl.dsp.window.move({ workspace = i }))
 end
-
--- Overview
-hl.bind(mainMod .. " + TAB", function()
-	if hl.plugin.scrolloverview then
-		hl.plugin.scrolloverview.overview("toggle")
-	end
-end)
 
 -- Media keys (locked + repeating)
 hl.bind(

@@ -33,6 +33,16 @@
     -- lint/linters/markdownlint.lua) -- re-sync this list if that ever changes.
     require("lint").linters.markdownlint.args = { "--stdin", "--disable", "MD013" }
 
+    -- Same story for yamllint's line-length rule (80 cols, also noisy on
+    -- generated/data YAML). NOTE: upstream default args are
+    -- { "--format", "parsable", "-" } (nvim-lint/lua/lint/linters/yamllint.lua)
+    -- -- re-sync this list if that ever changes.
+    require("lint").linters.yamllint.args = {
+      "--format", "parsable",
+      "-d", "{extends: default, rules: {line-length: disable}}",
+      "-",
+    }
+
     vim.api.nvim_create_autocmd("BufWritePost", {
       pattern = { "*/.github/workflows/*.yml", "*/.github/workflows/*.yaml" },
       callback = function()

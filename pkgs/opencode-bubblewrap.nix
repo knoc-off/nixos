@@ -3,19 +3,27 @@
   upkgs,
   pkgs,
   ...
-}: let
-  jail = inputs.jail-nix.lib.init (pkgs.extend (_: prev: {
-    writeShellApplication = args:
-      prev.writeShellApplication (args
-        // {
-          excludeShellChecks = (args.excludeShellChecks or []) ++ ["SC2016"];
-        });
-    # Use Determinate's nix so jail-nix's internal `nix-store --query`
-    # (in runtime-deep-ro-bind, invoked by the network combinator) doesn't
-    # warn about eval-cores / lazy-trees / wasm-builtin from /etc/nix/nix.conf
-    # on every startup.
-    nix = inputs.determinate.inputs.nix.packages.${prev.stdenv.hostPlatform.system}.nix-cli;
-  }));
+}:
+let
+  jail = inputs.jail-nix.lib.init (
+    pkgs.extend (
+      _: prev: {
+        writeShellApplication =
+          args:
+          prev.writeShellApplication (
+            args
+            // {
+              excludeShellChecks = (args.excludeShellChecks or [ ]) ++ [ "SC2016" ];
+            }
+          );
+        # Use Determinate's nix so jail-nix's internal `nix-store --query`
+        # (in runtime-deep-ro-bind, invoked by the network combinator) doesn't
+        # warn about eval-cores / lazy-trees / wasm-builtin from /etc/nix/nix.conf
+        # on every startup.
+        nix = inputs.determinate.inputs.nix.packages.${prev.stdenv.hostPlatform.system}.nix-cli;
+      }
+    )
+  );
   inherit (pkgs) lib;
 
   # flock (from util-linux) — used host-side to gate cleanup of shared project
@@ -23,9 +31,9 @@
   # pull the binary from its "bin" output explicitly.
   flockBin = lib.getExe' pkgs.util-linux "flock";
 
-  compatProxy = pkgs.callPackage ./compat-proxy {};
-  claudeMem = pkgs.callPackage ./claude-mem {};
-  hostQuery = pkgs.callPackage ./host-query {};
+  compatProxy = pkgs.callPackage ./compat-proxy { };
+  claudeMem = pkgs.callPackage ./claude-mem { };
+  hostQuery = pkgs.callPackage ./host-query { };
 
   # Safe rm/rmdir — shadows coreutils inside the jail so agent deletions
   # land in the FreeDesktop trash (~/.local/share/Trash/) instead of being
@@ -44,76 +52,79 @@
   # Args pass straight through, so the caller controls the ssh/scp command line
   # (e.g. the dynamic 'C:/Users/vmadmin.TEMPLATE--XXXX/Desktop/' path).
   # Port/password are hardcoded (non-sensitive, local dev VM).
-  windowsVmHelpers = let
-    vmPort = "2223";
-    vmPass = "admin";
-    vmUser = "vmadmin";
-  in pkgs.symlinkJoin {
-    name = "windows-vm-helpers";
-    paths = [
-      (pkgs.writeShellScriptBin "windows-vm-ssh" ''
-        exec ${pkgs.sshpass}/bin/sshpass -p ${vmPass} \
-          ${pkgs.openssh}/bin/ssh -p ${vmPort} \
-          -o StrictHostKeyChecking=no -o WarnWeakCrypto=no -4 \
-          ${vmUser}@127.0.0.1 "$@"
-      '')
-      (pkgs.writeShellScriptBin "windows-vm-scp" ''
-        exec ${pkgs.sshpass}/bin/sshpass -p ${vmPass} \
-          ${pkgs.openssh}/bin/scp -P ${vmPort} \
-          -o StrictHostKeyChecking=no -o WarnWeakCrypto=no -4 \
-          "$@"
-      '')
-    ];
-  };
+  windowsVmHelpers =
+    let
+      vmPort = "2223";
+      vmPass = "admin";
+      vmUser = "vmadmin";
+    in
+    pkgs.symlinkJoin {
+      name = "windows-vm-helpers";
+      paths = [
+        (pkgs.writeShellScriptBin "windows-vm-ssh" ''
+          exec ${pkgs.sshpass}/bin/sshpass -p ${vmPass} \
+            ${pkgs.openssh}/bin/ssh -p ${vmPort} \
+            -o StrictHostKeyChecking=no -o WarnWeakCrypto=no -4 \
+            ${vmUser}@127.0.0.1 "$@"
+        '')
+        (pkgs.writeShellScriptBin "windows-vm-scp" ''
+          exec ${pkgs.sshpass}/bin/sshpass -p ${vmPass} \
+            ${pkgs.openssh}/bin/scp -P ${vmPort} \
+            -o StrictHostKeyChecking=no -o WarnWeakCrypto=no -4 \
+            "$@"
+        '')
+      ];
+    };
 
   # Jail-specific opencode overrides — merged on top of the global config.
   # Permissions are relaxed because the sandbox already constrains blast radius.
-  jailConfig = pkgs.writeText "opencode-jail.json" (builtins.toJSON {
-    "$schema" = "https://opencode.ai/config.json";
-    permission = {
-      # Read/explore — always allowed, no side effects
-      read = "allow";
-      glob = "allow";
-      grep = "allow";
-      list = "allow";
-      lsp = "allow";
-      repo_overview = "allow";
-      codesearch = "allow";
-      webfetch = "allow";
-      websearch = "allow";
+  jailConfig = pkgs.writeText "opencode-jail.json" (
+    builtins.toJSON {
+      "$schema" = "https://opencode.ai/config.json";
+      permission = {
+        # Read/explore — always allowed, no side effects
+        read = "allow";
+        glob = "allow";
+        grep = "allow";
+        list = "allow";
+        lsp = "allow";
+        repo_overview = "allow";
+        codesearch = "allow";
+        webfetch = "allow";
+        websearch = "allow";
 
-      # Agent utilities — safe
-      # NOTE: task and todowrite are intentionally omitted. The default
-      # "*": "allow" still lets the top-level agent use them, but opencode's
-      # exact-match checks (rule.permission === "task"/"todowrite") won't
-      # find explicit rules, so sub-agents get these tools disabled —
-      # preventing recursive spawning and todo list clobbering.
-      question = "allow";
-      repo_clone = "allow";
-      skill = "allow";
-      external_directory = "allow";
+        # Agent utilities — safe
+        # NOTE: task and todowrite are intentionally omitted. The default
+        # "*": "allow" still lets the top-level agent use them, but opencode's
+        # exact-match checks (rule.permission === "task"/"todowrite") won't
+        # find explicit rules, so sub-agents get these tools disabled —
+        # preventing recursive spawning and todo list clobbering.
+        question = "allow";
+        repo_clone = "allow";
+        skill = "allow";
+        external_directory = "allow";
 
-      # Bash — sandbox + trash-backed rm constrain damage
-      bash = "allow";
+        # Bash — sandbox + trash-backed rm constrain damage
+        bash = "allow";
 
-      # Edit — user approves each file modification
-      edit = "ask";
+        # Edit — user approves each file modification
+        edit = "ask";
 
-      # Host exec — user approves each host command
-      host_exec = "ask";
-    };
-  });
+        # Host exec — user approves each host command
+        host_exec = "ask";
+      };
+    }
+  );
 
   # Appended to the system prompt by the compat-proxy (via COMPAT_PROXY_APPEND_SYSTEM).
   # Injected after the main CC prompt replacement, so the agent knows its constraints.
   jailSystemContext = builtins.readFile ./jail-context.md;
 
-  lspmux = pkgs.callPackage ./lspmux {};
+  lspmux = pkgs.callPackage ./lspmux { };
 
   # Determinate nix — same one added to the toolbelt below. Used as
   # nix-direnv's fallback nix so it doesn't reach for a pinned older nix.
-  determinateNix =
-    inputs.determinate.inputs.nix.packages.${pkgs.stdenv.hostPlatform.system}.nix-cli;
+  determinateNix = inputs.determinate.inputs.nix.packages.${pkgs.stdenv.hostPlatform.system}.nix-cli;
 
   # direnv integration for the jail's fish shell.
   #
@@ -225,12 +236,14 @@
     upkgs.opencode
   ];
 in
-  jail "jailed-opencode" upkgs.fish (with jail.combinators; [
+jail "jailed-opencode" upkgs.fish (
+  with jail.combinators;
+  [
     network
     time-zone
     no-new-session
-    (set-argv [])
-    (add-cleanup ''kill $HOST_QUERY_PID 2>/dev/null || true'')
+    (set-argv [ ])
+    (add-cleanup "kill $HOST_QUERY_PID 2>/dev/null || true")
 
     # Remove the empty mountpoint stubs bwrap created in the persistent
     # ~/projects backing dir for each mounted project — but only if this is the
@@ -484,7 +497,7 @@ in
     # Deferred so it prepends to PATH *after* add-pkg-deps has built it.
     (defer (add-path "${rmSafe}/bin"))
     # Windows VM helper scripts (windows-vm-ssh / windows-vm-scp).
-    (defer (add-path "${windowsVmHelpers}/bin"))
+    (defer (add-path "${windowsVmHelpers}/bin")) # cant this just be in the agent toolbelt? this looks dumb
     (add-runtime ''
       COMPAT_PROXY_RULES_REAL=$(readlink -f "$HOME/.config/compat-proxy/rules" 2>/dev/null || true)
     '')
@@ -513,5 +526,12 @@ in
     (set-env "OPENCODE_CONFIG" "${jailConfig}")
     (set-env "COMPAT_PROXY_APPEND_SYSTEM" jailSystemContext)
 
-    (add-pkg-deps (agentToolbelt ++ [compatProxy claudeMem]))
-  ])
+    (add-pkg-deps (
+      agentToolbelt
+      ++ [
+        compatProxy
+        claudeMem
+      ]
+    ))
+  ]
+)
