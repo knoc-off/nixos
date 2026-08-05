@@ -1,0 +1,234 @@
+{
+  inputs,
+  lib,
+  pkgs,
+  self,
+  ...
+}:
+let
+  user = "tv";
+in
+{
+  imports = [
+    inputs.disko.nixosModules.disko
+    ./hardware/disks/simple-disk.nix
+    ./services/kdeconnect.nix
+
+    inputs.determinate.nixosModules.default
+
+    self.nixosModules.pipewire
+    self.nixosModules.users.tv
+    self.nixosModules.nix
+    {
+      # this is not great. would be better to have it be additive
+      nix.settings.experimental-features = lib.mkForce [
+        "nix-command"
+        "flakes"
+        "pipe-operators"
+      ];
+    }
+
+    {
+      services.udisks2.enable = true;
+    }
+
+    {
+      security.sudo.extraRules = [
+        {
+          users = [ "tv" ];
+          commands = [
+            {
+              command = "ALL";
+              options = [
+                "NOPASSWD"
+                "SETENV"
+              ];
+            }
+          ];
+        }
+      ];
+    }
+
+    {
+      # services.sabnzbd = {
+      #   enable = true;
+      # };
+
+      # need to add a UI, to the user.
+      services.jellyfin = {
+        enable = true;
+      };
+    }
+
+    {
+      # No lock, no suspend, just turn screen off when idle
+      home-manager.users.${user} = {
+        systemd.user.services.sway-audio-idle-inhibit = {
+          Unit = {
+            Description = "Inhibit idle when audio is playing";
+            After = [ "graphical-session.target" ];
+            PartOf = [ "graphical-session.target" ];
+          };
+          Service = {
+            ExecStart = "${pkgs.sway-audio-idle-inhibit}/bin/sway-audio-idle-inhibit";
+            Restart = "on-failure";
+            RestartSec = 5;
+          };
+          Install.WantedBy = [ "graphical-session.target" ];
+        };
+
+        services.hypridle.settings = lib.mkForce {
+          general = {
+            after_sleep_cmd = "hyprctl dispatch dpms on";
+          };
+
+          listener = [
+            {
+              timeout = 2400; # 30 minutes - screen off
+              on-timeout = "hyprctl dispatch dpms off";
+              on-resume = "hyprctl dispatch dpms on";
+            }
+          ];
+        };
+      };
+    }
+
+    self.nixosModules.hyprland
+    self.nixosModules.noctalia
+    {
+      hardware.graphics = {
+        enable = true;
+        enable32Bit = true;
+        extraPackages = with pkgs; [
+          mesa
+          intel-media-driver
+          intel-vaapi-driver
+          libdrm
+        ];
+      };
+
+      services = {
+        xserver.displayManager.startx.enable = false;
+        getty.autologinUser = user;
+        greetd = {
+          enable = true;
+          settings = {
+            default_session = {
+              command = "uwsm start hyprland-uwsm.desktop";
+              inherit user;
+            };
+          };
+        };
+        seatd = {
+          enable = true;
+          inherit user;
+        };
+      };
+
+      users.users.${user} = {
+        isNormalUser = true;
+        extraGroups = [
+          "wheel"
+          "render"
+          "seat"
+          "video"
+          "audio"
+          "input"
+          "networkmanager"
+          "dialout"
+          "plugdev"
+        ];
+      };
+
+      environment.systemPackages = with pkgs; [
+        libdrm
+        mesa-demos
+        vulkan-tools
+
+        wl-clipboard
+        xdg-utils
+        dwl
+        firefox
+        mpv
+
+        bluetuith
+        bluez-tools
+        bluez-alsa
+        wireshark
+
+        libcec
+
+        spotify
+        sway-audio-idle-inhibit
+      ];
+    }
+
+    {
+      hardware.steam-hardware.enable = true;
+
+      hardware.graphics = {
+        enable = true;
+        enable32Bit = true;
+      };
+
+      services.pipewire.alsa.support32Bit = true;
+    }
+  ];
+
+  services.dbus.enable = true;
+
+  hardware.uinput.enable = true;
+
+  nix.settings.auto-optimise-store = true;
+
+  networking.firewall = {
+    enable = false;
+    allowedTCPPortRanges = [
+      {
+        from = 1714;
+        to = 1764;
+      }
+    ];
+    allowedUDPPortRanges = [
+      {
+        from = 1714;
+        to = 1764;
+      }
+    ];
+  };
+
+  boot = {
+    # TODO: need to check hardware
+    # kernelModules = [
+    #   # "i915"
+    #   # "cec" # HDMI-CEC support
+    #   # "drm" # DRM subsystem for CEC
+    # ];
+    # kernelParams = [
+    #   "i915.modeset=1"
+    #   "i915.preliminary_hw_support=1"
+    # ];
+  };
+
+  boot.loader.grub = {
+    efiSupport = true;
+    # TODO: check this
+    efiInstallAsRemovable = true;
+  };
+  services.openssh.enable = true;
+
+  time.timeZone = "Europe/Berlin";
+
+  environment.systemPackages = [
+    pkgs.curl
+    pkgs.gitMinimal
+    # inputs.nixgl.packages.x86_64-linux.nixGLIntel
+  ];
+
+  users.users.root.openssh.authorizedKeys.keys = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"
+  ];
+
+  # bump this system.stateVersion = "24.11";
+  system.stateVersion = "xx";
+}

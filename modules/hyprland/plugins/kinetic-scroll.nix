@@ -3,7 +3,8 @@
   pkgs,
   lib,
   ...
-}: let
+}:
+let
   system = pkgs.stdenv.hostPlatform.system;
   hyprlandPlugins = pkgs.hyprlandPlugins.override {
     hyprland = inputs.hyprnix.packages.${system}.hyprland;
@@ -23,7 +24,7 @@
     # Wire finger-lift (frame) detection for pointer nodes Hyprland does not flag
     # m_isTouchpad. This laptop's touchpad delivers FINGER-source scroll through
     # such a node, so upstream never sees the lift and discards all momentum.
-    patches = [./patches/kinetic-scroll-frame-all-pointers.patch];
+    patches = [ ./patches/kinetic-scroll-frame-all-pointers.patch ];
 
     buildInputs = with pkgs; [
       pango
@@ -50,7 +51,8 @@
       platforms = lib.platforms.linux;
     };
   });
-in {
+in
+{
   inherit package;
 
   lua = ''
@@ -60,7 +62,7 @@ in {
       plugin = {
         kinetic_scroll = {
           enabled               = 1,
-          decel                 = 0.99,
+          decel                 = 0.93,
           min_velocity          = 0.45,
           interval_ms           = 8,
           delta_multiplier      = 1.0,
