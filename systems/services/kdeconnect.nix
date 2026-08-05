@@ -3,13 +3,11 @@ _: {
   services = {
     dbus.enable = true;
 
-    # Enable PipeWire for audio and screen sharing on Wayland.
-    # This is the modern standard and replaces PulseAudio.
-    pulseaudio.enable = false; # Disable PulseAudio
+    pulseaudio.enable = false;
     pipewire = {
       enable = true;
       alsa.enable = true;
-      pulse.enable = true; # Provides a PulseAudio compatibility layer
+      pulse.enable = true;
     };
   };
 

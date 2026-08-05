@@ -161,6 +161,7 @@ in
         configType = "lua";
       };
 
+      # could be overridden by other users?
       xdg.configFile."hypr/hyprland.lua".source = ./hyprland.lua;
       xdg.configFile."hypr/nix-env.lua".source = nixEnvLua;
       xdg.configFile."hypr/plugins.lua".source = pluginsLua;

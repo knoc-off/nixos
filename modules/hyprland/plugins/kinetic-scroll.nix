@@ -10,7 +10,7 @@ let
     hyprland = inputs.hyprnix.packages.${system}.hyprland;
   };
 
-  package = hyprlandPlugins.mkHyprlandPlugin (finalAttrs: {
+  package = hyprlandPlugins.mkHyprlandPlugin (_: {
     pluginName = "hypr-kinetic-scroll";
     version = "0.2.0-unstable-2026-07-28";
 
