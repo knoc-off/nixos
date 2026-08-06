@@ -8,7 +8,8 @@
 }:
 let
   user = "default";
-in {
+in
+{
   imports = [
     ./hardware/hardware-configuration.nix
 
@@ -24,13 +25,14 @@ in {
       };
     }
     {
-      system.activationScripts.populateEtcNixos = let
-        configSrc = builtins.path {
-          path = ../.;
-          name = "nixos-config-src";
-        };
-      in
-        lib.stringAfter ["etc"] ''
+      system.activationScripts.populateEtcNixos =
+        let
+          configSrc = builtins.path {
+            path = ../.;
+            name = "nixos-config-src";
+          };
+        in
+        lib.stringAfter [ "etc" ] ''
           set -euo pipefail
           dst=/etc/nixos
           mkdir -p "$dst"
@@ -50,7 +52,7 @@ in {
 
     {
       console = {
-        packages = with pkgs; [terminus_font];
+        packages = with pkgs; [ terminus_font ];
         font = "${pkgs.terminus_font}/share/consolefonts/ter-i22b.psf.gz";
         useXkbConfig = true;
       };
@@ -71,7 +73,7 @@ in {
           pkgs.nerd-fonts.fira-code
         ];
         fontconfig.defaultFonts = {
-          monospace = ["FiraCode Nerd Font Mono"];
+          monospace = [ "FiraCode Nerd Font Mono" ];
         };
       };
     }
@@ -98,22 +100,24 @@ in {
           nixpkgs.flake = inputs.nixpkgs;
           nixos-hardware.flake = inputs.hardware;
         };
-        nixPath = ["nixpkgs=${inputs.nixpkgs}"];
+        nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
       };
     }
 
     {
-      services.greetd = let
-        tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
-      in {
-        enable = true;
-        settings = {
-          default_session = {
-            command = "${tuigreet} --time --remember --cmd 'fish'";
-            user = "greeter";
+      services.greetd =
+        let
+          tuigreet = "${pkgs.tuigreet}/bin/tuigreet";
+        in
+        {
+          enable = true;
+          settings = {
+            default_session = {
+              command = "${tuigreet} --time --remember --cmd 'fish'";
+              user = "greeter";
+            };
           };
         };
-      };
     }
 
     inputs.hardware.nixosModules.common-cpu-amd
@@ -153,28 +157,19 @@ in {
     users.${user} = {
       shell = pkgs.fish;
       isNormalUser = lib.mkDefault true;
-      extraGroups =
-        [
-          "wheel"
-          "audio"
-          "video"
-          "dialout"
-          "uinput"
-          "input"
-          "lp"
-        ]
-        ++ (
-          if config.virtualisation.libvirtd.enable
-          then ["libvirtd"]
-          else []
-        )
-        ++ (
-          if config.networking.networkmanager.enable
-          then ["networkmanager"]
-          else []
-        );
+      extraGroups = [
+        "wheel"
+        "audio"
+        "video"
+        "dialout"
+        "uinput"
+        "input"
+        "lp"
+      ]
+      ++ (if config.virtualisation.libvirtd.enable then [ "libvirtd" ] else [ ])
+      ++ (if config.networking.networkmanager.enable then [ "networkmanager" ] else [ ]);
       initialPassword = "password";
-      openssh.authorizedKeys.keys = [];
+      openssh.authorizedKeys.keys = [ ];
     };
   };
 

@@ -1,5 +1,6 @@
 {
   inputs,
+  ...
 }:
 let
   hyprnixPkgs = system: inputs.hyprnix.packages.${system};
