@@ -153,6 +153,7 @@
         (mkHost "framework13" "x86_64-linux")
         (mkHost "thinkpad-work" "x86_64-linux")
         (mkHost "nuci5" "x86_64-linux")
+        (mkHost "optiplex" "x86_64-linux")
         (mkHost "hetzner" "x86_64-linux")
         (mkHost "rpi-4b-plus" "aarch64-linux")
         (mkHost "home-server-pc" "x86_64-linux")

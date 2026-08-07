@@ -44,6 +44,19 @@
           description = "Allow editing boot entries at boot time (systemd-boot). Disable for security.";
         };
 
+        configurationLimit = mkOption {
+          type = types.nullOr types.int;
+          default = null;
+          example = 8;
+          description = ''
+            Number of generations to keep on the ESP. null means unlimited.
+
+            Worth bounding under lanzaboote: UKIs bundle the kernel and initrd
+            (~100 MB each), and systemd-pcrlock refuses to build a policy for
+            more than 8 variants, so measuredBoot requires a limit of 1..8.
+          '';
+        };
+
         initrdSystemd = mkOption {
           type = types.bool;
           default = true;
@@ -79,6 +92,7 @@
             systemd-boot = mkIf (cfg.type == "systemd-boot") {
               enable = true;
               editor = cfg.editor;
+              configurationLimit = cfg.configurationLimit;
             };
 
             grub = mkIf (cfg.type == "grub") {
@@ -94,6 +108,7 @@
           lanzaboote = mkIf (cfg.type == "lanzaboote") {
             enable = true;
             pkiBundle = cfg.pkiBundle;
+            configurationLimit = cfg.configurationLimit;
           };
         };
       };

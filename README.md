@@ -54,11 +54,15 @@ IE:
 > just an example, you should not have your encryption key in your history.
 
 ```sh
-nix run github:nix-community/nixos-anywhere -- \
+nix run .#nixos-anywhere -- \
  --flake .#framework13 \
  --disk-encryption-keys /tmp/secret.key /tmp/luks.key \
  root@<ip-address>
 ```
+
+Note `.#nixos-anywhere` rather than `github:nix-community/nixos-anywhere`. The
+upstream package bundles its own Nix, which cannot evaluate this flake because
+`lib/color-lib.nix` needs `builtins.wasm`. See `systems/README.md`.
 
 nixos-anywhere will:
 
@@ -68,11 +72,12 @@ nixos-anywhere will:
 4. Install the NixOS configuration
 5. Reboot
    After reboot, the system will prompt for the LUKS passphrase interactively on every boot.
-   Post-install TODO
 
 After the first successful boot:
 
-1. Enroll secure boot keys: `sudo sbctl create-keys` & `sudo sbctl enroll-keys`
-2. change boot type from systemd-boot to lanzaboote.
-3. Set up sops age key from SSH host key, create secrets file, uncomment the sops block
-4. Rebuild
+1. Set up sops age key from SSH host key, create secrets file, uncomment the sops block
+2. Rebuild
+
+For the full runbook -- adding the host, boot order gotchas, Secure Boot with
+lanzaboote, measured boot, and TPM2 auto-unlock -- see
+[systems/README.md](systems/README.md).

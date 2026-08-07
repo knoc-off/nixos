@@ -10,23 +10,121 @@ let
 in
 {
   imports = [
-    inputs.disko.nixosModules.disko
-    ./hardware/disks/simple-disk.nix
     ./services/kdeconnect.nix
 
     inputs.determinate.nixosModules.default
 
+    self.nixosModules.btrfs-luks
+    {
+      disks.btrfsLuks = {
+        enable = true;
+        device = "/dev/nvme0n1";
+        # Lanzaboote UKIs bundle kernel + initrd (~100 MB each), so 8
+        # generations plus systemd-boot does not fit the 512M module default.
+        espSize = "2G";
+        swapSize = "8G";
+        encryption = true;
+        # Enrolled against the pcrlock policy with systemd-cryptenroll; slots 0
+        # and 1 remain as passphrase recovery.
+        tpm2Unlock = true;
+        # Jellyfin library and the Minecraft world get their own subvolumes so
+        # they snapshot independently of the rootfs and survive root rollbacks.
+        extraSubvolumes = {
+          "/media".mountpoint = "/srv/media";
+          "/minecraft".mountpoint = "/srv/minecraft";
+        };
+      };
+    }
+
+    self.nixosModules.boot
+    {
+      # Staged Secure Boot / measured boot rollout on this OptiPlex 7080:
+      #
+      #  1. Install with nixos-anywhere; LUKS opens from the passphrase passed
+      #     via --disk-encryption-keys. That slot stays forever as recovery.
+      #  2. BIOS -> Secure Boot -> Expert Key Management -> Delete All Keys, so
+      #     the firmware is in Setup Mode (`bootctl status` -> "setup").
+      #  3. type = "lanzaboote" plus autoGenerateKeys/autoEnrollKeys below; two
+      #     reboots later `bootctl status` reports "enabled (user)".
+      #  4. boot.lanzaboote.measuredBoot = { enable = true; pcrs = [ 0 4 7 ]; };
+      #     Preflight with `systemd-pcrlock is-supported`.
+      #  5. systemd-cryptenroll --tpm2-device=auto \
+      #       --tpm2-pcrlock=/var/lib/systemd/pcrlock.json /dev/nvme0n1p2
+      #     then set disks.btrfsLuks.tpm2Unlock = true above.
+      #
+      # pcrlock rather than raw --tpm2-pcrs: lanzaboote regenerates and re-signs
+      # the policy on every rebuild, so kernel updates do not lock you out, and
+      # PCR 4 covers the whole post-firmware chain via the lanzaboote stub.
+      boot.custom = {
+        enable = true;
+        type = "lanzaboote";
+        efiSupport = true;
+        # Hard ceiling imposed by systemd-pcrlock (systemd/systemd#41526).
+        configurationLimit = 8;
+      };
+
+      # The BIOS "Delete All Keys" step left this board in Audit Mode
+      # (SetupMode=1, AuditMode=1) rather than plain Setup Mode. systemd-boot
+      # accepts both for enrollment, so this works as-is -- but note that
+      # enrolling a PK from Audit Mode transitions to Deployed Mode, which
+      # cannot be left from the OS. Redoing enrollment means another trip to
+      # the BIOS to wipe keys.
+      boot.lanzaboote = {
+        autoGenerateKeys.enable = true;
+        autoEnrollKeys = {
+          enable = true;
+          # sbctl only stages PK/KEK/db.auth onto the ESP; systemd-boot is what
+          # actually writes them to firmware on the following boot. The reboot
+          # is part of the mechanism, not a convenience.
+          autoReboot = true;
+        };
+
+        # PCR 0 is firmware code, 4 the boot loader plus UKI, 7 the Secure Boot
+        # policy. 1, 2 and 3 cover firmware configuration and option ROMs and
+        # are documented as flaky, so they stay out. Consequence of including
+        # 0: a BIOS update invalidates the policy and drops to the passphrase
+        # prompt until Phase 5's cryptenroll is re-run. That is a fallback, not
+        # a lockout -- LUKS slot 0 is never touched by any of this.
+        measuredBoot = {
+          enable = true;
+          pcrs = [
+            0
+            4
+            7
+          ];
+        };
+      };
+    }
+
+    inputs.hardware.nixosModules.common-cpu-intel
+    inputs.hardware.nixosModules.common-pc
+    inputs.hardware.nixosModules.common-pc-ssd
+    {
+      # Inlined from nixos-hardware common/cpu/intel/comet-lake: that path has
+      # no flake attr, and common-gpu-intel-comet-lake is deprecated
+      # (nixos-hardware#992). The i5-10500 is Comet Lake, UHD 630 is Gen9.5.
+      #
+      # enable_guc=2 loads GuC + HuC. HuC is what gives Jellyfin low-power
+      # fixed-function encode.
+      boot.kernelParams = [ "i915.enable_guc=2" ];
+
+      hardware.intelgpu = {
+        # Gen8-11. The default (intel-compute-runtime) targets Gen12+ and does
+        # not support Gen9.5, so OpenCL was silently broken.
+        computeRuntime = "legacy";
+        # iHD only. The null default installs i965 alongside it, leaving VA-API
+        # driver selection ambiguous.
+        vaapiDriver = "intel-media-driver";
+        # mediaRuntime stays at the vpl-gpu-rt default. It is Gen12+ only and so
+        # unused here, but the Gen9.5-correct alternative (intel-media-sdk) is
+        # EOL with local privesc CVEs and would need permittedInsecurePackages.
+        # Jellyfin uses the VA-API path via intel-media-driver regardless.
+      };
+    }
+
     self.nixosModules.pipewire
     self.nixosModules.users.tv
     self.nixosModules.nix
-    {
-      # this is not great. would be better to have it be additive
-      nix.settings.experimental-features = lib.mkForce [
-        "nix-command"
-        "flakes"
-        "pipe-operators"
-      ];
-    }
 
     {
       services.udisks2.enable = true;
@@ -58,6 +156,14 @@ in
       services.jellyfin = {
         enable = true;
       };
+
+      # Runs as jellyfin:jellyfin with no supplementary groups, so it cannot
+      # open /dev/dri/renderD128 (root:render 0660). Without this, hardware
+      # transcoding fails silently and every stream is transcoded on the CPU.
+      users.users.jellyfin.extraGroups = [
+        "render"
+        "video"
+      ];
     }
 
     {
@@ -96,15 +202,11 @@ in
     self.nixosModules.hyprland
     self.nixosModules.noctalia
     {
+      # extraPackages is owned by hardware.intelgpu above; listing drivers here
+      # too just duplicates them and re-adds i965.
       hardware.graphics = {
         enable = true;
         enable32Bit = true;
-        extraPackages = with pkgs; [
-          mesa
-          intel-media-driver
-          intel-vaapi-driver
-          libdrm
-        ];
       };
 
       services = {
@@ -166,18 +268,16 @@ in
     {
       hardware.steam-hardware.enable = true;
 
-      hardware.graphics = {
-        enable = true;
-        enable32Bit = true;
-      };
-
       services.pipewire.alsa.support32Bit = true;
     }
   ];
 
   services.dbus.enable = true;
 
-  hardware.uinput.enable = true;
+  hardware = {
+    uinput.enable = true;
+    enableRedistributableFirmware = true;
+  };
 
   nix.settings.auto-optimise-store = true;
 
@@ -197,24 +297,11 @@ in
     ];
   };
 
-  boot = {
-    # TODO: need to check hardware
-    # kernelModules = [
-    #   # "i915"
-    #   # "cec" # HDMI-CEC support
-    #   # "drm" # DRM subsystem for CEC
-    # ];
-    # kernelParams = [
-    #   "i915.modeset=1"
-    #   "i915.preliminary_hw_support=1"
-    # ];
-  };
+  # No i915 kernelParams/kernelModules needed here: hardware.intelgpu puts i915
+  # in the initrd (loadInInitrd defaults true) and sets enable_guc above.
+  # HDMI-CEC is not achievable on this box -- the Intel iGPU exposes no CEC
+  # adapter, so libcec needs a USB-CEC dongle (e.g. Pulse-Eight).
 
-  boot.loader.grub = {
-    efiSupport = true;
-    # TODO: check this
-    efiInstallAsRemovable = true;
-  };
   services.openssh.enable = true;
 
   time.timeZone = "Europe/Berlin";
@@ -230,5 +317,5 @@ in
   ];
 
   # bump this system.stateVersion = "24.11";
-  system.stateVersion = "xx";
+  system.stateVersion = "26.05";
 }
