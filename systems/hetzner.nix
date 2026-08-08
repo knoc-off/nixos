@@ -23,6 +23,8 @@
           "services/website/env" = {};
           "services/kitchenowl/jwt-secret" = {};
           "services/kitchenowl/api-token" = {};
+          "services/kitchenowl/oauth-client-id" = {};
+          "services/kitchenowl/oauth-client-secret" = {};
           "services/ntfy/admin-hash" = {};
           "services/ntfy/normal-hash" = {};
           "services/ntfy/publisher-hash" = {};
@@ -39,6 +41,7 @@
     ./services/kitchenowl.nix
     ./services/kitchenowl-notify.nix
     ./services/kitchenowl-meal-plan.nix
+    ./services/kitchenowl-mcp.nix
     ./services/trilium.nix
     ./services/ntfy.nix
 
@@ -61,6 +64,24 @@
     householdId = 1; # TODO: set to your KitchenOwl household ("home") id
     apiTokenFile = config.sops.secrets."services/kitchenowl/api-token".path;
     ntfyTokenFile = config.sops.secrets."services/ntfy/publish-token".path;
+  };
+
+  # Curated MCP tool surface over the KitchenOwl household.
+  services.kitchenowl-mcp = {
+    enable = true;
+    householdId = 1; # TODO: set to your KitchenOwl household ("home") id
+    domain = "kitchenowl-mcp.niko.ink";
+    apiTokenFile = config.sops.secrets."services/kitchenowl/api-token".path;
+
+    # Claude's web connector only speaks OAuth, so there is no bearer token
+    # here. GitHub does the authenticating; allowedGitHubUsers does the
+    # authorizing, and is the only thing keeping the rest of GitHub out.
+    oauth = {
+      enable = true;
+      clientIdFile = config.sops.secrets."services/kitchenowl/oauth-client-id".path;
+      clientSecretFile = config.sops.secrets."services/kitchenowl/oauth-client-secret".path;
+      allowedGitHubUsers = ["knoc-off"];
+    };
   };
 
   nix.optimise.automatic = true;

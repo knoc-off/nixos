@@ -206,6 +206,7 @@ let
 
     # Python tooling (uvx needed by claude-mem for chroma vector search)
     uv
+    python3
 
     # Language servers — opencode has built-in support for these.
     # Pre-provided because the jail lacks node/npm so npm-based

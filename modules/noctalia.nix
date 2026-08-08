@@ -187,7 +187,11 @@ in {
 
       pluginSettings = noctaliaPlugins.settings;
 
-      settings = lib.mkDefault {
+      # Not mkDefault: that would make any host-level override replace this
+      # whole blob instead of merging into it. As a plain definition, attrsets
+      # deep-merge -- but scalars conflict and lists *concatenate*, so hosts
+      # need lib.mkForce to replace either.
+      settings = {
         settingsVersion = 0;
         bar = {
           position = "left";

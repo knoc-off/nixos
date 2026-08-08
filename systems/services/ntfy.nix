@@ -16,8 +16,10 @@ in {
       auth-access = [
         "normal:cat-doorbell:ro"
         "normal:kitchenowl:ro"
+        "normal:wohnungen:ro"
         "publisher:cat-doorbell:wo"
         "publisher:kitchenowl:wo"
+        "publisher:wohnungen:wo"
       ];
     };
 

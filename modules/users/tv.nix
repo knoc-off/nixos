@@ -25,6 +25,10 @@
   in {
     imports = [ inputs.home-manager.nixosModules.home-manager ];
 
+    # The bridge is D-Bus activated by xdg-desktop-portal, so its
+    # share/dbus-1/services entry has to be on the session bus search path.
+    services.dbus.packages = [ self.packages.${pkgs.system}.hypr-kdeconnect-portal ];
+
     home-manager = {
       backupFileExtension = "bak";
       useGlobalPkgs = true;
@@ -38,7 +42,8 @@
           self.homeModules.opencode
 
           self.homeModules.noctalia
-          self.homeModules.hyprland
+          self.homeModules.hyprland-tv
+          self.homeModules.tv-away
           self.homeModules.stylix
 
           self.homeModules.git
@@ -135,6 +140,24 @@
 
         home.sessionVariables = {
           XDG_SESSION_TYPE = "wayland";
+        };
+
+        # Strip Noctalia down to OSD / popups / notifications: no bar, no dock.
+        # bar.monitors is a whitelist where [] means "every screen", so a
+        # sentinel name that matches nothing is what disables it. Panels stay
+        # alive because general.allowPanelsOnScreenWithoutBar is already true;
+        # noctalia then centers them on its own since there's no bar to attach
+        # to. Lists concatenate on merge, hence mkForce on every one of them.
+        programs.noctalia-shell.settings = {
+          bar.monitors = lib.mkForce [ "__disabled__" ];
+          bar.screenOverrides = lib.mkForce [ ];
+          general.lockScreenMonitors = lib.mkForce [ ];
+          ui.panelsAttachedToBar = lib.mkForce false;
+          controlCenter.position = lib.mkForce "center";
+          wallpaper.panelPosition = lib.mkForce "center";
+          notifications.location = lib.mkForce "bottom_right";
+          osd.location = lib.mkForce "bottom_center";
+          appLauncher.position = "center";
         };
 
         programs.mpv = {
@@ -244,21 +267,43 @@
           indicator = true;
         };
 
+        # KDE Connect advertises this box to phones even with the projector off,
+        # and Spotify keeps it in the Connect device list. Both get torn down
+        # when nobody's watching and come back on the first input event.
+        # Firefox is deliberately absent -- it stays up.
+        tv.away = {
+          units = [
+            "kdeconnect"
+            "kdeconnect-indicator"
+          ];
+          apps.spotify = {
+            description = "Spotify";
+            command = "${pkgs.spotify}/bin/spotify";
+          };
+        };
+
         xdg.portal = {
           enable = true;
           config = {
             common = {
               default = ["hyprland"];
-              "org.freedesktop.impl.portal.ScreenCast" = ["kde"];
-              "org.freedesktop.impl.portal.RemoteDesktop" = ["kde"];
+              # ScreenCast/Screenshot go to hyprland: xdp-kde implements these
+              # against KWin, which doesn't exist in this session.
+              "org.freedesktop.impl.portal.ScreenCast" = ["hyprland"];
+              "org.freedesktop.impl.portal.Screenshot" = ["hyprland"];
+              # The one interface xdph does not implement. Without this, KDE
+              # Connect's mousepad plugin can't create a session at all, which
+              # is why only the MPRIS-based features (volume, play/pause) work.
+              "org.freedesktop.impl.portal.RemoteDesktop" = ["hypr-kdeconnect"];
             };
           };
           extraPortals = [
-            pkgs.kdePackages.xdg-desktop-portal-kde
+            self.packages.${pkgs.system}.hypr-kdeconnect-portal
           ];
         };
 
-        services.mako.enable = true;
+        # Notifications are served by noctalia; a second daemon would just fight
+        # it for org.freedesktop.Notifications on the bus.
 
         xdg.configFile."menus/applications.menu".source = "${pkgs.kdePackages.plasma-workspace}/etc/xdg/menus/plasma-applications.menu";
 
@@ -268,59 +313,12 @@
           kbuildsycoca6 --noincremental || echo "Warning: kbuildsycoca6 failed, but continuing..."
         '';
 
-        # # Override the generated systemd user services to ensure they use Wayland
-        # systemd.user.services.kdeconnect = { # This targets the service for kdeconnectd
-        #   Service.Environment = lib.mkOverride 90 [ # mkOverride with a priority
-        #     # It's important to preserve any existing PATH set by the module,
-        #     # or set a sensible default.
-        #     # The default HM module sets: "PATH=${config.home.profileDirectory}/bin"
-        #     # Let's ensure that and add our variable.
-        #     "PATH=${config.home.profileDirectory}/bin:${pkgs.coreutils}/bin:${pkgs.dbus}/bin" # A more robust PATH
-        #     "QT_QPA_PLATFORM=wayland"
-        #     "XDG_SESSION_TYPE=wayland" # Also good to set explicitly
-        #   ];
-        # };
-
-        systemd.user.services = {
-          #kdeconnect-indicator =
-          #(generateService "kdeconnect-indicator" "kdeconnect-indicator");
-          kded-modules = {
-            Unit = {
-              Description = "KDED Modules";
-              After = ["kded.service" "user-path-import.service"];
-              PartOf = ["kded.service"];
-            };
-            Install.WantedBy = ["hyprland.target"];
-            Service = {
-              Type = "oneshot";
-              ExecStart = "${pkgs.writeScript "start-kded-modules" ''
-                #!/usr/bin/env zsh
-
-                moduleNames=(
-                  "gtkconfig"
-                  "bluedevil"
-                  "networkmanagement"
-                  "networkstatus"
-                  "smbwatcher"
-                  "device_automounter"
-                  "kded_kdd"  # This is the KDE Connect Display module - CRITICAL for screen mirroring
-                )
-
-                for module in $moduleNames; do
-                  qdbus org.kde.kded6 /kded org.kde.kded6.loadModule $module
-                done
-              ''}";
-              RemainAfterExit = true;
-            };
-          };
-        };
-        # systemd.user.services.kdeconnect-indicator = {
-        #   Service.Environment = lib.mkOverride 90 [
-        #     "PATH=${config.home.profileDirectory}/bin:${pkgs.coreutils}/bin:${pkgs.dbus}/bin"
-        #     "QT_QPA_PLATFORM=wayland"
-        #     "XDG_SESSION_TYPE=wayland"
-        #   ];
-        # };
+        # A kded-modules unit lived here. It loaded Plasma kded module names
+        # into a session with no Plasma, was WantedBy a hyprland.target that
+        # doesn't exist (so it never ran), and its "kded_kdd" entry -- commented
+        # upstream as critical for screen mirroring -- is not a real KDE Connect
+        # module. Removed rather than fixed: mirroring isn't wanted, and remote
+        # input goes through the RemoteDesktop portal instead.
 
         programs.firefox.enable = true;
 

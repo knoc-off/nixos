@@ -1,6 +1,7 @@
 {
   inputs,
-  lib,
+  config,
+  hostname,
   pkgs,
   self,
   ...
@@ -13,6 +14,41 @@ in
     ./services/kdeconnect.nix
 
     inputs.determinate.nixosModules.default
+
+    inputs.sops-nix.nixosModules.sops
+    {
+      sops = {
+        defaultSopsFile = ./secrets/${hostname}/default.yaml;
+        age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+
+        secrets = {
+          # ntfy token with publish rights, used by wohnungsfinder below.
+          "services/ntfy/publish-token" = { };
+        };
+      };
+    }
+
+    self.nixosModules.tailnet
+    {
+      # Client, not server: MagicDNS is what routes the hub's service names to
+      # tailnet IPs, so Caddy sees a trusted source and skips the OAuth redirect.
+      services.tailnet = {
+        enable = true;
+        acceptDns = true;
+      };
+    }
+
+    self.nixosModules.wohnungsfinder
+    {
+      # inberlinwohnen.de new-listing watcher -> ntfy.niko.ink.
+      services.wohnungsfinder = {
+        enable = true;
+        ntfy = {
+          topic = "wohnungen";
+          tokenFile = config.sops.secrets."services/ntfy/publish-token".path;
+        };
+      };
+    }
 
     self.nixosModules.btrfs-luks
     {
@@ -167,7 +203,7 @@ in
     }
 
     {
-      # No lock, no suspend, just turn screen off when idle
+      # Idle policy (screen off, no lock/suspend) lives in the tv-away module.
       home-manager.users.${user} = {
         systemd.user.services.sway-audio-idle-inhibit = {
           Unit = {
@@ -181,20 +217,6 @@ in
             RestartSec = 5;
           };
           Install.WantedBy = [ "graphical-session.target" ];
-        };
-
-        services.hypridle.settings = lib.mkForce {
-          general = {
-            after_sleep_cmd = "hyprctl dispatch dpms on";
-          };
-
-          listener = [
-            {
-              timeout = 2400; # 30 minutes - screen off
-              on-timeout = "hyprctl dispatch dpms off";
-              on-resume = "hyprctl dispatch dpms on";
-            }
-          ];
         };
       };
     }
@@ -309,6 +331,7 @@ in
   environment.systemPackages = [
     pkgs.curl
     pkgs.gitMinimal
+    self.packages.${pkgs.stdenv.hostPlatform.system}.session-env
     # inputs.nixgl.packages.x86_64-linux.nixGLIntel
   ];
 
@@ -316,6 +339,5 @@ in
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"
   ];
 
-  # bump this system.stateVersion = "24.11";
   system.stateVersion = "26.05";
 }

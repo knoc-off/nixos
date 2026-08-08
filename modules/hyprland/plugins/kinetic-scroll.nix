@@ -67,6 +67,7 @@ in
           interval_ms           = 8,
           delta_multiplier      = 1.0,
           disable_in_browser    = 1,
+          disabled_classes      = "slack",
           stop_on_target_change = 1,
           stop_on_click         = 1,
           stop_on_focus         = 1,

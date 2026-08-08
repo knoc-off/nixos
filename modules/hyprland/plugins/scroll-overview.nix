@@ -53,6 +53,9 @@ in {
           gesture_distance = 300,
           scale = 0.5,
           workspace_gap = 100,
+          input = {
+            touchpad_scroll_factor = 7,
+          },
         },
       },
     })
