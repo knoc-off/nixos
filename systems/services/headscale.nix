@@ -3,10 +3,13 @@
 # (reverse-proxied by Caddy on :443). MagicDNS serves the niko.ink service
 # names to tailnet IPs via extra_records, replacing the old dnsmasq split DNS.
 #
-# extra_records values are the nodes' Headscale-assigned tailnet IPs. Headscale
-# allocates from 100.64.0.0/10 in registration order; after enrolling the nodes
-# run `headscale nodes list` and confirm/adjust the IPs below.
-{...}: {
+# extra_records values come from lib/tailnet.nix, the single source of truth for
+# Headscale-assigned tailnet IPs. Headscale allocates from 100.64.0.0/10 in
+# registration order; after enrolling a node run `headscale nodes list` and
+# correct the entry there, not here.
+{self, ...}: let
+  inherit (self.lib) tailnet;
+in {
   services.headscale = {
     enable = true;
     address = "127.0.0.1";
@@ -44,20 +47,24 @@
           {
             name = "home.niko.ink";
             type = "A";
-            value = "100.64.0.2";
+            value = tailnet.rpi-4b-plus;
           }
           # kitchenowl + notes run on the hub; tailnet clients reach the hub
           # over the tailnet so Caddy sees a trusted source and skips OAuth.
           {
             name = "kitchenowl.niko.ink";
             type = "A";
-            value = "100.64.0.1";
+            value = tailnet.hetzner;
           }
           {
             name = "notes.niko.ink";
             type = "A";
-            value = "100.64.0.1";
+            value = tailnet.hetzner;
           }
+          # No mc.niko.ink record on purpose: Gate on the hub is the only
+          # player-facing entrypoint, and optiplex's firewall only accepts the
+          # game port from Gate's address. A split-horizon record here would
+          # create a second path that the firewall would then reject anyway.
         ];
       };
     };

@@ -44,6 +44,7 @@
     ./services/kitchenowl-mcp.nix
     ./services/trilium.nix
     ./services/ntfy.nix
+    ./services/minecraft-gate.nix
 
     ./services/headscale.nix
     self.nixosModules.tailnet
@@ -97,7 +98,8 @@
   networking.hostName = "oink";
   networking.firewall = {
     enable = true;
-    allowedTCPPorts = [80 443];
+    # 25565: Gate, the public Minecraft entrypoint (see services/minecraft-gate.nix).
+    allowedTCPPorts = [80 443 25565];
     # UDP 3478: STUN for the embedded Headscale DERP relay.
     allowedUDPPorts = [3478];
     logRefusedConnections = true;

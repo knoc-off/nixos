@@ -11,6 +11,9 @@
   # Everything disposable hangs off `tv-active.target`. Things that must survive
   # in order to *notice* you came back (hyprland, hypridle, noctalia) stay
   # outside it, as does Firefox.
+  #
+  # Windowed apps are the exception: they are frozen rather than stopped, so
+  # they go quiet on the network without their surface being destroyed.
   home =
     {
       config,
@@ -21,6 +24,33 @@
     let
       cfg = config.tv.away;
       systemctl = "${pkgs.systemd}/bin/systemctl";
+
+      frozen = lib.filterAttrs (_: app: app.freeze) cfg.apps;
+      frozenUnits = lib.mapAttrsToList (name: _: "${name}.service") frozen;
+
+      # Frozen apps are deliberately kept out of tv-active.target: destroying a
+      # window while the session is already idled makes Hyprland run
+      # recheckIdleInhibitorStatus(), which ends in an unconditional
+      # setInhibit(false). setInhibit has no change-guard, so it calls
+      # update() -> reset() -> sendResumed() -- a resume event out of thin air,
+      # with no input involved. hypridle then blanks-and-unblanks and restarts
+      # everything it just stopped, on a loop the length of the timeout.
+      # Freezing leaves the surface mapped, so the recheck never happens.
+      appTarget = app: if app.freeze then "graphical-session.target" else "tv-active.target";
+
+      awayScript = pkgs.writeShellScript "tv-away" ''
+        ${systemctl} --user stop tv-active.target
+        ${lib.optionalString (
+          frozenUnits != [ ]
+        ) "${systemctl} --user freeze ${lib.concatStringsSep " " frozenUnits}"}
+      '';
+
+      backScript = pkgs.writeShellScript "tv-back" ''
+        ${lib.optionalString (
+          frozenUnits != [ ]
+        ) "${systemctl} --user thaw ${lib.concatStringsSep " " frozenUnits}"}
+        ${systemctl} --user start tv-active.target
+      '';
     in
     {
       options.tv.away = {
@@ -68,6 +98,20 @@
                   default = "";
                   description = "Unit description.";
                 };
+                freeze = lib.mkOption {
+                  type = lib.types.bool;
+                  default = false;
+                  description = ''
+                    Suspend the app with the cgroup freezer instead of stopping
+                    it. Use this for anything with a window: killing a client
+                    while the session is idled makes Hyprland emit a bogus
+                    resume, which immediately undoes the teardown.
+
+                    A frozen app cannot run, so it drops off the network (a
+                    frozen Spotify stops advertising itself as a Connect
+                    device), but it keeps its memory and its window.
+                  '';
+                };
               };
             }
           );
@@ -85,6 +129,19 @@
         };
 
         systemd.user.services = lib.mkMerge [
+          # Wrapped as a real unit (rather than pointed to directly from
+          # hypridle and tv-remote both) so there's one canonical away path --
+          # anything that wants to put the TV to sleep runs this unit.
+          {
+            tv-away = {
+              Unit.Description = "Enter TV away state";
+              Service = {
+                Type = "oneshot";
+                ExecStart = awayScript;
+              };
+            };
+          }
+
           # Retarget services that already exist (kdeconnect et al). PartOf is a
           # list of primitives in home-manager's unit freeform type, so this
           # concatenates with whatever the upstream module set. WantedBy must be
@@ -99,13 +156,12 @@
           (lib.mapAttrs (name: app: {
             Unit = {
               Description = if app.description != "" then app.description else name;
-              PartOf = [ "tv-active.target" ];
+              PartOf = [ (appTarget app) ];
               After = [
                 "graphical-session.target"
-                "tv-active.target"
-              ];
+              ] ++ lib.optional (!app.freeze) "tv-active.target";
             };
-            Install.WantedBy = [ "tv-active.target" ];
+            Install.WantedBy = [ (appTarget app) ];
             Service = {
               ExecStart = app.command;
               Slice = "app-graphical.slice";
@@ -135,8 +191,8 @@
               }
               {
                 timeout = cfg.timeout;
-                on-timeout = "${systemctl} --user stop tv-active.target";
-                on-resume = "${systemctl} --user start tv-active.target";
+                on-timeout = "${systemctl} --user start tv-away.service";
+                on-resume = "${backScript}";
               }
             ];
           };

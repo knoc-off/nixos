@@ -12,6 +12,7 @@ in
 {
   imports = [
     ./services/kdeconnect.nix
+    ./services/minecraft.nix
 
     inputs.determinate.nixosModules.default
 
@@ -24,6 +25,8 @@ in
         secrets = {
           # ntfy token with publish rights, used by wohnungsfinder below.
           "services/ntfy/publish-token" = { };
+          # Assembled into an env file by services/minecraft.nix.
+          "services/minecraft/RCON_PASSWORD" = { };
         };
       };
     }
@@ -159,6 +162,22 @@ in
     }
 
     self.nixosModules.pipewire
+    {
+      # ACP ranks the analog jack above HDMI (prio 6500+ vs 5900), so
+      # find-best-profile picks the headphone jack by default even though the
+      # TV is the only speaker. Pinning the name here makes selection
+      # deterministic across the TV being off/on-another-input at boot, since
+      # find-preferred-profile matches on name only and ignores availability.
+      services.pipewire.wireplumber.extraConfig."99-tv-hdmi"."device.profile.priority.rules" = [
+        {
+          matches = [ { "device.name" = "alsa_card.pci-0000_00_1f.3"; } ];
+          actions.update-props.priorities = [
+            "output:hdmi-stereo+input:analog-stereo"
+            "output:hdmi-stereo"
+          ];
+        }
+      ];
+    }
     self.nixosModules.users.tv
     self.nixosModules.nix
 
@@ -191,6 +210,10 @@ in
       # need to add a UI, to the user.
       services.jellyfin = {
         enable = true;
+        # The firewall is enabled below, so the LAN ports (8096/8920 TCP,
+        # 1900/7359 UDP discovery) have to be opened explicitly or streaming to
+        # anything other than this box's own display breaks.
+        openFirewall = true;
       };
 
       # Runs as jellyfin:jellyfin with no supplementary groups, so it cannot
@@ -303,8 +326,11 @@ in
 
   nix.settings.auto-optimise-store = true;
 
+  # Minecraft's game port is not listed here: services/minecraft.nix opens it
+  # via extraCommands scoped to Gate's source address, since a port range or
+  # interface rule would admit the whole tailnet.
   networking.firewall = {
-    enable = false;
+    enable = true;
     allowedTCPPortRanges = [
       {
         from = 1714;

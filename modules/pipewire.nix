@@ -19,36 +19,7 @@
       jack.enable = true;
 
       # WirePlumber configuration (replaces media-session)
-      wireplumber = {
-        enable = true;
-
-        # Fix audio crackling/popping in media players like mpv/VLC
-        configPackages = [
-          (pkgs.writeTextDir "share/wireplumber/main.lua.d/99-alsa-lowlatency.lua" ''
-            alsa_monitor.properties = {
-              -- Reduce buffer sizes to prevent crackling
-              ["alsa.jackdbus-device"] = false,
-              ["alsa.reserve"] = true,
-              ["alsa.midi.rate"] = 48000,
-            }
-
-            alsa_monitor.rules = {
-              {
-                matches = {
-                  {
-                    { "device.name", "matches", "alsa_card.*" },
-                  },
-                },
-                apply_properties = {
-                  ["api.alsa.period-size"] = 512,
-                  ["api.alsa.headroom"] = 8192,
-                  ["session.suspend-timeout-seconds"] = 0,
-                },
-              },
-            }
-          '')
-        ];
-      };
+      wireplumber.enable = true;
     };
 
     boot.kernelParams = [
@@ -69,7 +40,6 @@
 
       # Diagnostics
       alsa-utils # amixer, aplay, etc.
-      pulseaudio-ctl # CLI control
       sound-theme-freedesktop # System sounds
     ];
   };

@@ -32,7 +32,7 @@ hl.config({
 		direction = "right",
 		column_width = 1.0,
 		fullscreen_on_one_column = true,
-		focus_fit_method = "center",
+		focus_fit_method = 0, -- 0 = center, 1 = fit
 		wrap_focus = true,
 	},
 
@@ -56,7 +56,7 @@ hl.config({
 	-- Let fullscreen video bypass compositing entirely. Meaningful power and
 	-- quality win on this iGPU.
 	render = {
-		direct_scanout = "auto",
+		direct_scanout = 2, -- 0 = off, 1 = on, 2 = auto
 	},
 
 	cursor = {
@@ -141,8 +141,11 @@ end
 -- Spotify is `silent` because tv-away starts it as a session unit at login and
 -- again on resume -- without it, the box would yank you to workspace 2 whenever
 -- Spotify comes back.
+-- window_rule uses RE2 FullMatch (whole-string, case-sensitive), and Spotify
+-- runs under XWayland with WM_CLASS "Spotify" (capital S) rather than a native
+-- app_id -- unlike everything else here, so it needs the explicit case-fold.
 hl.window_rule({ match = { class = "firefox" }, workspace = "1" })
-hl.window_rule({ match = { class = "spotify" }, workspace = "2 silent" })
+hl.window_rule({ match = { class = "(?i)spotify" }, workspace = "2 silent" })
 
 -- sway-audio-idle-inhibit already covers audible playback; this covers a paused
 -- or silent fullscreen video so the panel doesn't blank mid-movie.

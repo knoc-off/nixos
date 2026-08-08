@@ -7,6 +7,9 @@ in {
   # Per-window kanata/hyprkan key layers: { mkKeyLayers; presets; }
   keyLayers = import ./key-layers.nix {inherit lib;};
 
+  # Headscale-assigned tailnet IPs, by host.
+  tailnet = import ./tailnet.nix;
+
   # Recursively discover packages from a directory tree.
   # - foo.nix (not default.nix) -> { foo = pkgs.callPackage ./foo.nix {}; }
   # - bar/ with default.nix     -> { bar = pkgs.callPackage ./bar {}; }   (leaf package)

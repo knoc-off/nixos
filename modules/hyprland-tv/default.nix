@@ -20,9 +20,7 @@ in
 
       mainMod = "SUPER";
 
-      # The TV is driven over HDMI: no fractional scaling, output resolution is
-      # whatever the panel reports.
-      displayScale = 1;
+      displayScale = 2;
 
       # Same self-contained plugin fragments as the laptop config. kinetic-scroll
       # is kept for the couch touchpad; scroll-overview is the primary "remote"
@@ -57,6 +55,14 @@ in
         enable = true;
         package = hyprnix.hyprland;
         systemd.enable = false; # UWSM handles session/systemd integration
+
+        # Enabling the module otherwise turns on home-manager's own xdg.portal
+        # layer, which sets NIX_XDG_DESKTOP_PORTAL_DIR to the user profile and
+        # so hides every portal declared at the system level -- including the
+        # RemoteDesktop backend KDE Connect needs. Portals live in the NixOS
+        # config (modules/users/tv.nix); this also drops the nixpkgs xdph that
+        # would otherwise shadow the hyprnix build.
+        portalPackage = null;
 
         configType = "lua";
       };
