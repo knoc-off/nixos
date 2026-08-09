@@ -87,13 +87,19 @@ in {
   #
   # extraCommands runs before the chain's final reject rule, so a plain append
   # is reached (nixos/modules/services/networking/firewall-iptables.nix).
-  #
-  # RCON is not opened to anything. server-ip is empty so it binds 0.0.0.0, but
-  # with no rule it is reachable only over loopback -- i.e. the `mcrcon`
-  # wrapper below, locally or via `ssh optiplex`. RCON is plaintext.
   networking.firewall.extraCommands = ''
     iptables -A nixos-fw -p tcp -s ${gateHost} --dport ${toString gamePort} -j nixos-fw-accept
   '';
+
+  # RCON is reachable from the whole tailnet, unlike the game port -- it is an
+  # admin interface, so the trust boundary is "my machines", not "Gate only".
+  # server-ip is unset, so it already binds 0.0.0.0; only the firewall gated it.
+  #
+  # The password is the sole authorisation check, and RCON grants the full
+  # server console, so this is as sensitive as tailnet SSH. The protocol is
+  # plaintext, which is acceptable only because WireGuard encrypts the hop --
+  # this port must never be reachable off the tailnet.
+  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [rconPort];
 
   # `sudo mcrcon "<command>"` -- reads the secret at runtime, talks to the
   # local RCON port.

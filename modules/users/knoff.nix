@@ -370,7 +370,12 @@
                 spotify
 
                 upkgs.opencode
-                upkgs.prismlauncher
+                # Must come from nixpkgs, not unstable: the session's Kvantum/qt6ct
+                # style plugins are built against nixpkgs' qtbase. An unstable
+                # prismlauncher links a newer qtbase, so qt6ct fails to resolve
+                # kvantum as its base style and proxies itself instead, recursing
+                # in QProxyStyle::standardPalette until the stack overflows.
+                prismlauncher
 
                 upkgs.claude-code
 
