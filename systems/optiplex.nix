@@ -13,6 +13,7 @@ in
   imports = [
     ./services/kdeconnect.nix
     ./services/minecraft.nix
+    ./services/minecraft-snapshots.nix
 
     inputs.determinate.nixosModules.default
 
@@ -183,6 +184,29 @@ in
 
     {
       services.udisks2.enable = true;
+      services.gvfs.enable = true;
+      services.devmon.enable = true;
+    }
+
+    {
+      # Not pulling in self.nixosModules.misc for this: it also flips on
+      # printing/avahi/networkmanager/fwupd (all mkDefault, but all unwanted
+      # on a TV box). ghostty.nix hardcodes FiraCode Nerd Font Mono and
+      # nothing here installed it, so the terminal silently fell back and
+      # every nerd-font glyph (starship, icons) rendered as tofu.
+      programs.dconf.enable = true;
+
+      fonts = {
+        enableDefaultPackages = true;
+        packages = with pkgs; [
+          noto-fonts
+          noto-fonts-cjk-sans
+          noto-fonts-color-emoji
+          liberation_ttf
+          nerd-fonts.fira-code
+        ];
+        fontconfig.defaultFonts.monospace = [ "FiraCode Nerd Font Mono" ];
+      };
     }
 
     {

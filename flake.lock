@@ -1774,11 +1774,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1784828784,
-        "narHash": "sha256-TMT2Ttx4Rl8PEo2IOfVbmcBdi74qcDBF8y/3DoynMss=",
+        "lastModified": 1786293074,
+        "narHash": "sha256-RClA+M5smYrQhL0nvD6KIHycF3Vjigmot1V/N6KhWno=",
         "ref": "refs/heads/main",
-        "rev": "bbf34c11116bbbd98c0a85b4752a041ee16e333d",
-        "revCount": 21,
+        "rev": "6beb7363750889a507a53532989381c567b53c0f",
+        "revCount": 31,
         "type": "git",
         "url": "ssh://git@github.com/knoc-off/minecraft-modpack.git"
       },

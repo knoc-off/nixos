@@ -14,9 +14,11 @@ in {
       # ACLs are authoritative here; NTFY_AUTH_ACCESS must stay unset (env
       # overrides server.yml per-key). admin needs no entry (role = all topics).
       auth-access = [
+        "normal:alerts:ro"
         "normal:cat-doorbell:ro"
         "normal:kitchenowl:ro"
         "normal:wohnungen:ro"
+        "publisher:alerts:wo"
         "publisher:cat-doorbell:wo"
         "publisher:kitchenowl:wo"
         "publisher:wohnungen:wo"

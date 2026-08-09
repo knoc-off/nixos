@@ -35,6 +35,7 @@
       import sqlite3
       import sys
       import time
+      import urllib.error
       import urllib.request
 
       BASE = "https://www.inberlinwohnen.de"
@@ -332,8 +333,18 @@
 
 
       def notify(rec, ntfy_url, topic, title, token):
+          """Publish through ntfy's JSON API rather than its header API.
+
+          urllib encodes header values as latin-1, so any umlaut -- in a
+          district like Neukoelln, or in the fixed 'Angebot oeffnen' action
+          label -- reaches ntfy as a byte that is not valid UTF-8, and ntfy
+          rejects the whole request with 400 (error code 40018). A JSON body is
+          UTF-8 by construction, so the problem cannot recur.
+
+          Returns True on success; the caller escalates failures.
+          """
           if not ntfy_url or not topic:
-              return
+              return True
           bits = []
           if rec["rooms"]:
               bits.append("%g Zi" % rec["rooms"])
@@ -348,24 +359,36 @@
           # Region goes in the title: ntfy shows it in the notification list
           # without having to expand the message.
           head = rec["district"] or title
-          headers = {
-              "Title": (head + ": " + (rec["title"] or ""))[:200],
-              "Tags": "house",
-              "Content-Type": "text/plain; charset=utf-8",
+          payload = {
+              "topic": topic,
+              "title": (head + ": " + (rec["title"] or ""))[:200],
+              "message": body.strip(),
+              "tags": ["house"],
           }
           if rec["deeplink"]:
-              headers["Actions"] = "view, Angebot öffnen, " + rec["deeplink"]
+              payload["actions"] = [{
+                  "action": "view",
+                  "label": "Angebot öffnen",
+                  "url": rec["deeplink"],
+              }]
+          headers = {"Content-Type": "application/json"}
           if token:
               headers["Authorization"] = "Bearer " + token
           req = urllib.request.Request(
-              ntfy_url.rstrip("/") + "/" + topic,
-              data=body.strip().encode("utf-8"),
+              ntfy_url.rstrip("/") + "/",
+              data=json.dumps(payload).encode("utf-8"),
               headers=headers,
           )
           try:
               urllib.request.urlopen(req, timeout=20).close()
+              return True
+          except urllib.error.HTTPError as e:
+              # ntfy explains itself in the body; the status line alone does not.
+              detail = e.read(500).decode("utf-8", "replace").strip()
+              log("ntfy publish failed for %s: %s: %s" % (rec["id"], e, detail))
           except Exception as e:
               log("ntfy publish failed for %s: %s" % (rec["id"], e))
+          return False
 
 
       def opt_float(name):
@@ -420,6 +443,7 @@
           updates = ", ".join(f + "=?" for f in FIELDS if f != "id")
           new = 0
           sent = 0
+          failed = 0
           for rec in sorted(listings.values(), key=lambda r: r["created_at"] or ""):
               values = [rec[f] for f in FIELDS]
               if rec["id"] in known:
@@ -435,8 +459,10 @@
               )
               new += 1
               if not first_run and matches(rec, flt):
-                  notify(rec, ntfy_url, topic, title, token)
-                  sent += 1
+                  if notify(rec, ntfy_url, topic, title, token):
+                      sent += 1
+                  else:
+                      failed += 1
 
           # A listing missing from page 1 has merely scrolled off; only treat it
           # as gone when a full sweep did not see it.
@@ -452,9 +478,14 @@
 
           db.commit()
           db.close()
-          log("scraped=%d new=%d notified=%d gone=%d%s" % (
-              len(listings), new, sent, gone,
+          log("scraped=%d new=%d notified=%d failed=%d gone=%d%s" % (
+              len(listings), new, sent, failed, gone,
               " (seeded, no alerts)" if first_run else ""))
+          # The listing is already recorded, so it will never be retried. A
+          # silently dropped alert is the one failure mode this service exists
+          # to avoid, so fail the unit and let systemd surface it.
+          if failed:
+              raise SystemExit(1)
 
 
       if __name__ == "__main__":

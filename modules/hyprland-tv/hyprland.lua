@@ -190,6 +190,12 @@ hl.bind("Menu", function()
 	hl.plugin.scrolloverview.overview("toggle all")
 end)
 
+-- Couch file browser: a layer-shell overlay (see pkgs/tv-files), toggled via
+-- Quickshell's own IPC rather than hl.exec_cmd every press -- the shell stays
+-- resident so this is instant, no cold start.
+hl.bind("F5", hl.dsp.exec_cmd(env.qs .. " -c tv-files ipc call browser toggle"))
+hl.bind(mainMod .. " + F5", hl.dsp.exec_cmd(env.qs .. " -c tv-files ipc call browser toggle"))
+
 -- Workspaces
 for i = 1, 9 do
 	hl.bind(mainMod .. " + " .. i, hl.dsp.focus({ workspace = i }))

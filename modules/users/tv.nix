@@ -90,6 +90,7 @@
               self.homeModules.noctalia
               self.homeModules.hyprland-tv
               self.homeModules.tv-away
+              self.homeModules.tv-files
               self.homeModules.stylix
 
               self.homeModules.git
@@ -155,6 +156,41 @@
             home = {
               username = user;
               homeDirectory = "/home/${user}";
+            };
+
+            # modules/stylix.nix only turns on the gtk/qt targets, shared with
+            # every host. kde and mpv are TV-specific: Dolphin/Okular/Gwenview/Ark
+            # are all KDE apps installed below, and qt alone only sets the
+            # platform theme, not kdeglobals -- so without this they stayed
+            # unthemed even with stylix enabled.
+            stylix.targets = {
+              kde.enable = true;
+              mpv.enable = true;
+            };
+
+            # Couch-navigable file browser (F5 / tv-remote files). Media is
+            # the btrfs subvolume from disks.btrfsLuks.extraSubvolumes in
+            # systems/optiplex.nix; USB drives show up automatically under
+            # /run/media/tv via services.gvfs + devmon.
+            programs.tv-files = {
+              enable = true;
+              places = [
+                {
+                  name = "Media";
+                  path = "/srv/media";
+                  icon = "folder-videos";
+                }
+                {
+                  name = "Home";
+                  path = "/home/${user}";
+                  icon = "user-home";
+                }
+                {
+                  name = "Downloads";
+                  path = "/home/${user}/Downloads";
+                  icon = "folder-download";
+                }
+              ];
             };
 
             #  gtk = {
@@ -397,6 +433,10 @@
                   "50-launcher" = {
                     name = "Launcher";
                     command = "${tvRemote} launcher";
+                  };
+                  "55-files" = {
+                    name = "Files";
+                    command = "${tvRemote} files";
                   };
                   "60-sleep" = {
                     name = "Sleep Now";

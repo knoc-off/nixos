@@ -9,6 +9,7 @@
   hyprland,
   jq,
   systemd,
+  quickshell,
 }:
 writeShellApplication {
   name = "tv-remote";
@@ -19,6 +20,7 @@ writeShellApplication {
     hyprland
     jq
     systemd
+    quickshell
   ];
 
   text = ''
@@ -57,6 +59,7 @@ writeShellApplication {
       next|prev   focus the next/previous window along the tape
       close       close the focused window
       launcher    toggle the noctalia launcher
+      files       toggle the couch file browser
       app NAME    focus NAME if running, else start it (firefox, spotify)
       sleep       blank the screen and tear down tv-active.target
     EOF
@@ -73,6 +76,7 @@ writeShellApplication {
       # From $PATH deliberately: this must hit the noctalia instance actually
       # running in the session, not a separately built one.
       launcher) noctalia-shell ipc call launcher toggle ;;
+      files) qs -c tv-files ipc call browser toggle ;;
       app)
         case "''${2:-}" in
           firefox)

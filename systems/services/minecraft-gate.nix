@@ -11,9 +11,10 @@
 # `online-mode = true` over there keeps working untouched and Gate holds no
 # secrets.
 #
-# Tailnet members do not come through here at all -- headscale.nix resolves
-# mc.niko.ink to optiplex directly (split horizon), avoiding a Berlin ->
-# Falkenstein -> Berlin round trip.
+# Tailnet members come through here too: headscale.nix deliberately publishes
+# no mc.niko.ink record (a split-horizon record pointing at optiplex would be
+# rejected by its firewall, which only accepts the game port from Gate), so
+# every client resolves the public name and arrives at this listener.
 {self, ...}: let
   # Backend lives on optiplex. Literal tailnet IP rather than MagicDNS: this
   # host sets services.tailnet.acceptDns = false and so cannot resolve

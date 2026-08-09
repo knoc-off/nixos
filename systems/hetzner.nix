@@ -45,6 +45,7 @@
     ./services/trilium.nix
     ./services/ntfy.nix
     ./services/minecraft-gate.nix
+    ./services/minecraft-pack.nix
 
     ./services/headscale.nix
     self.nixosModules.tailnet

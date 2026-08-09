@@ -45,6 +45,7 @@ in
         M.wpctl = "${pkgs.wireplumber}/bin/wpctl"
         M.playerctl = "${lib.getExe pkgs.playerctl}"
         M.display_scale = ${toString displayScale}
+        M.qs = "${lib.getExe config.programs.tv-files.quickshellPackage}"
         return M
       '';
     in
