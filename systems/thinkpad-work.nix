@@ -51,6 +51,14 @@ in
       );
     }
 
+    self.nixosModules.tailnet
+    {
+      services.tailnet = {
+        enable = true;
+        acceptDns = true;
+      };
+    }
+
     self.nixosModules.users.niko
     self.nixosModules.nix
     self.nixosModules.nh

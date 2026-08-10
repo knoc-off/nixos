@@ -34,8 +34,6 @@ in
 
     self.nixosModules.tailnet
     {
-      # Client, not server: MagicDNS is what routes the hub's service names to
-      # tailnet IPs, so Caddy sees a trusted source and skips the OAuth redirect.
       services.tailnet = {
         enable = true;
         acceptDns = true;
