@@ -1,8 +1,8 @@
-# Minecraft server -- bricks-building-extended (NeoForge 1.21.1)
+# Minecraft server -- inkwell (NeoForge 1.21.1)
 #
 # Runs on optiplex. The server itself comes from the modpack flake's
 # nixosModules.default, which defines services.minecraft-servers.servers.
-# "bricks-building-extended" and enables the nix-minecraft service. Here we add
+# "inkwell" and enables the nix-minecraft service. Here we add
 # only the host-side concerns: the sops-provided RCON password, the port
 # policy, and a local `mcrcon` wrapper.
 #
@@ -31,7 +31,7 @@
   pkgs,
   ...
 }: let
-  serverName = "bricks-building-extended";
+  serverName = "inkwell";
   gamePort = 25565;
   rconPort = 25575;
 

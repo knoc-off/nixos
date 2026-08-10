@@ -1,9 +1,9 @@
 # Modpack distribution -- self-hosted packwiz remote.
 #
-# Serves the client side of bricks-building-extended so players install and
+# Serves the client side of inkwell so players install and
 # update it from here and nowhere else:
 #
-#   https://mc.niko.ink/pack/bricks-building-extended.zip  <- import into Prism
+#   https://mc.niko.ink/pack/inkwell.zip  <- import into Prism
 #   https://mc.niko.ink/pack/pack.toml                     <- packwiz remote
 #   https://mc.niko.ink/pack/jars/*.jar                    <- the mods
 #

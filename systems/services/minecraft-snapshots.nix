@@ -30,7 +30,7 @@
   pkgs,
   ...
 }: let
-  serverName = "bricks-building-extended";
+  serverName = "inkwell";
   serverUnit = "minecraft-server-${serverName}.service";
   rconPort = 25575;
   dataDir = "/srv/minecraft";
