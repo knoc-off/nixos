@@ -40,6 +40,12 @@ git, ripgrep, fd, jq, curl, bat, sed, awk, grep, tree, tar, nix (build/shell/run
 - **Only use these when the user explicitly asks you to interact with the Windows
   VM.** Do not use them otherwise.
 
+## Git
+- **Committing is fine, pushing is not.** No auth key, token or credential helper is
+  mounted, and git-over-SSH is disabled — pushes will fail. Commit freely and leave
+  pushing to the user, who does it from the host after reviewing your work.
+- Cloning over HTTPS works; cloning over SSH does not.
+
 ## Tool preferences
 - Prefer your **native built-in tools** (Read, Grep, Glob, Edit, Task) over shelling out
   to bash equivalents (`cat`, `grep`, `find`, `sed`) when possible — they're faster,

@@ -1,5 +1,5 @@
 { ... }: {
-  home = { pkgs, ... }: {
+  home = { config, pkgs, ... }: {
     home.shellAliases = {
       g = "git";
     };
@@ -91,11 +91,11 @@
           in "!${changesScript}/bin/git-changes";
         };
       };
-      # signing = {
-      #   key = "your-key-id";
-      #   format = "ssh";
-      #   signByDefault = true;
-      # };
+      signing = {
+        format = "ssh";
+        key = "${config.home.homeDirectory}/.ssh/id_ed25519_signing.pub";
+        signByDefault = true;
+      };
     };
 
     programs.delta = {

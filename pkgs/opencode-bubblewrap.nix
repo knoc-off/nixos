@@ -46,6 +46,12 @@ let
     ];
   };
 
+  gitSshDeny = pkgs.writeShellScript "git-ssh-denied" ''
+    echo "jailed-opencode: git over SSH is disabled inside the sandbox." >&2
+    echo "  Commit freely; fetch/push over SSH from the host." >&2
+    exit 1
+  '';
+
   # Windows VM helpers — thin wrappers around sshpass+ssh/scp for the local
   # QEMU Windows VM (SSH forwarded to 127.0.0.1:2223). The jail shares the host
   # net namespace, so 127.0.0.1 reaches the same forwarded port as on the host.
@@ -402,6 +408,14 @@ jail "jailed-opencode" upkgs.fish (
         [ -d "$HOME/.claude-mem" ] && RUNTIME_ARGS+=(--bind "$HOME/.claude-mem" "$HOME/.claude-mem")
       fi
 
+      if [[ -r "$HOME/.ssh/id_ed25519_signing" ]]; then
+        RUNTIME_ARGS+=(--ro-bind "$HOME/.ssh/id_ed25519_signing" "$HOME/.ssh/id_ed25519_signing")
+        RUNTIME_ARGS+=(--ro-bind "$HOME/.ssh/id_ed25519_signing.pub" "$HOME/.ssh/id_ed25519_signing.pub")
+      fi
+      RUNTIME_ARGS+=(--setenv GIT_CONFIG_COUNT 1)
+      RUNTIME_ARGS+=(--setenv GIT_CONFIG_KEY_0 core.sshCommand)
+      RUNTIME_ARGS+=(--setenv GIT_CONFIG_VALUE_0 "${gitSshDeny}")
+
       # ── Pass computed values into the jail ───────────────────
       RUNTIME_ARGS+=(--setenv JAIL_PROXY_PORT "$JAIL_PROXY_PORT")
       RUNTIME_ARGS+=(--setenv JAIL_MEM_PORT "$JAIL_MEM_PORT")
@@ -461,11 +475,6 @@ jail "jailed-opencode" upkgs.fish (
       ${entry}
     ''))
 
-    # Persist git identity, aliases, and global ignores into the jail.
-    # Read-only: the agent gets your config but can't rewrite it to add a
-    # remote/credential or change identity. No SSH key or credential helper
-    # is ever mounted, so authenticated pushes to real remotes remain
-    # impossible — the credential boundary is the enforcement, not config.
     (try-ro-bind (noescape "\"$HOME/.config/git\"") (noescape "~/.config/git"))
     (try-ro-bind (noescape "\"$HOME/.gitignore\"") (noescape "~/.gitignore"))
 
