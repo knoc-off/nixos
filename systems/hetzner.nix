@@ -8,7 +8,13 @@
   self,
   hostname,
   ...
-}: {
+}:
+let
+  inherit (self.lib) ssh;
+
+in
+
+{
   imports = [
     (modulesPath + "/installer/scan/not-detected.nix")
     (modulesPath + "/profiles/qemu-guest.nix")
@@ -17,18 +23,18 @@
     {
       sops = {
         defaultSopsFile = ./secrets/${hostname}/default.yaml;
-        age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
+        age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
 
         secrets = {
-          "services/website/env" = {};
-          "services/kitchenowl/jwt-secret" = {};
-          "services/kitchenowl/api-token" = {};
-          "services/kitchenowl/oauth-client-id" = {};
-          "services/kitchenowl/oauth-client-secret" = {};
-          "services/ntfy/admin-hash" = {};
-          "services/ntfy/normal-hash" = {};
-          "services/ntfy/publisher-hash" = {};
-          "services/ntfy/publish-token" = {};
+          "services/website/env" = { };
+          "services/kitchenowl/jwt-secret" = { };
+          "services/kitchenowl/api-token" = { };
+          "services/kitchenowl/oauth-client-id" = { };
+          "services/kitchenowl/oauth-client-secret" = { };
+          "services/ntfy/admin-hash" = { };
+          "services/ntfy/normal-hash" = { };
+          "services/ntfy/publisher-hash" = { };
+          "services/ntfy/publish-token" = { };
         };
       };
     }
@@ -49,7 +55,7 @@
 
     ./services/headscale.nix
     self.nixosModules.tailnet
-    {services.tailnet.enable = true;}
+    { services.tailnet.enable = true; }
   ];
 
   # KitchenOwl shopping-list -> ntfy change notifier.
@@ -82,7 +88,7 @@
       enable = true;
       clientIdFile = config.sops.secrets."services/kitchenowl/oauth-client-id".path;
       clientSecretFile = config.sops.secrets."services/kitchenowl/oauth-client-secret".path;
-      allowedGitHubUsers = ["knoc-off"];
+      allowedGitHubUsers = [ "knoc-off" ];
     };
   };
 
@@ -92,7 +98,10 @@
     dates = "weekly";
     options = "--delete-older-than 30d";
   };
-  nix.settings.experimental-features = ["nix-command" "flakes"];
+  nix.settings.experimental-features = [
+    "nix-command"
+    "flakes"
+  ];
 
   time.timeZone = "Europe/Berlin";
 
@@ -100,9 +109,13 @@
   networking.firewall = {
     enable = true;
     # 25565: Gate, the public Minecraft entrypoint (see services/minecraft-gate.nix).
-    allowedTCPPorts = [80 443 25565];
+    allowedTCPPorts = [
+      80
+      443
+      25565
+    ];
     # UDP 3478: STUN for the embedded Headscale DERP relay.
-    allowedUDPPorts = [3478];
+    allowedUDPPorts = [ 3478 ];
     logRefusedConnections = true;
   };
 
@@ -188,9 +201,10 @@
   # non-root admin for audit trail
   users.users.knoff = {
     isNormalUser = true;
-    extraGroups = ["wheel"];
+    extraGroups = [ "wheel" ];
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"
+      ssh.framework13 # should be identical
     ];
   };
 
@@ -203,9 +217,13 @@
   # emergency recovery
   users.users.root.openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"
+    ssh.framework13 # should be identical
   ];
 
-  environment.systemPackages = map lib.lowPrio [pkgs.curl pkgs.gitMinimal];
+  environment.systemPackages = map lib.lowPrio [
+    pkgs.curl
+    pkgs.gitMinimal
+  ];
 
   system.stateVersion = "23.11";
 }
