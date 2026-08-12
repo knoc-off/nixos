@@ -1,7 +1,7 @@
 //! `marki-typst` — render `typst` blocks by shelling out to the
 //! `typst` binary.
 //!
-//! Implements `marki_core::BlockRenderer` for the lang token `typst`.
+//! Implements `marki_render::Renderer` for the lang token `typst`.
 //! The block body is **raw Typst** (not TOML, unlike `map` and `media`).
 //! In a card's markdown, authors write a fenced block tagged `typst`
 //! containing arbitrary Typst source — `#import` directives, math,
@@ -10,7 +10,7 @@
 //! The renderer prepends a small preamble that auto-sizes the page
 //! to the content and removes default margins/fill, invokes
 //! `typst compile --format svg`, and emits the resulting SVG as an
-//! [`marki_core::EmittedAsset`].
+//! [`marki_render::Asset`].
 //!
 //! Compiled SVGs are cached at `<cache_dir>/typst/<key>/output.svg`,
 //! keyed by `blake3(RENDER_VERSION_TYPST | preamble | source)`.
@@ -26,7 +26,7 @@ pub mod version;
 
 use std::path::PathBuf;
 
-use marki_core::{BlockError, BlockRenderer, RenderCtx, RenderedBlock};
+use marki_render::{Fragment, Input, RenderCtx, RenderError, Renderer};
 
 pub use error::TypstError;
 pub use version::RENDER_VERSION_TYPST;
@@ -48,13 +48,13 @@ impl TypstRenderer {
     }
 }
 
-impl BlockRenderer for TypstRenderer {
+impl Renderer for TypstRenderer {
     fn lang(&self) -> &'static str {
         TYPST_LANG
     }
 
-    fn render(&self, src: &str, ctx: &mut RenderCtx<'_>) -> Result<RenderedBlock, BlockError> {
-        Ok(render::run(&self.binary, src, ctx)?)
+    fn render(&self, input: Input<'_>, ctx: &mut RenderCtx<'_>) -> Result<Fragment, RenderError> {
+        Ok(render::run(&self.binary, input.as_source()?, ctx)?)
     }
 }
 

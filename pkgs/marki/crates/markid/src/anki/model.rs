@@ -2,12 +2,13 @@
 //!
 //! Identity model:
 //!
-//!   * `#id(<hex>)` in the markdown → used as the Anki note's `guid` on
-//!     `addNote`. That guid stays stable across all devices, so moving a
-//!     file or renaming doesn't confuse any client.
-//!   * content hash → stored as a tag `marki::hash:<hex>` on the note.
-//!     No hidden fields, no custom note types — stock `Basic` / `Cloze`
-//!     are used verbatim.
+//!   * `#id(<hex>)` in the markdown -> stored as a `marki::id:<hex>` tag on
+//!     the note. AnkiConnect offers no way to set a note's `guid`, so the
+//!     tag is the identity carrier.
+//!   * content hash -> stored as a tag `marki::hash:<hex>` on the note.
+//!
+//! Stock `Basic` / `Cloze` are used for plain cards, but `#model(<name>)`
+//! cards get their own generated note type (see `note_type.rs`).
 //!
 //! The tag `marki` is applied to every managed note so
 //! `findNotes tag:marki` returns only ours.

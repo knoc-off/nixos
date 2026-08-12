@@ -1,5 +1,5 @@
 //! Crate-local error type. Every variant is convertible into
-//! [`marki_core::BlockError`] at the trait boundary.
+//! [`marki_render::RenderError`] at the trait boundary.
 
 #[derive(Debug, thiserror::Error)]
 pub enum MapError {
@@ -19,9 +19,9 @@ pub enum MapError {
     Internal(String),
 }
 
-impl From<MapError> for marki_core::BlockError {
+impl From<MapError> for marki_render::RenderError {
     fn from(e: MapError) -> Self {
-        use marki_core::BlockError as B;
+        use marki_render::RenderError as B;
         match e {
             MapError::Parse(s) => B::Parse(s),
             MapError::Resolve(s) => B::Resolve(s),

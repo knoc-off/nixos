@@ -6,7 +6,7 @@
 //!                    resolve → pick canvas → project → compose → style → write cache → embed
 //! ```
 //!
-//! Returns a [`marki_core::RenderedBlock`] ready for the daemon to
+//! Returns a [`marki_render::Fragment`] ready for the daemon to
 //! splice into a card and upload to Anki.
 //!
 //! ## Canvas sizing
@@ -33,7 +33,7 @@ use crate::sidecar::{Sidecar, SidecarLayer};
 use crate::style::load as load_theme;
 use crate::trim;
 use crate::unwrap;
-use marki_core::{AssetMime, EmittedAsset, RenderedBlock};
+use marki_render::{AssetMime, Asset, Fragment};
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -57,7 +57,7 @@ struct ResolvedLayer<'a> {
 ///
 /// On a cache hit, the SVGs and sidecar are read directly from disk
 /// and no resolve / project / compose work happens.
-pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<RenderedBlock, MapError> {
+pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<Fragment, MapError> {
     let theme = load_theme(&spec.style)?;
     let key = cache_key(spec, &theme.bytes)?;
 
@@ -565,7 +565,7 @@ fn build_block(
     render_h: u32,
     reveals: &BTreeMap<String, RevealMode>,
     svg_files: &[(String, String, Vec<u8>)],
-) -> RenderedBlock {
+) -> Fragment {
     let media_files: Vec<(String, String)> = svg_files
         .iter()
         .map(|(name, _cache_name, _)| (name.clone(), layer_media_filename(key, name)))
@@ -581,18 +581,18 @@ fn build_block(
         .collect();
     let embed = embed_layers(render_w, render_h, &layers);
 
-    let mut assets: Vec<EmittedAsset> = svg_files
+    let mut assets: Vec<Asset> = svg_files
         .iter()
-        .map(|(name, _cache_name, bytes)| EmittedAsset {
+        .map(|(name, _cache_name, bytes)| Asset {
             filename: layer_media_filename(key, name),
             bytes: bytes.clone(),
             mime: AssetMime::SvgXml,
         })
         .collect();
 
-    RenderedBlock {
-        front_html: embed.front_html,
-        back_html_extras: embed.back_html_extras,
+    Fragment {
+        html: embed.front_html,
+        reveal: embed.back_html_extras,
         assets,
     }
 }
@@ -601,7 +601,7 @@ fn load_from_cache(
     spec: &MapSpec,
     cache_root: &Path,
     key: &str,
-) -> Result<RenderedBlock, MapError> {
+) -> Result<Fragment, MapError> {
     // Read sidecar first — its `layers` array is the authoritative
     // source for layer order (written in TOML/IndexMap order during
     // the fresh render). Never rely on filesystem directory listing

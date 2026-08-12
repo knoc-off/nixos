@@ -3,7 +3,7 @@
 //! Registers custom types and their methods so Rhai scripts can call
 //! `note.paragraphs()`, `note.code_block("map")`, `block.html()`, etc.
 
-use marki_core::note::{Block, Note, TagValue};
+use crate::note::{Block, Note, TagValue};
 use rhai::{Dynamic, Engine, ImmutableString};
 
 use super::context::register_context_types;

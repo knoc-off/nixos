@@ -1,10 +1,11 @@
 [package]
-name = "marki-typst"
+name = "marki-render"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+authors.workspace = true
 
 [dependencies]
-blake3.workspace = true
-marki-render.workspace = true
+serde.workspace = true
 thiserror.workspace = true
+toml.workspace = true

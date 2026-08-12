@@ -9,7 +9,7 @@ use syntect::highlighting::{Theme, ThemeSet};
 use syntect::html::highlighted_html_for_string;
 use syntect::parsing::SyntaxSet;
 
-use crate::util::escape_html;
+use marki_render::escape_html;
 
 static SYNTAX_SET: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_newlines);
 

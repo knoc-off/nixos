@@ -1,6 +1,6 @@
 //! `marki-media` — render `media` blocks to images or audio.
 //!
-//! Implements `marki_core::BlockRenderer` for the lang token `media`.
+//! Implements `marki_render::Renderer` for the lang token `media`.
 //! See `dsl.rs` for the TOML body format.
 //!
 //! The renderer supports multiple named media sources. The `src` field
@@ -16,7 +16,7 @@
 //! → m4a → wav). Authors can also write the extension explicitly
 //! (`src = "diagrams/foo.png"`) for exact matches.
 //!
-//! Resolved files are emitted as `EmittedAsset`s with content-addressed
+//! Resolved files are emitted as `Asset`s with content-addressed
 //! filenames so two cards referencing the same logical file converge in
 //! Anki's media collection. The rendered HTML references the asset by
 //! basename — no inline base64 — keeping HTML small and letting Anki's
@@ -27,8 +27,8 @@ pub mod error;
 
 use std::path::{Path, PathBuf};
 
-use marki_core::{AssetMime, BlockError, BlockRenderer, EmittedAsset, RenderCtx, RenderedBlock};
-use marki_core::escape_html as escape_attr;
+use marki_render::{Asset, AssetMime, Fragment, Input, RenderCtx, RenderError, Renderer};
+use marki_render::escape_html as escape_attr;
 
 pub use error::MediaError;
 
@@ -63,13 +63,13 @@ impl MediaRenderer {
     }
 }
 
-impl BlockRenderer for MediaRenderer {
+impl Renderer for MediaRenderer {
     fn lang(&self) -> &'static str {
         MEDIA_LANG
     }
 
-    fn render(&self, src: &str, _ctx: &mut RenderCtx<'_>) -> Result<RenderedBlock, BlockError> {
-        let spec = dsl::parse_media_spec(src).map_err(|e| BlockError::Parse(e.to_string()))?;
+    fn render(&self, input: Input<'_>, _ctx: &mut RenderCtx<'_>) -> Result<Fragment, RenderError> {
+        let spec: dsl::MediaSpec = input.deserialize()?;
         Ok(render_media(&self.sources, &spec)?)
     }
 }
@@ -77,7 +77,7 @@ impl BlockRenderer for MediaRenderer {
 fn render_media(
     sources: &[(String, PathBuf)],
     spec: &dsl::MediaSpec,
-) -> Result<RenderedBlock, MediaError> {
+) -> Result<Fragment, MediaError> {
     let (path, ext) = resolve(&spec.src, sources)?;
     let class = classify(ext).ok_or_else(|| MediaError::UnsupportedExt {
         src: spec.src.clone(),
@@ -97,10 +97,10 @@ fn render_media(
         MediaClass::Audio => render_audio_html(spec, &asset_filename),
     };
 
-    Ok(RenderedBlock {
-        front_html: html,
-        back_html_extras: String::new(),
-        assets: vec![EmittedAsset {
+    Ok(Fragment {
+        html,
+        reveal: String::new(),
+        assets: vec![Asset {
             filename: asset_filename,
             bytes,
             mime,
@@ -525,11 +525,11 @@ mod tests {
             preload: dsl::PreloadMode::Auto,
         };
         let out = render_media(&sources, &spec).unwrap();
-        assert!(out.front_html.contains("max-width:300px"));
-        assert!(out.front_html.contains("<img "));
-        assert!(out.front_html.contains("marki-media-"));
-        assert!(out.front_html.contains("-de.svg"));
-        assert!(!out.front_html.contains("data:image"));
+        assert!(out.html.contains("max-width:300px"));
+        assert!(out.html.contains("<img "));
+        assert!(out.html.contains("marki-media-"));
+        assert!(out.html.contains("-de.svg"));
+        assert!(!out.html.contains("data:image"));
         assert_eq!(out.assets.len(), 1);
         assert_eq!(out.assets[0].mime, AssetMime::SvgXml);
     }
@@ -548,7 +548,7 @@ mod tests {
             preload: dsl::PreloadMode::Auto,
         };
         let out = render_media(&sources, &spec).unwrap();
-        assert!(out.front_html.contains("max-width:200px"));
+        assert!(out.html.contains("max-width:200px"));
     }
 
     #[test]
@@ -565,7 +565,7 @@ mod tests {
             preload: dsl::PreloadMode::Auto,
         };
         let out = render_media(&sources, &spec).unwrap();
-        assert!(out.front_html.contains("alt=\"\""));
+        assert!(out.html.contains("alt=\"\""));
     }
 
     #[test]
@@ -582,8 +582,8 @@ mod tests {
             preload: dsl::PreloadMode::Auto,
         };
         let out = render_media(&sources, &spec).unwrap();
-        assert!(out.front_html.contains("&quot;quoted&quot;"));
-        assert!(out.front_html.contains("&lt;flag&gt;"));
+        assert!(out.html.contains("&quot;quoted&quot;"));
+        assert!(out.html.contains("&lt;flag&gt;"));
     }
 
     #[test]
@@ -600,12 +600,12 @@ mod tests {
             preload: dsl::PreloadMode::Auto,
         };
         let out = render_media(&sources, &spec).unwrap();
-        assert!(out.front_html.contains("<audio "));
-        assert!(out.front_html.contains(" controls"));
-        assert!(out.front_html.contains("preload=\"auto\""));
-        assert!(!out.front_html.contains(" loop"));
-        assert!(!out.front_html.contains(" autoplay"));
-        assert!(out.front_html.contains("morning.mp3"));
+        assert!(out.html.contains("<audio "));
+        assert!(out.html.contains(" controls"));
+        assert!(out.html.contains("preload=\"auto\""));
+        assert!(!out.html.contains(" loop"));
+        assert!(!out.html.contains(" autoplay"));
+        assert!(out.html.contains("morning.mp3"));
         assert_eq!(out.assets[0].mime, AssetMime::AudioMpeg);
     }
 
@@ -623,13 +623,13 @@ mod tests {
             preload: dsl::PreloadMode::None,
         };
         let out = render_media(&sources, &spec).unwrap();
-        assert!(!out.front_html.contains(" controls"));
-        assert!(out.front_html.contains(" loop"));
-        assert!(out.front_html.contains(" autoplay"));
-        assert!(out.front_html.contains("preload=\"none\""));
-        assert!(out.front_html.contains("aria-label=\"morning\""));
+        assert!(!out.html.contains(" controls"));
+        assert!(out.html.contains(" loop"));
+        assert!(out.html.contains(" autoplay"));
+        assert!(out.html.contains("preload=\"none\""));
+        assert!(out.html.contains("aria-label=\"morning\""));
         // size silently ignored — no max-width on audio container.
-        assert!(!out.front_html.contains("max-width:300px"));
+        assert!(!out.html.contains("max-width:300px"));
     }
 
     #[test]
@@ -683,8 +683,8 @@ mod tests {
             source_path: &PathBuf::from("/tmp/x.md"),
             cache_dir: &PathBuf::from("/tmp/cache"),
         };
-        let err = r.render("not = [valid", &mut ctx).unwrap_err();
-        assert!(matches!(err, BlockError::Parse(_)));
+        let err = r.render(Input::Raw("not = [valid"), &mut ctx).unwrap_err();
+        assert!(matches!(err, RenderError::Parse(_)));
     }
 
     // -- test helpers --

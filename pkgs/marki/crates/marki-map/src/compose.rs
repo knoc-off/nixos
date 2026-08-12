@@ -7,7 +7,7 @@
 
 use crate::geometry::{Geometry, LonLat};
 use crate::project::Projector;
-use marki_core::escape_html as escape_attr;
+use marki_render::escape_html as escape_attr;
 use std::fmt::Write;
 
 /// One renderable feature on a layer.

@@ -1,5 +1,5 @@
 //! Crate-local error type. Every variant is convertible into
-//! [`marki_core::BlockError`] at the trait boundary.
+//! [`marki_render::RenderError`] at the trait boundary.
 
 use std::path::PathBuf;
 
@@ -15,9 +15,9 @@ pub enum TypstError {
     Io(#[from] std::io::Error),
 }
 
-impl From<TypstError> for marki_core::BlockError {
+impl From<TypstError> for marki_render::RenderError {
     fn from(e: TypstError) -> Self {
-        use marki_core::BlockError as B;
+        use marki_render::RenderError as B;
         match e {
             TypstError::BinaryNotFound(_) => B::Internal(e.to_string()),
             TypstError::Compile(_) => B::Internal(e.to_string()),

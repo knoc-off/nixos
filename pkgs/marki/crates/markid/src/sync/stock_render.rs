@@ -10,10 +10,10 @@
 //! This replaces the old parser's inline rendering + placeholder splicing
 //! approach with a single-pass render over the Note's block structure.
 
-use marki_core::note::{Block, Note};
-use marki_core::{BlockRequest, BlockSide, EmittedAsset};
-use marki_core::highlighter::highlight_code;
-use marki_core::util::escape_html;
+use crate::note::{Block, Note};
+use marki_render::{Asset, Input};
+use crate::highlighter::highlight_code;
+use marki_render::escape_html;
 use std::path::Path;
 
 use crate::render::Registry;
@@ -24,7 +24,7 @@ pub struct StockRenderResult {
     /// ("Text", html), ("Back Extra", html) for Cloze.
     pub fields: Vec<(String, String)>,
     /// Assets emitted by block renderers (SVGs, etc.)
-    pub assets: Vec<EmittedAsset>,
+    pub assets: Vec<Asset>,
     /// Non-fatal errors encountered during rendering.
     pub errors: Vec<String>,
 }
@@ -44,7 +44,7 @@ pub fn render_stock(
     let mut errors = Vec::new();
 
     let (front_html, front_extras, front_assets) = render_section(
-        sections.first().map(|s| s.as_slice()).unwrap_or(&[]),
+        note.section(0),
         registry,
         source_path,
         cache_dir,
@@ -53,7 +53,7 @@ pub fn render_stock(
 
     let (back_html, back_extras, back_assets) = if sections.len() > 1 {
         render_section(
-            sections[1].as_slice(),
+            note.section(1),
             registry,
             source_path,
             cache_dir,
@@ -98,37 +98,29 @@ pub fn render_stock(
 ///
 /// Returns (section_html, back_html_extras, assets).
 fn render_section(
-    blocks: &[&Block],
+    blocks: &[Block],
     registry: &Registry,
     source_path: &Path,
     cache_dir: &Path,
     errors: &mut Vec<String>,
-) -> (String, String, Vec<EmittedAsset>) {
+) -> (String, String, Vec<Asset>) {
     let mut html = String::new();
     let mut back_extras = String::new();
     let mut assets = Vec::new();
-    let mut block_index = 0usize;
 
     for block in blocks {
         match block {
             Block::CodeBlock { lang: Some(lang), source } => {
                 if is_external_lang(lang, registry) {
                     // Dispatch through block renderer.
-                    let req = BlockRequest {
-                        id: format!("stock-{block_index}"),
-                        lang: lang.clone(),
-                        source: source.clone(),
-                        byte_offset: 0,
-                        side: BlockSide::Front,
-                    };
-                    match registry.dispatch(&req, source_path, cache_dir) {
+                    match registry.dispatch(lang, Input::Raw(source), source_path, cache_dir) {
                         Ok(rb) => {
-                            html.push_str(&rb.front_html);
-                            if !rb.back_html_extras.is_empty() {
+                            html.push_str(&rb.html);
+                            if !rb.reveal.is_empty() {
                                 if !back_extras.is_empty() {
                                     back_extras.push('\n');
                                 }
-                                back_extras.push_str(&rb.back_html_extras);
+                                back_extras.push_str(&rb.reveal);
                             }
                             assets.extend(rb.assets);
                         }
@@ -152,11 +144,9 @@ fn render_section(
                     let effective_lang = lang.strip_prefix('_').unwrap_or(lang);
                     html.push_str(&highlight_code(source, effective_lang));
                 }
-                block_index += 1;
             }
             Block::CodeBlock { lang: None, source } => {
                 html.push_str(&highlight_code(source, "txt"));
-                block_index += 1;
             }
             Block::ThematicBreak => {
                 // Section boundaries are handled by the caller; skip
@@ -176,8 +166,8 @@ fn is_external_lang(lang: &str, registry: &Registry) -> bool {
     registry.external_langs().contains(&lang)
 }
 
-/// Render a non-code block to HTML. Matches note.rs::block_html but
-/// is kept here so we don't depend on marki-core internal functions.
+/// Render a non-code block to HTML. Duplicates `note.rs::block_html`;
+/// phase 3 collapses the two into a single render path.
 fn block_to_html(block: &Block) -> String {
     match block {
         Block::Heading { html, level, .. } => format!("<h{level}>{html}</h{level}>"),
@@ -192,7 +182,7 @@ fn block_to_html(block: &Block) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use marki_core::note_parser::parse_note;
+    use crate::note_parser::parse_note;
     use std::path::PathBuf;
 
     fn empty_registry() -> Registry {

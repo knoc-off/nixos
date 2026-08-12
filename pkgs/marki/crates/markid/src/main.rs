@@ -453,7 +453,7 @@ fn cmd_render_map(file: &Path, out: &Path, to_stdout: bool, registry: &Registry)
 
     let source = std::fs::read_to_string(file)
         .with_context(|| format!("read {}", file.display()))?;
-    let note = marki_core::note_parser::parse_note(&source, file.to_path_buf());
+    let note = markid::note_parser::parse_note(&source, file.to_path_buf());
 
     let cache = render_cache_dir();
     let result = markid::sync::stock_render::render_stock(&note, registry, file, &cache);

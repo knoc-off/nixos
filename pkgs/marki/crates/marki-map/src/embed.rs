@@ -36,7 +36,7 @@
 
 use crate::dsl::{LayerSpec, RevealMode};
 use indexmap::IndexMap;
-use marki_core::escape_html as escape_attr;
+use marki_render::escape_html as escape_attr;
 use std::collections::BTreeMap;
 
 /// One layer's emitted SVG, plus how it should reveal.

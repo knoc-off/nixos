@@ -1,46 +1,34 @@
 {...}: {
   nixos = {pkgs, ...}: {
-    services.pulseaudio.enable = false;
-    security.rtkit.enable = true; # Realtime priority management
+    security.rtkit.enable = true;
 
     services.pipewire = {
       enable = true;
 
-      # ALSA integration
       alsa = {
         enable = true;
         support32Bit = true;
       };
 
-      # PulseAudio compatibility
       pulse.enable = true;
 
-      # Professional audio support
-      jack.enable = true;
-
-      # WirePlumber configuration (replaces media-session)
-      wireplumber.enable = true;
+      # WirePlumber suspends idle nodes after 5s, which drops the A2DP
+      # transport; re-acquiring it races and can leave the node in `error`,
+      # dropping playback to the internal speakers.
+      wireplumber.extraConfig."51-bluez-no-suspend"."monitor.bluez.rules" = [
+        {
+          matches = [{"node.name" = "~bluez_output.*";}];
+          actions.update-props."session.suspend-timeout-seconds" = 0;
+        }
+      ];
     };
 
-    boot.kernelParams = [
-      "snd_hda_intel.power_save=0" # Prevent audio crackling
-    ];
+    # Kernel default is 10s, which crackles on wake.
+    boot.kernelParams = ["snd_hda_intel.power_save=0"];
 
-    # services.udev.extraRules = ''
-    #   # Prevent USB audio devices from suspending
-    #   ACTION=="add", SUBSYSTEM=="sound", ATTR{power/control}="on"
-    # '';
-
-    # Audio Tools
     environment.systemPackages = with pkgs; [
-      # Control
-      pavucontrol # Volume mixer
-      crosspipe
-      qjackctl # JACK control panel
-
-      # Diagnostics
-      alsa-utils # amixer, aplay, etc.
-      sound-theme-freedesktop # System sounds
+      pavucontrol
+      alsa-utils
     ];
   };
 }

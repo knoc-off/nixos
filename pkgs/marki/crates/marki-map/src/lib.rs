@@ -1,17 +1,14 @@
-//! `marki-map` — render `map` blocks to SVG layers + JSON sidecar.
+//! `marki-map` -- render `map` blocks to SVG layers + JSON sidecar.
 //!
-//! Implements `marki_core::BlockRenderer` for the lang token `map`.
+//! Implements `marki_render::Renderer` for the lang token `map`.
 //! See `dsl.rs` for the TOML body format and `tests/fixtures/` for
 //! authored examples.
 //!
 //! The renderer parses the DSL, resolves geometry references against
 //! Natural Earth (and, for OSM relation/way refs, the Overpass API),
 //! projects them to SVG units, composes one styled SVG per layer, and
-//! emits the bytes as `marki_core::EmittedAsset`s for the daemon to
+//! emits the bytes as `marki_render::Asset`s for the daemon to
 //! upload to Anki.
-//!
-//! For now this crate ships a stub renderer (Step 2e); the actual
-//! pipeline lands in steps 3–7.
 
 pub mod cache;
 pub mod clip;
@@ -33,7 +30,7 @@ pub mod trim;
 pub mod unwrap;
 pub mod version;
 
-use marki_core::{BlockError, BlockRenderer, RenderCtx, RenderedBlock};
+use marki_render::{Fragment, Input, RenderCtx, RenderError, Renderer};
 
 pub use defaults::MapDefaults;
 pub use error::MapError;
@@ -76,24 +73,23 @@ impl MapRenderer {
     }
 }
 
-impl BlockRenderer for MapRenderer {
+impl Renderer for MapRenderer {
     fn lang(&self) -> &'static str {
         MAP_LANG
     }
 
-    fn render(&self, src: &str, ctx: &mut RenderCtx<'_>) -> Result<RenderedBlock, BlockError> {
+    fn render(&self, input: Input<'_>, ctx: &mut RenderCtx<'_>) -> Result<Fragment, RenderError> {
         let spec = if self.defaults.is_empty() {
-            dsl::parse_map_spec(src).map_err(|e| BlockError::Parse(e.to_string()))?
+            input.deserialize()?
         } else {
             // Merge: project defaults (global + matching rules) underneath
             // the card's own block, then build the spec from the result.
             let mut merged = self.defaults.effective_table(ctx.source_path);
-            let card: toml::Table =
-                toml::from_str(src).map_err(|e| BlockError::Parse(e.to_string()))?;
+            let card = input.into_table()?;
             defaults::deep_merge(&mut merged, &card);
             toml::Value::Table(merged)
                 .try_into()
-                .map_err(|e| BlockError::Parse(e.to_string()))?
+                .map_err(|e: toml::de::Error| RenderError::Parse(e.to_string()))?
         };
         Ok(pipeline::run(&spec, ctx.cache_dir)?)
     }
@@ -111,7 +107,7 @@ mod tests {
             source_path: &PathBuf::from("/tmp/x.md"),
             cache_dir: &PathBuf::from("/tmp/cache"),
         };
-        let err = r.render("not = [valid toml", &mut ctx).unwrap_err();
-        assert!(matches!(err, BlockError::Parse(_)));
+        let err = r.render(Input::Raw("not = [valid toml"), &mut ctx).unwrap_err();
+        assert!(matches!(err, RenderError::Parse(_)));
     }
 }

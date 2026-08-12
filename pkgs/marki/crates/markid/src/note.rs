@@ -10,10 +10,11 @@
 //! rearrange content into arbitrarily many card faces.
 
 use std::collections::HashMap;
+use std::ops::Range;
 use std::path::PathBuf;
 
 use crate::tag::ClozeAlgorithm;
-use crate::util::escape_html;
+use marki_render::escape_html;
 
 /// A parsed note, ready for a model script to inspect.
 #[derive(Debug, Clone)]
@@ -26,8 +27,13 @@ pub struct Note {
     pub cloze_algorithm: ClozeAlgorithm,
     /// Ordered list of every block in the document.
     pub blocks: Vec<Block>,
-    /// System + parametric tags: `#country(JAM)` → `("country", Param("JAM"))`.
-    /// Boolean tags like `#geography` → `("geography", Bool)`.
+    /// Index ranges into `blocks` for each `---`-delimited section,
+    /// computed once at parse time. Model scripts hit `section()` and
+    /// `section_html()` repeatedly, so this avoids re-walking every block
+    /// (and allocating) on each call.
+    pub(crate) section_ranges: Vec<Range<usize>>,
+    /// System + parametric tags: `#country(JAM)` -> `("country", Param("JAM"))`.
+    /// Boolean tags like `#geography` -> `("geography", Bool)`.
     pub tags: HashMap<String, TagValue>,
     /// Pass-through Anki tags (bare `#word` tokens that aren't system tags).
     pub anki_tags: Vec<String>,
@@ -37,6 +43,25 @@ pub struct Note {
     pub source_path: PathBuf,
     /// Non-fatal warnings collected during parsing (e.g. malformed tags).
     pub warnings: Vec<String>,
+}
+
+/// Split points for `sections()`: one range per `---`-delimited run of
+/// blocks, with the `ThematicBreak` markers themselves excluded.
+///
+/// A document with no breaks yields exactly one range covering everything,
+/// and a trailing `---` yields a final empty range -- both matching the
+/// behaviour callers already relied on.
+pub(crate) fn section_ranges(blocks: &[Block]) -> Vec<Range<usize>> {
+    let mut ranges = Vec::new();
+    let mut start = 0;
+    for (i, b) in blocks.iter().enumerate() {
+        if matches!(b, Block::ThematicBreak) {
+            ranges.push(start..i);
+            start = i + 1;
+        }
+    }
+    ranges.push(start..blocks.len());
+    ranges
 }
 
 /// Value of a tag.
@@ -89,25 +114,21 @@ pub struct ListItem {
 // ---- Note convenience methods ----
 
 impl Note {
-    /// Split blocks at `ThematicBreak` into sections. Section 0 is
-    /// everything before the first `---`; section 1 is everything
-    /// after the first `---` and before the second; etc.
-    pub fn sections(&self) -> Vec<Vec<&Block>> {
-        let mut sections: Vec<Vec<&Block>> = vec![vec![]];
-        for b in &self.blocks {
-            match b {
-                Block::ThematicBreak => sections.push(vec![]),
-                _ => {
-                    sections.last_mut().unwrap().push(b);
-                }
-            }
-        }
-        sections
+    /// Blocks grouped by `---` separator. Section 0 is everything before
+    /// the first `---`; section 1 is everything after it and before the
+    /// second; etc.
+    pub fn sections(&self) -> Vec<&[Block]> {
+        self.section_ranges
+            .iter()
+            .map(|r| &self.blocks[r.clone()])
+            .collect()
     }
 
-    /// Get one section by index. Returns empty slice if out of range.
-    pub fn section(&self, n: usize) -> Vec<&Block> {
-        self.sections().into_iter().nth(n).unwrap_or_default()
+    /// Get one section by index. Returns an empty slice if out of range.
+    pub fn section(&self, n: usize) -> &[Block] {
+        self.section_ranges
+            .get(n)
+            .map_or(&[][..], |r| &self.blocks[r.clone()])
     }
 
     /// All paragraphs in document order.
@@ -280,32 +301,34 @@ mod tests {
     use super::*;
 
     fn sample_note() -> Note {
+        let blocks = vec![
+            Block::Paragraph {
+                text: "Question text".into(),
+                html: "Question text".into(),
+            },
+            Block::CodeBlock {
+                lang: Some("map".into()),
+                source: "[layers.base]\nfeatures = [\"country/DEU\"]".into(),
+            },
+            Block::ThematicBreak,
+            Block::Paragraph {
+                text: "Answer text".into(),
+                html: "Answer text".into(),
+            },
+            Block::List {
+                items: vec![
+                    ListItem { text: "Fact 1".into(), html: "Fact 1".into() },
+                    ListItem { text: "Fact 2".into(), html: "Fact 2".into() },
+                ],
+                ordered: false,
+                html: "<ul><li>Fact 1</li><li>Fact 2</li></ul>".into(),
+            },
+        ];
         Note {
             id: Some("abc123".into()),
             model: "basic".into(),
-            blocks: vec![
-                Block::Paragraph {
-                    text: "Question text".into(),
-                    html: "Question text".into(),
-                },
-                Block::CodeBlock {
-                    lang: Some("map".into()),
-                    source: "[layers.base]\nfeatures = [\"country/DEU\"]".into(),
-                },
-                Block::ThematicBreak,
-                Block::Paragraph {
-                    text: "Answer text".into(),
-                    html: "Answer text".into(),
-                },
-                Block::List {
-                    items: vec![
-                        ListItem { text: "Fact 1".into(), html: "Fact 1".into() },
-                        ListItem { text: "Fact 2".into(), html: "Fact 2".into() },
-                    ],
-                    ordered: false,
-                    html: "<ul><li>Fact 1</li><li>Fact 2</li></ul>".into(),
-                },
-            ],
+            section_ranges: section_ranges(&blocks),
+            blocks,
             tags: {
                 let mut m = HashMap::new();
                 m.insert("country".into(), TagValue::Param("DEU".into()));

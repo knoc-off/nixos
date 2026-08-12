@@ -1,20 +1,20 @@
-//! External block-renderer registry.
+//! Block-renderer registry.
 //!
-//! Wraps a `HashMap<&'static str, Box<dyn BlockRenderer>>` keyed by the
-//! lang token (e.g. `"map"`). The registry is built once at startup,
-//! handed to the parser (which uses [`Self::external_langs`] to know
-//! which fenced blocks to defer) and to the diff engine (which uses
-//! [`Self::dispatch`] to fulfil each [`marki_core::BlockRequest`]).
+//! Wraps a `HashMap<&'static str, Box<dyn Renderer>>` keyed by the block
+//! token (e.g. `"map"`). The registry is built once at startup, handed to
+//! the parser (which uses [`Registry::external_langs`] to know which fenced
+//! blocks to defer) and to the diff engine (which uses [`Registry::dispatch`]
+//! to render each deferred block).
 
-use marki_core::{BlockError, BlockRenderer, BlockRequest, RenderCtx, RenderedBlock};
+use marki_render::{Fragment, Input, RenderCtx, RenderError, Renderer};
 use std::collections::HashMap;
 use std::path::Path;
 
 #[derive(Default)]
 pub struct Registry {
-    renderers: HashMap<&'static str, Box<dyn BlockRenderer>>,
+    renderers: HashMap<&'static str, Box<dyn Renderer>>,
     /// Snapshot of the keyset as `&'static str` so callers can pass it
-    /// to the parser (`parse_with_externals`) without per-call allocation.
+    /// to the parser without per-call allocation.
     langs: Vec<&'static str>,
 }
 
@@ -25,7 +25,7 @@ impl Registry {
 
     /// Register a renderer. Panics on duplicate `lang()` to surface
     /// programmer errors at startup.
-    pub fn register(&mut self, r: Box<dyn BlockRenderer>) {
+    pub fn register(&mut self, r: Box<dyn Renderer>) {
         let lang = r.lang();
         assert!(
             !self.renderers.contains_key(lang),
@@ -35,64 +35,63 @@ impl Registry {
         self.langs.push(lang);
     }
 
-    /// Lang tokens to hand to the parser's `external_langs` argument.
+    /// Block tokens to hand to the parser's `external_langs` argument.
     pub fn external_langs(&self) -> &[&'static str] {
         &self.langs
     }
 
-    /// Number of renderers registered. Mostly for diagnostics.
-    pub fn len(&self) -> usize {
-        self.renderers.len()
+    /// True if some renderer handles `lang`.
+    pub fn handles(&self, lang: &str) -> bool {
+        self.renderers.contains_key(lang)
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.renderers.is_empty()
-    }
-
-    /// Render one block by looking up its lang in the registry. Returns
-    /// `Err(BlockError::Resolve)` if no renderer is registered for the
-    /// block's lang — shouldn't happen if the parser was given the
-    /// matching `external_langs`, but the asymmetry is a real failure
-    /// mode worth surfacing.
+    /// Render one block by looking up `lang` in the registry. Returns
+    /// `Err(RenderError::Resolve)` if nothing is registered for it --
+    /// shouldn't happen if the parser was given the matching
+    /// `external_langs`, but the asymmetry is a real failure mode worth
+    /// surfacing.
     pub fn dispatch(
         &self,
-        req: &BlockRequest,
+        lang: &str,
+        input: Input<'_>,
         source_path: &Path,
         cache_dir: &Path,
-    ) -> Result<RenderedBlock, BlockError> {
-        let r = self.renderers.get(req.lang.as_str()).ok_or_else(|| {
-            BlockError::Resolve(format!("no renderer registered for lang `{}`", req.lang))
+    ) -> Result<Fragment, RenderError> {
+        let r = self.renderers.get(lang).ok_or_else(|| {
+            RenderError::Resolve(format!("no renderer registered for lang `{lang}`"))
         })?;
         let mut ctx = RenderCtx {
             source_path,
             cache_dir,
         };
-        r.render(&req.source, &mut ctx)
+        r.render(input, &mut ctx)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use marki_core::{BlockSide, RenderedBlock};
     use std::path::PathBuf;
 
     struct Plain;
-    impl BlockRenderer for Plain {
+    impl Renderer for Plain {
         fn lang(&self) -> &'static str {
             "plain"
         }
         fn render(
             &self,
-            src: &str,
+            input: Input<'_>,
             _ctx: &mut RenderCtx<'_>,
-        ) -> Result<RenderedBlock, BlockError> {
-            Ok(RenderedBlock {
-                front_html: format!("<pre>{}</pre>", src.trim_end()),
-                back_html_extras: String::new(),
-                assets: Vec::new(),
+        ) -> Result<Fragment, RenderError> {
+            Ok(Fragment {
+                html: format!("<pre>{}</pre>", input.as_source()?.trim_end()),
+                ..Default::default()
             })
         }
+    }
+
+    fn paths() -> (PathBuf, PathBuf) {
+        (PathBuf::from("/tmp/x.md"), PathBuf::from("/tmp/c"))
     }
 
     #[test]
@@ -100,33 +99,38 @@ mod tests {
         let mut reg = Registry::new();
         reg.register(Box::new(Plain));
         assert_eq!(reg.external_langs(), &["plain"]);
+        assert!(reg.handles("plain"));
 
-        let req = BlockRequest {
-            id: "abc".into(),
-            lang: "plain".into(),
-            source: "hello\n".into(),
-            byte_offset: 0,
-            side: BlockSide::Front,
-        };
+        let (src, cache) = paths();
         let out = reg
-            .dispatch(&req, &PathBuf::from("/tmp/x.md"), &PathBuf::from("/tmp/c"))
+            .dispatch("plain", Input::Raw("hello\n"), &src, &cache)
             .unwrap();
-        assert_eq!(out.front_html, "<pre>hello</pre>");
+        assert_eq!(out.html, "<pre>hello</pre>");
     }
 
     #[test]
     fn unknown_lang_resolves_to_error() {
         let reg = Registry::new();
-        let req = BlockRequest {
-            id: "abc".into(),
-            lang: "map".into(),
-            source: String::new(),
-            byte_offset: 0,
-            side: BlockSide::Front,
-        };
+        let (src, cache) = paths();
         let err = reg
-            .dispatch(&req, &PathBuf::from("/tmp/x.md"), &PathBuf::from("/tmp/c"))
+            .dispatch("map", Input::Raw(""), &src, &cache)
             .unwrap_err();
-        assert!(matches!(err, BlockError::Resolve(_)));
+        assert!(matches!(err, RenderError::Resolve(_)));
+        assert!(!reg.handles("map"));
+    }
+
+    #[test]
+    fn spec_route_reaches_the_renderer() {
+        let mut reg = Registry::new();
+        reg.register(Box::new(Plain));
+
+        let mut t = toml::Table::new();
+        t.insert("source".into(), toml::Value::String("hi".into()));
+
+        let (src, cache) = paths();
+        let out = reg
+            .dispatch("plain", Input::Spec(toml::Value::Table(t)), &src, &cache)
+            .unwrap();
+        assert_eq!(out.html, "<pre>hi</pre>");
     }
 }

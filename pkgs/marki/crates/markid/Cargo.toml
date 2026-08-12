@@ -15,7 +15,7 @@ path = "src/lib.rs"
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
-marki-core.workspace = true
+marki-render.workspace = true
 marki-map.workspace = true
 marki-media.workspace = true
 marki-typst.workspace = true
@@ -34,3 +34,8 @@ base64.workspace = true
 dirs.workspace = true
 blake3.workspace = true
 thiserror.workspace = true
+getrandom = "0.3"
+pulldown-cmark.workspace = true
+regex.workspace = true
+strum.workspace = true
+syntect.workspace = true

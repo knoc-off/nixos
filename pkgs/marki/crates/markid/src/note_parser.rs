@@ -1,23 +1,22 @@
 //! Structural markdown parser.
 //!
-//! Unlike [`crate::parser`] (which renders directly to HTML for the
-//! old pipeline), this module parses markdown into an ordered list of
-//! typed [`Block`]s with both `text` and `html` representations. The
-//! resulting [`Note`] is what Rhai model scripts receive and query.
+//! Parses markdown into an ordered list of typed [`Block`]s with both
+//! `text` and `html` representations. The resulting [`Note`] is what
+//! Rhai model scripts receive and query.
 //!
 //! Tags are extracted into `Note::tags` and `Note::anki_tags` during
 //! parsing and stripped from block content.
 
 use crate::note::{Block, ListItem, Note, TagValue};
 use crate::tag::{ClozeAlgorithm, Parsed, SystemTag, TAG_REGEX, parse_token};
-use crate::util::escape_html;
+use marki_render::escape_html;
 use pulldown_cmark::{CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd};
 use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// Parse a markdown source into a structural [`Note`].
 ///
-/// This is the new entry point for the Rhai model pipeline. The
+/// This is the entry point for the Rhai model pipeline. The
 /// resulting `Note` contains typed blocks with inline HTML preserved
 /// and tags extracted into structured maps.
 pub fn parse_note(source: &str, source_path: PathBuf) -> Note {
@@ -337,6 +336,7 @@ pub fn parse_note(source: &str, source_path: PathBuf) -> Note {
         id,
         model,
         cloze_algorithm: resolved_cloze_algo,
+        section_ranges: crate::note::section_ranges(&blocks),
         blocks,
         tags,
         anki_tags,

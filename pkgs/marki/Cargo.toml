@@ -1,10 +1,9 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/marki-core",
-    "crates/marki-macros",
     "crates/marki-map",
     "crates/marki-media",
+    "crates/marki-render",
     "crates/marki-typst",
     "crates/markid",
 ]
@@ -39,16 +38,10 @@ toml = { version = "0.9", features = ["preserve_order"] }
 base64 = "0.22"
 dirs = "6"
 
-# proc-macro crates
-syn = { version = "2", features = ["full"] }
-quote = "1"
-proc-macro2 = "1"
-
 # map renderer deps
 shapefile = "0.6"
 
-marki-core = { path = "crates/marki-core" }
-marki-macros = { path = "crates/marki-macros" }
 marki-map = { path = "crates/marki-map" }
 marki-media = { path = "crates/marki-media" }
+marki-render = { path = "crates/marki-render" }
 marki-typst = { path = "crates/marki-typst" }

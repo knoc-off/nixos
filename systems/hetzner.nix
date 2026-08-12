@@ -203,8 +203,7 @@ in
     isNormalUser = true;
     extraGroups = [ "wheel" ];
     openssh.authorizedKeys.keys = [
-      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"
-      ssh.framework13 # should be identical
+      ssh.framework13
     ];
   };
 
@@ -216,8 +215,7 @@ in
 
   # emergency recovery
   users.users.root.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"
-    ssh.framework13 # should be identical
+    ssh.framework13
   ];
 
   environment.systemPackages = map lib.lowPrio [

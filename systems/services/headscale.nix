@@ -38,6 +38,10 @@ in {
         base_domain = "tail.niko.ink";
         nameservers.global = ["1.1.1.1" "9.9.9.9"];
 
+        # Routing domain: outranks the `~.` that tailscale0 and the work VPN
+        # both claim, so extra_records win instead of racing.
+        search_domains = ["niko.ink"];
+
         # Split-horizon: tailnet members resolve these service names to the
         # node that serves them; everything else falls through to the global
         # resolvers (so public names like ntfy.niko.ink keep hitting the

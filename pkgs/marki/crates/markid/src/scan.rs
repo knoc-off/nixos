@@ -5,8 +5,8 @@
 
 use anyhow::{Context, Result};
 use ignore::WalkBuilder;
-use marki_core::note::Note;
-use marki_core::note_parser::parse_note;
+use crate::note::Note;
+use crate::note_parser::parse_note;
 use std::path::{Path, PathBuf};
 
 /// A scanned note (structural parser pipeline).

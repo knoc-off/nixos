@@ -11,7 +11,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use marki_core::{AssetMime, EmittedAsset, RenderCtx, RenderedBlock};
+use marki_render::{AssetMime, Asset, RenderCtx, Fragment};
 
 use crate::error::TypstError;
 use crate::version::RENDER_VERSION_TYPST;
@@ -32,13 +32,13 @@ const READY_MARKER: &str = ".ready";
 /// File name written inside the cache dir.
 const SVG_NAME: &str = "output.svg";
 
-/// End-to-end render: returns the [`RenderedBlock`] the daemon
+/// End-to-end render: returns the [`Fragment`] the daemon
 /// splices into the card.
 pub fn run(
     binary: &Path,
     src: &str,
     ctx: &mut RenderCtx<'_>,
-) -> Result<RenderedBlock, TypstError> {
+) -> Result<Fragment, TypstError> {
     let key = cache_key(src);
     let dir = cache_dir(ctx.cache_dir, &key);
 
@@ -166,16 +166,16 @@ fn write_atomic(dir: &Path, svg: &[u8]) -> Result<(), TypstError> {
     Ok(())
 }
 
-/// Build the [`RenderedBlock`] from a cache key + SVG bytes.
+/// Build the [`Fragment`] from a cache key + SVG bytes.
 ///
-/// Build the [`RenderedBlock`] from rendered SVG bytes.
+/// Build the [`Fragment`] from rendered SVG bytes.
 ///
 /// The asset filename is content-addressed over the output bytes
 /// (matching `marki-media`'s scheme): two blocks that compile to the
 /// same SVG dedupe in Anki's media collection. The HTML wraps the
 /// `<img>` in a centered, max-width container; final visual sizing
 /// is the theme's responsibility.
-fn build_block(svg: Vec<u8>) -> RenderedBlock {
+fn build_block(svg: Vec<u8>) -> Fragment {
     let hex = blake3::hash(&svg).to_hex();
     let short = &hex.as_str()[..8];
     let filename = format!("marki-typst-{short}.svg");
@@ -185,10 +185,10 @@ fn build_block(svg: Vec<u8>) -> RenderedBlock {
          style=\"max-width:100%;height:auto;display:block;margin:0 auto;\" alt=\"\"></div>"
     );
 
-    RenderedBlock {
-        front_html: html,
-        back_html_extras: String::new(),
-        assets: vec![EmittedAsset {
+    Fragment {
+        html,
+        reveal: String::new(),
+        assets: vec![Asset {
             filename,
             bytes: svg,
             mime: AssetMime::SvgXml,
@@ -275,8 +275,8 @@ mod tests {
         assert!(block.assets[0].filename.starts_with("marki-typst-"));
         assert!(block.assets[0].filename.ends_with(".svg"));
         assert_eq!(block.assets[0].mime, AssetMime::SvgXml);
-        assert!(block.front_html.contains(&block.assets[0].filename));
-        assert!(block.back_html_extras.is_empty());
+        assert!(block.html.contains(&block.assets[0].filename));
+        assert!(block.reveal.is_empty());
     }
 
     #[test]

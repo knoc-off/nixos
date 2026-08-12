@@ -24,9 +24,7 @@ in
         age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
 
         secrets = {
-          # ntfy token with publish rights, used by wohnungsfinder below.
           "services/ntfy/publish-token" = { };
-          # Assembled into an env file by services/minecraft.nix.
           "services/minecraft/RCON_PASSWORD" = { };
         };
       };
@@ -42,7 +40,6 @@ in
 
     self.nixosModules.wohnungsfinder
     {
-      # inberlinwohnen.de new-listing watcher -> ntfy.niko.ink.
       services.wohnungsfinder = {
         enable = true;
         ntfy = {
@@ -383,9 +380,15 @@ in
     # inputs.nixgl.packages.x86_64-linux.nixGLIntel
   ];
 
-  users.users.root.openssh.authorizedKeys.keys = [
-    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink"
-  ];
+  users.users.root.openssh.authorizedKeys.keys =
+    let
+      inherit (self.lib) ssh;
+
+    in
+
+    [
+      ssh.framework13
+    ];
 
   system.stateVersion = "26.05";
 }

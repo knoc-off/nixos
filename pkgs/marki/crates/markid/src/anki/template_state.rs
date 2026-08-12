@@ -9,7 +9,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Per-model state: the ordered list of card names (by ordinal).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -104,11 +104,6 @@ impl TemplateState {
             // Unchanged.
             Ok(false)
         }
-    }
-
-    /// Path for the state file given a config directory.
-    pub fn default_path(config_dir: &Path) -> PathBuf {
-        config_dir.join("model_state.json")
     }
 }
 

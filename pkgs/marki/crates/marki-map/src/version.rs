@@ -1,6 +1,6 @@
 //! Bumped whenever marki-map would emit different bytes for the same
 //! source. Mixed into cache keys; not (currently) into the per-card
-//! content hash, since that's a marki-core concern.
+//! content hash, which the daemon owns.
 //!
 //! ## History
 //!

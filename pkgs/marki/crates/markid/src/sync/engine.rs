@@ -17,7 +17,7 @@
 //!   * nothing is pruned at all during a cycle that had render errors
 
 use anyhow::{Context, Result};
-use marki_core::EmittedAsset;
+use marki_render::Asset;
 use rhai::Dynamic;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -69,7 +69,7 @@ struct Local {
     kind: NoteKind,
     anki_tags: Vec<String>,
     deck: String,
-    assets: Vec<EmittedAsset>,
+    assets: Vec<Asset>,
     hash: String,
 }
 

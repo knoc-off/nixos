@@ -6,7 +6,7 @@ license.workspace = true
 
 [dependencies]
 blake3.workspace = true
-marki-core.workspace = true
+marki-render.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 toml.workspace = true

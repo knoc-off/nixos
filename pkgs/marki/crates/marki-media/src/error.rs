@@ -1,5 +1,5 @@
 //! Crate-local error type. Every variant is convertible into
-//! [`marki_core::BlockError`] at the trait boundary.
+//! [`marki_render::RenderError`] at the trait boundary.
 
 #[derive(Debug, thiserror::Error)]
 pub enum MediaError {
@@ -15,9 +15,9 @@ pub enum MediaError {
     Io(#[from] std::io::Error),
 }
 
-impl From<MediaError> for marki_core::BlockError {
+impl From<MediaError> for marki_render::RenderError {
     fn from(e: MediaError) -> Self {
-        use marki_core::BlockError as B;
+        use marki_render::RenderError as B;
         match e {
             MediaError::Parse(s) => B::Parse(s),
             MediaError::NotFound { .. } => B::Resolve(e.to_string()),
