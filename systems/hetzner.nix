@@ -1,7 +1,6 @@
 {
   modulesPath,
   inputs,
-  outputs,
   config,
   lib,
   pkgs,
@@ -213,9 +212,9 @@ in
     execWheelOnly = true;
   };
 
-  # emergency recovery
   users.users.root.openssh.authorizedKeys.keys = [
     ssh.framework13
+    ssh.thinkpad-work
   ];
 
   environment.systemPackages = map lib.lowPrio [

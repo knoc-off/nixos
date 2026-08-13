@@ -1,0 +1,11 @@
+// Vendored subset of ankitects/anki proto/anki/generic.proto.
+// Only the messages referenced by the notetypes/decks config blobs are
+// kept. Field numbers must match upstream exactly for wire compatibility.
+
+syntax = "proto3";
+
+package anki.generic;
+
+message UInt32 {
+  uint32 val = 1;
+}

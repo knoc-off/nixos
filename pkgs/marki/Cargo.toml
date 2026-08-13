@@ -5,7 +5,8 @@ members = [
     "crates/marki-media",
     "crates/marki-render",
     "crates/marki-typst",
-    "crates/markid",
+    "crates/marki-anki",
+    "crates/marki",
 ]
 
 [workspace.package]
@@ -24,7 +25,7 @@ notify-debouncer-full = "0.6"
 pulldown-cmark = "0.13"
 regex = "1"
 reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "rustls-tls"] }
-rhai = { version = "1", features = ["sync", "internals"] }
+mlua = { version = "0.12", features = ["lua54", "vendored", "serde"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 strum = { version = "0.27", features = ["derive"] }
@@ -37,6 +38,8 @@ indexmap = { version = "2", features = ["serde"] }
 toml = { version = "0.9", features = ["preserve_order"] }
 base64 = "0.22"
 dirs = "6"
+rusqlite = { version = "0.37", features = ["bundled", "collation"] }
+prost = "0.13"
 
 # map renderer deps
 shapefile = "0.6"
@@ -45,3 +48,4 @@ marki-map = { path = "crates/marki-map" }
 marki-media = { path = "crates/marki-media" }
 marki-render = { path = "crates/marki-render" }
 marki-typst = { path = "crates/marki-typst" }
+marki-anki = { path = "crates/marki-anki" }

@@ -7,9 +7,8 @@
 # subcommands work: `marki-oneshot init`, `marki-oneshot status`,
 # `marki-oneshot render-map …`, etc.
 #
-# With NO arguments it runs `marki push --wait-for-anki` — exactly one
-# scan → reconcile → push cycle, waiting for AnkiConnect to come up
-# first. This is the cron/systemd one-shot entry point.
+# With NO arguments it runs `marki push` -- exactly one scan -> reconcile
+# -> write cycle against the configured collection file.
 #
 # The two data env vars are set with `:=` so an explicit override in the
 # caller's environment still wins.
@@ -34,7 +33,7 @@ in
       export NATURAL_EARTH_DATA GEOBOUNDARIES_DATA
       if [ "$#" -eq 0 ]; then
         # No subcommand → the original one-shot push behaviour.
-        exec marki push --wait-for-anki
+        exec marki push
       else
         # Otherwise forward everything to marki (init, status, …).
         exec marki "$@"

@@ -40,7 +40,7 @@ pub const MAP_LANG: &str = "map";
 
 /// Map block renderer. Construct with [`MapRenderer::new`] (no project
 /// defaults) or [`MapRenderer::with_defaults`], and register against the
-/// markid daemon's [`crate::Registry`].
+/// marki daemon's [`crate::Registry`].
 pub struct MapRenderer {
     /// Project-level DSL defaults + path rules, merged underneath each
     /// card's own block. Empty for a bare [`MapRenderer::new`].

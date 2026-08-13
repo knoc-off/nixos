@@ -2,7 +2,7 @@
 
 Renders fenced ` ```map ` blocks in markdown cards to one SVG per layer
 plus a JSON sidecar, ready to be uploaded to Anki's media collection
-by the `markid` daemon.
+by the `marki` daemon.
 
 ## TL;DR
 
@@ -133,7 +133,7 @@ hull fill/stroke; the bundled `atlas` theme ships a translucent default.
 ## Project defaults & path rules
 
 A marki project can set DSL defaults for every `map` block in its
-`.markid/config.toml`, and override them per directory. This keeps cards
+`.marki/config.toml`, and override them per directory. This keeps cards
 terse — set a theme or viewport tuning once, not in every block.
 
 ```toml
@@ -402,13 +402,13 @@ To override the default, set `reveal = "none"` (always visible) or
 `reveal = "fade"` (always faded-in-on-back) on the layer.
 
 The renderer returns a `back_html_extras` chunk (`<style>` block
-overriding to `opacity: 1`); the `markid` daemon appends it to the
+overriding to `opacity: 1`); the `marki` daemon appends it to the
 card's back HTML.
 
 ## CLI: theme iteration without Anki
 
 ```sh
-markid render-map path/to/card.md --out ./out
+marki render-map path/to/card.md --out ./out
 ```
 
 Writes the rendered SVGs and a `preview.html` to `./out/`. Handy when

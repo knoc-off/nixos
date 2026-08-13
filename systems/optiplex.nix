@@ -383,11 +383,10 @@ in
   users.users.root.openssh.authorizedKeys.keys =
     let
       inherit (self.lib) ssh;
-
     in
-
     [
       ssh.framework13
+      ssh.thinkpad-work
     ];
 
   system.stateVersion = "26.05";

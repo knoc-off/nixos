@@ -9,8 +9,8 @@
   naturalEarthData = pkgs.callPackage ../natural-earth-data {};
   geoBoundariesData = pkgs.callPackage ../geoboundaries-data {};
 
-  markid = pkgs.rustPlatform.buildRustPackage {
-    pname = "markid";
+  marki = pkgs.rustPlatform.buildRustPackage {
+    pname = "marki";
     inherit version;
 
     src = lib.cleanSource ./.;
@@ -19,29 +19,21 @@
       lockFile = ./Cargo.lock;
     };
 
-    # Build just the daemon binary; its transitive deps pull the rest of the workspace.
-    cargoBuildFlags = ["-p" "markid"];
+    # Build just the CLI binary; its transitive deps pull the rest of the workspace.
+    cargoBuildFlags = ["-p" "marki"];
     cargoTestFlags = ["--workspace"];
 
     # reqwest with rustls-tls needs no system OpenSSL; keep nativeBuildInputs minimal.
     nativeBuildInputs = [pkgs.pkg-config];
 
-    # The binary is now `marki` (one-shot-first CLI). Keep `markid` as a
-    # back-compat alias so existing systemd units / scripts keep working.
-    postInstall = ''
-      if [ -e "$out/bin/marki" ] && [ ! -e "$out/bin/markid" ]; then
-        ln -s marki "$out/bin/markid"
-      fi
-    '';
-
     meta = {
-      description = "One-shot CLI (with optional watch daemon) that syncs a repo of markdown cards with Anki via AnkiConnect";
+      description = "One-shot CLI (with optional watch daemon) that syncs a repo of markdown cards directly into an Anki collection file";
       license = lib.licenses.mit;
       mainProgram = "marki";
     };
 
     passthru.devShell = pkgs.mkShell {
-      inputsFrom = [markid];
+      inputsFrom = [marki];
       nativeBuildInputs = [
         pkgs.gdal
         pkgs.curl
@@ -57,4 +49,4 @@
     };
   };
 in
-  markid
+  marki

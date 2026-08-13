@@ -18,7 +18,7 @@
 //!
 //! The user controls the `typst` binary path — they can install
 //! plugins, fonts, or pin a version however they like and pass it in
-//! via the markid config / `MARKID_TYPST` env var.
+//! via the marki config / `MARKI_TYPST` env var.
 
 pub mod error;
 pub mod render;
@@ -35,7 +35,7 @@ pub use version::RENDER_VERSION_TYPST;
 pub const TYPST_LANG: &str = "typst";
 
 /// Typst block renderer. Construct with [`TypstRenderer::new`] and
-/// register against the markid daemon's renderer registry.
+/// register against the marki daemon's renderer registry.
 pub struct TypstRenderer {
     /// Path to the `typst` CLI binary. The user supplies this — we
     /// don't pin a version or require a particular install method.

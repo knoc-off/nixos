@@ -1,0 +1,88 @@
+// Vendored subset of ankitects/anki proto/anki/decks.proto.
+// Services and tree/request messages are stripped; only the on-disk blob
+// types kept: Deck and its nested Common/Normal/Filtered/KindContainer.
+// Field numbers must match upstream exactly -- these bytes are written into
+// the decks `common` and `kind` columns.
+
+syntax = "proto3";
+
+package anki.decks;
+
+message Deck {
+  message Common {
+    bool study_collapsed = 1;
+    bool browser_collapsed = 2;
+    uint32 last_day_studied = 3;
+    int32 new_studied = 4;
+    int32 review_studied = 5;
+    int32 milliseconds_studied = 7;
+    int32 learning_studied = 6;
+
+    reserved 8 to 13;
+
+    bytes other = 255;
+  }
+  message Normal {
+    message DayLimit {
+      uint32 limit = 1;
+      uint32 today = 2;
+    }
+    int64 config_id = 1;
+    uint32 extend_new = 2;
+    uint32 extend_review = 3;
+    string description = 4;
+    bool markdown_description = 5;
+    optional uint32 review_limit = 6;
+    optional uint32 new_limit = 7;
+    DayLimit review_limit_today = 8;
+    DayLimit new_limit_today = 9;
+    optional float desired_retention = 10;
+
+    reserved 12 to 15;
+  }
+  message Filtered {
+    message SearchTerm {
+      enum Order {
+        OLDEST_REVIEWED_FIRST = 0;
+        RANDOM = 1;
+        INTERVALS_ASCENDING = 2;
+        INTERVALS_DESCENDING = 3;
+        LAPSES = 4;
+        ADDED = 5;
+        DUE = 6;
+        REVERSE_ADDED = 7;
+        RETRIEVABILITY_ASCENDING = 8;
+        RETRIEVABILITY_DESCENDING = 9;
+        RELATIVE_OVERDUENESS = 10;
+      }
+
+      string search = 1;
+      uint32 limit = 2;
+      Order order = 3;
+    }
+
+    bool reschedule = 1;
+    repeated SearchTerm search_terms = 2;
+    repeated float delays = 3;
+    uint32 preview_delay = 4;
+    uint32 preview_again_secs = 7;
+    uint32 preview_hard_secs = 5;
+    uint32 preview_good_secs = 6;
+  }
+  message KindContainer {
+    oneof kind {
+      Normal normal = 1;
+      Filtered filtered = 2;
+    }
+  }
+
+  int64 id = 1;
+  string name = 2;
+  int64 mtime_secs = 3;
+  int32 usn = 4;
+  Common common = 5;
+  oneof kind {
+    Normal normal = 6;
+    Filtered filtered = 7;
+  }
+}

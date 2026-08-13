@@ -7,7 +7,7 @@ pub enum MediaError {
     Parse(String),
     #[error("media not found for `{src}` (searched {searched})")]
     NotFound { src: String, searched: String },
-    #[error("no media sources configured; set [media_sources] in markid config")]
+    #[error("no media sources configured; set [media_sources] in marki config")]
     NoSources,
     #[error("unsupported media extension `.{ext}` for `{src}`")]
     UnsupportedExt { src: String, ext: String },

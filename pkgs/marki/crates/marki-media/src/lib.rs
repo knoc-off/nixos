@@ -157,7 +157,7 @@ fn render_audio_html(spec: &dsl::MediaSpec, asset_filename: &str) -> String {
 /// Build a content-addressed filename of the form
 /// `marki-media-<8 hex>-<orig basename>`. The prefix prevents collisions
 /// with markdown-inline media (which uses a separate scheme in
-/// `markid::sync::media`).
+/// `marki::sync::media`).
 fn content_addressed_filename(bytes: &[u8], orig_basename: &str) -> String {
     let hex = blake3::hash(bytes).to_hex();
     let short = &hex.as_str()[..8];

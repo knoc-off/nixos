@@ -2,7 +2,7 @@
 //!
 //! geoBoundaries carries no coastline layer, so we keep Natural Earth
 //! solely for `coastline` references. `NATURAL_EARTH_DATA` (set by the
-//! markid module) points at a directory containing the
+//! environment sets this, e.g. `marki-oneshot`) points at a directory containing the
 //! `ne_10m_coastline` shapefile set (`.shp` + `.shx` + `.dbf`).
 //!
 //! `coastline` is parameter-free: it returns every coastline polyline

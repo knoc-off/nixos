@@ -1,6 +1,6 @@
 //! geoBoundaries gbOpen loader.
 //!
-//! `GEOBOUNDARIES_DATA` env (set by the markid module) points at a
+//! `GEOBOUNDARIES_DATA` env (set by the environment (e.g. `marki-oneshot` or a devShell)) points at a
 //! directory produced by the `geoboundaries-data` derivation: one
 //! `<ISO3>_ADM<n>.geojson` (simplified geometry) per country/level plus
 //! a `meta.csv` carrying the ISO3 → Continent / UN-subregion mapping.
