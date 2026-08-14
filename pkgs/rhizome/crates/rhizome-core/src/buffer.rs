@@ -19,13 +19,6 @@ use crate::segment::{Block, BlockKind, Resolved, Segments, splice_resolved};
 
 const HTML_FENCE: &str = "=html";
 
-/// How a blank-line paragraph is written in the buffer. A pilcrow rather than
-/// nothing: Markdown has no way to represent an empty block, so *something*
-/// has to occupy the line for the parser to see it as a distinct chunk at
-/// all. Deleting that line removes the spacer on save; typing one inserts a
-/// fresh `<p>&nbsp;</p>`.
-const SPACER: &str = "\u{b6}";
-
 /// Canonical HTML for a spacer with no original block to restore from.
 const SPACER_HTML: &str = "<p>&nbsp;</p>";
 
@@ -51,17 +44,39 @@ pub fn render(segments: &Segments) -> String {
 /// implementation shared with `render` -- kept together rather than as two
 /// parallel walks so they cannot silently drift apart, the same reasoning
 /// `parse` already applies by routing through `splice_resolved`.
+///
+/// A spacer carries no body text of its own -- it *is* a blank line, not a
+/// marker on one. Two blocks separated by an ordinary single blank line get
+/// the usual `"\n\n"`; each spacer between them adds one more `\n` to that
+/// run, so N consecutive spacers read back as N extra blank lines. A run of
+/// spacers before the first block or after the last works the same way with
+/// no baseline to add, since there is no neighbour on that side to separate
+/// from. [`resolve_spans`] inverts this by counting newlines in the gaps
+/// between the chunks it finds.
 fn render_with_spans(segments: &Segments) -> (String, Vec<Range<usize>>) {
     let mut out = String::new();
     let mut spans = Vec::new();
-    for (i, block) in segments.blocks().enumerate() {
-        if i > 0 {
-            out.push_str("\n\n");
+    // Newlines owed before the next block is written: one per spacer seen
+    // since the last real block, plus two (the ordinary separator) once a
+    // real block has actually been emitted before.
+    let mut pending_newlines = 0usize;
+    let mut emitted_content = false;
+
+    for block in segments.blocks() {
+        if matches!(block.kind, BlockKind::Spacer) {
+            spans.push(out.len()..out.len());
+            pending_newlines += 1;
+            continue;
         }
+        if emitted_content {
+            pending_newlines += 2;
+        }
+        out.push_str(&"\n".repeat(pending_newlines));
+        pending_newlines = 0;
+
         let start = out.len();
         match &block.kind {
             BlockKind::Transparent { markdown } => out.push_str(markdown),
-            BlockKind::Spacer => out.push_str(SPACER),
             BlockKind::Opaque { .. } => {
                 let body = trim_layout_end(&block.source);
                 let fence = "`".repeat(fence_length(body));
@@ -74,9 +89,14 @@ fn render_with_spans(segments: &Segments) -> (String, Vec<Range<usize>>) {
                 out.push('\n');
                 out.push_str(&fence);
             }
+            BlockKind::Spacer => unreachable!("handled above"),
         }
         spans.push(start..out.len());
+        emitted_content = true;
     }
+    // Trailing spacers: their newlines were accumulated above but never
+    // flushed, since nothing after them triggered the flush.
+    out.push_str(&"\n".repeat(pending_newlines));
     (out, spans)
 }
 
@@ -123,6 +143,14 @@ pub fn resolve(text: &str, segments: &Segments) -> Vec<Resolved> {
 /// came from. That range is what a "which lines are unsaved" indicator needs
 /// and [`resolve`] otherwise throws away; kept as one function rather than two
 /// parallel implementations so they cannot drift.
+///
+/// Spacers have no chunk of their own in `text` -- see [`render_with_spans`]
+/// -- so they are recovered from the newline count of the gap before,
+/// between and after the real chunks [`split_blocks_with_ranges`] finds: a
+/// gap between two chunks needs two newlines just to separate them, so a
+/// spacer is one newline beyond that baseline; a leading or trailing gap has
+/// no baseline to subtract; either way each extra newline is exactly one
+/// spacer, in the exact same order `render_with_spans` put them there.
 pub fn resolve_spans(text: &str, segments: &Segments) -> Vec<(Resolved, Range<usize>)> {
     let blocks: Vec<&Block> = segments.blocks().collect();
 
@@ -142,67 +170,90 @@ pub fn resolve_spans(text: &str, segments: &Segments) -> Vec<(Resolved, Range<us
     let mut by_markdown: HashMap<&str, Vec<usize>> = HashMap::new();
     let mut by_id: HashMap<&str, usize> = HashMap::new();
     let mut spacers: Vec<usize> = Vec::new();
+    let mut content_block_count = 0usize;
     for (i, block) in blocks.iter().enumerate() {
         match &block.kind {
             BlockKind::Transparent { markdown } => {
-                by_markdown.entry(markdown.as_str()).or_default().push(i)
+                by_markdown.entry(markdown.as_str()).or_default().push(i);
+                content_block_count += 1;
             }
             BlockKind::Opaque { .. } => {
                 by_id.insert(block.id.as_str(), i);
+                content_block_count += 1;
             }
             BlockKind::Spacer => spacers.push(i),
         }
     }
 
     let chunks = split_blocks_with_ranges(text);
-    // With the block count unchanged, an unmatched chunk is an edit of the
-    // block in that position, and saying so keeps the whitespace around it.
-    // Once blocks have been added or removed that inference is unsound -- it
-    // would consume the wrong block and rewrite an untouched one -- so it is
-    // dropped entirely rather than guessed at.
-    let positional = chunks.len() == blocks.len();
+    // With the (non-spacer) block count unchanged, an unmatched chunk is an
+    // edit of the block in that position, and saying so keeps the
+    // whitespace around it. Once blocks have been added or removed that
+    // inference is unsound -- it would consume the wrong block and rewrite
+    // an untouched one -- so it is dropped entirely rather than guessed at.
+    let positional = chunks.len() == content_block_count;
 
     let mut used = vec![false; blocks.len()];
     let mut cursor = 0usize;
     let mut out = Vec::with_capacity(chunks.len());
 
-    for (chunk, span) in chunks {
-        if let Some((id, html)) = parse_html_fence(&chunk) {
+    // Claim `count` spacers (in order, any remaining one will do -- see
+    // `render_with_spans`'s doc comment) for a gap starting at byte offset
+    // `at`, one newline per spacer. A claim with nothing left to restore
+    // becomes a freshly authored blank line.
+    let claim_spacers = |count: usize,
+                          at: usize,
+                          used: &mut [bool],
+                          cursor: &mut usize,
+                          out: &mut Vec<(Resolved, Range<usize>)>| {
+        for k in 0..count {
+            let claimed = spacers
+                .iter()
+                .copied()
+                .find(|&i| !used[i] && i >= *cursor)
+                .or_else(|| spacers.iter().copied().find(|&i| !used[i]));
+            let pos = at + k;
+            match claimed {
+                Some(i) => {
+                    used[i] = true;
+                    *cursor = i + 1;
+                    out.push((Resolved::Original(i), pos..pos + 1));
+                }
+                None => out.push((Resolved::New(SPACER_HTML.to_string()), pos..pos + 1)),
+            }
+        }
+    };
+
+    let mut prev_end = 0usize;
+    for (idx, (chunk, span)) in chunks.iter().enumerate() {
+        let gap = &text[prev_end..span.start];
+        let newlines = gap.chars().filter(|&c| c == '\n').count();
+        // A leading gap (idx == 0) has no preceding chunk to separate from,
+        // so every newline in it is a spacer; an interior gap needs two
+        // newlines just to separate the chunks either side of it.
+        let spacer_count = if idx == 0 {
+            newlines
+        } else {
+            newlines.saturating_sub(2)
+        };
+        claim_spacers(spacer_count, span.start, &mut used, &mut cursor, &mut out);
+
+        if let Some((id, html)) = parse_html_fence(chunk) {
             match by_id.get(id) {
                 Some(&i) if !used[i] => {
                     used[i] = true;
                     cursor = i + 1;
                     if trim_layout(&html) == trim_layout(&blocks[i].source) {
-                        out.push((Resolved::Original(i), span));
+                        out.push((Resolved::Original(i), span.clone()));
                     } else {
-                        out.push((Resolved::Replaced(i, html), span));
+                        out.push((Resolved::Replaced(i, html), span.clone()));
                     }
                 }
                 // A fence whose id is unknown, or already claimed by an earlier
                 // chunk, is taken at face value.
-                _ => out.push((Resolved::New(html), span)),
+                _ => out.push((Resolved::New(html), span.clone())),
             }
-            continue;
-        }
-
-        if chunk == SPACER {
-            // Any remaining spacer will do -- they are interchangeable, so
-            // whichever restores this one's original bytes is as good as any
-            // other. A brand new pilcrow with nothing left to claim becomes a
-            // freshly authored blank line.
-            let claimed = spacers
-                .iter()
-                .copied()
-                .find(|&i| !used[i] && i >= cursor)
-                .or_else(|| spacers.iter().copied().find(|&i| !used[i]));
-            match claimed {
-                Some(i) => {
-                    used[i] = true;
-                    cursor = i + 1;
-                    out.push((Resolved::Original(i), span));
-                }
-                None => out.push((Resolved::New(SPACER_HTML.to_string()), span)),
-            }
+            prev_end = span.end;
             continue;
         }
 
@@ -220,20 +271,28 @@ pub fn resolve_spans(text: &str, segments: &Segments) -> Vec<(Resolved, Range<us
             Some(i) => {
                 used[i] = true;
                 cursor = i + 1;
-                out.push((Resolved::Original(i), span));
+                out.push((Resolved::Original(i), span.clone()));
             }
             None => {
-                let html = markdown_to_html(&chunk);
+                let html = markdown_to_html(chunk);
                 if positional && cursor < blocks.len() && !used[cursor] {
                     used[cursor] = true;
-                    out.push((Resolved::Replaced(cursor, html), span));
+                    out.push((Resolved::Replaced(cursor, html), span.clone()));
                     cursor += 1;
                 } else {
-                    out.push((Resolved::New(html), span));
+                    out.push((Resolved::New(html), span.clone()));
                 }
             }
         }
+        prev_end = span.end;
     }
+
+    // Trailing gap: like a leading one, no baseline to subtract, since
+    // nothing follows to separate from.
+    let gap = &text[prev_end..text.len()];
+    let trailing = gap.chars().filter(|&c| c == '\n').count();
+    claim_spacers(trailing, prev_end, &mut used, &mut cursor, &mut out);
+
     out
 }
 
@@ -267,7 +326,7 @@ pub fn task_list_degradations(text: &str, segments: &Segments) -> Vec<Range<usiz
     let mut out = Vec::new();
 
     for (chunk, span) in split_blocks_with_ranges(text) {
-        if chunk == SPACER || parse_html_fence(&chunk).is_some() {
+        if parse_html_fence(&chunk).is_some() {
             continue;
         }
         let matched = by_markdown.get(chunk.as_str()).and_then(|indices| {
@@ -299,6 +358,13 @@ pub fn task_list_degradations(text: &str, segments: &Segments) -> Vec<Range<usiz
 /// Uses the Markdown parser's own notion of a block rather than blank-line
 /// splitting, because fenced code and admonitions legitimately span blank
 /// lines.
+///
+/// `Event::Start`/`Event::End` are not the whole story: a thematic break
+/// (`---`) is `Event::Rule`, a standalone event with no enclosing pair, and a
+/// raw HTML block is one `Event::Html` per line with no pair either. Neither
+/// used to be handled, so a `---` -- or an `<hr>` re-emitted by `to_md` --
+/// produced no chunk at all and `splice_resolved` silently dropped it on the
+/// next edited save.
 fn split_blocks_with_ranges(text: &str) -> Vec<(String, Range<usize>)> {
     let mut options = Options::empty();
     options.insert(Options::ENABLE_TABLES);
@@ -307,23 +373,48 @@ fn split_blocks_with_ranges(text: &str) -> Vec<(String, Range<usize>)> {
 
     let mut out = Vec::new();
     let mut depth = 0usize;
+    // Consecutive top-level `Event::Html` lines belong to a single HTML
+    // block and must be merged into one chunk; flushed whenever a
+    // differently-kinded top-level event interrupts the run.
+    let mut html_run: Option<Range<usize>> = None;
+
+    fn push_range(out: &mut Vec<(String, Range<usize>)>, text: &str, range: Range<usize>) {
+        let raw = &text[range.clone()];
+        let chunk = trim_layout_end(raw);
+        if !chunk.is_empty() {
+            // Only trailing whitespace was trimmed above, so the chunk still
+            // starts exactly where `range` did.
+            out.push((chunk.to_string(), range.start..range.start + chunk.len()));
+        }
+    }
+
     for (event, range) in Parser::new_ext(text, options).into_offset_iter() {
+        if let Event::Html(_) = event {
+            if depth == 0 {
+                html_run = Some(match html_run.take() {
+                    Some(run) => run.start..range.end,
+                    None => range,
+                });
+                continue;
+            }
+        } else if let Some(run) = html_run.take() {
+            push_range(&mut out, text, run);
+        }
+
         match event {
             Event::Start(_) => depth += 1,
             Event::End(_) => {
                 depth -= 1;
                 if depth == 0 {
-                    let raw = &text[range.clone()];
-                    let chunk = trim_layout_end(raw);
-                    if !chunk.is_empty() {
-                        // Only trailing whitespace was trimmed above, so the
-                        // chunk still starts exactly where `range` did.
-                        out.push((chunk.to_string(), range.start..range.start + chunk.len()));
-                    }
+                    push_range(&mut out, text, range);
                 }
             }
+            Event::Rule if depth == 0 => push_range(&mut out, text, range),
             _ => {}
         }
+    }
+    if let Some(run) = html_run {
+        push_range(&mut out, text, run);
     }
     out
 }
@@ -406,6 +497,24 @@ mod tests {
         let segments = segment(html);
         let edited = render(&segments).replace("second", "changed");
         assert_eq!(parse(&edited, &segments), "<p>first</p>\n<p>changed</p>");
+    }
+
+    /// A `<br>` renders as a real newline in the buffer, and typing a
+    /// newline in the middle of a paragraph comes back as a `<br>` -- the
+    /// buffer's own convention that every newline the user types is a hard
+    /// break, not CommonMark's usual soft one.
+    #[test]
+    fn typing_a_newline_inside_a_paragraph_inserts_a_br() {
+        let html = "<p>first line</p>";
+        let segments = segment(html);
+        let buffer = render(&segments);
+        assert_eq!(buffer, "first line");
+
+        let edited = buffer.replace("first line", "first line\nsecond line");
+        assert_eq!(
+            parse(&edited, &segments),
+            "<p>first line<br>second line</p>"
+        );
     }
 
     /// A list carrying CKEditor's per-item ids round-trips untouched by
@@ -726,10 +835,10 @@ mod tests {
     }
 
     #[test]
-    fn spacer_renders_as_a_pilcrow() {
+    fn a_spacer_renders_as_an_extra_blank_line() {
         let html = "<p>a</p>\n<p>&nbsp;</p>\n<p>b</p>";
         let buffer = render(&segment(html));
-        assert_eq!(buffer, "a\n\n\u{b6}\n\nb");
+        assert_eq!(buffer, "a\n\n\nb");
     }
 
     #[test]
@@ -740,9 +849,10 @@ mod tests {
     }
 
     /// The whole point: a blank-line spacer can be removed just by deleting
-    /// its line, the same as deleting any other line.
+    /// its extra blank line, leaving the ordinary single-blank-line
+    /// separator behind.
     #[test]
-    fn deleting_the_pilcrow_line_removes_the_spacer() {
+    fn deleting_the_extra_blank_line_removes_the_spacer() {
         let html = "<p>a</p>\n<p>&nbsp;</p>\n<p>b</p>";
         let segments = segment(html);
         let edited = "a\n\nb";
@@ -750,14 +860,38 @@ mod tests {
     }
 
     #[test]
-    fn typing_a_pilcrow_inserts_a_fresh_spacer() {
+    fn typing_an_extra_blank_line_inserts_a_fresh_spacer() {
         let html = "<p>a</p>\n<p>b</p>";
         let segments = segment(html);
-        let edited = "a\n\n\u{b6}\n\nb";
+        let edited = "a\n\n\nb";
         assert_eq!(
             parse(edited, &segments),
             "<p>a</p>\n<p>&nbsp;</p>\n<p>b</p>"
         );
+    }
+
+    /// Several blank lines in a row insert that many spacers, not just one.
+    #[test]
+    fn several_extra_blank_lines_insert_several_spacers() {
+        let html = "<p>a</p>\n<p>b</p>";
+        let segments = segment(html);
+        let edited = "a\n\n\n\n\nb";
+        assert_eq!(
+            parse(edited, &segments),
+            "<p>a</p>\n<p>&nbsp;</p>\n<p>&nbsp;</p>\n<p>&nbsp;</p>\n<p>b</p>"
+        );
+    }
+
+    /// A spacer before the first real block, or after the last, has no
+    /// neighbour on that side to separate from -- its newline count has no
+    /// baseline to subtract, unlike an interior gap.
+    #[test]
+    fn leading_and_trailing_spacers_round_trip() {
+        let html = "<p>&nbsp;</p>\n<p>a</p>\n<p>&nbsp;</p>";
+        let segments = segment(html);
+        let buffer = render(&segments);
+        assert_eq!(buffer, "\na\n");
+        assert_eq!(parse(&buffer, &segments), html);
     }
 
     /// Two adjacent spacers with different original markup must each restore
@@ -765,6 +899,32 @@ mod tests {
     #[test]
     fn consecutive_spacers_round_trip_byte_identically() {
         let html = "<p>a</p>\n<p>&nbsp;</p>\n<p><br></p>\n<p>b</p>";
+        let segments = segment(html);
+        assert_eq!(parse(&render(&segments), &segments), html);
+    }
+
+    /// A thematic break is `Event::Rule`, a standalone pulldown-cmark event
+    /// with no enclosing `Start`/`End` pair -- `split_blocks_with_ranges`
+    /// used to only look at that pair, so a `<hr>` block was silently
+    /// dropped by any edited save touching the same note, even one that
+    /// never touched the `<hr>` itself.
+    #[test]
+    fn a_thematic_break_survives_an_edited_save() {
+        let html = "<p>a</p>\n<hr>\n<p>b</p>";
+        let segments = segment(html);
+        let buffer = render(&segments);
+        assert!(buffer.contains("---"), "got {buffer}");
+        let edited = buffer.replace("a", "a!");
+        assert_eq!(parse(&edited, &segments), "<p>a!</p>\n<hr>\n<p>b</p>");
+    }
+
+    /// An unedited note containing an `<hr>` splices back byte-identically
+    /// -- the regression `a_thematic_break_survives_an_edited_save` guards
+    /// against a save that touches an *unrelated* block; this guards the
+    /// simpler case of the fast path never engaging in the first place.
+    #[test]
+    fn a_thematic_break_round_trips_byte_identically() {
+        let html = "<p>a</p>\n<hr>\n<p>b</p>";
         let segments = segment(html);
         assert_eq!(parse(&render(&segments), &segments), html);
     }

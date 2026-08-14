@@ -265,7 +265,7 @@ fn row_cells(row: &Element, cell_tag: &str, mode: Escaping) -> Option<Vec<String
         if cell.name != cell_tag || !cell.attrs.is_empty() {
             return None;
         }
-        let text = inline_to_markdown(&cell.children, mode)?;
+        let text = inline_to_markdown_ctx(&cell.children, mode, true)?;
         // A literal pipe would break the row structure.
         if text.contains('|') {
             return None;
@@ -568,22 +568,31 @@ pub fn blocks_to_markdown(nodes: &[Node], mode: Escaping) -> Option<String> {
 // ---------------------------------------------------------------------------
 
 pub fn inline_to_markdown(nodes: &[Node], mode: Escaping) -> Option<String> {
+    inline_to_markdown_ctx(nodes, mode, false)
+}
+
+/// `literal_br`: whether `<br>` must stay `<br>` instead of becoming a
+/// literal newline. True only inside a table cell (see `row_cells`), where a
+/// newline would end the cell's line and break the table's row-based syntax;
+/// propagated through every function on this recursive descent so a `<br>`
+/// nested inside e.g. a `<span>` inside a cell still sees it.
+fn inline_to_markdown_ctx(nodes: &[Node], mode: Escaping, literal_br: bool) -> Option<String> {
     let mut out = String::new();
     for node in nodes {
         match node {
             Node::Comment(_) => return None,
             Node::Text(t) => out.push_str(&escape_markdown(t, mode)),
-            Node::Element(e) => out.push_str(&inline_element(e, mode)?),
+            Node::Element(e) => out.push_str(&inline_element(e, mode, literal_br)?),
         }
     }
     Some(out)
 }
 
-fn inline_element(e: &Element, mode: Escaping) -> Option<String> {
-    if let Some(md) = inline_rule(e, mode) {
+fn inline_element(e: &Element, mode: Escaping, literal_br: bool) -> Option<String> {
+    if let Some(md) = inline_rule(e, mode, literal_br) {
         return Some(md);
     }
-    inline_verbatim(e, mode)
+    inline_verbatim(e, mode, literal_br)
 }
 
 /// Carry an inline element that has no Markdown form through as raw HTML.
@@ -603,7 +612,7 @@ fn inline_element(e: &Element, mode: Escaping) -> Option<String> {
 /// Restricted to known inline tags on purpose. An unrecognised *block* element
 /// inside a paragraph must not be silently treated as inline -- that block goes
 /// opaque instead, which is the safe direction to fail in.
-fn inline_verbatim(e: &Element, mode: Escaping) -> Option<String> {
+fn inline_verbatim(e: &Element, mode: Escaping, literal_br: bool) -> Option<String> {
     if !INLINE_VERBATIM.contains(&e.name.as_str()) {
         return None;
     }
@@ -616,7 +625,7 @@ fn inline_verbatim(e: &Element, mode: Escaping) -> Option<String> {
     if crate::dom::is_void(&e.name) {
         return Some(open);
     }
-    let inner = inline_to_markdown(&e.children, mode)?;
+    let inner = inline_to_markdown_ctx(&e.children, mode, literal_br)?;
     Some(format!("{open}{inner}</{}>", e.name))
 }
 
@@ -634,11 +643,11 @@ fn open_tag(e: &Element) -> String {
     out
 }
 
-fn inline_rule(e: &Element, mode: Escaping) -> Option<String> {
+fn inline_rule(e: &Element, mode: Escaping, literal_br: bool) -> Option<String> {
     match e.name.as_str() {
-        "strong" | "b" => wrap(e, "**", mode),
-        "em" | "i" => wrap(e, "*", mode),
-        "del" | "s" | "strike" => wrap(e, "~~", mode),
+        "strong" | "b" => wrap(e, "**", mode, literal_br),
+        "em" | "i" => wrap(e, "*", mode, literal_br),
+        "del" | "s" | "strike" => wrap(e, "~~", mode, literal_br),
         "code" => {
             // CKEditor tags inline code with `spellcheck="false"` (1531 of 1560
             // occurrences in the reference corpus), so that is the canonical
@@ -659,31 +668,37 @@ fn inline_rule(e: &Element, mode: Escaping) -> Option<String> {
             if !e.attrs.is_empty() {
                 return None;
             }
-            // Emitted as raw inline HTML rather than a Markdown hard break.
-            // A hard break forces a newline, and the whitespace that newline
-            // introduces does not exist in the CKEditor source, so the block
-            // would fail verification. `br` is not a block-level tag in
-            // CommonMark, so this stays inline.
-            Some("<br>".into())
+            if literal_br {
+                // Inside a table cell, a newline would end the cell's line
+                // and break the row's syntax; kept as raw inline HTML.
+                Some("<br>".into())
+            } else {
+                // A hard break, not a soft one: the buffer's own convention
+                // is that every newline the user types is a `<br>`, so every
+                // `<br>` must come back as a real newline, not fold away
+                // into a space on the next round trip. `to_html` maps every
+                // soft break onto a hard one to match.
+                Some("\n".into())
+            }
         }
-        "a" => anchor(e, mode),
+        "a" => anchor(e, mode, literal_br),
         "img" => image(e, mode),
         _ => None,
     }
 }
 
-fn wrap(e: &Element, delim: &str, mode: Escaping) -> Option<String> {
+fn wrap(e: &Element, delim: &str, mode: Escaping, literal_br: bool) -> Option<String> {
     if !e.attrs.is_empty() {
         return None;
     }
-    let inner = inline_to_markdown(&e.children, mode)?;
+    let inner = inline_to_markdown_ctx(&e.children, mode, literal_br)?;
     if inner.trim().is_empty() {
         return None;
     }
     Some(format!("{delim}{inner}{delim}"))
 }
 
-fn anchor(e: &Element, mode: Escaping) -> Option<String> {
+fn anchor(e: &Element, mode: Escaping, literal_br: bool) -> Option<String> {
     let href = e.attr("href")?;
     match e.attr("class") {
         // CKEditor's internal "reference" link renders the target's title.
@@ -714,7 +729,7 @@ fn anchor(e: &Element, mode: Escaping) -> Option<String> {
             if e.attrs.len() != 1 {
                 return None;
             }
-            let text = inline_to_markdown(&e.children, mode)?;
+            let text = inline_to_markdown_ctx(&e.children, mode, literal_br)?;
             if text.contains(']') {
                 return None;
             }
@@ -798,7 +813,18 @@ fn escape_markdown(s: &str, mode: Escaping) -> String {
 /// Independent of `Escaping`: `-`/`+`/`#`/`>`/an ordered-list marker at the
 /// very start of a line is a block-structure hazard regardless of how the
 /// inline text after it was escaped, so this always applies.
+///
+/// Applied line by line, not just to the string's first character: a `br`
+/// now round-trips as a literal newline (see `inline_rule`), so a hazard can
+/// start any line a hard break introduced, not only the block's first one.
 fn escape_block_start(s: &str) -> String {
+    s.lines()
+        .map(escape_line_start)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn escape_line_start(s: &str) -> String {
     let mut chars = s.char_indices();
     let Some((_, first)) = chars.next() else {
         return s.to_string();
@@ -908,5 +934,34 @@ mod tests {
         ] {
             assert_eq!(escape_block_start(input), expected);
         }
+    }
+
+    #[test]
+    fn a_br_in_prose_becomes_a_real_newline() {
+        let nodes = crate::dom::parse("<p>a<br>b</p>");
+        let md = block_to_markdown(&nodes[0], Escaping::Bare).unwrap();
+        assert_eq!(md, "a\nb");
+    }
+
+    #[test]
+    fn a_br_in_a_table_cell_stays_literal() {
+        let nodes = crate::dom::parse(
+            "<figure class=\"table\"><table><thead><tr><th>h</th></tr></thead><tbody><tr><td>a<br>b</td></tr></tbody></table></figure>",
+        );
+        let md = block_to_markdown(&nodes[0], Escaping::Bare).unwrap();
+        assert!(
+            md.contains("a<br>b"),
+            "table cell br should stay literal, got: {md:?}"
+        );
+    }
+
+    #[test]
+    fn a_block_start_hazard_after_an_embedded_break_is_escaped() {
+        // The line after a hard break becomes the start of a fresh Markdown
+        // line; if it happens to look like a list marker or heading, it must
+        // be escaped the same as any other block start.
+        let nodes = crate::dom::parse("<p>a<br>- not a list</p>");
+        let md = block_to_markdown(&nodes[0], Escaping::Bare).unwrap();
+        assert_eq!(md, "a\n\\- not a list");
     }
 }

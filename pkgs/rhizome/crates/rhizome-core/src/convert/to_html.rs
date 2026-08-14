@@ -5,7 +5,7 @@
 //! and renders admonitions as `<aside class="admonition ...">`. Those are applied
 //! as DOM fixups after rendering, so this stays the exact inverse of `to_md`.
 
-use pulldown_cmark::{Options, Parser, html};
+use pulldown_cmark::{Event, Options, Parser, html};
 
 use crate::convert::to_md::ADMONITIONS;
 use crate::dom::{self, Element, Node};
@@ -28,8 +28,24 @@ pub fn markdown_to_html_reporting(md: &str) -> (String, bool) {
     options.insert(Options::ENABLE_STRIKETHROUGH);
     options.insert(Options::ENABLE_TASKLISTS);
 
+    // Every newline the user types is a hard break, not CommonMark's usual
+    // soft one -- `to_md`'s `br` rule relies on this to round-trip a literal
+    // newline back into `<br>` without needing a trailing backslash or two
+    // trailing spaces the source never had.
+    let parser = Parser::new_ext(md, options).map(|event| match event {
+        Event::SoftBreak => Event::HardBreak,
+        other => other,
+    });
     let mut raw = String::new();
-    html::push_html(&mut raw, Parser::new_ext(md, options));
+    html::push_html(&mut raw, parser);
+    // pulldown-cmark's own HTML writer renders a hard break as `<br />\n`,
+    // pretty-printing with a trailing newline the same as it does after a
+    // block tag. That newline is not layout here -- `<br>` is inline, and
+    // `dom::normalize`'s block-adjacency rule (see `drop_layout_whitespace`)
+    // does not drop whitespace next to it -- so left alone it would survive
+    // as a literal space next to every hard break and fail verification
+    // against CKEditor's own compact `<p>a<br>b</p>`.
+    raw = raw.replace("<br />\n", "<br>");
 
     let mut nodes = dom::parse(&raw);
     split_mixed_task_lists(&mut nodes);
@@ -619,4 +635,24 @@ fn trim_code_newline(e: &Element) -> Option<Node> {
         return Some(Node::Element(out));
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_newline_in_a_paragraph_becomes_a_br() {
+        assert_eq!(markdown_to_html("a\nb"), "<p>a<br>b</p>");
+    }
+
+    #[test]
+    fn several_newlines_each_become_their_own_br() {
+        assert_eq!(markdown_to_html("a\nb\nc"), "<p>a<br>b<br>c</p>");
+    }
+
+    #[test]
+    fn a_blank_line_still_separates_paragraphs_rather_than_becoming_a_br() {
+        assert_eq!(markdown_to_html("a\n\nb"), "<p>a</p>\n<p>b</p>");
+    }
 }

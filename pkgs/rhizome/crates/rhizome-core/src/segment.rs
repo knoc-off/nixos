@@ -564,6 +564,16 @@ mod tests {
         );
     }
 
+    /// A `<br>` inside a paragraph is transparent -- it round-trips as a
+    /// real newline, not as literal `<br>` text or an escaped backslash.
+    #[test]
+    fn a_br_in_prose_is_transparent() {
+        let seg = segment("<p>first line<br>second line</p>");
+        assert_eq!(seg.stats().transparent, 1);
+        let block = seg.blocks().next().unwrap();
+        assert_eq!(block.markdown().unwrap(), "first line\nsecond line");
+    }
+
     /// The case `Bare` cannot handle: a literal, unpaired `*` reads as
     /// emphasis on reparse, so the proof must fail it and fall back to
     /// `Full` -- which is what actually keeps the block transparent instead

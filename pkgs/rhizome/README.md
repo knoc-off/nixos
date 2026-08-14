@@ -114,6 +114,25 @@ note, and Markdown link syntax cannot:
 See [[_help_KC1HB96bqqHX|Templates]] for details.
 ```
 
+### Newlines and blank lines
+
+Every newline you type inside a block is a hard line break: it round-trips to a
+literal `<br>` in the note's HTML, and every `<br>` comes back as a real newline
+in the buffer. This is what CKEditor's <kbd>Shift-Enter</kbd> produces, so a
+soft break typed in the web UI and one typed in the editor are the same thing.
+The one exception is inside a table cell, where a real newline would end the
+cell's row: there a `<br>` stays literal `<br>` in the buffer, since Markdown
+table rows are single-line.
+
+Blank lines between blocks are preserved as written. CKEditor cannot represent
+a run of empty paragraphs as content, so *N* blank lines in the buffer encode
+as *N−1* invisible spacer blocks in the note; deleting or adding a blank line
+adds or removes a spacer. An unedited note round-trips its blank lines
+byte-for-byte.
+
+Because every newline is load-bearing, a formatter or linter that reflows the
+buffer will rewrite the note's HTML -- see the formatter caveat below.
+
 ### Lists
 
 Plain lists and CKEditor's two-state todo list both edit as ordinary Markdown,
@@ -151,13 +170,17 @@ stays a plain Markdown list and the checkbox itself is written out as literal
 `[ ]`/`[x]` text instead of being dropped or left as invalid HTML, with an LSP
 warning at the spot where it happened.
 
-**A markdown formatter attached to the buffer can corrupt an `=html` fence.**
-Note buffers are `filetype = "markdown"`, so a formatter that reindents or
-rewraps text will also reach inside `=html` fences and reformat the HTML they
-carry verbatim. That HTML is compared byte-for-byte against the block's
-original source to decide whether anything changed; a reformatted fence reads
-as an edit and gets written back to Trilium on save, turning a no-op save into
-a real diff. Disable autoformatting for rhizome note buffers, or review a
+**A markdown formatter attached to the buffer can corrupt a note.** Note
+buffers are `filetype = "markdown"`, so a formatter (prettierd) or linter
+(markdownlint) wired to run on `markdown` reaches rhizome buffers too. Two
+things break: it reindents or rewraps text *inside* `=html` fences, reformatting
+the verbatim HTML they carry; and it reflows prose or collapses blank-line runs,
+which -- because every newline round-trips to a `<br>` and blank lines encode
+spacer blocks -- silently rewrites the note's HTML. Either turns a no-op save
+into a real diff written back to Trilium. The plugin defends against this: with
+`soft_wrap` (on by default) it sets the conform.nvim `disable_autoformat` flag
+on each note buffer, and the NixOS module's `format_on_save`/lint hooks honour
+it. If you wire up formatting yourself, gate it on that flag, or review a
 fence's diff before saving if one looks unexpectedly large.
 
 Two lists of the same *flavour* (`ul`/`ul`, `ol`/`ol`, or
@@ -442,5 +465,24 @@ An explicit modifier always overrides the default: `:vsplit Rhizome search
 foo` splits regardless of `open_mode`. `gd`/references jumps are Neovim's own
 LSP navigation and follow whatever split/tab keymaps you already use for
 those, not `open_mode`.
+
+`soft_wrap` (on by default) tunes a note buffer for prose. It turns on `wrap`
+and `linebreak` so long paragraphs wrap at word boundaries instead of scrolling
+off-screen, `breakindent` + `breakindentopt=list:-1` with a Markdown-aware
+`formatlistpat` so a wrapped list item's continuation aligns under the text
+after its marker rather than under the bullet, and sets the conform.nvim
+`disable_autoformat` flag so a project-wide markdown formatter/linter leaves the
+note alone (see the formatter caveat above). Turn it off if you manage these
+options yourself.
+
+One rough edge is not rhizome's to fix: with `link_titles` on, a `[[id|Title]]`
+link renders its title as inline virtual text over concealed source, and
+Neovim's soft-wrap does not account for inline virtual text width
+([neovim/neovim#41227](https://github.com/neovim/neovim/issues/41227)) or
+conceal width ([neovim/neovim#14409](https://github.com/neovim/neovim/issues/14409))
+when deciding where to break. A line containing a rendered link can therefore
+wrap at an odd spot or mid-word despite `linebreak`. This is upstream and
+affects any plugin combining inline virtual text with `wrap`; there is nothing
+to change on this side until those land.
 
 Not yet built: a raw/parsed toggle and note deletion.

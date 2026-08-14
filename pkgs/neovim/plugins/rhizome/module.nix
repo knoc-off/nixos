@@ -67,6 +67,21 @@ in {
       '';
     };
 
+    softWrap = mkOption {
+      type = types.bool;
+      default = true;
+      description = ''
+        Soft-wrap note buffers for prose editing: `wrap`/`linebreak` so long
+        paragraphs wrap at word boundaries, `breakindent` (+ a Markdown-aware
+        `formatlistpat`) so wrapped list continuations align under the marker,
+        and the conform.nvim `disable_autoformat` buffer flag so a project-wide
+        markdown formatter/linter leaves the note alone -- every newline in a
+        rhizome buffer round-trips to a `<br>`, so a reflow would rewrite the
+        note's HTML. The bundled `languages` module's `format_on_save` and
+        nvim-lint hooks honour that flag.
+      '';
+    };
+
     keymaps = {
       enable = mkEnableOption "default rhizome keymaps" // {default = true;};
 
@@ -119,6 +134,7 @@ in {
         url_env = ${luaString cfg.urlEnv},
         token_env = ${luaString cfg.tokenEnv},
         token_cmd = ${tokenCommandLua},
+        soft_wrap = ${lib.boolToString cfg.softWrap},
       })
     '';
 

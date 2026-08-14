@@ -56,6 +56,17 @@ local defaults = {
   --- open in a visible window -- that window is focused instead, rather
   --- than opening a second view of it.
   open_mode = "current",
+  --- Soft-wrap notes for prose editing: turn on `wrap`/`linebreak` so long
+  --- paragraphs wrap at word boundaries instead of scrolling off-screen,
+  --- `breakindent` so a wrapped line keeps its block's indent, and a
+  --- Markdown-aware `formatlistpat` so wrapped list continuations align under
+  --- the marker rather than the bullet. Also sets `disable_autoformat` on the
+  --- buffer so a project-wide `markdown` formatter/linter (prettierd,
+  --- markdownlint) does not reflow a note whose whitespace is load-bearing --
+  --- every newline in a rhizome buffer round-trips to a `<br>`, so a reflow
+  --- would rewrite the note's HTML. Window-local, applied the same way as
+  --- `fold_opaque`/`link_titles`.
+  soft_wrap = true,
 }
 
 local function notify(message, level)
@@ -374,6 +385,24 @@ local function apply_window_options(bufnr, read_only)
         -- flashes back to raw before the title catches up.
         vim.wo[win].concealcursor = "nvic"
       end
+      if state.opts.soft_wrap then
+        vim.wo[win].wrap = true
+        -- Wrap at word boundaries, not mid-word.
+        vim.wo[win].linebreak = true
+        -- A wrapped line keeps the indent of the line it continues, so a
+        -- wrapped paragraph or blockquote stays visually inside its block.
+        vim.wo[win].breakindent = true
+        -- `list:-1` lines wrapped list-item continuations up under the text
+        -- after the marker (`- `, `1. `), not under the marker itself --
+        -- which is exactly how the item reads as Markdown.
+        vim.wo[win].breakindentopt = "list:-1"
+        -- Teach that indent machinery what a list marker looks like: an
+        -- optional indent, then a `-`/`+`/`*` bullet or an `N.`/`N)` ordered
+        -- marker, then trailing whitespace. Buffer-local, but set here
+        -- alongside the window options it feeds so the wrap behaviour is
+        -- configured in one place.
+        vim.bo[bufnr].formatlistpat = [[^\s*[-+*]\s\+\|^\s*\d\+[.)]\s\+]]
+      end
     end
   end
 end
@@ -391,6 +420,18 @@ local function configure_buffer(bufnr, read_only)
   -- `gf` on a `[[noteId|Title]]` under the cursor -- see `M.includeexpr` for
   -- why this can't just trust the filename Vim hands it.
   vim.bo[bufnr].includeexpr = "v:lua.require'rhizome'.includeexpr(v:fname)"
+
+  -- A rhizome buffer has `filetype = "markdown"`, so any project-wide
+  -- markdown formatter (prettierd) or linter (markdownlint) wired to run on
+  -- save would fire on it too. Their reflowing is actively wrong here: every
+  -- newline in the buffer round-trips to a `<br>`, and blank-line runs encode
+  -- spacer blocks, so collapsing blank lines or re-wrapping a paragraph would
+  -- silently rewrite the note's HTML. `disable_autoformat` is the conform.nvim
+  -- convention for a per-buffer opt-out; the nixvim `format_on_save`/lint
+  -- guards honour it.
+  if state.opts.soft_wrap then
+    vim.b[bufnr].disable_autoformat = true
+  end
 
   apply_window_options(bufnr, read_only)
   vim.api.nvim_create_autocmd("BufWinEnter", {

@@ -2,7 +2,7 @@
 # autoInstall pulls the linter binaries from nixpkgs automatically; the built-in
 # BufWritePost autocmd runs `try_lint()` on save, which only executes linters
 # matching the current buffer's filetype -- so linting stays lazy per-filetype.
-{pkgs, ...}: {
+{pkgs, lib, ...}: {
   plugins.lint = {
     enable = true;
 
@@ -12,6 +12,20 @@
       # `markdownlint-cli`; every other linter below resolves as `pkgs.<name>`.
       overrides.markdownlint = pkgs.markdownlint-cli;
     };
+
+    # Skip linting on buffers that opt out via `vim.b.disable_autoformat`
+    # (conform's convention, reused here so one flag silences both formatter
+    # and linter). rhizome note buffers set it: they are `filetype =
+    # "markdown"` but markdownlint's diagnostics are noise on a buffer whose
+    # newlines and blank-line runs are load-bearing HTML, not prose.
+    autoCmd.callback = lib.nixvim.mkRaw ''
+      function()
+        if vim.b.disable_autoformat or vim.g.disable_autoformat then
+          return
+        end
+        require('lint').try_lint()
+      end
+    '';
 
     lintersByFt = {
       nix = ["statix" "deadnix"];

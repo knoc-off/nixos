@@ -114,10 +114,22 @@
   plugins.conform-nvim = {
     enable = true;
     settings = {
-      format_on_save = {
-        lsp_format = "fallback";
-        timeout_ms = 2000;
-      };
+      # A function rather than a static table so a buffer can opt out of
+      # format-on-save by setting `vim.b.disable_autoformat` (conform's own
+      # convention). rhizome note buffers set it: they are `filetype =
+      # "markdown"` but every newline round-trips to a `<br>`, so a reflow
+      # would silently rewrite the note's HTML.
+      format_on_save = lib.nixvim.mkRaw ''
+        function(bufnr)
+          if vim.b[bufnr].disable_autoformat or vim.g.disable_autoformat then
+            return nil
+          end
+          return {
+            lsp_format = "fallback",
+            timeout_ms = 2000,
+          }
+        end
+      '';
 
       formatters_by_ft = {
         "*" = [ "trim_whitespace" ];
