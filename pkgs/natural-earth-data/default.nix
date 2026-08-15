@@ -6,8 +6,8 @@
 #
 # Data is in the public domain (Natural Earth's terms).
 #
-# Consumers read NATURAL_EARTH_DATA env, which the markid home-manager
-# module sets to the build output of this derivation.
+# Consumers point marki-map's NATURAL_EARTH_DATA env var (e.g. via
+# marki-oneshot or a project devShell) at this derivation's output.
 {
   lib,
   stdenvNoCC,

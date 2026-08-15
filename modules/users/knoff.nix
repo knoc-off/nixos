@@ -21,8 +21,6 @@
 
       inherit (self.lib.keyLayers) presets;
 
-      hayleox-flags = pkgs.callPackage ../../pkgs/hayleox-flags { };
-
       type-date = pkgs.writeShellApplication {
         name = "type-date";
         runtimeInputs = with pkgs; [
@@ -139,30 +137,13 @@
               }
               self.homeModules.starship
 
-              # self.homeModules.markid
-              # {
-              #   services.markid = {
-              #     enable = true;
-              #     settings.cards_dir = "/home/knoff/projects/flashcards";
-              #     mediaSources = {
-              #       circle = "${pkgs.circle-flags}/share/circle-flags-svg";
-              #       flags = "${hayleox-flags}/share/hayleox-flags";
-              #     };
-              #     typstPackage = pkgs.typst.withPackages (p:
-              #       with p; [
-              #         circuiteria
-              #         cetz
-              #         cetz_0_3_4
-              #         oxifmt_0_2_1
-              #         zap
-              #       ]);
-              #   };
-              #   # Anki with AnkiConnect pre-installed — launch as a normal desktop app,
-              #   # markid connects via wait_for_anki() once it's open.
-              #   home.packages = [
-              #     (pkgs.anki.withAddons (with pkgs.ankiAddons; [anki-connect]))
-              #   ];
-              # }
+              {
+                # Plain Anki, no addons -- marki writes directly into the
+                # collection file via SQLite. Anki must be closed while
+                # running `marki push`, since it holds an exclusive lock
+                # on the collection for its entire runtime.
+                home.packages = [pkgs.anki];
+              }
 
               self.homeModules.compat-proxy
               {

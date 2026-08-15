@@ -5,9 +5,8 @@
 #
 # Data is public domain (sourced from Wikimedia Commons).
 #
-# Consumers read MARKID_MEDIA_DIR env, which the markid home-manager
-# module sets to the build output of this derivation (or a merged
-# directory that also includes iso-flags).
+# Consumers point marki's `media_sources` config (or a `MARKI_MEDIA_DIR`
+# devShell env var) at this derivation's `$out/share/region-flags`.
 {
   lib,
   stdenvNoCC,

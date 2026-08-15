@@ -23,8 +23,8 @@
 # Data: geoBoundaries CGAZ, CC-BY 4.0. Attribution required.
 # Source: https://www.geoboundaries.org/
 #
-# Consumers read the `GEOBOUNDARIES_DATA` env var, which the markid
-# home-manager module sets to this derivation's output.
+# Consumers point marki-map's `GEOBOUNDARIES_DATA` env var (e.g. via
+# marki-oneshot or a project devShell) at this derivation's output.
 {
   lib,
   stdenvNoCC,
