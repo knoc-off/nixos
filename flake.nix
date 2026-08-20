@@ -20,9 +20,15 @@
 
       inherit (lib) nixosSystem listToAttrs;
 
-      inherit (import ./lib { inherit lib; }) discoverPackages discoverAspects;
+      inherit (import ./lib { inherit lib; })
+        discoverPackages
+        discoverAspects
+        flattenDrvs
+        ;
 
       aspects = discoverAspects { inherit inputs self; } ./modules;
+
+      overlays = import ./overlays { inherit inputs; };
 
       mkConfig =
         {
@@ -55,14 +61,6 @@
           ]
           ++ extraModules;
         };
-
-      # Host configuration
-      mkHost = hostname: system: {
-        name = hostname;
-        value = mkConfig {
-          inherit hostname system;
-        };
-      };
 
       mkImage =
         hostname: system: imageType:
@@ -105,11 +103,80 @@
             };
             overlays = [
               inputs.fenix.overlays.default
+              overlays.builders
               (_final: _prev: { inherit inputs upkgs; })
             ];
           };
         in
         discoverPackages pkgs ./pkgs;
+
+      # Which of ./pkgs the build farm prebuilds directly, per system.
+      #
+      # x86_64-linux gets everything meta.platforms says is available: those are
+      # built ad-hoc via `nix build`/`nix run` and devShells, not only through a
+      # host closure, so they are worth having on their own.
+      #
+      # aarch64-linux gets nothing directly. rpi-4b-plus is the only aarch64
+      # host, and everything it installs -- mqtt-automations via
+      # services/home-assistant.nix, caddy-with-plugins via caddy-common --
+      # already arrives through toplevel/rpi-4b-plus. Listing packages here as
+      # well would only add emulated rebuilds of things nothing installs.
+      #
+      # null (or a missing entry) means "everything meta says is available".
+      cachePackages = {
+        aarch64-linux = [ ];
+      };
+
+      # What the build farm prebuilds for `system`: the per-host toplevels plus
+      # whatever cachePackages allows.
+      #
+      # The toplevels are the important half. "What will this host try to
+      # install" is not something to maintain by hand -- system.build.toplevel
+      # already answers it exactly, and transitively. Combined with
+      # nix-fast-build --skip-cached, the marginal cost of a toplevel is only
+      # its uncached delta: everything reachable from cache.nixos.org is
+      # skipped, and what remains is precisely the local packages and patches
+      # that are the whole point of the farm.
+      mkCacheJobs =
+        system:
+        let
+          # elaborate rather than { system = ...; }: meta.platforms entries may be
+          # attrset patterns (lib.systems.inspect.*) as well as plain strings, and
+          # matching those needs platform.parsed.
+          platform = lib.systems.elaborate system;
+          available = lib.filterAttrs (_: lib.meta.availableOn platform) (flattenDrvs (mkPkgs system));
+
+          allow = cachePackages.${system} or null;
+          missing = lib.subtractLists (lib.attrNames available) (if allow == null then [ ] else allow);
+          packages =
+            if allow == null then
+              available
+            else if missing != [ ] then
+              # Loud on purpose: a typo here, or a package whose meta.platforms
+              # excludes this system, would otherwise silently build nothing.
+              throw "cachePackages.${system} names attrs unavailable on ${system}: ${lib.concatStringsSep ", " missing}"
+            else
+              lib.filterAttrs (name: _: lib.elem name allow) available;
+
+          toplevels = lib.mapAttrs' (
+            hostname: _:
+            lib.nameValuePair "toplevel/${hostname}" nixosConfigurations.${hostname}.config.system.build.toplevel
+          ) (lib.filterAttrs (_: hostSystem: hostSystem == system) hosts);
+        in
+        packages // toplevels;
+
+      # hostname -> system. Single source for both nixosConfigurations and the
+      # set of toplevels the build farm prebuilds.
+      hosts = {
+        framework13 = "x86_64-linux";
+        thinkpad-work = "x86_64-linux";
+        nuci5 = "x86_64-linux";
+        optiplex = "x86_64-linux";
+        hetzner = "x86_64-linux";
+        rpi-4b-plus = "aarch64-linux";
+      };
+
+      nixosConfigurations = lib.mapAttrs (hostname: system: mkConfig { inherit hostname system; }) hosts;
     in
     {
       packages = forAllSystems mkPkgs;
@@ -135,7 +202,7 @@
       homeModules = aspects.home;
       # darwinModules removed — darwin configs commented out
 
-      overlays = import ./overlays { inherit inputs; };
+      inherit overlays;
 
       lib = import ./lib { inherit lib; };
 
@@ -146,17 +213,13 @@
       ];
 
       # darwinConfigurations = listToAttrs [
-      #   # (mkHost "Nicholass-MacBook-Pro" "aarch64-darwin")
+      #   # ("Nicholass-MacBook-Pro" "aarch64-darwin")
       # ];
 
-      nixosConfigurations = listToAttrs [
-        (mkHost "framework13" "x86_64-linux")
-        (mkHost "thinkpad-work" "x86_64-linux")
-        (mkHost "nuci5" "x86_64-linux")
-        (mkHost "optiplex" "x86_64-linux")
-        (mkHost "hetzner" "x86_64-linux")
-        (mkHost "rpi-4b-plus" "aarch64-linux")
-      ];
+      inherit nixosConfigurations;
+
+      # Everything the optiplex build farm prebuilds and serves. See mkCacheJobs.
+      cacheJobs = forAllSystems mkCacheJobs;
     };
 
   inputs = {

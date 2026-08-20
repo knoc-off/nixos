@@ -9,7 +9,7 @@
       src = ./window-server;
     };
 
-    smart-paste-nvim = import ../neovim/plugins/smart-paste/package.nix {
+    smart-paste-nvim = import ./plugins/smart-paste/package.nix {
       inherit vimUtils fetchFromGitHub;
     };
 
@@ -23,7 +23,7 @@
 
   # Export the nixvim modules for use in configurations
   modules = {
-    smart-paste = ../neovim/plugins/smart-paste/module.nix;
-    rhizome = ../neovim/plugins/rhizome/module.nix;
+    smart-paste = ./plugins/smart-paste/module.nix;
+    rhizome = ./plugins/rhizome/module.nix;
   };
 }

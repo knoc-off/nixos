@@ -8,18 +8,44 @@ You are running inside a bubblewrap (bwrap) sandbox. This changes how you should
 - The sandbox filesystem constrains your blast radius; you cannot affect files outside the project
 
 ## Filesystem
-- **Writable**: project directories (CWD or `~/projects/<name>`), opencode state/cache dirs
+- **Writable**: project directories, `~/scratch`, `~/workspaces`, opencode state/cache dirs
 - **Read-only**: /nix/store, system config, proxy rules
 - **Inaccessible**: the rest of the host filesystem
-- When launched with explicit project paths, they are mounted under `~/projects/`
+- Projects are mounted at **their real host path** — a repo the host knows as
+  `~/work/foo` is `~/work/foo` in here too, with the same absolute path. File
+  references you produce are therefore directly usable on the host, and host-side
+  tools (language servers in particular) understand the paths you send them.
+- With a single project, opencode's root is that project directly. With
+  multiple projects, the root is their deepest common ancestor (often `~`
+  itself), and each project appears as a subdirectory beneath it — `@`-complete
+  and the file index reach all of them, but only from that shared root down.
+  If the ancestor isn't itself a git repo, opencode's file index and
+  `.gitignore` handling degrade (fewer files indexed, paths shown from `/`) —
+  a warning is printed at startup when this happens.
 
-## Scratch workspace — `~/projects/`
-- `~/projects/` is **persistent across sessions**: anything you write there survives
+## Scratch workspace — `~/scratch/`
+- `~/scratch/` is **persistent across sessions**: anything you write there survives
   restarts of this jail (per-`--name`, or a shared dir for unnamed jails).
 - `/tmp` is a tmpfs and is **wiped every session** — do NOT use it for anything you
   want to keep.
 - Put throwaway scripts, experiments, clones, notes, and generated artifacts under
-  `~/projects/` (e.g. `~/projects/scratch/`) instead of `/tmp`, so useful work persists.
+  `~/scratch/` instead of `/tmp`, so useful work persists.
+- Everything else in `~` is a tmpfs and is discarded when the session ends, apart
+  from explicitly shared caches (cargo registry, nix, pnpm, npm, bun, uv).
+
+## Git worktrees — `~/workspaces/`
+- `~/workspaces/` is a **real host directory**, bound at the same path, shared by
+  every jail (not per-`--name` like `~/scratch`) — a worktree created here from
+  one session is immediately visible on the host and from any other session.
+- Use it for `git worktree add ~/workspaces/<name> <branch>` when you need a
+  second checkout of a repo (e.g. to work on two branches at once without
+  disturbing the main checkout). Because the whole directory is mounted, new
+  worktrees created inside it appear automatically — no jail restart, and no
+  need to pass them as explicit projects.
+- Unlike project directories, `~/workspaces/` is not automatically part of
+  opencode's `@`-completable root unless it happens to fall under the deepest
+  common ancestor of your mounted projects. It's always reachable by path in
+  the shell either way.
 
 ## Per-directory environments — direnv
 - direnv is active in the shell. `cd`-ing into a project dir containing an `.envrc`

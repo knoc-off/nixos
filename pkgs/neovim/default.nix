@@ -7,10 +7,10 @@
   fetchFromGitHub,
 }: let
   myLib = import ../../lib {inherit lib;};
-  inherit (myLib) color-lib math;
+  inherit (myLib) color-lib math rustAnalyzerSettings;
   theme = import ../../theme.nix {inherit lib color-lib;};
 
-  neovim-plugins = import ../neovim-plugins {inherit vimUtils fetchFromGitHub;};
+  neovim-plugins = import ./plugins-overlay.nix {inherit vimUtils fetchFromGitHub;};
 
   customPkgs = import inputs.nixpkgs-unstable {
     system = pkgs.stdenv.hostPlatform.system;
@@ -24,15 +24,11 @@
   };
 
   nixvim = inputs.nixvim.legacyPackages.${pkgs.stdenv.hostPlatform.system};
-
-  mkNeovim = configModule:
-    nixvim.makeNixvimWithModule {
-      pkgs = customPkgs;
-      extraSpecialArgs = {inherit color-lib theme;};
-      module = {
-        imports = [configModule];
-      };
+in
+  nixvim.makeNixvimWithModule {
+    pkgs = customPkgs;
+    extraSpecialArgs = {inherit color-lib theme rustAnalyzerSettings;};
+    module = {
+      imports = [./configurations/minimal.nix];
     };
-in {
-  default = mkNeovim ./configurations/minimal.nix;
-}
+  }

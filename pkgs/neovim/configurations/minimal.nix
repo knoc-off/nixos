@@ -6,6 +6,7 @@
     ./modules/foldtext.nix
     ./modules/ui.nix
     ./modules/treesitter.nix
+    ./modules/markdown.nix
     ./modules/bufferline.nix
     ./modules/statusline.nix
     ./modules/scope.nix

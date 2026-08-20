@@ -24,14 +24,10 @@ let
       }
     )
   );
-  inherit (pkgs) lib;
-
-  # flock (from util-linux) — used host-side to gate cleanup of shared project
-  # mountpoint stubs behind a last-holder lock. util-linux splits outputs, so
-  # pull the binary from its "bin" output explicitly.
-  flockBin = lib.getExe' pkgs.util-linux "flock";
+   inherit (pkgs) lib;
 
   compatProxy = pkgs.callPackage ./compat-proxy { };
+
   claudeMem = pkgs.callPackage ./claude-mem { };
   hostQuery = pkgs.callPackage ./host-query { };
 
@@ -127,6 +123,7 @@ let
   jailSystemContext = builtins.readFile ./jail-context.md;
 
   lspmux = pkgs.callPackage ./lspmux { };
+  lspmuxSession = pkgs.callPackage ./lspmux-session { };
 
   # Determinate nix — same one added to the toolbelt below. Used as
   # nix-direnv's fallback nix so it doesn't reach for a pinned older nix.
@@ -236,7 +233,8 @@ let
     upkgs.gleam # .gleam — unstable skips network test escript_success_with_dependency (stable nixos-26.05 lags)
     zls # .zig .zon
     clojure-lsp # .clj .cljs .cljc .edn
-    lspmux # LSP multiplexer (rust LSP via lspmux client)
+    lspmux # LSP multiplexer — `lspmux status` for inspecting instances
+    lspmuxSession # lspmux-attach (used by the rust LSP) + lspmux-session
 
     # Coding agents
     upkgs.claude-code
@@ -251,34 +249,6 @@ jail "jailed-opencode" upkgs.fish (
     no-new-session
     (set-argv [ ])
     (add-cleanup "kill $HOST_QUERY_PID 2>/dev/null || true")
-
-    # Remove the empty mountpoint stubs bwrap created in the persistent
-    # ~/projects backing dir for each mounted project — but only if this is the
-    # *last* session using each stub. Concurrent sessions mounting the same
-    # project share one stub; rmdir'ing it out from under another session's
-    # live bind-mount tears that session's mount down. We gate the rmdir behind
-    # a per-stub flock: each session holds a shared lock for its lifetime (see
-    # add-runtime), and on exit we try to upgrade to an exclusive lock. That
-    # only succeeds when no other session holds the shared lock, i.e. we're the
-    # last one out. Doing the rmdir while holding the exclusive lock also blocks
-    # a concurrently-starting session (which must take its shared lock before
-    # relying on the stub), closing the rmdir-vs-new-session race. rmdir is
-    # empty-only, so real content is never touched.
-    (add-cleanup ''
-      for _bname in "''${JAIL_MOUNTED_BASENAMES[@]-}"; do
-        [ -n "$_bname" ] || continue
-        # Release our own shared lock first, otherwise the exclusive upgrade
-        # below would see this very process as another holder and never fire.
-        _fd="''${JAIL_STUB_LOCK_FDS[$_bname]-}"
-        [ -n "$_fd" ] && eval "exec $_fd>&-"
-        _lockf="$JAIL_PROJECTS_BACKING/.$_bname.lock"
-        if exec {_xfd}>"$_lockf" && ${flockBin} -n -x "$_xfd"; then
-          rmdir "$JAIL_PROJECTS_BACKING/$_bname" 2>/dev/null || true
-          rm -f "$_lockf" 2>/dev/null || true
-          eval "exec $_xfd>&-"
-        fi
-      done
-    '')
 
     (add-runtime ''
       # ── Parse CLI arguments ──────────────────────────────────
@@ -297,7 +267,7 @@ jail "jailed-opencode" upkgs.fish (
       done
 
       # ── Persist-dir prefix (named = isolated, unnamed = shared) ──
-      # Backs the writable ~/projects scratch area and direnv allow-state.
+      # Backs the writable ~/scratch area and direnv allow-state.
       # Named jails get an isolated dir; unnamed jails share one "_shared"
       # dir (kept separate from your real host ~, so the agent can't clobber it).
       if [[ -n "$JAIL_NAME" ]]; then
@@ -305,55 +275,83 @@ jail "jailed-opencode" upkgs.fish (
       else
         JAIL_PERSIST_DIR="$HOME/.local/share/opencode-jails/_shared"
       fi
-      JAIL_PROJECTS_BACKING="$JAIL_PERSIST_DIR/projects"
+      JAIL_SCRATCH_BACKING="$JAIL_PERSIST_DIR/scratch"
       JAIL_DIRENV_DIR="$JAIL_PERSIST_DIR/direnv"
-      ${pkgs.coreutils}/bin/mkdir -p "$JAIL_PROJECTS_BACKING" "$JAIL_DIRENV_DIR"
+      # ~/scratch was called ~/projects before projects moved to their real
+      # paths. Carry the old backing dir over rather than orphaning it.
+      if [[ -d "$JAIL_PERSIST_DIR/projects" && ! -e "$JAIL_SCRATCH_BACKING" ]]; then
+        ${pkgs.coreutils}/bin/mv "$JAIL_PERSIST_DIR/projects" "$JAIL_SCRATCH_BACKING"
+      fi
+      ${pkgs.coreutils}/bin/mkdir -p "$JAIL_SCRATCH_BACKING" "$JAIL_DIRENV_DIR"
 
       # ── Project mounting ─────────────────────────────────────
-      # ~/projects is always backed by a persistent host dir so scratch work,
-      # clones, and generated artifacts survive across sessions. Explicitly
-      # passed projects are bind-mounted *on top* at ~/projects/<basename>
-      # (bwrap applies binds in order; nested binds layer over the backing dir).
-      RUNTIME_ARGS+=(--bind "$JAIL_PROJECTS_BACKING" "$HOME/projects")
+      # Projects are bound at their *real host path*, not remapped under a
+      # jail-local directory.
+      #
+      # This is load-bearing for anything that talks to a host process about
+      # files. LSP is the sharp case: lspmux lets an in-jail client join the
+      # rust-analyzer the host's neovim already started, but it initializes the
+      # server from the *first* client's InitializeParams and discards later
+      # ones. A joining client whose files live under a different prefix is
+      # therefore describing paths the server was never told about -- they
+      # belong to no crate, so it gets no diagnostics, no hover, nothing.
+      # Identical paths also make file references in agent output directly
+      # usable on the host.
+      #
+      # ~/scratch stays backed by a persistent host dir so throwaway clones and
+      # generated artifacts survive across sessions.
+      RUNTIME_ARGS+=(--bind "$JAIL_SCRATCH_BACKING" "$HOME/scratch")
       # Persist direnv allow-state so authorized .envrc files stay allowed.
       RUNTIME_ARGS+=(--bind "$JAIL_DIRENV_DIR" "$HOME/.local/share/direnv")
+
+      # ~/workspaces holds git worktrees, bound at its real host path and
+      # shared (unlike ~/scratch) across every jail, named or not -- a
+      # worktree created in one session should be usable from the host and
+      # from any other session immediately, not siloed per jail name. Because
+      # the whole directory is bound, worktrees created *inside* it become
+      # visible to the jail automatically; they don't need to be passed as
+      # explicit projects or require a jail restart.
+      ${pkgs.coreutils}/bin/mkdir -p "$HOME/workspaces"
+      RUNTIME_ARGS+=(--bind "$HOME/workspaces" "$HOME/workspaces")
+
       if [[ ''${#JAIL_PROJECTS[@]} -eq 0 ]]; then
-        # No explicit project: work on the current dir (bound at its real path),
-        # but keep the persistent ~/projects available for scratch/clones.
+        # No explicit project: work on the current dir.
         RUNTIME_ARGS+=(--bind "$PWD" "$PWD")
         JAIL_START_DIR="$PWD"
       else
-        declare -A SEEN_NAMES
-        # Track the mountpoint stubs we ask bwrap to create inside the
-        # persistent backing dir, so add-cleanup can remove the (empty) stubs
-        # on exit — otherwise every mounted project leaves an empty dir forever.
-        JAIL_MOUNTED_BASENAMES=()
-        # Per-stub shared flock fds, held for the whole session lifetime. This
-        # lets add-cleanup detect whether it's the *last* session using a stub
-        # before removing it — concurrent sessions mounting the same project
-        # share one stub in the persistent backing dir, and deleting it out from
-        # under a live bind-mount tears that session's mount down. See cleanup.
-        declare -A JAIL_STUB_LOCK_FDS
         for proj in "''${JAIL_PROJECTS[@]}"; do
-          bname=$(${pkgs.coreutils}/bin/basename "$proj")
-          if [[ -n "''${SEEN_NAMES[$bname]+x}" ]]; then
-            echo "jailed-opencode: duplicate project basename '$bname'" >&2
-            echo "  previous: ''${SEEN_NAMES[$bname]}" >&2
-            echo "  conflict: $proj" >&2
+          RUNTIME_ARGS+=(--bind "$proj" "$proj")
+        done
+        # opencode is single-root: it can only browse (@-complete, index) files
+        # under one directory. With multiple projects, root at their deepest
+        # common ancestor so all of them show up as siblings under it, rather
+        # than at the first project (which would hide the rest entirely).
+        JAIL_START_DIR="''${JAIL_PROJECTS[0]}"
+        if [[ ''${#JAIL_PROJECTS[@]} -gt 1 ]]; then
+          common="''${JAIL_PROJECTS[0]}"
+          for proj in "''${JAIL_PROJECTS[@]:1}"; do
+            while [[ "$common" != "/" && "$proj" != "$common" && "$proj" != "$common"/* ]]; do
+              common="''${common%/*}"
+              [[ -z "$common" ]] && common="/"
+            done
+          done
+          if [[ "$common" == "/" ]]; then
+            echo "jailed-opencode: projects share no common ancestor above /:" >&2
+            printf '  %s\n' "''${JAIL_PROJECTS[@]}" >&2
             exit 1
           fi
-          SEEN_NAMES[$bname]="$proj"
-          JAIL_MOUNTED_BASENAMES+=("$bname")
-          # Take a shared lock on the stub's lockfile before bwrap binds over
-          # it. Held via a tracked fd until this process exits (or crashes —
-          # the kernel releases it either way, so no stale-lock bookkeeping).
-          _lockf="$JAIL_PROJECTS_BACKING/.$bname.lock"
-          exec {_fd}>"$_lockf"
-          ${flockBin} -s "$_fd"
-          JAIL_STUB_LOCK_FDS[$bname]=$_fd
-          RUNTIME_ARGS+=(--bind "$proj" "$HOME/projects/$bname")
-        done
-        JAIL_START_DIR="$HOME/projects"
+          JAIL_START_DIR="$common"
+          # opencode only indexes up to 100k files under a non-git root (it
+          # falls back to `project.directory = "/"` internally when the root
+          # itself isn't a repo, which also breaks relative path display and
+          # .gitignore lookup) -- so a shared ancestor above all your repos is
+          # a known-inferior fallback, not a fully-supported setup. Loud rather
+          # than silently degraded.
+          if [[ ! -e "$JAIL_START_DIR/.git" ]]; then
+            echo "jailed-opencode: warning: shared root $JAIL_START_DIR is not a git repo" >&2
+            echo "  opencode's file index and .gitignore handling degrade outside a repo root" >&2
+          fi
+        fi
       fi
 
       # ── Port derivation (deterministic per identity) ─────────
@@ -482,14 +480,55 @@ jail "jailed-opencode" upkgs.fish (
     (try-rw-bind (noescape "\"$HOME/.cache/opencode\"") (noescape "~/.cache/opencode"))
     (try-rw-bind (noescape "\"$HOME/.cache/uv\"") (noescape "~/.cache/uv"))
 
+    # Package-manager caches, shared read-write with the host so a session
+    # doesn't start cold and re-download everything into a tmpfs it then throws
+    # away. All of these are content-addressed or checksum-verified, so a
+    # corrupted entry is re-fetched rather than silently trusted.
+    #
+    # Note this is ~/.cargo/registry rather than ~/.cargo: there is no
+    # credentials file there today, but `cargo login` writes a crates.io token
+    # to ~/.cargo/credentials.toml, and binding the subdirectory keeps that
+    # permanently out of the jail's reach. ~/.rustup is deliberately absent --
+    # toolchains come from the devshell.
+    (try-rw-bind (noescape "\"$HOME/.cargo/registry\"") (noescape "~/.cargo/registry"))
+    (try-rw-bind (noescape "\"$HOME/.cargo/git\"") (noescape "~/.cargo/git"))
+    (try-rw-bind (noescape "\"$HOME/.cache/nix\"") (noescape "~/.cache/nix"))
+    (try-rw-bind (noescape "\"$HOME/.local/share/pnpm\"") (noescape "~/.local/share/pnpm"))
+    (try-rw-bind (noescape "\"$HOME/.npm\"") (noescape "~/.npm"))
+    (try-rw-bind (noescape "\"$HOME/.bun\"") (noescape "~/.bun"))
+
     # lspmux client config (read-only). Without it the in-jail client falls back
     # to the default `pass_environment = ["*"]`, which drags jail-specific vars
     # (JAIL_NAME, derived ports, the injected system prompt) into the instance
     # fingerprint — so every session with different ports mints a fresh
-    # rust-analyzer instead of reusing one. Note this does *not* let the jail
-    # share the host's instance: PATH is part of the fingerprint and the jail's
-    # PATH is its own toolbelt.
+    # rust-analyzer instead of reusing one.
     (try-ro-bind (noescape "\"$HOME/.config/lspmux\"") (noescape "~/.config/lspmux"))
+
+    # Named lspmux sessions (read-only), so a jailed agent can *join* the same
+    # rust-analyzer the host's neovim is using instead of spawning its own.
+    #
+    # Three things have to line up for the instance key to match across the
+    # sandbox boundary, and they do:
+    #   * `server` — the wrapper path, which hangs off HOME (identical here) and
+    #     is exec'd by the host lspmux server, so it must resolve host-side.
+    #   * `env` — `lspmux-attach` re-execs under `env -i`, so JAIL_NAME and the
+    #     derived ports can't leak into the fingerprint no matter what.
+    #   * `workspace_root` — compared by (device, inode), and projects are bound
+    #     at their real host path anyway, so both spellings agree.
+    #
+    # Matching the instance key is necessary but not sufficient: the server is
+    # initialized from the first client's InitializeParams and later ones are
+    # discarded, so a joining client must also *name* its files the way the
+    # first one did. That is why projects are mounted at their real paths.
+    #
+    # Read-only because a session saved in here would snapshot the jail's
+    # toolbelt PATH, which is useless to the host server that has to run it.
+    # Note the wrappers contain the snapshotted devshell environment, so
+    # anything in the lspmux env allowlist is readable by the agent.
+    (add-runtime ''
+      ${pkgs.coreutils}/bin/mkdir -p "$HOME/.local/state/lspmux"
+    '')
+    (ro-bind (noescape "\"$HOME/.local/state/lspmux\"") (noescape "~/.local/state/lspmux"))
 
     # direnv hook + nix-direnv rc (read-only — agent can't disable the hook).
     # `direnv allow` still works: it writes to ~/.local/share/direnv, which is
@@ -532,6 +571,9 @@ jail "jailed-opencode" upkgs.fish (
     (try-fwd-env "COMPAT_PROXY_DUMP")
     (try-fwd-env "COMPAT_PROXY_UPSTREAM")
     (try-fwd-env "NIX_PATH")
+    # Selects which named lspmux session the in-jail rust LSP joins, e.g.
+    # `LSPMUX_SESSION=windows jailed-opencode ~/integrations-mono`.
+    (try-fwd-env "LSPMUX_SESSION")
     (set-env "NIX_REMOTE" "daemon")
     (set-env "OPENCODE_CONFIG" "${jailConfig}")
     (set-env "COMPAT_PROXY_APPEND_SYSTEM" jailSystemContext)

@@ -28,7 +28,7 @@ BP_LINE=8   # the `acc *= i;` line inside the loop
 
 echo "[1/6] compile demo.rs -g ....................... (building)"
 
-NVIM_STORE="$(nix build "$FLAKE#neovim.default" --accept-flake-config --no-link --print-out-paths 2>/dev/null)"
+NVIM_STORE="$(nix build "$FLAKE#neovim" --accept-flake-config --no-link --print-out-paths 2>/dev/null)"
 NVIM="$NVIM_STORE/bin/nvim"
 
 # Plugin pack dir (holds nvim-dap etc.) from the built nvim's closure.

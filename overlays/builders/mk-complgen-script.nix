@@ -25,7 +25,11 @@ stdenv.mkDerivation {
   env.grammar = grammar;
   env.scriptContent = scriptContent;
 
-  src = lib.cleanSource ./.;
+  # Both the script and the grammar arrive through the environment, so there is
+  # nothing to unpack. This used to be `src = lib.cleanSource ./.`, which -- from
+  # its old home in pkgs/ -- meant the entire package tree: every completion
+  # script rebuilt whenever any unrelated package changed.
+  dontUnpack = true;
 
   installPhase = ''
     runHook preInstall

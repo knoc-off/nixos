@@ -9,7 +9,7 @@
   ...
 }:
 let
-  inherit (self.lib) ssh;
+  inherit (self.lib.ssh) user;
 
 in
 
@@ -55,6 +55,14 @@ in
     ./services/headscale.nix
     self.nixosModules.tailnet
     { services.tailnet.enable = true; }
+
+    self.nixosModules.nix-cache
+    {
+      services.nixCache = {
+        client.enable = true;
+        builder.enable = true;
+      };
+    }
   ];
 
   # KitchenOwl shopping-list -> ntfy change notifier.
@@ -202,7 +210,7 @@ in
     isNormalUser = true;
     extraGroups = [ "wheel" ];
     openssh.authorizedKeys.keys = [
-      ssh.framework13
+      user.framework13
     ];
   };
 
@@ -213,8 +221,8 @@ in
   };
 
   users.users.root.openssh.authorizedKeys.keys = [
-    ssh.framework13
-    ssh.thinkpad-work
+    user.framework13
+    user.thinkpad-work
   ];
 
   environment.systemPackages = map lib.lowPrio [

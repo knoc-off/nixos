@@ -1,7 +1,7 @@
-{ self, ... }: {
+{ ... }: {
   home = { pkgs, lib, ... }: let
     config_dir = "/etc/nixos";
-    inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) mkComplgenScript;
+    inherit (pkgs) mkComplgenScript;
   in {
     home.packages =
       [

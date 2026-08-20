@@ -436,16 +436,23 @@
           };
         };
         rust = {
+          # lspmux-attach rather than a bare `lspmux client`: with LSPMUX_SESSION
+          # set it joins the named session by name, so a jailed opencode and the
+          # host's neovim land on one rust-analyzer instead of two. Absolute
+          # store path because the jail's PATH is its own toolbelt.
           command = [
-            "${self.packages.${system}.lspmux}/bin/lspmux"
-            "client"
+            "${self.packages.${system}.lspmux-session}/bin/lspmux-attach"
           ];
+
+          # lspmux gives the *first* client's initializationOptions to the
+          # server and discards everyone else's, so this has to match what
+          # rustaceanvim sends or the config depends on who connected first.
+          initialization = self.lib.rustAnalyzerSettings;
         };
       };
     };
 
-    xdg.configFile."opencode/plugins/ghostty-progress.js".source =
-      "${self}/pkgs/ghostty-progress/opencode-plugin.js";
+    xdg.configFile."opencode/plugins/ghostty-progress.js".source = ./ghostty-progress.js;
 
     xdg.configFile."opencode/tui.json".text = builtins.toJSON {
       "$schema" = "https://opencode.ai/tui.json";

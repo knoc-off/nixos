@@ -14,6 +14,7 @@ in
     ./services/kdeconnect.nix
     ./services/minecraft.nix
     ./services/minecraft-snapshots.nix
+    ./services/nix-autobuild.nix
 
     inputs.determinate.nixosModules.default
 
@@ -26,8 +27,14 @@ in
         secrets = {
           "services/ntfy/publish-token" = { };
           "services/minecraft/RCON_PASSWORD" = { };
+          "services/nix-autobuild/deploy-key" = { };
         };
       };
+    }
+
+    self.nixosModules.nix-cache
+    {
+      services.nixCache.server.enable = true;
     }
 
     self.nixosModules.tailnet
@@ -345,6 +352,29 @@ in
 
   nix.settings.auto-optimise-store = true;
 
+  # aarch64 support is for evaluation as much as building: pkgs/sphereview does
+  # IFD on its Cargo.lock, which forces `nix eval` itself to realise a
+  # platform-matching derivation. Without emulation, evaluating
+  # cacheJobs.aarch64-linux fails before a single build starts.
+  boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+
+  # --skip-cached means nix-autobuild only ever stores the delta over
+  # cache.nixos.org, so this is deliberately more aggressive than a typical
+  # workstation's monthly gc: the dated gcroots it leaves behind (see
+  # nix-autobuild.nix) are what actually protects the last few weeks of
+  # builds, not this.
+  nix.gc = {
+    automatic = true;
+    dates = "weekly";
+    options = "--delete-older-than 30d";
+  };
+
+  services.nixAutobuild = {
+    enable = true;
+    deployKeyFile = config.sops.secrets."services/nix-autobuild/deploy-key".path;
+    ntfyTokenFile = config.sops.secrets."services/ntfy/publish-token".path;
+  };
+
   # Minecraft's game port is not listed here: services/minecraft.nix opens it
   # via extraCommands scoped to Gate's source address, since a port range or
   # interface rule would admit the whole tailnet.
@@ -382,11 +412,12 @@ in
 
   users.users.root.openssh.authorizedKeys.keys =
     let
-      inherit (self.lib) ssh;
+      # Not `user`: that name is taken by the "tv" binding at the top of this file.
+      userKeys = self.lib.ssh.user;
     in
     [
-      ssh.framework13
-      ssh.thinkpad-work
+      userKeys.framework13
+      userKeys.thinkpad-work
     ];
 
   system.stateVersion = "26.05";

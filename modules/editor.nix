@@ -2,12 +2,12 @@
   home = { pkgs, lib, ... }: let
     renamedMinimal = pkgs.symlinkJoin {
       name = "nvim-minimal";
-      paths = [self.packages.${pkgs.stdenv.hostPlatform.system}.neovim.default];
+      paths = [self.packages.${pkgs.stdenv.hostPlatform.system}.neovim];
       buildInputs = [pkgs.makeWrapper];
       postBuild = ''
         # Wrap the nvim binary as nvim-minimal.
         wrapProgram $out/bin/nvim \
-          --prefix PATH : ${self.packages.${pkgs.stdenv.hostPlatform.system}.neovim.default}/bin \
+          --prefix PATH : ${self.packages.${pkgs.stdenv.hostPlatform.system}.neovim}/bin \
           --set NAME nvim-minimal
         mv $out/bin/nvim $out/bin/nvim-minimal
 

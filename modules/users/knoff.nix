@@ -344,7 +344,7 @@
 
                 upkgs.notion-app-enhanced
 
-                self.packages.${pkgs.stdenv.hostPlatform.system}.neovim.default
+                self.packages.${pkgs.stdenv.hostPlatform.system}.neovim
                 self.packages.${pkgs.stdenv.hostPlatform.system}.opencode-bubblewrap
 
                 #inputs.nelly.packages.${pkgs.stdenv.hostPlatform.system}.linear-cli

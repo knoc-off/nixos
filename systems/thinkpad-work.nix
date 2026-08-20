@@ -59,6 +59,14 @@ in
       };
     }
 
+    self.nixosModules.nix-cache
+    {
+      services.nixCache = {
+        client.enable = true;
+        builder.enable = true;
+      };
+    }
+
     self.nixosModules.users.niko
     self.nixosModules.nix
     self.nixosModules.nh
@@ -169,6 +177,16 @@ in
     #./modules/yubikey.nix
   ];
 
+  environment.systemPackages = with pkgs; [
+
+    moreutils
+    windowsVmHelpers
+
+    awscli2
+    podman-compose
+    postgresql
+  ];
+
   services.power-profiles-daemon.enable = true;
 
   disks.btrfsLuks = {
@@ -186,6 +204,38 @@ in
     algorithm = "zstd";
     memoryPercent = 50;
     priority = 100;
+  };
+
+  # Two independent OOM killers. The kernel's own never fires here -- swap
+  # "exists", so the box thrashes zram/swapfile into a freeze instead.
+  # Stock NixOS starts oomd but points it at nothing (`oomctl` shows no cgroups).
+  systemd.oomd = {
+    enable = true;
+    enableRootSlice = true;
+    # Not enableSystemSlice: oomd must not reap sshd/NetworkManager, which are
+    # what keep the box recoverable remotely.
+    enableUserSlices = true;
+    settings.OOM = {
+      # Default 90% of ~39G swap = acting long after the desktop stopped responding.
+      SwapUsedLimit = "70%";
+      DefaultMemoryPressureLimit = "50%";
+      DefaultMemoryPressureDurationSec = "10s";
+    };
+  };
+
+  # Backstop: dumb free-RAM poller, shares no mechanism with oomd (no PSI, no
+  # cgroups). --prefer/--avoid match /proc/pid/comm, truncated to 15 chars.
+  services.earlyoom = {
+    enable = true;
+    freeMemThreshold = 4;
+    freeSwapThreshold = 20;
+    enableNotifications = true;
+    extraArgs = [
+      "--prefer"
+      "^(rustc|rust-analyzer|cargo|cc1|cc1plus|ld|clang)$"
+      "--avoid"
+      "^(Hyprland|ghostty|systemd|sshd|dbus-broker|nvim|greetd)$"
+    ];
   };
 
   # Throwaway cargo build artifacts in RAM -- keeps the ~100 MB/s build write
@@ -392,6 +442,13 @@ in
       # Increase inotify limits for rust-analyzer and other file watchers
       "fs.inotify.max_user_watches" = 524288;
       "fs.inotify.max_user_instances" = 1024;
+      # Wake kswapd at ~2% free instead of the 0.1% default, so reclaim starts
+      # while there is headroom left for the OOM killers to act in.
+      "vm.watermark_scale_factor" = 200;
+      # Was 16 (sync only). 1 enables Alt+PrtSc+F (kill largest process) and
+      # Alt+PrtSc+R,E,I,S,U,B -- handled in the keyboard IRQ path, so they
+      # still work when userspace is wedged.
+      "kernel.sysrq" = 1;
     };
   };
 
@@ -430,14 +487,6 @@ in
       defaultNetwork.settings.dns_enabled = true;
     };
   };
-
-  environment.systemPackages = with pkgs; [
-    windowsVmHelpers
-
-    awscli2
-    podman-compose
-    postgresql
-  ];
 
   system.stateVersion = "23.11";
 }

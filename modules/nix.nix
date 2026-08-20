@@ -1,6 +1,12 @@
-{ inputs, ... }: {
+{ inputs, self, ... }: {
   nixos = {...}: {
     nixpkgs.config.allowUnfree = true;
+    # Local builders (mkComplgenScript, writeLuaScript, writeNuScript) as
+    # pkgs.* on the host's own pkgs instance -- the same instance home-manager
+    # sees, since every user profile sets useGlobalPkgs = true. This is
+    # additive only: it does not touch self.packages' fenix/upkgs overlays,
+    # which nothing at the host level depends on.
+    nixpkgs.overlays = [ self.overlays.builders ];
 
     # Pre-size the Boehm GC heap for Nix evaluation. A full system eval grows the
     # heap to ~4.3GB and triggers 2 GC cycles; starting at 6GB avoids one of them

@@ -19,6 +19,14 @@
     ./services/caddy-lan.nix
     self.nixosModules.tailnet
     {services.tailnet.enable = true;}
+
+    self.nixosModules.nix-cache
+    {
+      services.nixCache = {
+        client.enable = true;
+        builder.enable = true;
+      };
+    }
   ];
 
   sops = {

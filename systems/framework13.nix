@@ -23,8 +23,16 @@ in
         enable = true;
         acceptDns = true;
       };
-
     }
+
+    self.nixosModules.nix-cache
+    {
+      services.nixCache = {
+        client.enable = true;
+        builder.enable = true;
+      };
+    }
+
 
     self.nixosModules.claude-ping
     {
@@ -120,6 +128,10 @@ in
     self.nixosModules.fish
 
     #./modules/yubikey.nix
+  ];
+
+  environment.systemPackages = with pkgs; [
+    moreutils
   ];
 
   programs = {
