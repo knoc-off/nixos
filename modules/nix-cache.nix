@@ -1,29 +1,23 @@
-# Optiplex as build farm + binary cache for the rest of the tailnet.
+# Build farm + binary cache for the tailnet. Fully generic: which host runs
+# the server and who's allowed to use it live in lib/nix-cache.nix, not here.
 #
 # Three independent switches, meant to be mixed per host:
 #
-#   server   -- harmonia + a nixremote login, for optiplex only.
-#   client   -- substituter pointed at optiplex.
-#   builder  -- dispatch builds to optiplex over ssh-ng.
+#   server   -- harmonia + a nixremote login, for the cache host.
+#   client   -- the cache host as an extra substituter.
+#   builder  -- dispatch builds to the cache host over ssh-ng.
 #
 # client and builder are separate because they answer different questions
 # ("where do I fetch already-built things from" vs "where do I ask to build
 # things I don't have") and a host could plausibly want one without the
-# other. In practice every non-optiplex, non-nuci5 host wants both.
+# other. In practice every client in cache.clients wants both.
 { self, ... }:
 let
   inherit (self.lib) ssh;
-  inherit (self.lib.tailnet) optiplex;
+  cache = self.lib.nixCache;
+  cacheHost = self.lib.tailnet.${cache.hostName};
 
-  port = 5000;
-
-  # Filled in after the first server deploy: `journalctl -u harmonia-init` (or
-  # `cat /var/lib/harmonia/cache.key` and derive the public half) prints it.
-  # Deliberately not a real key so a half-finished bootstrap fails loudly
-  # (wrong signature) instead of silently trusting an unsigned cache.
-  cachePublicKey = "optiplex-1:0000000000000000000000000000000000000000=";
-
-  cacheUrl = "http://${optiplex}:${toString port}";
+  cacheUrl = "http://${cacheHost}:${toString cache.port}";
 in
 {
   nixos =
@@ -39,24 +33,17 @@ in
     in
     {
       options.services.nixCache = {
-        server.enable = lib.mkEnableOption "harmonia binary cache, serving this host's /nix/store over the tailnet";
-        client.enable = lib.mkEnableOption "optiplex as an extra substituter";
-        builder.enable = lib.mkEnableOption "optiplex as a distributed build machine";
+        server.enable = lib.mkEnableOption "harmonia binary cache + distributed-build server, for the cache host itself";
+        client.enable = lib.mkEnableOption "the cache host as an extra substituter";
+        builder.enable = lib.mkEnableOption "the cache host as a distributed build machine";
       };
 
       config = lib.mkMerge [
         (lib.mkIf cfg.server.enable {
-          assertions = [
-            {
-              assertion = cachePublicKey != "optiplex-1:0000000000000000000000000000000000000000=";
-              message = "modules/nix-cache.nix: cachePublicKey is still the bootstrap placeholder. Fill it in from the real key (see harmonia-init.service) before relying on client.enable elsewhere.";
-            }
-          ];
-
           services.harmonia.cache = {
             enable = true;
             # Module default is 50, cache.nixos.org is 40 -- without this,
-            # clients would consult upstream first and optiplex never wins.
+            # clients would consult upstream first and this cache never wins.
             settings.priority = 30;
             signKeyPaths = [ "/var/lib/harmonia/cache.key" ];
           };
@@ -66,7 +53,7 @@ in
           # binding the tailnet IP directly would fail at boot, before
           # tailscaled has brought the interface up. Confinement comes from
           # the firewall rule below instead.
-          networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ port ];
+          networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ cache.port ];
 
           systemd.services.harmonia-init = {
             description = "Generate the harmonia cache signing key";
@@ -77,7 +64,7 @@ in
               Type = "oneshot";
               StateDirectory = "harmonia";
               ExecStart = pkgs.writeShellScript "harmonia-init" ''
-                ${config.nix.package}/bin/nix-store --generate-binary-cache-key optiplex-1 \
+                ${config.nix.package}/bin/nix-store --generate-binary-cache-key ${cache.keyName} \
                   /var/lib/harmonia/cache.key /var/lib/harmonia/cache.pub
                 echo "harmonia cache public key: $(cat /var/lib/harmonia/cache.pub)"
               '';
@@ -94,19 +81,10 @@ in
 
             openssh.authorizedKeys.keys =
               let
-                # Every host that's a client of the cache is also a builder
-                # client, so its host key needs to log in here as nixremote.
-                # optiplex itself and nuci5 (no tailnet) are never in this list.
-                builderHosts = [
-                  "framework13"
-                  "thinkpad-work"
-                  "hetzner"
-                  "rpi-4b-plus"
-                ];
                 forced = key: ''command="${config.nix.package}/bin/nix-daemon --stdio",restrict ${key}'';
               in
               map (h: forced ssh.hostKeys.${h}) (
-                builtins.filter (h: ssh.hostKeys.${h} != "") builderHosts
+                builtins.filter (h: ssh.hostKeys.${h} != "") cache.clients
               );
           };
           users.groups.nixremote = { };
@@ -116,16 +94,20 @@ in
         (lib.mkIf cfg.client.enable {
           assertions = [
             {
-              assertion = hostname != "optiplex";
-              message = "modules/nix-cache.nix: services.nixCache.client should not be enabled on optiplex itself -- it would consult its own cache and defeat --skip-cached during autobuild.";
+              assertion = hostname != cache.hostName;
+              message = "modules/nix-cache.nix: services.nixCache.client should not be enabled on the cache host itself -- it would consult its own cache and defeat --skip-cached during autobuild.";
+            }
+            {
+              assertion = cache.publicKey != "";
+              message = "modules/nix-cache.nix: lib.nixCache.publicKey is still empty. Fill it in from the real key (see harmonia-init.service on ${cache.hostName}) before relying on client.enable.";
             }
           ];
 
           nix.settings = {
             extra-substituters = [ cacheUrl ];
-            extra-trusted-public-keys = [ cachePublicKey ];
+            extra-trusted-public-keys = [ cache.publicKey ];
             # Defaults are fallback = false and connect-timeout = 15s: an
-            # offline optiplex would otherwise turn every build into a hard
+            # offline cache host would otherwise turn every build into a hard
             # error instead of a slower local build.
             fallback = true;
             connect-timeout = lib.mkDefault 5;
@@ -136,7 +118,11 @@ in
           assertions = [
             {
               assertion = ssh.hostKeys.${hostname} or "" != "";
-              message = "modules/nix-cache.nix: services.nixCache.builder needs lib.ssh.hostKeys.${hostname} filled in (ssh-keyscan -t ed25519 <host>) so optiplex can be told which client keys to trust, and so this host can verify optiplex in known_hosts.";
+              message = "modules/nix-cache.nix: services.nixCache.builder needs lib.ssh.hostKeys.${hostname} filled in (ssh-keyscan -t ed25519 <host>) so ${cache.hostName} can be told which client keys to trust, and so this host can verify ${cache.hostName} in known_hosts.";
+            }
+            {
+              assertion = ssh.hostKeys.${cache.hostName} != "";
+              message = "modules/nix-cache.nix: services.nixCache.builder needs lib.ssh.hostKeys.${cache.hostName} filled in (ssh-keyscan -t ed25519 ${cache.hostName}) so this host can verify ${cache.hostName}'s known_hosts entry -- otherwise programs.ssh accepts the empty string as a valid publicKey and known_hosts ends up silently broken.";
             }
           ];
 
@@ -145,31 +131,21 @@ in
 
           nix.buildMachines = [
             {
-              hostName = optiplex;
+              hostName = cacheHost;
               protocol = "ssh-ng";
               sshUser = "nixremote";
               sshKey = "/etc/ssh/ssh_host_ed25519_key";
-              systems = [
-                "x86_64-linux"
-                "aarch64-linux"
-              ];
-              maxJobs = 8;
-              speedFactor = 2;
-              supportedFeatures = [
-                "kvm"
-                "big-parallel"
-                "nixos-test"
-                "benchmark"
-              ];
+              inherit (cache) systems maxJobs speedFactor supportedFeatures;
             }
           ];
 
-          # publicHostKey (base64 -w0 of the .pub file) is left unset -- optiplex
-          # is verified the ordinary way instead, via known_hosts. Avoids an
-          # extra IFD-computed base64 encode for what programs.ssh already does.
-          programs.ssh.knownHosts.optiplex = {
-            hostNames = [ optiplex ];
-            publicKey = ssh.hostKeys.optiplex;
+          # publicHostKey (base64 -w0 of the .pub file) is left unset -- the
+          # cache host is verified the ordinary way instead, via known_hosts.
+          # Avoids an extra IFD-computed base64 encode for what programs.ssh
+          # already does.
+          programs.ssh.knownHosts.${cache.hostName} = {
+            hostNames = [ cacheHost ];
+            publicKey = ssh.hostKeys.${cache.hostName};
           };
         })
       ];

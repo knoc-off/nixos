@@ -286,7 +286,7 @@
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
 
     minecraft-modpack = {
-      url = "git+ssh://git@github.com/knoc-off/minecraft-modpack.git";
+      url = "github:knoc-off/minecraft-modpack";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
       inputs.nix-minecraft.follows = "nix-minecraft";
     };

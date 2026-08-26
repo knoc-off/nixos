@@ -1,7 +1,5 @@
 pub mod config;
 pub mod creds;
 pub mod proxy;
-pub mod rules;
-pub mod session_log;
+pub mod shape;
 pub mod usage;
-pub mod wire;

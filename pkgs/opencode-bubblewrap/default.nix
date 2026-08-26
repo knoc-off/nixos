@@ -26,10 +26,15 @@ let
   );
    inherit (pkgs) lib;
 
-  compatProxy = pkgs.callPackage ./compat-proxy { };
+  compatProxy = pkgs.callPackage ../compat-proxy { };
 
-  claudeMem = pkgs.callPackage ./claude-mem { };
-  hostQuery = pkgs.callPackage ./host-query { };
+  # Patched opencode (pkgs/opencode) rather than upkgs.opencode directly --
+  # its own prompts no longer say "opencode", so the compat-proxy's Claude
+  # Code identity spoofing isn't undermined from inside the jail either.
+  patchedOpencode = pkgs.callPackage ../opencode { };
+
+  claudeMem = pkgs.callPackage ../claude-mem { };
+  hostQuery = pkgs.callPackage ../host-query { };
 
   # Safe rm/rmdir — shadows coreutils inside the jail so agent deletions
   # land in the FreeDesktop trash (~/.local/share/Trash/) instead of being
@@ -83,6 +88,13 @@ let
   jailConfig = pkgs.writeText "opencode-jail.json" (
     builtins.toJSON {
       "$schema" = "https://opencode.ai/config.json";
+
+      # The agent's model of the filesystem it has been given: real project
+      # paths, the scratch and workspaces binds, and which of them persist.
+      # Delivered as an instruction file rather than injected into the system
+      # prompt by the proxy, so it is opencode's own config that decides.
+      instructions = [ "${./jail-context.md}" ];
+
       permission = {
         # Read/explore — always allowed, no side effects
         read = "allow";
@@ -118,12 +130,52 @@ let
     }
   );
 
-  # Appended to the system prompt by the compat-proxy (via COMPAT_PROXY_APPEND_SYSTEM).
-  # Injected after the main CC prompt replacement, so the agent knows its constraints.
-  jailSystemContext = builtins.readFile ./jail-context.md;
+  # Shell helpers shared by the host-side launcher (add-runtime) and the
+  # in-jail entrypoint (wrap-entry). Those are two separate scripts, so
+  # anything both need has to be injected into both.
+  shellHelpers = ''
+    # Poll a health endpoint until it answers. Returns non-zero on timeout;
+    # the caller decides whether that is fatal.
+    #
+    # Absolute curl: the host-side launcher runs before the jail's toolbelt
+    # PATH exists. The same store path is bound inside the jail, so one
+    # definition works for both callers.
+    wait_for_health() {
+      local url=$1
+      local _
+      for _ in $(seq 1 20); do
+        if ${pkgs.curl}/bin/curl -sf "$url" > /dev/null 2>&1; then
+          return 0
+        fi
+        sleep 0.25
+      done
+      return 1
+    }
 
-  lspmux = pkgs.callPackage ./lspmux { };
-  lspmuxSession = pkgs.callPackage ./lspmux-session { };
+    # First free TCP port at or above $1.
+    #
+    # Ports used to be derived as hash % 200, which silently collided
+    # between jails: the loser failed to bind and the session died. Probing
+    # keeps the derived port when it is free -- so a restart normally lands
+    # on the same one -- and steps past it when it is not.
+    pick_port() {
+      local port=$1
+      local limit=$((port + 200))
+      while [ "$port" -lt "$limit" ]; do
+        # Subshell so the descriptor is closed for us either way.
+        if ! (exec 3<>/dev/tcp/127.0.0.1/"$port") 2>/dev/null; then
+          printf '%s' "$port"
+          return 0
+        fi
+        port=$((port + 1))
+      done
+      echo "jailed-opencode: no free port in $1-$limit" >&2
+      return 1
+    }
+  '';
+
+  lspmux = pkgs.callPackage ../lspmux { };
+  lspmuxSession = pkgs.callPackage ../lspmux-session { };
 
   # Determinate nix — same one added to the toolbelt below. Used as
   # nix-direnv's fallback nix so it doesn't reach for a pinned older nix.
@@ -160,6 +212,7 @@ let
 
     # Non-interactive SSH auth (used by the windows-vm-* helper scripts).
     sshpass
+    windowsVmHelpers # windows-vm-ssh / windows-vm-scp
 
     # Search & navigation
     ripgrep
@@ -238,7 +291,7 @@ let
 
     # Coding agents
     upkgs.claude-code
-    upkgs.opencode
+    patchedOpencode
   ];
 in
 jail "jailed-opencode" upkgs.fish (
@@ -251,6 +304,8 @@ jail "jailed-opencode" upkgs.fish (
     (add-cleanup "kill $HOST_QUERY_PID 2>/dev/null || true")
 
     (add-runtime ''
+      ${shellHelpers}
+
       # ── Parse CLI arguments ──────────────────────────────────
       JAIL_NAME=""
       JAIL_PROJECTS=()
@@ -354,32 +409,28 @@ jail "jailed-opencode" upkgs.fish (
         fi
       fi
 
-      # ── Port derivation (deterministic per identity) ─────────
+      # ── Port allocation ──────────────────────────────────────
+      # Seeded from the jail identity so a given jail keeps its ports across
+      # restarts, then probed so two jails can never fight over one.
       if [[ -n "$JAIL_NAME" ]]; then
         PORT_SEED="$JAIL_NAME"
       else
         PORT_SEED="''${JAIL_PROJECTS[0]:-$PWD}"
       fi
       PORT_HASH=$(echo "$PORT_SEED" | ${pkgs.coreutils}/bin/sha256sum | ${pkgs.coreutils}/bin/head -c7)
-      JAIL_PROXY_PORT=$((18800 + 16#''${PORT_HASH:0:4} % 200))
-      JAIL_MEM_PORT=$((19200 + 16#''${PORT_HASH:0:4} % 200))
-      HOST_QUERY_PORT=$((19600 + 16#''${PORT_HASH:0:4} % 200))
+      PORT_OFFSET=$((16#''${PORT_HASH:0:4} % 200))
+      JAIL_PROXY_PORT=$(pick_port $((18800 + PORT_OFFSET)))
+      JAIL_MEM_PORT=$(pick_port $((19200 + PORT_OFFSET)))
+      HOST_QUERY_PORT=$(pick_port $((19600 + PORT_OFFSET)))
 
       # ── Host-query service (runs on host, outside jail) ──────
       ${pkgs.coreutils}/bin/mkdir -p "$HOME/.local/state/opencode"
-      # Kill stale host-query from a previous crashed session
-      ${pkgs.procps}/bin/fuser -k "$HOST_QUERY_PORT/tcp" 2>/dev/null || true
       ${lib.getExe hostQuery} "$HOST_QUERY_PORT" \
         > "$HOME/.local/state/opencode/host-query.log" 2>&1 &
       HOST_QUERY_PID=$!
-      for _ in $(seq 1 20); do
-        if ${pkgs.curl}/bin/curl -sf "http://127.0.0.1:$HOST_QUERY_PORT/health" > /dev/null 2>&1; then
-          break
-        fi
-        sleep 0.25
-      done
-      if ! ${pkgs.curl}/bin/curl -sf "http://127.0.0.1:$HOST_QUERY_PORT/health" > /dev/null 2>&1; then
-        echo "WARNING: host-query failed to start (host_exec tool will be unavailable)" >&2
+      if ! wait_for_health "http://127.0.0.1:$HOST_QUERY_PORT/health"; then
+        echo "jailed-opencode: warning: host-query failed to start on port $HOST_QUERY_PORT" >&2
+        echo "  the host_exec tool will be unavailable this session" >&2
       fi
 
       # ── State mounting (named = isolated, unnamed = host) ────
@@ -399,7 +450,7 @@ jail "jailed-opencode" upkgs.fish (
         RUNTIME_ARGS+=(--bind "$JAIL_FISH_DIR" "$HOME/.local/share/fish")
       else
         ${pkgs.coreutils}/bin/mkdir -p "$HOME/.claude" "$HOME/.local/share/opencode" "$HOME/.local/state/opencode"
-        RUNTIME_ARGS+=(--bind "$HOME/.claude.json" "$HOME/.claude.json")
+        [ -f "$HOME/.claude.json" ] && RUNTIME_ARGS+=(--bind "$HOME/.claude.json" "$HOME/.claude.json")
         RUNTIME_ARGS+=(--bind "$HOME/.claude" "$HOME/.claude")
         RUNTIME_ARGS+=(--bind "$HOME/.local/share/opencode" "$HOME/.local/share/opencode")
         RUNTIME_ARGS+=(--bind "$HOME/.local/state/opencode" "$HOME/.local/state/opencode")
@@ -423,31 +474,24 @@ jail "jailed-opencode" upkgs.fish (
     '')
 
     (wrap-entry (entry: ''
-      PROXY_LOG="$HOME/.local/state/opencode"
-      mkdir -p "$PROXY_LOG"
+      ${shellHelpers}
 
-      COMPAT_PROXY_LOG=''${COMPAT_PROXY_LOG:-info}
+      LOG_DIR="$HOME/.local/state/opencode"
+      mkdir -p "$LOG_DIR"
 
-      RULES_DIR="''${COMPAT_PROXY_RULES:-$HOME/.config/compat-proxy/rules}"
       ${lib.getExe compatProxy} \
-        --rules-dir "$RULES_DIR" \
-        --schema-registry "$RULES_DIR/cc-schemas.toml" \
         --credentials-path "$HOME/.claude/.credentials.json" \
         --port "$JAIL_PROXY_PORT" \
-        --log-level "$COMPAT_PROXY_LOG" \
-        ''${COMPAT_PROXY_DUMP:+--dump-requests} \
-        > "$PROXY_LOG/compat-proxy.log" 2>&1 &
+        --log-level "''${COMPAT_PROXY_LOG:-info}" \
+        > "$LOG_DIR/compat-proxy.log" 2>&1 &
       PROXY_PID=$!
       trap 'kill $PROXY_PID 2>/dev/null || true' EXIT
 
-      for _ in $(seq 1 20); do
-        if curl -sf "http://127.0.0.1:$JAIL_PROXY_PORT/health" > /dev/null 2>&1; then
-          break
-        fi
-        sleep 0.25
-      done
-      if ! curl -sf "http://127.0.0.1:$JAIL_PROXY_PORT/health" > /dev/null 2>&1; then
-        echo "FATAL: compat-proxy failed to start (check $PROXY_LOG/compat-proxy.log)" >&2
+      # Fatal: without the proxy there are no credentials, so every request
+      # would fail with a 503 that is far less legible than this.
+      if ! wait_for_health "http://127.0.0.1:$JAIL_PROXY_PORT/health"; then
+        echo "jailed-opencode: FATAL: compat-proxy failed to start" >&2
+        echo "  see $LOG_DIR/compat-proxy.log" >&2
         exit 1
       fi
 
@@ -456,16 +500,15 @@ jail "jailed-opencode" upkgs.fish (
       CLAUDE_MEM_WORKER_PORT=$JAIL_MEM_PORT \
       CLAUDE_MEM_WORKER_HOST=127.0.0.1 \
       CLAUDE_MEM_DATA_DIR="$HOME/.claude-mem" \
-        ${lib.getExe claudeMem} > "$PROXY_LOG/claude-mem.log" 2>&1 &
+        ${lib.getExe claudeMem} > "$LOG_DIR/claude-mem.log" 2>&1 &
       CLAUDE_MEM_PID=$!
       trap 'kill $PROXY_PID $CLAUDE_MEM_PID 2>/dev/null || true' EXIT
 
-      for _ in $(seq 1 20); do
-        if curl -sf "http://127.0.0.1:$JAIL_MEM_PORT/api/health" > /dev/null 2>&1; then
-          break
-        fi
-        sleep 0.25
-      done
+      # Non-fatal: memory search degrades, the session still works.
+      if ! wait_for_health "http://127.0.0.1:$JAIL_MEM_PORT/api/health"; then
+        echo "jailed-opencode: warning: claude-mem failed to start on port $JAIL_MEM_PORT" >&2
+        echo "  memory search will be unavailable; see $LOG_DIR/claude-mem.log" >&2
+      fi
 
       export CLAUDE_MEM_WORKER_PORT=$JAIL_MEM_PORT
 
@@ -544,13 +587,10 @@ jail "jailed-opencode" upkgs.fish (
 
     # Shadow coreutils rm/rmdir with trash-backed versions inside the jail.
     # Deferred so it prepends to PATH *after* add-pkg-deps has built it.
+    # Shadow coreutils rm/rmdir with trash-backed versions inside the jail.
+    # Deferred so it prepends to PATH *after* add-pkg-deps has built it --
+    # this is the one entry that has to win against a toolbelt name.
     (defer (add-path "${rmSafe}/bin"))
-    # Windows VM helper scripts (windows-vm-ssh / windows-vm-scp).
-    (defer (add-path "${windowsVmHelpers}/bin")) # cant this just be in the agent toolbelt? this looks dumb
-    (add-runtime ''
-      COMPAT_PROXY_RULES_REAL=$(readlink -f "$HOME/.config/compat-proxy/rules" 2>/dev/null || true)
-    '')
-    (try-ro-bind (noescape "\"$COMPAT_PROXY_RULES_REAL\"") (noescape "~/.config/compat-proxy/rules"))
     # Nix support — allows nix build/shell/run inside the jail.
     #
     # The jail's /nix/store is per-path bind mounts (from add-pkg-deps), so
@@ -567,8 +607,6 @@ jail "jailed-opencode" upkgs.fish (
 
     (set-env "SHELL" "${upkgs.fish}/bin/fish")
     (try-fwd-env "COMPAT_PROXY_LOG")
-    (try-fwd-env "COMPAT_PROXY_RULES")
-    (try-fwd-env "COMPAT_PROXY_DUMP")
     (try-fwd-env "COMPAT_PROXY_UPSTREAM")
     (try-fwd-env "NIX_PATH")
     # Selects which named lspmux session the in-jail rust LSP joins, e.g.
@@ -576,7 +614,6 @@ jail "jailed-opencode" upkgs.fish (
     (try-fwd-env "LSPMUX_SESSION")
     (set-env "NIX_REMOTE" "daemon")
     (set-env "OPENCODE_CONFIG" "${jailConfig}")
-    (set-env "COMPAT_PROXY_APPEND_SYSTEM" jailSystemContext)
 
     (add-pkg-deps (
       agentToolbelt

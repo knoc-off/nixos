@@ -109,7 +109,11 @@
       sa = hex: lighten (saturate hex);
     in {
       enable = true;
-      package = upkgs.opencode;
+      # Patched build (pkgs/opencode): opencode's own prompts no longer say
+      # "opencode" anywhere a request body would carry them, so the
+      # compat-proxy's Claude Code identity spoofing isn't undermined by
+      # opencode's own system prompt admitting what it actually is.
+      package = self.packages.${system}.opencode;
       themes.customtheme = {
         "$schema" = "https://opencode.ai/theme.json";
         defs = {
@@ -361,14 +365,11 @@
           };
         };
       };
-      agent = {
-        build.prompt = "[proxy:replace=build]";
-        plan.prompt = "[proxy:replace=plan]";
-        explore.prompt = "[proxy:replace=explore]";
-        general.prompt = "[proxy:replace=general]";
-        title.prompt = "[proxy:replace=title]";
-        summary.prompt = "[proxy:replace=summary]";
-      };
+      # No agent.*.prompt overrides: packages/opencode/src/session/prompt/anthropic.txt
+      # is patched at the source (pkgs/opencode) to be the real system
+      # prompt, so build/plan/general/explore/title/summary/compaction all
+      # fall through to opencode's own (now Claude-Code-branded) defaults
+      # instead of needing a `{file:...}` override here.
 
       permission = {
         edit = "ask";

@@ -14,6 +14,7 @@ in
   # Headscale-assigned tailnet IPs, by host.
   tailnet = import ./tailnet.nix;
   ssh = import ./ssh.nix;
+  nixCache = import ./nix-cache.nix;
 
   # rust-analyzer settings shared by neovim and opencode, so that whichever
   # client initializes a shared lspmux session proposes the same config.
