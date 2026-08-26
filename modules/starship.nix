@@ -1,4 +1,4 @@
-{ self, inputs, ... }: {
+{ self, ... }: {
   home = { pkgs, lib, config, ... }:
   let
     cfg = config.programs.starshipLinear;
@@ -6,7 +6,6 @@
     jqBin = "${pkgs.jq}/bin/jq";
     grepBin = "${pkgs.gnugrep}/bin/grep";
     sedBin = "${pkgs.gnused}/bin/sed";
-    linearBin = "${inputs.nelly.packages.${pkgs.stdenv.hostPlatform.system}.linear-cli}/bin/linear";
     branchColors = [
       "#e06c75"
       "#98c379"
@@ -74,11 +73,17 @@
       printf "\e[1;38;2;%d;%d;%dm%s\e[0m", $r, $g, $b, $display;
     '';
 
+    # linear-cli isn't packaged in this flake -- it's a private tool
+    # (nelly-solutions/nix) only relevant on the work machine. Resolved off
+    # PATH at runtime rather than pinned as a flake input, so hosts without
+    # it installed just get a silent no-op instead of a broken build.
     linearTicket = pkgs.writeShellScriptBin "linear-ticket" ''
+      command -v ${lib.escapeShellArg cfg.linearCommand} >/dev/null 2>&1 || exit 0
+
       branch=$(${gitBin} rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
       ticket=$(echo "$branch" | ${grepBin} -oiP '^[A-Z]+-\d+') || exit 0
 
-      json=$(${linearBin} i v "$ticket" -j 2>/dev/null) || exit 0
+      json=$(${lib.escapeShellArg cfg.linearCommand} i v "$ticket" -j 2>/dev/null) || exit 0
 
       state_color=$(echo "$json" | ${jqBin} -r '.state.color // empty')
       linear_url=$(echo "$json" | ${jqBin} -r '.url // empty')
@@ -114,8 +119,22 @@
       printf '\e[%sm\e]8;;%s\e\\󰘬\e]8;;\e\\\e[0m' "$color" "$url"
     '';
   in {
-    options.programs.starshipLinear.enable =
-      lib.mkEnableOption "Linear ticket integration in the starship prompt (requires the nelly linear-cli)";
+    options.programs.starshipLinear = {
+      enable = lib.mkEnableOption "Linear ticket integration in the starship prompt";
+
+      linearCommand = lib.mkOption {
+        type = lib.types.str;
+        default = "linear";
+        description = ''
+          Name (or absolute path) of the linear-cli binary, resolved off
+          PATH at runtime. linear-cli is a private tool
+          (nelly-solutions/nix) not packaged in this flake -- install it
+          out of band on hosts that want this (e.g. `nix profile install
+          git+ssh://git@github.com/nelly-solutions/nix#linear-cli`). When
+          it's missing, the prompt segment silently no-ops.
+        '';
+      };
+    };
 
     imports = [
       self.homeModules.prompt-daemon

@@ -14,7 +14,7 @@
 #   ./scripts/nix-flamegraph.sh -A nixosConfigurations.hetzner.config.system.build.toplevel.drvPath
 #   ./scripts/nix-flamegraph.sh --freq 499 -o my-flamegraph.svg
 #   # anything after `--` is passed straight to `nix eval`:
-#   ./scripts/nix-flamegraph.sh -- --offline --override-input nelly path:/tmp/fake-nelly
+#   ./scripts/nix-flamegraph.sh -- --offline --override-input hyprland path:/tmp/fake-hyprland
 
 set -euo pipefail
 

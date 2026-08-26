@@ -32,6 +32,7 @@ let
     name = "nix-autobuild-run";
     runtimeInputs = [
       pkgs.git
+      pkgs.openssh
       pkgs.nix-fast-build
       pkgs.nix-eval-jobs
       pkgs.curl
@@ -46,6 +47,13 @@ let
       date_stamp=$(date +%Y%m%d-%H%M%S)
 
       mkdir -p "$gcroots_dir" "$results_dir"
+
+      # ProtectHome=true on the systemd service makes /root a read-only empty
+      # mount, and this runs as root with no HOME override -- nix then fails
+      # trying to create $HOME/.cache/nix/fetcher-locks. Point it at the state
+      # dir instead, which is writable and persists between runs either way.
+      export HOME="$state_dir"
+
       printf '%s\n' ${escapeShellArg githubKnownHost} > "$known_hosts"
 
       export GIT_SSH_COMMAND="ssh -i $CREDENTIALS_DIRECTORY/deploy-key -o IdentitiesOnly=yes -o UserKnownHostsFile=$known_hosts"

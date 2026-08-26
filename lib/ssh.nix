@@ -27,8 +27,8 @@
   hostKeys = {
     optiplex = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHOSVw65Xl7eind7bUuDmyVcHb4dpvlbsnzUoVdnGR/j";
     framework13 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIME1gAzCfuoDLdBwe6ptHES9MRYYqporJB/NeoSU4e+A";
-    thinkpad-work = "";
-    hetzner = "";
-    rpi-4b-plus = "";
+    thinkpad-work = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICimRMpaSmOKhgaRz03Mdk6YzPZLX0bLUEUAdsrZdPvx";
+    hetzner = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM7F9mU/XlIYzq82SBUyxaGLq+ROFllnO1ysuljdI0Ib";
+    rpi-4b-plus = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGOaX5OwjZz3gZIF4Hb7YW51M1uUY9yE2/WMzrwYVAYR";
   };
 }

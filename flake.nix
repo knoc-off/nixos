@@ -154,13 +154,15 @@
             else if missing != [ ] then
               # Loud on purpose: a typo here, or a package whose meta.platforms
               # excludes this system, would otherwise silently build nothing.
-              throw "cachePackages.${system} names attrs unavailable on ${system}: ${lib.concatStringsSep ", " missing}"
+              throw
+                "cachePackages.${system} names attrs unavailable on ${system}: ${lib.concatStringsSep ", " missing}"
             else
               lib.filterAttrs (name: _: lib.elem name allow) available;
 
           toplevels = lib.mapAttrs' (
             hostname: _:
-            lib.nameValuePair "toplevel/${hostname}" nixosConfigurations.${hostname}.config.system.build.toplevel
+            lib.nameValuePair "toplevel/${hostname}"
+              nixosConfigurations.${hostname}.config.system.build.toplevel
           ) (lib.filterAttrs (_: hostSystem: hostSystem == system) hosts);
         in
         packages // toplevels;
@@ -331,11 +333,6 @@
     };
     firefox-addons = {
       url = "gitlab:rycee/nur-expressions?dir=pkgs/firefox-addons";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-
-    nelly = {
-      url = "github:nelly-solutions/nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
 

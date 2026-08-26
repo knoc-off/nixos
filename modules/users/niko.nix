@@ -287,7 +287,6 @@
               self.packages.${pkgs.stdenv.hostPlatform.system}.opencode-bubblewrap
               self.packages.${pkgs.stdenv.hostPlatform.system}.neovim
 
-              inputs.nelly.packages.${pkgs.stdenv.hostPlatform.system}.linear-cli
               spotify
 
               upkgs.opencode
