@@ -25,8 +25,8 @@
   # filters those out rather than emitting a broken authorized_keys line, so
   # this can be filled in host by host.
   hostKeys = {
-    optiplex = "";
-    framework13 = "";
+    optiplex = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHOSVw65Xl7eind7bUuDmyVcHb4dpvlbsnzUoVdnGR/j";
+    framework13 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIME1gAzCfuoDLdBwe6ptHES9MRYYqporJB/NeoSU4e+A";
     thinkpad-work = "";
     hetzner = "";
     rpi-4b-plus = "";

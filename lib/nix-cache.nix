@@ -15,7 +15,7 @@
   # `cat /var/lib/harmonia/cache.pub`) on first boot of the server. Empty
   # string = not yet bootstrapped; modules/nix-cache.nix fails loudly on
   # client.enable rather than silently trusting an unsigned cache.
-  publicKey = "";
+  publicKey = "optiplex-1:Tfd4+AJqqEfEdnmXOk+71AehkBBgm3oHx4W2wJRtev8=";
 
   # Hosts allowed to authenticate to the server as `nixremote` (i.e. every
   # host that runs services.nixCache.builder). Driven off lib.ssh.hostKeys,
