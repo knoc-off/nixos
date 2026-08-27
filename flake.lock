@@ -189,22 +189,6 @@
         "type": "github"
       }
     },
-    "claude-code-system-prompts": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1780524016,
-        "narHash": "sha256-sEFkuH5dTv32s+Hs9nLlIRYzzxzKcQ9yDUfLeouWumU=",
-        "owner": "Piebald-AI",
-        "repo": "claude-code-system-prompts",
-        "rev": "7c04a8c63881c90540586524341d8bf1a5c8c64e",
-        "type": "github"
-      },
-      "original": {
-        "owner": "Piebald-AI",
-        "repo": "claude-code-system-prompts",
-        "type": "github"
-      }
-    },
     "crane": {
       "locked": {
         "lastModified": 1780532242,
@@ -1753,11 +1737,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1786985234,
-        "narHash": "sha256-xmSFdXqL5fBZplJ5Nc3rFsRt3q/Mg3clOhRPxc6HFYg=",
+        "lastModified": 1787863536,
+        "narHash": "sha256-TCl2mtykIDUHSkwNG56PEWzxDUXcsywUWr7BVoTNfh0=",
         "owner": "knoc-off",
         "repo": "minecraft-modpack",
-        "rev": "04335c1d232a7a5c61cc66d08346be6b79381889",
+        "rev": "0b95944e0667a246e2a762ea126135fff82127b6",
         "type": "github"
       },
       "original": {
@@ -2393,7 +2377,6 @@
     "root": {
       "inputs": {
         "Hyprspace": "Hyprspace",
-        "claude-code-system-prompts": "claude-code-system-prompts",
         "crane": "crane",
         "determinate": "determinate",
         "disko": "disko",

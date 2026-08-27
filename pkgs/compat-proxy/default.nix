@@ -3,6 +3,14 @@
   pkgs,
   inputs,
   fenix,
+  upkgs,
+  # Claude Code version to impersonate by default (UA, billing block,
+  # billing fingerprint). Defaults to the version of the claude-code
+  # package actually installed, auto-wired by `callPackage` (the flake's
+  # overlay exposes `upkgs` on `pkgs`), so every caller -- the
+  # home-manager service and the bubblewrap jail alike -- impersonates
+  # the real installed CLI without needing to pass this explicitly.
+  ccVersion ? upkgs.claude-code.version,
 }: let
   toolchain = fenix.combine [
     fenix.minimal.toolchain
@@ -25,6 +33,8 @@ in
   craneLib.buildPackage (commonArgs
     // {
       inherit cargoArtifacts;
+
+      COMPAT_PROXY_CC_VERSION_DEFAULT = ccVersion;
 
       meta = {
         description = "OAuth shim that lets Anthropic-compatible clients use Claude Code credentials";

@@ -150,120 +150,6 @@
                 services.compat-proxy = {
                   enable = true;
                   port = 58192;
-                  sessionLog = true;
-
-                  # Pull CC subagent prompts from Piebald repo
-                  extraSystemPrompts =
-                    let
-                      piebald = "${inputs.claude-code-system-prompts}/system-prompts";
-                    in
-                    {
-                      "cc-explore.txt" = "${piebald}/agent-prompt-explore.md";
-                      "cc-general.txt" = "${piebald}/agent-prompt-general-purpose.md";
-                      "cc-title.txt" = "${piebald}/agent-prompt-coding-session-title-generator.md";
-                      "cc-summary.txt" = "${piebald}/agent-prompt-conversation-summarization.md";
-                      "cc-plan.txt" = "${piebald}/agent-prompt-plan-mode-enhanced.md";
-                    };
-
-                  clients.opencode = {
-                    # Fallback for unmarked requests
-                    systemPrompt.replaceWithFile = "system-prompts/cc-2.1.97.txt";
-
-                    systemPrompt.markers = {
-                      build = "system-prompts/cc-2.1.97.txt";
-                      plan = "system-prompts/cc-plan.txt";
-                      explore = "system-prompts/cc-explore.txt";
-                      general = "system-prompts/cc-general.txt";
-                      title = "system-prompts/cc-title.txt";
-                      summary = "system-prompts/cc-summary.txt";
-                    };
-
-                    # Match real CC's request shape
-                    maxTokens = 64000;
-                    injectThinking = true;
-                    injectContextManagement = true;
-                    stripToolChoiceAuto = true;
-                    accountUuid = "eb263d3b-dc7d-4d1d-858d-2b476d9128d7";
-
-                    toolRenames = [
-                      {
-                        from = "bash";
-                        to = "Bash";
-                      }
-                      {
-                        from = "read";
-                        to = "Read";
-                      }
-                      {
-                        from = "write";
-                        to = "Write";
-                      }
-                      {
-                        from = "edit";
-                        to = "Edit";
-                      }
-                      {
-                        from = "glob";
-                        to = "Glob";
-                      }
-                      {
-                        from = "grep";
-                        to = "Grep";
-                      }
-                      {
-                        from = "webfetch";
-                        to = "WebFetch";
-                      }
-                      {
-                        from = "todowrite";
-                        to = "TodoWrite";
-                      }
-                      {
-                        from = "task";
-                        to = "Task";
-                      }
-                      {
-                        from = "question";
-                        to = "AskUser";
-                      }
-                      {
-                        from = "grep_searchGitHub";
-                        to = "GithubSearch";
-                      }
-                      {
-                        from = "context7_resolve-library-id";
-                        to = "LibrarySearch";
-                      }
-                      {
-                        from = "context7_query-docs";
-                        to = "LibraryDocs";
-                      }
-                    ];
-
-                    toolDrops = [ "skill" ];
-                    unmappedPolicy = "passthrough";
-
-                    # OpenCode-specific top-level fields the Anthropic API doesn't
-                    # define. Real Claude Code never sends these -- forwarding
-                    # them is a fingerprint signal.
-                    unknownFields = [
-                      {
-                        # output_config: { effort: ... } -- real CC sends this too.
-                        name = "output_config";
-                        action = "keep";
-                      }
-                      {
-                        # context_management -- real CC sends this on opus/sonnet.
-                        name = "context_management";
-                        action = "keep";
-                      }
-                      {
-                        # speed: "fast" | "default" -- OpenCode-only field. Strip.
-                        name = "speed";
-                        action = "strip";
-                      }
-                    ];
-                  };
                 };
               }
 
@@ -349,7 +235,7 @@
 
                 spotify
 
-                upkgs.opencode
+                self.packages.${pkgs.stdenv.hostPlatform.system}.opencode
                 # Must come from nixpkgs, not unstable: the session's Kvantum/qt6ct
                 # style plugins are built against nixpkgs' qtbase. An unstable
                 # prismlauncher links a newer qtbase, so qt6ct fails to resolve

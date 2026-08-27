@@ -13,6 +13,7 @@ use serde_json::Value;
 
 use crate::config::{AppState, REQUIRED_OAUTH_BETAS};
 use crate::creds::CredentialError;
+use crate::dump;
 use crate::shape;
 
 /// Unified proxy error type.
@@ -75,8 +76,16 @@ const FORWARDED_RESPONSE_HEADERS: &[&str] = &[
     "request-id",
 ];
 
-/// Build Stainless SDK headers matching real Claude Code's Anthropic JS SDK.
-fn stainless_headers(cc_version: &str, session_id: &str) -> Vec<(&'static str, String)> {
+/// Build the headers real Claude Code sends. A static grep of the shipped
+/// 2.1.204 binary previously concluded these `x-stainless-*` headers
+/// didn't exist -- that was wrong, and cost a working request: they're
+/// built by the bundled Stainless-generated SDK client, not assembled from
+/// a literal string the binary's strings table would show. A live capture
+/// (routing the real `claude` binary through a passthrough logger) proved
+/// they're sent on every request, alongside
+/// `anthropic-dangerous-direct-browser-access`. Values below are the ones
+/// actually observed on the wire for 2.1.204 on Linux/x64/Node.
+fn claude_code_headers(cc_version: &str, session_id: &str) -> Vec<(&'static str, String)> {
     let os_name = if cfg!(target_os = "macos") {
         "macOS"
     } else if cfg!(target_os = "windows") {
@@ -93,15 +102,15 @@ fn stainless_headers(cc_version: &str, session_id: &str) -> Vec<(&'static str, S
     };
 
     vec![
-        ("user-agent", format!("claude-cli/{cc_version} (third-party, cli)")),
+        ("user-agent", format!("claude-cli/{cc_version} (external, cli)")),
         ("x-app", "cli".to_string()),
         ("x-claude-code-session-id", session_id.to_string()),
         ("x-stainless-arch", arch.to_string()),
         ("x-stainless-lang", "js".to_string()),
         ("x-stainless-os", os_name.to_string()),
-        ("x-stainless-package-version", "0.81.0".to_string()),
+        ("x-stainless-package-version", "0.94.0".to_string()),
         ("x-stainless-runtime", "node".to_string()),
-        ("x-stainless-runtime-version", "v22.14.0".to_string()),
+        ("x-stainless-runtime-version", "v26.3.0".to_string()),
         ("x-stainless-retry-count", "0".to_string()),
         ("x-stainless-timeout", "600".to_string()),
         ("anthropic-dangerous-direct-browser-access", "true".to_string()),
@@ -135,10 +144,11 @@ pub async fn handle_messages(
     State(state): State<AppState>,
     body: axum::body::Bytes,
 ) -> Result<Response, ProxyError> {
-    let mut req: Value = serde_json::from_slice(&body).map_err(|e| {
+    let inbound: Value = serde_json::from_slice(&body).map_err(|e| {
         tracing::error!(error = %e, body_len = body.len(), "failed to parse request body");
         ProxyError::Deserialize(e.to_string())
     })?;
+    let mut req = inbound.clone();
 
     shape::to_claude_code(
         &mut req,
@@ -146,7 +156,11 @@ pub async fn handle_messages(
             cc_version: &state.cc_version,
             session_id: &state.session_id,
             device_id: &state.device_id,
-            max_tokens: Some(state.max_tokens),
+            account_uuid: state.account_uuid.as_deref(),
+            max_tokens: state.max_tokens,
+            inject_thinking: state.inject_thinking,
+            inject_context_management: state.inject_context_management,
+            strip_tool_choice_auto: state.strip_tool_choice_auto,
         },
     );
 
@@ -156,7 +170,7 @@ pub async fn handle_messages(
 
     let mut upstream = state
         .client
-        .post(format!("{}/v1/messages", state.upstream_url))
+        .post(format!("{}/v1/messages?beta=true", state.upstream_url))
         .header("anthropic-version", &state.api_version)
         .header("content-type", "application/json");
 
@@ -171,23 +185,29 @@ pub async fn handle_messages(
         upstream = upstream.header("anthropic-beta", betas);
     }
 
-    for (name, value) in stainless_headers(&state.cc_version, &state.session_id) {
+    for (name, value) in claude_code_headers(&state.cc_version, &state.session_id) {
         upstream = upstream.header(name, value);
     }
 
     let body = serde_json::to_vec(&req).map_err(|e| ProxyError::Upstream(e.to_string()))?;
-    let resp = upstream
+    let request = upstream
         .body(body)
-        .send()
+        .build()
+        .map_err(|e| ProxyError::Upstream(e.to_string()))?;
+
+    // Captured before `execute` consumes the request — this is what actually
+    // went on the wire, as opposed to what we intended to send.
+    let sent_headers = request.headers().clone();
+
+    let resp = state
+        .client
+        .execute(request)
         .await
         .map_err(|e| ProxyError::Upstream(e.to_string()))?;
 
     state.usage.update_from_headers(resp.headers());
 
     let status = resp.status();
-    if !status.is_success() {
-        tracing::warn!(status = status.as_u16(), "upstream returned an error");
-    }
 
     let mut headers = HeaderMap::new();
     for name in FORWARDED_RESPONSE_HEADERS {
@@ -198,11 +218,39 @@ pub async fn handle_messages(
         }
     }
 
+    if !status.is_success() {
+        // Buffer rather than stream: error bodies are small (a JSON error
+        // object), and this is the one case where seeing the body matters
+        // more than avoiding the copy.
+        let error_body = resp.bytes().await.map_err(|e| ProxyError::Upstream(e.to_string()))?;
+        let error_text = String::from_utf8_lossy(&error_body).into_owned();
+        tracing::warn!(status = status.as_u16(), body = %error_text, "upstream returned an error");
+
+        state.dump.write(dump::Record {
+            inbound: &inbound,
+            outbound: &req,
+            headers: &sent_headers,
+            status: status.as_u16(),
+            error_body: Some(&error_text),
+        });
+
+        return Ok((status, headers, Body::from(error_body)).into_response());
+    }
+
+    state.dump.write(dump::Record {
+        inbound: &inbound,
+        outbound: &req,
+        headers: &sent_headers,
+        status: status.as_u16(),
+        error_body: None,
+    });
+
     // Stream the body straight through. Errors mid-stream surface as a
     // truncated body, which is what the client would see from upstream
     // directly, so there is nothing useful to translate here.
     Ok((status, headers, Body::from_stream(resp.bytes_stream())).into_response())
 }
+
 
 /// Fallback handler — logs unmatched requests so we can see what clients are hitting.
 async fn fallback(req: axum::extract::Request) -> impl IntoResponse {

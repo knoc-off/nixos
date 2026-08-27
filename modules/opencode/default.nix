@@ -101,6 +101,13 @@
 
     qmlDocPath = "${pkgs.kdePackages.qtdoc}/share/doc/qtdoc";
   in {
+    # Native LLM runtime: routes requests through packages/llm instead of
+    # the AI SDK, which is the code path the Claude-Code tool-name aliasing
+    # patch (pkgs/opencode postPatch) actually runs on. Without this, that
+    # patch sits dead and every request still goes out with opencode's own
+    # lowercase tool names.
+    home.sessionVariables.OPENCODE_EXPERIMENTAL_NATIVE_LLM = "1";
+
     programs.opencode = let
       inherit (color-lib) setOkhslLightness setOkhslSaturation;
       lighten = setOkhslLightness 0.7;
@@ -355,6 +362,7 @@
     # opencode v1.14+ reads opencode.json, not config.json.
     # The HM module still writes config.json, so we bypass it.
     xdg.configFile."opencode/opencode.json".text = builtins.toJSON {
+
       "$schema" = "https://opencode.ai/config.json";
       autoupdate = false;
       provider = {

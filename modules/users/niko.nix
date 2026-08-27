@@ -117,74 +117,16 @@
 
               self.homeModules.compat-proxy
               # Fuck anthropic
-              {
+              ({
+                config,
+                ...
+              }: {
                 services.compat-proxy = {
                   enable = true;
                   port = 58192;
-
-                  clients.opencode = {
-                    systemPrompt.replaceWithFile = "system-prompts/cc-2.1.97.txt";
-
-                    toolRenames = [
-                      {
-                        from = "bash";
-                        to = "Bash";
-                      }
-                      {
-                        from = "read";
-                        to = "Read";
-                      }
-                      {
-                        from = "write";
-                        to = "Write";
-                      }
-                      {
-                        from = "edit";
-                        to = "Edit";
-                      }
-                      {
-                        from = "glob";
-                        to = "Glob";
-                      }
-                      {
-                        from = "grep";
-                        to = "Grep";
-                      }
-                      {
-                        from = "webfetch";
-                        to = "WebFetch";
-                      }
-                      {
-                        from = "todowrite";
-                        to = "TodoWrite";
-                      }
-                      {
-                        from = "task";
-                        to = "Task";
-                      }
-                      {
-                        from = "question";
-                        to = "AskUser";
-                      }
-                      {
-                        from = "grep_searchGitHub";
-                        to = "GithubSearch";
-                      }
-                      {
-                        from = "context7_resolve-library-id";
-                        to = "LibrarySearch";
-                      }
-                      {
-                        from = "context7_query-docs";
-                        to = "LibraryDocs";
-                      }
-                    ];
-
-                    toolDrops = [ "skill" ];
-                    unmappedPolicy = "passthrough";
-                  };
+                  dumpDir = "${config.xdg.stateHome}/compat-proxy/dumps";
                 };
-              }
+              })
 
               self.homeModules.git
               {
@@ -289,7 +231,7 @@
 
               spotify
 
-              upkgs.opencode
+              self.packages.${pkgs.stdenv.hostPlatform.system}.opencode
 
               upkgs.claude-code
 

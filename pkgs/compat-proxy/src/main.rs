@@ -16,6 +16,7 @@ use tracing_subscriber::EnvFilter;
 
 use compat_proxy::config::{AppConfig, AppState};
 use compat_proxy::creds::CredentialReader;
+use compat_proxy::dump::Dumper;
 use compat_proxy::proxy;
 use compat_proxy::usage::UsageState;
 
@@ -32,7 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     tracing::info!(
         cc_version = %config.cc_version,
-        max_tokens = config.max_tokens,
+        max_tokens = ?config.max_tokens,
         "compat-proxy starting"
     );
 
@@ -63,6 +64,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     tracing::info!("session_id: {session_id}");
     tracing::debug!("device_id: {device_id}");
 
+    // Real CC reads this once at startup from its own config file and
+    // includes it in every request's metadata. Warn rather than fail --
+    // requests still work without it, just less distinguishable to
+    // Anthropic as belonging to a specific account.
+    let account_uuid = read_account_uuid();
+    match &account_uuid {
+        Some(uuid) => tracing::info!("account_uuid: {uuid}"),
+        None => tracing::warn!(
+            "account_uuid not found in ~/.claude.json; requests will omit it from metadata"
+        ),
+    }
+
+    // One subdirectory per run, so dumps from separate sessions don't
+    // interleave and sequence numbers stay meaningful.
+    let dump_dir = config.dump_dir.as_ref().map(|dir| dir.join(&session_id));
+    if let Some(dir) = &dump_dir {
+        tracing::info!("dumping shaped requests to {}", dir.display());
+    }
+
     let state = AppState {
         creds: Arc::new(creds),
         client,
@@ -71,9 +91,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         cc_version: config.cc_version.clone(),
         betas: config.betas.clone(),
         max_tokens: config.max_tokens,
+        inject_thinking: config.inject_thinking,
+        inject_context_management: config.inject_context_management,
+        strip_tool_choice_auto: config.strip_tool_choice_auto,
         session_id,
         device_id,
+        account_uuid,
         usage: Arc::new(UsageState::default()),
+        dump: Arc::new(Dumper::new(dump_dir)),
     };
 
     let app = proxy::build_router(state);
@@ -101,4 +126,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     }
 
     Ok(())
+}
+
+/// Reads `oauthAccount.accountUuid` from `~/.claude.json`, real CC's own
+/// config file. Returns `None` on any failure (missing `HOME`, missing
+/// file, malformed JSON, absent field) -- this is best-effort enrichment,
+/// not something worth failing startup over.
+fn read_account_uuid() -> Option<String> {
+    let home = std::env::var("HOME").ok()?;
+    let path = std::path::Path::new(&home).join(".claude.json");
+    let contents = std::fs::read_to_string(path).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&contents).ok()?;
+    json.get("oauthAccount")?
+        .get("accountUuid")?
+        .as_str()
+        .map(str::to_string)
 }

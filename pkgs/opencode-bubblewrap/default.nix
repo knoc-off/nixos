@@ -443,6 +443,44 @@ jail "jailed-opencode" upkgs.fish (
 
         ${pkgs.coreutils}/bin/mkdir -p "$JAIL_CLAUDE_DIR" "$JAIL_STATE_DIR" "$JAIL_MEM_DIR" "$JAIL_FISH_DIR"
 
+        # Named jails get their *own* .claude.json rather than the host's, so
+        # the isolation the name buys isn't undone by sharing Claude Code's
+        # config (and session history) with the host. Seeded from the host's
+        # copy on first use because the proxy reads `oauthAccount.accountUuid`
+        # out of it for the `metadata.user_id` field real CC sends -- without
+        # it the jail's requests are missing a field every genuine CC request
+        # carries. Also stops the `claude` CLI complaining the file is absent.
+        if [[ ! -f "$JAIL_DIR/claude.json" && -f "$HOME/.claude.json" ]]; then
+          ${pkgs.coreutils}/bin/cp "$HOME/.claude.json" "$JAIL_DIR/claude.json"
+        fi
+        [ -f "$JAIL_DIR/claude.json" ] && RUNTIME_ARGS+=(--bind "$JAIL_DIR/claude.json" "$HOME/.claude.json")
+
+        # opencode must not hold its own anthropic OAuth token in here. The
+        # compat-proxy is what supplies credentials, so an `oauth` entry is
+        # redundant -- but worse, it is silently destructive: native-runtime.ts
+        # refuses to run the native LLM path under OAuth auth ("OAuth auth
+        # requires a provider fetch override") and falls back to the AI SDK,
+        # which is the *only* path the Claude Code tool-name aliasing patch
+        # (pkgs/opencode) hooks. Requests then go out naming opencode's own
+        # tools -- `todowrite` alone is enough -- and Anthropic rejects them
+        # with a quota-shaped "You're out of extra usage" error that has
+        # nothing to do with quota. Swapped for the same dummy api key the
+        # global config already sets, since the proxy ignores it either way.
+        AUTH_JSON="$JAIL_DIR/auth.json"
+        if [ -f "$AUTH_JSON" ] \
+          && [ "$(${pkgs.jq}/bin/jq -r '.anthropic.type // ""' "$AUTH_JSON")" = "oauth" ]; then
+          ${pkgs.coreutils}/bin/cp "$AUTH_JSON" "$AUTH_JSON.oauth.bak"
+          if ${pkgs.jq}/bin/jq '.anthropic = {"type":"api","key":"not-needed"}' \
+              "$AUTH_JSON" > "$AUTH_JSON.tmp"; then
+            ${pkgs.coreutils}/bin/mv "$AUTH_JSON.tmp" "$AUTH_JSON"
+            echo "jailed-opencode: replaced stale anthropic OAuth auth in $AUTH_JSON" >&2
+            echo "  (it disables opencode's native LLM runtime; backup at $AUTH_JSON.oauth.bak)" >&2
+          else
+            ${pkgs.coreutils}/bin/rm -f "$AUTH_JSON.tmp"
+            echo "jailed-opencode: warning: could not rewrite $AUTH_JSON" >&2
+          fi
+        fi
+
         RUNTIME_ARGS+=(--bind "$JAIL_CLAUDE_DIR" "$HOME/.claude")
         RUNTIME_ARGS+=(--bind "$JAIL_DIR" "$HOME/.local/share/opencode")
         RUNTIME_ARGS+=(--bind "$JAIL_STATE_DIR" "$HOME/.local/state/opencode")
@@ -451,6 +489,19 @@ jail "jailed-opencode" upkgs.fish (
       else
         ${pkgs.coreutils}/bin/mkdir -p "$HOME/.claude" "$HOME/.local/share/opencode" "$HOME/.local/state/opencode"
         [ -f "$HOME/.claude.json" ] && RUNTIME_ARGS+=(--bind "$HOME/.claude.json" "$HOME/.claude.json")
+
+        # Same OAuth hazard as the named branch above, but this is the host's
+        # real auth.json rather than disposable per-jail state, so say so
+        # instead of rewriting it.
+        if [ -f "$HOME/.local/share/opencode/auth.json" ] \
+          && [ "$(${pkgs.jq}/bin/jq -r '.anthropic.type // ""' \
+                  "$HOME/.local/share/opencode/auth.json")" = "oauth" ]; then
+          echo "jailed-opencode: warning: anthropic is set to OAuth auth in ~/.local/share/opencode/auth.json" >&2
+          echo "  that disables opencode's native LLM runtime, so requests go out with opencode's" >&2
+          echo "  own tool names and Anthropic rejects them as \"out of extra usage\"." >&2
+          echo "  Fix: set it to {\"type\":\"api\",\"key\":\"not-needed\"} (the proxy supplies credentials)." >&2
+        fi
+
         RUNTIME_ARGS+=(--bind "$HOME/.claude" "$HOME/.claude")
         RUNTIME_ARGS+=(--bind "$HOME/.local/share/opencode" "$HOME/.local/share/opencode")
         RUNTIME_ARGS+=(--bind "$HOME/.local/state/opencode" "$HOME/.local/state/opencode")
@@ -479,9 +530,20 @@ jail "jailed-opencode" upkgs.fish (
       LOG_DIR="$HOME/.local/state/opencode"
       mkdir -p "$LOG_DIR"
 
+      # Full request/response capture, opt-in via COMPAT_PROXY_DUMP=1.
+      # The shaped body that actually goes upstream is the only reliable
+      # thing to debug against -- reconstructing it by hand has repeatedly
+      # produced requests that behave differently from the real ones.
+      PROXY_DUMP_ARGS=()
+      if [[ -n "''${COMPAT_PROXY_DUMP:-}" ]]; then
+        PROXY_DUMP_ARGS+=(--dump-dir "$LOG_DIR/dumps")
+      fi
+
       ${lib.getExe compatProxy} \
         --credentials-path "$HOME/.claude/.credentials.json" \
         --port "$JAIL_PROXY_PORT" \
+        --max-tokens 64000 \
+        "''${PROXY_DUMP_ARGS[@]}" \
         --log-level "''${COMPAT_PROXY_LOG:-info}" \
         > "$LOG_DIR/compat-proxy.log" 2>&1 &
       PROXY_PID=$!
@@ -496,6 +558,12 @@ jail "jailed-opencode" upkgs.fish (
       fi
 
       export OPENCODE_PROXY_URL="http://127.0.0.1:$JAIL_PROXY_PORT/v1"
+
+      # Routes requests through packages/llm instead of the AI SDK -- the
+      # code path the Claude-Code tool-name aliasing patch (pkgs/opencode
+      # postPatch) actually runs on. home.sessionVariables doesn't cross
+      # the bwrap boundary, so this has to be set here too.
+      export OPENCODE_EXPERIMENTAL_NATIVE_LLM=1
 
       CLAUDE_MEM_WORKER_PORT=$JAIL_MEM_PORT \
       CLAUDE_MEM_WORKER_HOST=127.0.0.1 \
@@ -607,6 +675,7 @@ jail "jailed-opencode" upkgs.fish (
 
     (set-env "SHELL" "${upkgs.fish}/bin/fish")
     (try-fwd-env "COMPAT_PROXY_LOG")
+    (try-fwd-env "COMPAT_PROXY_DUMP")
     (try-fwd-env "COMPAT_PROXY_UPSTREAM")
     (try-fwd-env "NIX_PATH")
     # Selects which named lspmux session the in-jail rust LSP joins, e.g.

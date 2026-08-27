@@ -8,287 +8,9 @@
   with lib; let
     cfg = config.services.compat-proxy;
     system = pkgs.stdenv.hostPlatform.system;
-
-    # Generate a single TOML rule file from a client config attrset.
-    mkRuleToml = name: client: let
-      replacementLines =
-        concatMapStringsSep "\n" (r: ''
-          [[system_prompt.text_replacements]]
-          find = ${builtins.toJSON r.find}
-          replace = ${builtins.toJSON r.replace}
-        '')
-        client.textReplacements;
-
-      renameLines =
-        concatMapStringsSep "\n" (r: ''
-          [[tools.rename]]
-          from = ${builtins.toJSON r.from}
-          to_schema = ${builtins.toJSON r.to}
-        '')
-        client.toolRenames;
-
-      dropLines =
-        concatMapStringsSep "\n" (t: ''
-          [[tools.drop]]
-          name = ${builtins.toJSON t}
-        '')
-        client.toolDrops;
-
-      unknownFieldLines =
-        concatMapStringsSep "\n" (r: ''
-          [[unknown_fields.rules]]
-          name = ${builtins.toJSON r.name}
-          action = ${builtins.toJSON r.action}
-          ${optionalString (r.renameTo != null)
-            "rename_to = ${builtins.toJSON r.renameTo}"}
-        '')
-        client.unknownFields;
-
-      markerLines =
-        concatStringsSep "\n" (mapAttrsToList (
-            marker: path: "${builtins.toJSON marker} = ${builtins.toJSON path}"
-          )
-          client.systemPrompt.markers);
-    in
-      pkgs.writeText "${name}.toml" ''
-        [meta]
-        client_name = ${builtins.toJSON name}
-        target_cc_version = ${builtins.toJSON client.targetVersion}
-
-        [system_prompt]
-        ${optionalString (client.systemPrompt.detect != null)
-          "detect = ${builtins.toJSON client.systemPrompt.detect}"}
-        ${optionalString (client.systemPrompt.replaceWithFile != null)
-          "replace_with_file = ${builtins.toJSON client.systemPrompt.replaceWithFile}"}
-        ${optionalString (client.systemPrompt.appendFile != null)
-          "append_file = ${builtins.toJSON client.systemPrompt.appendFile}"}
-
-        ${optionalString (client.systemPrompt.markers != {}) ''
-          [system_prompt.markers]
-          ${markerLines}
-        ''}
-
-        ${replacementLines}
-
-        [tools]
-        unmapped_policy = ${builtins.toJSON client.unmappedPolicy}
-
-        ${renameLines}
-
-        ${dropLines}
-
-        [properties]
-        ${optionalString (client.maxTokens != null)
-          "max_tokens = ${toString client.maxTokens}"}
-        inject_thinking = ${boolToString client.injectThinking}
-        inject_context_management = ${boolToString client.injectContextManagement}
-        strip_tool_choice_auto = ${boolToString client.stripToolChoiceAuto}
-        ${optionalString (client.accountUuid != null)
-          "account_uuid = ${builtins.toJSON client.accountUuid}"}
-
-        [headers]
-        inject = []
-
-        [billing]
-        inject_block = ${boolToString client.billing.injectBlock}
-        cc_version = ${builtins.toJSON client.billing.ccVersion}
-
-        ${unknownFieldLines}
-      '';
-
-    # Assemble a rules directory from all client configs + the bundled schema registry.
-    bundledRules = "${cfg.package}/share/compat-proxy/rules";
-
-    rulesDir = pkgs.runCommand "compat-proxy-rules" {} (''
-        mkdir -p $out/system-prompts
-        # Copy schema registry and system prompts from the package
-        cp ${bundledRules}/cc-schemas.toml $out/
-        cp -r ${bundledRules}/system-prompts/* $out/system-prompts/ 2>/dev/null || true
-      ''
-      # Copy extra system prompt files (strip markdown frontmatter comments)
-      + concatStringsSep "\n" (mapAttrsToList (
-          name: path: ''
-            ${pkgs.gnused}/bin/sed '/^<!--$/,/^-->$/d' ${path} > $out/system-prompts/${name}
-          ''
-        )
-        cfg.extraSystemPrompts)
-      + "\n"
-      + concatStringsSep "\n" (mapAttrsToList (
-          name: client: "cp ${mkRuleToml name client} $out/${name}.toml"
-        )
-        cfg.clients));
-
-    textReplacementType = types.submodule {
-      options = {
-        find = mkOption {
-          type = types.str;
-          description = "Text to find.";
-        };
-        replace = mkOption {
-          type = types.str;
-          description = "Replacement text.";
-        };
-      };
-    };
-
-    toolRenameType = types.submodule {
-      options = {
-        from = mkOption {
-          type = types.str;
-          description = "Client tool name.";
-        };
-        to = mkOption {
-          type = types.str;
-          description = "Canonical schema name.";
-        };
-      };
-    };
-
-    unknownFieldType = types.submodule {
-      options = {
-        name = mkOption {
-          type = types.str;
-          description = "Top-level field name as the client sends it.";
-        };
-        action = mkOption {
-          type = types.enum ["strip" "keep" "rename"];
-          description = ''
-            What to do with the field:
-            - strip: drop it silently (use for known-bogus client-only fields)
-            - keep: forward as-is, no warning (use when upstream accepts it)
-            - rename: forward under a different name (requires renameTo)
-          '';
-        };
-        renameTo = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "Destination field name when action = \"rename\".";
-        };
-      };
-    };
-
-    clientType = types.submodule {
-      options = {
-        targetVersion = mkOption {
-          type = types.str;
-          default = "2.1.97";
-          description = "Target Claude Code version to emulate.";
-        };
-
-        systemPrompt = {
-          detect = mkOption {
-            type = types.nullOr types.str;
-            default = null;
-            description = "Substring to detect in the client's system prompt. Null for unconditional replacement.";
-          };
-
-          replaceWithFile = mkOption {
-            type = types.nullOr types.str;
-            default = null;
-            description = "Replacement system prompt file, relative to rules dir. Null to keep the client's prompt.";
-          };
-
-          appendFile = mkOption {
-            type = types.nullOr types.str;
-            default = null;
-            description = "File to append to the system prompt, relative to rules dir.";
-          };
-
-          markers = mkOption {
-            type = types.attrsOf types.str;
-            default = {};
-            description = ''
-              Named marker replacements. When a system prompt starts with
-              `[proxy:replace=NAME]`, the proxy looks up NAME in this map
-              and replaces the entire system block with the referenced file.
-              Values are paths relative to the rules dir.
-            '';
-          };
-        };
-
-        textReplacements = mkOption {
-          type = types.listOf textReplacementType;
-          default = [];
-          description = "Text replacements applied after system prompt replacement.";
-        };
-
-        toolRenames = mkOption {
-          type = types.listOf toolRenameType;
-          default = [];
-          description = "Tool name mappings from client names to canonical schema names.";
-        };
-
-        toolDrops = mkOption {
-          type = types.listOf types.str;
-          default = [];
-          description = "Tool names to drop silently.";
-        };
-
-        unmappedPolicy = mkOption {
-          type = types.enum ["error" "drop" "passthrough"];
-          default = "error";
-          description = "Policy for tools with no mapping rule.";
-        };
-
-        unknownFields = mkOption {
-          type = types.listOf unknownFieldType;
-          default = [];
-          description = ''
-            Rules for handling unknown top-level request fields.
-            Real Claude Code only sends documented Anthropic API fields,
-            so any unhandled field is a fingerprint signal. Anything not
-            listed here will be forwarded with a warning.
-          '';
-        };
-
-        billing = {
-          injectBlock = mkOption {
-            type = types.bool;
-            default = true;
-            description = "Inject billing header block into the system prompt.";
-          };
-
-          ccVersion = mkOption {
-            type = types.str;
-            default = "2.1.97";
-            description = "Claude Code version for billing fingerprint.";
-          };
-        };
-
-        maxTokens = mkOption {
-          type = types.nullOr types.int;
-          default = null;
-          description = "Override max_tokens on every request (e.g. 64000 to match real CC).";
-        };
-
-        injectThinking = mkOption {
-          type = types.bool;
-          default = false;
-          description = "Inject thinking:{type:adaptive} when absent.";
-        };
-
-        injectContextManagement = mkOption {
-          type = types.bool;
-          default = false;
-          description = "Inject context_management when absent.";
-        };
-
-        stripToolChoiceAuto = mkOption {
-          type = types.bool;
-          default = false;
-          description = "Strip tool_choice:{type:auto} (real CC omits it).";
-        };
-
-        accountUuid = mkOption {
-          type = types.nullOr types.str;
-          default = null;
-          description = "Account UUID for metadata.user_id injection.";
-        };
-      };
-    };
   in {
     options.services.compat-proxy = {
-      enable = mkEnableOption "compat-proxy, a typed API compatibility proxy";
+      enable = mkEnableOption "compat-proxy, an OAuth shim that lets Anthropic-compatible clients use Claude Code credentials";
 
       package = mkOption {
         type = types.package;
@@ -326,90 +48,110 @@
         description = "Log level filter.";
       };
 
-      dumpRequests = mkOption {
-        type = types.bool;
-        default = false;
-        description = "Dump request/response bodies for debugging. WARNING: logs sensitive data.";
-      };
-
-      sessionLog = mkOption {
-        type = types.bool;
-        default = false;
-        description = ''
-          Enable per-session JSONL transaction logging.
-
-          When enabled, the proxy writes one line per request to
-          `$XDG_STATE_HOME/compat-proxy/sessions/<session_id>.jsonl`
-          (or whatever `sessionLogDir` is set to). Each line captures the
-          parsed inbound request, a JSON Patch describing the translation
-          we applied, redacted upstream headers, the upstream status, and
-          the (reverse-translated) response or SSE event sequence.
-
-          File mode is 0600. New file per proxy restart.
-        '';
-      };
-
-      sessionLogDir = mkOption {
+      dumpDir = mkOption {
         type = types.nullOr types.str;
         default = null;
         description = ''
-          Override directory for session log files.
-          Default: `$XDG_STATE_HOME/compat-proxy/sessions`.
+          Directory to dump shaped requests into (one JSON file per
+          exchange, in a per-run subdirectory keyed by session ID).
+          Records contain full prompts and conversation history --
+          leave unset outside of debugging.
         '';
       };
 
-      extraSystemPrompts = mkOption {
-        type = types.attrsOf types.path;
-        default = {};
+      maxTokens = mkOption {
+        type = types.nullOr types.int;
+        default = 64000;
         description = ''
-          Extra system prompt files to include in the rules directory.
-          Keys are filenames under `system-prompts/`, values are paths
-          to the source files. Markdown frontmatter (HTML comments) is
-          stripped automatically.
+          Override `max_tokens` on every request (real CC sends 64000).
+          Set to null to leave the client's own `max_tokens` untouched.
         '';
       };
 
-      clients = mkOption {
-        type = types.attrsOf clientType;
-        default = {};
-        description = "Client rule definitions. Each key becomes a TOML rule file.";
+      injectThinking = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Inject `thinking: {type: "adaptive"}` on models the client
+          didn't already request thinking on. Off by default: "adaptive"
+          only exists on specific newer model families (Opus/Sonnet 4.6+)
+          and the API 400s outright on anything older, with no reliable
+          way to tell which from the model string alone.
+        '';
+      };
+
+      injectContextManagement = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Inject `context_management` clearing stale thinking blocks.
+          Tied to the same model-family guesswork as `injectThinking` and
+          just as unsafe to guess at, so also off by default.
+        '';
+      };
+
+      stripToolChoiceAuto = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Drop `tool_choice: {type: "auto"}` (real CC omits it rather
+          than sending the default explicitly). Cosmetic, not required
+          for correctness.
+        '';
       };
     };
 
     config = mkIf cfg.enable {
-      home.packages = [cfg.package];
+      assertions = [
+        {
+          assertion = cfg.port != null || cfg.socket != null;
+          message = ''
+            services.compat-proxy: set at least one of `port` or `socket`.
+            With both null, the binary falls back to
+            $XDG_RUNTIME_DIR/compat-proxy.sock on its own, but
+            home.sessionVariables.OPENCODE_PROXY_URL only gets set from
+            `port` -- with neither set explicitly, opencode would have
+            nothing to connect to.
+          '';
+        }
+      ];
 
-      # Generate the rules directory into XDG config
-      xdg.configFile."compat-proxy/rules".source = rulesDir;
+      home.packages = [ cfg.package ];
 
-      home.sessionVariables.OPENCODE_PROXY_URL = "http://127.0.0.1:58192/v1";
+      # opencode's `baseURL` config option needs an HTTP URL -- it can't
+      # reach a Unix socket -- so this is only meaningful in port mode.
+      home.sessionVariables = mkIf (cfg.port != null) {
+        OPENCODE_PROXY_URL = "http://127.0.0.1:${toString cfg.port}/v1";
+      };
 
       systemd.user.services.compat-proxy = {
         Unit = {
-          Description = "compat-proxy API compatibility proxy";
-          After = ["network.target"];
+          Description = "compat-proxy OAuth shim";
+          After = [ "network.target" ];
         };
 
         Service = {
-          ExecStart = concatStringsSep " " ([
+          ExecStart = concatStringsSep " " (
+            [
               "${lib.getExe cfg.package}"
-              "--rules-dir ${config.xdg.configHome}/compat-proxy/rules"
-              "--schema-registry ${config.xdg.configHome}/compat-proxy/rules/cc-schemas.toml"
               "--credentials-path ${cfg.credentialsPath}"
               "--upstream-url ${cfg.upstreamUrl}"
               "--log-level ${cfg.logLevel}"
             ]
             ++ optional (cfg.port != null) "--port ${toString cfg.port}"
             ++ optional (cfg.socket != null) "--socket ${cfg.socket}"
-            ++ optional cfg.dumpRequests "--dump-requests"
-            ++ optional cfg.sessionLog "--session-log"
-            ++ optional (cfg.sessionLogDir != null) "--session-log-dir ${cfg.sessionLogDir}");
+            ++ optional (cfg.dumpDir != null) "--dump-dir ${cfg.dumpDir}"
+            ++ optional (cfg.maxTokens != null) "--max-tokens ${toString cfg.maxTokens}"
+            ++ optional cfg.injectThinking "--inject-thinking"
+            ++ optional cfg.injectContextManagement "--inject-context-management"
+            ++ optional cfg.stripToolChoiceAuto "--strip-tool-choice-auto"
+          );
           Restart = "on-failure";
           RestartSec = 5;
         };
 
         Install = {
-          WantedBy = ["default.target"];
+          WantedBy = [ "default.target" ];
         };
       };
     };

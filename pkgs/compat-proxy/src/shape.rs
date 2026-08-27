@@ -26,12 +26,66 @@ const BILLING_HASH_INDICES: [usize; 3] = [4, 7, 20];
 /// (identity + last system block) and leave the rest for the client.
 const CACHE_BREAKPOINTS: usize = 2;
 
+/// opencode's own internal tool ids. Real Claude Code never sends these --
+/// it sends `Bash`, `Read`, `TodoWrite`, ... -- so seeing one here means
+/// the wire-name aliasing in pkgs/opencode's `anthropic-messages.ts` patch
+/// did not run for this request.
+///
+/// This is worth shouting about because the failure is silent and the
+/// upstream error is actively misleading. opencode only applies the alias
+/// on its *native* LLM runtime; if that runtime bails (most easily by
+/// having an `oauth` entry for anthropic in opencode's `auth.json`, which
+/// makes `native-runtime.ts` return "OAuth auth requires a provider fetch
+/// override") it silently falls back to the AI SDK path, which has no
+/// aliasing. The request then goes out with these names and Anthropic
+/// rejects it with "You're out of extra usage" -- a quota-shaped message
+/// for what is really a request-content rejection. `todowrite` alone is
+/// enough to trigger it, verified by live differential testing.
+const OPENCODE_TOOL_IDS: &[&str] = &[
+    "apply_patch",
+    "bash",
+    "edit",
+    "glob",
+    "grep",
+    "invalid",
+    "lsp",
+    "plan_exit",
+    "question",
+    "read",
+    "skill",
+    "task",
+    "todowrite",
+    "webfetch",
+    "websearch",
+    "write",
+];
+
 /// Everything the shaper needs to know about the caller.
 pub struct Context<'a> {
     pub cc_version: &'a str,
     pub session_id: &'a str,
     pub device_id: &'a str,
+    /// The account UUID real CC reads from `~/.claude.json`'s
+    /// `oauthAccount.accountUuid` and includes in `metadata.user_id`.
+    /// Absent it entirely on read failure rather than guessing — real CC
+    /// only omits it when it genuinely doesn't have one either.
+    pub account_uuid: Option<&'a str>,
     pub max_tokens: Option<u64>,
+    /// Inject `thinking: {type: "adaptive"}` on models the caller didn't
+    /// already request thinking on. Off by default: "adaptive" only exists
+    /// on specific newer model families (Opus/Sonnet 4.6+) and the API
+    /// 400s outright on anything older — there is no way to tell which
+    /// from the model string alone, so guessing is worse than leaving the
+    /// client's own `thinking` field (if any) untouched.
+    pub inject_thinking: bool,
+    /// Inject `context_management` clearing stale thinking blocks. Tied to
+    /// the same "adaptive" assumption as `inject_thinking` above and just
+    /// as unsafe to guess at, so also off by default.
+    pub inject_context_management: bool,
+    /// Drop `tool_choice: {type: "auto"}` (real CC omits it rather than
+    /// sending the default explicitly). Cosmetic fidelity, not a
+    /// correctness requirement, so off by default.
+    pub strip_tool_choice_auto: bool,
 }
 
 /// Rewrite a `/v1/messages` body into Claude Code's wire shape, in place.
@@ -52,11 +106,20 @@ pub fn to_claude_code(req: &mut Value, ctx: &Context<'_>) {
     system.insert(0, json!({ "type": "text", "text": IDENTITY }));
     system.insert(0, billing);
     apply_cache_control(system);
+    strip_tool_cache_control(obj);
+    upgrade_message_cache_control(obj);
+    warn_on_unaliased_tools(obj);
 
-    inject_metadata(obj, ctx.session_id, ctx.device_id);
-    inject_thinking(obj);
-    inject_context_management(obj);
-    strip_tool_choice_auto(obj);
+    inject_metadata(obj, ctx.session_id, ctx.device_id, ctx.account_uuid);
+    if ctx.inject_thinking {
+        inject_thinking(obj);
+    }
+    if ctx.inject_context_management {
+        inject_context_management(obj);
+    }
+    if ctx.strip_tool_choice_auto {
+        strip_tool_choice_auto(obj);
+    }
 
     if let Some(max) = ctx.max_tokens {
         obj.insert("max_tokens".into(), json!(max));
@@ -87,11 +150,21 @@ fn normalize_system(obj: &mut Map<String, Value>) -> &mut Vec<Value> {
 
 /// Stamp `cache_control` on the identity block and the last system block.
 ///
-/// Without this the client pays full price for a system prompt that is
-/// identical on every request. Blocks that already carry an explicit
-/// `cache_control` are left alone.
+/// `ttl: "1h"`, matching real CC's own breakpoints (confirmed by live
+/// capture: both system blocks and its first user-message breakpoint use
+/// `ttl: "1h"`, and it sets none at all on `tools`). Anthropic requires
+/// breakpoint TTLs to be non-increasing across the request (`tools`, then
+/// `system`, then `messages`) -- an earlier version of this function used
+/// plain `ephemeral` (5m) here specifically to sit below opencode's own
+/// default 5m breakpoint on its last tool, but that only papered over the
+/// real fix: `strip_tool_cache_control` below removes that tool breakpoint
+/// entirely, so `1h` here no longer conflicts with anything downstream.
+/// Always overwrites: opencode's own caching strategy already stamps a
+/// plain (5m) breakpoint on the last system block, and leaving that alone
+/// would violate the same ordering rule one block later.
 fn apply_cache_control(system: &mut [Value]) {
     let cache = json!({ "type": "ephemeral", "ttl": "1h" });
+
 
     // Index 0 is the billing block, which real CC leaves uncached.
     let mut targets = vec![1usize];
@@ -104,9 +177,83 @@ fn apply_cache_control(system: &mut [Value]) {
         let Some(block) = system.get_mut(index).and_then(Value::as_object_mut) else {
             continue;
         };
-        block
-            .entry("cache_control")
-            .or_insert_with(|| cache.clone());
+        block.insert("cache_control".into(), cache.clone());
+    }
+}
+
+/// Remove any `cache_control` opencode placed on `tools[*]`.
+///
+/// Real CC never caches on tools (confirmed by live capture: 28 tools, zero
+/// breakpoints) -- it relies entirely on the system-prompt breakpoints
+/// above. opencode's own cache-strategy logic defaults to putting a 5m
+/// breakpoint on the last tool, which both looks wrong next to real CC's
+/// shape and, combined with the `1h` system breakpoints above, would
+/// violate Anthropic's non-increasing-TTL-ordering rule (`tools` ->
+/// `system` -> `messages`) if left in place.
+fn strip_tool_cache_control(obj: &mut Map<String, Value>) {
+    let Some(tools) = obj.get_mut("tools").and_then(Value::as_array_mut) else {
+        return;
+    };
+    for tool in tools {
+        if let Some(tool) = tool.as_object_mut() {
+            tool.remove("cache_control");
+        }
+    }
+}
+
+/// Shout if opencode's internal tool ids reached the wire.
+///
+/// See `OPENCODE_TOOL_IDS`. This proxy deliberately does *not* rename them
+/// itself: the model would then answer with `tool_use` blocks named
+/// `TodoWrite`, which opencode wouldn't route back to its own `todowrite`
+/// handler without also rewriting the streaming response. Renaming belongs
+/// in opencode, where both directions are one symbol. All this can do is
+/// make the breakage legible instead of surfacing as a bogus quota error.
+fn warn_on_unaliased_tools(obj: &Map<String, Value>) {
+    let Some(tools) = obj.get("tools").and_then(Value::as_array) else {
+        return;
+    };
+    let leaked: Vec<&str> = tools
+        .iter()
+        .filter_map(|t| t.get("name").and_then(Value::as_str))
+        .filter(|name| OPENCODE_TOOL_IDS.contains(name))
+        .collect();
+
+    if leaked.is_empty() {
+        return;
+    }
+    tracing::error!(
+        tools = leaked.join(","),
+        "opencode's internal tool names reached the wire; Anthropic will reject \
+         this request with a misleading \"out of extra usage\" error. The \
+         tool-name aliasing only runs on opencode's native LLM runtime -- check \
+         that OPENCODE_EXPERIMENTAL_NATIVE_LLM is set and that opencode's \
+         auth.json has no `oauth` entry for anthropic (an oauth entry disables \
+         the native runtime and silently falls back to the AI SDK path)"
+    );
+}
+
+/// Rewrite any existing message-level `cache_control` to `ttl: "1h"`.
+///
+/// opencode places its own breakpoint (plain `ephemeral`, no `ttl`) on the
+/// last message when it decides the conversation is worth caching. Real CC
+/// uses `ttl: "1h"` for this too (confirmed by live capture). This only
+/// upgrades blocks that already have a breakpoint -- it never adds one.
+fn upgrade_message_cache_control(obj: &mut Map<String, Value>) {    let Some(messages) = obj.get_mut("messages").and_then(Value::as_array_mut) else {
+        return;
+    };
+    for message in messages {
+        let Some(content) = message.get_mut("content").and_then(Value::as_array_mut) else {
+            continue;
+        };
+        for block in content {
+            let Some(block) = block.as_object_mut() else {
+                continue;
+            };
+            if block.contains_key("cache_control") {
+                block.insert("cache_control".into(), json!({ "type": "ephemeral", "ttl": "1h" }));
+            }
+        }
     }
 }
 
@@ -118,7 +265,7 @@ fn billing_block(obj: &Map<String, Value>, cc_version: &str) -> Value {
         "type": "text",
         "text": format!(
             "x-anthropic-billing-header: cc_version={cc_version}.{fingerprint}; \
-             cc_entrypoint=cli; cch=00000;"
+             cc_entrypoint=cli;"
         ),
     })
 }
@@ -141,7 +288,16 @@ fn billing_fingerprint(first_user_text: &str, cc_version: &str) -> String {
         .collect()
 }
 
-/// Text of the first user message, which seeds the billing fingerprint.
+/// Text of the first *genuine* user message, which seeds the billing
+/// fingerprint.
+///
+/// opencode prepends `<system-reminder>` blocks (available agent types,
+/// skills, etc.) to the first user turn's content array; real CC's own
+/// fingerprint is seeded from the actual prompt text, not these injected
+/// blocks (confirmed by live capture: matching CC's captured fingerprint
+/// required skipping three leading `<system-reminder>` blocks to reach the
+/// real prompt). Falls back to the first text block if every block is a
+/// reminder, so this never produces an empty seed unnecessarily.
 fn first_user_text(obj: &Map<String, Value>) -> String {
     let Some(messages) = obj.get("messages").and_then(Value::as_array) else {
         return String::new();
@@ -153,13 +309,19 @@ fn first_user_text(obj: &Map<String, Value>) -> String {
         }
         return match message.get("content") {
             Some(Value::String(text)) => text.clone(),
-            Some(Value::Array(blocks)) => blocks
-                .iter()
-                .find(|b| b.get("type").and_then(Value::as_str) == Some("text"))
-                .and_then(|b| b.get("text"))
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_string(),
+            Some(Value::Array(blocks)) => {
+                let texts: Vec<&str> = blocks
+                    .iter()
+                    .filter(|b| b.get("type").and_then(Value::as_str) == Some("text"))
+                    .filter_map(|b| b.get("text").and_then(Value::as_str))
+                    .collect();
+                texts
+                    .iter()
+                    .find(|t| !t.starts_with("<system-reminder>"))
+                    .or_else(|| texts.first())
+                    .map(|t| t.to_string())
+                    .unwrap_or_default()
+            }
             _ => String::new(),
         };
     }
@@ -167,8 +329,19 @@ fn first_user_text(obj: &Map<String, Value>) -> String {
 }
 
 /// Real CC sends `metadata.user_id` as a JSON *string* of its identifiers.
-fn inject_metadata(obj: &mut Map<String, Value>, session_id: &str, device_id: &str) {
-    let user_id = json!({ "device_id": device_id, "session_id": session_id }).to_string();
+fn inject_metadata(
+    obj: &mut Map<String, Value>,
+    session_id: &str,
+    device_id: &str,
+    account_uuid: Option<&str>,
+) {
+    let mut fields = Map::new();
+    fields.insert("device_id".into(), json!(device_id));
+    if let Some(uuid) = account_uuid {
+        fields.insert("account_uuid".into(), json!(uuid));
+    }
+    fields.insert("session_id".into(), json!(session_id));
+    let user_id = Value::Object(fields).to_string();
     obj.insert("metadata".into(), json!({ "user_id": user_id }));
 }
 
@@ -246,12 +419,23 @@ mod tests {
             cc_version: "2.1.97",
             session_id: "session",
             device_id: "device",
+            account_uuid: Some("account"),
             max_tokens: Some(64000),
+            inject_thinking: true,
+            inject_context_management: true,
+            strip_tool_choice_auto: true,
         }
     }
 
     fn shaped(mut req: Value) -> Value {
         to_claude_code(&mut req, &ctx());
+        req
+    }
+
+    fn shaped_with_version(mut req: Value, cc_version: &'static str) -> Value {
+        let mut c = ctx();
+        c.cc_version = cc_version;
+        to_claude_code(&mut req, &c);
         req
     }
 
@@ -285,15 +469,89 @@ mod tests {
         }));
         let system = out["system"].as_array().unwrap();
 
+        let ttl_1h = json!({ "type": "ephemeral", "ttl": "1h" });
         assert!(system[0].get("cache_control").is_none());
-        assert_eq!(system[1]["cache_control"]["ttl"], "1h");
+        assert_eq!(system[1]["cache_control"], ttl_1h);
         assert!(system[2].get("cache_control").is_none());
-        assert_eq!(system[3]["cache_control"]["ttl"], "1h");
+        assert_eq!(system[3]["cache_control"], ttl_1h);
     }
 
     #[test]
-    fn preserves_unknown_fields() {
-        let out = shaped(json!({ "model": "claude-sonnet-4", "some_new_field": { "a": 1 } }));
+    fn strips_tool_cache_control() {        let out = shaped(json!({
+            "model": "claude-sonnet-4",
+            "tools": [
+                { "name": "bash", "cache_control": { "type": "ephemeral" } },
+                { "name": "read" },
+            ],
+        }));
+        let tools = out["tools"].as_array().unwrap();
+        assert!(tools[0].get("cache_control").is_none());
+        assert!(tools[1].get("cache_control").is_none());
+    }
+
+    #[test]
+    fn upgrades_message_cache_control_to_1h() {
+        let out = shaped(json!({
+            "model": "claude-sonnet-4",
+            "messages": [{
+                "role": "user",
+                "content": [
+                    { "type": "text", "text": "hi", "cache_control": { "type": "ephemeral" } },
+                    { "type": "text", "text": "uncached" },
+                ],
+            }],
+        }));
+        let content = out["messages"][0]["content"].as_array().unwrap();
+        assert_eq!(content[0]["cache_control"], json!({ "type": "ephemeral", "ttl": "1h" }));
+        assert!(content[1].get("cache_control").is_none());
+    }
+
+    /// The exact tool list captured from a jail session that Anthropic
+    /// rejected. Every one of these lowercase ids must be recognised as
+    /// un-aliased, and the Claude Code names and MCP/plugin tools alongside
+    /// them must not produce false positives.
+    #[test]
+    fn detects_unaliased_opencode_tool_names() {
+        let captured = [
+            "bash", "edit", "glob", "grep", "question", "read", "skill", "task", "todowrite",
+            "webfetch", "write",
+        ];
+        for name in captured {
+            assert!(
+                OPENCODE_TOOL_IDS.contains(&name),
+                "{name} should be detected as an un-aliased opencode tool id"
+            );
+        }
+
+        // Real CC names, MCP tools and host plugins share the wire with them
+        // and must never be flagged.
+        for name in [
+            "Bash",
+            "Edit",
+            "Glob",
+            "Grep",
+            "Read",
+            "Task",
+            "TodoWrite",
+            "WebFetch",
+            "Write",
+            "AskUserQuestion",
+            "claude_mem_search",
+            "host_exec",
+            "list_mcp_resources",
+            "read_mcp_resource",
+            "mcp__context7__query-docs",
+            "mcp__nixos__nix",
+        ] {
+            assert!(
+                !OPENCODE_TOOL_IDS.contains(&name),
+                "{name} must not be flagged as an opencode tool id"
+            );
+        }
+    }
+
+    #[test]
+    fn preserves_unknown_fields() {        let out = shaped(json!({ "model": "claude-sonnet-4", "some_new_field": { "a": 1 } }));
         assert_eq!(out["some_new_field"]["a"], 1);
     }
 
@@ -354,11 +612,51 @@ mod tests {
     }
 
     #[test]
+    fn fingerprint_skips_system_reminder_blocks() {
+        // Real CC prefixes the first user turn with <system-reminder> blocks
+        // (agent types, skills, etc.) before the actual prompt. The
+        // fingerprint must be seeded from the real prompt, not those -- this
+        // reproduces a live-captured CC request (fingerprint `0e4` for
+        // cc_version `2.1.204`) to prove the seed selection matches.
+        let out = shaped_with_version(
+            json!({
+                "model": "claude-sonnet-4",
+                "messages": [{
+                    "role": "user",
+                    "content": [
+                        { "type": "text", "text": "<system-reminder>\nAvailable agent types..." },
+                        { "type": "text", "text": "<system-reminder>\nThe following skills..." },
+                        { "type": "text", "text": "<system-reminder>\nAs you answer..." },
+                        { "type": "text", "text": "reply with exactly the word pong and nothing else" },
+                    ],
+                }],
+            }),
+            "2.1.204",
+        );
+        assert!(out["system"][0]["text"]
+            .as_str()
+            .unwrap()
+            .starts_with("x-anthropic-billing-header: cc_version=2.1.204.0e4;"));
+    }
+
+    #[test]
     fn metadata_user_id_is_a_json_string() {
         let out = shaped(json!({ "model": "claude-sonnet-4" }));
         let user_id = out["metadata"]["user_id"].as_str().unwrap();
         let parsed: Value = serde_json::from_str(user_id).unwrap();
         assert_eq!(parsed["session_id"], "session");
         assert_eq!(parsed["device_id"], "device");
+        assert_eq!(parsed["account_uuid"], "account");
+    }
+
+    #[test]
+    fn metadata_omits_account_uuid_when_absent() {
+        let mut req = json!({ "model": "claude-sonnet-4" });
+        let mut ctx = ctx();
+        ctx.account_uuid = None;
+        to_claude_code(&mut req, &ctx);
+        let user_id = req["metadata"]["user_id"].as_str().unwrap();
+        let parsed: Value = serde_json::from_str(user_id).unwrap();
+        assert!(parsed.get("account_uuid").is_none());
     }
 }
