@@ -186,6 +186,13 @@ let
       fi
       cd "$repo_dir"
       git fetch origin main
+      # reset before checkout, not after. A run that dies between `nix flake
+      # update` and the commit leaves flake.lock modified; once origin/main
+      # moves, `checkout -B` then refuses to overwrite it and every subsequent
+      # run aborts here having done nothing, permanently, until someone logs
+      # in. Discarding is always right: the working tree is disposable state,
+      # rebuilt from origin/main and a fresh `flake update` on every run.
+      git reset --hard origin/main
       git checkout -B autobuild-work origin/main
       git clean -fdx
 
@@ -241,7 +248,7 @@ let
       # installed somewhere, it would have failed that host's toplevel too.
       verdict_file="$run_dir/verdict.txt"
       gate_ok=1
-      ${getExe gate} ${escapeShellArg requiredFile} \
+      ${gate} ${escapeShellArg requiredFile} \
         "x86_64-linux=$run_dir/x86_64-linux.json" \
         "aarch64-linux=$run_dir/aarch64-linux.json" \
         > "$verdict_file" 2>&1 || gate_ok=0
@@ -393,13 +400,22 @@ in
 
         # Runs as root deliberately (see header): it talks to the nix daemon
         # and to git/ssh, neither of which is a privilege gain either way.
+        #
+        # RestrictNamespaces and ProtectKernelTunables are deliberately absent.
+        # root is a trusted-user and NIX_REMOTE is unset, so nix builds
+        # in-process inside this unit rather than handing work to nix-daemon --
+        # and the build sandbox is itself made of user/mount namespaces. Either
+        # setting makes every sandboxed build fail with "this system does not
+        # support the kernel namespaces that are required for sandboxing",
+        # which is a confusing way to say the service was hardened against its
+        # own job. Both were confirmed to break it, and the set kept below
+        # confirmed not to, by running an identical trivial derivation under
+        # systemd-run with each option toggled.
         NoNewPrivileges = true;
         ProtectHome = true;
         PrivateTmp = true;
-        ProtectKernelTunables = true;
         ProtectKernelModules = true;
         ProtectControlGroups = true;
-        RestrictNamespaces = true;
         LockPersonality = true;
       };
     };
