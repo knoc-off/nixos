@@ -200,7 +200,16 @@ let
       # `nix-autobuild-now hyprland noctalia`. Same subcommand either way --
       # `nix flake update inputs...` is the current interface (the older
       # `nix flake lock --update-input` form still works but is legacy).
-      ${escapeShellArg nix} flake update "$@"
+      #
+      # --accept-flake-config because flake.nix carries a nixConfig block, and
+      # without it nix stops to ask interactively -- which in a Type=oneshot
+      # unit with no TTY is a hang, not a failure. Answering the prompt by hand
+      # once caches it under $HOME, but that is undeclared state inside a
+      # StateDirectory: it vanishes on a state reset and never exists on a
+      # fresh host. Nothing is actually granted here, since the substituters
+      # and keys that block names are already trusted system-wide in
+      # modules/nix.nix.
+      ${escapeShellArg nix} flake update --accept-flake-config "$@"
       if [ "$#" -eq 0 ]; then
         update_summary="all inputs"
       else
@@ -220,6 +229,7 @@ let
           --skip-cached \
           --no-nom \
           --retries 1 \
+          --option accept-flake-config true \
           --eval-workers ${toString cfg.evalWorkers} \
           --eval-max-memory-size ${toString cfg.evalMaxMemoryMiB} \
           --out-link "$run_dir/$arch" \
