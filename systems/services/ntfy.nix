@@ -17,10 +17,12 @@ in {
         "normal:alerts:ro"
         "normal:cat-doorbell:ro"
         "normal:kitchenowl:ro"
+        "normal:nixbuild:ro"
         "normal:wohnungen:ro"
         "publisher:alerts:wo"
         "publisher:cat-doorbell:wo"
         "publisher:kitchenowl:wo"
+        "publisher:nixbuild:wo"
         "publisher:wohnungen:wo"
       ];
     };

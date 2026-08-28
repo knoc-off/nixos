@@ -26,6 +26,13 @@
         client.enable = true;
         builder.enable = true;
       };
+
+      # Never build on the Pi itself. Combined with the builder.enable above
+      # (distributedBuilds + optiplex in nix.buildMachines), a cache miss is
+      # dispatched to optiplex rather than compiled here; if optiplex is
+      # unreachable it fails outright instead of spending hours on an SD card.
+      # Either way the Pi's own CPU is off the table, which is the point.
+      nix.settings.max-jobs = 0;
     }
   ];
 

@@ -3,12 +3,18 @@
 # systems/services/nix-autobuild.nix) into the local checkout, without
 # touching anything else in the working tree.
 #
-# optiplex builds every cacheJobs.x86_64-linux attr against a candidate
-# flake.lock and only pushes it to the `built` branch if that build succeeds
-# -- so unlike a plain `nix flake update`, bumping via this script means the
-# new lock is already known to build and its outputs are already sitting in
-# optiplex's harmonia cache. Run this instead of `nix flake update` on
-# anything that isn't optiplex itself.
+# optiplex builds every cacheJobs attr against a candidate flake.lock and only
+# pushes it to the `built` branch if every per-host toplevel succeeded -- so
+# unlike a plain `nix flake update`, bumping via this script means the new lock
+# is already known to build and its outputs are already sitting in optiplex's
+# harmonia cache. Run this instead of `nix flake update` on anything that isn't
+# optiplex itself.
+#
+# Taking only flake.lock is enough to hit that cache: no derivation depends on
+# this repo's git revision, so a local checkout at a different commit than the
+# builder still evaluates to identical store paths. (This was not always true --
+# system.nixos.label used to embed self.shortRev, which made every host's
+# toplevel miss the cache unless the client sat on the builder's exact commit.)
 #
 # Servers don't need this at all: they can rebuild straight off the branch,
 # e.g. `nixos-rebuild switch --flake github:knoc-off/nixos/built#hetzner`.

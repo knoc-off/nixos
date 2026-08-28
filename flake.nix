@@ -56,9 +56,6 @@
             ./systems/${hostname}.nix
             { networking.hostName = lib.mkDefault hostname; }
           ]
-          ++ lib.optionals (!lib.strings.hasSuffix "darwin" system) [
-            ./systems/modules/commit_message.nix
-          ]
           ++ extraModules;
         };
 
@@ -222,6 +219,12 @@
 
       # Everything the optiplex build farm prebuilds and serves. See mkCacheJobs.
       cacheJobs = forAllSystems mkCacheJobs;
+
+      # The hostname -> system table as plain data, so nix-autobuild can learn
+      # which `toplevel/*` attrs it must see succeed before publishing without
+      # evaluating a single host configuration. Kept in sync by construction:
+      # this is the same attrset mkCacheJobs derives the toplevels from.
+      hostSystems = hosts;
     };
 
   inputs = {

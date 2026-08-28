@@ -3,6 +3,13 @@
 # repo-root discussion in nix-cache.nix for why this exists: this is the half
 # that keeps optiplex's cache actually current.
 #
+# The publish gate is deliberately partial. Both architectures are always
+# built, every attr is attempted, and only the per-host `toplevel/*` attrs are
+# blocking -- a broken ad hoc package leaves the lock publishable, because a
+# package that any host actually installs is inside that host's closure and
+# fails its toplevel anyway. Everything that did get realised stays in the
+# store and is served regardless, so a red run still warms the cache.
+#
 # Deliberately not DynamicUser: the same nix-autobuild-run script is reused
 # both by the timer-driven service below and by ad hoc `systemd-run` for
 # targeted updates (nix-autobuild-now), and a fixed system user keeps state
@@ -12,13 +19,34 @@
   config,
   lib,
   pkgs,
+  self,
   ...
 }:
-with lib;
 let
+  inherit (lib)
+    escapeShellArg
+    getExe
+    getExe'
+    mkEnableOption
+    mkIf
+    mkOption
+    types
+    ;
+
   cfg = config.services.nixAutobuild;
 
   nix = getExe' config.nix.package "nix";
+
+  # The toplevel attrs that must build before a lock is publishable, derived
+  # from flake.nix's host table rather than restated here. Anything else in
+  # cacheJobs (ad hoc packages, devShell inputs) may fail without blocking the
+  # publish: if a package actually matters to a host it is already inside that
+  # host's closure and fails the toplevel with it.
+  requiredAttrs = lib.mapAttrsToList (hostname: system: "${system}\ttoplevel/${hostname}") self.hostSystems;
+
+  requiredFile = pkgs.writeText "nix-autobuild-required-attrs" (
+    lib.concatMapStrings (line: line + "\n") requiredAttrs
+  );
 
   # GitHub's published ssh-ed25519 host key (see
   # https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints).
@@ -27,6 +55,86 @@ let
   # is strictly safer than TOFU. Worth reconfirming against GitHub's docs at
   # bootstrap time regardless.
   githubKnownHost = "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
+
+  # Reduces a run's per-arch result JSON to a publish verdict. Kept in Python
+  # rather than grep/jq because the interesting fields are nested and the error
+  # strings are multi-line JSON-escaped blobs -- line-oriented tools read those
+  # as data and silently miscount.
+  #
+  # nix-fast-build emits one record per attr per phase (EVAL then BUILD), so an
+  # attr is only genuinely fine if no phase reports failure for it; checking
+  # just the BUILD records would count an attr that never got past EVAL as
+  # absent rather than broken.
+  gate = pkgs.writers.writePython3 "nix-autobuild-gate" { } ''
+    """Read nix-fast-build result JSONs, decide whether the lock is publishable.
+
+    argv: <required-file> <arch>=<results.json> [<arch>=<results.json> ...]
+
+    Writes a human summary to stdout. Exits 0 if every required attr succeeded,
+    1 otherwise.
+    """
+    import json
+    import sys
+
+    required = set()
+    with open(sys.argv[1]) as fh:
+        for line in fh:
+            if line.strip():
+                arch, attr = line.rstrip("\n").split("\t")
+                required.add((arch, attr))
+
+    failed = {}
+    seen = set()
+
+    for spec in sys.argv[2:]:
+        arch, _, path = spec.partition("=")
+        try:
+            with open(path) as fh:
+                results = json.load(fh).get("results", [])
+        except (OSError, json.JSONDecodeError) as exc:
+            # A missing or truncated result file means the run died before
+            # writing it. Treat every attr for that arch as unproven rather
+            # than letting an unreadable file read as "nothing failed".
+            print(f"{arch}: unreadable result file ({exc})")
+            for key in required:
+                if key[0] == arch:
+                    failed[key] = "no results"
+            continue
+
+        for record in results:
+            attr = record.get("attr")
+            if attr is None:
+                continue
+            seen.add((arch, attr))
+            if not record.get("success", False):
+                phase = record.get("type", "?")
+                failed.setdefault((arch, attr), phase)
+
+    # An attr that was required but never appeared in any phase did not
+    # silently pass -- it was never evaluated, which is itself a failure.
+    for key in required:
+        if key not in seen:
+            failed.setdefault(key, "missing")
+
+    required_failures = sorted(k for k in failed if k in required)
+    other_failures = sorted(k for k in failed if k not in required)
+
+
+    def fmt(keys):
+        return ", ".join(
+            f"{arch}:{attr} ({failed[(arch, attr)]})" for arch, attr in keys
+        )
+
+
+    if other_failures:
+        print(f"non-blocking failures: {fmt(other_failures)}")
+
+    if required_failures:
+        print(f"BLOCKING: {fmt(required_failures)}")
+        sys.exit(1)
+
+    print(f"all {len(required)} required toplevels ok")
+  '';
 
   runner = pkgs.writeShellApplication {
     name = "nix-autobuild-run";
@@ -42,11 +150,17 @@ let
       state_dir=${escapeShellArg cfg.stateDir}
       repo_dir="$state_dir/nixos"
       gcroots_dir="$state_dir/gcroots"
-      results_dir="$state_dir/results"
       known_hosts="$state_dir/known_hosts"
       date_stamp=$(date +%Y%m%d-%H%M%S)
 
-      mkdir -p "$gcroots_dir" "$results_dir"
+      # One directory per run, holding both arches' out-links and result JSONs.
+      # nix-fast-build appends "-<attr>" to --out-link, and attrs contain
+      # slashes ("toplevel/framework13", "noctalia/bluetooth"), so the link
+      # names are neither predictable nor flat. Giving the run its own
+      # directory means retention never has to parse them: the whole
+      # generation is one rm -rf, and nested attr directories stay contained.
+      run_dir="$gcroots_dir/$date_stamp"
+      mkdir -p "$run_dir"
 
       # ProtectHome=true on the systemd service makes /root a read-only empty
       # mount, and this runs as root with no HOME override -- nix then fails
@@ -86,60 +200,81 @@ let
         update_summary="$*"
       fi
 
-      x86_ok=1
-      nix-fast-build \
-        --nix ${escapeShellArg nix} \
-        --flake ".#cacheJobs.x86_64-linux" \
-        --systems x86_64-linux \
-        --skip-cached \
-        --no-nom \
-        --retries 1 \
-        --eval-workers ${toString cfg.evalWorkers} \
-        --eval-max-memory-size ${toString cfg.evalMaxMemoryMiB} \
-        --out-link "$gcroots_dir/$date_stamp-x86_64" \
-        --result-file "$results_dir/x86_64-$date_stamp.json" \
-        || x86_ok=0
-
-      aarch64_ok=0
-      if [ "$x86_ok" -eq 1 ]; then
-        aarch64_ok=1
+      # Both arches run unconditionally. Gating aarch64 on x86 success meant
+      # the Pi -- the host least able to build for itself -- was never built at
+      # all while any x86 attr was broken. The arches share no build inputs
+      # that would make one's failure predictive of the other's.
+      build_arch() {
+        local arch="$1"
         nix-fast-build \
           --nix ${escapeShellArg nix} \
-          --flake ".#cacheJobs.aarch64-linux" \
-          --systems aarch64-linux \
+          --flake ".#cacheJobs.$arch" \
+          --systems "$arch" \
           --skip-cached \
           --no-nom \
           --retries 1 \
           --eval-workers ${toString cfg.evalWorkers} \
           --eval-max-memory-size ${toString cfg.evalMaxMemoryMiB} \
-          --out-link "$gcroots_dir/$date_stamp-aarch64" \
-          --result-file "$results_dir/aarch64-$date_stamp.json" \
-          || aarch64_ok=0
-      fi
+          --out-link "$run_dir/$arch" \
+          --result-file "$run_dir/$arch.json" \
+          || true
+      }
 
-      # Retention: keep the last N dated generations (both arches count as one
-      # "generation" by date_stamp prefix). Older ones lose their gcroot, so
-      # nix.gc reclaims the store paths they alone were pinning; their result
-      # JSONs go too, since they only describe builds we can no longer inspect.
-      # shellcheck disable=SC2012
-      ls -1 "$gcroots_dir" \
-        | sed -E 's/-(x86_64|aarch64)$//' \
-        | sort -ru \
-        | tail -n "+$((${toString cfg.keepGenerations} + 1))" \
-        | while read -r old_stamp; do
-            rm -rf "''${gcroots_dir:?}/$old_stamp-x86_64" "''${gcroots_dir:?}/$old_stamp-aarch64"
-            rm -f "''${results_dir:?}/x86_64-$old_stamp.json" "''${results_dir:?}/aarch64-$old_stamp.json"
-          done
+      build_arch x86_64-linux
+      build_arch aarch64-linux
 
-      if [ "$x86_ok" -eq 1 ]; then
+      # Retention: keep the last N dated run directories. Older ones lose their
+      # out-links, so nix.gc reclaims the store paths they alone were pinning;
+      # their result JSONs go with them, since they only describe builds we can
+      # no longer inspect. The glob only matches dated names, so the
+      # `published` symlink set below is never a retention candidate.
+      for old_run in $(
+        printf '%s\n' "$gcroots_dir"/[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9] \
+          | sort -r \
+          | tail -n "+$((${toString cfg.keepGenerations} + 1))"
+      ); do
+        rm -rf "''${old_run:?}"
+      done
+
+      # Publish gate: only the per-host toplevels are blocking. A failed ad hoc
+      # package does not stop hosts from switching -- if it were actually
+      # installed somewhere, it would have failed that host's toplevel too.
+      verdict_file="$run_dir/verdict.txt"
+      gate_ok=1
+      ${getExe gate} ${escapeShellArg requiredFile} \
+        "x86_64-linux=$run_dir/x86_64-linux.json" \
+        "aarch64-linux=$run_dir/aarch64-linux.json" \
+        > "$verdict_file" 2>&1 || gate_ok=0
+      verdict=$(cat "$verdict_file")
+
+      if [ "$gate_ok" -eq 1 ]; then
         git add flake.lock
-        git commit -m "autobuild: $date_stamp ($update_summary)" --allow-empty
+        # No --allow-empty: `built` should only move when the lock actually
+        # changed, so its history stays a log of real bumps and clients can
+        # tell "nothing to do" from "a new lock landed" by rev alone.
+        if git diff --cached --quiet; then
+          notify low "nix-autobuild: no change" \
+            "$update_summary produced no lock change; $verdict"
+          exit 0
+        fi
+        git commit -m "autobuild: $date_stamp ($update_summary)"
+
+        # Pin before publishing, not after. These out-links are what keeps the
+        # published closure alive across nix.gc, independently of the dated
+        # rotation above -- so if the push were to happen first and this were
+        # to fail, `built` would name a closure that gc is free to delete.
+        # cp -a copies the symlinks themselves, giving `published` its own
+        # roots rather than a reference to the run dir that retention rotates.
+        rm -rf "''${gcroots_dir:?}/published"
+        cp -a --reflink=auto "$run_dir" "$gcroots_dir/published"
+
         git push --force origin "HEAD:${cfg.branch}"
+
         notify default "nix-autobuild: published" \
-          "updated: $update_summary. x86_64: ok. aarch64: $([ "$aarch64_ok" -eq 1 ] && echo ok || echo failed).  See $results_dir on optiplex."
+          "updated: $update_summary. $verdict. See $run_dir on optiplex."
       else
         notify high "nix-autobuild: FAILED" \
-          "x86_64 build failed for $update_summary -- not publishing. See $results_dir/x86_64-$date_stamp.json on optiplex."
+          "$update_summary not published. $verdict. See $run_dir on optiplex."
         exit 1
       fi
     '';
