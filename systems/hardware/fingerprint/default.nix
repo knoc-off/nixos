@@ -12,6 +12,12 @@
   # PAM services to enable grosshack fingerprint auth on.
   # greetd is excluded -- its gnome-keyring integration adds extra pam_unix
   # (unix-early) before grosshack, causing multiple password prompts.
+  #
+  # "noctalia-shell" is the pre-v5 PAM service name; v5 registers as
+  # "noctalia" (pam_authenticator.cpp). Left both rather than pruning: an
+  # unused PAM service entry is inert, so there's no cost to keeping it
+  # against the chance anything else on the system still calls pam_start
+  # under the old name.
   pamServices = [
     "sudo"
     "login"

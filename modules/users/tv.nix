@@ -229,22 +229,33 @@
               XDG_SESSION_TYPE = "wayland";
             };
 
-            # Strip Noctalia down to OSD / popups / notifications: no bar, no dock.
-            # bar.monitors is a whitelist where [] means "every screen", so a
-            # sentinel name that matches nothing is what disables it. Panels stay
-            # alive because general.allowPanelsOnScreenWithoutBar is already true;
-            # noctalia then centers them on its own since there's no bar to attach
-            # to. Lists concatenate on merge, hence mkForce on every one of them.
-            programs.noctalia-shell.settings = {
-              bar.monitors = lib.mkForce [ "__disabled__" ];
-              bar.screenOverrides = lib.mkForce [ ];
-              general.lockScreenMonitors = lib.mkForce [ ];
-              ui.panelsAttachedToBar = lib.mkForce false;
-              controlCenter.position = lib.mkForce "center";
-              wallpaper.panelPosition = lib.mkForce "center";
-              notifications.location = lib.mkForce "bottom_right";
-              osd.location = lib.mkForce "bottom_center";
-              appLauncher.position = "center";
+            # Strip Noctalia down to OSD / popups / notifications: no bar, no
+            # dock. v5's schema is unrelated to v4's -- `bar.monitors` as an
+            # allow-list is gone, panels are floating-vs-attached per surface
+            # under [shell.panel] rather than one global toggle, and section
+            # names are singular ([lockscreen], [osd], [notification]).
+            #
+            # bar.default.enabled = false rather than omitting `bar`
+            # entirely: an absent `bar` table means "not configured, use
+            # defaults" (one bar named "default", enabled), verified by
+            # reading config_service.cpp -- omitting the section is not a way
+            # to disable the bar. An explicit entry with enabled = false is
+            # the actual off switch, keyed by the same "default" name v5 uses
+            # when nothing else names it.
+            programs.noctalia.settings = {
+              bar.default.enabled = false;
+              lockscreen.monitors = [ ];
+              shell.panel = {
+                control_center_placement = "floating";
+                control_center_position = "center";
+                wallpaper_placement = "floating";
+                wallpaper_position = "center";
+                session_placement = "floating";
+                session_position = "center";
+                launcher_position = "center";
+              };
+              notification.position = "bottom_right";
+              osd.position = "bottom_center";
             };
 
             programs.mpv = {

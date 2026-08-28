@@ -70,8 +70,8 @@ in
       inherit (self.lib) color-lib theme;
       system = pkgs.stdenv.hostPlatform.system;
       hyprnix = hyprnixPkgs system;
-      noctaliaCmd = lib.getExe config.programs.noctalia-shell.package;
-      noctalia = cmd: "${noctaliaCmd} ipc call ${cmd}";
+      noctaliaCmd = lib.getExe config.programs.noctalia.package;
+      noctalia = cmd: "${noctaliaCmd} msg ${cmd}";
 
       # can this be auto calculated
       displayScale = 1.171339564;
@@ -131,7 +131,7 @@ in
         enable = true;
         settings = {
           general = {
-            lock_cmd = "${noctaliaCmd} ipc call lockScreen lock"; # triggered by loginctl lock-session
+            lock_cmd = "${noctaliaCmd} msg session lock"; # triggered by loginctl lock-session
             before_sleep_cmd = "loginctl lock-session"; # always lock before sleep
             after_sleep_cmd = "hyprctl dispatch 'hl.dsp.dpms({ action = \"enable\" })'"; # restore monitors after wake
           };
@@ -181,6 +181,12 @@ in
           wsColors = theme.dark.workspaceColors;
           numWsColors = builtins.length wsColors;
 
+          # v5's custom-palette loader only recognises this exact camelCase
+          # "m"-prefixed key set, nested under a `dark` (and optionally
+          # `light`) key -- see the base16Palette comment in modules/noctalia.nix
+          # for how this was verified against the parser source. Only `dark`
+          # is emitted here since this whole feature is dark-theme-only
+          # (theme.dark.workspaceColors has no light counterpart).
           mkWsPalette =
             wsHex:
             let
@@ -200,25 +206,35 @@ in
               onHover = "#${theme.dark.base06}";
             in
             builtins.toJSON {
-              mPrimary = primary;
-              mOnPrimary = onBg;
-              mSecondary = secondary;
-              mOnSecondary = onBg;
-              mTertiary = tertiary;
-              mOnTertiary = onBg;
-              mError = error;
-              mOnError = onBg;
-              mSurface = surface;
-              mOnSurface = onSurface;
-              mSurfaceVariant = surfaceVar;
-              mOnSurfaceVariant = onSurfVar;
-              mOutline = outline;
-              mShadow = "#000000";
-              mHover = hover;
-              mOnHover = onHover;
+              dark = {
+                mPrimary = primary;
+                mOnPrimary = onBg;
+                mSecondary = secondary;
+                mOnSecondary = onBg;
+                mTertiary = tertiary;
+                mOnTertiary = onBg;
+                mError = error;
+                mOnError = onBg;
+                mSurface = surface;
+                mOnSurface = onSurface;
+                mSurfaceVariant = surfaceVar;
+                mOnSurfaceVariant = onSurfVar;
+                mOutline = outline;
+                mShadow = "#000000";
+                mHover = hover;
+                mOnHover = onHover;
+              };
             };
 
-          # Generate solid-color PNG files and colors.json palettes at build time
+          # Generate solid-color PNG files and named custom-palette JSONs at
+          # build time. Palette files are copied into
+          # ~/.config/noctalia/palettes/ver-<i>.json at daemon start (v5 only
+          # discovers palettes that live there, per customPalettePath in
+          # custom_palettes.cpp) and selected at runtime with `msg
+          # color-scheme-set custom ws-<i>` -- v4's approach of overwriting one
+          # mutable colors.json in place has no v5 equivalent; there is no
+          # "just write the active palette" IPC call anymore, only "switch to
+          # a palette that already exists on disk by name".
           workspaceWallpapers =
             pkgs.runCommand "workspace-wallpapers"
               {
@@ -238,8 +254,13 @@ in
 
             NOCTALIA="${noctaliaCmd}"
             WALLPAPER_DIR="${workspaceWallpapers}"
-            COLORS_FILE="$HOME/.config/noctalia/colors.json"
+            PALETTE_DIR="$HOME/.config/noctalia/palettes"
             NUM_COLORS=${toString numWsColors}
+
+            mkdir -p "$PALETTE_DIR"
+            for f in "$WALLPAPER_DIR"/ws-*.json; do
+              cp -f "$f" "$PALETTE_DIR/$(basename "$f")"
+            done
 
             # Map workspace ID to index (1-indexed, wraps with modulo)
             ws_index() {
@@ -253,7 +274,7 @@ in
               local ws_id=$2
               local idx
               idx=$(ws_index "$ws_id")
-              "$NOCTALIA" ipc call wallpaper set "$WALLPAPER_DIR/ws-''${idx}.png" "$monitor" &
+              "$NOCTALIA" msg wallpaper-set "$monitor" "$WALLPAPER_DIR/ws-''${idx}.png" &
             }
 
             # Update the color palette based on the focused monitor's workspace
@@ -261,7 +282,7 @@ in
               local ws_id=$1
               local idx
               idx=$(ws_index "$ws_id")
-              cat "$WALLPAPER_DIR/ws-''${idx}.json" > "$COLORS_FILE"
+              "$NOCTALIA" msg color-scheme-set custom "ws-''${idx}"
             }
 
             # Sync all monitors on startup
@@ -277,7 +298,7 @@ in
 
             # Wait for noctalia to be ready
             for i in $(seq 1 30); do
-              if "$NOCTALIA" ipc call state all >/dev/null 2>&1; then
+              if "$NOCTALIA" msg status >/dev/null 2>&1; then
                 break
               fi
               sleep 1
@@ -331,9 +352,10 @@ in
           Unit = {
             Description = "Hyprland workspace wallpaper and color daemon";
             After = [
-              "noctalia-shell.service"
+              "noctalia.service"
               "graphical-session.target"
             ];
+
             PartOf = [ "graphical-session.target" ];
             ConditionEnvironment = "HYPRLAND_INSTANCE_SIGNATURE";
           };

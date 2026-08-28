@@ -16,7 +16,7 @@ in
     let
       system = pkgs.stdenv.hostPlatform.system;
       hyprnix = hyprnixPkgs system;
-      noctaliaCmd = lib.getExe config.programs.noctalia-shell.package;
+      noctaliaCmd = lib.getExe config.programs.noctalia.package;
 
       mainMod = "SUPER";
 

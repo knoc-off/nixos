@@ -75,7 +75,7 @@ writeShellApplication {
       close) dispatch 'hl.dsp.window.close()' ;;
       # From $PATH deliberately: this must hit the noctalia instance actually
       # running in the session, not a separately built one.
-      launcher) noctalia-shell ipc call launcher toggle ;;
+      launcher) noctalia msg panel-toggle launcher ;;
       files) qs -c tv-files ipc call browser toggle ;;
       app)
         case "''${2:-}" in

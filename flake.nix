@@ -304,16 +304,16 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # v5 is a native rewrite (meson/C++, OpenGL ES) -- the quickshell/QML era
+    # is over, so nothing from the v4 integration carries across: no
+    # calendarSupport override, no QML plugins, and settings are TOML with
+    # snake_case keys rather than camelCase JSON. Repo also renamed
+    # noctalia-shell -> noctalia.
     noctalia = {
-      url = "github:noctalia-dev/noctalia-shell";
+      url = "github:noctalia-dev/noctalia/v5.0.0-beta.10";
       inputs = {
         nixpkgs.follows = "nixpkgs";
       };
-    };
-
-    noctalia-plugins = {
-      url = "github:noctalia-dev/noctalia-plugins";
-      flake = false;
     };
 
     determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
