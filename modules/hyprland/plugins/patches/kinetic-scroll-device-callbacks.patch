@@ -1,0 +1,68 @@
+diff --git a/main.cpp b/main.cpp
+index 6d66a02..a5540dd 100644
+--- a/main.cpp
++++ b/main.cpp
+@@ -22,10 +22,14 @@ static Hyprutils::Signal::CHyprSignalListener g_pWindowCallback;
+ static Hyprutils::Signal::CHyprSignalListener g_pConfigReloadCallback;
+ static std::vector<Hyprutils::Signal::CHyprSignalListener> g_pTouchpadCallbacks;
+ 
++static void refreshTouchpadCallbacksIfDevicesChanged();
++
+ static void onMouseAxis(const IPointer::SAxisEvent& e, Event::SCallbackInfo& /*info*/) {
+     if (!g_pKineticState)
+         return;
+ 
++    refreshTouchpadCallbacksIfDevicesChanged();
++
+     auto event = e;
+     g_pKineticState->onAxis(event);
+     // Don't cancel - let the original scroll event pass through to the app
+@@ -161,15 +165,29 @@ static void registerConfigValues() {
+     HyprlandAPI::addConfigValueV2(PHANDLE, makeShared<CIntValue>("plugin:kinetic-scroll:stop_on_focus", "Stop inertia on focus change", 0));
+ }
+ 
++static size_t g_lastPointerCount = 0;
++
+ static void registerTouchpadCallbacks() {
++    g_pTouchpadCallbacks.clear();
++    g_lastPointerCount = g_pInputManager->m_pointers.size();
++
+     for (const auto& pointer : g_pInputManager->m_pointers) {
+-        if (!pointer || !pointer->m_isTouchpad)
++        if (!pointer)
+             continue;
+ 
++        // Finger-lift detection needs frame events. Some touchpads expose a
++        // pointer node with m_isTouchpad=false that still delivers FINGER-source
++        // scroll (e.g. PixArt pixa3854); wire frame for every pointer so the
++        // lift frame is seen and momentum can start. Motion/hold (new-contact
++        // cancel) stay touchpad-only so a real mouse cannot cancel momentum.
+         g_pTouchpadCallbacks.emplace_back(pointer->m_pointerEvents.frame.listen([] {
+             if (g_pKineticState)
+                 g_pKineticState->onPointerFrame();
+         }));
++
++        if (!pointer->m_isTouchpad)
++            continue;
++
+         g_pTouchpadCallbacks.emplace_back(pointer->m_pointerEvents.motion.listen([](const IPointer::SMotionEvent&) {
+             if (g_pKineticState)
+                 g_pKineticState->onTouchpadContact();
+@@ -181,6 +199,17 @@ static void registerTouchpadCallbacks() {
+     }
+ }
+ 
++// PLUGIN_INIT runs before Hyprland has finished enumerating input devices, so
++// the initial pass can attach zero listeners and kinetic scrolling silently
++// never engages. There is no device-added event on the bus, so re-scan lazily
++// whenever the pointer set has changed since the last registration.
++static void refreshTouchpadCallbacksIfDevicesChanged() {
++    if (g_pInputManager->m_pointers.size() == g_lastPointerCount)
++        return;
++
++    registerTouchpadCallbacks();
++}
++
+ APICALL EXPORT std::string PLUGIN_API_VERSION() {
+     return HYPRLAND_API_VERSION;
+ }

@@ -20,10 +20,19 @@ let
       hash = "sha256-2RI9RSoXhri9tr9DAsB/Zen96DzKsj/wLRbQQKEZ1Yc=";
     };
 
-    # Wire finger-lift (frame) detection for pointer nodes Hyprland does not flag
-    # m_isTouchpad. This laptop's touchpad delivers FINGER-source scroll through
-    # such a node, so upstream never sees the lift and discards all momentum.
-    patches = [ ./patches/kinetic-scroll-frame-all-pointers.patch ];
+    # Two upstream bugs that together stop momentum from ever engaging here:
+    #
+    # 1. Finger-lift (frame) detection is wired only for pointer nodes flagged
+    #    m_isTouchpad. This laptop's PixArt pixa3854 delivers FINGER-source
+    #    scroll through a node that is not flagged, so upstream never sees the
+    #    lift and discards all momentum as "gestureIdle".
+    # 2. registerTouchpadCallbacks() runs once in PLUGIN_INIT, which happens
+    #    before Hyprland finishes enumerating input devices -- so at boot it
+    #    attaches zero listeners and the plugin is silently inert until the
+    #    plugin is manually reloaded.
+    #
+    # both are device-support bugs maybe sendupstream
+    patches = [ ./patches/kinetic-scroll-device-callbacks.patch ];
 
     buildInputs = with pkgs; [
       pango
