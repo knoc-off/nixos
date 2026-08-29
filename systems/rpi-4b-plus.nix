@@ -9,9 +9,6 @@
 }: {
   imports = [
     self.nixosModules.nix
-    {
-      nix.settings.experimental-features = lib.mkForce ["nix-command" "flakes" "pipe-operators"];
-    }
     inputs.sops-nix.nixosModules.sops
     inputs.hardware.nixosModules.raspberry-pi-4
 

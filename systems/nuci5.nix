@@ -17,9 +17,6 @@ in {
     self.nixosModules.pipewire
     self.nixosModules.users.tv
     self.nixosModules.nix
-    {
-      nix.settings.experimental-features = lib.mkForce ["nix-command" "flakes" "pipe-operators"];
-    }
 
     {
       services.udisks2.enable = true;

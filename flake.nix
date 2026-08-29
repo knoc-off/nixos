@@ -318,26 +318,6 @@
 
     determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
 
-    # nixpkgs' nix-eval-jobs links stock Nix, whose evaluator has no
-    # builtins.wasm -- lib/color-lib.nix needs it, so the build farm could
-    # not evaluate any host. This fork tracks Determinate's nix-src; its
-    # `nix` input follows ours so the evaluator it links is the same one
-    # the system runs, rather than whatever the fork happened to pin.
-    #
-    # Must be the `main` branch, not `detsys`: detsys pins an older nix-src
-    # (3.15, predating builtins.wasm) and its eval-args.hh still declares
-    # gcRootsDir as nix::Path, a type removed in 3.21. main uses
-    # std::filesystem::path and tracks nix-src/3.
-    #
-    # See overlays/default.nix (determinate-eval) for the wiring.
-    nix-eval-jobs-determinate = {
-      url = "github:DeterminateSystems/nix-eval-jobs/main";
-      inputs = {
-        nix.follows = "determinate/nix";
-        nixpkgs.follows = "nixpkgs";
-      };
-    };
-
     zen-browser = {
       url = "github:0xc000022070/zen-browser-flake";
       inputs = {
