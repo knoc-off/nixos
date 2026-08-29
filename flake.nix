@@ -302,7 +302,20 @@
 
     nixgl.url = "github:nix-community/nixGL";
 
-    hyprnix.url = "github:hyprwm/hyprnix";
+    # Pinned, not floating. hyprnix vendors its own nixpkgs on purpose --
+    # hyprland requires wayland-protocols >= 1.49, which ours does not carry --
+    # so it cannot be made to follow ours without breaking hyprland.
+    #
+    # Held at dcd7cdd because upstream is broken past it: at b7c9bd9 their
+    # nixpkgs moved to a newer GCC while their prebuilt libhyprutils.so did
+    # not, so linking hyprlang against it fails with undefined GLIBCXX_3.4.35
+    # and _3.4.36 symbols. That reproduces building hyprnix standalone from
+    # GitHub, with no involvement from this config.
+    #
+    # Retry by bumping this rev and building .#hyprnix.hyprlang. Unpin once
+    # upstream links again, or once our nixpkgs carries wayland-protocols
+    # >= 1.49 and the whole stack can follow a single nixpkgs.
+    hyprnix.url = "github:hyprwm/hyprnix/dcd7cdd105acc7359645d7744589444ec538b520";
     hyprland.follows = "hyprnix/hyprland";
     hyprland-plugins = {
       url = "github:hyprwm/hyprland-plugins";
