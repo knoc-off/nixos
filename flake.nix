@@ -179,6 +179,40 @@
     in
     {
       packages = forAllSystems mkPkgs;
+
+      # `nix flake check` runs the color library against its golden fixture.
+      # The fixture is static JSON (lib/color-lib/golden.json), so this needs
+      # no special evaluator and no network -- just eval.
+      checks = forAllSystems (
+        system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+          inherit (nixpkgs) lib;
+          results = import ./lib/color-lib/tests.nix { inherit lib; };
+          inherit (results) summary;
+        in
+        {
+          color-lib =
+            pkgs.runCommand "color-lib-golden"
+              {
+                passthru = { inherit (results) summary failures; };
+              }
+              ''
+                ${
+                  if summary.fail == 0 && summary.error == 0 then
+                    ''echo "color-lib: ${toString summary.pass}/${toString summary.total} passed (${toString summary.known} known divergences, ${toString summary.unsupported} unsupported)"''
+                  else
+                    ''
+                      echo "color-lib: ${toString summary.fail} failed, ${toString summary.error} errored (of ${toString summary.total})" >&2
+                      echo "inspect: nix eval --impure --json --expr '(import ./lib/color-lib/tests.nix {}).failures'" >&2
+                      exit 1
+                    ''
+                }
+                touch $out
+              '';
+        }
+      );
+
       devShells = forAllSystems (
         system:
         let

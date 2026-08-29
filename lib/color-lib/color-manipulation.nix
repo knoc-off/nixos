@@ -374,14 +374,27 @@ let
       currentValue = getOkhsvValue hexColor;
     in setOkhsvValue (1.0 - currentValue) hueFlipped;
 
+  # WCAG 2.1 relative luminance and contrast ratio.
+  #
+  # sRGB channel values are gamma-encoded, so they must be linearised before
+  # the luminance coefficients are applied -- weighting the encoded values
+  # directly (as this previously did) understates the ratio badly: white on
+  # the theme background came out 5.7 instead of 15.8, which would silently
+  # pass colors that fail AA.
+  #
+  # https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
   contrastRatio = colorA: colorB:
     let
-      rgbA = hexToRgb colorA;
-      rgbB = hexToRgb colorB;
-      luminance = { r, g, b, ... }: 0.2126 * r + 0.7152 * g + 7.22e-2 * b;
-      l1 = (luminance rgbA) + 5.0e-2;
-      l2 = (luminance rgbB) + 5.0e-2;
-    in (if l1 > l2 then l1 / l2 else l2 / l1);
+      linearise = c:
+        if c <= 4.045e-2
+        then c / 12.92
+        else math.powFloat ((c + 5.5e-2) / 1.055) 2.4;
+      luminance = {r, g, b, ...}:
+        0.2126 * (linearise r) + 0.7152 * (linearise g) + 7.22e-2 * (linearise b);
+      l1 = (luminance (hexToRgb colorA)) + 5.0e-2;
+      l2 = (luminance (hexToRgb colorB)) + 5.0e-2;
+    in
+      if l1 > l2 then l1 / l2 else l2 / l1;
 
   # Adjust one color to contrast with a fixed reference color using Okhsv
   adjustContrastAgainstFixed = fixedColor: colorToAdjust: factor:
@@ -408,12 +421,44 @@ let
       modified = setOkhsvHue newHue (setOkhsvValue newValue colorToAdjust);
     in modified;
 
+  # Raise `textColor`'s contrast against `backgroundColor` to at least
+  # `minRatio`, adjusting *only* Okhsl lightness so hue and saturation survive.
+  #
+  # This used to delegate to adjustContrastAgainstFixed, which also rotates hue
+  # toward the background's complement -- that turned blue text on a dark
+  # background orange. Keeping hue fixed is what callers actually want from
+  # something named "ensure contrast"; use adjustContrastAgainstFixed directly
+  # if a hue shift is intended.
+  #
+  # Binary search rather than a closed form: contrast is monotonic in lightness
+  # but not analytically invertible through the Okhsl -> sRGB transform. 24
+  # iterations resolves lightness to ~6e-8, far finer than one 8-bit step.
   ensureTextContrast = textColor: backgroundColor: minRatio:
-    let
-      currentRatio = contrastRatio textColor backgroundColor;
-      neededBoost = (minRatio - currentRatio) / 3.0;
-      factor = clamp neededBoost 0.0 1.0;
-    in adjustContrastAgainstFixed backgroundColor textColor factor;
+    if contrastRatio textColor backgroundColor >= minRatio
+    then textColor
+    else let
+      # Dark backgrounds need lighter text, light backgrounds need darker.
+      goLighter = getOkhslLightness backgroundColor < 0.5;
+      textL = getOkhslLightness textColor;
+
+      search = lo: hi: i:
+        if i == 0
+        then (lo + hi) / 2.0
+        else let
+          mid = (lo + hi) / 2.0;
+          ok = contrastRatio (setOkhslLightness mid textColor) backgroundColor >= minRatio;
+        in
+          # Converge toward the original lightness while staying compliant.
+          if ok == goLighter
+          then search lo mid (i - 1)
+          else search mid hi (i - 1);
+
+      finalL =
+        if goLighter
+        then search textL 1.0 24
+        else search 0.0 textL 24;
+    in
+      setOkhslLightness finalL textColor;
 
 in {
   # Export core conversion functions
