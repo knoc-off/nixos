@@ -168,6 +168,17 @@ let
       # dir instead, which is writable and persists between runs either way.
       export HOME="$state_dir"
 
+      # git refuses to commit without an identity, and it will not find one:
+      # there is no global config under the redirected HOME, and the fallback
+      # from hostname/username is rejected as auto-detected
+      # ("root@optiplex.(none)"). Set it in the environment rather than
+      # writing a .gitconfig -- the state dir is disposable, and the commits
+      # produced here are machine-generated lock bumps, not authored work.
+      export GIT_AUTHOR_NAME=${escapeShellArg cfg.committerName}
+      export GIT_AUTHOR_EMAIL=${escapeShellArg cfg.committerEmail}
+      export GIT_COMMITTER_NAME=${escapeShellArg cfg.committerName}
+      export GIT_COMMITTER_EMAIL=${escapeShellArg cfg.committerEmail}
+
       printf '%s\n' ${escapeShellArg githubKnownHost} > "$known_hosts"
 
       export GIT_SSH_COMMAND="ssh -i $CREDENTIALS_DIRECTORY/deploy-key -o IdentitiesOnly=yes -o UserKnownHostsFile=$known_hosts"
@@ -317,6 +328,21 @@ in
       type = types.path;
       default = "/var/lib/nix-autobuild";
       description = "Where the working clone, gcroots, and result files live.";
+    };
+
+    committerName = mkOption {
+      type = types.str;
+      default = "nix-autobuild";
+      description = "Author and committer name on the generated lock-bump commits.";
+    };
+
+    committerEmail = mkOption {
+      type = types.str;
+      default = "nix-autobuild@localhost";
+      description = ''
+        Author and committer email on the generated lock-bump commits. Never
+        receives mail -- it exists because git will not commit without one.
+      '';
     };
 
     deployKeyFile = mkOption {
