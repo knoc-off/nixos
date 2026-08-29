@@ -169,7 +169,6 @@
       hosts = {
         framework13 = "x86_64-linux";
         thinkpad-work = "x86_64-linux";
-        nuci5 = "x86_64-linux";
         optiplex = "x86_64-linux";
         hetzner = "x86_64-linux";
         rpi-4b-plus = "aarch64-linux";

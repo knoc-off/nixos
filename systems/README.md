@@ -26,7 +26,7 @@ Existing hosts worth copying from:
 - `optiplex.nix` -- encrypted btrfs, lanzaboote, measured boot, TPM2 unlock.
   The most complete example.
 - `home-server-pc.nix` -- same disk module, unencrypted, headless.
-- `hetzner.nix`, `nuci5.nix` -- the older `hardware/disks/simple-disk.nix`
+- `hetzner.nix` -- the older `hardware/disks/simple-disk.nix`
   layout (LVM/ext4). Prefer `btrfs-luks` for anything new.
 
 ### Disk layout
