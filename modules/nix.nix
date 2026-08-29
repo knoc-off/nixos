@@ -6,7 +6,13 @@
     # sees, since every user profile sets useGlobalPkgs = true. This is
     # additive only: it does not touch self.packages' fenix/upkgs overlays,
     # which nothing at the host level depends on.
-    nixpkgs.overlays = [ self.overlays.builders ];
+    nixpkgs.overlays = [
+      self.overlays.builders
+      # nix-eval-jobs/nix-fast-build must evaluate with Determinate's
+      # evaluator: lib/color-lib.nix calls builtins.wasm, which stock Nix
+      # does not have. See overlays/default.nix for the full explanation.
+      self.overlays.determinate-eval
+    ];
 
     # Pre-size the Boehm GC heap for Nix evaluation. A full system eval grows the
     # heap to ~4.3GB and triggers 2 GC cycles; starting at 6GB avoids one of them

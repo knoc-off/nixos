@@ -142,6 +142,32 @@ upkgs.opencode.overrideAttrs (old: {
           "You are OpenCode, an interactive general AI agent running on a user's computer." \
           "You are Claude Code, an interactive general AI agent running on a user's computer."
 
+      # meta.txt is the Llama-family prompt, added upstream in 1.18.x. It is
+      # guarded because the pinned upkgs revision may predate it, and a bare
+      # substituteInPlace hard-errors on a missing file. This is not a silent
+      # skip: if the file exists and this block fails to debrand it, the leak
+      # assertion at the end of postPatch still fails the build.
+      #
+      # The heading on the "Tool Use" line contains an en dash followed by a
+      # non-breaking space, so that anchor is deliberately the trailing ASCII
+      # substring -- matching the full line would embed those bytes here and
+      # break on any upstream whitespace churn.
+      if [ -f packages/opencode/src/session/prompt/meta.txt ]; then
+        substituteInPlace packages/opencode/src/session/prompt/meta.txt \
+          --replace-fail \
+            "You are OpenCode, a coding agent that helps users with software engineering tasks. You are powered by {{MODEL_NAME}}, a large language model trained by Meta MSL." \
+            "You are Claude Code, a coding agent that helps users with software engineering tasks." \
+          --replace-fail \
+            "OpenCode Specifics" \
+            "Agent Specifics" \
+          --replace-fail \
+            "- Users can give feedback or report issues at https://github.com/anomalyco/opencode and mention that they are using Meta {{MODEL_NAME}}." \
+            "- Users can give feedback or report issues at https://github.com/anthropics/claude-code/issues" \
+          --replace-fail \
+            '- When users ask directly about OpenCode (eg. "can OpenCode do...", "are you able to do...") or its features (eg. implement a hook, write a slash command, or install an MCP server), use the WebFetch tool to gather information to answer the question from the OpenCode docs at https://opencode.ai/docs.' \
+            ""
+      fi
+
       substituteInPlace packages/opencode/src/tool/lsp.txt \
         --replace-fail \
           "For workspaceSymbol, filePath is not sent in the LSP workspace/symbol request. It is used by opencode to select and start the matching LSP server." \
