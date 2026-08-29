@@ -1,26 +1,21 @@
 {
-  inputs,
   ...
 }:
-let
-  hyprnixPkgs = system: inputs.hyprnix.packages.${system};
-  hyprqt6engine = system: inputs.hyprqt6engine.packages.${system}.default;
-in
 {
   nixos =
     {
       pkgs,
+      upkgs,
       ...
     }:
-    let
-      system = pkgs.stdenv.hostPlatform.system;
-      hyprnix = hyprnixPkgs system;
-    in
     {
       programs.hyprland = {
         enable = true;
-        package = hyprnix.hyprland;
-        portalPackage = hyprnix.xdg-desktop-portal-hyprland;
+        # Plugins are ABI-locked to the exact hyprland they load into, and the
+        # third-party ones only compile against HEAD-ish releases, so the
+        # compositor and portal come from upkgs alongside them.
+        package = upkgs.hyprland;
+        portalPackage = upkgs.xdg-desktop-portal-hyprland;
         withUWSM = true;
       };
 
@@ -42,19 +37,13 @@ in
 
       environment.sessionVariables.NIXOS_OZONE_WL = "1";
 
-      # Fix hyprland-share-picker crash: the picker (Qt6 from hyprnix) segfaults when
-      # it loads the session's Kvantum style plugin due to Qt version mismatch
-      # (nixpkgs Qt 6.10.1 vs hyprnix Qt 6.10.2). Use hyprqt6engine built against
-      # hyprnix's Qt so the platform theme plugin is ABI-compatible with the picker.
-      systemd.user.services.xdg-desktop-portal-hyprland.serviceConfig.Environment =
-        let
-          engine = hyprqt6engine system;
-        in
-        [
-          "QT_QPA_PLATFORMTHEME=hyprqt6engine"
-          "QT_STYLE_OVERRIDE="
-          "QT_PLUGIN_PATH=${engine}/lib/qt-6/plugins"
-        ];
+      # The share-picker used to segfault loading the session's Kvantum style
+      # plugin, because hyprnix built it against a different Qt patch release
+      # than nixpkgs (6.10.2 vs 6.10.1) and the plugin ABI did not match. That
+      # needed hyprqt6engine built against hyprnix's Qt to work around. Now
+      # that the whole stack comes from one nixpkgs there is only one Qt, so
+      # the override is gone -- if the picker ever crashes on a style plugin
+      # again, suspect a reintroduced Qt split rather than restoring this.
     };
 
   home =
@@ -63,13 +52,13 @@ in
       config,
       lib,
       pkgs,
+      upkgs,
       self,
       ...
     }:
     let
       inherit (self.lib) color-lib theme;
       system = pkgs.stdenv.hostPlatform.system;
-      hyprnix = hyprnixPkgs system;
       noctaliaCmd = lib.getExe config.programs.noctalia.package;
       noctalia = cmd: "${noctaliaCmd} msg ${cmd}";
 
@@ -82,12 +71,11 @@ in
       # Lua (load + settings + binds/gestures). We concatenate the fragments into
       # hypr/plugins.lua, which hyprland.lua requires.
       hyprPlugins = [
-        (import ./plugins/kinetic-scroll.nix { inherit inputs pkgs lib; })
-        # (import ./plugins/confined-floats.nix {inherit inputs pkgs lib;})
+        (import ./plugins/kinetic-scroll.nix { inherit pkgs upkgs lib; })
         (import ./plugins/scroll-overview.nix {
           inherit
-            inputs
             pkgs
+            upkgs
             lib
             mainMod
             ;
@@ -110,22 +98,6 @@ in
     {
       # XWayland renders at 96 DPI without this -- compositor upscales (blurry)
       xresources.properties."Xft.dpi" = builtins.floor (96 * displayScale);
-
-      # hyprqt6engine: match Stylix fonts so screen-share picker looks consistent
-      xdg.configFile."hypr/hyprqt6engine.conf".text =
-        let
-          fonts = config.stylix.fonts;
-        in
-        ''
-          theme {
-              style = Fusion
-              icon_theme = ${config.gtk.iconTheme.name}
-              font = ${fonts.sansSerif.name}
-              font_size = ${toString fonts.sizes.applications}
-              font_fixed = ${fonts.monospace.name}
-              font_fixed_size = ${toString fonts.sizes.terminal}
-          }
-        '';
 
       services.hypridle = {
         enable = true;
@@ -156,7 +128,7 @@ in
 
       wayland.windowManager.hyprland = {
         enable = true;
-        package = hyprnix.hyprland;
+        package = upkgs.hyprland;
         systemd.enable = false; # UWSM handles session/systemd integration
 
         configType = "lua";

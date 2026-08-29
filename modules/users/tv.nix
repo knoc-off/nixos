@@ -72,7 +72,7 @@
         backupFileExtension = "bak";
         useGlobalPkgs = true;
         useUserPackages = true;
-        extraSpecialArgs = { inherit self inputs; };
+        extraSpecialArgs = { inherit self inputs upkgs; };
 
         users.${user} =
           {

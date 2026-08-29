@@ -1,14 +1,13 @@
 {
-  inputs,
   pkgs,
+  upkgs,
   lib,
   ...
 }:
 let
-  system = pkgs.stdenv.hostPlatform.system;
-  hyprlandPlugins = pkgs.hyprlandPlugins.override {
-    hyprland = inputs.hyprnix.packages.${system}.hyprland;
-  };
+  # Built against upkgs' hyprland to match scroll-overview and the compositor
+  # itself -- plugins must link the exact hyprland they load into.
+  inherit (upkgs) hyprlandPlugins;
 
   package = hyprlandPlugins.mkHyprlandPlugin (_: {
     pluginName = "hypr-kinetic-scroll";

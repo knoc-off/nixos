@@ -302,36 +302,13 @@
 
     nixgl.url = "github:nix-community/nixGL";
 
-    # Pinned, not floating. hyprnix vendors its own nixpkgs on purpose --
-    # hyprland requires wayland-protocols >= 1.49, which ours does not carry --
-    # so it cannot be made to follow ours without breaking hyprland.
-    #
-    # Held at dcd7cdd because upstream is broken past it: at b7c9bd9 their
-    # nixpkgs moved to a newer GCC while their prebuilt libhyprutils.so did
-    # not, so linking hyprlang against it fails with undefined GLIBCXX_3.4.35
-    # and _3.4.36 symbols. That reproduces building hyprnix standalone from
-    # GitHub, with no involvement from this config.
-    #
-    # Retry by bumping this rev and building .#hyprnix.hyprlang. Unpin once
-    # upstream links again, or once our nixpkgs carries wayland-protocols
-    # >= 1.49 and the whole stack can follow a single nixpkgs.
-    hyprnix.url = "github:hyprwm/hyprnix/dcd7cdd105acc7359645d7744589444ec538b520";
-    hyprland.follows = "hyprnix/hyprland";
-    hyprland-plugins = {
-      url = "github:hyprwm/hyprland-plugins";
-      inputs.hyprland.follows = "hyprland";
-    };
-    Hyprspace = {
-      url = "github:KZDKM/Hyprspace";
-      inputs.hyprland.follows = "hyprland";
-    };
-    hyprqt6engine = {
-      url = "github:hyprwm/hyprqt6engine";
-      inputs.nixpkgs.follows = "hyprnix/nixpkgs";
-      inputs.hyprutils.follows = "hyprnix/hyprutils";
-      inputs.hyprlang.follows = "hyprnix/hyprlang";
-      inputs.systems.follows = "hyprnix/systems";
-    };
+    # No hyprnix. The whole hypr stack comes from nixpkgs so there is exactly
+    # one nixpkgs behind hyprland, its plugins and the portal -- and therefore
+    # one libstdc++ and one Qt. Vendoring a second nixpkgs caused real
+    # breakage: a Qt 6.10.1/6.10.2 split that segfaulted the share-picker, and
+    # a libstdc++ skew that left hyprlang unable to link against its own
+    # hyprutils. It also missed the binary cache on every build. The tradeoff
+    # is tracking nixpkgs' hyprland instead of upstream HEAD.
 
     sops-nix.url = "github:Mic92/sops-nix";
 

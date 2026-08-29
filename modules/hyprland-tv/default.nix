@@ -1,21 +1,17 @@
 {
-  inputs,
   ...
 }:
-let
-  hyprnixPkgs = system: inputs.hyprnix.packages.${system};
-in
 {
   home =
     {
       config,
       lib,
       pkgs,
+      upkgs,
       ...
     }:
     let
       system = pkgs.stdenv.hostPlatform.system;
-      hyprnix = hyprnixPkgs system;
       noctaliaCmd = lib.getExe config.programs.noctalia.package;
 
       mainMod = "SUPER";
@@ -26,11 +22,11 @@ in
       # is kept for the couch touchpad; scroll-overview is the primary "remote"
       # navigation surface.
       hyprPlugins = [
-        (import ../hyprland/plugins/kinetic-scroll.nix { inherit inputs pkgs lib; })
+        (import ../hyprland/plugins/kinetic-scroll.nix { inherit pkgs upkgs lib; })
         (import ../hyprland/plugins/scroll-overview.nix {
           inherit
-            inputs
             pkgs
+            upkgs
             lib
             mainMod
             ;
@@ -54,15 +50,14 @@ in
       # module, which owns hypridle so both fire off a single timeout.
       wayland.windowManager.hyprland = {
         enable = true;
-        package = hyprnix.hyprland;
+        package = upkgs.hyprland;
         systemd.enable = false; # UWSM handles session/systemd integration
 
         # Enabling the module otherwise turns on home-manager's own xdg.portal
         # layer, which sets NIX_XDG_DESKTOP_PORTAL_DIR to the user profile and
         # so hides every portal declared at the system level -- including the
         # RemoteDesktop backend KDE Connect needs. Portals live in the NixOS
-        # config (modules/users/tv.nix); this also drops the nixpkgs xdph that
-        # would otherwise shadow the hyprnix build.
+        # config (modules/users/tv.nix).
         portalPackage = null;
 
         configType = "lua";

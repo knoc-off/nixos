@@ -1,30 +1,31 @@
 {
-  inputs,
   pkgs,
+  upkgs,
   lib,
   mainMod ? "SUPER",
   ...
 }: let
-  system = pkgs.stdenv.hostPlatform.system;
-  hyprlandPlugins = pkgs.hyprlandPlugins.override {
-    hyprland = inputs.hyprnix.packages.${system}.hyprland;
-  };
+  # Third-party hypr plugins track Hyprland HEAD, not releases, so they need
+  # the newest hyprland available -- against stable's 0.55.4 this fails to
+  # compile on moved headers (hyprland/src/output/Monitor.hpp) and a changed
+  # CHyprColor signature. upkgs carries 0.56.2, which it builds against.
+  inherit (upkgs) hyprlandPlugins;
 
   package = hyprlandPlugins.mkHyprlandPlugin (finalAttrs: {
     pluginName = "scrolloverview";
-    version = "0.1-unstable-2026-08-02";
+    version = "0.1-unstable-2026-08-27";
 
     src = pkgs.fetchFromGitHub {
       owner = "yayuuu";
       repo = "hyprland-scroll-overview";
-      rev = "16eb0f851faa308ce3e4a982316ffc8f3d2a2085";
-      hash = "sha256-TWUKtHT/RoF5EqETCPyZZiyVVOUzZRHottpHAaE0El4=";
+      rev = "f9248ab6bee770e9d68813b48cc6ca12b3271254";
+      hash = "sha256-SEa8XQtrNg90AUeZFE9+lGvYEWd0T2ht/+sKx+kWUak=";
     };
 
     # The version header is generated from git at build time; the sandboxed
     # fetchFromGitHub source has no .git, so pin the version explicitly to avoid
     # an "unknown" fallback.
-    env.SCROLLOVERVIEW_BUILD_VERSION = "16eb0f851faa";
+    env.SCROLLOVERVIEW_BUILD_VERSION = "f9248ab6bee7";
 
     nativeBuildInputs = with pkgs; [cmake];
 
