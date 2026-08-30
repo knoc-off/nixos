@@ -67,49 +67,11 @@ in
     in
     discover;
 
-  # Recursively discover nix modules from a directory tree.
-  # - foo.nix (not default.nix) -> { foo = import foo.nix; }
-  # - bar/ with default.nix     -> { bar = import bar/; }   (leaf module)
-  # - baz/ without default.nix  -> { baz = <recurse into baz/>; }
-  discoverModules =
-    let
-      discover =
-        dir:
-        lib.pipe (builtins.readDir dir) [
-          (lib.filterAttrs (name: _: name != "default.nix"))
-          (lib.mapAttrs' (
-            name: type:
-            if type == "regular" && lib.hasSuffix ".nix" name then
-              {
-                name = lib.removeSuffix ".nix" name;
-                value = import (dir + "/${name}");
-              }
-            else if type == "directory" && builtins.pathExists (dir + "/${name}/default.nix") then
-              {
-                name = name;
-                value = import (dir + "/${name}");
-              }
-            else if type == "directory" then
-              {
-                name = name;
-                value = discover (dir + "/${name}");
-              }
-            else
-              {
-                name = name;
-                value = null;
-              }
-          ))
-          (lib.filterAttrs (_: v: v != null))
-        ];
-    in
-    discover;
-
   # Discover dendritic aspect modules from a directory tree.
   # Each module file is a function: { inputs, self } -> { nixos?, home? }
   # Returns { nixos = <nested attrset of NixOS modules>; home = <nested attrset of HM modules>; }
   #
-  # Tree-walking rules are the same as discoverModules, but each leaf is
+  # Tree-walking rules are the same as discoverPackages, but each leaf is
   # called with { inputs, self } and the result is split by side.
   discoverAspects =
     { inputs, self }:

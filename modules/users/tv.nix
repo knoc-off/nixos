@@ -192,38 +192,6 @@
               ];
             };
 
-            #  gtk = {
-            #    enable = true;
-            #    theme = {
-            #      name = "Breeze-Dark";
-            #      package = pkgs.kdePackages.breeze-gtk;
-            #    };
-            #    iconTheme = {
-            #      name = "breeze-dark";
-            #      package = pkgs.kdePackages.breeze-icons;
-            #    };
-            #    cursorTheme = {
-            #      name = "breeze_cursors";
-            #      package = pkgs.kdePackages.breeze;
-            #      size = 24;
-            #    };
-            #    font = {
-            #      name = "Noto Sans";
-            #      size = 10;
-            #    };
-            #    gtk3.extraConfig.gtk-application-prefer-dark-theme = true;
-            #    gtk4.extraConfig.gtk-application-prefer-dark-theme = true;
-            #  };
-
-            #   qt = {
-            #     enable = true;
-            #     platformTheme.name = "kde";
-            #     style = {
-            #       name = "breeze";
-            #       package = pkgs.kdePackages.breeze;
-            #     };
-            #   };
-
             home.sessionVariables = {
               XDG_SESSION_TYPE = "wayland";
             };

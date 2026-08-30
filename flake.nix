@@ -192,8 +192,6 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05";
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
-    # nixpkgs-darwin.url = "github:NixOS/nixpkgs/nixpkgs-26.05-darwin";
-
     nixos-cli.url = "github:water-sucks/nixos";
 
     rust-overlay.url = "github:oxalica/rust-overlay";
@@ -246,9 +244,6 @@
       inputs.nixpkgs.follows = "nixpkgs-unstable";
       inputs.nix-minecraft.follows = "nix-minecraft";
     };
-
-    # nix-darwin.url = "github:nix-darwin/nix-darwin/nix-darwin-26.05";
-    # nix-darwin.inputs.nixpkgs.follows = "nixpkgs-darwin";
 
     stylix = {
       url = "github:nix-community/stylix/release-26.05";
