@@ -1,4 +1,4 @@
-# Declarative per-window key remapping for kanata + hyprkan.
+# Declarative per-window key remapping for kanata + Hyprland.
 #
 # When caps (rmet via kanata) is held, keys can be remapped via capsbinds.
 # Keys can also be unconditionally remapped per-window via binds.
@@ -71,7 +71,8 @@
 #     };
 #   };
 #
-#   result.hyprkanRules   -- list of hyprkan rule attrsets
+#   result.windowRules    -- list of { class; layer; } window match rules,
+#                            consumed by modules/keylayers to generate Lua
 #   result.kanataConfig   -- function: extraAliases string -> kanata config string
 { lib }:
 let
@@ -145,7 +146,8 @@ let
   #
   # We use `unmod` rather than the older `(multi (release-key rmet) ...)`:
   # release-key emits a one-shot release *edge* that is decoupled from the
-  # action's lifecycle. If a layer switch (e.g. hyprkan sending one over TCP)
+  # action's lifecycle. If a layer switch (e.g. the generated Lua sending one
+  # over TCP)
   # swaps out the `layer-while-held` parent that is holding rmet while this
   # edge is mid-flight, the release can be lost and rmet strands as a
   # logically-held Super on the virtual device -- a dead keyboard with a
@@ -432,7 +434,7 @@ let
         );
     in
     {
-      hyprkanRules =
+      windowRules =
         let
           nonBase = lib.filterAttrs (n: _: n != "base") layers;
         in

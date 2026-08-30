@@ -142,7 +142,6 @@
               }
 
               self.homeModules.kanata
-              self.homeModules.hyprkan
               self.homeModules.keylayers
               {
                 keyLayers = {
@@ -151,18 +150,6 @@
                     ctrl = presets.baseCtrlKeys;
                     keys = presets.navKeys;
                   };
-                };
-              }
-              {
-                programs.hyprkan = {
-                  package = self.packages.${pkgs.stdenv.hostPlatform.system}.hyprkan;
-                  enable = true;
-                  service.enable = true;
-
-                  service.extraArgs = [
-                    "--port"
-                    "52545"
-                  ];
                 };
               }
 

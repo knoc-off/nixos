@@ -8,7 +8,7 @@ in
   inherit color-lib;
   theme = import ../theme.nix { inherit lib color-lib; };
 
-  # Per-window kanata/hyprkan key layers: { mkKeyLayers; presets; }
+  # Per-window kanata + Hyprland key layers: { mkKeyLayers; presets; }
   keyLayers = import ./key-layers.nix { inherit lib; };
 
   # Headscale-assigned tailnet IPs, by host.
