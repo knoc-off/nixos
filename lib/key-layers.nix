@@ -4,12 +4,10 @@
 # Keys can also be unconditionally remapped per-window via binds.
 # Unlisted keys pass through as Super_R+key (triggering Hyprland WM binds).
 #
-# "base" is the wildcard fallback for windows not matching any other class/title.
+# "base" is the wildcard fallback for windows not matching any other class.
 #
-# Layers can match windows by class, title, or both:
+# Layers match windows by class only:
 #   classes  = ["firefox" "chromium-browser"];
-#   titles   = ["DevTools" "Inspector"];
-#   matchers = [{ class = "firefox"; title = "DevTools"; }];
 #
 # capsbinds: keys remapped when caps is held
 #   Bulk shorthand:  ctrl = ["a" "b" "c"];   alt = ["1" "2" "3"];
@@ -434,43 +432,22 @@ let
         );
     in
     {
+      # Flat class -> layer match list for non-"base" layers, deduped
+      # per-class (multiple app modules can independently declare the same
+      # class, e.g. firefox and zen-browser both claiming "firefox").
       windowRules =
         let
           nonBase = lib.filterAttrs (n: _: n != "base") layers;
         in
-        (lib.concatLists (
+        lib.concatLists (
           lib.mapAttrsToList (
             name: layer:
-            let
-              classRules = map (class: {
-                inherit class;
-                layer = name;
-              }) (layer.classes or [ ]);
-
-              titleRules = map (title: {
-                inherit title;
-                layer = name;
-              }) (layer.titles or [ ]);
-
-              matcherRules = map (
-                m:
-                {
-                  layer = name;
-                }
-                // lib.optionalAttrs (m ? class) { inherit (m) class; }
-                // lib.optionalAttrs (m ? title) { inherit (m) title; }
-              ) (layer.matchers or [ ]);
-            in
-            matcherRules ++ classRules ++ titleRules
+            map (class: {
+              inherit class;
+              layer = name;
+            }) (lib.unique (layer.classes or [ ]))
           ) nonBase
-        ))
-        ++ [
-          {
-            class = "*";
-            title = "*";
-            layer = "base";
-          }
-        ];
+        );
 
       kanataConfig =
         extraAliases:

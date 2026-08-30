@@ -27,27 +27,148 @@
     let
       cfg = config.keyLayers;
       inherit (self.lib.keyLayers) mkKeyLayers;
-      kl = mkKeyLayers cfg.layers;
 
-      port = config.services.kanata.keyboards.${cfg.kanataKeyboard}.port;
+      modNames = [
+        "ctrl"
+        "shift"
+        "alt"
+      ];
 
-      # Rules are ordered specific-first with a `*` wildcard fallback tacked
-      # on by mkKeyLayers (see lib/key-layers.nix); the Lua below implements
-      # that fallback itself (layerFor's default return), so the literal "*"
-      # entry is dropped rather than emitted as a rule that can never match a
-      # real class string. Only literal `class` is ever set by any layer
-      # contributor today, so that's all this generates.
+      # A single key/chord action: bare key, modified key, shell command, or a
+      # raw escape-hatch kanata expression. Shared by capsbinds.keys entries,
+      # simple binds, and each branch of a fork.
+      actionSubmodule = types.submodule {
+        options = {
+          mod = mkOption {
+            type = types.nullOr (types.enum modNames);
+            default = null;
+            description = "Modifier to combine with `key` (or the bound key itself if `key` is unset).";
+          };
+          key = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = "Target key name. Defaults to the bound/held key's own name.";
+          };
+          cmd = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = "Shell command to run instead of emitting a key.";
+          };
+          raw = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+            description = "Raw kanata action expression (escape hatch).";
+          };
+        };
+      };
+
+      # String shorthand (e.g. "ctrl" or "down") or an explicit actionSubmodule.
+      actionType = types.either types.str actionSubmodule;
+
+      # A bind key's value: either a simple action, or a fork over currently
+      # held modifiers (each branch an actionType). lib/key-layers.nix's
+      # `isFork` distinguishes the two by which fields are present after
+      # null-stripping below.
+      bindSubmodule = types.submodule {
+        options =
+          {
+            mod = mkOption {
+              type = types.nullOr (types.enum modNames);
+              default = null;
+            };
+            key = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+            };
+            cmd = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+            };
+            raw = mkOption {
+              type = types.nullOr types.str;
+              default = null;
+            };
+          }
+          // genAttrs
+            [
+              "default"
+              "shift"
+              "ctrl"
+              "alt"
+              "alt_ctrl"
+              "alt_shift"
+              "ctrl_shift"
+              "alt_ctrl_shift"
+            ]
+            (
+              _:
+              mkOption {
+                type = types.nullOr actionType;
+                default = null;
+              }
+            );
+      };
+      bindType = types.either types.str bindSubmodule;
+
+      capsbindsSubmodule = types.submodule {
+        options = {
+          ctrl = mkOption {
+            type = types.listOf types.str;
+            default = [ ];
+          };
+          shift = mkOption {
+            type = types.listOf types.str;
+            default = [ ];
+          };
+          alt = mkOption {
+            type = types.listOf types.str;
+            default = [ ];
+          };
+          keys = mkOption {
+            type = types.attrsOf actionType;
+            default = { };
+          };
+        };
+      };
+
+      layerSubmodule = types.submodule {
+        options = {
+          classes = mkOption {
+            type = types.listOf types.str;
+            default = [ ];
+          };
+          capsbinds = mkOption {
+            type = capsbindsSubmodule;
+            default = { };
+          };
+          binds = mkOption {
+            type = types.attrsOf bindType;
+            default = { };
+          };
+        };
+      };
+
+      # Submodule evaluation fills every unset option with `null` instead of
+      # omitting it, but the compiler in lib/key-layers.nix distinguishes
+      # "field present" from "field absent" (`action ? mod`, `isFork`'s
+      # field-presence check) -- so strip nulls before handing layers over.
+      layers = filterAttrsRecursive (_: v: v != null) cfg.layers;
+      kl = mkKeyLayers layers;
+
+      port = (config.services.kanata.keyboards.${cfg.kanataKeyboard} or { }).port or null;
+
       # ponytail: exact class match only, no title/regex matching -- add
       # `w.title` / string.find into the Lua below if a layer ever needs it.
-      rules = filter (r: (r.class or null) != null && r.class != "*") kl.windowRules;
-      ruleLines = concatMapStringsSep ",\n  " (r: ''{ class = "${r.class}", layer = "${r.layer}" }'') rules;
+      ruleLines = concatMapStringsSep ",\n  " (
+        r: ''{ class = "${escape [ "\\" "\"" ] r.class}", layer = "${r.layer}" }''
+      ) kl.windowRules;
     in
     {
       options.keyLayers = {
         enable = mkEnableOption "per-window kanata layer switching (kanata config + Hyprland Lua)";
 
         layers = mkOption {
-          type = types.attrsOf types.anything;
+          type = types.attrsOf layerSubmodule;
           default = { };
           description = ''
             Map of layer name to layer definition, merged from app modules and the
