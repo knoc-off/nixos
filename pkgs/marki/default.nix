@@ -1,14 +1,15 @@
 {
   lib,
   pkgs,
+  self,
   ...
 }:
 let
   cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
   version = cargoToml.workspace.package.version;
 
-  naturalEarthData = pkgs.callPackage ../natural-earth-data { };
-  geoBoundariesData = pkgs.callPackage ../geoboundaries-data { };
+  naturalEarthData = self.packages.${pkgs.stdenv.hostPlatform.system}.natural-earth-data;
+  geoBoundariesData = self.packages.${pkgs.stdenv.hostPlatform.system}.geoboundaries-data;
 
   marki = pkgs.rustPlatform.buildRustPackage {
     pname = "marki";

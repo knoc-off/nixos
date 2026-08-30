@@ -21,16 +21,18 @@ let
     )
   );
   inherit (pkgs) lib;
+  system = pkgs.stdenv.hostPlatform.system;
+  selfPkgs = self.packages.${system};
 
-  compatProxy = pkgs.callPackage ../compat-proxy { };
+  compatProxy = selfPkgs.compat-proxy;
 
   # Patched opencode (pkgs/opencode) rather than upkgs.opencode directly --
   # its own prompts no longer say "opencode", so the compat-proxy's Claude
   # Code identity spoofing isn't undermined from inside the jail either.
-  patchedOpencode = pkgs.callPackage ../opencode { };
+  patchedOpencode = selfPkgs.opencode;
 
-  claudeMem = pkgs.callPackage ../claude-mem { };
-  hostQuery = pkgs.callPackage ../host-query { };
+  claudeMem = selfPkgs.claude-mem;
+  hostQuery = selfPkgs.host-query;
 
   # The jail's entire ~/.config/opencode, generated in the store. See
   # config/default.nix for why this is a store path rather than the host's
@@ -131,8 +133,8 @@ let
     }
   '';
 
-  lspmux = pkgs.callPackage ../lspmux { };
-  lspmuxSession = pkgs.callPackage ../lspmux-session { };
+  lspmux = selfPkgs.lspmux;
+  lspmuxSession = selfPkgs.lspmux-session;
 
   # direnv integration for the jail's fish shell.
   #

@@ -18,6 +18,7 @@
 {
   lib,
   pkgs,
+  self,
   writeShellApplication,
   symlinkJoin,
   bash,
@@ -26,7 +27,7 @@
   git,
 }:
 let
-  lspmux = pkgs.callPackage ../lspmux { };
+  lspmux = self.packages.${pkgs.stdenv.hostPlatform.system}.lspmux;
   lspmuxBin = lib.getExe lspmux;
   jqBin = lib.getExe jq;
   gitBin = lib.getExe git;

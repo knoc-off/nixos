@@ -11,36 +11,35 @@
       systems = [
         "aarch64-linux"
         "x86_64-linux"
-        "aarch64-darwin"
       ];
 
       forAllSystems = nixpkgs.lib.genAttrs systems;
 
       inherit (nixpkgs) lib;
 
-      inherit (lib) nixosSystem listToAttrs;
+      inherit (lib) nixosSystem;
 
-      inherit (import ./lib { inherit lib; })
-        discoverPackages
-        discoverAspects
-        ;
+      libExtra = import ./lib { inherit lib; };
+      inherit (libExtra) discoverPackages discoverAspects;
 
       aspects = discoverAspects { inherit inputs self; } ./modules;
 
       overlays = import ./overlays { inherit inputs; };
+
+      # allowUnfree/android_sdk.accept_license apply identically to both the
+      # stable and unstable pkgs instantiations below.
+      nixpkgsConfig = {
+        allowUnfree = true;
+        android_sdk.accept_license = true;
+      };
 
       mkConfig =
         {
           hostname,
           system,
           extraModules ? [ ],
-          extraConfigs ? { },
         }:
-        let
-          mkSystem =
-            if lib.strings.hasSuffix "darwin" system then inputs.nix-darwin.lib.darwinSystem else nixosSystem;
-        in
-        mkSystem {
+        nixosSystem {
           inherit system;
           specialArgs = {
             inherit
@@ -49,8 +48,7 @@
               hostname
               ;
             upkgs = unstablePkgs system;
-          }
-          // extraConfigs;
+          };
           modules = [
             ./systems/${hostname}.nix
             { networking.hostName = lib.mkDefault hostname; }
@@ -70,21 +68,16 @@
             .${imageType} or [
             ];
         in
-        lib.nameValuePair name (
-          (mkConfig {
-            inherit hostname system;
-            extraModules = [ ./systems/modules/${imageType}.nix ] ++ imageOverrides;
-          }).config.system.build.${imageType}
-        );
+        (mkConfig {
+          inherit hostname system;
+          extraModules = [ ./systems/modules/${imageType}.nix ] ++ imageOverrides;
+        }).config.system.build.${imageType};
 
       unstablePkgs =
         system:
         import nixpkgs-unstable {
           inherit system;
-          config = {
-            allowUnfree = true;
-            android_sdk.accept_license = true;
-          };
+          config = nixpkgsConfig;
         };
 
       mkPkgs =
@@ -93,10 +86,7 @@
           upkgs = unstablePkgs system;
           pkgs = import nixpkgs {
             inherit system;
-            config = {
-              allowUnfree = true;
-              android_sdk.accept_license = true;
-            };
+            config = nixpkgsConfig;
             overlays = [
               inputs.fenix.overlays.default
               overlays.builders
@@ -106,18 +96,7 @@
         in
         discoverPackages pkgs ./pkgs;
 
-      # What the build farm prebuilds for `system`: the per-host toplevels,
-      # and nothing else. "What will this host try to install" is not
-      # something to maintain by hand -- system.build.toplevel already
-      # answers it exactly, and transitively. Combined with nix-fast-build
-      # --skip-cached, the marginal cost of a toplevel is only its uncached
-      # delta: everything reachable from cache.nixos.org is skipped, and what
-      # remains is precisely the local packages and patches that are the
-      # whole point of the farm.
-      #
-      # Packages under ./pkgs that no host installs are deliberately absent
-      # here -- they stay reachable via `nix build`/`nix run`/devShells, they
-      # just aren't built weekly by the farm.
+      # just iterate over toplevels, build all things that i would need to build
       mkCacheJobs =
         system:
         lib.mapAttrs' (
@@ -126,8 +105,7 @@
             nixosConfigurations.${hostname}.config.system.build.toplevel
         ) (lib.filterAttrs (_: hostSystem: hostSystem == system) hosts);
 
-      # hostname -> system. Single source for both nixosConfigurations and the
-      # set of toplevels the build farm prebuilds.
+      # hostname -> system. check if each is a valid arch
       hosts = {
         framework13 = "x86_64-linux";
         thinkpad-work = "x86_64-linux";
@@ -148,7 +126,6 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
-          inherit (nixpkgs) lib;
           results = import ./lib/color-lib/tests.nix { inherit lib; };
           inherit (results) summary;
         in
@@ -194,33 +171,21 @@
 
       nixosModules = aspects.nixos;
       homeModules = aspects.home;
-      # darwinModules removed — darwin configs commented out
 
       inherit overlays;
 
-      lib = import ./lib { inherit lib; };
+      lib = libExtra;
 
-      images = listToAttrs [
-        (mkImage "minimal" "x86_64-linux" "isoImage")
-        (mkImage "rpi-4b-plus" "aarch64-linux" "sdImage")
-        # (mkImage "framework13" "x86_64-linux" "isoImage")
-      ];
-
-      # darwinConfigurations = listToAttrs [
-      #   # ("Nicholass-MacBook-Pro" "aarch64-darwin")
-      # ];
+      images = {
+        minimal-isoImage = mkImage "minimal" "x86_64-linux" "isoImage";
+        rpi-4b-plus-sdImage = mkImage "rpi-4b-plus" "aarch64-linux" "sdImage";
+      };
 
       inherit nixosConfigurations;
 
       # The per-host toplevels the optiplex build farm prebuilds and serves.
       # See mkCacheJobs.
       cacheJobs = forAllSystems mkCacheJobs;
-
-      # The hostname -> system table as plain data, so nix-autobuild can learn
-      # which `toplevel/*` attrs it must see succeed before publishing without
-      # evaluating a single host configuration. Kept in sync by construction:
-      # this is the same attrset mkCacheJobs derives the toplevels from.
-      hostSystems = hosts;
     };
 
   inputs = {

@@ -16,7 +16,6 @@
   config,
   lib,
   pkgs,
-  self,
   ...
 }:
 let
@@ -34,17 +33,6 @@ let
 
   nix = getExe' config.nix.package "nix";
 
-  # The toplevel attrs that must build before a lock is publishable, derived
-  # from flake.nix's host table rather than restated here. This is also all of
-  # cacheJobs -- every attr it names is required.
-  requiredAttrs = lib.mapAttrsToList (
-    hostname: system: "${system}\ttoplevel/${hostname}"
-  ) self.hostSystems;
-
-  requiredFile = pkgs.writeText "nix-autobuild-required-attrs" (
-    lib.concatMapStrings (line: line + "\n") requiredAttrs
-  );
-
   # GitHub's published ssh-ed25519 host key (see
   # https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/githubs-ssh-key-fingerprints).
   # Getting this wrong only fails closed (git over ssh refuses to connect), so
@@ -52,86 +40,6 @@ let
   # is strictly safer than TOFU. Worth reconfirming against GitHub's docs at
   # bootstrap time regardless.
   githubKnownHost = "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
-
-  # Reduces a run's per-arch result JSON to a publish verdict. Kept in Python
-  # rather than grep/jq because the interesting fields are nested and the error
-  # strings are multi-line JSON-escaped blobs -- line-oriented tools read those
-  # as data and silently miscount.
-  #
-  # nix-fast-build emits one record per attr per phase (EVAL then BUILD), so an
-  # attr is only genuinely fine if no phase reports failure for it; checking
-  # just the BUILD records would count an attr that never got past EVAL as
-  # absent rather than broken.
-  gate = pkgs.writers.writePython3 "nix-autobuild-gate" { } ''
-    """Read nix-fast-build result JSONs, decide whether the lock is publishable.
-
-    argv: <required-file> <arch>=<results.json> [<arch>=<results.json> ...]
-
-    Writes a human summary to stdout. Exits 0 if every required attr succeeded,
-    1 otherwise.
-    """
-    import json
-    import sys
-
-    required = set()
-    with open(sys.argv[1]) as fh:
-        for line in fh:
-            if line.strip():
-                arch, attr = line.rstrip("\n").split("\t")
-                required.add((arch, attr))
-
-    failed = {}
-    seen = set()
-
-    for spec in sys.argv[2:]:
-        arch, _, path = spec.partition("=")
-        try:
-            with open(path) as fh:
-                results = json.load(fh).get("results", [])
-        except (OSError, json.JSONDecodeError) as exc:
-            # A missing or truncated result file means the run died before
-            # writing it. Treat every attr for that arch as unproven rather
-            # than letting an unreadable file read as "nothing failed".
-            print(f"{arch}: unreadable result file ({exc})")
-            for key in required:
-                if key[0] == arch:
-                    failed[key] = "no results"
-            continue
-
-        for record in results:
-            attr = record.get("attr")
-            if attr is None:
-                continue
-            seen.add((arch, attr))
-            if not record.get("success", False):
-                phase = record.get("type", "?")
-                failed.setdefault((arch, attr), phase)
-
-    # An attr that was required but never appeared in any phase did not
-    # silently pass -- it was never evaluated, which is itself a failure.
-    for key in required:
-        if key not in seen:
-            failed.setdefault(key, "missing")
-
-    required_failures = sorted(k for k in failed if k in required)
-    other_failures = sorted(k for k in failed if k not in required)
-
-
-    def fmt(keys):
-        return ", ".join(
-            f"{arch}:{attr} ({failed[(arch, attr)]})" for arch, attr in keys
-        )
-
-
-    if other_failures:
-        print(f"non-blocking failures: {fmt(other_failures)}")
-
-    if required_failures:
-        print(f"BLOCKING: {fmt(required_failures)}")
-        sys.exit(1)
-
-    print(f"all {len(required)} required toplevels ok")
-  '';
 
   runner = pkgs.writeShellApplication {
     name = "nix-autobuild-run";
@@ -228,6 +136,13 @@ let
       # the Pi -- the host least able to build for itself -- was never built at
       # all while any x86 attr was broken. The arches share no build inputs
       # that would make one's failure predictive of the other's.
+      #
+      # cacheJobs is per-host toplevels only, so nix-fast-build's own exit
+      # code already says "every toplevel for this arch succeeded" -- no
+      # separate verdict computation needed. Per-attr detail (which toplevel,
+      # which phase) lives in $run_dir/<arch>.json for post-mortem; the
+      # notification only names the failing arch.
+      failed_arches=""
       build_arch() {
         local arch="$1"
         nix-fast-build \
@@ -242,7 +157,7 @@ let
           --eval-max-memory-size ${toString cfg.evalMaxMemoryMiB} \
           --out-link "$run_dir/$arch" \
           --result-file "$run_dir/$arch.json" \
-          || true
+          || failed_arches="$failed_arches $arch"
       }
 
       build_arch x86_64-linux
@@ -261,16 +176,9 @@ let
         rm -rf "''${old_run:?}"
       done
 
-      # Publish gate: every per-host toplevel must succeed.
-      verdict_file="$run_dir/verdict.txt"
-      gate_ok=1
-      ${gate} ${escapeShellArg requiredFile} \
-        "x86_64-linux=$run_dir/x86_64-linux.json" \
-        "aarch64-linux=$run_dir/aarch64-linux.json" \
-        > "$verdict_file" 2>&1 || gate_ok=0
-      verdict=$(cat "$verdict_file")
-
-      if [ "$gate_ok" -eq 1 ]; then
+      # Publish gate: every per-host toplevel must have succeeded.
+      if [ -z "$failed_arches" ]; then
+        verdict="all toplevels ok"
         git add flake.lock
         # No --allow-empty: `built` should only move when the lock actually
         # changed, so its history stays a log of real bumps and clients can
@@ -296,6 +204,7 @@ let
         notify default "nix-autobuild: published" \
           "updated: $update_summary. $verdict. See $run_dir on optiplex."
       else
+        verdict="failed arches:$failed_arches"
         notify high "nix-autobuild: FAILED" \
           "$update_summary not published. $verdict. See $run_dir on optiplex."
         exit 1

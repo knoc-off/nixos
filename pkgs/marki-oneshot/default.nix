@@ -18,12 +18,14 @@
 #               nix run .#marki-oneshot                 # one-shot push
 {
   writeShellApplication,
-  callPackage,
+  pkgs,
+  self,
 }:
 let
-  marki = callPackage ../marki { };
-  naturalEarthData = callPackage ../natural-earth-data { };
-  geoBoundariesData = callPackage ../geoboundaries-data { };
+  system = pkgs.stdenv.hostPlatform.system;
+  marki = self.packages.${system}.marki;
+  naturalEarthData = self.packages.${system}.natural-earth-data;
+  geoBoundariesData = self.packages.${system}.geoboundaries-data;
 in
 writeShellApplication {
   name = "marki-oneshot";

@@ -1,8 +1,8 @@
 # Aggregates per-window key layers contributed by app modules and the user's
 # `base` layer, then wires the assembled result into hyprkan + kanata.
 #
-# App modules (firefox, ghostty, slack, freecad, ...) contribute their slice
-# via `keyLayers.layers.<name>`. The layer schema is documented in
+# App modules (firefox, ghostty, slack, zen-browser, ...) contribute their
+# slice via `keyLayers.layers.<name>`. The layer schema is documented in
 # lib/key-layers.nix; shared building blocks live in `self.lib.keyLayers.presets`.
 #
 # This module deliberately does NOT import the kanata/hyprkan modules, so app

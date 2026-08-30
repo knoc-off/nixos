@@ -25,37 +25,44 @@ in
   # - bar/ with default.nix     -> { bar = pkgs.callPackage ./bar {}; }   (leaf package)
   # - baz/ without default.nix  -> { baz = <recurse into baz/>; }
   # Skips hidden entries (starting with ".").
+  #
+  # Filtering happens on readDir's name/type *before* building the value
+  # thunks, not by building every value and dropping the nulls afterward --
+  # the latter forces every package in the tree to WHNF just to find out
+  # which ones exist, which breaks any package that references
+  # self.packages.${system} (a common pattern for dropping ../backlinks
+  # between sibling packages): forcing it needs the very attrset currently
+  # under construction.
   discoverPackages =
     pkgs:
     let
       discover =
         dir:
         lib.pipe (builtins.readDir dir) [
-          (lib.filterAttrs (name: _: name != "default.nix" && !lib.hasPrefix "." name))
+          (lib.filterAttrs (
+            name: type:
+            name != "default.nix"
+            && !lib.hasPrefix "." name
+            && (type == "directory" || (type == "regular" && lib.hasSuffix ".nix" name))
+          ))
           (lib.mapAttrs' (
             name: type:
-            if type == "regular" && lib.hasSuffix ".nix" name then
+            if type == "regular" then
               {
                 name = lib.removeSuffix ".nix" name;
                 value = pkgs.callPackage (dir + "/${name}") { };
               }
-            else if type == "directory" && builtins.pathExists (dir + "/${name}/default.nix") then
+            else if builtins.pathExists (dir + "/${name}/default.nix") then
               {
                 name = name;
                 value = pkgs.callPackage (dir + "/${name}") { };
               }
-            else if type == "directory" then
+            else
               {
                 name = name;
                 value = discover (dir + "/${name}");
               }
-            else
-              {
-                name = name;
-                value = null;
-              }
           ))
-          (lib.filterAttrs (_: v: v != null))
         ];
     in
     discover;
