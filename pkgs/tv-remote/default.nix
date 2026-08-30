@@ -90,8 +90,8 @@ writeShellApplication {
             if running spotify; then
               dispatch 'hl.dsp.focus({ window = "class:(?i)spotify" })'
             else
-              # Started as a unit so it rejoins tv-active.target and is torn
-              # down again on the next idle timeout.
+              # Started as a unit so it lands in its own cgroup with a stable
+              # name, the same one the session autostart uses.
               systemctl --user start spotify.service
             fi
             ;;
@@ -99,11 +99,8 @@ writeShellApplication {
         esac
         ;;
       sleep)
-        # tv-away.service is the same path hypridle's timeout uses -- it
-        # freezes windowed apps (Spotify) instead of stopping them, which
-        # matters: killing a window while the session is idled makes
-        # Hyprland emit a bogus resume event that immediately undoes the
-        # teardown.
+        # tv-away.service is the same path hypridle's timeout uses -- one
+        # canonical way to put the box to sleep.
         systemctl --user start tv-away.service
         dispatch 'hl.dsp.dpms({ action = "disable" })'
         ;;

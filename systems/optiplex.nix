@@ -54,6 +54,159 @@ in
       };
     }
 
+    self.nixosModules.ovwatch
+    {
+      # Subscriptions live in StateDirectory, not here: publish "+spiderman
+      # imax ov" to the ovwatch topic to watch a film, "?" to list, "-" to
+      # drop. Notifications and commands share that one topic, so the token
+      # needs rw on it (see hetzner's services/ntfy.nix).
+      services.ovwatch = {
+        enable = true;
+        ntfy.tokenFile = config.sops.secrets."services/ntfy/publish-token".path;
+
+        # Hall quality drives the score, adjusted by how much I like the place
+        # and its reviews, minus what it costs me to get there. The feed never
+        # says which hall a screening is in, so where a format does not pin it
+        # (IMAX at UCI, 70mm at Zoo) the notification shows a range instead.
+        scoring = {
+          enable = true;
+          cinemas = {
+            "Zoo Palast" = {
+              match = [ "zoo palast" ];
+              bias = 9;
+              review = 9.2;
+              travel = 0.60;
+              halls = [
+                {
+                  name = "Saal 1";
+                  score = 8.9;
+                  formats = [ "70mm" ];
+                }
+              ];
+            };
+            "UCI East Side Gallery" = {
+              match = [ "east side gallery" ];
+              review = 8.3;
+              travel = 1.20;
+              halls = [
+                {
+                  name = "Saal 1 IMAX";
+                  score = 10.0;
+                  bias = 7;
+                  formats = [ "IMAX" ];
+                }
+                # iSense and ScreenX never appear in the feed's format field,
+                # so a plain OV screening here is always a range across these.
+                {
+                  name = "Saal 2 iSense";
+                  score = 8.0;
+                  bias = 7;
+                }
+                {
+                  name = "Saal 4 ScreenX";
+                  score = 5.3;
+                  bias = 4;
+                }
+              ];
+            };
+            "Kino International" = {
+              match = [ "kino international" ];
+              bias = 9;
+              review = 9.2;
+              travel = 0.30;
+              halls = [
+                {
+                  name = "Saal 1";
+                  score = 6.8;
+                }
+              ];
+            };
+            "CineStar CUBIX" = {
+              match = [ "cubix" ];
+              review = 3.3;
+              travel = 0.12;
+              halls = [
+                {
+                  name = "Saal 9";
+                  score = 8.4;
+                  bias = 6;
+                }
+                {
+                  name = "Saal 7";
+                  score = 6.4;
+                  bias = 5;
+                }
+              ];
+            };
+            "Cineplex Alhambra" = {
+              match = [ "alhambra" ];
+              bias = 6;
+              review = 5.8;
+              travel = 0.0;
+              halls = [
+                {
+                  name = "Saal 1";
+                  score = 6.6;
+                }
+              ];
+            };
+            "CinemaxX Potsdamer Platz" = {
+              match = [ "cinemaxx" ];
+              bias = 6;
+              review = 4.2;
+              travel = 0.18;
+              halls = [
+                {
+                  name = "Saal 7";
+                  score = 7.2;
+                }
+                {
+                  name = "Saal 3";
+                  score = 6.9;
+                }
+              ];
+            };
+            "Kulturbrauerei" = {
+              match = [ "kulturbrauerei" ];
+              bias = 7;
+              review = 5.0;
+              travel = 0.0;
+              halls = [
+                {
+                  name = "Saal 1";
+                  score = 6.0;
+                }
+              ];
+            };
+            "Cineplex Neukoelln" = {
+              match = [ "neuk" ];
+              bias = 4;
+              review = 4.2;
+              travel = 0.72;
+              halls = [
+                {
+                  name = "Saal 1";
+                  score = 6.6;
+                }
+              ];
+            };
+            "Cineplex Titania" = {
+              match = [ "titania" ];
+              bias = 7;
+              review = 5.8;
+              travel = 1.68;
+              halls = [
+                {
+                  name = "Saal 1";
+                  score = 6.3;
+                }
+              ];
+            };
+          };
+        };
+      };
+    }
+
     self.nixosModules.btrfs-luks
     {
       disks.btrfsLuks = {

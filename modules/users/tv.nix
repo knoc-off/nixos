@@ -381,20 +381,29 @@
               SystemdService=kdeconnect.service
             '';
 
-            # KDE Connect advertises this box to phones even with the projector off,
-            # and Spotify keeps it in the Connect device list. Both get torn down
-            # when nobody's watching and come back on the first input event.
-            # Firefox is deliberately absent -- it stays up.
-            tv.away = {
-              units = [ "kdeconnect" ];
-              apps.spotify = {
-                description = "Spotify";
-                command = "${pkgs.spotify}/bin/spotify";
-                # Frozen rather than stopped so the TV stops showing up as a
-                # Connect target on the phone without its window being torn
-                # down mid-idle -- see the freeze option for why that matters.
-                freeze = true;
+            # KDE Connect advertises this box to phones even with the projector
+            # off, so it gets torn down when nobody's watching and comes back on
+            # the first input event. GUI apps stay out of tv-active.target --
+            # see the note in the tv-away module for why.
+            tv.away.units = [ "kdeconnect" ];
+
+            # A unit rather than a hyprland exec-once so tv-remote has a stable
+            # name to start it by. It is never stopped by the idle policy.
+            systemd.user.services.spotify = {
+              Unit = {
+                Description = "Spotify";
+                PartOf = [ "graphical-session.target" ];
+                After = [ "graphical-session.target" ];
               };
+              Service = {
+                ExecStart = "${pkgs.spotify}/bin/spotify";
+                Slice = "app-graphical.slice";
+                # A clean exit means you closed the window on purpose -- leave
+                # it closed. Only crashes get restarted.
+                Restart = "on-failure";
+                RestartSec = 5;
+              };
+              Install.WantedBy = [ "graphical-session.target" ];
             };
 
             # Run-commands the phone can trigger. QJsonObject sorts by key, so

@@ -13,6 +13,12 @@ in
       auth-default-access = "deny-all";
       enable-login = true;
 
+      # The message cache is in-memory by default, so an ntfy restart drops
+      # anything not yet delivered. ovwatch polls its command topic on a timer
+      # rather than holding a stream open, so a restart between publishing a
+      # command and the next tick would silently swallow it.
+      cache-file = "/var/lib/ntfy-sh/cache.db";
+
       # ACLs are authoritative here; NTFY_AUTH_ACCESS must stay unset (env
       # overrides server.yml per-key). admin needs no entry (role = all topics).
       auth-access = [
@@ -20,11 +26,15 @@ in
         "normal:cat-doorbell:ro"
         "normal:kitchenowl:ro"
         "normal:nixbuild:ro"
+        # rw for both: ovwatch shares one topic for notifications and for the
+        # commands that manage subscriptions, so each side must read and write.
+        "normal:ovwatch:rw"
         "normal:wohnungen:ro"
         "publisher:alerts:wo"
         "publisher:cat-doorbell:wo"
         "publisher:kitchenowl:wo"
         "publisher:nixbuild:wo"
+        "publisher:ovwatch:rw"
         "publisher:wohnungen:wo"
       ];
     };
