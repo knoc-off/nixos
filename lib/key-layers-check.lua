@@ -2,31 +2,25 @@
 -- (see lib/key-layers.nix's `windowRules` + modules/keylayers/default.nix's
 -- template). Run via `nix flake check` (checks.<system>.key-layers).
 --
--- Stubs Hyprland's `hl` global and Lua's `io.popen` (the fragment's only
--- external dependency, used for the persistent `nc` pipe to kanata) with an
--- in-memory fake, then asserts on the sequence of writes produced by a
--- scripted series of focus events.
+-- Stubs Hyprland's `hl` global (the fragment's only external dependency:
+-- `hl.on` for the focus callback, `hl.exec_cmd` for the fire-and-forget
+-- nc invocation towards kanata), then asserts on the sequence of layer
+-- switches produced by a scripted series of focus events.
 --
 -- Usage: lua key-layers-check.lua <generated-fragment.lua>
 local fragmentPath = arg[1]
 
-local writes = {}
-local realPopen = io.popen
-io.popen = function(cmd, mode)
-  return {
-    write = function(_, data)
-      table.insert(writes, data)
-      return true
-    end,
-    flush = function() end,
-    close = function() end,
-  }
-end
-
+local switches = {}
 local registered = {}
 hl = {
   on = function(event, fn)
     registered[event] = fn
+  end,
+  exec_cmd = function(cmd)
+    -- Extract the layer from the ChangeLayer JSON embedded in the command.
+    local layer = cmd:match('"ChangeLayer".-"new".-"([^"]+)"')
+    assert(layer, "exec_cmd called without a ChangeLayer payload: " .. cmd)
+    table.insert(switches, layer)
   end,
 }
 
@@ -42,20 +36,19 @@ fire({ class = "com.mitchellh.ghostty" }) -- expect: switch to terminal
 fire({ class = "unknown-app-xyz" }) -- unmatched class, expect: fall back to base
 fire({ class = nil }) -- malformed event, expect: ignored
 fire(nil) -- malformed event, expect: ignored
-io.popen = realPopen
 
 local expected = {
-  '{"ChangeLayer":{"new":"browser"}}\n',
-  '{"ChangeLayer":{"new":"terminal"}}\n',
-  '{"ChangeLayer":{"new":"base"}}\n',
+  "browser",
+  "terminal",
+  "base",
 }
 
 assert(
-  #writes == #expected,
-  string.format("expected %d writes, got %d: %s", #expected, #writes, table.concat(writes, ", "))
+  #switches == #expected,
+  string.format("expected %d switches, got %d: %s", #expected, #switches, table.concat(switches, ", "))
 )
 for i, w in ipairs(expected) do
-  assert(writes[i] == w, string.format("write %d: expected %q, got %q", i, w, writes[i]))
+  assert(switches[i] == w, string.format("switch %d: expected %q, got %q", i, w, switches[i]))
 end
 
 print("key-layers Lua behavior: " .. #expected .. "/" .. #expected .. " assertions passed")

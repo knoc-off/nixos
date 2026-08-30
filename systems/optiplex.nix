@@ -26,6 +26,7 @@ in
           "services/ntfy/publish-token" = { };
           "services/minecraft/RCON_PASSWORD" = { };
           "services/nix-autobuild/deploy-key" = { };
+          "services/anki-sync-server/password" = { };
         };
       };
     }
@@ -206,6 +207,42 @@ in
         };
       };
     }
+
+    {
+      # Anki sync for AnkiDroid over the tailnet; marki pushes markdown cards
+      # from /srv/flashcards directly into the served collection file. Caddy
+      # terminates TLS (DNS-01 via caddy-common, no public reachability
+      # needed); the sync server itself only listens on loopback.
+      services.anki-sync-server = {
+        enable = true;
+        address = "127.0.0.1";
+        port = 27701;
+        users = [
+          {
+            username = "tv";
+            passwordFile = config.sops.secrets."services/anki-sync-server/password".path;
+          }
+        ];
+      };
+
+      sops.secrets."services/caddy/cloudflare-env" = { };
+
+      services.caddy = {
+        enable = true;
+        email = "acme@niko.ink";
+        environmentFile = config.sops.secrets."services/caddy/cloudflare-env".path;
+        virtualHosts."optiplex.tail.niko.ink".extraConfig = ''
+          reverse_proxy localhost:27701
+        '';
+      };
+
+      # Tailnet-only: no openFirewall, just the tailscale interface. Cert
+      # issuance is DNS-01, so no inbound port 80 required.
+      networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 443 ];
+
+      systemd.tmpfiles.rules = [ "d /srv/flashcards 0755 ${user} users -" ];
+    }
+    self.nixosModules.caddy-common
 
     self.nixosModules.btrfs-luks
     {
@@ -558,6 +595,7 @@ in
   environment.systemPackages = [
     pkgs.curl
     pkgs.gitMinimal
+    self.packages.${pkgs.stdenv.hostPlatform.system}.marki
     self.packages.${pkgs.stdenv.hostPlatform.system}.session-env
     # inputs.nixgl.packages.x86_64-linux.nixGLIntel
   ];

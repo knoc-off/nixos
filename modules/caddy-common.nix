@@ -19,8 +19,18 @@
           hash = "sha256-8yZDrejNKsaUnUaTUFYbarWNmxafqp2z2rWo+XRsxV8=";
         };
 
+        # cert_issuer (not acme_dns): the DNS-01 solver looks up the owning
+        # zone with an SOA query through the system resolver, and on hosts
+        # with acceptDns = true that resolver is MagicDNS, which only speaks
+        # A/AAAA and answers NOTIMP to everything else. Explicit resolvers
+        # bypass it for ACME only. Same nameservers as headscale's global
+        # fallback. Note cert_issuer replaces the default issuer list, so
+        # this drops the ZeroSSL fallback -- fine for these internal certs.
         services.caddy.globalConfig = ''
-          acme_dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+          cert_issuer acme {
+            dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+            resolvers 1.1.1.1 9.9.9.9
+          }
         '';
 
         # mkBefore so the snippet is declared earlier in the generated

@@ -147,7 +147,7 @@
             # systems/optiplex.nix; USB drives show up automatically under
             # /run/media/tv via services.gvfs + devmon.
             programs.tv-files = {
-              enable = true;
+              enable = false;
               places = [
                 {
                   name = "Media";

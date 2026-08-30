@@ -222,7 +222,7 @@
           # derivation's build; key-layers-check.lua loads the generated Lua
           # fragment (catching syntax errors) and asserts its runtime
           # behavior (class -> layer matching, dedup, base fallback,
-          # malformed-event safety) against an in-memory `io.popen`/`hl` stub.
+          # malformed-event safety) against an in-memory `hl` stub.
           key-layers =
             pkgs.runCommand "key-layers-check"
               {

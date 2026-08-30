@@ -27,6 +27,15 @@ let
   # `dark`/`light` -- verified by reading the parser directly, since it isn't
   # documented anywhere the schema is spelled out completely. Getting a key
   # wrong doesn't error, it just falls back to magenta for that role.
+  #
+  # `terminal` is NOT optional despite the name suggesting it's just for
+  # terminal-app theming: src/theme/theme_service.cpp's
+  # parseCommunityPaletteJson (the function that actually backs runtime
+  # `color-scheme-set custom <name>`, not just the `cli.cpp` fixed-palette
+  # path) requires `readModeTerminalJson` to succeed for the *whole mode* to
+  # parse. Omit it and the entire custom palette is rejected -- Noctalia logs
+  # "custom palette 'X' not found or invalid; falling back to builtin" and
+  # silently reverts to the builtin palette. Verified by reading the parser.
   mkPaletteMode = t: {
     mPrimary = "#${t.base0C}";
     mOnPrimary = "#${t.base00}";
@@ -42,6 +51,34 @@ let
     mOnSurfaceVariant = "#${t.base04}";
     mOutline = "#${t.base03}";
     mShadow = "#000000";
+    terminal = {
+      normal = {
+        black = "#${t.base00}";
+        red = "#${t.base08}";
+        green = "#${t.base0B}";
+        yellow = "#${t.base0A}";
+        blue = "#${t.base0D}";
+        magenta = "#${t.base0E}";
+        cyan = "#${t.base0C}";
+        white = "#${t.base06}";
+      };
+      bright = {
+        black = "#${t.base03}";
+        red = "#${t.base08}";
+        green = "#${t.base0B}";
+        yellow = "#${t.base0A}";
+        blue = "#${t.base0D}";
+        magenta = "#${t.base0E}";
+        cyan = "#${t.base0C}";
+        white = "#${t.base07}";
+      };
+      foreground = "#${t.base05}";
+      background = "#${t.base00}";
+      cursor = "#${t.base09}";
+      cursorText = "#${t.base00}";
+      selectionFg = "#${t.base06}";
+      selectionBg = "#${t.base02}";
+    };
   };
 
   base16Palette = {

@@ -159,6 +159,11 @@
           # for how this was verified against the parser source. Only `dark`
           # is emitted here since this whole feature is dark-theme-only
           # (theme.dark.workspaceColors has no light counterpart).
+          #
+          # `terminal` is required, not optional -- see the comment on
+          # mkPaletteMode in modules/noctalia.nix. Without it,
+          # parseCommunityPaletteJson rejects the whole mode and every
+          # workspace silently falls back to the builtin palette.
           mkWsPalette =
             wsHex:
             let
@@ -195,6 +200,34 @@
                 mShadow = "#000000";
                 mHover = hover;
                 mOnHover = onHover;
+                terminal = {
+                  normal = {
+                    black = surface;
+                    red = error;
+                    green = "#${theme.dark.base0B}";
+                    yellow = "#${theme.dark.base0A}";
+                    blue = secondary;
+                    magenta = tertiary;
+                    cyan = primary;
+                    white = onSurface;
+                  };
+                  bright = {
+                    black = outline;
+                    red = error;
+                    green = "#${theme.dark.base0B}";
+                    yellow = "#${theme.dark.base0A}";
+                    blue = secondary;
+                    magenta = tertiary;
+                    cyan = primary;
+                    white = "#${theme.dark.base07}";
+                  };
+                  foreground = onSurface;
+                  background = surface;
+                  cursor = "#${theme.dark.base09}";
+                  cursorText = onBg;
+                  selectionFg = onHover;
+                  selectionBg = hover;
+                };
               };
             };
 
