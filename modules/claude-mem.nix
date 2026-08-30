@@ -25,12 +25,6 @@
           default = self.packages.${system}.claude-mem;
           description = "The claude-mem package to use.";
         };
-
-        opencode.enable = lib.mkOption {
-          type = lib.types.bool;
-          default = true;
-          description = "Install the claude-mem plugin for OpenCode.";
-        };
       };
 
       config = lib.mkIf cfg.enable {
@@ -53,12 +47,6 @@
             ];
           };
           Install.WantedBy = [ "default.target" ];
-        };
-
-        # Install OpenCode plugin
-        xdg.configFile = lib.mkIf cfg.opencode.enable {
-          "opencode/plugins/claude-mem.js".source =
-            "${cfg.package}/lib/claude-mem/dist/opencode-plugin/index.js";
         };
       };
     };

@@ -42,8 +42,6 @@
     ./modules/languages/lua.nix
     # ./modules/languages/github-actions.nix
 
-    # ./modules/opencode.nix
-
     ./themes
 
     ./modules/precognition.nix

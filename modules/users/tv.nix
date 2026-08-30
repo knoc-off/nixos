@@ -85,7 +85,6 @@
             imports = [
               self.homeModules.cli-tools
               self.homeModules.ghostty
-              self.homeModules.opencode
 
               self.homeModules.noctalia
               self.homeModules.hyprland-tv

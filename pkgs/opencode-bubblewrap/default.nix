@@ -1,5 +1,6 @@
 {
   inputs,
+  self,
   upkgs,
   pkgs,
   ...
@@ -30,6 +31,14 @@ let
 
   claudeMem = pkgs.callPackage ../claude-mem { };
   hostQuery = pkgs.callPackage ../host-query { };
+
+  # The jail's entire ~/.config/opencode, generated in the store. See
+  # config/default.nix for why this is a store path rather than the host's
+  # config dir, and why it is mounted as an overlay lower layer.
+  opencodeConfig = pkgs.callPackage ./config {
+    inherit claudeMem hostQuery lspmuxSession;
+    jailContext = ./jail-context.md;
+  };
 
   # Safe rm/rmdir — shadows coreutils inside the jail so agent deletions
   # land in the FreeDesktop trash (~/.local/share/Trash/) instead of being
@@ -77,53 +86,6 @@ let
         '')
       ];
     };
-
-  # Jail-specific opencode overrides — merged on top of the global config.
-  # Permissions are relaxed because the sandbox already constrains blast radius.
-  jailConfig = pkgs.writeText "opencode-jail.json" (
-    builtins.toJSON {
-      "$schema" = "https://opencode.ai/config.json";
-
-      # The agent's model of the filesystem it has been given: real project
-      # paths, the scratch and workspaces binds, and which of them persist.
-      # Delivered as an instruction file rather than injected into the system
-      # prompt by the proxy, so it is opencode's own config that decides.
-      instructions = [ "${./jail-context.md}" ];
-
-      permission = {
-        # Read/explore — always allowed, no side effects
-        read = "allow";
-        glob = "allow";
-        grep = "allow";
-        list = "allow";
-        lsp = "allow";
-        repo_overview = "allow";
-        codesearch = "allow";
-        webfetch = "allow";
-        websearch = "allow";
-
-        # Agent utilities — safe
-        # NOTE: task and todowrite are intentionally omitted. The default
-        # "*": "allow" still lets the top-level agent use them, but opencode's
-        # exact-match checks (rule.permission === "task"/"todowrite") won't
-        # find explicit rules, so sub-agents get these tools disabled —
-        # preventing recursive spawning and todo list clobbering.
-        question = "allow";
-        repo_clone = "allow";
-        skill = "allow";
-        external_directory = "allow";
-
-        # Bash — sandbox + trash-backed rm constrain damage
-        bash = "allow";
-
-        # Edit — user approves each file modification
-        edit = "ask";
-
-        # Host exec — user approves each host command
-        host_exec = "ask";
-      };
-    }
-  );
 
   # Shell helpers shared by the host-side launcher (add-runtime) and the
   # in-jail entrypoint (wrap-entry). Those are two separate scripts, so
@@ -412,89 +374,89 @@ jail "jailed-opencode" upkgs.fish (
       HOST_QUERY_PORT=$(pick_port $((19600 + PORT_OFFSET)))
 
       # ── Host-query service (runs on host, outside jail) ──────
-      ${pkgs.coreutils}/bin/mkdir -p "$HOME/.local/state/opencode"
+      # Its log goes to this jail's own state dir, not the host's
+      # ~/.local/state/opencode -- that path is the *jail's* state once bound,
+      # and writing there from the host side would be the last thing putting
+      # agent state outside a jail-owned directory.
+      if [[ -n "$JAIL_NAME" ]]; then
+        JAIL_STATE_DIR="$HOME/.local/state/opencode-jails/$JAIL_NAME"
+      else
+        JAIL_STATE_DIR="$HOME/.local/state/opencode-jails/_shared"
+      fi
+      ${pkgs.coreutils}/bin/mkdir -p "$JAIL_STATE_DIR"
       ${lib.getExe hostQuery} "$HOST_QUERY_PORT" \
-        > "$HOME/.local/state/opencode/host-query.log" 2>&1 &
+        > "$JAIL_STATE_DIR/host-query.log" 2>&1 &
       HOST_QUERY_PID=$!
       if ! wait_for_health "http://127.0.0.1:$HOST_QUERY_PORT/health"; then
         echo "jailed-opencode: warning: host-query failed to start on port $HOST_QUERY_PORT" >&2
         echo "  the host_exec tool will be unavailable this session" >&2
       fi
 
-      # ── State mounting (named = isolated, unnamed = host) ────
-      if [[ -n "$JAIL_NAME" ]]; then
-        JAIL_DIR="$JAIL_PERSIST_DIR"
-        JAIL_STATE_DIR="$HOME/.local/state/opencode-jails/$JAIL_NAME"
-        JAIL_CLAUDE_DIR="$JAIL_DIR/claude"
-        JAIL_MEM_DIR="$JAIL_DIR/claude-mem"
-        JAIL_FISH_DIR="$JAIL_DIR/fish"
+      # ── State mounting (all jail-owned, nothing from the host) ────
+      # Named and unnamed jails differ only in *which* persist dir they use:
+      # a named one gets its own, unnamed ones share "_shared" (the same
+      # identity that already backs their ~/scratch and direnv state). Neither
+      # reads or writes the host's ~/.claude, ~/.claude.json or
+      # ~/.local/share/opencode -- the host holds no agent state at all.
+      #
+      # This is also where credentials live. compat-proxy only *reads* tokens
+      # (creds.rs: "no caching, no refresh logic") and errors on expiry, so the
+      # refresh has to come from the `claude` CLI in the jail's own toolbelt,
+      # writing to the .credentials.json below. That means one `claude /login`
+      # per jail identity -- once for _shared, once per named jail.
+      JAIL_DIR="$JAIL_PERSIST_DIR"
+      JAIL_CLAUDE_DIR="$JAIL_DIR/claude"
+      JAIL_MEM_DIR="$JAIL_DIR/claude-mem"
+      JAIL_FISH_DIR="$JAIL_DIR/fish"
+      # JAIL_STATE_DIR was computed above, for the host-query log.
 
-        ${pkgs.coreutils}/bin/mkdir -p "$JAIL_CLAUDE_DIR" "$JAIL_STATE_DIR" "$JAIL_MEM_DIR" "$JAIL_FISH_DIR"
+      ${pkgs.coreutils}/bin/mkdir -p "$JAIL_CLAUDE_DIR" "$JAIL_MEM_DIR" "$JAIL_FISH_DIR"
 
-        # Named jails get their *own* .claude.json rather than the host's, so
-        # the isolation the name buys isn't undone by sharing Claude Code's
-        # config (and session history) with the host. Seeded from the host's
-        # copy on first use because the proxy reads `oauthAccount.accountUuid`
-        # out of it for the `metadata.user_id` field real CC sends -- without
-        # it the jail's requests are missing a field every genuine CC request
-        # carries. Also stops the `claude` CLI complaining the file is absent.
-        if [[ ! -f "$JAIL_DIR/claude.json" && -f "$HOME/.claude.json" ]]; then
-          ${pkgs.coreutils}/bin/cp "$HOME/.claude.json" "$JAIL_DIR/claude.json"
+      # .claude.json carries `oauthAccount.accountUuid`, which compat-proxy
+      # reads for the `metadata.user_id` field real Claude Code sends. It is
+      # created by the first in-jail `claude` login; until then requests simply
+      # omit the field (main.rs warns and continues). Bound only if present so
+      # a fresh jail doesn't fail on a missing file.
+      [ -f "$JAIL_DIR/claude.json" ] && RUNTIME_ARGS+=(--bind "$JAIL_DIR/claude.json" "$HOME/.claude.json")
+
+      # opencode must not hold its own anthropic OAuth token in here. The
+      # compat-proxy is what supplies credentials, so an `oauth` entry is
+      # redundant -- but worse, it is silently destructive: native-runtime.ts
+      # refuses to run the native LLM path under OAuth auth ("OAuth auth
+      # requires a provider fetch override") and falls back to the AI SDK,
+      # which is the *only* path the Claude Code tool-name aliasing patch
+      # (pkgs/opencode) hooks. Requests then go out naming opencode's own
+      # tools -- `todowrite` alone is enough -- and Anthropic rejects them
+      # with a quota-shaped "You're out of extra usage" error that has
+      # nothing to do with quota. Swapped for the same dummy api key the
+      # generated config already sets, since the proxy ignores it either way.
+      AUTH_JSON="$JAIL_DIR/auth.json"
+      if [ -f "$AUTH_JSON" ] \
+        && [ "$(${pkgs.jq}/bin/jq -r '.anthropic.type // ""' "$AUTH_JSON")" = "oauth" ]; then
+        ${pkgs.coreutils}/bin/cp "$AUTH_JSON" "$AUTH_JSON.oauth.bak"
+        if ${pkgs.jq}/bin/jq '.anthropic = {"type":"api","key":"not-needed"}' \
+            "$AUTH_JSON" > "$AUTH_JSON.tmp"; then
+          ${pkgs.coreutils}/bin/mv "$AUTH_JSON.tmp" "$AUTH_JSON"
+          echo "jailed-opencode: replaced stale anthropic OAuth auth in $AUTH_JSON" >&2
+          echo "  (it disables opencode's native LLM runtime; backup at $AUTH_JSON.oauth.bak)" >&2
+        else
+          ${pkgs.coreutils}/bin/rm -f "$AUTH_JSON.tmp"
+          echo "jailed-opencode: warning: could not rewrite $AUTH_JSON" >&2
         fi
-        [ -f "$JAIL_DIR/claude.json" ] && RUNTIME_ARGS+=(--bind "$JAIL_DIR/claude.json" "$HOME/.claude.json")
-
-        # opencode must not hold its own anthropic OAuth token in here. The
-        # compat-proxy is what supplies credentials, so an `oauth` entry is
-        # redundant -- but worse, it is silently destructive: native-runtime.ts
-        # refuses to run the native LLM path under OAuth auth ("OAuth auth
-        # requires a provider fetch override") and falls back to the AI SDK,
-        # which is the *only* path the Claude Code tool-name aliasing patch
-        # (pkgs/opencode) hooks. Requests then go out naming opencode's own
-        # tools -- `todowrite` alone is enough -- and Anthropic rejects them
-        # with a quota-shaped "You're out of extra usage" error that has
-        # nothing to do with quota. Swapped for the same dummy api key the
-        # global config already sets, since the proxy ignores it either way.
-        AUTH_JSON="$JAIL_DIR/auth.json"
-        if [ -f "$AUTH_JSON" ] \
-          && [ "$(${pkgs.jq}/bin/jq -r '.anthropic.type // ""' "$AUTH_JSON")" = "oauth" ]; then
-          ${pkgs.coreutils}/bin/cp "$AUTH_JSON" "$AUTH_JSON.oauth.bak"
-          if ${pkgs.jq}/bin/jq '.anthropic = {"type":"api","key":"not-needed"}' \
-              "$AUTH_JSON" > "$AUTH_JSON.tmp"; then
-            ${pkgs.coreutils}/bin/mv "$AUTH_JSON.tmp" "$AUTH_JSON"
-            echo "jailed-opencode: replaced stale anthropic OAuth auth in $AUTH_JSON" >&2
-            echo "  (it disables opencode's native LLM runtime; backup at $AUTH_JSON.oauth.bak)" >&2
-          else
-            ${pkgs.coreutils}/bin/rm -f "$AUTH_JSON.tmp"
-            echo "jailed-opencode: warning: could not rewrite $AUTH_JSON" >&2
-          fi
-        fi
-
-        RUNTIME_ARGS+=(--bind "$JAIL_CLAUDE_DIR" "$HOME/.claude")
-        RUNTIME_ARGS+=(--bind "$JAIL_DIR" "$HOME/.local/share/opencode")
-        RUNTIME_ARGS+=(--bind "$JAIL_STATE_DIR" "$HOME/.local/state/opencode")
-        RUNTIME_ARGS+=(--bind "$JAIL_MEM_DIR" "$HOME/.claude-mem")
-        RUNTIME_ARGS+=(--bind "$JAIL_FISH_DIR" "$HOME/.local/share/fish")
-      else
-        ${pkgs.coreutils}/bin/mkdir -p "$HOME/.claude" "$HOME/.local/share/opencode" "$HOME/.local/state/opencode"
-        [ -f "$HOME/.claude.json" ] && RUNTIME_ARGS+=(--bind "$HOME/.claude.json" "$HOME/.claude.json")
-
-        # Same OAuth hazard as the named branch above, but this is the host's
-        # real auth.json rather than disposable per-jail state, so say so
-        # instead of rewriting it.
-        if [ -f "$HOME/.local/share/opencode/auth.json" ] \
-          && [ "$(${pkgs.jq}/bin/jq -r '.anthropic.type // ""' \
-                  "$HOME/.local/share/opencode/auth.json")" = "oauth" ]; then
-          echo "jailed-opencode: warning: anthropic is set to OAuth auth in ~/.local/share/opencode/auth.json" >&2
-          echo "  that disables opencode's native LLM runtime, so requests go out with opencode's" >&2
-          echo "  own tool names and Anthropic rejects them as \"out of extra usage\"." >&2
-          echo "  Fix: set it to {\"type\":\"api\",\"key\":\"not-needed\"} (the proxy supplies credentials)." >&2
-        fi
-
-        RUNTIME_ARGS+=(--bind "$HOME/.claude" "$HOME/.claude")
-        RUNTIME_ARGS+=(--bind "$HOME/.local/share/opencode" "$HOME/.local/share/opencode")
-        RUNTIME_ARGS+=(--bind "$HOME/.local/state/opencode" "$HOME/.local/state/opencode")
-        [ -d "$HOME/.claude-mem" ] && RUNTIME_ARGS+=(--bind "$HOME/.claude-mem" "$HOME/.claude-mem")
       fi
+
+      # No credentials yet: say so up front rather than letting the first
+      # request fail with a 503 from the proxy.
+      if [ ! -f "$JAIL_CLAUDE_DIR/.credentials.json" ]; then
+        echo "jailed-opencode: no credentials in $JAIL_CLAUDE_DIR" >&2
+        echo "  run 'claude /login' inside the jail once to authenticate this jail identity" >&2
+      fi
+
+      RUNTIME_ARGS+=(--bind "$JAIL_CLAUDE_DIR" "$HOME/.claude")
+      RUNTIME_ARGS+=(--bind "$JAIL_DIR" "$HOME/.local/share/opencode")
+      RUNTIME_ARGS+=(--bind "$JAIL_STATE_DIR" "$HOME/.local/state/opencode")
+      RUNTIME_ARGS+=(--bind "$JAIL_MEM_DIR" "$HOME/.claude-mem")
+      RUNTIME_ARGS+=(--bind "$JAIL_FISH_DIR" "$HOME/.local/share/fish")
 
       if [[ -r "$HOME/.ssh/id_ed25519_signing" ]]; then
         RUNTIME_ARGS+=(--ro-bind "$HOME/.ssh/id_ed25519_signing" "$HOME/.ssh/id_ed25519_signing")
@@ -575,7 +537,14 @@ jail "jailed-opencode" upkgs.fish (
     (try-ro-bind (noescape "\"$HOME/.config/git\"") (noescape "~/.config/git"))
     (try-ro-bind (noescape "\"$HOME/.gitignore\"") (noescape "~/.gitignore"))
 
-    (try-rw-bind (noescape "\"$HOME/.config/opencode\"") (noescape "~/.config/opencode"))
+    # ~/.config/opencode is generated (pkgs/opencode-bubblewrap/config), not
+    # the host's. A tmpfs overlay rather than a plain ro-bind because opencode
+    # writes into its own config dir on every start and cannot be told not to
+    # -- .gitignore via ensureGitignore, and package.json/bun.lock/node_modules
+    # from the background `@opencode-ai/plugin` install. Those land in the
+    # upper layer and are discarded at session end, so config state can never
+    # accumulate across sessions.
+    (overlay-tmp [ "${opencodeConfig}" ] (noescape "~/.config/opencode"))
     (try-rw-bind (noescape "\"$HOME/.cache/opencode\"") (noescape "~/.cache/opencode"))
     (try-rw-bind (noescape "\"$HOME/.cache/uv\"") (noescape "~/.cache/uv"))
 
@@ -669,8 +638,12 @@ jail "jailed-opencode" upkgs.fish (
     # Selects which named lspmux session the in-jail rust LSP joins, e.g.
     # `LSPMUX_SESSION=windows jailed-opencode ~/integrations-mono`.
     (try-fwd-env "LSPMUX_SESSION")
+    # MCP server credentials, read out of the config by opencode's {env:...}
+    # substitution. Sourced from sops via the shell environment on the host;
+    # without these forwards the context7 and figma servers silently fail to
+    # authenticate inside the jail.
+    (try-fwd-env "CONTEXT7_API_KEY")
     (set-env "NIX_REMOTE" "daemon")
-    (set-env "OPENCODE_CONFIG" "${jailConfig}")
 
     (add-pkg-deps (
       agentToolbelt

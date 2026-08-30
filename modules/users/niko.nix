@@ -50,7 +50,6 @@
               self.homeModules.cli-tools
               self.homeModules.ghostty
               self.homeModules.pueue
-              self.homeModules.opencode
 
               self.homeModules.shell
               self.homeModules.scripts
@@ -67,11 +66,8 @@
               self.homeModules.environment
 
               self.homeModules.lspmux
-              self.homeModules.claude-token-refresh
               self.homeModules.claude-mem
               { services.claude-mem.enable = true; }
-              self.homeModules.host-query
-              { services.host-query.enable = true; }
 
               self.homeModules.hyprland
               self.homeModules.noctalia
@@ -114,22 +110,6 @@
                   };
                 };
               }
-
-              self.homeModules.compat-proxy
-              # Fuck anthropic
-              (
-                {
-                  config,
-                  ...
-                }:
-                {
-                  services.compat-proxy = {
-                    enable = true;
-                    port = 58192;
-                    dumpDir = "${config.xdg.stateHome}/compat-proxy/dumps";
-                  };
-                }
-              )
 
               self.homeModules.git
               {
@@ -233,10 +213,6 @@
               self.packages.${pkgs.stdenv.hostPlatform.system}.neovim
 
               spotify
-
-              self.packages.${pkgs.stdenv.hostPlatform.system}.opencode
-
-              upkgs.claude-code
 
               gnome-calculator
 

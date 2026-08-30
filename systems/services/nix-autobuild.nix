@@ -1,14 +1,11 @@
 # Weekly (or on-demand) refresh of the flake's lockfile, verified by building
-# everything cacheJobs names, and published to the `built` branch. See the
-# repo-root discussion in nix-cache.nix for why this exists: this is the half
-# that keeps optiplex's cache actually current.
+# every per-host toplevel cacheJobs names, and published to the `built`
+# branch. See the repo-root discussion in nix-cache.nix for why this exists:
+# this is the half that keeps optiplex's cache actually current.
 #
-# The publish gate is deliberately partial. Both architectures are always
-# built, every attr is attempted, and only the per-host `toplevel/*` attrs are
-# blocking -- a broken ad hoc package leaves the lock publishable, because a
-# package that any host actually installs is inside that host's closure and
-# fails its toplevel anyway. Everything that did get realised stays in the
-# store and is served regardless, so a red run still warms the cache.
+# Both architectures are always built, and every `toplevel/*` attr is
+# blocking: cacheJobs names nothing else, so a red run means some host would
+# fail to switch on this lock.
 #
 # Deliberately not DynamicUser: the same nix-autobuild-run script is reused
 # both by the timer-driven service below and by ad hoc `systemd-run` for
@@ -38,10 +35,8 @@ let
   nix = getExe' config.nix.package "nix";
 
   # The toplevel attrs that must build before a lock is publishable, derived
-  # from flake.nix's host table rather than restated here. Anything else in
-  # cacheJobs (ad hoc packages, devShell inputs) may fail without blocking the
-  # publish: if a package actually matters to a host it is already inside that
-  # host's closure and fails the toplevel with it.
+  # from flake.nix's host table rather than restated here. This is also all of
+  # cacheJobs -- every attr it names is required.
   requiredAttrs = lib.mapAttrsToList (
     hostname: system: "${system}\ttoplevel/${hostname}"
   ) self.hostSystems;
@@ -266,9 +261,7 @@ let
         rm -rf "''${old_run:?}"
       done
 
-      # Publish gate: only the per-host toplevels are blocking. A failed ad hoc
-      # package does not stop hosts from switching -- if it were actually
-      # installed somewhere, it would have failed that host's toplevel too.
+      # Publish gate: every per-host toplevel must succeed.
       verdict_file="$run_dir/verdict.txt"
       gate_ok=1
       ${gate} ${escapeShellArg requiredFile} \

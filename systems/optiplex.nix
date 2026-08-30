@@ -503,10 +503,11 @@ in
 
   nix.settings.auto-optimise-store = true;
 
-  # aarch64 support is for evaluation as much as building: pkgs/sphereview does
-  # IFD on its Cargo.lock, which forces `nix eval` itself to realise a
-  # platform-matching derivation. Without emulation, evaluating
-  # cacheJobs.aarch64-linux fails before a single build starts.
+  # rpi-4b-plus (aarch64) has nix.settings.max-jobs = 0 and dispatches every
+  # build to optiplex via services.nixCache.builder -- there is no native
+  # aarch64 machine behind it. QEMU emulation is what lets optiplex actually
+  # realise toplevel/rpi-4b-plus, both for nix-autobuild's weekly cacheJobs
+  # build and for the Pi's own on-demand switches.
   boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
 
   # --skip-cached means nix-autobuild only ever stores the delta over

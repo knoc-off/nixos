@@ -60,34 +60,6 @@ in
     in
     discover;
 
-  # Flatten a package tree into a single level of derivations, keyed by
-  # "namespace/name".
-  #
-  # This mirrors discoverPackages' own rule -- a directory without default.nix
-  # is a namespace, everything else is a package -- and enforces the invariant
-  # that every leaf under ./pkgs is a derivation. Anything else is an error
-  # rather than a silent omission: a package that quietly evaluates to a
-  # non-derivation (an empty directory, a builder function left in the tree)
-  # would otherwise vanish from the build farm without a trace.
-  flattenDrvs =
-    let
-      flatten =
-        prefix: attrs:
-        lib.concatMapAttrs (
-          name: value:
-          let
-            path = if prefix == "" then name else "${prefix}/${name}";
-          in
-          if lib.isDerivation value then
-            { ${path} = value; }
-          else if lib.isAttrs value && !(value ? __functor) then
-            flatten path value
-          else
-            throw "pkgs/${path} is a ${builtins.typeOf value}, not a derivation or a namespace. Builders belong in overlays/, raw assets belong next to the module that uses them."
-        ) attrs;
-    in
-    flatten "";
-
   # Recursively discover nix modules from a directory tree.
   # - foo.nix (not default.nix) -> { foo = import foo.nix; }
   # - bar/ with default.nix     -> { bar = import bar/; }   (leaf module)

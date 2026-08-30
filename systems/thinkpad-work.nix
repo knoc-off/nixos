@@ -153,14 +153,6 @@ in
 
     self.nixosModules.fish
 
-    self.nixosModules.claude-ping
-    {
-      services.claude-ping = {
-        enable = true;
-        user = user;
-      };
-    }
-
     #./modules/yubikey.nix
   ];
 

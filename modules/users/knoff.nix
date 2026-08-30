@@ -57,7 +57,6 @@
               self.homeModules.cli-tools
               self.homeModules.ghostty
               self.homeModules.pueue
-              self.homeModules.opencode
 
               self.homeModules.shell
               self.homeModules.scripts
@@ -75,11 +74,8 @@
               self.homeModules.environment
 
               self.homeModules.lspmux
-              self.homeModules.claude-token-refresh
               self.homeModules.claude-mem
               { services.claude-mem.enable = true; }
-              self.homeModules.host-query
-              { services.host-query.enable = true; }
 
               self.homeModules.hyprland
               self.homeModules.noctalia
@@ -143,14 +139,6 @@
                 # running `marki push`, since it holds an exclusive lock
                 # on the collection for its entire runtime.
                 home.packages = [ pkgs.anki ];
-              }
-
-              self.homeModules.compat-proxy
-              {
-                services.compat-proxy = {
-                  enable = true;
-                  port = 58192;
-                };
               }
 
               self.homeModules.kanata
@@ -235,15 +223,12 @@
 
                 spotify
 
-                self.packages.${pkgs.stdenv.hostPlatform.system}.opencode
                 # Must come from nixpkgs, not unstable: the session's Kvantum/qt6ct
                 # style plugins are built against nixpkgs' qtbase. An unstable
                 # prismlauncher links a newer qtbase, so qt6ct fails to resolve
                 # kvantum as its base style and proxies itself instead, recursing
                 # in QProxyStyle::standardPalette until the stack overflows.
                 prismlauncher
-
-                upkgs.claude-code
 
                 gnome-calculator
 

@@ -3,7 +3,8 @@
 # systems/services/nix-autobuild.nix) into the local checkout, without
 # touching anything else in the working tree.
 #
-# optiplex builds every cacheJobs attr against a candidate flake.lock and only
+# optiplex builds every per-host toplevel against a candidate flake.lock and
+# only
 # pushes it to the `built` branch if every per-host toplevel succeeded -- so
 # unlike a plain `nix flake update`, bumping via this script means the new lock
 # is already known to build and its outputs are already sitting in optiplex's

@@ -31,19 +31,6 @@ in
       };
     }
 
-    self.nixosModules.claude-ping
-    {
-      services.claude-ping = {
-        enable = true;
-        user = user;
-        # Personal machine: ping every day, not just workdays.
-        schedule = [
-          "07:00"
-          "12:00"
-        ];
-      };
-    }
-
     self.nixosModules.users.knoff
     self.nixosModules.nix
     self.nixosModules.nh
