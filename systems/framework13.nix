@@ -305,8 +305,8 @@ in
         "input"
         "lp"
       ]
-      ++ (if config.virtualisation.libvirtd.enable then [ "libvirtd" ] else [ ])
-      ++ (if config.networking.networkmanager.enable then [ "networkmanager" ] else [ ]);
+      ++ lib.optional config.virtualisation.libvirtd.enable "libvirtd"
+      ++ lib.optional config.networking.networkmanager.enable "networkmanager";
       initialPassword = "password";
       openssh.authorizedKeys.keys = [ ];
     };

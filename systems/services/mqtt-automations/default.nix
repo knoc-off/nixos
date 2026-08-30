@@ -365,7 +365,7 @@ let
     }
   ];
 
-  allServices = lib.foldl' (acc: def: acc // (mkAutomation def)) { } automations;
+  allServices = lib.mergeAttrsList (map mkAutomation automations);
 in
 {
   systemd.services = allServices;

@@ -17,23 +17,11 @@
 
       inherit (self.lib.keyLayers) presets;
 
-      # maybe add things to spawn certain programs, etc?
-
-      toMimeApps =
-        attrs:
-        builtins.foldl' (
-          acc: topLevelName:
-          let
-            subSet = attrs.${topLevelName};
-            mapped = builtins.mapAttrs (subKey: desktopFiles: {
-              name = "${topLevelName}/${subKey}";
-              value = desktopFiles;
-            }) subSet;
-          in
-          builtins.foldl' (acc2: entry: acc2 // { ${entry.name} = entry.value; }) acc (
-            builtins.attrValues mapped
-          )
-        ) { } (builtins.attrNames attrs);
+      # Flattens { application.pdf = [...]; video.mp4 = [...]; } into
+      # { "application/pdf" = [...]; "video/mp4" = [...]; } for xdg.mimeApps.
+      toMimeApps = lib.concatMapAttrs (
+        type: lib.mapAttrs' (sub: apps: lib.nameValuePair "${type}/${sub}" apps)
+      );
     in
     {
       imports = [ inputs.home-manager.nixosModules.home-manager ];

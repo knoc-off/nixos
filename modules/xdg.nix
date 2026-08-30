@@ -1,28 +1,12 @@
 { ... }: {
   home =
-    { pkgs, ... }:
+    { pkgs, lib, ... }:
     let
-      toMimeApps =
-        attrs:
-        builtins.foldl' (
-          acc: topLevelName:
-          let
-            subSet = attrs.${topLevelName};
-            # Map each key in subSet (e.g. "pdf", "mp4") to full MIME string
-            mapped = builtins.mapAttrs (
-              subKey: desktopFiles:
-              # subKey = "pdf" -> "application/pdf"
-              # topLevelName = "application", "image", "video", etc.
-              {
-                name = "${topLevelName}/${subKey}";
-                value = desktopFiles;
-              }) subSet;
-            # fold each "name = value" pair into the main accumulator
-          in
-          builtins.foldl' (acc2: entry: acc2 // { ${entry.name} = entry.value; }) acc (
-            builtins.attrValues mapped
-          )
-        ) { } (builtins.attrNames attrs);
+      # Flattens { application.pdf = [...]; video.mp4 = [...]; } into
+      # { "application/pdf" = [...]; "video/mp4" = [...]; } for xdg.mimeApps.
+      toMimeApps = lib.concatMapAttrs (
+        type: lib.mapAttrs' (sub: apps: lib.nameValuePair "${type}/${sub}" apps)
+      );
     in
     {
       # gnome settings app

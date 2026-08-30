@@ -78,13 +78,7 @@ let
     if builtins.length xs != builtins.length ys then
       255
     else
-      lib.foldl' (
-        acc: i:
-        let
-          d = abs (elemAt xs i - elemAt ys i);
-        in
-        if d > acc then d else acc
-      ) 0 (lib.range 0 (builtins.length xs - 1));
+      lib.foldl' lib.max 0 (lib.zipListsWith (x: y: abs (x - y)) xs ys);
 
   # Channel specs in the fixture are "<space>_<channel>"; the pure-Nix API
   # encodes the same thing in the function name.
@@ -248,13 +242,7 @@ let
         # attrset (hexToRgb): compare componentwise
         let
           keys = builtins.attrNames exp;
-          d = lib.foldl' (
-            acc: k:
-            let
-              x = abs (actual.${k} - exp.${k});
-            in
-            if x > acc then x else acc
-          ) 0.0 keys;
+          d = lib.foldl' (acc: k: lib.max acc (abs (actual.${k} - exp.${k}))) 0.0 keys;
         in
         {
           status = if d <= floatTolerance then "pass" else "fail";

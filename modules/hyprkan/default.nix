@@ -180,10 +180,11 @@
           };
 
           Service = {
-            ExecStart =
-              "${cfg.package}/bin/hyprkan"
-              + (if cfg.configFile != null then " --config ${cfg.configFile}" else "")
-              + (if cfg.service.extraArgs != [ ] then " " + (concatStringsSep " " cfg.service.extraArgs) else "");
+            ExecStart = concatStringsSep " " (
+              [ "${cfg.package}/bin/hyprkan" ]
+              ++ optional (cfg.configFile != null) "--config ${cfg.configFile}"
+              ++ optional (cfg.service.extraArgs != [ ]) (escapeShellArgs cfg.service.extraArgs)
+            );
             Restart = "on-failure";
             RestartSec = 5;
             Type = "simple";

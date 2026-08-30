@@ -194,8 +194,6 @@
 
     nixos-cli.url = "github:water-sucks/nixos";
 
-    rust-overlay.url = "github:oxalica/rust-overlay";
-
     crane.url = "github:ipetkov/crane";
 
     fenix = {
