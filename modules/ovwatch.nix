@@ -5,6 +5,12 @@
 # replace filters. The daemon records the ids of its own published messages
 # and skips them when draining, so sharing one topic does not feed back.
 #
+# Filter tokens are ANDed: languages (ov, omu, omeu), formats (imax, 70mm,
+# 3d, ...), cinema:name, after:HH:MM, before:HH:MM, weekday names, weekend,
+# weekday, and afterwork. The last means weekdays from 17:00 onward with
+# weekends unrestricted, which the other tokens cannot express because
+# after: applies to every day alike.
+#
 # The site is a static Astro build. Each /movies/<id>-<slug>/ page embeds its
 # screenings as schema.org ScreeningEvent in one application/ld+json block, so
 # no HTML scraping is involved. /diag.json carries a generatedAt stamp that
@@ -113,11 +119,22 @@
             # Idle read timeout on the command stream. Doubles as the sweep clock, so it
             # must be shorter than SITE_INTERVAL to keep the sweep on schedule.
             READ_TIMEOUT = float(os.environ.get("OVW_READ_TIMEOUT", "300"))
+            # Replies land so fast that a phone can show them level with, or above, the
+            # command that caused them: ntfy timestamps have second granularity, so a
+            # reply sharing the command's second leaves the client no stable order to
+            # sort on. The delay has to exceed a full second to guarantee a later
+            # timestamp, since the command may have arrived anywhere within its own
+            # second; 0.3 was not enough and still collided.
+            REPLY_DELAY = float(os.environ.get("OVW_REPLY_DELAY", "1.1"))
             MAX_BACKOFF = 300
             # Past this many changes at once, collapse into one digest rather than
             # spamming the phone and tripping ntfy's rate limit.
             BATCH_THRESHOLD = 5
             BATCH_LIST = 15
+            # "afterwork": weekdays from this time onward, weekends unrestricted. Fixed
+            # rather than configurable because it encodes when a working day ends, which
+            # is not something that varies per subscription.
+            AFTERWORK_CUTOFF = 17 * 60
 
             SCORING = None
 
@@ -281,7 +298,7 @@
 
             def empty_filters():
                 return {"langs": set(), "fmts": set(), "cinemas": set(),
-                        "after": None, "before": None, "days": set()}
+                        "after": None, "before": None, "days": set(), "afterwork": False}
 
 
             def matches(s, f):
@@ -296,13 +313,17 @@
                         return False
                 t = parse_start(s["start"])
                 if t is None:
-                    return not (f["after"] or f["before"] or f["days"])
+                    return not (f["after"] or f["before"] or f["days"] or f["afterwork"])
                 mins = t.tm_hour * 60 + t.tm_min
                 if f["after"] is not None and mins < f["after"]:
                     return False
                 if f["before"] is not None and mins > f["before"]:
                     return False
                 if f["days"] and t.tm_wday not in f["days"]:
+                    return False
+                # Weekends are exempt: the cutoff is about working days, not about the
+                # hour itself. ANDed with the rest, so "afterwork sat" still means Sat.
+                if f["afterwork"] and t.tm_wday < 5 and mins < AFTERWORK_CUTOFF:
                     return False
                 return True
 
@@ -321,7 +342,7 @@
                 low = t.lower()
                 if low in LANGS or low in KNOWN_FMTS or low in DAYS:
                     return True
-                if low in ("weekend", "weekday"):
+                if low in ("weekend", "weekday", "afterwork"):
                     return True
                 return bool(re.match(r"^(cinema|after|before|at):", low))
 
@@ -343,6 +364,8 @@
                         f["days"].update({5, 6})
                     elif low == "weekday":
                         f["days"].update({0, 1, 2, 3, 4})
+                    elif low == "afterwork":
+                        f["afterwork"] = True
                     elif low.startswith("cinema:"):
                         v = low.split(":", 1)[1].strip()
                         f["cinemas"].add(v) if v else unknown.append(t)
@@ -371,6 +394,8 @@
                     parts.append("after %02d:%02d" % (f["after"] // 60, f["after"] % 60))
                 if f["before"] is not None:
                     parts.append("before %02d:%02d" % (f["before"] // 60, f["before"] % 60))
+                if f["afterwork"]:
+                    parts.append("afterwork")
                 return " ".join(parts) if parts else "no filters"
 
 
@@ -401,6 +426,7 @@
                     "after": f["after"],
                     "before": f["before"],
                     "days": sorted(f["days"]),
+                    "afterwork": f["afterwork"],
                 }
 
 
@@ -412,6 +438,8 @@
                     "after": d.get("after"),
                     "before": d.get("before"),
                     "days": set(d.get("days") or []),
+                    # Absent in state written before this token existed.
+                    "afterwork": bool(d.get("afterwork")),
                 }
 
 
@@ -1028,6 +1056,8 @@
                             save_state(state_path, st)
                             continue
                         try:
+                            if REPLY_DELAY > 0:
+                                time.sleep(REPLY_DELAY)
                             handle(text, st)
                         except Exception as e:  # noqa: BLE001
                             log("command %r failed: %s" % (text, e))
@@ -1114,6 +1144,21 @@
           description = ''
             Minimum seconds between requests, honouring the `Crawl-delay: 1` in
             their robots.txt. Applies across all fetches in a tick.
+          '';
+        };
+
+        replyDelay = mkOption {
+          type = types.number;
+          default = 1.1;
+          description = ''
+            Seconds to wait before answering a command. Replies otherwise
+            arrive fast enough that a client may show them level with, or
+            above, the command that caused them: ntfy timestamps have second
+            granularity, so a reply sharing the command's second leaves the
+            client no stable order to sort on. This must exceed a full second
+            to guarantee a later timestamp, because the command may have
+            arrived anywhere within its own second. Set to 0 to reply as fast
+            as possible and accept the occasional inversion.
           '';
         };
 
@@ -1349,6 +1394,13 @@
             description = ''
               Topic used for both notifications and inbound commands. The token
               in `tokenFile` needs read-write access to it.
+
+              Commands are "+<film> [filters]" to watch, "-<film>" to drop,
+              "=<film> [filters]" to replace filters, and "?" to list. Filter
+              tokens are ANDed: `ov`/`omu`/`omeu`, formats such as `imax` or
+              `70mm`, `cinema:zoo`, `after:HH:MM`, `before:HH:MM`, day names,
+              `weekend`, `weekday`, and `afterwork` for weekdays from 17:00
+              with weekends unrestricted.
             '';
           };
 
@@ -1372,6 +1424,13 @@
           wants = [ "network-online.target" ];
           wantedBy = [ "multi-user.target" ];
 
+          # Reconnects are handled internally with backoff, so repeated
+          # restarts mean something is actually wrong; do not rate-limit the
+          # unit into a permanent failed state over a long outage.
+          # Belongs to [Unit], not [Service] -- systemd ignores it in
+          # serviceConfig and logs "Unknown key ... ignoring".
+          unitConfig.StartLimitIntervalSec = 0;
+
           environment = {
             OVW_BASE = cfg.baseUrl;
             OVW_UA = cfg.userAgent;
@@ -1381,6 +1440,7 @@
             OVW_SITE_INTERVAL = toString cfg.siteIntervalSeconds;
             OVW_READ_TIMEOUT = toString readTimeout;
             OVW_MAX_SUBS = toString cfg.maxSubscriptions;
+            OVW_REPLY_DELAY = toString cfg.replyDelay;
             OVW_SCORING = mkIf cfg.scoring.enable scoringJson;
           };
 
@@ -1392,10 +1452,6 @@
             ExecStart = getExe pollScript;
             Restart = "always";
             RestartSec = "10s";
-            # Reconnects are handled internally with backoff, so repeated
-            # restarts mean something is actually wrong; do not rate-limit the
-            # unit into a permanent failed state over a long outage.
-            StartLimitIntervalSec = 0;
 
             DynamicUser = true;
             StateDirectory = "ovwatch";

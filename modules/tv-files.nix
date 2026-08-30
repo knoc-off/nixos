@@ -24,8 +24,13 @@
       # per-file, so this coexists in the same directory rather than
       # conflicting with it. Generated rather than shipped in the package
       # because it needs self.lib.theme, which is only available here.
+      # QtQuick is imported for the `color` value type: it is not a builtin,
+      # so with only Quickshell in scope every `property color` fails to
+      # resolve ("color is not a type") and the whole config tree -- Theme,
+      # State, Sidebar, Browser, shell -- refuses to load.
       themeQml = pkgs.writeText "tv-files-theme.qml" ''
         pragma Singleton
+        import QtQuick
         import Quickshell
 
         Singleton {
@@ -112,6 +117,15 @@
             PartOf = [ "graphical-session.target" ];
             # Only meaningful inside a Hyprland session
             ConditionEnvironment = "HYPRLAND_INSTANCE_SIGNATURE";
+            # quickshell allocates a fresh /run/user/$UID/quickshell/by-id
+            # instance directory per launch and only cleans it up on a graceful
+            # exit, so a crash loop leaks inodes at 1/RestartSec. Unbounded,
+            # that exhausts the runtime tmpfs (~814k inodes) in a few days and
+            # takes the whole user manager down with it -- generators then fail
+            # with ENOSPC and `nixos-rebuild switch` cannot reload the session.
+            # Give up after 5 failures instead of degrading the machine.
+            StartLimitIntervalSec = 60;
+            StartLimitBurst = 5;
           };
           Service = {
             ExecStart = "${qs} -c tv-files";
