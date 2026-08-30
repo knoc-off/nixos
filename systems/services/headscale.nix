@@ -7,9 +7,11 @@
 # Headscale-assigned tailnet IPs. Headscale allocates from 100.64.0.0/10 in
 # registration order; after enrolling a node run `headscale nodes list` and
 # correct the entry there, not here.
-{self, ...}: let
+{ self, ... }:
+let
   inherit (self.lib) tailnet;
-in {
+in
+{
   services.headscale = {
     enable = true;
     address = "127.0.0.1";
@@ -21,7 +23,7 @@ in {
       # Fully self-hosted relay: enable the embedded DERP and drop the
       # default upstream (Tailscale-operated) DERP map.
       derp = {
-        urls = [];
+        urls = [ ];
         server = {
           enabled = true;
           region_id = 999;
@@ -36,11 +38,14 @@ in {
         magic_dns = true;
         override_local_dns = true;
         base_domain = "tail.niko.ink";
-        nameservers.global = ["1.1.1.1" "9.9.9.9"];
+        nameservers.global = [
+          "1.1.1.1"
+          "9.9.9.9"
+        ];
 
         # Routing domain: outranks the `~.` that tailscale0 and the work VPN
         # both claim, so extra_records win instead of racing.
-        search_domains = ["niko.ink"];
+        search_domains = [ "niko.ink" ];
 
         # Split-horizon: tailnet members resolve these service names to the
         # node that serves them; everything else falls through to the global

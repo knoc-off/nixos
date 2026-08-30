@@ -2,7 +2,7 @@
 # - vtsls (TypeScript LSP, faster alternative to ts_ls)
 # - Inlay hints for parameters, return types, variable types
 # - Auto-imports, completions with full function signatures
-{...}: {
+{ ... }: {
   plugins.lsp.servers.vtsls = {
     enable = true;
 

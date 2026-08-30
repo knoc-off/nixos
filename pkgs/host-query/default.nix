@@ -1,4 +1,10 @@
-{ lib, stdenv, python3, systemd, makeWrapper }:
+{
+  lib,
+  stdenv,
+  python3,
+  systemd,
+  makeWrapper,
+}:
 
 stdenv.mkDerivation {
   pname = "host-query";

@@ -3,7 +3,8 @@
   color-lib,
   lib,
   ...
-}: {
+}:
+{
   "extensions.autoDisableScopes" = 0;
 
   "fission.autostart" = true;
@@ -127,11 +128,13 @@
   "browser.display.background_color.dark" = "#${theme.dark.base01}";
   "browser.display.foreground_color" = "#${theme.dark.base06}";
   "browser.display.foreground_color.dark" = "#${theme.dark.base07}";
-  "browser.newtabpage.activity-stream.newNewtabExperience.colors" = "#${theme.dark.base08},#${theme.dark.base09},#${theme.dark.base0A},#${theme.dark.base0B},#${theme.dark.base0C},#${theme.dark.base0D},#${theme.dark.base0E}";
+  "browser.newtabpage.activity-stream.newNewtabExperience.colors" =
+    "#${theme.dark.base08},#${theme.dark.base09},#${theme.dark.base0A},#${theme.dark.base0B},#${theme.dark.base0C},#${theme.dark.base0D},#${theme.dark.base0E}";
   "browser.visited_color" = "#${theme.dark.base0E}";
   "browser.visited_color.dark" = "#${theme.dark.base0F}";
   "editor.background_color" = "#${theme.dark.base01}";
-  "pdfjs.highlightEditorColors" = "yellow=#${theme.dark.base0A},green=#${theme.dark.base0B},blue=#${theme.dark.base0D},pink=#${theme.dark.base0E},red=#${theme.dark.base08}";
+  "pdfjs.highlightEditorColors" =
+    "yellow=#${theme.dark.base0A},green=#${theme.dark.base0B},blue=#${theme.dark.base0D},pink=#${theme.dark.base0E},red=#${theme.dark.base08}";
 
   "ui.key.menuAccessKeyFocuses" = false;
 

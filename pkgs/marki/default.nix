@@ -2,12 +2,13 @@
   lib,
   pkgs,
   ...
-}: let
+}:
+let
   cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
   version = cargoToml.workspace.package.version;
 
-  naturalEarthData = pkgs.callPackage ../natural-earth-data {};
-  geoBoundariesData = pkgs.callPackage ../geoboundaries-data {};
+  naturalEarthData = pkgs.callPackage ../natural-earth-data { };
+  geoBoundariesData = pkgs.callPackage ../geoboundaries-data { };
 
   marki = pkgs.rustPlatform.buildRustPackage {
     pname = "marki";
@@ -20,11 +21,14 @@
     };
 
     # Build just the CLI binary; its transitive deps pull the rest of the workspace.
-    cargoBuildFlags = ["-p" "marki"];
-    cargoTestFlags = ["--workspace"];
+    cargoBuildFlags = [
+      "-p"
+      "marki"
+    ];
+    cargoTestFlags = [ "--workspace" ];
 
     # reqwest with rustls-tls needs no system OpenSSL; keep nativeBuildInputs minimal.
-    nativeBuildInputs = [pkgs.pkg-config];
+    nativeBuildInputs = [ pkgs.pkg-config ];
 
     meta = {
       description = "One-shot CLI (with optional watch daemon) that syncs a repo of markdown cards directly into an Anki collection file";
@@ -33,7 +37,7 @@
     };
 
     passthru.devShell = pkgs.mkShell {
-      inputsFrom = [marki];
+      inputsFrom = [ marki ];
       nativeBuildInputs = [
         pkgs.gdal
         pkgs.curl
@@ -49,4 +53,4 @@
     };
   };
 in
-  marki
+marki

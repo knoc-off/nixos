@@ -30,7 +30,8 @@
   lib,
   pkgs,
   ...
-}: let
+}:
+let
   serverName = "inkwell";
   gamePort = 25565;
   rconPort = 25575;
@@ -43,8 +44,9 @@
   ph = name: config.sops.placeholder.${name};
   envFile = config.sops.templates."minecraft.env".path;
   rcon = self.packages.${pkgs.stdenv.hostPlatform.system}.rcon-cli;
-in {
-  imports = [inputs.minecraft-modpack.nixosModules.default];
+in
+{
+  imports = [ inputs.minecraft-modpack.nixosModules.default ];
 
   # nix-minecraft substitutes @RCON_PASSWORD@ in server.properties from this
   # environment file when it copies the file into the data dir at service
@@ -99,7 +101,7 @@ in {
   # server console, so this is as sensitive as tailnet SSH. The protocol is
   # plaintext, which is acceptable only because WireGuard encrypts the hop --
   # this port must never be reachable off the tailnet.
-  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [rconPort];
+  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ rconPort ];
 
   # `sudo mcrcon "<command>"` -- reads the secret at runtime, talks to the
   # local RCON port.

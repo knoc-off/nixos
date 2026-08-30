@@ -13,7 +13,7 @@ python3Packages.buildPythonApplication {
 
   src = ./.;
 
-  build-system = [python3Packages.hatchling];
+  build-system = [ python3Packages.hatchling ];
 
   dependencies = with python3Packages; [
     fastmcp
@@ -30,14 +30,15 @@ python3Packages.buildPythonApplication {
     python3Packages.py-key-value-aio
   ];
 
-  passthru.devShell = python3Packages.python.withPackages (ps:
-    with ps; [
+  passthru.devShell = python3Packages.python.withPackages (
+    ps: with ps; [
       fastmcp
       httpx
       mcp
       uvicorn
       pytest
-    ]);
+    ]
+  );
 
   meta = {
     description = "MCP server for a single KitchenOwl household, with recipe validation";

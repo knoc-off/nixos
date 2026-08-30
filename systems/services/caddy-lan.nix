@@ -7,8 +7,9 @@
   self,
   config,
   ...
-}: {
-  imports = [self.nixosModules.caddy-common];
+}:
+{
+  imports = [ self.nixosModules.caddy-common ];
 
   services.caddy = {
     enable = true;
@@ -29,7 +30,7 @@
   };
 
   services.caddy.environmentFile = config.sops.secrets."services/caddy/cloudflare-env".path;
-  sops.secrets."services/caddy/cloudflare-env" = {};
+  sops.secrets."services/caddy/cloudflare-env" = { };
 
   systemd.tmpfiles.rules = [
     "d /var/log/caddy 0750 caddy caddy -"

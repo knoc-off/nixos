@@ -1,168 +1,160 @@
 { ... }: {
-  home = { pkgs, lib, ... }: let
-    config_dir = "/etc/nixos";
-    inherit (pkgs) mkComplgenScript;
-  in {
-    home.packages =
-      [
-        (
-          pkgs.writeShellApplication {
-            name = "get-review-requests";
+  home =
+    { pkgs, lib, ... }:
+    let
+      config_dir = "/etc/nixos";
+      inherit (pkgs) mkComplgenScript;
+    in
+    {
+      home.packages = [
+        (pkgs.writeShellApplication {
+          name = "get-review-requests";
 
-            runtimeInputs = [
-              pkgs.gh
-            ];
+          runtimeInputs = [
+            pkgs.gh
+          ];
 
-            text = ''
-              gh search prs \
-                --review-requested=@me \
-                --state=open \
-                --sort=updated \
-                --order=desc \
-                --json repository,title,url,createdAt,author \
-                --template '{{range .}}{{tablerow .repository.nameWithOwner .title .author.login (timeago .createdAt) .url}}{{end}}'
-            '';
+          text = ''
+            gh search prs \
+              --review-requested=@me \
+              --state=open \
+              --sort=updated \
+              --order=desc \
+              --json repository,title,url,createdAt,author \
+              --template '{{range .}}{{tablerow .repository.nameWithOwner .title .author.login (timeago .createdAt) .url}}{{end}}'
+          '';
+        })
+
+        (pkgs.writeShellApplication {
+          name = "google-oauth";
+
+          runtimeInputs = [
+            pkgs.oath-toolkit
+            pkgs.wl-clipboard
+          ];
+
+          text = ''
+            CODE=$(oathtool --totp -b "$GOOGLE_TOTP_KEY")
+            echo "$CODE"
+            echo "$CODE" | wl-copy
+          '';
+        })
+
+        (pkgs.writeShellApplication {
+          name = "skim-env-vars";
+
+          runtimeInputs = [
+            pkgs.python3
+            pkgs.skim
+          ];
+
+          text = ''
+            python3 -c 'import os,sys; sys.stdout.write("\0".join(sorted(os.environ)) + "\0")' \
+              | sk --read0 --no-mouse --no-multi \
+                  --preview 'python3 -c "import os,sys; k=sys.argv[1]; sys.stdout.write(os.environ.get(k, \"\"))" {}' \
+                  --preview-window=right:70%:wrap
+          '';
+        })
+
+        (pkgs.writeShellScriptBin "opencode-api" ''
+          set -euo pipefail
+
+          AUTH_DIR="$HOME/.local/share/opencode"
+          AUTH_FILE="$AUTH_DIR/auth.json"
+          AUTH_API="$AUTH_DIR/auth.json.api"
+          AUTH_BAK="$AUTH_DIR/auth.json.bak.$$"
+
+          [[ -f "$AUTH_API" ]] || { echo "Missing $AUTH_API"; exit 1; }
+
+          RESTORE_PID=""
+          cleanup() {
+            [[ -n "''${RESTORE_PID:-}" ]] && kill "$RESTORE_PID" 2>/dev/null || true
+            [[ -f "$AUTH_BAK" ]] && mv "$AUTH_BAK" "$AUTH_FILE"
           }
-        )
+          trap cleanup EXIT
 
-        (
-          pkgs.writeShellApplication {
-            name = "google-oauth";
+          cp "$AUTH_FILE" "$AUTH_BAK"
+          cp "$AUTH_API" "$AUTH_FILE"
 
-            runtimeInputs = [
-              pkgs.oath-toolkit
-              pkgs.wl-clipboard
-            ];
+          (sleep 30 && [[ -f "$AUTH_BAK" ]] && mv "$AUTH_BAK" "$AUTH_FILE") &
+          RESTORE_PID=$!
 
-            text = ''
-              CODE=$(oathtool --totp -b "$GOOGLE_TOTP_KEY")
-              echo "$CODE"
-              echo "$CODE" | wl-copy
-            '';
-          }
-        )
+          opencode "$@"
+        '')
 
-        (
-          pkgs.writeShellApplication {
-            name = "skim-env-vars";
+        (pkgs.writeShellScriptBin "git-branch-view" ''
+          set -euo pipefail
 
-            runtimeInputs = [
-              pkgs.python3
-              pkgs.skim
-            ];
+          export GIT="${pkgs.git}/bin/git"
+          export SK="${pkgs.skim}/bin/sk"
+          export DELTA="${pkgs.delta}/bin/delta"
+          export BASH="${pkgs.bash}/bin/bash"
+          export TPUT="${pkgs.ncurses}/bin/tput"
 
-            text = ''
-              python3 -c 'import os,sys; sys.stdout.write("\0".join(sorted(os.environ)) + "\0")' \
-                | sk --read0 --no-mouse --no-multi \
-                    --preview 'python3 -c "import os,sys; k=sys.argv[1]; sys.stdout.write(os.environ.get(k, \"\"))" {}' \
-                    --preview-window=right:70%:wrap
-            '';
-          }
-        )
-
-        (
-          pkgs.writeShellScriptBin "opencode-api" ''
-            set -euo pipefail
-
-            AUTH_DIR="$HOME/.local/share/opencode"
-            AUTH_FILE="$AUTH_DIR/auth.json"
-            AUTH_API="$AUTH_DIR/auth.json.api"
-            AUTH_BAK="$AUTH_DIR/auth.json.bak.$$"
-
-            [[ -f "$AUTH_API" ]] || { echo "Missing $AUTH_API"; exit 1; }
-
-            RESTORE_PID=""
-            cleanup() {
-              [[ -n "''${RESTORE_PID:-}" ]] && kill "$RESTORE_PID" 2>/dev/null || true
-              [[ -f "$AUTH_BAK" ]] && mv "$AUTH_BAK" "$AUTH_FILE"
-            }
-            trap cleanup EXIT
-
-            cp "$AUTH_FILE" "$AUTH_BAK"
-            cp "$AUTH_API" "$AUTH_FILE"
-
-            (sleep 30 && [[ -f "$AUTH_BAK" ]] && mv "$AUTH_BAK" "$AUTH_FILE") &
-            RESTORE_PID=$!
-
-            opencode "$@"
-          ''
-        )
-
-        (
-          pkgs.writeShellScriptBin "git-branch-view" ''
-            set -euo pipefail
-
-            export GIT="${pkgs.git}/bin/git"
-            export SK="${pkgs.skim}/bin/sk"
-            export DELTA="${pkgs.delta}/bin/delta"
-            export BASH="${pkgs.bash}/bin/bash"
-            export TPUT="${pkgs.ncurses}/bin/tput"
-
-            # Pick a default BASE if not provided
-            if [ -z "''${BASE:-}" ]; then
-              if "$GIT" show-ref --verify --quiet refs/remotes/origin/main; then
-                BASE="origin/main"
-              elif "$GIT" show-ref --verify --quiet refs/heads/main; then
-                BASE="main"
-              elif "$GIT" show-ref --verify --quiet refs/remotes/origin/master; then
-                BASE="origin/master"
-              elif "$GIT" show-ref --verify --quiet refs/heads/master; then
-                BASE="master"
-              else
-                BASE=""
-              fi
-              export BASE
+          # Pick a default BASE if not provided
+          if [ -z "''${BASE:-}" ]; then
+            if "$GIT" show-ref --verify --quiet refs/remotes/origin/main; then
+              BASE="origin/main"
+            elif "$GIT" show-ref --verify --quiet refs/heads/main; then
+              BASE="main"
+            elif "$GIT" show-ref --verify --quiet refs/remotes/origin/master; then
+              BASE="origin/master"
+            elif "$GIT" show-ref --verify --quiet refs/heads/master; then
+              BASE="master"
+            else
+              BASE=""
             fi
+            export BASE
+          fi
 
-            # Delta enabled by default (set SHOW_DELTA=0 to disable)
-            export SHOW_DELTA="''${SHOW_DELTA: -1}"
+          # Delta enabled by default (set SHOW_DELTA=0 to disable)
+          export SHOW_DELTA="''${SHOW_DELTA: -1}"
 
-            "$GIT" for-each-ref --format='%(refname:short)' refs/heads \
-            | "$SK" \
-                --prompt="branch> " \
-                --height=100% \
-                --layout=reverse \
-                --preview-window='right:70%' \
-                --bind="ctrl-u:preview-page-up,ctrl-d:preview-page-down" \
-                --preview 'bash -lc '"'"'
-                  b="''${1-}"
-                  [ -n "$b" ] || exit 0
+          "$GIT" for-each-ref --format='%(refname:short)' refs/heads \
+          | "$SK" \
+              --prompt="branch> " \
+              --height=100% \
+              --layout=reverse \
+              --preview-window='right:70%' \
+              --bind="ctrl-u:preview-page-up,ctrl-d:preview-page-down" \
+              --preview 'bash -lc '"'"'
+                b="''${1-}"
+                [ -n "$b" ] || exit 0
 
-                  base="''${BASE:-}"
-                  show="''${SHOW_DELTA:-1}"
+                base="''${BASE:-}"
+                show="''${SHOW_DELTA:-1}"
 
-                  mb=""
-                  if [ -n "$base" ]; then
-                    mb="$("$GIT" merge-base "$b" "$base" 2>/dev/null || true)"
-                  fi
+                mb=""
+                if [ -n "$base" ]; then
+                  mb="$("$GIT" merge-base "$b" "$base" 2>/dev/null || true)"
+                fi
 
-                  cols="''${FZF_PREVIEW_COLUMNS:-}"
-                  if [ -z "$cols" ]; then
-                    cols="$("$TPUT" cols 2>/dev/null || echo 120)"
-                  fi
+                cols="''${FZF_PREVIEW_COLUMNS:-}"
+                if [ -z "$cols" ]; then
+                  cols="$("$TPUT" cols 2>/dev/null || echo 120)"
+                fi
 
-                  if [ -n "$mb" ]; then
-                    "$GIT" diff --name-status "$mb..$b"
+                if [ -n "$mb" ]; then
+                  "$GIT" diff --name-status "$mb..$b"
+                  echo
+                  "$GIT" log --oneline --no-merges "$mb..$b" | head -200
+
+                  if [ "$show" = "1" ]; then
                     echo
-                    "$GIT" log --oneline --no-merges "$mb..$b" | head -200
-
-                    if [ "$show" = "1" ]; then
-                      echo
-                      "$GIT" diff --color=always "$mb..$b" | "$DELTA" --paging=never --width="$cols"
-                    fi
-                  else
-                    "$GIT" show --name-status --oneline -n 1 "$b"
-                    echo
-                    "$GIT" log --oneline -n 30 "$b"
-
-                    if [ "$show" = "1" ]; then
-                      echo
-                      "$GIT" show --color=always -n 1 "$b" | "$DELTA" --paging=never --width="$cols"
-                    fi
+                    "$GIT" diff --color=always "$mb..$b" | "$DELTA" --paging=never --width="$cols"
                   fi
-                '"'"' _ {}'
-          ''
-        )
+                else
+                  "$GIT" show --name-status --oneline -n 1 "$b"
+                  echo
+                  "$GIT" log --oneline -n 30 "$b"
+
+                  if [ "$show" = "1" ]; then
+                    echo
+                    "$GIT" show --color=always -n 1 "$b" | "$DELTA" --paging=never --width="$cols"
+                  fi
+                fi
+              '"'"' _ {}'
+        '')
 
         (mkComplgenScript {
           name = "excel_to_csv";
@@ -182,7 +174,17 @@
 
         (pkgs.writeShellApplication {
           name = "record-region";
-          runtimeInputs = with pkgs; [wl-screenrec slurp wl-clipboard libnotify coreutils dragon-drop socat jq gawk];
+          runtimeInputs = with pkgs; [
+            wl-screenrec
+            slurp
+            wl-clipboard
+            libnotify
+            coreutils
+            dragon-drop
+            socat
+            jq
+            gawk
+          ];
           text = ''
             outdir="''${HOME}/Videos/recordings"
             mkdir -p "$outdir"
@@ -277,7 +279,7 @@
           grammar = ''
             cli <_>...;
           '';
-          runtimeDeps = [pkgs.fabric-ai];
+          runtimeDeps = [ pkgs.fabric-ai ];
         })
 
         (mkComplgenScript {
@@ -351,7 +353,16 @@
             pipewire-combine-sinks (-c | --clean | -h | --help)?;
           '';
 
-          runtimeDeps = with pkgs; [pipewire jq pulseaudio wireplumber coreutils gum gnugrep gawk];
+          runtimeDeps = with pkgs; [
+            pipewire
+            jq
+            pulseaudio
+            wireplumber
+            coreutils
+            gum
+            gnugrep
+            gawk
+          ];
         })
 
         (mkComplgenScript {
@@ -427,7 +438,7 @@
           grammar = ''
             connect {{{ ${pkgs.networkmanager}/bin/nmcli -t -f SSID dev wifi list }}} "SSID" [password "password: string"];
           '';
-          runtimeDeps = [pkgs.networkmanager];
+          runtimeDeps = [ pkgs.networkmanager ];
         })
 
         (mkComplgenScript {
@@ -457,7 +468,7 @@
           grammar = ''
             qr (--share | {{{ ${pkgs.fd}/bin/fd --type directory --type file --max-depth 1 . --color never }}} <INPUT>);
           '';
-          runtimeDeps = [pkgs.qrencode];
+          runtimeDeps = [ pkgs.qrencode ];
         })
 
         (mkComplgenScript {
@@ -518,5 +529,5 @@
           ];
         })
       ];
-  };
+    };
 }

@@ -49,7 +49,7 @@
         cdToFile = ''pushd "$(fd . --exclude .git --exclude .gitignore -t f | fzf | xargs dirname)"'';
 
         edit_command_buffer = {
-          description = ''Edit the command buffer in an external editor'';
+          description = "Edit the command buffer in an external editor";
           body = ''
             set -l f (mktemp)
             if set -q f[1]

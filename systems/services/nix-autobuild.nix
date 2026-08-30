@@ -42,7 +42,9 @@ let
   # cacheJobs (ad hoc packages, devShell inputs) may fail without blocking the
   # publish: if a package actually matters to a host it is already inside that
   # host's closure and fails the toplevel with it.
-  requiredAttrs = lib.mapAttrsToList (hostname: system: "${system}\ttoplevel/${hostname}") self.hostSystems;
+  requiredAttrs = lib.mapAttrsToList (
+    hostname: system: "${system}\ttoplevel/${hostname}"
+  ) self.hostSystems;
 
   requiredFile = pkgs.writeText "nix-autobuild-required-attrs" (
     lib.concatMapStrings (line: line + "\n") requiredAttrs

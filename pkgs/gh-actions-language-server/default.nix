@@ -6,7 +6,8 @@
   bun,
   nodejs,
   makeBinaryWrapper,
-}: let
+}:
+let
   pname = "gh-actions-language-server";
   version = "unstable-2025-11-18";
 
@@ -21,7 +22,7 @@
     pname = "${pname}-node-modules";
     inherit version src;
 
-    nativeBuildInputs = [bun];
+    nativeBuildInputs = [ bun ];
 
     dontConfigure = true;
 
@@ -49,54 +50,54 @@
     outputHash = "sha256-WXMIUvdiels1NimJCYZiPA9M7NO64jVi6Ifw5HjDc3o=";
   };
 in
-  stdenv.mkDerivation {
-    inherit pname version src;
+stdenv.mkDerivation {
+  inherit pname version src;
 
-    nativeBuildInputs = [
-      bun
-      nodejs
-      makeBinaryWrapper
-    ];
+  nativeBuildInputs = [
+    bun
+    nodejs
+    makeBinaryWrapper
+  ];
 
-    configurePhase = ''
-      runHook preConfigure
+  configurePhase = ''
+    runHook preConfigure
 
-      ln -s ${node_modules}/node_modules node_modules
+    ln -s ${node_modules}/node_modules node_modules
 
-      runHook postConfigure
-    '';
+    runHook postConfigure
+  '';
 
-    buildPhase = ''
-      runHook preBuild
+  buildPhase = ''
+    runHook preBuild
 
-      export HOME=$TMPDIR
-      bun run build:node
+    export HOME=$TMPDIR
+    bun run build:node
 
-      runHook postBuild
-    '';
+    runHook postBuild
+  '';
 
-    installPhase = ''
-      runHook preInstall
+  installPhase = ''
+    runHook preInstall
 
-      mkdir -p $out/lib/gh-actions-language-server
-      mkdir -p $out/bin
+    mkdir -p $out/lib/gh-actions-language-server
+    mkdir -p $out/bin
 
-      cp -r . $out/lib/gh-actions-language-server/
-      rm $out/lib/gh-actions-language-server/node_modules
-      cp -r ${node_modules}/node_modules $out/lib/gh-actions-language-server/
+    cp -r . $out/lib/gh-actions-language-server/
+    rm $out/lib/gh-actions-language-server/node_modules
+    cp -r ${node_modules}/node_modules $out/lib/gh-actions-language-server/
 
-      makeBinaryWrapper ${nodejs}/bin/node $out/bin/gh-actions-language-server \
-        --add-flags "$out/lib/gh-actions-language-server/bin/gh-actions-language-server"
+    makeBinaryWrapper ${nodejs}/bin/node $out/bin/gh-actions-language-server \
+      --add-flags "$out/lib/gh-actions-language-server/bin/gh-actions-language-server"
 
-      runHook postInstall
-    '';
+    runHook postInstall
+  '';
 
-    meta = with lib; {
-      description = "Language server for GitHub Actions workflows";
-      homepage = "https://github.com/lttb/gh-actions-language-server";
-      license = licenses.mit;
-      maintainers = [];
-      mainProgram = "gh-actions-language-server";
-      platforms = platforms.all;
-    };
-  }
+  meta = with lib; {
+    description = "Language server for GitHub Actions workflows";
+    homepage = "https://github.com/lttb/gh-actions-language-server";
+    license = licenses.mit;
+    maintainers = [ ];
+    mainProgram = "gh-actions-language-server";
+    platforms = platforms.all;
+  };
+}

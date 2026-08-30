@@ -1,12 +1,15 @@
 { inputs, ... }: {
-  nixos = {
-    lib,
-    config,
-    ...
-  }:
-    with lib; let
+  nixos =
+    {
+      lib,
+      config,
+      ...
+    }:
+    with lib;
+    let
       cfg = config.boot.custom;
-    in {
+    in
+    {
       imports = [
         inputs.lanzaboote.nixosModules.lanzaboote
       ];
@@ -15,7 +18,11 @@
         enable = mkEnableOption "custom bootloader configuration";
 
         type = mkOption {
-          type = types.enum ["grub" "systemd-boot" "lanzaboote"];
+          type = types.enum [
+            "grub"
+            "systemd-boot"
+            "lanzaboote"
+          ];
           default = "systemd-boot";
           description = "The bootloader type to use.";
         };
@@ -98,10 +105,7 @@
             grub = mkIf (cfg.type == "grub") {
               enable = true;
               efiSupport = cfg.efiSupport;
-              device =
-                if cfg.efiSupport
-                then "nodev"
-                else cfg.grubDevice;
+              device = if cfg.efiSupport then "nodev" else cfg.grubDevice;
             };
           };
 

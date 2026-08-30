@@ -1,7 +1,7 @@
 # Statusline via mini.statusline
 # Shows mode, file, git branch, diagnostics, LSP, cursor position, and a small
 # "AI:N" count of items staged in the prompt-reference review (only when N > 0).
-{lib, ...}: {
+{ lib, ... }: {
   plugins.mini = {
     enable = true;
     modules.statusline = {

@@ -31,7 +31,6 @@ in
       };
     }
 
-
     self.nixosModules.claude-ping
     {
       services.claude-ping = {

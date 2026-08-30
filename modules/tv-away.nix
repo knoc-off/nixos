@@ -159,7 +159,8 @@
               PartOf = [ (appTarget app) ];
               After = [
                 "graphical-session.target"
-              ] ++ lib.optional (!app.freeze) "tv-active.target";
+              ]
+              ++ lib.optional (!app.freeze) "tv-active.target";
             };
             Install.WantedBy = [ (appTarget app) ];
             Service = {

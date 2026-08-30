@@ -1,7 +1,7 @@
 # mini.files - file explorer with git status integration
 # Reads from GitState (source of truth) for comparison base
 # Shows both working tree status AND branch diff (files changed since merge-base)
-{lib, ...}: {
+{ lib, ... }: {
   plugins.mini = {
     enable = true;
     modules.files = {

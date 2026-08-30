@@ -117,16 +117,19 @@
 
               self.homeModules.compat-proxy
               # Fuck anthropic
-              ({
-                config,
-                ...
-              }: {
-                services.compat-proxy = {
-                  enable = true;
-                  port = 58192;
-                  dumpDir = "${config.xdg.stateHome}/compat-proxy/dumps";
-                };
-              })
+              (
+                {
+                  config,
+                  ...
+                }:
+                {
+                  services.compat-proxy = {
+                    enable = true;
+                    port = 58192;
+                    dumpDir = "${config.xdg.stateHome}/compat-proxy/dumps";
+                  };
+                }
+              )
 
               self.homeModules.git
               {

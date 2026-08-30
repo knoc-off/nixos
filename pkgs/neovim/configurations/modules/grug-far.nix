@@ -3,7 +3,7 @@
 # ripgrep (already provided via mini-pick's extraPackages).
 #   <leader>fR  (normal) open an empty search/replace buffer
 #   <leader>fR  (visual) open pre-seeded with the current selection as the search
-{lib, ...}: {
+{ lib, ... }: {
   plugins.grug-far = {
     enable = true;
     # <Esc> in normal mode closes the grug-far panel (buffer-local, so it does

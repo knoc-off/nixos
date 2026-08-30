@@ -83,9 +83,7 @@ in
               let
                 forced = key: ''command="${config.nix.package}/bin/nix-daemon --stdio",restrict ${key}'';
               in
-              map (h: forced ssh.hostKeys.${h}) (
-                builtins.filter (h: ssh.hostKeys.${h} != "") cache.clients
-              );
+              map (h: forced ssh.hostKeys.${h}) (builtins.filter (h: ssh.hostKeys.${h} != "") cache.clients);
           };
           users.groups.nixremote = { };
           nix.settings.trusted-users = [ "nixremote" ];
@@ -135,7 +133,12 @@ in
               protocol = "ssh-ng";
               sshUser = "nixremote";
               sshKey = "/etc/ssh/ssh_host_ed25519_key";
-              inherit (cache) systems maxJobs speedFactor supportedFeatures;
+              inherit (cache)
+                systems
+                maxJobs
+                speedFactor
+                supportedFeatures
+                ;
             }
           ];
 

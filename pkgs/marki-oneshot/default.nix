@@ -19,24 +19,25 @@
 {
   writeShellApplication,
   callPackage,
-}: let
-  marki = callPackage ../marki {};
-  naturalEarthData = callPackage ../natural-earth-data {};
-  geoBoundariesData = callPackage ../geoboundaries-data {};
+}:
+let
+  marki = callPackage ../marki { };
+  naturalEarthData = callPackage ../natural-earth-data { };
+  geoBoundariesData = callPackage ../geoboundaries-data { };
 in
-  writeShellApplication {
-    name = "marki-oneshot";
-    runtimeInputs = [marki];
-    text = ''
-      : "''${NATURAL_EARTH_DATA:=${naturalEarthData}}"
-      : "''${GEOBOUNDARIES_DATA:=${geoBoundariesData}}"
-      export NATURAL_EARTH_DATA GEOBOUNDARIES_DATA
-      if [ "$#" -eq 0 ]; then
-        # No subcommand → the original one-shot push behaviour.
-        exec marki push
-      else
-        # Otherwise forward everything to marki (init, status, …).
-        exec marki "$@"
-      fi
-    '';
-  }
+writeShellApplication {
+  name = "marki-oneshot";
+  runtimeInputs = [ marki ];
+  text = ''
+    : "''${NATURAL_EARTH_DATA:=${naturalEarthData}}"
+    : "''${GEOBOUNDARIES_DATA:=${geoBoundariesData}}"
+    export NATURAL_EARTH_DATA GEOBOUNDARIES_DATA
+    if [ "$#" -eq 0 ]; then
+      # No subcommand → the original one-shot push behaviour.
+      exec marki push
+    else
+      # Otherwise forward everything to marki (init, status, …).
+      exec marki "$@"
+    fi
+  '';
+}

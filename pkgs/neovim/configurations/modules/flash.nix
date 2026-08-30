@@ -5,23 +5,25 @@
 #   r  remote flash (operator-pending, e.g. `yr` to yank a remote range)
 #   R  Treesitter search in operator-pending/visual
 # Enabling the plugin also enhances f/F/t/T with labels (flash `char` mode).
-{lib, ...}: {
+{ lib, ... }: {
   plugins.flash.enable = true;
 
-  keymaps = let
-    mk = modes: key: fn: desc: {
-      mode = modes;
-      inherit key;
-      action = lib.nixvim.mkRaw "function() require('flash').${fn} end";
-      options = {
-        silent = true;
-        inherit desc;
+  keymaps =
+    let
+      mk = modes: key: fn: desc: {
+        mode = modes;
+        inherit key;
+        action = lib.nixvim.mkRaw "function() require('flash').${fn} end";
+        options = {
+          silent = true;
+          inherit desc;
+        };
       };
-    };
-  in [
-    (mk ["n" "x" "o"] "s" "jump()" "Flash jump")
-    (mk ["n" "x" "o"] "S" "treesitter()" "Flash Treesitter")
-    (mk ["o"] "r" "remote()" "Flash remote")
-    (mk ["o" "x"] "R" "treesitter_search()" "Flash Treesitter search")
-  ];
+    in
+    [
+      (mk [ "n" "x" "o" ] "s" "jump()" "Flash jump")
+      (mk [ "n" "x" "o" ] "S" "treesitter()" "Flash Treesitter")
+      (mk [ "o" ] "r" "remote()" "Flash remote")
+      (mk [ "o" "x" ] "R" "treesitter_search()" "Flash Treesitter search")
+    ];
 }

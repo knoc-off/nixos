@@ -51,7 +51,7 @@
     # defaults true, expanding checks to `--all-targets` + one rustc per core.
     check = {
       allTargets = false;
-      extraArgs = ["-j4"];
+      extraArgs = [ "-j4" ];
     };
     # Defaults to core count.
     numThreads = 8;

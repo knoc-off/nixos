@@ -1,5 +1,5 @@
 # Treesitter syntax highlighting and context
-{lib, ...}: {
+{ lib, ... }: {
   plugins.treesitter = {
     enable = true;
     settings = {
@@ -27,7 +27,7 @@
   autoCmd = [
     {
       event = "FileType";
-      pattern = ["nix"];
+      pattern = [ "nix" ];
       callback.__raw = ''
         function()
           vim.bo.indentexpr = ""

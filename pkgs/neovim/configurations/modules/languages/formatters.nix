@@ -5,17 +5,18 @@
   lib,
   pkgs,
   ...
-}: {
+}:
+{
   plugins.conform-nvim.settings = {
     formatters_by_ft = {
-      javascript = ["biome"];
-      typescript = ["biome"];
-      javascriptreact = ["biome"];
-      typescriptreact = ["biome"];
-      json = ["biome"];
-      jsonc = ["biome"];
-      yaml = ["prettierd"];
-      markdown = ["prettierd"];
+      javascript = [ "biome" ];
+      typescript = [ "biome" ];
+      javascriptreact = [ "biome" ];
+      typescriptreact = [ "biome" ];
+      json = [ "biome" ];
+      jsonc = [ "biome" ];
+      yaml = [ "prettierd" ];
+      markdown = [ "prettierd" ];
     };
 
     formatters = {

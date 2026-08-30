@@ -1,7 +1,8 @@
 {
   vimUtils,
   fetchFromGitHub,
-}: {
+}:
+{
   overlay = self: super: {
     window-manager = vimUtils.buildVimPlugin {
       pname = "windowServer";

@@ -4,7 +4,8 @@
   lib,
   mainMod ? "SUPER",
   ...
-}: let
+}:
+let
   # Third-party hypr plugins track Hyprland HEAD, not releases, so they need
   # the newest hyprland available -- against stable's 0.55.4 this fails to
   # compile on moved headers (hyprland/src/output/Monitor.hpp) and a changed
@@ -27,7 +28,7 @@
     # an "unknown" fallback.
     env.SCROLLOVERVIEW_BUILD_VERSION = "f9248ab6bee7";
 
-    nativeBuildInputs = with pkgs; [cmake];
+    nativeBuildInputs = with pkgs; [ cmake ];
 
     buildInputs = with pkgs; [
       pango
@@ -42,7 +43,8 @@
       platforms = lib.platforms.linux;
     };
   });
-in {
+in
+{
   inherit package;
 
   lua = ''

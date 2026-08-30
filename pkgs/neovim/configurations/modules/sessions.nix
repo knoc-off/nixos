@@ -1,10 +1,13 @@
 # Session management via mini.sessions
 # Slots 1-3 for quick save/load, plus named sessions with picker
-{lib, ...}: let
-  saveSlotKeymaps =
-    builtins.genList (i: let
+{ lib, ... }:
+let
+  saveSlotKeymaps = builtins.genList (
+    i:
+    let
       n = toString (i + 1);
-    in {
+    in
+    {
       mode = "n";
       key = "<leader>s${n}";
       action = lib.nixvim.mkRaw ''
@@ -17,13 +20,15 @@
         silent = true;
         desc = "Save session slot ${n}";
       };
-    })
-    3;
+    }
+  ) 3;
 
-  loadSlotKeymaps =
-    builtins.genList (i: let
+  loadSlotKeymaps = builtins.genList (
+    i:
+    let
       n = toString (i + 1);
-    in {
+    in
+    {
       mode = "n";
       key = "<leader>S${n}";
       action = lib.nixvim.mkRaw ''
@@ -41,9 +46,10 @@
         silent = true;
         desc = "Load session slot ${n}";
       };
-    })
-    3;
-in {
+    }
+  ) 3;
+in
+{
   whichKeyGroups = [
     {
       __unkeyed = "<leader>s";
@@ -75,74 +81,73 @@ in {
     };
   };
 
-  keymaps =
-    [
-      {
-        mode = "n";
-        key = "<leader>ss";
-        action = lib.nixvim.mkRaw ''
-          function()
-            vim.ui.input({ prompt = "Session name: " }, function(name)
-              if name and name ~= "" then
-                require('mini.sessions').write(name)
-                vim.notify("Session saved: " .. name, vim.log.levels.INFO)
-              end
-            end)
-          end
-        '';
-        options = {
-          silent = true;
-          desc = "Save session (named)";
-        };
-      }
-      {
-        mode = "n";
-        key = "<leader>sl";
-        action = lib.nixvim.mkRaw ''
-          function()
-            local MiniSessions = require('mini.sessions')
-            local sessions = vim.tbl_keys(MiniSessions.detected)
-            if #sessions == 0 then
-              vim.notify("No sessions found", vim.log.levels.WARN)
-              return
+  keymaps = [
+    {
+      mode = "n";
+      key = "<leader>ss";
+      action = lib.nixvim.mkRaw ''
+        function()
+          vim.ui.input({ prompt = "Session name: " }, function(name)
+            if name and name ~= "" then
+              require('mini.sessions').write(name)
+              vim.notify("Session saved: " .. name, vim.log.levels.INFO)
             end
-            table.sort(sessions)
-            vim.ui.select(sessions, { prompt = "Load session:" }, function(choice)
-              if choice then MiniSessions.read(choice) end
-            end)
+          end)
+        end
+      '';
+      options = {
+        silent = true;
+        desc = "Save session (named)";
+      };
+    }
+    {
+      mode = "n";
+      key = "<leader>sl";
+      action = lib.nixvim.mkRaw ''
+        function()
+          local MiniSessions = require('mini.sessions')
+          local sessions = vim.tbl_keys(MiniSessions.detected)
+          if #sessions == 0 then
+            vim.notify("No sessions found", vim.log.levels.WARN)
+            return
           end
-        '';
-        options = {
-          silent = true;
-          desc = "Load session (pick)";
-        };
-      }
-      {
-        mode = "n";
-        key = "<leader>sd";
-        action = lib.nixvim.mkRaw ''
-          function()
-            local MiniSessions = require('mini.sessions')
-            local sessions = vim.tbl_keys(MiniSessions.detected)
-            if #sessions == 0 then
-              vim.notify("No sessions found", vim.log.levels.WARN)
-              return
+          table.sort(sessions)
+          vim.ui.select(sessions, { prompt = "Load session:" }, function(choice)
+            if choice then MiniSessions.read(choice) end
+          end)
+        end
+      '';
+      options = {
+        silent = true;
+        desc = "Load session (pick)";
+      };
+    }
+    {
+      mode = "n";
+      key = "<leader>sd";
+      action = lib.nixvim.mkRaw ''
+        function()
+          local MiniSessions = require('mini.sessions')
+          local sessions = vim.tbl_keys(MiniSessions.detected)
+          if #sessions == 0 then
+            vim.notify("No sessions found", vim.log.levels.WARN)
+            return
+          end
+          table.sort(sessions)
+          vim.ui.select(sessions, { prompt = "Delete session:" }, function(choice)
+            if choice then
+              MiniSessions.delete(choice)
+              vim.notify("Session deleted: " .. choice, vim.log.levels.INFO)
             end
-            table.sort(sessions)
-            vim.ui.select(sessions, { prompt = "Delete session:" }, function(choice)
-              if choice then
-                MiniSessions.delete(choice)
-                vim.notify("Session deleted: " .. choice, vim.log.levels.INFO)
-              end
-            end)
-          end
-        '';
-        options = {
-          silent = true;
-          desc = "Delete session";
-        };
-      }
-    ]
-    ++ saveSlotKeymaps
-    ++ loadSlotKeymaps;
+          end)
+        end
+      '';
+      options = {
+        silent = true;
+        desc = "Delete session";
+      };
+    }
+  ]
+  ++ saveSlotKeymaps
+  ++ loadSlotKeymaps;
 }

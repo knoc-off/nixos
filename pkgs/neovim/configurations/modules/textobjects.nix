@@ -1,5 +1,5 @@
 # Text objects via mini.ai and hardtime for building good habits
-{...}: {
+{ ... }: {
   # Provides the @function/@class/@conditional/@loop treesitter queries that
   # mini.ai consumes below. Its own select/move/swap mappings stay off so they
   # don't fight mini.ai over the a/i keys.

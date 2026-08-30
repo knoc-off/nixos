@@ -1,5 +1,5 @@
-{...}: {
-  nixos = {pkgs, ...}: {
+{ ... }: {
+  nixos = { pkgs, ... }: {
     security.rtkit.enable = true;
 
     services.pipewire = {
@@ -17,14 +17,14 @@
       # dropping playback to the internal speakers.
       wireplumber.extraConfig."51-bluez-no-suspend"."monitor.bluez.rules" = [
         {
-          matches = [{"node.name" = "~bluez_output.*";}];
+          matches = [ { "node.name" = "~bluez_output.*"; } ];
           actions.update-props."session.suspend-timeout-seconds" = 0;
         }
       ];
     };
 
     # Kernel default is 10s, which crackles on wake.
-    boot.kernelParams = ["snd_hda_intel.power_save=0"];
+    boot.kernelParams = [ "snd_hda_intel.power_save=0" ];
 
     environment.systemPackages = with pkgs; [
       pavucontrol

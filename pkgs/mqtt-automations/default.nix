@@ -3,7 +3,8 @@
   pkgs,
   inputs,
   fenix,
-}: let
+}:
+let
   toolchain = fenix.combine [
     fenix.minimal.toolchain
   ];
@@ -26,12 +27,14 @@
   # Dependencies-only build -- cached until Cargo.lock changes.
   cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 in
-  craneLib.buildPackage (commonArgs
-    // {
-      inherit cargoArtifacts;
+craneLib.buildPackage (
+  commonArgs
+  // {
+    inherit cargoArtifacts;
 
-      meta = {
-        description = "Lightweight MQTT automation binaries for Zigbee2MQTT";
-        license = lib.licenses.mit;
-      };
-    })
+    meta = {
+      description = "Lightweight MQTT automation binaries for Zigbee2MQTT";
+      license = lib.licenses.mit;
+    };
+  }
+)

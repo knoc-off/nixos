@@ -27,23 +27,22 @@ let
   # `dark`/`light` -- verified by reading the parser directly, since it isn't
   # documented anywhere the schema is spelled out completely. Getting a key
   # wrong doesn't error, it just falls back to magenta for that role.
-  mkPaletteMode =
-    t: {
-      mPrimary = "#${t.base0C}";
-      mOnPrimary = "#${t.base00}";
-      mSecondary = "#${t.base0D}";
-      mOnSecondary = "#${t.base00}";
-      mTertiary = "#${t.base0E}";
-      mOnTertiary = "#${t.base00}";
-      mError = "#${t.base08}";
-      mOnError = "#${t.base00}";
-      mSurface = "#${t.base00}";
-      mOnSurface = "#${t.base05}";
-      mSurfaceVariant = "#${t.base01}";
-      mOnSurfaceVariant = "#${t.base04}";
-      mOutline = "#${t.base03}";
-      mShadow = "#000000";
-    };
+  mkPaletteMode = t: {
+    mPrimary = "#${t.base0C}";
+    mOnPrimary = "#${t.base00}";
+    mSecondary = "#${t.base0D}";
+    mOnSecondary = "#${t.base00}";
+    mTertiary = "#${t.base0E}";
+    mOnTertiary = "#${t.base00}";
+    mError = "#${t.base08}";
+    mOnError = "#${t.base00}";
+    mSurface = "#${t.base00}";
+    mOnSurface = "#${t.base05}";
+    mSurfaceVariant = "#${t.base01}";
+    mOnSurfaceVariant = "#${t.base04}";
+    mOutline = "#${t.base03}";
+    mShadow = "#000000";
+  };
 
   base16Palette = {
     dark = mkPaletteMode theme.dark;
@@ -78,7 +77,6 @@ in
         launcher (cmd noctalia msg panel-toggle launcher)
         dbl (tap-dance-eager 250 (XX @launcher))
       '';
-
 
       home.packages = with pkgs; [
         hicolor-icon-theme

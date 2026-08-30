@@ -34,14 +34,14 @@ stdenv.mkDerivation rec {
   postInstall = ''
     # Runtime dependencies for the `colorscad` script.
     wrapProgram $out/bin/colorscad \
-      --prefix PATH : "${lib.makeBinPath [openscad-package]}:$out/bin"
+      --prefix PATH : "${lib.makeBinPath [ openscad-package ]}:$out/bin"
   '';
 
   meta = with lib; {
     description = "Export OpenSCAD models to AMF or 3MF with preserved colors";
     homepage = "https://github.com/jschobben/colorscad";
     license = licenses.mit;
-    maintainers = with maintainers; ["knoc-off"];
+    maintainers = with maintainers; [ "knoc-off" ];
     platforms = platforms.all;
     mainProgram = "colorscad";
   };

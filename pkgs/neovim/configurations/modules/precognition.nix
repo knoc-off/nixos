@@ -6,7 +6,7 @@
 #               moment the cursor moves, insert mode starts, or you leave the buf.
 # Complements flash (labelled jumps on s/S) -- this is a passive hint HUD, not a
 # jump motion, so there is no key or behaviour overlap.
-{...}: {
+{ ... }: {
   plugins.precognition = {
     enable = true;
     settings = {

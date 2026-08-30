@@ -13,10 +13,11 @@
   lib,
   config,
   ...
-}: {
+}:
+{
   options.whichKeyGroups = lib.mkOption {
     type = with lib.types; listOf attrs;
-    default = [];
+    default = [ ];
     description = ''
       which-key group specs contributed by feature modules. Merged (and
       deduplicated by key) into plugins.which-key.settings.spec.
@@ -27,8 +28,8 @@
     let
       # Deduplicate by the group's `__unkeyed` key: build an attrset keyed by it
       # so repeated declarations of the same group collapse to a single entry.
-      byKey = lib.foldl' (acc: g: acc // {${g.__unkeyed} = g;}) {} config.whichKeyGroups;
+      byKey = lib.foldl' (acc: g: acc // { ${g.__unkeyed} = g; }) { } config.whichKeyGroups;
     in
-      lib.attrValues byKey
+    lib.attrValues byKey
   );
 }

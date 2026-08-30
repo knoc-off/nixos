@@ -33,7 +33,7 @@ python3Packages.buildPythonApplication rec {
     description = "App-aware Kanata layer switcher for Linux";
     homepage = "https://github.com/haithium/hyprkan";
     license = lib.licenses.mit;
-    maintainers = with lib.maintainers; [];
+    maintainers = with lib.maintainers; [ ];
     mainProgram = "hyprkan";
     platforms = lib.platforms.linux;
   };

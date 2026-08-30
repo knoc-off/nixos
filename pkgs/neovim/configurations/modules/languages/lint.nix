@@ -2,7 +2,7 @@
 # autoInstall pulls the linter binaries from nixpkgs automatically; the built-in
 # BufWritePost autocmd runs `try_lint()` on save, which only executes linters
 # matching the current buffer's filetype -- so linting stays lazy per-filetype.
-{pkgs, lib, ...}: {
+{ pkgs, lib, ... }: {
   plugins.lint = {
     enable = true;
 
@@ -28,13 +28,16 @@
     '';
 
     lintersByFt = {
-      nix = ["statix" "deadnix"];
-      lua = ["selene"];
-      yaml = ["yamllint"];
-      sh = ["shellcheck"];
-      bash = ["shellcheck"];
-      markdown = ["markdownlint"];
-      dockerfile = ["hadolint"];
+      nix = [
+        "statix"
+        "deadnix"
+      ];
+      lua = [ "selene" ];
+      yaml = [ "yamllint" ];
+      sh = [ "shellcheck" ];
+      bash = [ "shellcheck" ];
+      markdown = [ "markdownlint" ];
+      dockerfile = [ "hadolint" ];
     };
   };
 
@@ -66,5 +69,5 @@
     })
   '';
 
-  extraPackages = [pkgs.actionlint];
+  extraPackages = [ pkgs.actionlint ];
 }

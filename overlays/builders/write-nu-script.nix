@@ -3,7 +3,8 @@
 {
   nushell,
   writeTextFile,
-}: name: script:
+}:
+name: script:
 writeTextFile rec {
   inherit name;
   text = "#!${nushell}/bin/nu" + "\n" + script;

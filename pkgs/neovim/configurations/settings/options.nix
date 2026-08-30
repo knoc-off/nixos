@@ -1,4 +1,4 @@
-{pkgs, ...}: {
+{ pkgs, ... }: {
   globals = {
     # Disable useless providers
     loaded_ruby_provider = 0;

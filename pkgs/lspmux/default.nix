@@ -4,7 +4,8 @@
   lib,
   pkgs,
   fenix,
-}: let
+}:
+let
   rustPlatform = pkgs.makeRustPlatform {
     cargo = fenix.minimal.toolchain;
     rustc = fenix.minimal.toolchain;
@@ -18,20 +19,20 @@
     hash = "sha256-OchqUe8GdBPL6tE3zpdaThfhzYZhYluagz1yXiexFT0=";
   };
 in
-  rustPlatform.buildRustPackage {
-    pname = "lspmux";
-    version = "0.3.1-unstable";
+rustPlatform.buildRustPackage {
+  pname = "lspmux";
+  version = "0.3.1-unstable";
 
-    inherit src;
+  inherit src;
 
-    cargoLock = {
-      lockFile = "${src}/Cargo.lock";
-    };
+  cargoLock = {
+    lockFile = "${src}/Cargo.lock";
+  };
 
-    meta = {
-      description = "LSP multiplexer - share language servers between editor instances";
-      homepage = "https://codeberg.org/p2502/lspmux";
-      license = lib.licenses.eupl12;
-      mainProgram = "lspmux";
-    };
-  }
+  meta = {
+    description = "LSP multiplexer - share language servers between editor instances";
+    homepage = "https://codeberg.org/p2502/lspmux";
+    license = lib.licenses.eupl12;
+    mainProgram = "lspmux";
+  };
+}

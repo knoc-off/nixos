@@ -20,7 +20,8 @@
   pkgs,
   lib,
   ...
-}: {
+}:
+{
   whichKeyGroups = [
     {
       __unkeyed = "<leader>a";

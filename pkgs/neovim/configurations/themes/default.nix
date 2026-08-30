@@ -4,33 +4,34 @@
   color-lib,
   theme,
   ...
-}: let
+}:
+let
   # Generate highlights for all theme colors
-  flattenThemeToHighlights = attrPrefix: attrs:
+  flattenThemeToHighlights =
+    attrPrefix: attrs:
     lib.foldl' (
-      acc: name: let
+      acc: name:
+      let
         value = attrs.${name};
-        attrPath =
-          if attrPrefix == ""
-          then name
-          else "${attrPrefix}_${name}";
+        attrPath = if attrPrefix == "" then name else "${attrPrefix}_${name}";
       in
-        if builtins.isString value
-        then
-          acc
-          // {
-            ${attrPath} = {
-              bg = "#${value}";
-              fg = "#${color-lib.ensureTextContrast value value 4.5}";
-            };
-          }
-        else if builtins.isAttrs value
-        then acc // flattenThemeToHighlights attrPath value
-        else acc # skip lists, numbers, etc.
-    ) {} (builtins.attrNames attrs);
+      if builtins.isString value then
+        acc
+        // {
+          ${attrPath} = {
+            bg = "#${value}";
+            fg = "#${color-lib.ensureTextContrast value value 4.5}";
+          };
+        }
+      else if builtins.isAttrs value then
+        acc // flattenThemeToHighlights attrPath value
+      else
+        acc # skip lists, numbers, etc.
+    ) { } (builtins.attrNames attrs);
 
   themeHighlights = flattenThemeToHighlights "theme" theme;
-in {
+in
+{
   colorschemes.onedark = {
     enable = true;
     settings = rec {
@@ -93,414 +94,413 @@ in {
         constants = "none";
       };
 
-      highlights =
-        {
-          # Basic UI Elements
-          Normal = {
-            fg = "$fg";
-            bg = "$bg0";
-          };
-          NormalFloat = {
-            fg = "$fg";
-            bg = "$bg1";
-          };
-          Comment = {
-            fg = "$grey";
-            fmt = "${code_style.comments}";
-          };
-          LineNr = {
-            fg = "$grey";
-          };
-          CursorLineNr = {
-            fg = "$bright_yellow";
-          };
-          Visual = {
-            bg = "$bg3";
-          };
-          Cursor = {
-            fg = "$bg0";
-            bg = "$bright_cyan";
-          };
-          VisualNOS = {
-            bg = "$bg3";
-          };
-          Search = {
-            fg = "$bg0";
-            bg = "$orange";
-          };
-          IncSearch = {
-            fg = "$bg0";
-            bg = "$orange";
-          };
-          CursorLine = {
-            bg = "$bg1";
-          };
-          CursorColumn = {
-            bg = "$bg1";
-          };
-          ColorColumn = {
-            bg = "$bg1";
-          };
-          SignColumn = {
-            fg = "$fg";
-          };
-          StatusLine = {
-            fg = "$fg";
-            bg = "$bg2";
-          };
-          StatusLineNC = {
-            fg = "$grey";
-            bg = "$bg1";
-          };
-          VertSplit = {
-            fg = "$bg3";
-          };
-          MatchParen = {
-            fg = "$orange";
-            fmt = "bold,underline";
-          };
+      highlights = {
+        # Basic UI Elements
+        Normal = {
+          fg = "$fg";
+          bg = "$bg0";
+        };
+        NormalFloat = {
+          fg = "$fg";
+          bg = "$bg1";
+        };
+        Comment = {
+          fg = "$grey";
+          fmt = "${code_style.comments}";
+        };
+        LineNr = {
+          fg = "$grey";
+        };
+        CursorLineNr = {
+          fg = "$bright_yellow";
+        };
+        Visual = {
+          bg = "$bg3";
+        };
+        Cursor = {
+          fg = "$bg0";
+          bg = "$bright_cyan";
+        };
+        VisualNOS = {
+          bg = "$bg3";
+        };
+        Search = {
+          fg = "$bg0";
+          bg = "$orange";
+        };
+        IncSearch = {
+          fg = "$bg0";
+          bg = "$orange";
+        };
+        CursorLine = {
+          bg = "$bg1";
+        };
+        CursorColumn = {
+          bg = "$bg1";
+        };
+        ColorColumn = {
+          bg = "$bg1";
+        };
+        SignColumn = {
+          fg = "$fg";
+        };
+        StatusLine = {
+          fg = "$fg";
+          bg = "$bg2";
+        };
+        StatusLineNC = {
+          fg = "$grey";
+          bg = "$bg1";
+        };
+        VertSplit = {
+          fg = "$bg3";
+        };
+        MatchParen = {
+          fg = "$orange";
+          fmt = "bold,underline";
+        };
 
-          # Popup Menus
-          Pmenu = {
-            fg = "$fg";
-            bg = "$bg1";
-          };
-          PmenuSel = {
-            fg = "$bg0";
-            bg = "$blue";
-          };
-          PmenuSbar = {
-            bg = "$bg1";
-          };
-          PmenuThumb = {
-            bg = "$grey";
-          };
+        # Popup Menus
+        Pmenu = {
+          fg = "$fg";
+          bg = "$bg1";
+        };
+        PmenuSel = {
+          fg = "$bg0";
+          bg = "$blue";
+        };
+        PmenuSbar = {
+          bg = "$bg1";
+        };
+        PmenuThumb = {
+          bg = "$grey";
+        };
 
-          # Folds and Spell Checking
-          Folded = {
-            fg = "$grey";
-            bg = "$bg1";
-          };
-          FoldColumn = {
-            fg = "$grey";
-            bg = "$bg0";
-          };
-          SpellBad = {
-            fg = "$red";
-            fmt = "underline";
-          };
-          SpellCap = {
-            fg = "$blue";
-            fmt = "underline";
-          };
-          SpellRare = {
-            fg = "$purple";
-            fmt = "underline";
-          };
-          SpellLocal = {
-            fg = "$cyan";
-            fmt = "underline";
-          };
+        # Folds and Spell Checking
+        Folded = {
+          fg = "$grey";
+          bg = "$bg1";
+        };
+        FoldColumn = {
+          fg = "$grey";
+          bg = "$bg0";
+        };
+        SpellBad = {
+          fg = "$red";
+          fmt = "underline";
+        };
+        SpellCap = {
+          fg = "$blue";
+          fmt = "underline";
+        };
+        SpellRare = {
+          fg = "$purple";
+          fmt = "underline";
+        };
+        SpellLocal = {
+          fg = "$cyan";
+          fmt = "underline";
+        };
 
-          # Diff Highlighting
-          DiffAdd = {
-            fg = "$green";
-            bg = "#${color-lib.setOkhslLightness 0.15 theme.dark.base0B}";
-          };
-          DiffChange = {
-            fg = "$blue";
-            bg = "#${color-lib.setOkhslLightness 0.15 theme.dark.base0D}";
-          };
-          DiffDelete = {
-            fg = "$red";
-            bg = "#${color-lib.setOkhslLightness 0.15 theme.dark.base08}";
-          };
-          DiffText = {
-            fg = "$fg";
-            bg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0E}";
-          };
+        # Diff Highlighting
+        DiffAdd = {
+          fg = "$green";
+          bg = "#${color-lib.setOkhslLightness 0.15 theme.dark.base0B}";
+        };
+        DiffChange = {
+          fg = "$blue";
+          bg = "#${color-lib.setOkhslLightness 0.15 theme.dark.base0D}";
+        };
+        DiffDelete = {
+          fg = "$red";
+          bg = "#${color-lib.setOkhslLightness 0.15 theme.dark.base08}";
+        };
+        DiffText = {
+          fg = "$fg";
+          bg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0E}";
+        };
 
-          # Syntax Highlighting
-          Identifier = {
-            fg = "$fg";
-            fmt = "${code_style.variables}";
-          };
-          Statement = {
-            fg = "$purple";
-            fmt = "${code_style.keywords}";
-          };
-          Keyword = {
-            fg = "$purple";
-            fmt = "${code_style.keywords}";
-          };
-          Conditional = {
-            fg = "$purple";
-            fmt = "${code_style.keywords}";
-          };
-          Repeat = {
-            fg = "$purple";
-            fmt = "${code_style.keywords}";
-          };
-          Label = {
-            fg = "$purple";
-            fmt = "${code_style.keywords}";
-          };
-          Operator = {
-            fg = "$purple";
-            fmt = "${code_style.keywords}";
-          };
-          Exception = {
-            fg = "$purple";
-            fmt = "${code_style.keywords}";
-          };
-          PreProc = {
-            fg = "$purple";
-          };
-          Include = {
-            fg = "$purple";
-          };
-          Define = {
-            fg = "$purple";
-          };
-          Macro = {
-            fg = "$purple";
-          };
-          Type = {
-            fg = "$yellow";
-          };
-          StorageClass = {
-            fg = "$yellow";
-          };
-          Structure = {
-            fg = "$yellow";
-          };
-          Typedef = {
-            fg = "$yellow";
-          };
-          Special = {
-            fg = "$orange";
-          };
-          SpecialChar = {
-            fg = "$red";
-          };
-          Tag = {
-            fg = "$blue";
-          };
-          Delimiter = {
-            fg = "$light_grey";
-          };
-          SpecialComment = {
-            fg = "$grey";
-            fmt = "${code_style.comments}";
-          };
-          Todo = {
-            fg = "$red";
-            fmt = "${code_style.comments}";
-          };
-          Function = {
-            fg = "$blue";
-            fmt = "${code_style.functions}";
-          };
-          String = {
-            fg = "$green";
-            fmt = "${code_style.strings}";
-          };
-          Character = {
-            fg = "$green";
-          };
-          Number = {
-            fg = "$orange";
-          };
-          Boolean = {
-            fg = "$orange";
-          };
-          Float = {
-            fg = "$orange";
-          };
-          Constant = {
-            fg = "$orange";
-            fmt = "${code_style.constants}";
-          };
+        # Syntax Highlighting
+        Identifier = {
+          fg = "$fg";
+          fmt = "${code_style.variables}";
+        };
+        Statement = {
+          fg = "$purple";
+          fmt = "${code_style.keywords}";
+        };
+        Keyword = {
+          fg = "$purple";
+          fmt = "${code_style.keywords}";
+        };
+        Conditional = {
+          fg = "$purple";
+          fmt = "${code_style.keywords}";
+        };
+        Repeat = {
+          fg = "$purple";
+          fmt = "${code_style.keywords}";
+        };
+        Label = {
+          fg = "$purple";
+          fmt = "${code_style.keywords}";
+        };
+        Operator = {
+          fg = "$purple";
+          fmt = "${code_style.keywords}";
+        };
+        Exception = {
+          fg = "$purple";
+          fmt = "${code_style.keywords}";
+        };
+        PreProc = {
+          fg = "$purple";
+        };
+        Include = {
+          fg = "$purple";
+        };
+        Define = {
+          fg = "$purple";
+        };
+        Macro = {
+          fg = "$purple";
+        };
+        Type = {
+          fg = "$yellow";
+        };
+        StorageClass = {
+          fg = "$yellow";
+        };
+        Structure = {
+          fg = "$yellow";
+        };
+        Typedef = {
+          fg = "$yellow";
+        };
+        Special = {
+          fg = "$orange";
+        };
+        SpecialChar = {
+          fg = "$red";
+        };
+        Tag = {
+          fg = "$blue";
+        };
+        Delimiter = {
+          fg = "$light_grey";
+        };
+        SpecialComment = {
+          fg = "$grey";
+          fmt = "${code_style.comments}";
+        };
+        Todo = {
+          fg = "$red";
+          fmt = "${code_style.comments}";
+        };
+        Function = {
+          fg = "$blue";
+          fmt = "${code_style.functions}";
+        };
+        String = {
+          fg = "$green";
+          fmt = "${code_style.strings}";
+        };
+        Character = {
+          fg = "$green";
+        };
+        Number = {
+          fg = "$orange";
+        };
+        Boolean = {
+          fg = "$orange";
+        };
+        Float = {
+          fg = "$orange";
+        };
+        Constant = {
+          fg = "$orange";
+          fmt = "${code_style.constants}";
+        };
 
-          # Messages and Errors
-          Error = {
-            fg = "$red";
-          };
-          ErrorMsg = {
-            fg = "$red";
-          };
-          WarningMsg = {
-            fg = "$yellow";
-          };
-          MoreMsg = {
-            fg = "$blue";
-          };
-          Question = {
-            fg = "$cyan";
-          };
+        # Messages and Errors
+        Error = {
+          fg = "$red";
+        };
+        ErrorMsg = {
+          fg = "$red";
+        };
+        WarningMsg = {
+          fg = "$yellow";
+        };
+        MoreMsg = {
+          fg = "$blue";
+        };
+        Question = {
+          fg = "$cyan";
+        };
 
-          # Git and Diff Highlighting
-          GitSignsAdd = {
-            fg = "$green";
-          };
-          GitSignsChange = {
-            fg = "$blue";
-          };
-          GitSignsDelete = {
-            fg = "$red";
-          };
+        # Git and Diff Highlighting
+        GitSignsAdd = {
+          fg = "$green";
+        };
+        GitSignsChange = {
+          fg = "$blue";
+        };
+        GitSignsDelete = {
+          fg = "$red";
+        };
 
-          # mini.pick fuzzy finder
-          MiniPickNormal = {
-            fg = "$fg";
-            bg = "$bg1";
-          };
-          MiniPickBorder = {
-            fg = "$bg3";
-            bg = "$bg1";
-          };
-          MiniPickBorderText = {
-            fg = "$purple";
-            bg = "$bg1";
-          };
-          MiniPickPrompt = {
-            fg = "$blue";
-            bg = "$bg1";
-          };
-          MiniPickMatchCurrent = {
-            fg = "$fg";
-            bg = "$bg3";
-            fmt = "bold";
-          };
-          MiniPickMatchMarked = {
-            fg = "$orange";
-          };
-          MiniPickMatchRanges = {
-            fg = "$orange";
-          };
-          MiniPickPreviewLine = {
-            bg = "$bg2";
-          };
-          MiniPickPreviewRegion = {
-            bg = "$bg3";
-          };
-          MiniPickIconFile = {
-            fg = "$fg";
-          };
-          MiniPickIconDirectory = {
-            fg = "$blue";
-          };
-          # Blink.cmp completion menu
-          BlinkCmpMenu = {
-            fg = "$fg";
-            bg = "$bg1";
-          };
-          BlinkCmpMenuSelection = {
-            fg = "$bg0";
-            bg = "$blue";
-          };
-          BlinkCmpLabel = {
-            fg = "$fg";
-          };
-          BlinkCmpLabelMatch = {
-            fg = "$blue";
-          };
-          BlinkCmpKindFunction = {
-            fg = "$blue";
-          };
-          BlinkCmpKindMethod = {
-            fg = "$blue";
-          };
-          BlinkCmpKindVariable = {
-            fg = "$cyan";
-          };
-          BlinkCmpKindField = {
-            fg = "$red";
-          };
-          BlinkCmpKindKeyword = {
-            fg = "$purple";
-          };
-          BlinkCmpKindText = {
-            fg = "$cyan";
-          };
-          BlinkCmpKindInterface = {
-            fg = "$cyan";
-          };
-          BlinkCmpGhostText = {
-            fg = "$grey";
-          };
+        # mini.pick fuzzy finder
+        MiniPickNormal = {
+          fg = "$fg";
+          bg = "$bg1";
+        };
+        MiniPickBorder = {
+          fg = "$bg3";
+          bg = "$bg1";
+        };
+        MiniPickBorderText = {
+          fg = "$purple";
+          bg = "$bg1";
+        };
+        MiniPickPrompt = {
+          fg = "$blue";
+          bg = "$bg1";
+        };
+        MiniPickMatchCurrent = {
+          fg = "$fg";
+          bg = "$bg3";
+          fmt = "bold";
+        };
+        MiniPickMatchMarked = {
+          fg = "$orange";
+        };
+        MiniPickMatchRanges = {
+          fg = "$orange";
+        };
+        MiniPickPreviewLine = {
+          bg = "$bg2";
+        };
+        MiniPickPreviewRegion = {
+          bg = "$bg3";
+        };
+        MiniPickIconFile = {
+          fg = "$fg";
+        };
+        MiniPickIconDirectory = {
+          fg = "$blue";
+        };
+        # Blink.cmp completion menu
+        BlinkCmpMenu = {
+          fg = "$fg";
+          bg = "$bg1";
+        };
+        BlinkCmpMenuSelection = {
+          fg = "$bg0";
+          bg = "$blue";
+        };
+        BlinkCmpLabel = {
+          fg = "$fg";
+        };
+        BlinkCmpLabelMatch = {
+          fg = "$blue";
+        };
+        BlinkCmpKindFunction = {
+          fg = "$blue";
+        };
+        BlinkCmpKindMethod = {
+          fg = "$blue";
+        };
+        BlinkCmpKindVariable = {
+          fg = "$cyan";
+        };
+        BlinkCmpKindField = {
+          fg = "$red";
+        };
+        BlinkCmpKindKeyword = {
+          fg = "$purple";
+        };
+        BlinkCmpKindText = {
+          fg = "$cyan";
+        };
+        BlinkCmpKindInterface = {
+          fg = "$cyan";
+        };
+        BlinkCmpGhostText = {
+          fg = "$grey";
+        };
 
-          # Indent-blankline plugin highlights
-          IblIndent = {
-            fg = "$bg2"; # subtle indent guides
-          };
+        # Indent-blankline plugin highlights
+        IblIndent = {
+          fg = "$bg2"; # subtle indent guides
+        };
 
-          # Dimmed rainbow indent guides (parent scope hierarchy)
-          IblRainbowRed = {
-            fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base08}";
-            nocombine = true;
-          };
-          IblRainbowYellow = {
-            fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0A}";
-            nocombine = true;
-          };
-          IblRainbowBlue = {
-            fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0D}";
-            nocombine = true;
-          };
-          IblRainbowOrange = {
-            fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base09}";
-            nocombine = true;
-          };
-          IblRainbowGreen = {
-            fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0B}";
-            nocombine = true;
-          };
-          IblRainbowViolet = {
-            fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0E}";
-            nocombine = true;
-          };
-          IblRainbowCyan = {
-            fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0C}";
-            nocombine = true;
-          };
+        # Dimmed rainbow indent guides (parent scope hierarchy)
+        IblRainbowRed = {
+          fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base08}";
+          nocombine = true;
+        };
+        IblRainbowYellow = {
+          fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0A}";
+          nocombine = true;
+        };
+        IblRainbowBlue = {
+          fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0D}";
+          nocombine = true;
+        };
+        IblRainbowOrange = {
+          fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base09}";
+          nocombine = true;
+        };
+        IblRainbowGreen = {
+          fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0B}";
+          nocombine = true;
+        };
+        IblRainbowViolet = {
+          fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0E}";
+          nocombine = true;
+        };
+        IblRainbowCyan = {
+          fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0C}";
+          nocombine = true;
+        };
 
-          # vim-matchup - bright active pair highlighting
-          MatchWord = {
-            fg = "$bright_cyan";
-            fmt = "bold,underline";
-          };
-          MatchWordCur = {
-            fg = "$bright_cyan";
-            fmt = "bold,underline";
-          };
-          MatchParenCur = {
-            fg = "$bright_orange";
-            fmt = "bold";
-          };
+        # vim-matchup - bright active pair highlighting
+        MatchWord = {
+          fg = "$bright_cyan";
+          fmt = "bold,underline";
+        };
+        MatchWordCur = {
+          fg = "$bright_cyan";
+          fmt = "bold,underline";
+        };
+        MatchParenCur = {
+          fg = "$bright_orange";
+          fmt = "bold";
+        };
 
-          # Custom highlights from core.nix
-          TODO = {
-            fg = "$bg0";
-            bg = "#${color-lib.setOkhsvValue 0.9 theme.dark.base0A}";
-          };
-          FIXME = {
-            fg = "$bg0";
-            bg = "#${color-lib.setOkhsvValue 0.9 theme.dark.base0E}";
-          };
-          HACK = {
-            fg = "$bg0";
-            bg = "#${color-lib.setOkhsvValue 0.9 theme.dark.base0C}";
-          };
-          SnippetCursor = {
-            fg = "$bg0";
-            bg = "$green";
-          };
-          ExtraWhitespace = {
-            bg = "$bg2";
-          };
-        }
-        // themeHighlights;
+        # Custom highlights from core.nix
+        TODO = {
+          fg = "$bg0";
+          bg = "#${color-lib.setOkhsvValue 0.9 theme.dark.base0A}";
+        };
+        FIXME = {
+          fg = "$bg0";
+          bg = "#${color-lib.setOkhsvValue 0.9 theme.dark.base0E}";
+        };
+        HACK = {
+          fg = "$bg0";
+          bg = "#${color-lib.setOkhsvValue 0.9 theme.dark.base0C}";
+        };
+        SnippetCursor = {
+          fg = "$bg0";
+          bg = "$green";
+        };
+        ExtraWhitespace = {
+          bg = "$bg2";
+        };
+      }
+      // themeHighlights;
     };
   };
 }

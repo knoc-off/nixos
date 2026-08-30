@@ -28,9 +28,11 @@
   inputs,
   pkgs,
   ...
-}: let
+}:
+let
   packSite = inputs.minecraft-modpack.packages.${pkgs.stdenv.hostPlatform.system}.packSite;
-in {
+in
+{
   services.caddy.virtualHosts."mc.niko.ink".extraConfig = ''
     import security-headers
 

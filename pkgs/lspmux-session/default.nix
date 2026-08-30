@@ -24,8 +24,9 @@
   coreutils,
   jq,
   git,
-}: let
-  lspmux = pkgs.callPackage ../lspmux {};
+}:
+let
+  lspmux = pkgs.callPackage ../lspmux { };
   lspmuxBin = lib.getExe lspmux;
   jqBin = lib.getExe jq;
   gitBin = lib.getExe git;
@@ -168,8 +169,7 @@
 
   positivePatterns = lib.filter (p: !(lib.hasPrefix "!" p)) envAllowlist;
   negativePatterns = map (lib.removePrefix "!") (lib.filter (lib.hasPrefix "!") envAllowlist);
-  shellArray = name: items:
-    "${name}=(${lib.concatMapStringsSep " " lib.escapeShellArg items})";
+  shellArray = name: items: "${name}=(${lib.concatMapStringsSep " " lib.escapeShellArg items})";
 
   # Derived from HOME alone, deliberately ignoring XDG_STATE_HOME.
   #
@@ -657,17 +657,20 @@
     '';
   };
 in
-  symlinkJoin {
-    name = "lspmux-session";
+symlinkJoin {
+  name = "lspmux-session";
 
-    paths = [lspmux-attach lspmux-session];
+  paths = [
+    lspmux-attach
+    lspmux-session
+  ];
 
-    passthru = {
-      inherit envAllowlist lspmux;
-    };
+  passthru = {
+    inherit envAllowlist lspmux;
+  };
 
-    meta = {
-      description = "Named, manually managed lspmux language server sessions";
-      mainProgram = "lspmux-session";
-    };
-  }
+  meta = {
+    description = "Named, manually managed lspmux language server sessions";
+    mainProgram = "lspmux-session";
+  };
+}

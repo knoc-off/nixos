@@ -13,7 +13,7 @@
 # NOTE: languages/github-actions.nix (currently disabled in minimal.nix) also
 # configures yamlls. If you ever enable it, reconcile it with this module --
 # two yamlls server definitions would otherwise collide.
-{...}: {
+{ ... }: {
   plugins.lsp.servers = {
     jsonls.enable = true;
     yamlls.enable = true;

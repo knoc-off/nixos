@@ -8,7 +8,7 @@
 #   <leader>va  add a label to the current file (named bookmark)
 #   <leader>vd  remove a label from the current file
 #   <leader>vn / <leader>vp  jump to next / previous file by frecency
-{lib, ...}: {
+{ lib, ... }: {
   whichKeyGroups = [
     {
       __unkeyed = "<leader>v";
@@ -16,24 +16,26 @@
     }
   ];
 
-  plugins.mini.modules.visits = {};
+  plugins.mini.modules.visits = { };
 
-  keymaps = let
-    mk = key: fn: desc: {
-      mode = "n";
-      inherit key;
-      action = lib.nixvim.mkRaw "function() ${fn} end";
-      options = {
-        silent = true;
-        inherit desc;
+  keymaps =
+    let
+      mk = key: fn: desc: {
+        mode = "n";
+        inherit key;
+        action = lib.nixvim.mkRaw "function() ${fn} end";
+        options = {
+          silent = true;
+          inherit desc;
+        };
       };
-    };
-  in [
-    (mk "<leader>vv" "require('mini.extra').pickers.visit_paths()" "Visits (frecency)")
-    (mk "<leader>vl" "require('mini.extra').pickers.visit_labels()" "Visits by label")
-    (mk "<leader>va" "require('mini.visits').add_label()" "Add label")
-    (mk "<leader>vd" "require('mini.visits').remove_label()" "Remove label")
-    (mk "<leader>vn" "require('mini.visits').iterate_paths('forward')" "Next visit")
-    (mk "<leader>vp" "require('mini.visits').iterate_paths('backward')" "Previous visit")
-  ];
+    in
+    [
+      (mk "<leader>vv" "require('mini.extra').pickers.visit_paths()" "Visits (frecency)")
+      (mk "<leader>vl" "require('mini.extra').pickers.visit_labels()" "Visits by label")
+      (mk "<leader>va" "require('mini.visits').add_label()" "Add label")
+      (mk "<leader>vd" "require('mini.visits').remove_label()" "Remove label")
+      (mk "<leader>vn" "require('mini.visits').iterate_paths('forward')" "Next visit")
+      (mk "<leader>vp" "require('mini.visits').iterate_paths('backward')" "Previous visit")
+    ];
 }

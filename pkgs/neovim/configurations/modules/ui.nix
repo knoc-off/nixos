@@ -1,11 +1,11 @@
 # UI polish: notifications, smooth scroll, icons
-{lib, ...}: {
+{ lib, ... }: {
   plugins.mini = {
     enable = true;
     mockDevIcons = true;
     modules = {
-      icons = {};
-      notify = {};
+      icons = { };
+      notify = { };
       animate = {
         cursor.enable = false;
         resize.enable = false;

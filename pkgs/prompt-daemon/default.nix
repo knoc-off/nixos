@@ -2,7 +2,8 @@
   lib,
   pkgs,
   fenix,
-}: let
+}:
+let
   toolchain = fenix.combine [
     fenix.minimal.toolchain
     fenix.default.clippy
@@ -12,27 +13,27 @@
     rustc = toolchain;
   };
 in
-  rustPlatform.buildRustPackage {
-    pname = "prompt-daemon";
-    version = "0.1.0-unstable";
+rustPlatform.buildRustPackage {
+  pname = "prompt-daemon";
+  version = "0.1.0-unstable";
 
-    src = lib.cleanSource ./.;
+  src = lib.cleanSource ./.;
 
-    nativeBuildInputs = [
-      fenix.rust-analyzer
-    ];
+  nativeBuildInputs = [
+    fenix.rust-analyzer
+  ];
 
-    # postCheck = ''
-    #   cargo clippy --all-targets -- -D warnings
-    # '';
+  # postCheck = ''
+  #   cargo clippy --all-targets -- -D warnings
+  # '';
 
-    cargoLock = {
-      lockFile = ./Cargo.lock;
-    };
+  cargoLock = {
+    lockFile = ./Cargo.lock;
+  };
 
-    meta = {
-      description = "Pre-computation cache daemon for shell prompt segments";
-      license = lib.licenses.mit;
-      mainProgram = "prompt-daemon";
-    };
-  }
+  meta = {
+    description = "Pre-computation cache daemon for shell prompt segments";
+    license = lib.licenses.mit;
+    mainProgram = "prompt-daemon";
+  };
+}

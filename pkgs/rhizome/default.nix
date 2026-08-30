@@ -9,7 +9,8 @@
   lib,
   pkgs,
   ...
-}: let
+}:
+let
   cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
   version = cargoToml.workspace.package.version;
 
@@ -19,20 +20,29 @@
 
     src = lib.cleanSourceWith {
       src = ./.;
-      filter = path: type: let
-        base = baseNameOf path;
-      in
-        !(builtins.elem base [".cargo-home" "target" ".direnv"])
+      filter =
+        path: type:
+        let
+          base = baseNameOf path;
+        in
+        !(builtins.elem base [
+          ".cargo-home"
+          "target"
+          ".direnv"
+        ])
         && lib.cleanSourceFilter path type;
     };
 
     cargoLock.lockFile = ./Cargo.lock;
 
-    cargoBuildFlags = ["-p" "rhizomed"];
-    cargoTestFlags = ["--workspace"];
+    cargoBuildFlags = [
+      "-p"
+      "rhizomed"
+    ];
+    cargoTestFlags = [ "--workspace" ];
 
     # reqwest is built against rustls, so no system OpenSSL is needed.
-    nativeBuildInputs = [pkgs.pkg-config];
+    nativeBuildInputs = [ pkgs.pkg-config ];
 
     meta = {
       description = "Trilium notes as Neovim buffers, with lossless-by-proof HTML round-tripping";
@@ -48,9 +58,11 @@
     inherit version;
     src = lib.cleanSourceWith {
       src = ./.;
-      filter = path: _: let
-        rel = lib.removePrefix (toString ./. + "/") (toString path);
-      in
+      filter =
+        path: _:
+        let
+          rel = lib.removePrefix (toString ./. + "/") (toString path);
+        in
         lib.hasPrefix "lua" rel || lib.hasPrefix "plugin" rel;
     };
     postInstall = ''
@@ -62,7 +74,7 @@
     # noon, and from drifting across DST transitions) is checked directly
     # with a plain `lua` interpreter rather than a Neovim test harness.
     doCheck = true;
-    nativeCheckInputs = [pkgs.lua];
+    nativeCheckInputs = [ pkgs.lua ];
     checkPhase = ''
       runHook preCheck
       TZ=Europe/Berlin TZDIR=${pkgs.tzdata}/share/zoneinfo LUA_PATH="$PWD/lua/?.lua;;" \
@@ -72,31 +84,29 @@
     meta.description = "Neovim client for Trilium notes over ETAPI";
   };
 in
-  rhizome
-  // {
-    passthru =
-      (rhizome.passthru or {})
-      // {
-        inherit plugin;
+rhizome
+// {
+  passthru = (rhizome.passthru or { }) // {
+    inherit plugin;
 
-        devShell = pkgs.mkShell {
-          inputsFrom = [rhizome];
-          nativeBuildInputs = [
-            pkgs.cargo
-            pkgs.rustc
-            pkgs.clippy
-            pkgs.rustfmt
-            pkgs.rust-analyzer
-            # `spike` and `check` are run against real note HTML; pandoc is here
-            # only to re-derive the comparison numbers in the README.
-            pkgs.pandoc
-            pkgs.jq
-          ];
-          shellHook = ''
-            echo "rhizome dev shell"
-            echo "  cargo test --workspace"
-            echo "  cargo run -p rhizomed -- spike <dir-of-note-html>"
-          '';
-        };
-      };
-  }
+    devShell = pkgs.mkShell {
+      inputsFrom = [ rhizome ];
+      nativeBuildInputs = [
+        pkgs.cargo
+        pkgs.rustc
+        pkgs.clippy
+        pkgs.rustfmt
+        pkgs.rust-analyzer
+        # `spike` and `check` are run against real note HTML; pandoc is here
+        # only to re-derive the comparison numbers in the README.
+        pkgs.pandoc
+        pkgs.jq
+      ];
+      shellHook = ''
+        echo "rhizome dev shell"
+        echo "  cargo test --workspace"
+        echo "  cargo run -p rhizomed -- spike <dir-of-note-html>"
+      '';
+    };
+  };
+}

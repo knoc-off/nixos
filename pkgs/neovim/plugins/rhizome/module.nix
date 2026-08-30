@@ -8,11 +8,18 @@
   config,
   pkgs,
   ...
-}: let
-  inherit (lib) types mkEnableOption mkOption mkIf;
+}:
+let
+  inherit (lib)
+    types
+    mkEnableOption
+    mkOption
+    mkIf
+    ;
 
   cfg = config.plugins.rhizome;
-in {
+in
+{
   options.plugins.rhizome = {
     enable = mkEnableOption "rhizome - Trilium notes in Neovim";
 
@@ -60,7 +67,10 @@ in {
     tokenCommand = mkOption {
       type = types.nullOr (types.listOf types.str);
       default = null;
-      example = ["pass" "trilium/etapi"];
+      example = [
+        "pass"
+        "trilium/etapi"
+      ];
       description = ''
         Command printing an ETAPI token on stdout, for when the token is not in
         the environment. Takes precedence over `tokenEnv`.
@@ -83,7 +93,9 @@ in {
     };
 
     keymaps = {
-      enable = mkEnableOption "default rhizome keymaps" // {default = true;};
+      enable = mkEnableOption "default rhizome keymaps" // {
+        default = true;
+      };
 
       pick = mkOption {
         type = types.nullOr types.str;
@@ -112,31 +124,30 @@ in {
   };
 
   config = mkIf cfg.enable {
-    extraPlugins = [cfg.package.passthru.plugin];
+    extraPlugins = [ cfg.package.passthru.plugin ];
 
     # `rhizome` in $PATH is not needed by the plugin, but having the CLI
     # available makes `rhizome roundtrip` and friends usable from :terminal.
-    extraPackages = [cfg.package];
+    extraPackages = [ cfg.package ];
 
-    extraConfigLua = let
-      luaString = s: ''"${lib.escape ["\"" "\\"] s}"'';
-      tokenCommandLua =
-        if cfg.tokenCommand == null
-        then "nil"
-        else "{ ${lib.concatMapStringsSep ", " luaString cfg.tokenCommand} }";
-    in ''
-      require("rhizome").setup({
-        url = ${
-        if cfg.url == null
-        then "nil"
-        else luaString cfg.url
-      },
-        url_env = ${luaString cfg.urlEnv},
-        token_env = ${luaString cfg.tokenEnv},
-        token_cmd = ${tokenCommandLua},
-        soft_wrap = ${lib.boolToString cfg.softWrap},
-      })
-    '';
+    extraConfigLua =
+      let
+        luaString = s: ''"${lib.escape [ "\"" "\\" ] s}"'';
+        tokenCommandLua =
+          if cfg.tokenCommand == null then
+            "nil"
+          else
+            "{ ${lib.concatMapStringsSep ", " luaString cfg.tokenCommand} }";
+      in
+      ''
+        require("rhizome").setup({
+          url = ${if cfg.url == null then "nil" else luaString cfg.url},
+          url_env = ${luaString cfg.urlEnv},
+          token_env = ${luaString cfg.tokenEnv},
+          token_cmd = ${tokenCommandLua},
+          soft_wrap = ${lib.boolToString cfg.softWrap},
+        })
+      '';
 
     keymaps = lib.optionals cfg.keymaps.enable (
       lib.optional (cfg.keymaps.pick != null) {

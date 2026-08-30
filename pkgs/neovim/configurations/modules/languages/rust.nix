@@ -7,7 +7,8 @@
   pkgs,
   rustAnalyzerSettings,
   ...
-}: {
+}:
+{
   whichKeyGroups = [
     {
       __unkeyed = "<leader>r";
@@ -43,7 +44,7 @@
         # then restarts from a freshly-built config, so the target is dropped.
         # Even if it worked, the `settings` function below would overwrite
         # cargo.target from the session metadata on the next start.)
-        cmd = ["lspmux-attach"];
+        cmd = [ "lspmux-attach" ];
 
         # Shared with opencode's `lsp.rust.initialization` so that whichever
         # client initializes a shared lspmux session proposes the same config.
@@ -85,7 +86,7 @@
   };
 
   plugins.conform-nvim.settings = {
-    formatters_by_ft.rust = ["rustfmt"];
+    formatters_by_ft.rust = [ "rustfmt" ];
     formatters.rustfmt = {
       command = lib.getExe pkgs.rustfmt;
     };

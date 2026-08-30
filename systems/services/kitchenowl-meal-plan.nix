@@ -15,15 +15,18 @@
   pkgs,
   ...
 }:
-with lib; let
+with lib;
+let
   cfg = config.services.kitchenowl-meal-plan;
 
-  pollScript =
-    pkgs.writers.writePython3Bin "kitchenowl-meal-plan" {
-      flakeIgnore = ["E501" "W503"];
-    }
-    ./kitchenowl-meal-plan.py;
-in {
+  pollScript = pkgs.writers.writePython3Bin "kitchenowl-meal-plan" {
+    flakeIgnore = [
+      "E501"
+      "W503"
+    ];
+  } ./kitchenowl-meal-plan.py;
+in
+{
   options.services.kitchenowl-meal-plan = {
     enable = mkEnableOption "KitchenOwl meal-plan notifier";
 
@@ -84,8 +87,8 @@ in {
   config = mkIf cfg.enable {
     systemd.services.kitchenowl-meal-plan = {
       description = "KitchenOwl meal-plan notifier";
-      after = ["network-online.target"];
-      wants = ["network-online.target"];
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
 
       environment = {
         KO_API_BASE = cfg.apiBase;
@@ -119,15 +122,23 @@ in {
         RestrictSUIDSGID = true;
         RestrictNamespaces = true;
         LockPersonality = true;
-        RestrictAddressFamilies = ["AF_INET" "AF_INET6" "AF_UNIX"];
+        RestrictAddressFamilies = [
+          "AF_INET"
+          "AF_INET6"
+          "AF_UNIX"
+        ];
       };
     };
 
     systemd.timers.kitchenowl-meal-plan = {
       description = "KitchenOwl meal-plan reminder timer";
-      wantedBy = ["timers.target"];
+      wantedBy = [ "timers.target" ];
       timerConfig = {
-        OnCalendar = [cfg.times.breakfast cfg.times.lunch cfg.times.dinner];
+        OnCalendar = [
+          cfg.times.breakfast
+          cfg.times.lunch
+          cfg.times.dinner
+        ];
         # A missed meal reminder is stale; don't catch up on boot.
         Persistent = false;
       };

@@ -11,6 +11,6 @@
 #
 # Escape hatch for false positives: drop a `typos.toml` / `_typos.toml` at the
 # repo root (a documented root marker) to extend the dictionary per project.
-{...}: {
+{ ... }: {
   plugins.lsp.servers.typos_lsp.enable = true;
 }

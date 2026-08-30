@@ -16,13 +16,19 @@
   lib,
   pkgs,
   ...
-}: {
-  whichKeyGroups = [{__unkeyed = "<leader>d"; group = "Debug";}];
+}:
+{
+  whichKeyGroups = [
+    {
+      __unkeyed = "<leader>d";
+      group = "Debug";
+    }
+  ];
 
   # Puts `codelldb` on PATH. nixpkgs compiles it from source (properly linked,
   # no FHS/marketplace-blob issues) — this is the NixOS path the rustaceanvim
   # README points at. rustaceanvim's adapter fn checks executable('codelldb').
-  extraPackages = [pkgs.vscode-extensions.vadimcn.vscode-lldb.adapter];
+  extraPackages = [ pkgs.vscode-extensions.vadimcn.vscode-lldb.adapter ];
 
   plugins.dap = {
     enable = true;
@@ -67,53 +73,59 @@
     };
   };
 
-  keymaps = let
-    mk = key: fn: desc: {
-      mode = "n";
-      inherit key;
-      action = lib.nixvim.mkRaw "function() ${fn} end";
-      options = {
-        silent = true;
-        inherit desc;
+  keymaps =
+    let
+      mk = key: fn: desc: {
+        mode = "n";
+        inherit key;
+        action = lib.nixvim.mkRaw "function() ${fn} end";
+        options = {
+          silent = true;
+          inherit desc;
+        };
       };
-    };
-  in [
-    # Flow control. F-keys follow the VSCode convention every nvim-dap tutorial
-    # uses, so external docs match. <leader>d* duplicates for discoverability.
-    (mk "<F5>" "require('dap').continue()" "Debug: continue / start")
-    (mk "<leader>dc" "require('dap').continue()" "Continue / start")
-    (mk "<F10>" "require('dap').step_over()" "Debug: step over")
-    (mk "<leader>do" "require('dap').step_over()" "Step over")
-    (mk "<F11>" "require('dap').step_into()" "Debug: step into")
-    (mk "<leader>di" "require('dap').step_into()" "Step into")
-    (mk "<S-F11>" "require('dap').step_out()" "Debug: step out")
-    (mk "<leader>dO" "require('dap').step_out()" "Step out")
-    (mk "<S-F5>" "require('dap').terminate()" "Debug: terminate")
-    (mk "<leader>dt" "require('dap').terminate()" "Terminate")
-    (mk "<leader>dr" "require('dap').run_last()" "Run last")
-    (mk "<leader>dR" "require('dap').restart()" "Restart")
+    in
+    [
+      # Flow control. F-keys follow the VSCode convention every nvim-dap tutorial
+      # uses, so external docs match. <leader>d* duplicates for discoverability.
+      (mk "<F5>" "require('dap').continue()" "Debug: continue / start")
+      (mk "<leader>dc" "require('dap').continue()" "Continue / start")
+      (mk "<F10>" "require('dap').step_over()" "Debug: step over")
+      (mk "<leader>do" "require('dap').step_over()" "Step over")
+      (mk "<F11>" "require('dap').step_into()" "Debug: step into")
+      (mk "<leader>di" "require('dap').step_into()" "Step into")
+      (mk "<S-F11>" "require('dap').step_out()" "Debug: step out")
+      (mk "<leader>dO" "require('dap').step_out()" "Step out")
+      (mk "<S-F5>" "require('dap').terminate()" "Debug: terminate")
+      (mk "<leader>dt" "require('dap').terminate()" "Terminate")
+      (mk "<leader>dr" "require('dap').run_last()" "Run last")
+      (mk "<leader>dR" "require('dap').restart()" "Restart")
 
-    # Breakpoints.
-    (mk "<F9>" "require('dap').toggle_breakpoint()" "Debug: toggle breakpoint")
-    (mk "<leader>db" "require('dap').toggle_breakpoint()" "Toggle breakpoint")
-    (mk "<leader>dB" "require('dap').set_breakpoint(vim.fn.input('Breakpoint condition: '))" "Conditional breakpoint")
-    (mk "<leader>dp" "require('dap').set_breakpoint(nil, nil, vim.fn.input('Log point message: '))" "Log point")
+      # Breakpoints.
+      (mk "<F9>" "require('dap').toggle_breakpoint()" "Debug: toggle breakpoint")
+      (mk "<leader>db" "require('dap').toggle_breakpoint()" "Toggle breakpoint")
+      (mk "<leader>dB" "require('dap').set_breakpoint(vim.fn.input('Breakpoint condition: '))"
+        "Conditional breakpoint"
+      )
+      (mk "<leader>dp" "require('dap').set_breakpoint(nil, nil, vim.fn.input('Log point message: '))"
+        "Log point"
+      )
 
-    # Inspection. Hover evaluates the expression under the cursor in a float
-    # (works in visual mode too, on the selection). Watch adds it to dap-view's
-    # persistent Watches section.
-    (mk "<leader>de" "require('dap.ui.widgets').hover()" "Eval under cursor")
-    (mk "<leader>dw" "require('dap-view').add_expr()" "Watch expression")
-    (mk "<leader>dv" "require('dap-view').toggle()" "Toggle debug view")
-    (mk "<leader>dj" "require('dap-view').jump_to_view('watches')" "Jump to debug view")
-    {
-      mode = "v";
-      key = "<leader>de";
-      action = lib.nixvim.mkRaw "function() require('dap.ui.widgets').hover() end";
-      options = {
-        silent = true;
-        desc = "Eval selection";
-      };
-    }
-  ];
+      # Inspection. Hover evaluates the expression under the cursor in a float
+      # (works in visual mode too, on the selection). Watch adds it to dap-view's
+      # persistent Watches section.
+      (mk "<leader>de" "require('dap.ui.widgets').hover()" "Eval under cursor")
+      (mk "<leader>dw" "require('dap-view').add_expr()" "Watch expression")
+      (mk "<leader>dv" "require('dap-view').toggle()" "Toggle debug view")
+      (mk "<leader>dj" "require('dap-view').jump_to_view('watches')" "Jump to debug view")
+      {
+        mode = "v";
+        key = "<leader>de";
+        action = lib.nixvim.mkRaw "function() require('dap.ui.widgets').hover() end";
+        options = {
+          silent = true;
+          desc = "Eval selection";
+        };
+      }
+    ];
 }

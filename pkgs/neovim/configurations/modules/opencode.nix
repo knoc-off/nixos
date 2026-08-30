@@ -6,7 +6,8 @@
   lib,
   pkgs,
   ...
-}: {
+}:
+{
   # snacks.nvim provides terminal/window/input backend for opencode.nvim
   plugins.snacks = {
     enable = true;
@@ -41,7 +42,10 @@
       };
     }
     {
-      mode = ["n" "v"];
+      mode = [
+        "n"
+        "v"
+      ];
       key = "<leader>oa";
       action = lib.nixvim.mkRaw "function() require('opencode').ask() end";
       options = {
@@ -50,7 +54,10 @@
       };
     }
     {
-      mode = ["n" "v"];
+      mode = [
+        "n"
+        "v"
+      ];
       key = "<leader>oe";
       action = lib.nixvim.mkRaw "function() require('opencode').prompt('Edit @this') end";
       options = {

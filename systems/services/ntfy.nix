@@ -1,6 +1,8 @@
-{config, ...}: let
+{ config, ... }:
+let
   ph = name: config.sops.placeholder.${name};
-in {
+in
+{
   services.ntfy-sh = {
     enable = true;
     settings = {

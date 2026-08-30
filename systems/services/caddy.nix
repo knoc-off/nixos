@@ -2,14 +2,16 @@
   self,
   config,
   ...
-}: let
+}:
+let
   # Tailnet source ranges (Headscale defaults). Requests arriving from these
   # skip the public OAuth gate; everything else is treated as WAN.
   trustedIps = "100.64.0.0/10 fd7a:115c:a1e0::/48";
-in {
-  imports = [self.nixosModules.caddy-common];
+in
+{
+  imports = [ self.nixosModules.caddy-common ];
 
-  sops.secrets."services/caddy/cloudflare-env" = {};
+  sops.secrets."services/caddy/cloudflare-env" = { };
 
   services.caddy = {
     enable = true;

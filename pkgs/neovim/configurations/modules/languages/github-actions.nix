@@ -2,7 +2,7 @@
 # - gh_actions_ls (workflow-aware completions, expression validation)
 # - yamlls (general YAML schema validation + completion)
 # - actionlint via none-ls (workflow linting as LSP diagnostics)
-{pkgs, ...}: {
+{ pkgs, ... }: {
   # Actions-specific LSP: understands workflow syntax, action inputs/outputs, expressions
   plugins.lsp.servers.gh_actions_ls = {
     enable = true;

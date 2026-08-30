@@ -23,13 +23,12 @@
   pkgs,
   ...
 }:
-with lib; let
+with lib;
+let
   cfg = config.services.kitchenowl-mcp;
-  oauthBaseUrl =
-    if cfg.oauth.baseUrl != null
-    then cfg.oauth.baseUrl
-    else "https://${cfg.domain}";
-in {
+  oauthBaseUrl = if cfg.oauth.baseUrl != null then cfg.oauth.baseUrl else "https://${cfg.domain}";
+in
+{
   options.services.kitchenowl-mcp = {
     enable = mkEnableOption "KitchenOwl MCP server";
 
@@ -115,18 +114,16 @@ in {
     };
 
     oauth = {
-      enable =
-        mkEnableOption ""
-        // {
-          description = ''
-            Authenticate MCP clients via GitHub OAuth instead of a bearer
-            token, for clients that cannot send an Authorization header.
+      enable = mkEnableOption "" // {
+        description = ''
+          Authenticate MCP clients via GitHub OAuth instead of a bearer
+          token, for clients that cannot send an Authorization header.
 
-            The server exposes its own OAuth endpoints (discovery, dynamic
-            client registration, consent, callback) on `domain` and proxies
-            them upstream to a GitHub OAuth app.
-          '';
-        };
+          The server exposes its own OAuth endpoints (discovery, dynamic
+          client registration, consent, callback) on `domain` and proxies
+          them upstream to a GitHub OAuth app.
+        '';
+      };
 
       clientId = mkOption {
         type = types.str;
@@ -158,8 +155,8 @@ in {
 
       allowedGitHubUsers = mkOption {
         type = types.listOf types.str;
-        default = [];
-        example = ["octocat"];
+        default = [ ];
+        example = [ "octocat" ];
         description = ''
           GitHub logins permitted to use this server. Checked on every request,
           so revoking someone takes effect immediately rather than when their
@@ -174,7 +171,7 @@ in {
       allowedRedirectUris = mkOption {
         type = types.nullOr (types.listOf types.str);
         default = null;
-        example = ["https://claude.ai/api/mcp/auth_callback"];
+        example = [ "https://claude.ai/api/mcp/auth_callback" ];
         description = ''
           Redirect URI patterns accepted from registering MCP clients. Null
           keeps the built-in default (Anthropic's connector callbacks).
@@ -208,7 +205,7 @@ in {
         '';
       }
       {
-        assertion = !cfg.oauth.enable || cfg.oauth.allowedGitHubUsers != [];
+        assertion = !cfg.oauth.enable || cfg.oauth.allowedGitHubUsers != [ ];
         message = ''
           services.kitchenowl-mcp.oauth.allowedGitHubUsers is empty. GitHub
           authenticates every account on the site, so this would expose the
@@ -216,9 +213,7 @@ in {
         '';
       }
       {
-        assertion =
-          !cfg.oauth.enable
-          || ((cfg.oauth.clientId != "") != (cfg.oauth.clientIdFile != null));
+        assertion = !cfg.oauth.enable || ((cfg.oauth.clientId != "") != (cfg.oauth.clientIdFile != null));
         message = "services.kitchenowl-mcp.oauth needs exactly one of clientId or clientIdFile.";
       }
       {
@@ -236,44 +231,46 @@ in {
 
     systemd.services.kitchenowl-mcp = {
       description = "KitchenOwl MCP server";
-      wantedBy = ["multi-user.target"];
-      after = ["network-online.target" "podman-kitchenowl.service"];
-      wants = ["network-online.target"];
+      wantedBy = [ "multi-user.target" ];
+      after = [
+        "network-online.target"
+        "podman-kitchenowl.service"
+      ];
+      wants = [ "network-online.target" ];
 
-      environment =
-        {
-          KITCHENOWL_API_BASE = cfg.apiBase;
-          KITCHENOWL_HOUSEHOLD_ID = toString cfg.householdId;
-          KITCHENOWL_MCP_HOST = cfg.host;
-          KITCHENOWL_MCP_PORT = toString cfg.port;
-          KITCHENOWL_MCP_ENABLE_RAW_GET = boolToString cfg.enableRawGet;
-          # Read at exec time from the credentials directory, so no token ever
-          # lands in the unit file or the store.
-          KITCHENOWL_API_TOKEN_FILE = "%d/api-token";
-        }
-        // optionalAttrs (cfg.mcpTokenFile != null) {
-          KITCHENOWL_MCP_TOKEN_FILE = "%d/mcp-token";
-        }
-        // optionalAttrs cfg.oauth.enable {
-          KITCHENOWL_MCP_OAUTH_BASE_URL = oauthBaseUrl;
-          KITCHENOWL_MCP_OAUTH_CLIENT_SECRET_FILE = "%d/oauth-client-secret";
-          KITCHENOWL_MCP_OAUTH_ALLOWED_USERS = concatStringsSep "," cfg.oauth.allowedGitHubUsers;
-          # Issued-token and client-registration state. Persisted so a restart
-          # does not force every client through the consent flow again.
-          FASTMCP_HOME = "%S/kitchenowl-mcp/fastmcp";
-        }
-        // optionalAttrs (cfg.oauth.enable && cfg.oauth.clientIdFile != null) {
-          KITCHENOWL_MCP_OAUTH_CLIENT_ID_FILE = "%d/oauth-client-id";
-        }
-        // optionalAttrs (cfg.oauth.enable && cfg.oauth.clientId != "") {
-          KITCHENOWL_MCP_OAUTH_CLIENT_ID = cfg.oauth.clientId;
-        }
-        // optionalAttrs (cfg.oauth.enable && cfg.oauth.allowedRedirectUris != null) {
-          KITCHENOWL_MCP_OAUTH_REDIRECT_URIS = concatStringsSep "," cfg.oauth.allowedRedirectUris;
-        }
-        // optionalAttrs (cfg.styleGuideFile != null) {
-          KITCHENOWL_MCP_STYLE_GUIDE = toString cfg.styleGuideFile;
-        };
+      environment = {
+        KITCHENOWL_API_BASE = cfg.apiBase;
+        KITCHENOWL_HOUSEHOLD_ID = toString cfg.householdId;
+        KITCHENOWL_MCP_HOST = cfg.host;
+        KITCHENOWL_MCP_PORT = toString cfg.port;
+        KITCHENOWL_MCP_ENABLE_RAW_GET = boolToString cfg.enableRawGet;
+        # Read at exec time from the credentials directory, so no token ever
+        # lands in the unit file or the store.
+        KITCHENOWL_API_TOKEN_FILE = "%d/api-token";
+      }
+      // optionalAttrs (cfg.mcpTokenFile != null) {
+        KITCHENOWL_MCP_TOKEN_FILE = "%d/mcp-token";
+      }
+      // optionalAttrs cfg.oauth.enable {
+        KITCHENOWL_MCP_OAUTH_BASE_URL = oauthBaseUrl;
+        KITCHENOWL_MCP_OAUTH_CLIENT_SECRET_FILE = "%d/oauth-client-secret";
+        KITCHENOWL_MCP_OAUTH_ALLOWED_USERS = concatStringsSep "," cfg.oauth.allowedGitHubUsers;
+        # Issued-token and client-registration state. Persisted so a restart
+        # does not force every client through the consent flow again.
+        FASTMCP_HOME = "%S/kitchenowl-mcp/fastmcp";
+      }
+      // optionalAttrs (cfg.oauth.enable && cfg.oauth.clientIdFile != null) {
+        KITCHENOWL_MCP_OAUTH_CLIENT_ID_FILE = "%d/oauth-client-id";
+      }
+      // optionalAttrs (cfg.oauth.enable && cfg.oauth.clientId != "") {
+        KITCHENOWL_MCP_OAUTH_CLIENT_ID = cfg.oauth.clientId;
+      }
+      // optionalAttrs (cfg.oauth.enable && cfg.oauth.allowedRedirectUris != null) {
+        KITCHENOWL_MCP_OAUTH_REDIRECT_URIS = concatStringsSep "," cfg.oauth.allowedRedirectUris;
+      }
+      // optionalAttrs (cfg.styleGuideFile != null) {
+        KITCHENOWL_MCP_STYLE_GUIDE = toString cfg.styleGuideFile;
+      };
 
       serviceConfig = {
         ExecStart = getExe cfg.package;
@@ -283,14 +280,14 @@ in {
         DynamicUser = true;
         StateDirectory = "kitchenowl-mcp";
         StateDirectoryMode = "0700";
-        LoadCredential =
-          ["api-token:${toString cfg.apiTokenFile}"]
-          ++ optional (cfg.mcpTokenFile != null) "mcp-token:${toString cfg.mcpTokenFile}"
-          ++ optionals cfg.oauth.enable (
-            ["oauth-client-secret:${toString cfg.oauth.clientSecretFile}"]
-            ++ optional (cfg.oauth.clientIdFile != null)
-            "oauth-client-id:${toString cfg.oauth.clientIdFile}"
-          );
+        LoadCredential = [
+          "api-token:${toString cfg.apiTokenFile}"
+        ]
+        ++ optional (cfg.mcpTokenFile != null) "mcp-token:${toString cfg.mcpTokenFile}"
+        ++ optionals cfg.oauth.enable (
+          [ "oauth-client-secret:${toString cfg.oauth.clientSecretFile}" ]
+          ++ optional (cfg.oauth.clientIdFile != null) "oauth-client-id:${toString cfg.oauth.clientIdFile}"
+        );
 
         # Hardening.
         NoNewPrivileges = true;
@@ -307,8 +304,16 @@ in {
         LockPersonality = true;
         MemoryDenyWriteExecute = true;
         SystemCallArchitectures = "native";
-        SystemCallFilter = ["@system-service" "~@privileged" "~@resources"];
-        RestrictAddressFamilies = ["AF_INET" "AF_INET6" "AF_UNIX"];
+        SystemCallFilter = [
+          "@system-service"
+          "~@privileged"
+          "~@resources"
+        ];
+        RestrictAddressFamilies = [
+          "AF_INET"
+          "AF_INET6"
+          "AF_UNIX"
+        ];
       };
     };
 

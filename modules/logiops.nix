@@ -1,22 +1,23 @@
 { ... }: {
-  nixos = {
-    lib,
-    config,
-    pkgs,
-    ...
-  }:
-    with lib; let
+  nixos =
+    {
+      lib,
+      config,
+      pkgs,
+      ...
+    }:
+    with lib;
+    let
       cfg = config.services.logiops;
 
       configFile =
-        if cfg.configFile != null
-        then cfg.configFile
-        else pkgs.writeText "logid.cfg" cfg.config;
-    in {
+        if cfg.configFile != null then cfg.configFile else pkgs.writeText "logid.cfg" cfg.config;
+    in
+    {
       options.services.logiops = {
         enable = mkEnableOption "logiops, Logitech Options on Linux";
 
-        package = mkPackageOption pkgs "logiops" {};
+        package = mkPackageOption pkgs "logiops" { };
 
         config = mkOption {
           type = types.lines;
@@ -59,7 +60,7 @@
 
         productIds = mkOption {
           type = types.listOf types.str;
-          default = ["b034"];
+          default = [ "b034" ];
           description = ''
             Optional list of USB product IDs to filter specific devices.
             If empty, triggers on any device matching vendorId.
@@ -72,28 +73,30 @@
       };
 
       config = mkIf cfg.enable {
-        environment.systemPackages = [cfg.package];
+        environment.systemPackages = [ cfg.package ];
 
-        services.udev.extraRules = let
-          productIdMatch = optionalString (
-            cfg.productIds != []
-          ) '', ATTRS{idProduct}=="${concatStringsSep "|" cfg.productIds}"'';
-        in ''
-          # Ensure hidraw and uinput devices have proper permissions
-          KERNEL=="hidraw*", SUBSYSTEM=="hidraw", GROUP="input", MODE="0660"
-          KERNEL=="uinput", SUBSYSTEM=="misc", GROUP="uinput", MODE="0660"
+        services.udev.extraRules =
+          let
+            productIdMatch = optionalString (
+              cfg.productIds != [ ]
+            ) '', ATTRS{idProduct}=="${concatStringsSep "|" cfg.productIds}"'';
+          in
+          ''
+            # Ensure hidraw and uinput devices have proper permissions
+            KERNEL=="hidraw*", SUBSYSTEM=="hidraw", GROUP="input", MODE="0660"
+            KERNEL=="uinput", SUBSYSTEM=="misc", GROUP="uinput", MODE="0660"
 
-          # Start logiops when matching HID device connects (USB or Bluetooth)
-          ACTION=="add", SUBSYSTEM=="hid", ATTRS{idVendor}=="${cfg.vendorId}"${productIdMatch}, TAG+="systemd", ENV{SYSTEMD_WANTS}+="logiops.service"
-          ACTION=="bind", SUBSYSTEM=="hid", ATTRS{idVendor}=="${cfg.vendorId}"${productIdMatch}, DRIVER=="logitech-hidpp-device", TAG+="systemd", ENV{SYSTEMD_WANTS}+="logiops.service"
+            # Start logiops when matching HID device connects (USB or Bluetooth)
+            ACTION=="add", SUBSYSTEM=="hid", ATTRS{idVendor}=="${cfg.vendorId}"${productIdMatch}, TAG+="systemd", ENV{SYSTEMD_WANTS}+="logiops.service"
+            ACTION=="bind", SUBSYSTEM=="hid", ATTRS{idVendor}=="${cfg.vendorId}"${productIdMatch}, DRIVER=="logitech-hidpp-device", TAG+="systemd", ENV{SYSTEMD_WANTS}+="logiops.service"
 
-          # Stop logiops when matching HID device disconnects
-          ACTION=="remove", SUBSYSTEM=="hid", ATTRS{idVendor}=="${cfg.vendorId}"${productIdMatch}, RUN+="${pkgs.systemd}/bin/systemctl stop logiops.service"
-        '';
+            # Stop logiops when matching HID device disconnects
+            ACTION=="remove", SUBSYSTEM=="hid", ATTRS{idVendor}=="${cfg.vendorId}"${productIdMatch}, RUN+="${pkgs.systemd}/bin/systemctl stop logiops.service"
+          '';
 
         systemd.services.logiops = {
           description = "Logiops daemon for Logitech devices";
-          after = ["systemd-udev-settle.service"];
+          after = [ "systemd-udev-settle.service" ];
 
           serviceConfig = {
             Type = "simple";

@@ -4,7 +4,8 @@
   pkgs,
   lib,
   ...
-}: let
+}:
+let
   inherit (self.packages.${pkgs.stdenv.hostPlatform.system}) grosshack;
 
   pam_fprintd_grosshackSo = "${grosshack}/lib/security/pam_fprintd_grosshack.so";
@@ -44,14 +45,17 @@
       };
     };
   };
-in {
+in
+{
   services.fprintd.enable = true;
 
-  security.pam.services = lib.mkMerge ([
+  security.pam.services = lib.mkMerge (
+    [
       # Explicitly disable standard fprintd on the greeter.
-      {greetd.fprintAuth = false;}
+      { greetd.fprintAuth = false; }
     ]
-    ++ (map mkGrosshackService pamServices));
+    ++ (map mkGrosshackService pamServices)
+  );
 
   # Restart fprintd after resume from suspend/hibernate.
   # Lock screens that poll fprintd leave the dbus session in a broken state

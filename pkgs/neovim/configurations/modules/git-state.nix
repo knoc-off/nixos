@@ -1,6 +1,6 @@
 # Shared Git State - Single source of truth for git comparison base
 # All git-related plugins (gitsigns, mini.files, neogit) should read from this
-{lib, ...}: {
+{ lib, ... }: {
   extraConfigLuaPre = ''
     -- GitState: Single source of truth for git comparison
     -- Consumers: gitsigns, mini.files, (future: neogit)

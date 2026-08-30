@@ -11,8 +11,9 @@
   lib,
   pkgs,
   ...
-}: {
-  extraPackages = [pkgs.ast-grep];
+}:
+{
+  extraPackages = [ pkgs.ast-grep ];
 
   keymaps = [
     {

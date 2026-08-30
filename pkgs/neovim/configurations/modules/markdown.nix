@@ -6,15 +6,18 @@
 # that is missing is `conceallevel`, which defaults to 0 and makes the runtime
 # ignore every one of those captures. This is the same machinery that renders
 # LSP hover floats, where `vim/lsp/util.lua` sets `conceallevel = 2`.
-{...}: {
+{ ... }: {
   autoCmd = [
     {
       # `conceallevel`/`concealcursor` are window-local, so `FileType` alone is
       # not enough: displaying an already-loaded markdown buffer in a window
       # that never saw the event (`:b notes.md` in an existing split) leaves it
       # at 0. `BufWinEnter` covers those windows.
-      event = ["FileType" "BufWinEnter"];
-      pattern = ["*"];
+      event = [
+        "FileType"
+        "BufWinEnter"
+      ];
+      pattern = [ "*" ];
       callback.__raw = ''
         function(args)
           if vim.bo[args.buf].filetype ~= "markdown" then

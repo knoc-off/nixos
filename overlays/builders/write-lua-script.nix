@@ -3,7 +3,8 @@
 {
   lua,
   writeTextFile,
-}: name: script:
+}:
+name: script:
 writeTextFile {
   inherit name;
   text = ''

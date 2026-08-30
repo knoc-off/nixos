@@ -1,6 +1,6 @@
-{config, ...}: {
+{ config, ... }: {
   sops.secrets."services/oauth2-proxy/env" = {
-    restartUnits = ["oauth2-proxy.service"];
+    restartUnits = [ "oauth2-proxy.service" ];
   };
 
   services.oauth2-proxy = {
@@ -24,7 +24,7 @@
       git@tilley.cc
     '';
 
-    email.domains = ["*"];
+    email.domains = [ "*" ];
 
     extraConfig = {
       approval-prompt = "auto"; # skip prompt for returning users

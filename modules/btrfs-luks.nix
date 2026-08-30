@@ -1,10 +1,12 @@
 { inputs, ... }: {
-  nixos = {
-    lib,
-    config,
-    ...
-  }:
-    with lib; let
+  nixos =
+    {
+      lib,
+      config,
+      ...
+    }:
+    with lib;
+    let
       cfg = config.disks.btrfsLuks;
 
       subvolumeType = types.submodule {
@@ -21,42 +23,50 @@
         };
       };
 
-      defaultMountOptions = subvolOpts:
-        if subvolOpts.mountOptions != null
-        then subvolOpts.mountOptions
+      defaultMountOptions =
+        subvolOpts:
+        if subvolOpts.mountOptions != null then
+          subvolOpts.mountOptions
         else
-          (optional (cfg.compression != "none") "compress=${cfg.compression}")
-          ++ cfg.mountOptions;
+          (optional (cfg.compression != "none") "compress=${cfg.compression}") ++ cfg.mountOptions;
 
       defaultSubvolumes = {
-        "/root" = {mountpoint = "/"; mountOptions = null;};
-        "/home" = {mountpoint = "/home"; mountOptions = null;};
-        "/nix" = {mountpoint = "/nix"; mountOptions = null;};
+        "/root" = {
+          mountpoint = "/";
+          mountOptions = null;
+        };
+        "/home" = {
+          mountpoint = "/home";
+          mountOptions = null;
+        };
+        "/nix" = {
+          mountpoint = "/nix";
+          mountOptions = null;
+        };
       };
 
       allSubvolumes = defaultSubvolumes // cfg.extraSubvolumes;
 
-      buildSubvolumes = let
-        regular =
-          mapAttrs (_name: subvol: {
+      buildSubvolumes =
+        let
+          regular = mapAttrs (_name: subvol: {
             mountpoint = subvol.mountpoint;
             mountOptions = defaultMountOptions subvol;
-          })
-          allSubvolumes;
+          }) allSubvolumes;
 
-        swap = optionalAttrs (cfg.swapSize != null) {
-          "/swap" = {
-            mountpoint = "/.swapvol";
-            mountOptions = ["noatime"];
-            swap.swapfile.size = cfg.swapSize;
+          swap = optionalAttrs (cfg.swapSize != null) {
+            "/swap" = {
+              mountpoint = "/.swapvol";
+              mountOptions = [ "noatime" ];
+              swap.swapfile.size = cfg.swapSize;
+            };
           };
-        };
-      in
+        in
         regular // swap;
 
       btrfsContent = {
         type = "btrfs";
-        extraArgs = ["-f"];
+        extraArgs = [ "-f" ];
         subvolumes = buildSubvolumes;
       };
 
@@ -66,24 +76,25 @@
       rootPartition = {
         size = "100%";
         content =
-          if cfg.encryption
-          then {
-            type = "luks";
-            name = cfg.luksName;
-            passwordFile = cfg.luksPasswordFile;
-            # disko merges `settings` verbatim into boot.initrd.luks.devices.<name>.
-            settings =
-              {
+          if cfg.encryption then
+            {
+              type = "luks";
+              name = cfg.luksName;
+              passwordFile = cfg.luksPasswordFile;
+              # disko merges `settings` verbatim into boot.initrd.luks.devices.<name>.
+              settings = {
                 allowDiscards = cfg.allowDiscards;
               }
               // optionalAttrs cfg.tpm2Unlock {
-                crypttabExtraOpts = ["tpm2-device=auto"];
+                crypttabExtraOpts = [ "tpm2-device=auto" ];
               };
-            content = btrfsContent;
-          }
-          else btrfsContent;
+              content = btrfsContent;
+            }
+          else
+            btrfsContent;
       };
-    in {
+    in
+    {
       imports = [
         inputs.disko.nixosModules.disko
       ];
@@ -141,14 +152,19 @@
         };
 
         compression = mkOption {
-          type = types.enum ["zstd" "lzo" "zlib" "none"];
+          type = types.enum [
+            "zstd"
+            "lzo"
+            "zlib"
+            "none"
+          ];
           default = "zstd";
           description = "Btrfs compression algorithm.";
         };
 
         mountOptions = mkOption {
           type = types.listOf types.str;
-          default = ["noatime"];
+          default = [ "noatime" ];
           description = "Base mount options applied to all subvolumes (in addition to compression).";
         };
 
@@ -197,7 +213,7 @@
 
         extraSubvolumes = mkOption {
           type = types.attrsOf subvolumeType;
-          default = {};
+          default = { };
           example = literalExpression ''
             {
               "/var/log" = {
@@ -239,7 +255,10 @@
         # tpm_crb covers Intel PTT / fTPM, tpm_tis covers discrete TPM chips.
         # Neither is in nixpkgs' default initrd module set, and without them
         # systemd-cryptsetup silently falls through to the passphrase prompt.
-        boot.initrd.availableKernelModules = mkIf cfg.tpm2Unlock ["tpm_crb" "tpm_tis"];
+        boot.initrd.availableKernelModules = mkIf cfg.tpm2Unlock [
+          "tpm_crb"
+          "tpm_tis"
+        ];
 
         boot.resumeDevice = mkIf cfg.hibernation "/dev/mapper/${cfg.luksName}";
 
@@ -256,15 +275,11 @@
                   type = "filesystem";
                   format = "vfat";
                   mountpoint = "/boot";
-                  mountOptions = ["defaults"];
+                  mountOptions = [ "defaults" ];
                 };
               };
             }
-            // (
-              if cfg.encryption
-              then {luks = rootPartition;}
-              else {root = rootPartition;}
-            );
+            // (if cfg.encryption then { luks = rootPartition; } else { root = rootPartition; });
           };
         };
       };

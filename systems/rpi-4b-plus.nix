@@ -6,7 +6,8 @@
   pkgs,
   hostname,
   ...
-}: {
+}:
+{
   imports = [
     self.nixosModules.nix
     inputs.sops-nix.nixosModules.sops
@@ -15,7 +16,7 @@
     ./services/home-assistant.nix
     ./services/caddy-lan.nix
     self.nixosModules.tailnet
-    {services.tailnet.enable = true;}
+    { services.tailnet.enable = true; }
 
     self.nixosModules.nix-cache
     {
@@ -35,9 +36,9 @@
 
   sops = {
     defaultSopsFile = ./secrets/${hostname}/default.yaml;
-    age.sshKeyPaths = ["/etc/ssh/ssh_host_ed25519_key"];
-    secrets."wifi/home/fritz" = {};
-    secrets."ntfy/token" = {};
+    age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+    secrets."wifi/home/fritz" = { };
+    secrets."ntfy/token" = { };
   };
 
   time.timeZone = "Europe/Berlin";
@@ -52,7 +53,11 @@
       grub.enable = false;
       generic-extlinux-compatible.enable = true;
     };
-    blacklistedKernelModules = ["btsdio" "hci_uart" "bluetooth"]; # fails every boot
+    blacklistedKernelModules = [
+      "btsdio"
+      "hci_uart"
+      "bluetooth"
+    ]; # fails every boot
   };
 
   hardware = {
@@ -108,11 +113,15 @@
       ];
     };
     defaultGateway = "192.168.178.1";
-    nameservers = ["192.168.178.1"];
+    nameservers = [ "192.168.178.1" ];
     firewall = {
       enable = true;
-      allowedTCPPorts = [22 443 8123];
-      allowedUDPPorts = [];
+      allowedTCPPorts = [
+        22
+        443
+        8123
+      ];
+      allowedUDPPorts = [ ];
     };
   };
 
@@ -121,9 +130,9 @@
   # 390 Mbit/s PHY). Disabling it restores ~25 Mbit/s. Bound to the device so it
   # re-applies on every wlan0 appearance (reboot or interface flap).
   systemd.services.wifi-powersave-off = {
-    wantedBy = ["multi-user.target"];
-    after = ["sys-subsystem-net-devices-wlan0.device"];
-    bindsTo = ["sys-subsystem-net-devices-wlan0.device"];
+    wantedBy = [ "multi-user.target" ];
+    after = [ "sys-subsystem-net-devices-wlan0.device" ];
+    bindsTo = [ "sys-subsystem-net-devices-wlan0.device" ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;

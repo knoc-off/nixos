@@ -29,7 +29,8 @@
   config,
   pkgs,
   ...
-}: let
+}:
+let
   serverName = "inkwell";
   serverUnit = "minecraft-server-${serverName}.service";
   rconPort = 25575;
@@ -78,7 +79,8 @@
     # ExecStopPost must never mask the outcome of the snapshot run itself.
     exit 0
   '';
-in {
+in
+{
   # `v` creates a btrfs subvolume where the filesystem supports one, which keeps
   # the snapshot directory out of the snapshots themselves. It degrades to a
   # plain directory harmlessly -- that would only leave an empty stub dir inside
@@ -111,7 +113,7 @@ in {
   };
 
   systemd.services.btrbk-minecraft = {
-    onFailure = ["btrbk-minecraft-failure.service"];
+    onFailure = [ "btrbk-minecraft-failure.service" ];
     serviceConfig = {
       ExecStartPre = "+${quiesce}";
       ExecStopPost = "+${unquiesce}";
@@ -145,6 +147,6 @@ in {
   services.btrfs.autoScrub = {
     enable = true;
     interval = "monthly";
-    fileSystems = ["/"];
+    fileSystems = [ "/" ];
   };
 }

@@ -5,11 +5,12 @@
   stdenv,
   complgen,
   makeWrapper,
-}: {
+}:
+{
   name,
   scriptContent,
   grammar,
-  runtimeDeps ? [],
+  runtimeDeps ? [ ],
 }:
 stdenv.mkDerivation {
   pname = name;

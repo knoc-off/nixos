@@ -14,12 +14,14 @@
   lib,
   pkgs,
   ...
-}: let
+}:
+let
   nixfmt = lib.getExe pkgs.nixfmt-rfc-style;
   # Host whose evaluated options power nixd's NixOS option completion/docs.
   # Change if you primarily edit a different machine's config.
   optionsHost = "thinkpad-work";
-in {
+in
+{
   plugins.lsp.servers = {
     # nixd: the completion / documentation engine.
     nixd = {
@@ -29,10 +31,10 @@ in {
         # / NIX_PATH. nixpkgs packages and NixOS options both come from this
         # flake's own inputs and evaluated host config.
         nixpkgs.expr = "(builtins.getFlake (toString ./.)).inputs.nixpkgs-unstable.legacyPackages.\${builtins.currentSystem}";
-        formatting.command = [nixfmt];
+        formatting.command = [ nixfmt ];
         options.nixos.expr = "(builtins.getFlake (toString ./.)).nixosConfigurations.${optionsHost}.options";
         # nil owns diagnostics; keep nixd from emitting overlapping ones.
-        diagnostic.suppress = ["sema-escaping-with"];
+        diagnostic.suppress = [ "sema-escaping-with" ];
       };
     };
 
@@ -55,10 +57,13 @@ in {
   };
 
   # nixd + the RFC-style formatter available to the editor's runtime.
-  extraPackages = [pkgs.nixd pkgs.nixfmt-rfc-style];
+  extraPackages = [
+    pkgs.nixd
+    pkgs.nixfmt-rfc-style
+  ];
 
   plugins.conform-nvim.settings = {
-    formatters_by_ft.nix = ["nixfmt"];
+    formatters_by_ft.nix = [ "nixfmt" ];
     formatters.nixfmt.command = nixfmt;
   };
 }

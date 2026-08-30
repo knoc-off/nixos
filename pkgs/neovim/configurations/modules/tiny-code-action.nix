@@ -11,8 +11,9 @@
   pkgs,
   lib,
   ...
-}: {
-  extraPackages = [pkgs.delta];
+}:
+{
+  extraPackages = [ pkgs.delta ];
   extraPlugins = [
     (pkgs.vimUtils.buildVimPlugin {
       pname = "tiny-code-action-nvim";
@@ -25,7 +26,7 @@
       };
       # Optional picker/previewer backends (snacks, fzf-lua, telescope) aren't
       # installed; we only use the buffer picker + delta backend.
-      nvimSkipModules = ["tiny-code-action.previewers.snacks"];
+      nvimSkipModules = [ "tiny-code-action.previewers.snacks" ];
       meta.description = "Code-action picker with inline diff preview";
     })
   ];
@@ -36,7 +37,10 @@
 
   keymaps = [
     {
-      mode = ["n" "x"];
+      mode = [
+        "n"
+        "x"
+      ];
       key = "<leader>ca";
       action = lib.nixvim.mkRaw "function() require('tiny-code-action').code_action() end";
       options = {

@@ -31,7 +31,8 @@
   curl,
   cacert,
   python3,
-}: let
+}:
+let
   # Immutable commit the CGAZ files + Open metadata CSV are pinned to.
   metaCommit = "5c25134028196d43ce97b5071934fd0cfc92f09f";
   shortRev = builtins.substring 0 7 metaCommit;
@@ -45,7 +46,10 @@
     pname = "cgaz-raw";
     version = "CGAZ-${shortRev}";
 
-    nativeBuildInputs = [curl cacert];
+    nativeBuildInputs = [
+      curl
+      cacert
+    ];
     dontUnpack = true;
     dontConfigure = true;
     dontBuild = true;
@@ -83,30 +87,33 @@
     outputHash = "sha256-nA2tvqhQt+yK74pbeYvNvLg3sxqojA7Y/oaSQNPUDyk=";
   };
 
-  pyenv = python3.withPackages (ps: [ps.shapely ps.numpy]);
+  pyenv = python3.withPackages (ps: [
+    ps.shapely
+    ps.numpy
+  ]);
 in
-  stdenvNoCC.mkDerivation {
-    pname = "geoboundaries-data";
-    version = "CGAZ-${shortRev}";
+stdenvNoCC.mkDerivation {
+  pname = "geoboundaries-data";
+  version = "CGAZ-${shortRev}";
 
-    nativeBuildInputs = [pyenv];
-    dontUnpack = true;
-    dontConfigure = true;
+  nativeBuildInputs = [ pyenv ];
+  dontUnpack = true;
+  dontConfigure = true;
 
-    buildPhase = ''
-      runHook preBuild
-      mkdir -p "$out"
-      SRC=${cgazRaw} out="$out" python3 ${./simplify.py}
-      echo "geoboundaries: wrote $(ls "$out"/*.geojson | wc -l) per-country files"
-      runHook postBuild
-    '';
+  buildPhase = ''
+    runHook preBuild
+    mkdir -p "$out"
+    SRC=${cgazRaw} out="$out" python3 ${./simplify.py}
+    echo "geoboundaries: wrote $(ls "$out"/*.geojson | wc -l) per-country files"
+    runHook postBuild
+  '';
 
-    dontInstall = true;
+  dontInstall = true;
 
-    meta = with lib; {
-      description = "geoBoundaries CGAZ ADM0/1/2, coverage-simplified per-country, for marki-map";
-      homepage = "https://www.geoboundaries.org/";
-      license = licenses.cc-by-40;
-      platforms = platforms.all;
-    };
-  }
+  meta = with lib; {
+    description = "geoBoundaries CGAZ ADM0/1/2, coverage-simplified per-country, for marki-map";
+    homepage = "https://www.geoboundaries.org/";
+    license = licenses.cc-by-40;
+    platforms = platforms.all;
+  };
+}

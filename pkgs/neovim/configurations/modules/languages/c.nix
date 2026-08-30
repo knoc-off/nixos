@@ -5,7 +5,8 @@
   lib,
   pkgs,
   ...
-}: {
+}:
+{
   plugins.clangd-extensions = {
     enable = true;
     enableOffsetEncodingWorkaround = true; # Fixes "multiple different client offset_encodings" warning
@@ -24,8 +25,8 @@
   };
 
   plugins.conform-nvim.settings = {
-    formatters_by_ft.c = ["clang-format"];
-    formatters_by_ft.cpp = ["clang-format"];
+    formatters_by_ft.c = [ "clang-format" ];
+    formatters_by_ft.cpp = [ "clang-format" ];
     formatters."clang-format" = {
       command = lib.getExe' pkgs.clang-tools "clang-format";
     };

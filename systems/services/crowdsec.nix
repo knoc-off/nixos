@@ -4,9 +4,11 @@
   lib,
   inputs,
   ...
-}: let
+}:
+let
   upkgs = inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system};
-in {
+in
+{
   services.crowdsec = {
     enable = true;
     package = upkgs.crowdsec;
@@ -36,19 +38,22 @@ in {
           description = "Whitelist trusted tailnet subnets";
           whitelist = {
             reason = "Trusted tailnet peer";
-            cidr = ["100.64.0.0/10" "fd7a:115c:a1e0::/48"];
+            cidr = [
+              "100.64.0.0/10"
+              "fd7a:115c:a1e0::/48"
+            ];
           };
         }
       ];
 
       acquisitions = [
         {
-          filenames = ["/var/log/caddy/access-*.log"];
+          filenames = [ "/var/log/caddy/access-*.log" ];
           labels.type = "caddy";
         }
         {
           source = "journalctl";
-          journalctl_filter = ["_SYSTEMD_UNIT=sshd.service"];
+          journalctl_filter = [ "_SYSTEMD_UNIT=sshd.service" ];
           labels.type = "syslog";
         }
       ];
@@ -56,7 +61,7 @@ in {
       profiles = [
         {
           name = "default_ip_remediation";
-          filters = ["Alert.Remediation == true && Alert.GetScope() == \"Ip\""];
+          filters = [ "Alert.Remediation == true && Alert.GetScope() == \"Ip\"" ];
           decisions = [
             {
               type = "ban";
@@ -85,8 +90,8 @@ in {
 
   # The bouncer races crowdsec at boot, exits 1 before LAPI is up.
   systemd.services.crowdsec-firewall-bouncer = {
-    after = ["crowdsec.service"];
-    requires = ["crowdsec.service"];
+    after = [ "crowdsec.service" ];
+    requires = [ "crowdsec.service" ];
     serviceConfig = {
       Restart = "on-failure";
       RestartSec = "10s";
@@ -115,7 +120,7 @@ in {
   # ReadWritePaths, and map crowdsec -> uid 988 with PrivateUsers=true.
   systemd.services.crowdsec-firewall-bouncer-register.serviceConfig = {
     StateDirectory = lib.mkForce "crowdsec-firewall-bouncer-register";
-    ReadWritePaths = ["/var/lib/crowdsec"];
+    ReadWritePaths = [ "/var/lib/crowdsec" ];
     PrivateUsers = true;
   };
 
@@ -128,7 +133,7 @@ in {
   # data).
   systemd.tmpfiles.rules = [
     "L+ /etc/crowdsec/config.yaml - - - - ${
-      (pkgs.formats.yaml {}).generate "crowdsec.yaml" config.services.crowdsec.settings.general
+      (pkgs.formats.yaml { }).generate "crowdsec.yaml" config.services.crowdsec.settings.general
     }"
   ];
 }

@@ -1,9 +1,9 @@
-{lib, ...}: {
+{ lib, ... }: {
   disko.devices = {
     disk = {
       vdb = {
         type = "disk";
-        device = lib.mkDefault "/dev/nvme0n1"; #lib.mkDefault "/dev/sda";
+        device = lib.mkDefault "/dev/nvme0n1"; # lib.mkDefault "/dev/sda";
         content = {
           type = "gpt";
           partitions = {
@@ -33,19 +33,28 @@
                 #additionalKeyFiles = [ "/tmp/additionalSecret.key" ];
                 content = {
                   type = "btrfs";
-                  extraArgs = ["-f"];
+                  extraArgs = [ "-f" ];
                   subvolumes = {
                     "/root" = {
                       mountpoint = "/";
-                      mountOptions = ["compress=zstd" "noatime"];
+                      mountOptions = [
+                        "compress=zstd"
+                        "noatime"
+                      ];
                     };
                     "/home" = {
                       mountpoint = "/home";
-                      mountOptions = ["compress=zstd" "noatime"];
+                      mountOptions = [
+                        "compress=zstd"
+                        "noatime"
+                      ];
                     };
                     "/nix" = {
                       mountpoint = "/nix";
-                      mountOptions = ["compress=zstd" "noatime"];
+                      mountOptions = [
+                        "compress=zstd"
+                        "noatime"
+                      ];
                     };
                     "/swap" = {
                       mountpoint = "/.swapvol";

@@ -1,6 +1,6 @@
 # Git integration - gitsigns with hunk navigation, staging, and blame
 # Uses GitState as source of truth (from git-state.nix)
-{lib, ...}: {
+{ lib, ... }: {
   whichKeyGroups = [
     {
       __unkeyed = "<leader>g";

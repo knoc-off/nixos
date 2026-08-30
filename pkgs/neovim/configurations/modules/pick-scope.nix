@@ -8,7 +8,7 @@
 #   4. narrowest attached LSP root_dir
 #   5. git root
 #   6. cwd
-{...}: {
+{ ... }: {
   extraConfigLua = ''
     _G.PickScope = {}
     local Scope = _G.PickScope

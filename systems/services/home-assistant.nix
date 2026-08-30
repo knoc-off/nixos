@@ -3,9 +3,11 @@
   lib,
   pkgs,
   ...
-}: let
+}:
+let
   slzb06Ip = "slzb-06";
-in {
+in
+{
   imports = [
     ./mqtt-automations
     ./sunrise-dashboard.nix
@@ -65,7 +67,7 @@ in {
     ];
 
     config = {
-      default_config = {};
+      default_config = { };
 
       # Load custom card JS globally — no manual resource registration needed.
       frontend.extra_module_url = [
@@ -78,7 +80,10 @@ in {
         use_x_forwarded_for = true;
         # 10.100.0.1: Hetzner Caddy via WG (remote + VPN path).
         # 127.0.0.1: Pi-local Caddy on same host (home LAN path).
-        trusted_proxies = ["10.100.0.1" "127.0.0.1"];
+        trusted_proxies = [
+          "10.100.0.1"
+          "127.0.0.1"
+        ];
       };
 
       homeassistant = {
@@ -95,7 +100,10 @@ in {
     };
   };
 
-  networking.firewall.allowedTCPPorts = [8123 7768];
+  networking.firewall.allowedTCPPorts = [
+    8123
+    7768
+  ];
 
   systemd.tmpfiles.rules = [
     "d /var/lib/zigbee2mqtt/external_converters 0755 zigbee2mqtt zigbee2mqtt -"
@@ -114,9 +122,12 @@ in {
   };
 
   systemd.services.zigbee2mqtt = {
-    after = ["mosquitto.service" "network-online.target"];
-    wants = ["network-online.target"];
-    bindsTo = ["mosquitto.service"];
+    after = [
+      "mosquitto.service"
+      "network-online.target"
+    ];
+    wants = [ "network-online.target" ];
+    bindsTo = [ "mosquitto.service" ];
     environment.NODE_OPTIONS = "--max-old-space-size=128";
     serviceConfig = {
       Restart = lib.mkForce "always";
@@ -131,9 +142,15 @@ in {
   };
 
   systemd.services.home-assistant = {
-    after = ["mosquitto.service" "network-online.target"];
-    wants = ["mosquitto.service" "network-online.target"];
-    bindsTo = ["mosquitto.service"];
+    after = [
+      "mosquitto.service"
+      "network-online.target"
+    ];
+    wants = [
+      "mosquitto.service"
+      "network-online.target"
+    ];
+    bindsTo = [ "mosquitto.service" ];
     serviceConfig = {
       Restart = lib.mkForce "always";
       RestartSec = lib.mkForce "5s";

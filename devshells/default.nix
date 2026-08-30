@@ -5,5 +5,5 @@
   };
   embeddedRust = pkgs.callPackage ./embeddedrust.nix { inherit (inputs) rust-overlay; };
   embedded-c = pkgs.callPackage ./embedded-c.nix { };
-  bevy =  pkgs.callPackage ./bevy.nix { inherit (inputs) rust-overlay; };
+  bevy = pkgs.callPackage ./bevy.nix { inherit (inputs) rust-overlay; };
 }

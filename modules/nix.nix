@@ -1,5 +1,5 @@
 { inputs, self, ... }: {
-  nixos = {...}: {
+  nixos = { ... }: {
     nixpkgs.config.allowUnfree = true;
     # Local builders (mkComplgenScript, writeLuaScript, writeNuScript) as
     # pkgs.* on the host's own pkgs instance -- the same instance home-manager
@@ -21,7 +21,7 @@
       };
       #nix.nixPath = [ "/etc/nix/path" ];
       #environment.etc."nix/path/nixpkgs".source = inputs.nixpkgs;
-      nixPath = ["nixpkgs=${inputs.nixpkgs}"];
+      nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
       settings = {
         extra-substituters = [
           "https://hyprland.cachix.org"
@@ -29,8 +29,12 @@
         extra-trusted-public-keys = [
           "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc="
         ];
-        experimental-features = ["nix-command" "flakes" "pipe-operators"];
-        trusted-users = ["@wheel"];
+        experimental-features = [
+          "nix-command"
+          "flakes"
+          "pipe-operators"
+        ];
+        trusted-users = [ "@wheel" ];
         download-buffer-size = 4294967296; # 4gb # 2147483648; # 2GB
       };
     };

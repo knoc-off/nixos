@@ -1,7 +1,7 @@
 # OpenSCAD development environment
 # - openscad_lsp (LSP)
 # - Auto-launch OpenSCAD viewer on .scad files
-{lib, ...}: {
+{ lib, ... }: {
   plugins.lsp.servers.openscad_lsp.enable = true;
 
   autoCmd = [

@@ -25,7 +25,7 @@ stdenvNoCC.mkDerivation {
     })
   ];
 
-  nativeBuildInputs = [unzip];
+  nativeBuildInputs = [ unzip ];
 
   # No source unpack happens automatically when `srcs` is multiple
   # archives; do it ourselves so each zip lands flat in $out.

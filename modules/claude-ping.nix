@@ -21,7 +21,12 @@
 { ... }:
 {
   nixos =
-    { config, lib, pkgs, ... }:
+    {
+      config,
+      lib,
+      pkgs,
+      ...
+    }:
     let
       cfg = config.services.claude-ping;
     in

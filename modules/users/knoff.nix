@@ -142,7 +142,7 @@
                 # collection file via SQLite. Anki must be closed while
                 # running `marki push`, since it holds an exclusive lock
                 # on the collection for its entire runtime.
-                home.packages = [pkgs.anki];
+                home.packages = [ pkgs.anki ];
               }
 
               self.homeModules.compat-proxy

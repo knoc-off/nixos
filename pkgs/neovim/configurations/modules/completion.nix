@@ -1,7 +1,7 @@
 # Completion via blink.cmp + LuaSnip
 # Enter to accept, Tab/S-Tab for snippet placeholder jumping
 # Sources: LSP, snippets (LuaSnip + friendly-snippets), buffer, path
-{lib, ...}: {
+{ lib, ... }: {
   # LuaSnip snippet engine
   plugins.luasnip = {
     enable = true;
@@ -25,10 +25,24 @@
     settings = {
       keymap = {
         preset = "enter";
-        "<Tab>" = ["snippet_forward" "select_next" "fallback"];
-        "<S-Tab>" = ["snippet_backward" "select_prev" "fallback"];
-        "<C-j>" = ["select_next" "fallback"];
-        "<C-k>" = ["select_prev" "fallback"];
+        "<Tab>" = [
+          "snippet_forward"
+          "select_next"
+          "fallback"
+        ];
+        "<S-Tab>" = [
+          "snippet_backward"
+          "select_prev"
+          "fallback"
+        ];
+        "<C-j>" = [
+          "select_next"
+          "fallback"
+        ];
+        "<C-k>" = [
+          "select_prev"
+          "fallback"
+        ];
       };
 
       completion = {
@@ -46,7 +60,7 @@
           border = "rounded";
           scrollbar = true;
           draw = {
-            treesitter = ["lsp"];
+            treesitter = [ "lsp" ];
             columns = lib.nixvim.mkRaw ''
               { { "kind_icon" }, { "label", "label_description", gap = 1 }, { "source_name" } }
             '';
@@ -88,7 +102,10 @@
 
       cmdline = {
         enabled = true;
-        sources = ["cmdline" "buffer"];
+        sources = [
+          "cmdline"
+          "buffer"
+        ];
         # Stock cmdline preset: <Tab> reveals+inserts then cycles (menu stays
         # open), <S-Tab> cycles back, arrows / <C-n>/<C-p> navigate, <C-y> accept,
         # <C-e> cancel. <CR> is "accept" (not accept_and_enter): if an item is
@@ -98,7 +115,10 @@
         # normal Enter and runs the typed command immediately.
         keymap = {
           preset = "cmdline";
-          "<CR>" = ["accept" "fallback"];
+          "<CR>" = [
+            "accept"
+            "fallback"
+          ];
         };
         completion = {
           menu.auto_show = true;

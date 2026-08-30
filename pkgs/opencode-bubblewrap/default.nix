@@ -19,7 +19,7 @@ let
       }
     )
   );
-   inherit (pkgs) lib;
+  inherit (pkgs) lib;
 
   compatProxy = pkgs.callPackage ../compat-proxy { };
 

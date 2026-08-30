@@ -11,7 +11,8 @@
   # home-manager service and the bubblewrap jail alike -- impersonates
   # the real installed CLI without needing to pass this explicitly.
   ccVersion ? upkgs.claude-code.version,
-}: let
+}:
+let
   toolchain = fenix.combine [
     fenix.minimal.toolchain
   ];
@@ -30,15 +31,17 @@
   # Dependencies-only build -- cached until Cargo.lock changes.
   cargoArtifacts = craneLib.buildDepsOnly commonArgs;
 in
-  craneLib.buildPackage (commonArgs
-    // {
-      inherit cargoArtifacts;
+craneLib.buildPackage (
+  commonArgs
+  // {
+    inherit cargoArtifacts;
 
-      COMPAT_PROXY_CC_VERSION_DEFAULT = ccVersion;
+    COMPAT_PROXY_CC_VERSION_DEFAULT = ccVersion;
 
-      meta = {
-        description = "OAuth shim that lets Anthropic-compatible clients use Claude Code credentials";
-        license = lib.licenses.mit;
-        mainProgram = "compat-proxy";
-      };
-    })
+    meta = {
+      description = "OAuth shim that lets Anthropic-compatible clients use Claude Code credentials";
+      license = lib.licenses.mit;
+      mainProgram = "compat-proxy";
+    };
+  }
+)

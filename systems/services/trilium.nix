@@ -1,10 +1,13 @@
-{inputs, pkgs, ...}:
+{ inputs, pkgs, ... }:
 let
   upkgs = import inputs.nixpkgs-unstable {
     inherit (pkgs.stdenv.hostPlatform) system;
-    config = { allowUnfree = true; };
+    config = {
+      allowUnfree = true;
+    };
   };
-in {
+in
+{
   services.trilium-server = {
     enable = true;
     package = upkgs.trilium-server;

@@ -15,18 +15,22 @@ let
 
 in
 pkgs.mkShell {
-  nativeBuildInputs = with pkgs; [
-    gcc
-    gdb
-    valgrind
-    clang-tools
-    bear
-    sccache
-    pkg-config
-    cmake
-    ninja
-    meson
-  ] ++ avrTools ++ arduinoTools;
+  nativeBuildInputs =
+    with pkgs;
+    [
+      gcc
+      gdb
+      valgrind
+      clang-tools
+      bear
+      sccache
+      pkg-config
+      cmake
+      ninja
+      meson
+    ]
+    ++ avrTools
+    ++ arduinoTools;
 
   buildInputs = with pkgs; [
     libusb-compat-0_1
@@ -46,4 +50,3 @@ pkgs.mkShell {
     echo "MONITOR_PORT: $MONITOR_PORT"
   '';
 }
-

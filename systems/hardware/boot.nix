@@ -1,9 +1,20 @@
-{ lib, config, inputs, pkgs, ... }:
+{
+  lib,
+  config,
+  inputs,
+  pkgs,
+  ...
+}:
 with lib;
 let
   # Define the available bootloader types
-  bootloaderTypes = [ "grub" "systemd-boot" "lanzaboote" ];
-in {
+  bootloaderTypes = [
+    "grub"
+    "systemd-boot"
+    "lanzaboote"
+  ];
+in
+{
   imports = [ inputs.lanzaboote.nixosModules.lanzaboote ];
   options = {
     bootloader = {
@@ -49,8 +60,7 @@ in {
           #boot.loader.grub.useOSProber = true; # Detect other operating systems
 
           systemd-boot.enable = config.bootloader.type == "systemd-boot";
-          systemd-boot.editor =
-            true; # Allow editing of boot entries at boot time
+          systemd-boot.editor = true; # Allow editing of boot entries at boot time
         };
 
         lanzaboote.enable = config.bootloader.type == "lanzaboote";

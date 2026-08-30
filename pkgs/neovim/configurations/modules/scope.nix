@@ -3,7 +3,8 @@
 # - IBL indent: dimmed rainbow per depth level
 # - IBL scope: depth-based using rainbow colors (language-aware)
 # - Matchup: bright active pair highlighting
-{lib, ...}: let
+{ lib, ... }:
+let
   # Bright rainbow highlights (rainbow-delimiters + IBL active scope)
   rainbowHighlights = [
     "RainbowDelimiterRed"
@@ -178,7 +179,8 @@
       "parenthesized_expression"
     ];
   };
-in {
+in
+{
   plugins.rainbow-delimiters = {
     enable = true;
     settings.highlight = rainbowHighlights;

@@ -1,6 +1,17 @@
-{ lib, stdenv, python3, pipewire, makeWrapper }:
+{
+  lib,
+  stdenv,
+  python3,
+  pipewire,
+  makeWrapper,
+}:
 let
-  py = python3.withPackages (ps: with ps; [ numpy scipy ]);
+  py = python3.withPackages (
+    ps: with ps; [
+      numpy
+      scipy
+    ]
+  );
 in
 stdenv.mkDerivation {
   pname = "pa-sweep";
