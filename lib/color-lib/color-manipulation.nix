@@ -494,6 +494,55 @@ let
     in
     modified;
 
+  # Apply `f` to a color in float Okhsl space, decoding from and encoding to hex
+  # exactly once. Alpha is preserved.
+  #
+  # Prefer this over chaining setOkhsl*/adjustOkhsl*: each of those is a full
+  # hex -> okhsl -> hex round trip, so a three-step chain quantizes to 8 bits
+  # three times and pays three sRGB<->Okhsl conversions. Composing inside a
+  # single withOkhsl does the conversion work once.
+  withOkhsl =
+    f: hexColor:
+    let
+      rgba = hexToRgb hexColor;
+      okhsl = srgb_to_okhsl { inherit (rgba) r g b; };
+    in
+    rgbToHex (okhsl_to_srgb (f okhsl) // { inherit (rgba) alpha; });
+
+  # Relative luminance / contrast on float RGB, skipping the hex round trip that
+  # contrastRatio performs. Used by searches that evaluate many candidates.
+  luminanceRgb =
+    {
+      r,
+      g,
+      b,
+      ...
+    }:
+    let
+      linearise = c: if c <= 4.045e-2 then c / 12.92 else math.powFloat ((c + 5.5e-2) / 1.055) 2.4;
+    in
+    0.2126 * (linearise r) + 0.7152 * (linearise g) + 7.22e-2 * (linearise b);
+
+  contrastRatioRgb =
+    a: b:
+    let
+      l1 = (luminanceRgb a) + 5.0e-2;
+      l2 = (luminanceRgb b) + 5.0e-2;
+    in
+    if l1 > l2 then l1 / l2 else l2 / l1;
+
+  # Round float RGB to the exact 8-bit values hex encoding will produce.
+  quantiseRgb =
+    c:
+    let
+      q = v: (builtins.floor ((clamp v 0.0 1.0) * 255.0 + 0.5)) / 255.0;
+    in
+    {
+      r = q c.r;
+      g = q c.g;
+      b = q c.b;
+    };
+
   # Raise `textColor`'s contrast against `backgroundColor` to at least
   # `minRatio`, adjusting *only* Okhsl lightness so hue and saturation survive.
   #
@@ -504,38 +553,61 @@ let
   # if a hue shift is intended.
   #
   # Binary search rather than a closed form: contrast is monotonic in lightness
-  # but not analytically invertible through the Okhsl -> sRGB transform. 24
-  # iterations resolves lightness to ~6e-8, far finer than one 8-bit step.
+  # but not analytically invertible through the Okhsl -> sRGB transform.
+  #
+  # The search evaluates *quantised* candidates. Searching in continuous float
+  # space finds a lightness that satisfies minRatio as a real number, but the
+  # returned hex is 8-bit, and that rounding can drop the shipped color back
+  # under the threshold -- which is why several theme accents used to miss their
+  # own 4.5 target by ~0.01. Optimising the value actually emitted makes the
+  # result compliant by construction. 16 iterations is past convergence (14
+  # already gives identical output for every theme hue).
   ensureTextContrast =
     textColor: backgroundColor: minRatio:
     if contrastRatio textColor backgroundColor >= minRatio then
       textColor
     else
       let
-        # Dark backgrounds need lighter text, light backgrounds need darker.
-        goLighter = getOkhslLightness backgroundColor < 0.5;
-        textL = getOkhslLightness textColor;
+        bgRgba = hexToRgb backgroundColor;
+        bgRgb = {
+          inherit (bgRgba) r g b;
+        };
+        txRgba = hexToRgb textColor;
+        txOkhsl = srgb_to_okhsl {
+          inherit (txRgba) r g b;
+        };
 
+        # Dark backgrounds need lighter text, light backgrounds need darker.
+        goLighter = (srgb_to_okhsl bgRgb).l < 0.5;
+
+        ratioAtL = l: contrastRatioRgb (quantiseRgb (okhsl_to_srgb (txOkhsl // { inherit l; }))) bgRgb;
+
+        # The bound that stays on the compliant side depends on direction: going
+        # lighter, `hi` is always known-good; going darker, `lo` is. Return that
+        # bound rather than the midpoint, so the result is a lightness that was
+        # actually verified against minRatio.
         search =
           lo: hi: i:
           if i == 0 then
-            (lo + hi) / 2.0
+            (if goLighter then hi else lo)
           else
             let
               mid = (lo + hi) / 2.0;
-              ok = contrastRatio (setOkhslLightness mid textColor) backgroundColor >= minRatio;
+              ok = ratioAtL mid >= minRatio;
             in
-            # Converge toward the original lightness while staying compliant.
             if ok == goLighter then search lo mid (i - 1) else search mid hi (i - 1);
 
-        finalL = if goLighter then search textL 1.0 24 else search 0.0 textL 24;
+        finalL = if goLighter then search txOkhsl.l 1.0 16 else search 0.0 txOkhsl.l 16;
       in
-      setOkhslLightness finalL textColor;
+      rgbToHex (okhsl_to_srgb (txOkhsl // { l = finalL; }) // { inherit (txRgba) alpha; });
 
 in
 {
   # Export core conversion functions
   inherit hexToRgb rgbToHex;
+
+  # Pipeline primitive: compose many Okhsl edits with a single hex round trip.
+  inherit withOkhsl;
 
   # Export Okhsl modification functions
   inherit modifyOkhslLightness modifyOkhslSaturation modifyOkhslHue;

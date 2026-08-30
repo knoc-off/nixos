@@ -27,9 +27,8 @@ let
   inherit (lib.lists) genList;
   inherit (color-lib)
     setOkhslLightness
-    setOkhslSaturation
-    setOkhslHue
     getOkhslLightness
+    withOkhsl
     mixColors
     ensureTextContrast
     ;
@@ -88,12 +87,18 @@ let
       # to meet the minimum contrast ratio.  This keeps each color as vivid
       # and true-to-hue as possible -- the binary search in ensureTextContrast
       # only changes Okhsl lightness, preserving hue and saturation.
+      #
+      # withOkhsl sets all three components in one pass; chaining the
+      # per-component setters instead would round-trip through hex (and quantise
+      # to 8 bits) once per component.
       mkAccent =
         hue:
         let
-          raw = setOkhslLightness accentStartL (
-            setOkhslHue (mod1 (hue + hueOffset)) (setOkhslSaturation accentS "FF0000")
-          );
+          raw = withOkhsl (_: {
+            h = mod1 (hue + hueOffset);
+            s = accentS;
+            l = accentStartL;
+          }) "FF0000";
         in
         ensureTextContrast raw bg minContrast;
 
@@ -108,10 +113,11 @@ let
 
       workspaceColors = genList (
         n:
-        let
-          hue = mod1 (n * 1.0 / numWS + hueOffset);
-        in
-        setOkhslLightness wsL (setOkhslHue hue (setOkhslSaturation wsS "FF0000"))
+        withOkhsl (_: {
+          h = mod1 (n * 1.0 / numWS + hueOffset);
+          s = wsS;
+          l = wsL;
+        }) "FF0000"
       ) numWS;
 
     in
