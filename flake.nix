@@ -240,8 +240,8 @@
 
       images = listToAttrs [
         (mkImage "minimal" "x86_64-linux" "isoImage")
-        (mkImage "framework13" "x86_64-linux" "isoImage")
         (mkImage "rpi-4b-plus" "aarch64-linux" "sdImage")
+        # (mkImage "framework13" "x86_64-linux" "isoImage")
       ];
 
       # darwinConfigurations = listToAttrs [

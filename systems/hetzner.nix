@@ -46,7 +46,7 @@ in
     ./services/kitchenowl.nix
     ./services/kitchenowl-notify.nix
     ./services/kitchenowl-meal-plan.nix
-    ./services/kitchenowl-mcp.nix
+    # ./services/kitchenowl-mcp.nix
     ./services/trilium.nix
     ./services/ntfy.nix
     ./services/minecraft-gate.nix
