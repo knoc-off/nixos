@@ -16,8 +16,6 @@ in
     ./services/minecraft-snapshots.nix
     ./services/nix-autobuild.nix
 
-    inputs.determinate.nixosModules.default
-
     inputs.sops-nix.nixosModules.sops
     {
       sops = {

@@ -16,11 +16,6 @@ let
               excludeShellChecks = (args.excludeShellChecks or [ ]) ++ [ "SC2016" ];
             }
           );
-        # Use Determinate's nix so jail-nix's internal `nix-store --query`
-        # (in runtime-deep-ro-bind, invoked by the network combinator) doesn't
-        # warn about eval-cores / lazy-trees / wasm-builtin from /etc/nix/nix.conf
-        # on every startup.
-        nix = inputs.determinate.inputs.nix.packages.${prev.stdenv.hostPlatform.system}.nix-cli;
       }
     )
   );
@@ -177,10 +172,6 @@ let
   lspmux = pkgs.callPackage ../lspmux { };
   lspmuxSession = pkgs.callPackage ../lspmux-session { };
 
-  # Determinate nix — same one added to the toolbelt below. Used as
-  # nix-direnv's fallback nix so it doesn't reach for a pinned older nix.
-  determinateNix = inputs.determinate.inputs.nix.packages.${pkgs.stdenv.hostPlatform.system}.nix-cli;
-
   # direnv integration for the jail's fish shell.
   #
   # direnv is a shell hook (not a daemon), so nothing needs mounting from the
@@ -194,7 +185,7 @@ let
     ${lib.getExe pkgs.direnv} hook fish | source
   '';
   direnvRc = pkgs.writeText "direnvrc" ''
-    export NIX_DIRENV_FALLBACK_NIX=${lib.getExe determinateNix}
+    export NIX_DIRENV_FALLBACK_NIX=${lib.getExe pkgs.nix}
     source ${pkgs.nix-direnv}/share/nix-direnv/direnvrc
   '';
 
@@ -255,10 +246,7 @@ let
     procps # ps, top, pgrep, etc.
 
     # Nix — self-provisioning inside the jail.
-    # Use Determinate's nix-cli (instead of pkgs.nix) so it recognizes
-    # the eval-cores / lazy-trees settings present in /etc/nix/nix.conf
-    # and doesn't emit warnings on every invocation.
-    determinateNix
+    nix
 
     # Python tooling (uvx needed by claude-mem for chroma vector search)
     uv

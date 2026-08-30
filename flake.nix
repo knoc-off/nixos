@@ -339,8 +339,6 @@
       };
     };
 
-    determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/*";
-
     zen-browser = {
       url = "github:0xc000022070/zen-browser-flake";
       inputs = {

@@ -52,9 +52,18 @@ let
       byte = i: hexVal (substring (i * 2) 1 s) * 16 + hexVal (substring (i * 2 + 1) 1 s);
     in
     if n == 6 then
-      [ (byte 0) (byte 1) (byte 2) ]
+      [
+        (byte 0)
+        (byte 1)
+        (byte 2)
+      ]
     else if n == 8 then
-      [ (byte 0) (byte 1) (byte 2) (byte 3) ]
+      [
+        (byte 0)
+        (byte 1)
+        (byte 2)
+        (byte 3)
+      ]
     else
       throw "unexpected hex '${h}'";
 
@@ -69,19 +78,51 @@ let
     if builtins.length xs != builtins.length ys then
       255
     else
-      lib.foldl' (acc: i: let d = abs (elemAt xs i - elemAt ys i); in if d > acc then d else acc) 0 (
-        lib.range 0 (builtins.length xs - 1)
-      );
+      lib.foldl' (
+        acc: i:
+        let
+          d = abs (elemAt xs i - elemAt ys i);
+        in
+        if d > acc then d else acc
+      ) 0 (lib.range 0 (builtins.length xs - 1));
 
   # Channel specs in the fixture are "<space>_<channel>"; the pure-Nix API
   # encodes the same thing in the function name.
   fns = {
-    okhsl_h = { get = color-lib.getOkhslHue; set = color-lib.setOkhslHue; adjust = color-lib.adjustOkhslHue; };
-    okhsl_s = { get = color-lib.getOkhslSaturation; set = color-lib.setOkhslSaturation; adjust = color-lib.adjustOkhslSaturation; scale = color-lib.scaleOkhslSaturation; };
-    okhsl_l = { get = color-lib.getOkhslLightness; set = color-lib.setOkhslLightness; adjust = color-lib.adjustOkhslLightness; scale = color-lib.scaleOkhslLightness; };
-    okhsv_h = { get = color-lib.getOkhsvHue; set = color-lib.setOkhsvHue; adjust = color-lib.adjustOkhsvHue; };
-    okhsv_s = { get = color-lib.getOkhsvSaturation; set = color-lib.setOkhsvSaturation; adjust = color-lib.adjustOkhsvSaturation; scale = color-lib.scaleOkhsvSaturation; };
-    okhsv_v = { get = color-lib.getOkhsvValue; set = color-lib.setOkhsvValue; adjust = color-lib.adjustOkhsvValue; scale = color-lib.scaleOkhsvValue; };
+    okhsl_h = {
+      get = color-lib.getOkhslHue;
+      set = color-lib.setOkhslHue;
+      adjust = color-lib.adjustOkhslHue;
+    };
+    okhsl_s = {
+      get = color-lib.getOkhslSaturation;
+      set = color-lib.setOkhslSaturation;
+      adjust = color-lib.adjustOkhslSaturation;
+      scale = color-lib.scaleOkhslSaturation;
+    };
+    okhsl_l = {
+      get = color-lib.getOkhslLightness;
+      set = color-lib.setOkhslLightness;
+      adjust = color-lib.adjustOkhslLightness;
+      scale = color-lib.scaleOkhslLightness;
+    };
+    okhsv_h = {
+      get = color-lib.getOkhsvHue;
+      set = color-lib.setOkhsvHue;
+      adjust = color-lib.adjustOkhsvHue;
+    };
+    okhsv_s = {
+      get = color-lib.getOkhsvSaturation;
+      set = color-lib.setOkhsvSaturation;
+      adjust = color-lib.adjustOkhsvSaturation;
+      scale = color-lib.scaleOkhsvSaturation;
+    };
+    okhsv_v = {
+      get = color-lib.getOkhsvValue;
+      set = color-lib.setOkhsvValue;
+      adjust = color-lib.adjustOkhsvValue;
+      scale = color-lib.scaleOkhsvValue;
+    };
   };
 
   # Returns null when the pure-Nix library has no counterpart for a case.
@@ -127,13 +168,24 @@ let
   #   gamut: pure blue (0000FF) sits on the sRGB gamut boundary, where the
   #     okhsl/okhsv gamut-clipping approximation in color-math.nix differs
   #     from palette's. Only affects fully-saturated primaries at the edge.
-  achromatic = [ "000000" "FFFFFF" "808080" "7F7F7F" ];
+  achromatic = [
+    "000000"
+    "FFFFFF"
+    "808080"
+    "7F7F7F"
+  ];
   gamutEdge = [ "0000FF" ];
 
   # A case diverges if *any* of its color inputs is one of the known-awkward
   # values -- mix takes two, and at factor 1.0 the result is entirely `b`.
   inputsOf =
-    c: builtins.filter (v: v != null) [ (c.hex or null) (c.text or null) (c.a or null) (c.b or null) ];
+    c:
+    builtins.filter (v: v != null) [
+      (c.hex or null)
+      (c.text or null)
+      (c.a or null)
+      (c.b or null)
+    ];
 
   expectedDivergence =
     c:
@@ -154,9 +206,15 @@ let
       raw = builtins.tryEval (actualOf c);
     in
     if !raw.success then
-      { status = "error"; inherit (c) id op; }
+      {
+        status = "error";
+        inherit (c) id op;
+      }
     else if raw.value == null then
-      { status = "unsupported"; inherit (c) id op; }
+      {
+        status = "unsupported";
+        inherit (c) id op;
+      }
     else
       let
         actual = raw.value;
@@ -191,7 +249,11 @@ let
         let
           keys = builtins.attrNames exp;
           d = lib.foldl' (
-            acc: k: let x = abs (actual.${k} - exp.${k}); in if x > acc then x else acc
+            acc: k:
+            let
+              x = abs (actual.${k} - exp.${k});
+            in
+            if x > acc then x else acc
           ) 0.0 keys;
         in
         {
@@ -200,9 +262,16 @@ let
           delta = d;
         };
 
-  results = map (c: let r = check c; in r // {
-    divergence = expectedDivergence c;
-  }) golden;
+  results = map (
+    c:
+    let
+      r = check c;
+    in
+    r
+    // {
+      divergence = expectedDivergence c;
+    }
+  ) golden;
 
   by = s: builtins.filter (r: r.status == s) results;
 
@@ -211,9 +280,7 @@ let
   realFailures = builtins.filter (r: r.divergence == null) (by "fail");
   knownFailures = builtins.filter (r: r.divergence != null) (by "fail");
 
-  countByOp =
-    rs:
-    lib.foldl' (acc: r: acc // { ${r.op} = (acc.${r.op} or 0) + 1; }) { } rs;
+  countByOp = rs: lib.foldl' (acc: r: acc // { ${r.op} = (acc.${r.op} or 0) + 1; }) { } rs;
 in
 {
   inherit results;

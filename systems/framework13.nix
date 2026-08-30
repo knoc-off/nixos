@@ -14,8 +14,6 @@ in
   imports = [
     # inputs.nixgl.packages.x86_64-linux.nixGLIntel
 
-    inputs.determinate.nixosModules.default
-
     self.nixosModules.tailnet
     {
       # Laptop client: enroll declaratively and keep MagicDNS on.

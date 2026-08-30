@@ -54,15 +54,11 @@ IE:
 > just an example, you should not have your encryption key in your history.
 
 ```sh
-nix run .#nixos-anywhere -- \
+nix run github:nix-community/nixos-anywhere -- \
  --flake .#framework13 \
  --disk-encryption-keys /tmp/secret.key /tmp/luks.key \
  root@<ip-address>
 ```
-
-Note `.#nixos-anywhere` rather than `github:nix-community/nixos-anywhere`. The
-upstream package bundles its own Nix, which cannot evaluate this flake because
-`lib/color-lib.nix` needs `builtins.wasm`. See `systems/README.md`.
 
 nixos-anywhere will:
 

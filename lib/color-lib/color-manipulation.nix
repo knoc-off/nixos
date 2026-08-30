@@ -1,17 +1,35 @@
-{ lib ? import <nixpkgs/lib>, math ? import ../math.nix { inherit lib; }
-, colorMath ? import ./color-math.nix { inherit lib math; } }:
+{
+  lib ? import <nixpkgs/lib>,
+  math ? import ../math.nix { inherit lib; },
+  colorMath ? import ./color-math.nix { inherit lib math; },
+}:
 
 let
   inherit (lib)
-    stringToCharacters toUpper removePrefix stringLength elem all concatStrings
-    substring map filter;
+    stringToCharacters
+    toUpper
+    removePrefix
+    stringLength
+    elem
+    all
+    concatStrings
+    substring
+    map
+    filter
+    ;
   inherit (math) clamp; # Removed hexToDec from math
-  inherit (colorMath) srgb_to_okhsl okhsl_to_srgb srgb_to_okhsv okhsv_to_srgb;
+  inherit (colorMath)
+    srgb_to_okhsl
+    okhsl_to_srgb
+    srgb_to_okhsv
+    okhsv_to_srgb
+    ;
   epsilon = 1.0e-8;
 
   # --- Hex Helpers (copied from color-tests.nix) ---
 
-  hexDigitToDec = hexDigit:
+  hexDigitToDec =
+    hexDigit:
     let
       hexChars = {
         "0" = 0;
@@ -37,18 +55,25 @@ let
         "e" = 14;
         "f" = 15;
       };
-    in if builtins.hasAttr hexDigit hexChars then
+    in
+    if builtins.hasAttr hexDigit hexChars then
       hexChars.${hexDigit}
     else
       throw "Invalid hex digit: ${hexDigit}";
 
-  hexToDec = hexStr:
+  hexToDec =
+    hexStr:
     assert builtins.isString hexStr;
     let
       hexDigits = stringToCharacters hexStr;
       # Validate all digits are hex
-      _ = map (d: assert hexDigitToDec d >= 0; true) hexDigits;
-      hexToDecHelper = digits: acc:
+      _ = map (
+        d:
+        assert hexDigitToDec d >= 0;
+        true
+      ) hexDigits;
+      hexToDecHelper =
+        digits: acc:
         if digits == [ ] then
           acc
         else
@@ -56,69 +81,100 @@ let
             digit = builtins.head digits;
             remainingDigits = builtins.tail digits;
             digitValue = hexDigitToDec digit;
-          in hexToDecHelper remainingDigits (acc * 16 + digitValue);
-    in if hexStr == "" then
-      throw "Empty hex string"
-    else
-      hexToDecHelper hexDigits 0;
+          in
+          hexToDecHelper remainingDigits (acc * 16 + digitValue);
+    in
+    if hexStr == "" then throw "Empty hex string" else hexToDecHelper hexDigits 0;
 
-  isValidHex = str:
+  isValidHex =
+    str:
     let
       cleanHex = removePrefix "#" str;
-      validChars =
-        [ "0" "1" "2" "3" "4" "5" "6" "7" "8" "9" "A" "B" "C" "D" "E" "F" ];
+      validChars = [
+        "0"
+        "1"
+        "2"
+        "3"
+        "4"
+        "5"
+        "6"
+        "7"
+        "8"
+        "9"
+        "A"
+        "B"
+        "C"
+        "D"
+        "E"
+        "F"
+      ];
       chars = stringToCharacters (toUpper cleanHex);
-      validLengths = [ 3 4 6 8 ];
+      validLengths = [
+        3
+        4
+        6
+        8
+      ];
       isValidLength = elem (stringLength cleanHex) validLengths;
-    in isValidLength && all (c: elem c validChars) chars;
+    in
+    isValidLength && all (c: elem c validChars) chars;
 
-  splitHex = hex:
+  splitHex =
+    hex:
     let
       cleanHex = removePrefix "#" hex;
-      _ = if !(isValidHex cleanHex) then
-        throw "Invalid hex color code: ${hex}"
-      else
-        true;
-      normalizedHex = toUpper (if stringLength cleanHex == 3 then
-        concatStrings (map (c: c + c) (stringToCharacters cleanHex))
-      else if stringLength cleanHex == 4 then
-        concatStrings (map (c: c + c) (stringToCharacters cleanHex))
-      else
-        cleanHex # Already 6 or 8
+      _ = if !(isValidHex cleanHex) then throw "Invalid hex color code: ${hex}" else true;
+      normalizedHex = toUpper (
+        if stringLength cleanHex == 3 then
+          concatStrings (map (c: c + c) (stringToCharacters cleanHex))
+        else if stringLength cleanHex == 4 then
+          concatStrings (map (c: c + c) (stringToCharacters cleanHex))
+        else
+          cleanHex # Already 6 or 8
       );
       r = substring 0 2 normalizedHex;
       g = substring 2 2 normalizedHex;
       b = substring 4 2 normalizedHex;
-    in if stringLength normalizedHex == 8 then {
-      inherit r g b;
-      alpha = substring 6 2 normalizedHex;
-    } else {
-      inherit r g b;
-      alpha = "FF";
-    };
+    in
+    if stringLength normalizedHex == 8 then
+      {
+        inherit r g b;
+        alpha = substring 6 2 normalizedHex;
+      }
+    else
+      {
+        inherit r g b;
+        alpha = "FF";
+      };
 
-  combineHex = { r, g, b, alpha ? "FF" }:
+  combineHex =
+    {
+      r,
+      g,
+      b,
+      alpha ? "FF",
+    }:
     let
       padHex = hex: if stringLength hex == 1 then "0${hex}" else hex;
       result = toUpper "${padHex r}${padHex g}${padHex b}${
-          if (toUpper alpha) != "FF" then (padHex alpha) else ""
-        }";
-    in if isValidHex result then
-      result
-    else
-      throw "Invalid combined hex: ${result}";
+        if (toUpper alpha) != "FF" then (padHex alpha) else ""
+      }";
+    in
+    if isValidHex result then result else throw "Invalid combined hex: ${result}";
 
   # --- Hex <-> RGB Conversion (using new helpers) ---
 
   # Converts a hex color string (e.g., "#RRGGBB", "RGB", "#RGBA", etc.) to an RGB attribute set { r, g, b, alpha } with values 0.0-1.0.
-  hexToRgb = hex:
-    let parts = splitHex hex; # parts = { r, g, b, alpha } as hex strings
-    in {
+  hexToRgb =
+    hex:
+    let
+      parts = splitHex hex; # parts = { r, g, b, alpha } as hex strings
+    in
+    {
       r = (hexToDec parts.r) / 255.0;
       g = (hexToDec parts.g) / 255.0;
       b = (hexToDec parts.b) / 255.0;
-      alpha = (hexToDec parts.alpha)
-        / 255.0; # Convert alpha hex to float 0.0-1.0
+      alpha = (hexToDec parts.alpha) / 255.0; # Convert alpha hex to float 0.0-1.0
     };
 
   # Converts an RGB attribute set { r, g, b, alpha } (values 0.0-1.0) to a hex color string "#RRGGBBAA" or "#RRGGBB" (if alpha is 1.0)
@@ -126,14 +182,12 @@ let
     rgbWithFloatAlpha: # Expects { r, g, b, alpha } where alpha is float
     let
       # Use lib.toHexString for cleaner byte conversion
-      toHexByte = val:
-        lib.toHexString (builtins.floor
-          (clamp val 0.0 1.0 * 255.0 + 0.5)); # Add 0.5 for rounding
+      toHexByte = val: lib.toHexString (builtins.floor (clamp val 0.0 1.0 * 255.0 + 0.5)); # Add 0.5 for rounding
       alphaFloat = clamp rgbWithFloatAlpha.alpha 0.0 1.0;
       # Only include alpha hex if alpha is noticeably less than 1.0
-      alphaHex =
-        if alphaFloat >= (1.0 - epsilon) then "FF" else toHexByte alphaFloat;
-    in combineHex {
+      alphaHex = if alphaFloat >= (1.0 - epsilon) then "FF" else toHexByte alphaFloat;
+    in
+    combineHex {
       r = toHexByte rgbWithFloatAlpha.r;
       g = toHexByte rgbWithFloatAlpha.g;
       b = toHexByte rgbWithFloatAlpha.b;
@@ -171,47 +225,50 @@ let
       modifiedRgbWithFloatAlpha = modifiedRgbOnly // {
         alpha = originalFloatAlpha;
       };
-    in rgbToHex modifiedRgbWithFloatAlpha;
+    in
+    rgbToHex modifiedRgbWithFloatAlpha;
 
   # --- Okhsl Manipulation ---
 
   # Modify Okhsl Lightness (l)
   # modifierFunc: a function that takes the current lightness (0-1) and returns the new lightness
-  modifyOkhslLightness = modifierFunc: hexColor:
-    modifyComponent srgb_to_okhsl okhsl_to_srgb "l" modifierFunc hexColor;
+  modifyOkhslLightness =
+    modifierFunc: hexColor: modifyComponent srgb_to_okhsl okhsl_to_srgb "l" modifierFunc hexColor;
 
   # Modify Okhsl Saturation (s)
   # modifierFunc: a function that takes the current saturation (0-1) and returns the new saturation
-  modifyOkhslSaturation = modifierFunc: hexColor:
-    modifyComponent srgb_to_okhsl okhsl_to_srgb "s" modifierFunc hexColor;
+  modifyOkhslSaturation =
+    modifierFunc: hexColor: modifyComponent srgb_to_okhsl okhsl_to_srgb "s" modifierFunc hexColor;
 
   # Modify Okhsl Hue (h)
   # modifierFunc: a function that takes the current hue (0-1) and returns the new hue (wraps around)
-  modifyOkhslHue = modifierFunc: hexColor:
+  modifyOkhslHue =
+    modifierFunc: hexColor:
     let
-      wrappedModifier = currentHue:
-        math.fmod (modifierFunc currentHue) 1.0; # Ensure hue wraps
-    in modifyComponent srgb_to_okhsl okhsl_to_srgb "h" wrappedModifier hexColor;
+      wrappedModifier = currentHue: math.fmod (modifierFunc currentHue) 1.0; # Ensure hue wraps
+    in
+    modifyComponent srgb_to_okhsl okhsl_to_srgb "h" wrappedModifier hexColor;
 
   # --- Okhsv Manipulation ---
 
   # Modify Okhsv Value (v)
   # modifierFunc: a function that takes the current value (0-1) and returns the new value
-  modifyOkhsvValue = modifierFunc: hexColor:
-    modifyComponent srgb_to_okhsv okhsv_to_srgb "v" modifierFunc hexColor;
+  modifyOkhsvValue =
+    modifierFunc: hexColor: modifyComponent srgb_to_okhsv okhsv_to_srgb "v" modifierFunc hexColor;
 
   # Modify Okhsv Saturation (s)
   # modifierFunc: a function that takes the current saturation (0-1) and returns the new saturation
-  modifyOkhsvSaturation = modifierFunc: hexColor:
-    modifyComponent srgb_to_okhsv okhsv_to_srgb "s" modifierFunc hexColor;
+  modifyOkhsvSaturation =
+    modifierFunc: hexColor: modifyComponent srgb_to_okhsv okhsv_to_srgb "s" modifierFunc hexColor;
 
   # Modify Okhsv Hue (h)
   # modifierFunc: a function that takes the current hue (0-1) and returns the new hue (wraps around)
-  modifyOkhsvHue = modifierFunc: hexColor:
+  modifyOkhsvHue =
+    modifierFunc: hexColor:
     let
-      wrappedModifier = currentHue:
-        math.fmod (modifierFunc currentHue) 1.0; # Ensure hue wraps
-    in modifyComponent srgb_to_okhsv okhsv_to_srgb "h" wrappedModifier hexColor;
+      wrappedModifier = currentHue: math.fmod (modifierFunc currentHue) 1.0; # Ensure hue wraps
+    in
+    modifyComponent srgb_to_okhsv okhsv_to_srgb "h" wrappedModifier hexColor;
 
   # --- Convenience Functions ---
 
@@ -219,71 +276,63 @@ let
   setOkhslLightness = newL: hexColor: modifyOkhslLightness (_: newL) hexColor;
 
   # Adjust Okhsl Lightness by an amount (e.g., adjustOkhslLightness 0.1 increases lightness by 0.1)
-  adjustOkhslLightness = deltaL: hexColor:
-    modifyOkhslLightness (currentL: clamp (currentL + deltaL) 0.0 1.0) hexColor;
+  adjustOkhslLightness =
+    deltaL: hexColor: modifyOkhslLightness (currentL: clamp (currentL + deltaL) 0.0 1.0) hexColor;
 
   # Scale Okhsl Lightness by a factor (e.g., scaleOkhslLightness 1.1 increases lightness by 10%)
-  scaleOkhslLightness = factorL: hexColor:
-    modifyOkhslLightness (currentL: clamp (currentL * factorL) 0.0 1.0)
-    hexColor;
+  scaleOkhslLightness =
+    factorL: hexColor: modifyOkhslLightness (currentL: clamp (currentL * factorL) 0.0 1.0) hexColor;
 
   # Set Okhsl Saturation
   setOkhslSaturation = newS: hexColor: modifyOkhslSaturation (_: newS) hexColor;
 
   # Adjust Okhsl Saturation
-  adjustOkhslSaturation = deltaS: hexColor:
-    modifyOkhslSaturation (currentS: clamp (currentS + deltaS) 0.0 1.0)
-    hexColor;
+  adjustOkhslSaturation =
+    deltaS: hexColor: modifyOkhslSaturation (currentS: clamp (currentS + deltaS) 0.0 1.0) hexColor;
 
   # Scale Okhsl Saturation
-  scaleOkhslSaturation = factorS: hexColor:
-    modifyOkhslSaturation (currentS: clamp (currentS * factorS) 0.0 1.0)
-    hexColor;
+  scaleOkhslSaturation =
+    factorS: hexColor: modifyOkhslSaturation (currentS: clamp (currentS * factorS) 0.0 1.0) hexColor;
 
   # Set Okhsl Hue
   setOkhslHue = newH: hexColor: modifyOkhslHue (_: newH) hexColor;
 
   # Adjust Okhsl Hue (rotate hue)
-  adjustOkhslHue = deltaH: hexColor:
-    modifyOkhslHue (currentH: currentH + deltaH)
-    hexColor; # Wrapping handled by modifyOkhslHue
+  adjustOkhslHue = deltaH: hexColor: modifyOkhslHue (currentH: currentH + deltaH) hexColor; # Wrapping handled by modifyOkhslHue
 
   # Set Okhsv Value
   setOkhsvValue = newV: hexColor: modifyOkhsvValue (_: newV) hexColor;
 
   # Adjust Okhsv Value
-  adjustOkhsvValue = deltaV: hexColor:
-    modifyOkhsvValue (currentV: clamp (currentV + deltaV) 0.0 1.0) hexColor;
+  adjustOkhsvValue =
+    deltaV: hexColor: modifyOkhsvValue (currentV: clamp (currentV + deltaV) 0.0 1.0) hexColor;
 
   # Scale Okhsv Value
-  scaleOkhsvValue = factorV: hexColor:
-    modifyOkhsvValue (currentV: clamp (currentV * factorV) 0.0 1.0) hexColor;
+  scaleOkhsvValue =
+    factorV: hexColor: modifyOkhsvValue (currentV: clamp (currentV * factorV) 0.0 1.0) hexColor;
 
   # Set Okhsv Saturation
   setOkhsvSaturation = newS: hexColor: modifyOkhsvSaturation (_: newS) hexColor;
 
   # Adjust Okhsv Saturation
-  adjustOkhsvSaturation = deltaS: hexColor:
-    modifyOkhsvSaturation (currentS: clamp (currentS + deltaS) 0.0 1.0)
-    hexColor;
+  adjustOkhsvSaturation =
+    deltaS: hexColor: modifyOkhsvSaturation (currentS: clamp (currentS + deltaS) 0.0 1.0) hexColor;
 
   # Scale Okhsv Saturation
-  scaleOkhsvSaturation = factorS: hexColor:
-    modifyOkhsvSaturation (currentS: clamp (currentS * factorS) 0.0 1.0)
-    hexColor;
+  scaleOkhsvSaturation =
+    factorS: hexColor: modifyOkhsvSaturation (currentS: clamp (currentS * factorS) 0.0 1.0) hexColor;
 
   # Set Okhsv Hue
   setOkhsvHue = newH: hexColor: modifyOkhsvHue (_: newH) hexColor;
 
   # Adjust Okhsv Hue (rotate hue)
-  adjustOkhsvHue = deltaH: hexColor:
-    modifyOkhsvHue (currentH: currentH + deltaH)
-    hexColor; # Wrapping handled by modifyOkhsvHue
+  adjustOkhsvHue = deltaH: hexColor: modifyOkhsvHue (currentH: currentH + deltaH) hexColor; # Wrapping handled by modifyOkhsvHue
 
   # --- Component Getter Functions ---
 
   # Generic function to get a component from a specific color model
-  getComponent = modelConversionFunc: componentName: hexColor:
+  getComponent =
+    modelConversionFunc: componentName: hexColor:
     let
       # 1. Convert hex to RGB + Alpha (float)
       rgbWithFloatAlpha = hexToRgb hexColor;
@@ -297,7 +346,8 @@ let
       modelColor = modelConversionFunc rgbOnly;
 
       # 3. Return the requested component
-    in modelColor.${componentName};
+    in
+    modelColor.${componentName};
 
   # --- Okhsl Getters ---
   getOkhslLightness = hexColor: getComponent srgb_to_okhsl "l" hexColor;
@@ -310,7 +360,8 @@ let
   getOkhsvHue = hexColor: getComponent srgb_to_okhsv "h" hexColor;
 
   # Color Mixing function using Okhsl
-  mixColors = color1: color2: ratio:
+  mixColors =
+    color1: color2: ratio:
     let
       rgb1 = hexToRgb color1;
       rgb2 = hexToRgb color2;
@@ -350,13 +401,17 @@ let
       # Convert back
       mixed_okhsl = { inherit h s l; };
       mixed_rgb_only = okhsl_to_srgb mixed_okhsl;
-      mixed_rgb_alpha = mixed_rgb_only // { inherit alpha; };
-    in rgbToHex mixed_rgb_alpha;
+      mixed_rgb_alpha = mixed_rgb_only // {
+        inherit alpha;
+      };
+    in
+    rgbToHex mixed_rgb_alpha;
 
   # Match Lightness and Saturation
   # Takes two hex colors: colorToModify and referenceColor.
   # Returns colorToModify with its Okhsl lightness and saturation set to match referenceColor.
-  matchLightnessSaturation = colorToModify: referenceColor:
+  matchLightnessSaturation =
+    colorToModify: referenceColor:
     let
       targetL = getOkhslLightness referenceColor;
       targetS = getOkhslSaturation referenceColor;
@@ -364,15 +419,18 @@ let
       modifiedLightness = setOkhslLightness targetL colorToModify;
       # Then apply the target saturation to the result
       finalColor = setOkhslSaturation targetS modifiedLightness;
-    in finalColor;
+    in
+    finalColor;
 
-  invertColorOkhsv = hexColor:
+  invertColorOkhsv =
+    hexColor:
     let
       # Flip hue by 180 degrees (0.5 in 0-1 range)
       hueFlipped = adjustOkhsvHue 0.5 hexColor;
       # Invert value (1 - v) for maximum contrast
       currentValue = getOkhsvValue hexColor;
-    in setOkhsvValue (1.0 - currentValue) hueFlipped;
+    in
+    setOkhsvValue (1.0 - currentValue) hueFlipped;
 
   # WCAG 2.1 relative luminance and contrast ratio.
   #
@@ -383,21 +441,26 @@ let
   # pass colors that fail AA.
   #
   # https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
-  contrastRatio = colorA: colorB:
+  contrastRatio =
+    colorA: colorB:
     let
-      linearise = c:
-        if c <= 4.045e-2
-        then c / 12.92
-        else math.powFloat ((c + 5.5e-2) / 1.055) 2.4;
-      luminance = {r, g, b, ...}:
+      linearise = c: if c <= 4.045e-2 then c / 12.92 else math.powFloat ((c + 5.5e-2) / 1.055) 2.4;
+      luminance =
+        {
+          r,
+          g,
+          b,
+          ...
+        }:
         0.2126 * (linearise r) + 0.7152 * (linearise g) + 7.22e-2 * (linearise b);
       l1 = (luminance (hexToRgb colorA)) + 5.0e-2;
       l2 = (luminance (hexToRgb colorB)) + 5.0e-2;
     in
-      if l1 > l2 then l1 / l2 else l2 / l1;
+    if l1 > l2 then l1 / l2 else l2 / l1;
 
   # Adjust one color to contrast with a fixed reference color using Okhsv
-  adjustContrastAgainstFixed = fixedColor: colorToAdjust: factor:
+  adjustContrastAgainstFixed =
+    fixedColor: colorToAdjust: factor:
     let
       # Get Okhsv components
       fixedValue = getOkhsvValue fixedColor;
@@ -406,20 +469,30 @@ let
       currentHue = getOkhsvHue colorToAdjust;
 
       # Value adjustment: push away from fixed color's value
-      valueDelta = if fixedValue > 0.5 then
-        (0.0 - currentValue) # Fixed is light, push to dark
-      else
-        (1.0 - currentValue); # Fixed is dark, push to light
+      valueDelta =
+        if fixedValue > 0.5 then
+          (0.0 - currentValue) # Fixed is light, push to dark
+        else
+          (1.0 - currentValue); # Fixed is dark, push to light
       newValue = clamp (currentValue + valueDelta * factor) 0.0 1.0;
 
       # Hue adjustment: move to opposite side of hue circle
       targetHue = math.fmod (fixedHue + 0.5) 1.0;
-      hueDelta = let raw = targetHue - currentHue;
-      in if raw > 0.5 then raw - 1.0 else if raw < -0.5 then raw + 1.0 else raw;
+      hueDelta =
+        let
+          raw = targetHue - currentHue;
+        in
+        if raw > 0.5 then
+          raw - 1.0
+        else if raw < -0.5 then
+          raw + 1.0
+        else
+          raw;
       newHue = math.fmod (currentHue + hueDelta * factor) 1.0;
 
       modified = setOkhsvHue newHue (setOkhsvValue newValue colorToAdjust);
-    in modified;
+    in
+    modified;
 
   # Raise `textColor`'s contrast against `backgroundColor` to at least
   # `minRatio`, adjusting *only* Okhsl lightness so hue and saturation survive.
@@ -433,34 +506,34 @@ let
   # Binary search rather than a closed form: contrast is monotonic in lightness
   # but not analytically invertible through the Okhsl -> sRGB transform. 24
   # iterations resolves lightness to ~6e-8, far finer than one 8-bit step.
-  ensureTextContrast = textColor: backgroundColor: minRatio:
-    if contrastRatio textColor backgroundColor >= minRatio
-    then textColor
-    else let
-      # Dark backgrounds need lighter text, light backgrounds need darker.
-      goLighter = getOkhslLightness backgroundColor < 0.5;
-      textL = getOkhslLightness textColor;
+  ensureTextContrast =
+    textColor: backgroundColor: minRatio:
+    if contrastRatio textColor backgroundColor >= minRatio then
+      textColor
+    else
+      let
+        # Dark backgrounds need lighter text, light backgrounds need darker.
+        goLighter = getOkhslLightness backgroundColor < 0.5;
+        textL = getOkhslLightness textColor;
 
-      search = lo: hi: i:
-        if i == 0
-        then (lo + hi) / 2.0
-        else let
-          mid = (lo + hi) / 2.0;
-          ok = contrastRatio (setOkhslLightness mid textColor) backgroundColor >= minRatio;
-        in
-          # Converge toward the original lightness while staying compliant.
-          if ok == goLighter
-          then search lo mid (i - 1)
-          else search mid hi (i - 1);
+        search =
+          lo: hi: i:
+          if i == 0 then
+            (lo + hi) / 2.0
+          else
+            let
+              mid = (lo + hi) / 2.0;
+              ok = contrastRatio (setOkhslLightness mid textColor) backgroundColor >= minRatio;
+            in
+            # Converge toward the original lightness while staying compliant.
+            if ok == goLighter then search lo mid (i - 1) else search mid hi (i - 1);
 
-      finalL =
-        if goLighter
-        then search textL 1.0 24
-        else search 0.0 textL 24;
-    in
+        finalL = if goLighter then search textL 1.0 24 else search 0.0 textL 24;
+      in
       setOkhslLightness finalL textColor;
 
-in {
+in
+{
   # Export core conversion functions
   inherit hexToRgb rgbToHex;
 
@@ -484,8 +557,12 @@ in {
   inherit mixColors;
 
   # export the color invert function
-  inherit invertColorOkhsv ensureTextContrast contrastRatio
-    adjustContrastAgainstFixed;
+  inherit
+    invertColorOkhsv
+    ensureTextContrast
+    contrastRatio
+    adjustContrastAgainstFixed
+    ;
 
   # Export the matching function
   inherit matchLightnessSaturation;

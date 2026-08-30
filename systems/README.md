@@ -58,23 +58,13 @@ Put data that should survive a root rollback on its own subvolume via
 
 Boot the target from a NixOS minimal ISO and note its IP.
 
-### Use this flake's nixos-anywhere, not the upstream one
-
 ```sh
-nix run .#nixos-anywhere -- \
+nix run github:nix-community/nixos-anywhere -- \
   --flake .#<hostname> \
   --disk-encryption-keys /tmp/secret.key /tmp/luks.key \
   --build-on local \
   root@<ip>
 ```
-
-`nix run github:nix-community/nixos-anywhere` does not work here. It prepends
-its own bundled upstream Nix to `PATH`, and that binary is what evaluates the
-flake. `lib/color-lib.nix` calls `builtins.wasm`, which only exists in
-Determinate Nix, so evaluation dies with `attribute 'wasm' missing` before
-partitioning starts. `--build-on local` does not help -- it moves the build, not
-the eval. `pkgs/nixos-anywhere.nix` overrides the bundled Nix with Determinate's
-`nix-cli` to fix this.
 
 Two related traps:
 
