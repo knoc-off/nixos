@@ -25,10 +25,7 @@ in
 
     self.nixosModules.nix-cache
     {
-      services.nixCache = {
-        client.enable = true;
-        builder.enable = true;
-      };
+      services.nixCache.leaf.enable = true;
     }
 
     self.nixosModules.users.knoff
@@ -74,11 +71,10 @@ in
 
     self.nixosModules.boot
 
-    inputs.sops-nix.nixosModules.sops
+    self.nixosModules.sops
     {
       sops = {
         defaultSopsFile = ./secrets.yaml;
-        age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
         secrets = {
           "shell_environment/OPENROUTER_API_KEY" = {
             mode = "0644";
@@ -87,17 +83,6 @@ in
             mode = "0644";
           };
         };
-      };
-    }
-
-    {
-      nixpkgs.config.allowUnfree = true;
-      nix = {
-        registry = {
-          nixpkgs.flake = inputs.nixpkgs;
-          nixos-hardware.flake = inputs.hardware;
-        };
-        nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
       };
     }
 

@@ -59,18 +59,50 @@
       mkImage =
         hostname: system: imageType:
         let
-          name = "${hostname}-${imageType}";
-          imageOverrides =
-            {
-              isoImage = [ { image.fileName = lib.mkForce name; } ];
-              sdImage = [ ];
-            }
-            .${imageType} or [
-            ];
+          profiles = {
+            isoImage =
+              {
+                config,
+                lib,
+                pkgs,
+                modulesPath,
+                ...
+              }:
+              {
+                imports = [ "${modulesPath}/installer/cd-dvd/installation-cd-minimal.nix" ];
+                image.fileName = lib.mkForce "${hostname}-${imageType}";
+                boot = {
+                  kernelPackages = lib.mkForce pkgs.linuxPackages;
+                  initrd.systemd.dbus.enable = true;
+                  loader = {
+                    systemd-boot.enable =
+                      if lib.hasAttr "lanzaboote" config.boot && config.boot.lanzaboote.enable then
+                        lib.mkForce false
+                      else
+                        true;
+                    efi.canTouchEfiVariables = true;
+                  };
+                };
+              };
+            sdImage =
+              { lib, modulesPath, ... }:
+              {
+                imports = [ "${modulesPath}/installer/sd-card/sd-image-aarch64.nix" ];
+                # ZFS is enabled by default in installer profiles but is never cached
+                # (built against specific kernel versions). Disable it for SD images.
+                boot.supportedFilesystems.zfs = lib.mkForce false;
+                # The all-hardware profile includes dw-hdmi which was renamed/removed
+                # in newer kernels and doesn't exist in the RPi kernel. Disable it.
+                hardware.enableAllHardware = lib.mkForce false;
+              };
+          };
         in
         (mkConfig {
           inherit hostname system;
-          extraModules = [ ./systems/image/${imageType}.nix ] ++ imageOverrides;
+          extraModules = [
+            self.nixosModules.installer-image
+            profiles.${imageType}
+          ];
         }).config.system.build.${imageType};
 
       unstablePkgs =

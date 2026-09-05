@@ -36,9 +36,14 @@ in
         server.enable = lib.mkEnableOption "harmonia binary cache + distributed-build server, for the cache host itself";
         client.enable = lib.mkEnableOption "the cache host as an extra substituter";
         builder.enable = lib.mkEnableOption "the cache host as a distributed build machine";
+        leaf.enable = lib.mkEnableOption "this host as a cache client + build-dispatcher (the common non-server case: client + builder together)";
       };
 
       config = lib.mkMerge [
+        (lib.mkIf cfg.leaf.enable {
+          services.nixCache.client.enable = true;
+          services.nixCache.builder.enable = true;
+        })
         (lib.mkIf cfg.server.enable {
           services.harmonia.cache = {
             enable = true;

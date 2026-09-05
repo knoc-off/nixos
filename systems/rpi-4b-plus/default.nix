@@ -10,7 +10,7 @@
 {
   imports = [
     self.nixosModules.nix
-    inputs.sops-nix.nixosModules.sops
+    self.nixosModules.sops
     inputs.hardware.nixosModules.raspberry-pi-4
 
     ./services/home-assistant.nix
@@ -20,12 +20,9 @@
 
     self.nixosModules.nix-cache
     {
-      services.nixCache = {
-        client.enable = true;
-        builder.enable = true;
-      };
+      services.nixCache.leaf.enable = true;
 
-      # Never build on the Pi itself. Combined with the builder.enable above
+      # Never build on the Pi itself. Combined with leaf.enable above
       # (distributedBuilds + optiplex in nix.buildMachines), a cache miss is
       # dispatched to optiplex rather than compiled here; if optiplex is
       # unreachable it fails outright instead of spending hours on an SD card.
@@ -36,7 +33,6 @@
 
   sops = {
     defaultSopsFile = ./secrets.yaml;
-    age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
     secrets."wifi/home/fritz" = { };
     secrets."ntfy/token" = { };
   };

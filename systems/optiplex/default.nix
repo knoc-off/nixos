@@ -16,11 +16,10 @@ in
     ./services/minecraft-snapshots.nix
     ./services/nix-autobuild.nix
 
-    inputs.sops-nix.nixosModules.sops
+    self.nixosModules.sops
     {
       sops = {
         defaultSopsFile = ./secrets.yaml;
-        age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
 
         secrets = {
           "services/ntfy/publish-token" = { };

@@ -18,11 +18,10 @@ in
     (modulesPath + "/installer/scan/not-detected.nix")
     (modulesPath + "/profiles/qemu-guest.nix")
 
-    inputs.sops-nix.nixosModules.sops
+    self.nixosModules.sops
     {
       sops = {
         defaultSopsFile = ./secrets.yaml;
-        age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
 
         secrets = {
           "services/website/env" = { };
@@ -58,10 +57,7 @@ in
 
     self.nixosModules.nix-cache
     {
-      services.nixCache = {
-        client.enable = true;
-        builder.enable = true;
-      };
+      services.nixCache.leaf.enable = true;
     }
   ];
 

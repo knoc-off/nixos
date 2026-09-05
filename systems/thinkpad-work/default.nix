@@ -48,10 +48,7 @@ in
 
     self.nixosModules.nix-cache
     {
-      services.nixCache = {
-        client.enable = true;
-        builder.enable = true;
-      };
+      services.nixCache.leaf.enable = true;
     }
 
     self.nixosModules.users.niko
@@ -96,14 +93,12 @@ in
 
     self.nixosModules.boot
 
-    inputs.sops-nix.nixosModules.sops
+    self.nixosModules.sops
     {
       # todo: setup a systemd service, that will initialize the sops stuff.
       # would need to generate a pub key and ideally write it to the file.
       sops = {
         defaultSopsFile = ./secrets.yaml;
-        age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
-        # age.sshKeyPaths = ["/home/niko/.ssh/id_ed25519"];
         secrets = {
           "shell_environment/_ANTHROPIC_API_KEY" = {
             mode = "0644";
@@ -121,17 +116,6 @@ in
             mode = "0644";
           };
         };
-      };
-    }
-
-    {
-      nixpkgs.config.allowUnfree = true;
-      nix = {
-        registry = {
-          nixpkgs.flake = inputs.nixpkgs;
-          nixos-hardware.flake = inputs.hardware;
-        };
-        nixPath = [ "nixpkgs=${inputs.nixpkgs}" ];
       };
     }
 
