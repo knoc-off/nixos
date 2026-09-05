@@ -112,7 +112,7 @@ in
   ];
 
   programs = {
-    virt-manager.enable = true; # needed for what?
+    virt-manager.enable = true; # GUI frontend for libvirtd VMs below
     direnv = {
       enable = true;
       silent = true;

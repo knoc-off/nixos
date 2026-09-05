@@ -54,7 +54,7 @@ def good_draft(**overrides) -> RecipeDraft:
     return RecipeDraft(**base)
 
 
-# --- grammar transcription -------------------------------------------------
+# grammar transcription
 
 
 @pytest.mark.parametrize(
@@ -95,7 +95,7 @@ def test_extract_pills_ignores_code() -> None:
     assert [p.name for p in extract_pills(markdown)] == ["egg"]
 
 
-# --- happy path ------------------------------------------------------------
+# happy path
 
 
 def test_valid_recipe_passes(catalogue) -> None:
@@ -104,7 +104,7 @@ def test_valid_recipe_passes(catalogue) -> None:
     assert result.new_items == []
 
 
-# --- pills -----------------------------------------------------------------
+# pills
 
 
 def test_unresolved_pill_is_an_error_with_suggestions(catalogue) -> None:
@@ -140,7 +140,7 @@ def test_multi_word_item_is_referenced_with_underscores(catalogue) -> None:
     assert result.ok, result.report()
 
 
-# --- quantities ------------------------------------------------------------
+# quantities
 
 
 @pytest.mark.parametrize(
@@ -183,7 +183,7 @@ def test_brace_quantity_is_not_flagged(catalogue) -> None:
     assert "inline_quantity" not in codes(result)
 
 
-# --- catalogue dedup -------------------------------------------------------
+# catalogue dedup
 
 
 def test_near_duplicate_item_is_refused_with_candidates(catalogue) -> None:
@@ -229,7 +229,7 @@ def test_case_and_accent_insensitive_catalogue_match(catalogue) -> None:
     assert result.ok, result.report()
 
 
-# --- structural ------------------------------------------------------------
+# structural
 
 
 def test_duplicate_recipe_name_is_refused(catalogue) -> None:
@@ -291,7 +291,7 @@ def test_unstructured_description_is_a_warning(catalogue) -> None:
     assert result.ok
 
 
-# --- reporting -------------------------------------------------------------
+# reporting
 
 
 def test_all_violations_are_reported_together(catalogue) -> None:

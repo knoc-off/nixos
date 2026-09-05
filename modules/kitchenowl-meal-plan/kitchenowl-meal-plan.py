@@ -128,7 +128,7 @@ def main():
 
     plans = fetch_plans(api_base, household_id, api_token)
 
-    # --- Newly added recipes -------------------------------------------
+    # Newly added recipes
     current = {}
     for p in plans:
         recipe = p.get("recipe") or {}
@@ -155,7 +155,7 @@ def main():
             print(f"kitchenowl-meal-plan: {len(lines)} added")
         save_state(baseline_path, current.keys())
 
-    # --- Today's meals for the current slot -----------------------------
+    # Today's meals for the current slot
     slot = current_slot(times)
     today = date.today()
     due = [

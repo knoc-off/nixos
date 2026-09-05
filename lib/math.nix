@@ -8,11 +8,11 @@
 # (e.g. powFloat needs exp+ln, sin needs fmod, exp needs mod).
 
 rec {
-  # --- Constants ---
+  # Constants
   pi = 3.141592653589793;
   tau = 2.0 * pi;
   pi_half = pi / 2.0;
-  epsilon = 1.0e-10; # Small number for floating-point comparisons
+  epsilon = 1.0e-10;
 
   # Natural Logarithm related
   ln2 = 0.6931471805599453; # ln(2)
@@ -174,8 +174,7 @@ rec {
         in
         if exp_int < 0 then 1.0 / res_abs else res_abs;
 
-      # --- Step 1: Range Reduction ---
-      # Reduce x to r + k*ln(2), where r is in [-ln(2)/2, ln(2)/2]
+      # Step 1: range reduction
       # x = k*ln(2) + r  =>  x/ln(2) = k + r/ln(2)
       # Let k = round(x/ln(2)), then r = x - k*ln(2)
       k_float = x * ln2_inv; # x / ln(2)
@@ -183,7 +182,7 @@ rec {
       k = (builtins.fromJSON (builtins.toJSON k_int));
       r = x - (k * ln2);
 
-      # --- Step 2: Calculate e^r using direct summation of Taylor series ---
+      # Step 2: calculate e^r using direct summation of Taylor series
       # e^r = 1 + r + r^2/2! + r^3/3! + ...
       exp_r =
         let
@@ -217,7 +216,7 @@ rec {
         + term12
         + term13;
 
-      # --- Step 3: Calculate 2^k, then combine ---
+      # Step 3: calculate 2^k, then combine
       pow2_k = integerPow 2.0 k_int;
     in
     pow2_k * exp_r;
@@ -233,7 +232,7 @@ rec {
   sin =
     x:
     let
-      # --- Step 1: Range Reduction ---
+      # Step 1: range reduction
       # Reduce x to the primary range [-pi, pi) using tau = 2*pi
       x_reduced_pi = fmod (x + pi) tau - pi;
 
@@ -245,7 +244,7 @@ rec {
       x_final = if x_abs > pi_half then pi - x_abs else x_abs;
       # x_final is now in [0, pi/2]
 
-      # --- Step 2: Calculate sin(x_final) using iterative Taylor series ---
+      # Step 2: calculate sin(x_final) using iterative Taylor series
       # sin(y) = y - y^3/3! + y^5/5! - ...
       # term_{n+1} = term_n * (-y^2) / ((2n+3)*(2n+2))
       series_sum =
@@ -266,7 +265,7 @@ rec {
         in
         sum_loop y y 0.0;
 
-      # --- Step 3: Apply the sign ---
+      # Step 3: apply the sign
     in
     initial_sign * series_sum;
 

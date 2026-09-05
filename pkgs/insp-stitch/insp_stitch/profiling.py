@@ -55,7 +55,7 @@ class Profiler:
         """Attach a named scalar to the currently-open span."""
         self._stack[-1].metrics.append((name, value, unit))
 
-    # -- reporting -----------------------------------------------------------
+    # reporting
 
     def report(self) -> str:
         self.root.total = sum(c.total for c in self.root.children.values())

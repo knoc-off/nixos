@@ -3,6 +3,7 @@
   stdenv,
   python3,
   systemd,
+  bindfs,
   makeWrapper,
 }:
 
@@ -22,9 +23,16 @@ stdenv.mkDerivation {
     cp ${./server.py} $out/lib/host-query/server.py
     cp ${./opencode-plugin.js} $out/lib/host-query/plugin/index.js
 
+    # bindfs backs the read-only directory grants (POST /mount) -- FUSE so it
+    # needs no root, unlike `mount --bind`.
     makeWrapper ${python3}/bin/python3 $out/bin/host-query \
       --add-flags "$out/lib/host-query/server.py" \
-      --prefix PATH : ${lib.makeBinPath [ systemd ]}
+      --prefix PATH : ${
+        lib.makeBinPath [
+          systemd
+          bindfs
+        ]
+      }
 
     runHook postInstall
   '';

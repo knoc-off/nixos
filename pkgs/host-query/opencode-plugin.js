@@ -1,6 +1,8 @@
 // OpenCode plugin for host-query.
-// Exposes a single tool that executes commands on the host (outside the jail).
-// Permission is set to "ask" so the user always approves each command.
+// Exposes two tools that act on the host (outside the jail):
+//   host_exec  -- run a shell command
+//   host_mount -- grant a host directory read-only into the jail
+// Both are permission "ask" so the user approves each one.
 
 import { createRequire } from "node:module";
 const require = createRequire(
@@ -52,6 +54,51 @@ export default async (_ctx) => ({
           const code =
             data.exit_code !== 0 ? ` (exit ${data.exit_code})` : "";
           return `$ ${data.command}${code}\n${data.output || "(no output)"}`;
+        } catch (e) {
+          return `host-query service unavailable: ${e.message}`;
+        }
+      },
+    },
+
+    host_mount: {
+      description:
+        "Grant a host directory into the sandbox, read-only. Use when you " +
+        "need to browse or search files outside the mounted projects with " +
+        "the normal file tools. The directory appears at " +
+        "~/scratch/granted/<name> and stays for the rest of the session. " +
+        "Read-only: use host_exec if you need to write.",
+      args: {
+        path: z
+          .string()
+          .describe("Absolute host directory to grant (e.g. '/var/lib/foo')"),
+        name: z
+          .string()
+          .optional()
+          .describe("Mount name under ~/scratch/granted (default: basename)"),
+      },
+      async execute(args, context) {
+        const path = String(args.path || "").trim();
+        if (!path) return "Error: empty path";
+        const name = String(args.name || "").trim();
+
+        await context.ask({
+          permission: "host_mount",
+          patterns: [path],
+          always: [],
+          metadata: { path, name },
+        });
+
+        try {
+          const r = await fetch(`${BASE}/mount`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(name ? { path, name } : { path }),
+            signal: AbortSignal.timeout(35000),
+          });
+          const data = await r.json();
+
+          if (!r.ok) return `Error: ${data.error || r.statusText}`;
+          return `Mounted ${data.source} read-only at ${data.jail_path}`;
         } catch (e) {
           return `host-query service unavailable: ${e.message}`;
         }

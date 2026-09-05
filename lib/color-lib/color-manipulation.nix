@@ -26,7 +26,7 @@ let
     ;
   epsilon = 1.0e-8;
 
-  # --- Hex Helpers (copied from color-tests.nix) ---
+  # Hex helpers (copied from color-tests.nix)
 
   hexDigitToDec =
     hexDigit:
@@ -162,7 +162,7 @@ let
     in
     if isValidHex result then result else throw "Invalid combined hex: ${result}";
 
-  # --- Hex <-> RGB Conversion (using new helpers) ---
+  # Hex <-> RGB conversion (using new helpers)
 
   # Converts a hex color string (e.g., "#RRGGBB", "RGB", "#RGBA", etc.) to an RGB attribute set { r, g, b, alpha } with values 0.0-1.0.
   hexToRgb =
@@ -194,7 +194,7 @@ let
       alpha = alphaHex; # Pass hex alpha, combineHex handles omitting "FF"
     };
 
-  # --- Color Manipulation Functions ---
+  # Color manipulation functions
 
   # Generic function to modify a component of a color model, preserving alpha
   modifyComponent =
@@ -228,7 +228,7 @@ let
     in
     rgbToHex modifiedRgbWithFloatAlpha;
 
-  # --- Okhsl Manipulation ---
+  # Okhsl manipulation
 
   # Modify Okhsl Lightness (l)
   # modifierFunc: a function that takes the current lightness (0-1) and returns the new lightness
@@ -249,7 +249,7 @@ let
     in
     modifyComponent srgb_to_okhsl okhsl_to_srgb "h" wrappedModifier hexColor;
 
-  # --- Okhsv Manipulation ---
+  # Okhsv manipulation
 
   # Modify Okhsv Value (v)
   # modifierFunc: a function that takes the current value (0-1) and returns the new value
@@ -270,7 +270,7 @@ let
     in
     modifyComponent srgb_to_okhsv okhsv_to_srgb "h" wrappedModifier hexColor;
 
-  # --- Convenience Functions ---
+  # Convenience functions
 
   # Set Okhsl Lightness to a specific value
   setOkhslLightness = newL: hexColor: modifyOkhslLightness (_: newL) hexColor;
@@ -328,7 +328,7 @@ let
   # Adjust Okhsv Hue (rotate hue)
   adjustOkhsvHue = deltaH: hexColor: modifyOkhsvHue (currentH: currentH + deltaH) hexColor; # Wrapping handled by modifyOkhsvHue
 
-  # --- Component Getter Functions ---
+  # Component getter functions
 
   # Generic function to get a component from a specific color model
   getComponent =
@@ -349,12 +349,12 @@ let
     in
     modelColor.${componentName};
 
-  # --- Okhsl Getters ---
+  # Okhsl getters
   getOkhslLightness = hexColor: getComponent srgb_to_okhsl "l" hexColor;
   getOkhslSaturation = hexColor: getComponent srgb_to_okhsl "s" hexColor;
   getOkhslHue = hexColor: getComponent srgb_to_okhsl "h" hexColor;
 
-  # --- Okhsv Getters ---
+  # Okhsv getters
   getOkhsvValue = hexColor: getComponent srgb_to_okhsv "v" hexColor;
   getOkhsvSaturation = hexColor: getComponent srgb_to_okhsv "s" hexColor;
   getOkhsvHue = hexColor: getComponent srgb_to_okhsv "h" hexColor;
@@ -628,7 +628,7 @@ in
   # Export the color mixing function
   inherit mixColors;
 
-  # export the color invert function
+  # Export the color invert function
   inherit
     invertColorOkhsv
     ensureTextContrast

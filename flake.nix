@@ -409,6 +409,14 @@
 
     jail-nix.url = "sourcehut:~alexdavid/jail.nix";
 
+    # Prebuilt `comma`/nix-index database (weekly), used by the jailed
+    # opencode toolbelt so `, <program>` works without a first-use index
+    # build inside the jail.
+    nix-index-database = {
+      url = "github:nix-community/nix-index-database";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
+
     # opencode plugin consumed straight from the checkout (no build step, it's
     # JS + markdown). Referenced by store path in the jail's opencode config so
     # opencode never npm-installs it at runtime.

@@ -194,7 +194,7 @@ def validate_recipe(
     declared = {clean_item_name(i.name): i for i in draft.items if i.name.strip()}
     catalogue_by_clean = {clean_item_name(c.name): c for c in catalogue}
 
-    # --- structural -----------------------------------------------------
+    # structural
     if not draft.name.strip():
         add(Violation("empty_name", ERROR, "Recipe name is empty."))
     elif len(draft.name.strip()) > NAME_MAX_LENGTH:
@@ -239,7 +239,7 @@ def validate_recipe(
             )
         seen.add(key)
 
-    # --- duplicate recipe ------------------------------------------------
+    # duplicate recipe
     for existing in existing_recipes:
         if existing.id == recipe_id:
             continue
@@ -253,7 +253,7 @@ def validate_recipe(
                 )
             )
 
-    # --- pills -----------------------------------------------------------
+    # pills
     pills = extract_pills(draft.description)
     referenced: set[str] = set()
 
@@ -286,7 +286,7 @@ def validate_recipe(
                 )
             )
 
-    # --- quantities ------------------------------------------------------
+    # quantities
     # Heuristic, hence a warning: amounts must live where they can scale, which
     # means the item's description field or the pill's `{...}` override. A bare
     # number in prose stays fixed when the user changes servings.
@@ -302,7 +302,7 @@ def validate_recipe(
             )
         )
 
-    # --- catalogue / dedup -----------------------------------------------
+    # catalogue / dedup
     for key, item in declared.items():
         if key in catalogue_by_clean:
             continue
@@ -328,7 +328,7 @@ def validate_recipe(
                 )
             )
 
-    # --- house style -----------------------------------------------------
+    # house style
     if not draft.tags:
         add(
             Violation(

@@ -168,7 +168,7 @@ def correct_seam(
     warped_a = cv2.remap(filled_a, map_a_x, map_a_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
     warped_b = cv2.remap(filled_b, map_b_x, map_b_y, interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
 
-    # -- objective metrics: how much did the warp actually reduce mismatch? ---
+    # objective metrics: how much did the warp actually reduce mismatch?
     ov = both_valid_crop
     mag_ov = mag[ov]
     metrics = SeamMetrics(

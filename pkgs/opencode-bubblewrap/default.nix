@@ -33,12 +33,18 @@ let
 
   claudeMem = selfPkgs.claude-mem;
   hostQuery = selfPkgs.host-query;
+  scriptExec = selfPkgs.script-exec;
 
   # The jail's entire ~/.config/opencode, generated in the store. See
   # config/default.nix for why this is a store path rather than the host's
   # config dir, and why it is mounted as an overlay lower layer.
   opencodeConfig = pkgs.callPackage ./config {
-    inherit claudeMem hostQuery lspmuxSession;
+    inherit
+      claudeMem
+      hostQuery
+      scriptExec
+      lspmuxSession
+      ;
     jailContext = ./jail-context.md;
   };
 
@@ -136,6 +142,12 @@ let
   lspmux = selfPkgs.lspmux;
   lspmuxSession = selfPkgs.lspmux-session;
 
+  # `, <program>` runs any nixpkgs program by name without knowing its attr
+  # path, e.g. `, magick photo.png`. comma-with-db bundles a prebuilt weekly
+  # index (nix-index-database) rather than building one on first use inside
+  # the jail (~10min, and stale the moment nixpkgs moves).
+  commaWithDb = inputs.nix-index-database.legacyPackages.${system}.comma-with-db;
+
   # direnv integration for the jail's fish shell.
   #
   # direnv is a shell hook (not a daemon), so nothing needs mounting from the
@@ -198,6 +210,9 @@ let
     # Patching
     gnupatch
 
+    # Run any nixpkgs program by name without knowing its attr path.
+    commaWithDb
+
     # Safe deletion (trash-cli provides trash-put, used by rmtrash)
     trash-cli
     rmtrash
@@ -254,6 +269,16 @@ jail "jailed-opencode" upkgs.fish (
     no-new-session
     (set-argv [ ])
     (add-cleanup "kill $HOST_QUERY_PID 2>/dev/null || true")
+    # Tear down host_mount grants. Must be the *setuid* fusermount3 from
+    # /run/wrappers -- the store one lacks the privilege to unmount and fails
+    # with EPERM, leaving the mounts (and the session's grant dirs) behind.
+    (add-cleanup ''
+      for _grant in "''${JAIL_GRANT_ROOT:-}"/*; do
+        [ -d "$_grant" ] || continue
+        /run/wrappers/bin/fusermount3 -u "$_grant" 2>/dev/null || true
+        ${pkgs.coreutils}/bin/rmdir "$_grant" 2>/dev/null || true
+      done
+    '')
 
     (add-runtime ''
       ${shellHelpers}
@@ -386,7 +411,13 @@ jail "jailed-opencode" upkgs.fish (
         JAIL_STATE_DIR="$HOME/.local/state/opencode-jails/_shared"
       fi
       ${pkgs.coreutils}/bin/mkdir -p "$JAIL_STATE_DIR"
-      ${lib.getExe hostQuery} "$HOST_QUERY_PORT" \
+      # Read-only host directory grants (host_mount) land here. It sits under
+      # the ~/scratch backing dir on purpose: that bind is a propagation slave
+      # of the host's /home, so a bindfs mount made here shows up inside the
+      # *running* jail without a restart.
+      JAIL_GRANT_ROOT="$JAIL_SCRATCH_BACKING/granted"
+      ${pkgs.coreutils}/bin/mkdir -p "$JAIL_GRANT_ROOT"
+      ${lib.getExe hostQuery} "$HOST_QUERY_PORT" "$JAIL_GRANT_ROOT" \
         > "$JAIL_STATE_DIR/host-query.log" 2>&1 &
       HOST_QUERY_PID=$!
       if ! wait_for_health "http://127.0.0.1:$HOST_QUERY_PORT/health"; then
@@ -632,6 +663,13 @@ jail "jailed-opencode" upkgs.fish (
     # NixOS symlinks /etc/nix/{registry.json,nix.custom.conf} → /etc/static/…
     (try-ro-bind "/etc/static/nix" "/etc/static/nix")
 
+    # `#!/usr/bin/env bash` shebangs. The jail's / is a tmpfs with only /bin/sh,
+    # so scripts using the portable env shebang -- most third-party ones -- fail
+    # with ENOENT. bwrap creates the /usr/bin parents for us. Bound from the
+    # store rather than the host's /usr/bin/env, which is itself only a symlink
+    # into this same coreutils, so nothing of the host is exposed.
+    (ro-bind "${pkgs.coreutils}/bin/env" "/usr/bin/env")
+
     (set-env "SHELL" "${upkgs.fish}/bin/fish")
     (try-fwd-env "COMPAT_PROXY_LOG")
     (try-fwd-env "COMPAT_PROXY_DUMP")
@@ -646,6 +684,10 @@ jail "jailed-opencode" upkgs.fish (
     # authenticate inside the jail.
     (try-fwd-env "CONTEXT7_API_KEY")
     (set-env "NIX_REMOTE" "daemon")
+    # Pinned nixpkgs for the script_exec tool (pkgs/script-exec): its Nix
+    # environments build against the same unstable tree the toolbelt uses,
+    # not whatever <nixpkgs> happens to resolve to inside the jail.
+    (set-env "SCRIPT_EXEC_NIXPKGS_PATH" "${upkgs.path}")
 
     (add-pkg-deps (
       agentToolbelt

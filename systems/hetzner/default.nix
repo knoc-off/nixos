@@ -64,7 +64,7 @@ in
   # KitchenOwl shopping-list -> ntfy change notifier.
   services.kitchenowl-notify = {
     enable = true;
-    householdId = 1; # TODO: set to your KitchenOwl household ("home") id
+    householdId = 1;
     apiTokenFile = config.sops.secrets."services/kitchenowl/api-token".path;
     ntfyTokenFile = config.sops.secrets."services/ntfy/publish-token".path;
   };
@@ -72,7 +72,7 @@ in
   # KitchenOwl meal-plan -> ntfy notifier (additions + today's-meal reminders).
   services.kitchenowl-meal-plan = {
     enable = true;
-    householdId = 1; # TODO: set to your KitchenOwl household ("home") id
+    householdId = 1;
     apiTokenFile = config.sops.secrets."services/kitchenowl/api-token".path;
     ntfyTokenFile = config.sops.secrets."services/ntfy/publish-token".path;
   };

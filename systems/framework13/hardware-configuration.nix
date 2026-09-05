@@ -8,7 +8,7 @@
   ...
 }:
 {
-  # what does this do?
+  # Pulls in nixos-generate-config's hardware detection for unlisted devices.
   imports = [
     (modulesPath + "/installer/scan/not-detected.nix")
   ];

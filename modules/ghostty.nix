@@ -18,7 +18,7 @@
 
       sa = hex: lighten (saturate hex);
 
-      # --- Rotating color scheme generation ---
+      # Rotating color scheme generation
       numSchemes = 16;
 
       variants = genList (

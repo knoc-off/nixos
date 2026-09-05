@@ -7,6 +7,7 @@
   jailContext,
   claudeMem,
   hostQuery,
+  scriptExec,
   lspmuxSession,
 }:
 
@@ -287,6 +288,83 @@ let
     };
   };
 
+  # Read-only tool grant shared by every exploration tier.
+  #
+  # Runtime permission ids come from each tool's own `name` constant via
+  # Tool.permission() (core/src/tool/tool.ts), NOT the registry key -- so these
+  # are "bash"/"webfetch"/"websearch", not "shell"/"fetch"/"search". Writing
+  # rules against the aliases silently does nothing.
+  #
+  # Deliberately NOT granted: edit/write/apply_patch (read-only agents), task
+  # (deriveSubagentSessionPermission blocks recursive spawning), todowrite
+  # (prevents clobbering the parent's todo list), question (a subagent cannot
+  # prompt the user).
+  explorePermission = {
+    "*" = "deny";
+    grep = "allow";
+    glob = "allow";
+    # `list` is not a tool: directory listing is part of `read` (read.ts
+    # dispatches to reader.list()). Kept only because native `explore` carries
+    # the same inert entry; it grants nothing either way.
+    list = "allow";
+    # Native `explore` grants bash too (agent/agent.ts). Without it the
+    # sub-agent has no shell at all -- no rg/find/ls, and no way to run a
+    # build or test command while investigating.
+    bash = "allow";
+    read = "allow";
+    webfetch = "allow";
+    websearch = "allow";
+    external_directory = "allow";
+    # Skills are read-only instructions; a blanket deny would leave the
+    # subagent unable to load one. Currently moot -- pkgs/opencode strips
+    # `skill` from the outgoing tools array (CC_DROPPED_TOOLS) -- but the rule
+    # should be right for when that changes.
+    skill = "allow";
+  };
+
+  # One exploration sub-agent per model tier. Ordered cheapest first, which is
+  # also the order they should be reached for.
+  #
+  # contextBudget is a raw token count here, deliberately not the size tiers
+  # (small/medium/large). Those are fractions of each model's *own* context
+  # window, and the windows differ 5x -- Sonnet has 1M, Haiku and Opus 200k --
+  # so "medium" would mean 250k for explore-mid but only 50k for explore-deep.
+  # Percentages make the middle tier silently the most expensive one. Absolute
+  # numbers say what is actually being bought.
+  #
+  # These are ceilings for a *sub-agent*, not a session: the whole value is a
+  # small context condensed into one answer, so a budget that forces the
+  # summary is the feature. 40k is already many files' worth of grep output.
+  # Opus is capped hardest, not loosest -- it costs 5x Haiku per input token,
+  # and "hard question" means it needs to reason well, not that it needs to
+  # hold half a codebase in context.
+  exploreTiers = {
+    quick = {
+      model = "anthropic/claude-haiku-4-5";
+      contextBudget = 40000; # 20% of Haiku's 200k
+      description = "PREFERRED FIRST PASS for all codebase and filesystem investigation. Fastest and cheapest tier (Haiku). Read-only: locating files, keyword/regex search, finding definitions and call sites, reconnaissance before an edit, confirming assumptions. Reach for this by default instead of running Grep/Glob yourself, and dispatch several in ONE message to run them in parallel. Escalate to explore-mid only if a lookup genuinely needs reasoning.";
+    };
+    mid = {
+      model = "anthropic/claude-sonnet-4-5";
+      contextBudget = 60000; # Sonnet's window is 1M; 25% of it would be absurd for a lookup
+      description = "Mid-tier read-only exploration (Sonnet). Use when a lookup needs actual reasoning -- tracing logic across a few files, judging which of several candidates is correct, or summarizing how a subsystem fits together -- but does not need the strongest model. Batches well: dispatch alongside explore-quick calls in one message.";
+    };
+    deep = {
+      model = "anthropic/claude-opus-4-5";
+      contextBudget = 40000; # 20% of Opus's 200k, and the most expensive tokens on offer
+      description = "Deepest read-only exploration tier (Opus), and by far the most expensive -- use sparingly and only when a cheaper tier has actually failed. Reserve for genuinely hard reasoning: ambiguous scope, subtle cross-cutting bugs, judging a tricky tradeoff. It is capped tightly on context, so give it a narrow, well-posed question rather than a broad sweep -- use explore-quick for the sweep and hand the findings to this tier if you need them judged.";
+    };
+  };
+
+  exploreAgents = lib.mapAttrs' (
+    tier: cfg:
+    lib.nameValuePair "explore-${tier}" {
+      inherit (cfg) description model contextBudget;
+      mode = "subagent";
+      permission = explorePermission;
+    }
+  ) exploreTiers;
+
   opencodeJson = {
     "$schema" = "https://opencode.ai/config.json";
     autoupdate = false;
@@ -301,6 +379,34 @@ let
     # is patched at the source (pkgs/opencode) to be the real system prompt, so
     # build/plan/general/explore/title/summary/compaction all fall through to
     # opencode's own (now Claude-Code-branded) defaults.
+
+    # explore-quick / explore-mid / explore-deep: one read-only exploration
+    # sub-agent per model tier, generated from `exploreTiers` below.
+    #
+    # Three agents rather than one agent with a model parameter because the
+    # task tool has no model argument -- `subagent_type` selects an agent and
+    # each agent definition pins its own model. So the agent *name* is the
+    # tier selector, which also puts the cost/capability choice in front of
+    # the model at dispatch time instead of burying it in config.
+    #
+    # All three are read-only and context-budgeted. The budget is the point:
+    # a sub-agent's value is that it burns its own tiny context and hands back
+    # one condensed answer, so each tier gets a ceiling that forces the
+    # summary rather than letting it wander (the failure mode of the native
+    # unbudgeted `explore`). contextBudget is our own patch -- see
+    # pkgs/opencode -- and degrades to escalating reminders then a forced
+    # text-only summary.
+    #
+    # A *new* agent key (not overriding the native "explore") starts from
+    # agent.ts's default permission set (defaults ++ user), not explore's
+    # read-only restriction -- so that restriction is copied explicitly here.
+    #
+    # The native `explore` is disabled outright: it is unbudgeted, so it is the
+    # one prone to wandering into very long sessions, and leaving it alongside
+    # three budgeted tiers just invites the model to pick the bad option.
+    agent = exploreAgents // {
+      explore.disable = true;
+    };
 
     # The agent's model of the filesystem it has been given: real project
     # paths, the scratch and workspaces binds, and which of them persist.
@@ -323,11 +429,22 @@ let
       websearch = "allow";
 
       # Agent utilities — safe
-      # NOTE: task and todowrite are intentionally omitted. The default
-      # "*": "allow" still lets the top-level agent use them, but opencode's
-      # exact-match checks (rule.permission === "task"/"todowrite") won't
-      # find explicit rules, so sub-agents get these tools disabled --
-      # preventing recursive spawning and todo list clobbering.
+      # NOTE: todowrite is intentionally omitted. The default "*": "allow"
+      # still lets the top-level agent use it, but opencode's exact-match
+      # check (rule.permission === "todowrite") won't find an explicit rule,
+      # so sub-agent sessions get it denied -- preventing todo list
+      # clobbering. (Recursive Task spawning is blocked independently, at
+      # the subagent-definition level: see explorePermission above --
+      # deriveSubagentSessionPermission denies "task" in a child session
+      # unless the *subagent's own* definition grants it, and none of the
+      # explore-* tiers or general do.)
+      #
+      # task: every subagent type stays on "allow". The explore-* tiers are
+      # read-only and context-budgeted, and the whole point is to dispatch
+      # them in parallel batches -- a confirmation prompt per call would make
+      # a batch of five into five interruptions, i.e. exactly the friction
+      # that pushes the model back to doing greps by hand.
+      task = "allow";
       question = "allow";
       repo_clone = "allow";
       skill = "allow";
@@ -336,11 +453,18 @@ let
       # Bash — sandbox + trash-backed rm constrain damage
       bash = "allow";
 
+      # Script exec — same trust tier as bash: it runs inside the jail and
+      # can do nothing bash can't already do, just with structured deps.
+      script_exec = "allow";
+
       # Edit — user approves each file modification
       edit = "ask";
 
       # Host exec — user approves each host command
       host_exec = "ask";
+
+      # Host mount — user approves each read-only directory grant
+      host_mount = "ask";
     };
 
     # ponytail: injects its ruleset into the system prompt every turn and adds
@@ -492,4 +616,5 @@ pkgs.runCommand "opencode-jail-config" { } ''
   cp ${./ghostty-progress.js} $out/plugins/ghostty-progress.js
   cp ${claudeMem}/lib/claude-mem/dist/opencode-plugin/index.js $out/plugins/claude-mem.js
   cp ${hostQuery}/lib/host-query/plugin/index.js $out/plugins/host-query.js
+  cp ${scriptExec}/lib/script-exec/plugin/index.js $out/plugins/script-exec.js
 ''

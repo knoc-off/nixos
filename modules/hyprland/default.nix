@@ -62,7 +62,8 @@
       noctaliaCmd = lib.getExe config.programs.noctalia.package;
       noctalia = cmd: "${noctaliaCmd} msg ${cmd}";
 
-      # can this be auto calculated
+      # TODO: derive from monitor physical size/resolution instead of hardcoding,
+      # if a reliable source for panel DPI turns up (hyprctl doesn't expose it).
       displayScale = 1.171339564;
 
       mainMod = "SUPER";
@@ -134,7 +135,6 @@
         configType = "lua";
       };
 
-      # could be overridden by other users?
       xdg.configFile."hypr/hyprland.lua".source = ./hyprland.lua;
       xdg.configFile."hypr/nix-env.lua".source = nixEnvLua;
       xdg.configFile."hypr/plugins.lua".source = pluginsLua;

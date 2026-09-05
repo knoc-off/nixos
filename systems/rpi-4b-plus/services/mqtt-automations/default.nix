@@ -11,7 +11,7 @@
 let
   mqttPkg = self.packages.${pkgs.stdenv.hostPlatform.system}.mqtt-automations;
 
-  # -- helpers -----------------------------------------------------------------
+  # Helpers
 
   mkAutomation =
     {
@@ -202,14 +202,14 @@ let
         automation = [ ];
       };
 
-  # -- MQTT topics for HA-controlled settings ----------------------------------
+  # MQTT topics for HA-controlled settings
 
   delayTopic = "mqtt-auto/sunrise-lights/delay";
   maxBrightnessTopic = "mqtt-auto/sunrise-lights/max-brightness";
   gammaTopic = "mqtt-auto/sunrise-lights/gamma";
   hueEnabledTopic = "mqtt-auto/color-temp-cycle/enabled";
 
-  # -- button config -----------------------------------------------------------
+  # Button config
 
   buttonConfig = pkgs.writeText "button-dispatcher.json" (
     builtins.toJSON {
@@ -273,7 +273,7 @@ let
     }
   );
 
-  # -- service definitions -----------------------------------------------------
+  # Service definitions
 
   automations = [
     {

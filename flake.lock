@@ -471,11 +471,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1787865273,
-        "narHash": "sha256-ZFtjhBLepNwG8zyneSRcOBPesSjmLU07Y4CuYO9rls4=",
+        "lastModified": 1788591098,
+        "narHash": "sha256-4bFmp9JztIZF2sgpfRJeEg3wVk1pxCDUFY1oNeusaCI=",
         "owner": "knoc-off",
         "repo": "minecraft-modpack",
-        "rev": "cbce3e56396b0fd3a80a8e06a2f709a2f3a66d2d",
+        "rev": "bbd3e47b47fbc2e4c35fc5e7739985f6e314c0ff",
         "type": "github"
       },
       "original": {
@@ -503,6 +503,26 @@
       "original": {
         "owner": "nix-community",
         "repo": "nix-github-actions",
+        "type": "github"
+      }
+    },
+    "nix-index-database": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs-unstable"
+        ]
+      },
+      "locked": {
+        "lastModified": 1788080100,
+        "narHash": "sha256-n14luQo3F/ZLfCEHk1QieiI1nGnW92ZQZeZ0UIb0UMQ=",
+        "owner": "nix-community",
+        "repo": "nix-index-database",
+        "rev": "dbb978fa87faf13398e90ccbc52c343d21c7dd6d",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nix-index-database",
         "type": "github"
       }
     },
@@ -961,6 +981,7 @@
         "jail-nix": "jail-nix",
         "lanzaboote": "lanzaboote",
         "minecraft-modpack": "minecraft-modpack",
+        "nix-index-database": "nix-index-database",
         "nix-minecraft": "nix-minecraft",
         "nixgl": "nixgl",
         "nixneovimplugins": "nixneovimplugins",

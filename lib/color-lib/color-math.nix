@@ -499,9 +499,8 @@ rec {
       s = math.clamp s 0.0 1.0;
       l = l;
     }; # Returns { h, s, l }
-  # --- Okhsl section before this point is modified ---
-  # --- Okhsv section starts below ---
 
+  # Okhsv section
   okhsv_to_srgb =
     hsv: # hsv = { h, s, v }
     let
@@ -676,6 +675,4 @@ rec {
       s = math.clamp s 0.0 1.0;
       v = math.clamp v 0.0 1.0;
     }; # Returns { h, s, v }
-
-  # --- srgb_to_okhsv section before this point is modified ---
 }

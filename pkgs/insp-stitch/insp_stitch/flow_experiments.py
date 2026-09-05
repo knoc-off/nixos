@@ -35,7 +35,7 @@ from .dis import PRESETS, DISConfig, resolve_config
 from .viz import side_by_side
 
 
-# --- shared setup -----------------------------------------------------------
+# shared setup
 
 def _prepare(input_path: str, width: int, backend: str = "auto"):
     """Load + align + render both hemispheres once (the expensive part)."""
@@ -73,7 +73,7 @@ def _configs_to_test() -> dict[str, DISConfig]:
     }
 
 
-# --- synthetic ground-truth harness ----------------------------------------
+# synthetic ground-truth harness
 
 def _textured_crop(scene: dict, size: int = 640) -> np.ndarray:
     """Grab a well-covered, textured window from the front hemisphere near the
@@ -137,7 +137,7 @@ def synthetic(input_path: str, width: int = 7680, shift_px: float = 20.0, bar_sh
     print(f"a config that leaves in-bar EPE ~= {bar_shift_px} recovered nothing on the bar.")
 
 
-# --- real-photo parameter sweep --------------------------------------------
+# real-photo parameter sweep
 
 def sweep(input_path: str, out_dir: str, width: int = 7680, band_deg: float = 15.0, backend: str = "auto") -> None:
     scene = _prepare(input_path, width, backend=backend)
@@ -194,7 +194,7 @@ def _dump_seam_crop(scene: dict, rendered_front: np.ndarray, rendered_back: np.n
     cv2.imwrite(os.path.join(out_dir, f"seam_pos90_{name}.png"), crop)
 
 
-# --- seam-method comparison -------------------------------------------------
+# seam-method comparison
 
 def _apply_flow(scene: dict, dis_config: DISConfig):
     """Flow-correct copies of the rendered hemispheres (as the pipeline does),
@@ -295,7 +295,7 @@ def seam_compare(input_path: str, out_dir: str, width: int = 7680, scale: int = 
     print(f"lower ghost-peak = less edge-doubling. crops + full renders -> {out_dir}")
 
 
-# --- entry point ------------------------------------------------------------
+# entry point
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="insp-stitch-flowlab", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)

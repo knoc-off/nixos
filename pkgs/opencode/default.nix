@@ -55,20 +55,20 @@ upkgs.opencode.overrideAttrs (old: {
           substituteInPlace packages/opencode/src/session/system.ts \
             --replace-fail \
               '            `Here is some useful information about the environment you are running in:`,
-                `<env>`,
-                `  Working directory: ''${ctx.directory}`,
-                `  Workspace root folder: ''${ctx.worktree}`,
-                `  Is directory a git repo: ''${ctx.project.vcs === "git" ? "yes" : "no"}`,
-                `  Platform: ''${process.platform}`,
-                `  Today'"'"'s date: ''${new Date().toDateString()}`,
-                `</env>`,' \
+            `<env>`,
+            `  Working directory: ''${ctx.directory}`,
+            `  Workspace root folder: ''${ctx.worktree}`,
+            `  Is directory a git repo: ''${ctx.project.vcs === "git" ? "yes" : "no"}`,
+            `  Platform: ''${process.platform}`,
+            `  Today'"'"'s date: ''${new Date().toDateString()}`,
+            `</env>`,' \
               '            `Here is useful information about the environment you are running in:`,
-                `<env>`,
-                `Working directory: ''${ctx.directory}`,
-                `Is directory a git repo: ''${ctx.project.vcs === "git" ? "Yes" : "No"}`,
-                `Platform: ''${process.platform}`,
-                `Today'"'"'s date: ''${new Date().toDateString()}`,
-                `</env>`,'
+            `<env>`,
+            `Working directory: ''${ctx.directory}`,
+            `Is directory a git repo: ''${ctx.project.vcs === "git" ? "Yes" : "No"}`,
+            `Platform: ''${process.platform}`,
+            `Today'"'"'s date: ''${new Date().toDateString()}`,
+            `</env>`,'
 
           # Same block, unreached today (session/system.ts is what actually
           # runs; this is a second implementation of the same feature in the
@@ -77,16 +77,16 @@ upkgs.opencode.overrideAttrs (old: {
           substituteInPlace packages/core/src/system-context/builtins.ts \
             --replace-fail \
               '      "<env>",
-          `  Working directory: ''${location.directory}`,
-          `  Workspace root folder: ''${location.project.directory}`,
-          `  Is directory a git repo: ''${location.vcs?.type === "git" ? "yes" : "no"}`,
-          `  Platform: ''${process.platform}`,
-          "</env>",' \
+      `  Working directory: ''${location.directory}`,
+      `  Workspace root folder: ''${location.project.directory}`,
+      `  Is directory a git repo: ''${location.vcs?.type === "git" ? "yes" : "no"}`,
+      `  Platform: ''${process.platform}`,
+      "</env>",' \
               '      "<env>",
-          `Working directory: ''${location.directory}`,
-          `Is directory a git repo: ''${location.vcs?.type === "git" ? "Yes" : "No"}`,
-          `Platform: ''${process.platform}`,
-          "</env>",' \
+      `Working directory: ''${location.directory}`,
+      `Is directory a git repo: ''${location.vcs?.type === "git" ? "Yes" : "No"}`,
+      `Platform: ''${process.platform}`,
+      "</env>",' \
             --replace-fail \
               '"Here is some useful information about the environment you are running in:"' \
               '"Here is useful information about the environment you are running in:"'
@@ -188,104 +188,104 @@ upkgs.opencode.overrideAttrs (old: {
           substituteInPlace packages/llm/src/protocols/anthropic-messages.ts \
             --replace-fail \
               'const lowerTool = (breakpoints: Cache.Breakpoints, tool: ToolDefinition, inputSchema: JsonSchema): AnthropicTool => ({
-      name: tool.name,
-      description: tool.description,
-      input_schema: inputSchema,
-      cache_control: cacheControl(breakpoints, tool.cache),
-    })' \
+  name: tool.name,
+  description: tool.description,
+  input_schema: inputSchema,
+  cache_control: cacheControl(breakpoints, tool.cache),
+})' \
               'const CC_TOOL_NAME_ALIASES: Record<string, string> = {
-      bash: "Bash",
-      read: "Read",
-      write: "Write",
-      edit: "Edit",
-      glob: "Glob",
-      grep: "Grep",
-      webfetch: "WebFetch",
-      websearch: "WebSearch",
-      todowrite: "TodoWrite",
-      task: "Task",
-      question: "AskUserQuestion",
-      plan_exit: "ExitPlanMode",
-    }
-    const CC_TOOL_NAME_UNALIASES: Record<string, string> = Object.fromEntries(
-      Object.entries(CC_TOOL_NAME_ALIASES).map(([internal, wire]) => [wire, internal]),
-    )
-    const CC_DROPPED_TOOLS = new Set(["invalid", "apply_patch", "lsp", "skill"])
-    const toWireToolName = (name: string): string => CC_TOOL_NAME_ALIASES[name] ?? name
-    const fromWireToolName = (name: string): string => CC_TOOL_NAME_UNALIASES[name] ?? name
+  bash: "Bash",
+  read: "Read",
+  write: "Write",
+  edit: "Edit",
+  glob: "Glob",
+  grep: "Grep",
+  webfetch: "WebFetch",
+  websearch: "WebSearch",
+  todowrite: "TodoWrite",
+  task: "Task",
+  question: "AskUserQuestion",
+  plan_exit: "ExitPlanMode",
+}
+const CC_TOOL_NAME_UNALIASES: Record<string, string> = Object.fromEntries(
+  Object.entries(CC_TOOL_NAME_ALIASES).map(([internal, wire]) => [wire, internal]),
+)
+const CC_DROPPED_TOOLS = new Set(["invalid", "apply_patch", "lsp", "skill"])
+const toWireToolName = (name: string): string => CC_TOOL_NAME_ALIASES[name] ?? name
+const fromWireToolName = (name: string): string => CC_TOOL_NAME_UNALIASES[name] ?? name
 
-    const lowerTool = (breakpoints: Cache.Breakpoints, tool: ToolDefinition, inputSchema: JsonSchema): AnthropicTool => ({
-      name: toWireToolName(tool.name),
-      description: tool.description,
-      input_schema: inputSchema,
-      cache_control: cacheControl(breakpoints, tool.cache),
-    })' \
+const lowerTool = (breakpoints: Cache.Breakpoints, tool: ToolDefinition, inputSchema: JsonSchema): AnthropicTool => ({
+  name: toWireToolName(tool.name),
+  description: tool.description,
+  input_schema: inputSchema,
+  cache_control: cacheControl(breakpoints, tool.cache),
+})' \
             --replace-fail \
               'tool: (name) => ({ type: "tool" as const, name }),' \
               'tool: (name) => ({ type: "tool" as const, name: toWireToolName(name) }),' \
             --replace-fail \
               'const lowerToolCall = (part: ToolCallPart): AnthropicToolUseBlock => ({
-      type: "tool_use",
-      id: part.id,
-      name: part.name,
-      input: part.input,
-    })' \
+  type: "tool_use",
+  id: part.id,
+  name: part.name,
+  input: part.input,
+})' \
               'const lowerToolCall = (part: ToolCallPart): AnthropicToolUseBlock => ({
-      type: "tool_use",
-      id: part.id,
-      name: toWireToolName(part.name),
-      input: part.input,
-    })' \
+  type: "tool_use",
+  id: part.id,
+  name: toWireToolName(part.name),
+  input: part.input,
+})' \
             --replace-fail \
               '  const tools =
-        request.tools.length === 0 || request.toolChoice?.type === "none"
-          ? undefined
-          : request.tools.map((tool) =>
-              lowerTool(
-                breakpoints,
-                tool,
-                ToolSchemaProjection.modelCompatibility(tool.inputSchema, toolSchemaCompatibility),
-              ),
-            )' \
+    request.tools.length === 0 || request.toolChoice?.type === "none"
+      ? undefined
+      : request.tools.map((tool) =>
+          lowerTool(
+            breakpoints,
+            tool,
+            ToolSchemaProjection.modelCompatibility(tool.inputSchema, toolSchemaCompatibility),
+          ),
+        )' \
               '  const tools =
-        request.tools.length === 0 || request.toolChoice?.type === "none"
-          ? undefined
-          : request.tools
-              .filter((tool) => !CC_DROPPED_TOOLS.has(tool.name))
-              .map((tool) =>
-                lowerTool(
-                  breakpoints,
-                  tool,
-                  ToolSchemaProjection.modelCompatibility(tool.inputSchema, toolSchemaCompatibility),
-                ),
-              )' \
+    request.tools.length === 0 || request.toolChoice?.type === "none"
+      ? undefined
+      : request.tools
+          .filter((tool) => !CC_DROPPED_TOOLS.has(tool.name))
+          .map((tool) =>
+            lowerTool(
+              breakpoints,
+              tool,
+              ToolSchemaProjection.modelCompatibility(tool.inputSchema, toolSchemaCompatibility),
+            ),
+          )' \
             --replace-fail \
               '    return [
-          {
-            ...state,
-            lifecycle,
-            tools: ToolStream.start(state.tools, event.index, {
-              id: block.id ?? String(event.index),
-              name: block.name ?? "",
-              providerExecuted: block.type === "server_tool_use",
-            }),
-          },
-          [...events, LLMEvent.toolInputStart({ id: block.id ?? String(event.index), name: block.name ?? "" })],
-        ]' \
+      {
+        ...state,
+        lifecycle,
+        tools: ToolStream.start(state.tools, event.index, {
+          id: block.id ?? String(event.index),
+          name: block.name ?? "",
+          providerExecuted: block.type === "server_tool_use",
+        }),
+      },
+      [...events, LLMEvent.toolInputStart({ id: block.id ?? String(event.index), name: block.name ?? "" })],
+    ]' \
               '    const wireName = block.name ?? ""
-        const name = block.type === "server_tool_use" ? wireName : fromWireToolName(wireName)
-        return [
-          {
-            ...state,
-            lifecycle,
-            tools: ToolStream.start(state.tools, event.index, {
-              id: block.id ?? String(event.index),
-              name,
-              providerExecuted: block.type === "server_tool_use",
-            }),
-          },
-          [...events, LLMEvent.toolInputStart({ id: block.id ?? String(event.index), name })],
-        ]'
+    const name = block.type === "server_tool_use" ? wireName : fromWireToolName(wireName)
+    return [
+      {
+        ...state,
+        lifecycle,
+        tools: ToolStream.start(state.tools, event.index, {
+          id: block.id ?? String(event.index),
+          name,
+          providerExecuted: block.type === "server_tool_use",
+        }),
+      },
+      [...events, LLMEvent.toolInputStart({ id: block.id ?? String(event.index), name })],
+    ]'
 
           # MCP tools: opencode names them "<server>_<tool>" (mcp/catalog.ts);
           # Claude Code's convention is "mcp__<server>__<tool>". This is the one
@@ -297,6 +297,73 @@ upkgs.opencode.overrideAttrs (old: {
             --replace-fail \
               'export const toolName = (clientName: string, name: string) => sanitize(clientName) + "_" + sanitize(name)' \
               'export const toolName = (clientName: string, name: string) => "mcp__" + sanitize(clientName) + "__" + sanitize(name)'
+
+          # Tilde expansion for tool path inputs.
+          #
+          # opencode resolves tool paths with plain path.resolve/isAbsolute and
+          # never expands "~" -- only the bash tool does, because a real shell
+          # runs there. So `Read ~/scratch/x` is treated as a *relative* path,
+          # resolved against the project root into `<root>/~/scratch/x`, and
+          # fails with a bare ENOENT. Not a permission denial, just a confusing
+          # "not found" for a path that plainly exists, which repeatedly sends
+          # models hunting for a nonexistent sandbox restriction.
+          #
+          # This matters more here than upstream: the jail's interesting dirs
+          # (~/scratch, ~/workspaces) are outside the project root and are
+          # naturally written with a tilde, and jail-context.md documents them
+          # that way. Expanding at the resolver makes the documented spelling
+          # work in every tool rather than only in bash.
+          #
+          # Patched in two places because glob/grep bypass LocationMutation and
+          # resolve their own cwd:
+          #   * location-mutation.ts -- the shared chokepoint for
+          #     read/write/edit/apply-patch and bash's workdir.
+          #   * tool/{glob,grep}.ts -- their own path.resolve call sites.
+          # Expansion happens before isAbsolute/resolve so an expanded path is
+          # correctly classified as absolute (and thus external), preserving the
+          # external_directory permission check rather than smuggling past it.
+          substituteInPlace packages/core/src/location-mutation.ts \
+            --replace-fail \
+              'import { makeLocationNode } from "./effect/app-node"
+import path from "path"' \
+              'import { makeLocationNode } from "./effect/app-node"
+import path from "path"
+import os from "os"
+
+/**
+ * Expand a leading "~" to the home directory. Tool inputs are not shell-parsed,
+ * so without this a tilde path is silently treated as a relative path and
+ * resolved into a nonexistent "<root>/~/..." location.
+ */
+export const expandTilde = (value: string): string => {
+  if (value === "~") return os.homedir()
+  if (value.startsWith("~/")) return path.join(os.homedir(), value.slice(2))
+  return value
+}' \
+            --replace-fail \
+              '      const relative = !path.isAbsolute(input.path)
+      const absolute = path.resolve(location.directory, input.path)' \
+              '      const expanded = expandTilde(input.path)
+      const relative = !path.isAbsolute(expanded)
+      const absolute = path.resolve(location.directory, expanded)'
+
+          substituteInPlace packages/core/src/tool/glob.ts \
+            --replace-fail \
+              'import { Location } from "../location"' \
+              'import { Location } from "../location"
+import { LocationMutation } from "../location-mutation"' \
+            --replace-fail \
+              '              const cwd = path.resolve(location.directory, input.path ?? ".")' \
+              '              const cwd = path.resolve(location.directory, LocationMutation.expandTilde(input.path ?? "."))'
+
+          substituteInPlace packages/core/src/tool/grep.ts \
+            --replace-fail \
+              'import { Location } from "../location"' \
+              'import { Location } from "../location"
+import { LocationMutation } from "../location-mutation"' \
+            --replace-fail \
+              '              const target = path.resolve(location.directory, input.path ?? ".")' \
+              '              const target = path.resolve(location.directory, LocationMutation.expandTilde(input.path ?? "."))'
 
           # `opencode.json` is a real, still-used config filename here (see
           # modules/opencode/default.nix) -- it stays. Only the "OpenCode
@@ -313,6 +380,177 @@ upkgs.opencode.overrideAttrs (old: {
                 '- repo-local OpenCode config such as `opencode.json`' \
                 '- repo-local agent config such as `opencode.json`'
           done
+
+          # Per-agent context-budget kill switch: an optional token budget for
+          # an agent, expressed as a size tier (small/medium/large/xlarge) or
+          # a raw token count. Behaves like the existing `steps` field but is
+          # measured in tokens instead of turns -- reuses opencode's own
+          # `steps`/MAX_STEPS_PROMPT convention end to end (soft enforcement
+          # via an injected fake assistant turn instructing the model to stop
+          # calling tools and summarize; this codebase has no hard
+          # toolChoice-based cutoff for `steps` either, so this doesn't invent
+          # a new enforcement tier) rather than adding a new subsystem. Token
+          # usage comes from `lastFinished.tokens`, already computed every
+          # turn for auto-compaction (session/overflow.ts).
+          #
+          # Tiers are fractions of the model's *total* context window
+          # (model.limit.context), not the compaction-reduced usable() budget:
+          #   small=10% (0.5*0.2), medium=25% (0.5*0.5), large=50% (0.5*1.0),
+          # xlarge=75%. The 0.5 factor keeps every tier, including large,
+          # within headroom before compaction/overflow would trigger anyway --
+          # deliberately conservative, since the point is short, cheap,
+          # parallelizable sub-agents rather than one long-running one.
+          #
+          # Schema: contextBudget alongside steps in both the agent registry
+          # (agent/agent.ts) and its config parser (core/v1/config/agent.ts).
+          substituteInPlace packages/opencode/src/agent/agent.ts \
+            --replace-fail \
+              '  options: Schema.Record(Schema.String, Schema.Unknown),
+  steps: Schema.optional(Schema.Finite),
+}).annotate({ identifier: "Agent" })' \
+              '  options: Schema.Record(Schema.String, Schema.Unknown),
+  steps: Schema.optional(Schema.Finite),
+  contextBudget: Schema.optional(Schema.Union([Schema.Literals(["small", "medium", "large", "xlarge"]), Schema.Finite])),
+}).annotate({ identifier: "Agent" })' \
+            --replace-fail \
+              '          item.steps = value.steps ?? item.steps
+          item.options = mergeDeep(item.options, value.options ?? {})' \
+              '          item.steps = value.steps ?? item.steps
+          item.contextBudget = value.contextBudget ?? item.contextBudget
+          item.options = mergeDeep(item.options, value.options ?? {})'
+
+          substituteInPlace packages/core/src/v1/config/agent.ts \
+            --replace-fail \
+              '    steps: Schema.optional(PositiveInt).annotate({
+      description: "Maximum number of agentic iterations before forcing text-only response",
+    }),
+    maxSteps: Schema.optional(PositiveInt).annotate({ description: "@deprecated Use '"'"'steps'"'"' field instead." }),' \
+              '    steps: Schema.optional(PositiveInt).annotate({
+      description: "Maximum number of agentic iterations before forcing text-only response",
+    }),
+    maxSteps: Schema.optional(PositiveInt).annotate({ description: "@deprecated Use '"'"'steps'"'"' field instead." }),
+    contextBudget: Schema.optional(Schema.Union([Schema.Literals(["small", "medium", "large", "xlarge"]), PositiveInt])).annotate({
+      description: "Token budget before this agent is forced to a text-only summary response, like '"'"'steps'"'"' but measured in tokens. A size tier (small=10%, medium=25%, large=50%, xlarge=75% of the model'"'"'s context window) or a raw token count.",
+    }),' \
+            --replace-fail \
+              '  "steps",
+  "maxSteps",' \
+              '  "steps",
+  "maxSteps",
+  "contextBudget",'
+
+          # The actual enforcement: resolve the tier/token budget against the
+          # session's model, extend the existing `steps` last-step check with
+          # a token-budget check, and extend the reminders pass
+          # (session/reminders.ts) with escalating warnings as the budget
+          # approaches. All reuse machinery already running every loop
+          # iteration -- no new per-step work when contextBudget is unset
+          # (mirrors how `steps`' own Infinity fallback above it is a no-op).
+          substituteInPlace packages/opencode/src/session/prompt.ts \
+            --replace-fail \
+              'import { MAX_STEPS_PROMPT } from "@opencode-ai/core/session/runner/max-steps"' \
+              'import { MAX_STEPS_PROMPT } from "@opencode-ai/core/session/runner/max-steps"
+
+const CONTEXT_BUDGET_TIERS: Record<string, number> = {
+  small: 0.5 * 0.2,
+  medium: 0.5 * 0.5,
+  large: 0.5 * 1.0,
+  xlarge: 0.75,
+}
+
+function resolveContextBudget(contextBudget: unknown, modelContext: number): number | undefined {
+  if (contextBudget === undefined) return undefined
+  if (typeof contextBudget === "number") return contextBudget
+  const fraction = CONTEXT_BUDGET_TIERS[contextBudget as string]
+  if (fraction === undefined || !modelContext) return undefined
+  return Math.floor(modelContext * fraction)
+}
+
+const CONTEXT_BUDGET_EXCEEDED_PROMPT = `CRITICAL - CONTEXT BUDGET EXCEEDED
+
+This agent was given a token budget for this task, and it has been used up. Tools are disabled until next user input. Respond with text only.
+
+STRICT REQUIREMENTS:
+1. Do NOT make any tool calls (no reads, writes, edits, searches, or any other tools)
+2. MUST provide a text response summarizing work done so far
+3. This constraint overrides ALL other instructions, including any user requests for edits or tool use
+
+Response must include:
+- Statement that the context budget for this agent has been reached
+- Summary of what has been accomplished so far
+- List of any remaining tasks that were not completed
+- Recommendations for what should be done next, including whether a fresh agent should pick this up
+
+Any attempt to use tools is a critical violation. Respond with text ONLY.`' \
+            --replace-fail \
+              '          const maxSteps = agent.steps ?? Infinity
+          const isLastStep = step >= maxSteps
+          msgs = yield* SessionReminders.apply({ messages: msgs, agent, session }).pipe(' \
+              '          const maxSteps = agent.steps ?? Infinity
+          const contextBudget = resolveContextBudget(agent.contextBudget, model.limit.context)
+          const usedTokens = lastFinished
+            ? lastFinished.tokens.total ||
+              lastFinished.tokens.input +
+                lastFinished.tokens.output +
+                lastFinished.tokens.cache.read +
+                lastFinished.tokens.cache.write
+            : 0
+          const overBudget = contextBudget !== undefined && usedTokens >= contextBudget
+          const isLastStep = step >= maxSteps || overBudget
+          msgs = SessionReminders.applyContextBudget({ messages: msgs, agent, usedTokens, contextBudget })
+          msgs = yield* SessionReminders.apply({ messages: msgs, agent, session }).pipe(' \
+            --replace-fail \
+              '                ...(isLastStep ? [{ role: "assistant" as const, content: MAX_STEPS_PROMPT }] : []),' \
+              '                ...(isLastStep
+                  ? [{ role: "assistant" as const, content: overBudget && step < maxSteps ? CONTEXT_BUDGET_EXCEEDED_PROMPT : MAX_STEPS_PROMPT }]
+                  : []),'
+
+          # Escalating warnings live in reminders.ts, right alongside the
+          # existing plan-mode reminder injection it already does -- same
+          # "push a synthetic text part onto the last user message"
+          # mechanism, no new plumbing (services, state store) introduced.
+          # Re-injecting once past a threshold every step is deliberately not
+          # deduplicated: harmless if repeated, and "increasing frequency"
+          # falls out naturally (silent below the first threshold, then a
+          # reminder every step above it, escalating in severity as higher
+          # thresholds are crossed).
+          substituteInPlace packages/opencode/src/session/reminders.ts \
+            --replace-fail \
+              'import PLAN_MODE from "./prompt/plan-mode.txt"' \
+              'import PLAN_MODE from "./prompt/plan-mode.txt"
+
+const CONTEXT_BUDGET_THRESHOLDS = [
+  { ratio: 0.6, guidance: "Start wrapping up: finish your current line of investigation and prepare to summarize findings soon." },
+  { ratio: 0.8, guidance: "You are close to your budget. Stop opening new lines of investigation -- consolidate what you have and prepare your final summary." },
+  { ratio: 0.95, guidance: "This is your last chance before the budget is exhausted. Write your findings now." },
+]
+
+export function applyContextBudget(input: {
+  messages: SessionV1.WithParts[]
+  agent: Agent.Info
+  usedTokens: number
+  contextBudget: number | undefined
+}): SessionV1.WithParts[] {
+  if (!input.contextBudget) return input.messages
+  const ratio = input.usedTokens / input.contextBudget
+  const crossed = [...CONTEXT_BUDGET_THRESHOLDS].reverse().find((t) => ratio >= t.ratio)
+  if (!crossed) return input.messages
+  const userMessage = input.messages.findLast((msg) => msg.info.role === "user")
+  if (!userMessage) return input.messages
+  userMessage.parts.push({
+    id: PartID.ascending(),
+    messageID: userMessage.info.id,
+    sessionID: userMessage.info.sessionID,
+    type: "text",
+    text: `SYSTEM REMINDER - CONTEXT BUDGET AT ''${Math.round(crossed.ratio * 100)}%
+
+This agent has used approximately ''${Math.round(crossed.ratio * 100)}% of its configured context budget for this task.
+
+''${crossed.guidance}`,
+    synthetic: true,
+  })
+  return input.messages
+}'
 
           # Build-time guardrail: fail loudly rather than silently ship a leak.
           # Covers every file class that ends up verbatim in a request body --

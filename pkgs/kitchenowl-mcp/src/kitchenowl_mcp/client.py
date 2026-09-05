@@ -77,7 +77,7 @@ class KitchenOwlClient:
     async def post(self, path: str, payload: dict[str, Any]) -> Any:
         return await self.request("POST", path, json=payload)
 
-    # --- reads -----------------------------------------------------------
+    # reads
 
     async def raw_items(self) -> list[dict[str, Any]]:
         cached = self._fresh(self._items_cache)
@@ -104,7 +104,7 @@ class KitchenOwlClient:
     async def recipe(self, recipe_id: int) -> dict[str, Any]:
         return await self.get(f"/recipe/{recipe_id}")
 
-    # --- writes ----------------------------------------------------------
+    # writes
 
     async def create_recipe(self, payload: dict[str, Any]) -> dict[str, Any]:
         result = await self.post(f"/household/{self.household}/recipe", payload)
