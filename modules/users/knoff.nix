@@ -219,8 +219,6 @@
 
                 gnome-calculator
 
-                prusa-slicer
-
                 openscad
 
                 usbutils

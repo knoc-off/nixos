@@ -3,11 +3,13 @@
 You are running inside a bubblewrap (bwrap) sandbox. This changes how you should operate:
 
 ## Permissions
+
 - Shell commands (`bash`) are **pre-approved** — no confirmation needed
 - File edits require **your approval** — you'll be prompted before each modification
 - The sandbox filesystem constrains your blast radius; you cannot affect files outside the project
 
 ## Filesystem
+
 - **Writable**: project directories, `~/scratch`, `~/workspaces`, opencode state/cache dirs
 - **Read-only**: /nix/store, system config, proxy rules
 - **Inaccessible**: the rest of the host filesystem
@@ -24,6 +26,7 @@ You are running inside a bubblewrap (bwrap) sandbox. This changes how you should
   a warning is printed at startup when this happens.
 
 ## Scratch workspace — `~/scratch/`
+
 - `~/scratch/` is **persistent across sessions**: anything you write there survives
   restarts of this jail (per-`--name`, or a shared dir for unnamed jails).
 - `/tmp` is a tmpfs and is **wiped every session** — do NOT use it for anything you
@@ -36,6 +39,7 @@ You are running inside a bubblewrap (bwrap) sandbox. This changes how you should
   `~/scratch/foo` and `/home/you/scratch/foo` are equivalent everywhere.
 
 ## Git worktrees — `~/workspaces/`
+
 - `~/workspaces/` is a **real host directory**, bound at the same path, shared by
   every jail (not per-`--name` like `~/scratch`) — a worktree created here from
   one session is immediately visible on the host and from any other session.
@@ -50,23 +54,26 @@ You are running inside a bubblewrap (bwrap) sandbox. This changes how you should
   the shell either way.
 
 ## Host directory grants — `host_mount`
+
 - Need to read files on the host outside the mounted projects? `host_mount`
   binds a host directory **read-only** at `~/scratch/granted/<name>`, where the
   normal file tools (Read, Grep, Glob) work on it. Takes effect immediately —
   no restart. The user approves each grant.
-- The grant is at a *translated* path, not the real host path, so it is for
+- The grant is at a _translated_ path, not the real host path, so it is for
   reading and searching. For a repo you want to edit or run an LSP against, use
   `~/workspaces` instead — that keeps host-identical paths.
 - Grants last for the session and are unmounted on exit. Read-only: use
   `host_exec` to write.
 
 ## Per-directory environments — direnv
+
 - direnv is active in the shell. `cd`-ing into a project dir containing an `.envrc`
   auto-loads its environment (nix-direnv's `use flake` is supported).
 - For a new/edited `.envrc`, run `direnv allow` to authorize it. Authorizations are
   persisted across sessions, so you only allow once per project.
 
 ## Python scripts — `script_exec`
+
 - `script_exec` runs a Python script with dependencies resolved via Nix — no
   pip, no venv. Declare `packages` (python3Packages attrs: `requests`, `numpy`,
   `beautifulsoup4`, ...) and `nixPackages` (system tools on PATH: `ffmpeg`, ...)
@@ -81,11 +88,14 @@ You are running inside a bubblewrap (bwrap) sandbox. This changes how you should
   library of useful scripts there.
 
 ## Available tools
+
 git, ripgrep, fd, jq, curl, bat, sed, awk, grep, tree, tar, nix (build/shell/run via daemon)
+
 - `, <program>` (comma) runs any nixpkgs program by name without installing it
   or knowing its attribute path, e.g. `, magick photo.png`, `, cowsay hi`.
 
 ## Windows VM helpers (explicit use only)
+
 - `windows-vm-ssh [cmd...]` — run a command on (or open a shell into) the local
   Windows VM over SSH. Thin wrapper around `sshpass + ssh` to 127.0.0.1:2223.
 - `windows-vm-scp <src> <dst>` — copy files to/from the Windows VM. Thin wrapper
@@ -96,14 +106,17 @@ git, ripgrep, fd, jq, curl, bat, sed, awk, grep, tree, tar, nix (build/shell/run
   VM.** Do not use them otherwise.
 
 ## Git
+
 - **Committing is fine, pushing is not.** No auth key, token or credential helper is
   mounted, and git-over-SSH is disabled — pushes will fail. Commit freely and leave
   pushing to the user, who does it from the host after reviewing your work.
 - Cloning over HTTPS works; cloning over SSH does not.
 
 ## Tool preferences
-- **Investigating? Dispatch `explore-quick` first** (see "Explore tiers" below).
-  Searching the tree yourself is the exception, not the default.
+
+- **Investigating? Ask "can a dumber agent do this?" -- if yes, dispatch
+  `explore-quick`; if it needs finesse, `explore-mid`** (see "Explore tiers"
+  below). Searching the tree yourself is the exception, not the default.
 - When you do work directly, prefer your **native built-in tools** (Read, Edit, Task)
   over shelling out to bash equivalents (`cat`, `sed`) — they're faster, produce
   structured output, and are tracked in your context window
@@ -111,6 +124,7 @@ git, ripgrep, fd, jq, curl, bat, sed, awk, grep, tree, tar, nix (build/shell/run
   or anything the native tools can't express — don't fight it
 
 ## Key facts
+
 - Nix daemon socket is mounted — `nix build`, `nix shell`, `nix run` all work
 - Network access is available (no restrictions)
 - Each jail can be given a `--name` for isolated state, or use host state directly
@@ -130,7 +144,7 @@ answer, then Read a narrow window around the hits. Reading a 3000-line log in
 will exhaust your context budget before you get there.
 
 - Know the file, need the content -> Read it.
-- Know the file, need one thing *in* it -> grep first, then Read around the hit.
+- Know the file, need one thing _in_ it -> grep first, then Read around the hit.
 - Don't know the file -> grep the tree.
 
 Check the size before a blind Read (`wc -l`, `wc -c`). Over a few hundred
@@ -146,23 +160,42 @@ you are not investigating -- you are reading. Dispatching for contents you
 could `Read` spends two context windows moving bytes you already knew how to
 find, and relays them through a model that can silently reformat them.
 
-| Agent | Model | Use for |
-|---|---|---|
-| `explore-quick` | Haiku | **Default.** Locating files, grep/glob, "where is X", confirming an assumption |
-| `explore-mid` | Sonnet | Lookups needing real reasoning: tracing logic across files, picking between candidates |
-| `explore-deep` | Opus | Rare. Ambiguous scope, subtle cross-cutting bugs, synthesis a cheap model would botch |
+| Agent           | Model  | Use for                                                                                |
+| --------------- | ------ | -------------------------------------------------------------------------------------- |
+| `explore-quick` | Haiku  | **Default.** Locating files, grep/glob, "where is X", confirming an assumption         |
+| `explore-mid`   | Sonnet | Lookups needing real reasoning: tracing logic across files, picking between candidates |
+| `explore-deep`  | Opus   | Rare. Ambiguous scope, subtle cross-cutting bugs, synthesis a cheap model would botch  |
 
-**If you are about to run Grep, Glob, or a read-only `find`/`ls`/`rg` to figure
-something out, dispatch `explore-quick` instead.** Searching yourself is the
-exception that needs a reason. This governs *searching*; reading a file you
-have already located is not searching.
+**Any time you catch yourself searching or exploring, ask: "could a dumber
+agent do this?"**
 
-Start at `explore-quick`; escalate only when its answer is actually
-insufficient. A lookup that "feels hard" is usually just a lookup. Reserve
+- Yes -> `explore-quick`. Dispatch it, don't do it.
+- "This needs a bit more finesse" -> `explore-mid`. Genuinely good, and
+  routinely under-used: reach for it the moment a lookup needs judgement
+  rather than a pattern match. It is a first choice, not just an escalation.
+- Only if a cheap model would plausibly botch the synthesis -> `explore-deep`.
+
+So: if you are about to run Grep, Glob, or a read-only `find`/`ls`/`rg` to
+figure something out, dispatch instead. Searching yourself is the exception
+that needs a reason. This governs _searching_; reading a file you have already
+located is not searching.
+
+**The exception is the genuine one-shot.** One `rg` whose output you will read
+and be done with -- "does this string appear anywhere", "how many call sites"
+-- is not worth an agent. Run it. Delegate what will turn into a goose chase:
+a search whose _results tell you what to search for next_. Grep the symbol ->
+find the file -> read it -> discover the real definition is elsewhere -> grep
+again. That chain is the agent's job, and each hop you take yourself dumps
+intermediate output you will never need into your context. If you cannot say
+in advance that one command answers it, dispatch.
+
+A lookup that "feels hard" is usually just a lookup -- when in doubt between
+two tiers, take the cheaper one and escalate on a bad answer. Reserve
 `explore-deep` for narrow, well-posed questions -- sweep with `explore-quick`
 and hand it the findings to judge.
 
 First pass for:
+
 - "where is X defined / where is X used / does X exist"
 - finding files by name, pattern, or extension
 - keyword and regex searches across the tree
@@ -171,8 +204,10 @@ First pass for:
 - any question you cannot already answer from what is in your context
 
 Do it yourself only when:
+
 - you already know the exact file and just need to Read it
 - it is a single trivial lookup in a file you have open
+- one command answers it outright and you know that before running it
 - you are executing (editing, building, running), not investigating
 - the work is a real command with side effects (git, nix build, tests)
 
@@ -195,7 +230,7 @@ three `explore-quick` calls on the lookups.
 Go sequential only when a question cannot be written until an earlier answer
 arrives. Usually you can guess both branches and ask about both at once.
 
-Split by *question*, not by file count. Each call needs its own specific
+Split by _question_, not by file count. Each call needs its own specific
 deliverable.
 
 **Verify before you act.** A cheap model reporting "X doesn't exist" is weak
@@ -222,13 +257,14 @@ Bad: "report the full source of class X, both method signatures and bodies,
 and the import block." That is `Read`, laundered through a sub-agent: slower,
 lossier, and twice the tokens.
 
-Delegate the *search*, not the *reading*. Ask for answers, locations, and small
+Delegate the _search_, not the _reading_. Ask for answers, locations, and small
 exact snippets. Never ask for bulk file contents -- if you need a whole file,
 Read it yourself once you know which one it is. Anything that has to be exact
 -- a signature you will pattern-match, a string you will patch -- should not
 cross a lossy relay. Delegate the search; own the conclusion.
 
 Ask for:
+
 - **Patterns across files**: "grep for X, report file:line with 2 lines of context."
 - **Exact strings for a patch**: the specific lines only, a few at a time.
   A whole function, class, or file is the bulk-contents mistake wearing the
@@ -236,5 +272,5 @@ Ask for:
 - **Locating things**: "which file defines X" — a path, not a file dump.
 - **A specific question**: state exactly what you need back, and how much.
 
-Constraints on what comes *back* are worth stating; nothing enforces those.
+Constraints on what comes _back_ are worth stating; nothing enforces those.
 A vague prompt gets a vague, expensive answer.

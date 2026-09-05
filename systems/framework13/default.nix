@@ -157,7 +157,7 @@ in
       HandlePowerKey = "suspend";
     };
 
-    # flatpak.enable = true;
+    flatpak.enable = true;
 
     resolved.enable = true;
 

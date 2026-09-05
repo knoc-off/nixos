@@ -203,10 +203,6 @@
 
               gnome-calculator
 
-              prusa-slicer
-
-              openscad
-
               usbutils
               watchexec
               quicksand
