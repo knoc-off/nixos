@@ -11,23 +11,41 @@ a host is perfectly usable after phase 2.
 
 ## 1. Define the host
 
-Create `systems/<hostname>.nix` and register it in `flake.nix`:
+Create `systems/<hostname>/default.nix` and register it in `flake.nix`'s `hosts`
+attrset:
 
 ```nix
-(mkHost "<hostname>" "x86_64-linux")
+hosts = {
+  "<hostname>" = "x86_64-linux";
+};
 ```
 
 Modules are auto-discovered, so nothing else needs registering. Compose the host
 from `self.nixosModules.*` using the inline-config pattern (import and its
 config block co-located in `imports`).
 
+Everything belonging to one machine lives in its own directory:
+
+```
+systems/<hostname>/
+  default.nix     the host config itself
+  secrets.yaml    sops secrets (path_regex in .sops.yaml must match)
+  services/       config that exists only because *this* box has this role
+  disk.nix        only if not using self.nixosModules.btrfs-luks
+```
+
+The rule for where something goes: `modules/` holds *capabilities* -- things a
+hypothetical future host could switch on (bluetooth, pipewire, tailnet,
+oauth2-proxy). `systems/<hostname>/` holds *identity* -- config that exists
+because this particular machine plays this particular role, with its domains,
+IPs, and cross-host references baked in.
+
 Existing hosts worth copying from:
 
-- `optiplex.nix` -- encrypted btrfs, lanzaboote, measured boot, TPM2 unlock.
+- `optiplex/` -- encrypted btrfs, lanzaboote, measured boot, TPM2 unlock.
   The most complete example.
-- `home-server-pc.nix` -- same disk module, unencrypted, headless.
-- `hetzner.nix` -- the older `hardware/disks/simple-disk.nix`
-  layout (LVM/ext4). Prefer `btrfs-luks` for anything new.
+- `hetzner/` -- the older `disk.nix` layout (LVM/ext4), plus most of the
+  public-facing web services. Prefer `btrfs-luks` for anything new.
 
 ### Disk layout
 

@@ -11,7 +11,7 @@ let
 in
 {
   imports = [
-    ./services/kdeconnect.nix
+    self.nixosModules.kdeconnect
     ./services/minecraft.nix
     ./services/minecraft-snapshots.nix
     ./services/nix-autobuild.nix
@@ -19,7 +19,7 @@ in
     inputs.sops-nix.nixosModules.sops
     {
       sops = {
-        defaultSopsFile = ./secrets/${hostname}/default.yaml;
+        defaultSopsFile = ./secrets.yaml;
         age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
 
         secrets = {
@@ -44,7 +44,7 @@ in
       };
     }
 
-    self.nixosModules.wohnungsfinder
+    ./services/wohnungsfinder.nix
     {
       services.wohnungsfinder = {
         enable = true;
@@ -55,7 +55,7 @@ in
       };
     }
 
-    self.nixosModules.ovwatch
+    ./services/ovwatch.nix
     {
       # Subscriptions live in StateDirectory, not here: publish "+spiderman
       # imax ov" to the ovwatch topic to watch a film, "?" to list, "-" to

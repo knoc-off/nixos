@@ -76,8 +76,8 @@
 
               self.homeModules.noctalia
               self.homeModules.hyprland-tv
-              self.homeModules.tv-away
-              self.homeModules.tv-files
+              ./away.nix
+              ./files.nix
               self.homeModules.stylix
 
               self.homeModules.git

@@ -2,11 +2,138 @@
   home =
     { pkgs, lib, ... }:
     let
-      config_dir = "/etc/nixos";
       inherit (pkgs) mkComplgenScript;
     in
     {
       home.packages = [
+
+        # Render GitHub PR review threads as markdown, tracking which ones you've seen.
+        (mkComplgenScript {
+          name = "pr-threads";
+          package = pkgs.writers.writePython3Bin "pr-threads" { flakeIgnore = [ "E501" ]; } ''
+            import argparse
+            import json
+            import os
+            import re
+            import subprocess
+            import sys
+            from datetime import datetime, timedelta, timezone
+            from pathlib import Path
+
+            GH = "${pkgs.gh}/bin/gh"
+            EPOCH = "1970-01-01T00:00:00Z"
+            QUERY = """
+            query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
+              repository(owner: $owner, name: $name) {
+                pullRequest(number: $number) {
+                  reviewThreads(first: 100, after: $endCursor) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes {
+                      isResolved isOutdated path line originalLine
+                      comments(first: 100) {
+                        nodes { author { login } body url createdAt viewerDidAuthor }
+                      }
+                    }
+                  }
+                }
+              }
+            }"""
+
+
+            def gh(*args):
+                r = subprocess.run([GH, *args], capture_output=True, text=True)
+                if r.returncode:
+                    sys.exit(r.stderr.strip() or f"gh {args[0]} failed")
+                return r.stdout
+
+
+            def main():
+                p = argparse.ArgumentParser(description="Render GitHub PR review threads as markdown, tracking which ones you've seen. With neither --since nor --all, shows threads with comments newer than the last run.")
+                p.add_argument("pr", nargs="?", help="PR number (default: PR for current branch)")
+                p.add_argument("-R", "--repo", metavar="O/N", help="repository (default: current repo)")
+                p.add_argument("-s", "--since", metavar="SPEC", help='show threads with activity since SPEC (e.g. "1 hour", "2 days")')
+                p.add_argument("-a", "--all", action="store_true", help="show every thread, ignore state file")
+                p.add_argument("-n", "--no-mark", action="store_true", help="don't advance the seen-marker")
+                p.add_argument("--include-mine", action="store_true", help="keep threads whose only new comments are your own")
+                p.add_argument("-u", "--unresolved", action="store_true", help="drop resolved threads")
+                p.add_argument("-r", "--reasoning", choices=["fold", "strip", "raw"], default="fold", help="handling of <details> blocks (default: fold)")
+                a = p.parse_args()
+
+                repo = a.repo or gh("repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner").strip()
+                pr = a.pr or gh("pr", "view", "--json", "number", "-q", ".number").strip()
+                owner, name = repo.split("/", 1)
+                state = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local/state")) / "pr-threads" / f"{owner}__{name}__{pr}"
+
+                if a.all:
+                    cutoff = EPOCH
+                elif a.since:
+                    m = re.fullmatch(r"(\d+)\s*(minute|hour|day|week)s?", a.since.strip())
+                    if not m:
+                        sys.exit(f"cannot parse --since {a.since!r} (try '2 hours', '1 day')")
+                    cutoff = (datetime.now(timezone.utc) - timedelta(**{m[2] + "s": int(m[1])})).strftime("%Y-%m-%dT%H:%M:%SZ")
+                else:
+                    cutoff = state.read_text().strip() if state.exists() else EPOCH
+
+                pages = json.loads(gh(
+                    "api", "graphql", "--paginate", "--slurp",
+                    "-F", f"owner={owner}", "-F", f"name={name}", "-F", f"number={pr}",
+                    "-f", f"query={QUERY}"))
+                threads = [t for page in pages
+                           for t in page["data"]["repository"]["pullRequest"]["reviewThreads"]["nodes"]]
+
+                def is_new(c):
+                    return c["createdAt"] > cutoff
+
+                def clean(body):
+                    body = body.replace("\r", "")
+                    if a.reasoning == "strip":
+                        body = re.sub(r"<details>.*?</details>", "_[reasoning elided]_", body, flags=re.S)
+                    return body
+
+                shown = [t for t in threads if any(map(is_new, t["comments"]["nodes"]))]
+                if not a.include_mine:
+                    shown = [t for t in shown
+                             if any(is_new(c) and not c["viewerDidAuthor"] for c in t["comments"]["nodes"])]
+                if a.unresolved:
+                    shown = [t for t in shown if not t["isResolved"]]
+
+                if not shown:
+                    print(f"_Nothing new since {cutoff}._")
+                by_path = {}
+                for t in shown:
+                    by_path.setdefault(t["path"], []).append(t)
+                for path, ts in sorted(by_path.items()):
+                    print(f"# {path.rsplit('/', 1)[-1]}")
+                    print(f"`{path}`")
+                    print()
+                    for t in sorted(ts, key=lambda t: t["line"] or t["originalLine"] or 0):
+                        line = t["line"] or t["originalLine"] or "?"
+                        hdr = f"## [L{line}]({t['comments']['nodes'][0]['url']})"
+                        hdr += " *(resolved)*" if t["isResolved"] else ""
+                        hdr += " *(outdated)*" if t["isOutdated"] else ""
+                        print(hdr)
+                        print()
+                        for c in t["comments"]["nodes"]:
+                            tag = "  `new`" if is_new(c) else ""
+                            print(f"- **@{(c['author'] or {}).get('login', 'ghost')}**{tag}")
+                            for ln in clean(c["body"]).split("\n"):
+                                print("  " + ln if ln else "")
+                            print()
+
+                if not a.no_mark and not a.all:
+                    stamps = [c["createdAt"] for t in threads for c in t["comments"]["nodes"]]
+                    if stamps:
+                        state.parent.mkdir(parents=True, exist_ok=True)
+                        state.write_text(max(stamps) + "\n")
+
+
+            main()
+          '';
+          grammar = ''
+            pr-threads [<PR>] [(-R | --repo) <REPO> "repository"] [(-s | --since) <SPEC> "activity since"] [(-a | --all) "show every thread"] [(-n | --no-mark) "don't advance seen-marker"] [--include-mine "keep own comments"] [(-u | --unresolved) "drop resolved threads"] [(-r | --reasoning) (fold | strip | raw) "<details> handling"];
+          '';
+        })
+
         (pkgs.writeShellApplication {
           name = "get-review-requests";
 
@@ -158,13 +285,13 @@
 
         (mkComplgenScript {
           name = "excel_to_csv";
-          scriptContent = ''
+          text = ''
             python -c "import pandas as pd; import sys; pd.read_excel(sys.argv[1]).to_csv(sys.argv[2], index=False, encoding='utf-8')" "$1" "$2"
           '';
           grammar = ''
             excel_to_csv {{{ ${pkgs.fd}/bin/fd --type f --extension xlsx --extension xls --max-depth 1 . --color never --hidden --no-ignore }}} "Input Excel file" <PATH> "Output CSV file";
           '';
-          runtimeDeps = [
+          runtimeInputs = [
             (pkgs.python3.withPackages (ps: [
               ps.pandas
               ps.openpyxl
@@ -263,13 +390,22 @@
              --preview-window '+{2}-/2' \
              --delimiter ':'
         '')
+
+        (pkgs.writeShellApplication {
+          name = "gitignore";
+          runtimeInputs = [
+            pkgs.git
+            pkgs.gnused
+          ];
+          text = ''
+            git ls-files --others --exclude-standard | sed "s|^|$(git rev-parse --show-prefix)|" >> "$(git rev-parse --show-toplevel)/.git/info/exclude"
+          '';
+        })
       ]
       ++ lib.optionals pkgs.stdenv.isLinux [
         (mkComplgenScript {
           name = "cli";
-          scriptContent = ''
-            #!${pkgs.bash}/bin/bash
-            set -euo pipefail
+          text = ''
             if [ $# -eq 0 ]; then
               echo "Usage: cli <command> [args...]"
               exit 1
@@ -279,15 +415,12 @@
           grammar = ''
             cli <_>...;
           '';
-          runtimeDeps = [ pkgs.fabric-ai ];
+          runtimeInputs = [ pkgs.fabric-ai ];
         })
 
         (mkComplgenScript {
           name = "pipewire-combine-sinks";
-          scriptContent = ''
-            #!${pkgs.bash}/bin/bash
-            set -euo pipefail
-
+          text = ''
             die() { echo "Error: $*" >&2; exit 1; }
 
             cleanup() {
@@ -353,7 +486,7 @@
             pipewire-combine-sinks (-c | --clean | -h | --help)?;
           '';
 
-          runtimeDeps = with pkgs; [
+          runtimeInputs = with pkgs; [
             pipewire
             jq
             pulseaudio
@@ -368,10 +501,9 @@
         (mkComplgenScript {
           name = "ping"; # The command name users will type
 
-          scriptContent = ''
-            #!${pkgs.bash}/bin/bash
+          text = ''
             # Use exec to replace this script process with ping for cleaner signal handling
-            if [ -z "$1" ]; then
+            if [ $# -eq 0 ]; then
               echo "No target specified, pinging default: 1.1.1.1"
               # Use inetutils ping, which is more standard than toybox's
               exec ${pkgs.inetutils}/bin/ping 1.1.1.1
@@ -381,7 +513,8 @@
             fi
           '';
 
-          # Grammar for command-line completion
+          # Grammar for command-line completion. Its command block runs in the
+          # user's interactive shell, so it references awk by store path.
           grammar = ''
             ping {{{
               [ -f "$HOME/.ssh/known_hosts" ] && \
@@ -408,29 +541,21 @@
             # Allow any subsequent arguments (like -c, -i, etc.)
             ... ;
           '';
-
-          # Runtime dependencies for the script itself
-          # Note: Dependencies for the *grammar command* (awk, sort) are separate
-          # and assumed to be available in the completion environment,
-          # but we specify them explicitly above for clarity/robustness.
-          runtimeDeps = [
-            pkgs.bash # For the script execution
-            pkgs.inetutils # For the actual ping command
-            # Dependencies needed for the completion command:
-            pkgs.gawk # GNU awk is robust for parsing
-            pkgs.coreutils # For sort
-          ];
         })
 
-        (pkgs.writeShellScriptBin "chrome" ''
-          nix shell nixpkgs#ungoogled-chromium --command chromium $1 &>/dev/null &
-        '')
+        (mkComplgenScript {
+          name = "chrome";
+          text = ''
+            nix shell nixpkgs#ungoogled-chromium --command chromium "$@" &>/dev/null &
+          '';
+          grammar = ''
+            chrome [<URL>];
+          '';
+        })
 
         (mkComplgenScript {
           name = "connect";
-          scriptContent = ''
-            #!${pkgs.bash}/bin/bash
-            set -euo pipefail
+          text = ''
             if [ $# -lt 1 ]; then echo "Usage: connect <SSID> [password]"; exit 1; fi
             nmcli device wifi rescan
             nmcli device wifi connect "$@"
@@ -438,15 +563,12 @@
           grammar = ''
             connect {{{ ${pkgs.networkmanager}/bin/nmcli -t -f SSID dev wifi list }}} "SSID" [password "password: string"];
           '';
-          runtimeDeps = [ pkgs.networkmanager ];
+          runtimeInputs = [ pkgs.networkmanager ];
         })
 
         (mkComplgenScript {
           name = "qr";
-          scriptContent = ''
-            #!${pkgs.bash}/bin/bash
-            set -euo pipefail
-
+          text = ''
             # Check for --share option
             for arg in "$@"; do
                 if [[ "$arg" == "--share" ]]; then
@@ -468,22 +590,20 @@
           grammar = ''
             qr (--share | {{{ ${pkgs.fd}/bin/fd --type directory --type file --max-depth 1 . --color never }}} <INPUT>);
           '';
-          runtimeDeps = [ pkgs.qrencode ];
+          runtimeInputs = [ pkgs.qrencode ];
         })
 
         (mkComplgenScript {
           name = "compress";
-          scriptContent = ''
-            #!${pkgs.bash}/bin/bash
-            set -euo pipefail
+          text = ''
             if [ "$#" -ne 2 ]; then echo "Usage: compress <source> <dest.tar.gz>"; exit 1; fi
             [ ! -e "$1" ] && { echo "Error: Source not found"; exit 1; }
-            tar -cf - "$1" | pv -s $(du -sb "$1" | awk '{print $1}') | ${pkgs.pigz}/bin/pigz -9 > "$2".tar.gz
+            tar -cf - "$1" | pv -s "$(du -sb "$1" | awk '{print $1}')" | pigz -9 > "$2".tar.gz
           '';
           grammar = ''
             compress {{{ ${pkgs.fd}/bin/fd --type directory --type file --max-depth 1 . --color never }}} "Source" <PATH> "Destination";
           '';
-          runtimeDeps = [
+          runtimeInputs = [
             pkgs.pigz
             pkgs.pv
           ];
@@ -491,9 +611,7 @@
 
         (mkComplgenScript {
           name = "rsync-compress";
-          scriptContent = ''
-            #!${pkgs.bash}/bin/bash
-            set -euo pipefail
+          text = ''
             if [ "$#" -ne 2 ]; then echo "Usage: rsync-compress <source> <dest>"; exit 1; fi
             [ ! -e "$1" ] && { echo "Error: Source not found"; exit 1; }
             size=$(du -sb "$1" | awk '{print $1}')
@@ -502,30 +620,9 @@
           grammar = ''
             rsync-compress {{{ ${pkgs.fd}/bin/fd --type directory --type file --max-depth 1 . --color never }}} "Source" <PATH> "Destination";
           '';
-          runtimeDeps = [
+          runtimeInputs = [
             pkgs.rsync
             pkgs.pv
-          ];
-        })
-      ]
-      ++ [
-        (mkComplgenScript {
-          name = "gitignore";
-          scriptContent = ''
-            #!${pkgs.bash}/bin/bash
-            set -euo pipefail
-
-            git ls-files --others --exclude-standard | sed "s|^|$(git rev-parse --show-prefix)|" >> "$(git rev-parse --show-toplevel)/.git/info/exclude"
-          '';
-          grammar = ''
-            globalgitignore [-g] (-a {{{ ${pkgs.fd}/bin/fd --type f --max-depth 3 . --color never --hidden --no-ignore }}} "File to ignore" | -u | -l);
-          '';
-          runtimeDeps = [
-            pkgs.bash
-            pkgs.git
-            pkgs.gnused
-            pkgs.gnugrep
-            pkgs.coreutils
           ];
         })
       ];

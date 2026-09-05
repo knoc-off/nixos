@@ -70,26 +70,26 @@
       # `isFork` distinguishes the two by which fields are present after
       # null-stripping below.
       bindSubmodule = types.submodule {
-        options =
-          {
-            mod = mkOption {
-              type = types.nullOr (types.enum modNames);
-              default = null;
-            };
-            key = mkOption {
-              type = types.nullOr types.str;
-              default = null;
-            };
-            cmd = mkOption {
-              type = types.nullOr types.str;
-              default = null;
-            };
-            raw = mkOption {
-              type = types.nullOr types.str;
-              default = null;
-            };
-          }
-          // genAttrs
+        options = {
+          mod = mkOption {
+            type = types.nullOr (types.enum modNames);
+            default = null;
+          };
+          key = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+          };
+          cmd = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+          };
+          raw = mkOption {
+            type = types.nullOr types.str;
+            default = null;
+          };
+        }
+        //
+          genAttrs
             [
               "default"
               "shift"

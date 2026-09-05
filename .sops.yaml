@@ -4,37 +4,31 @@ keys:
   - &framework13 age1zdytsg2704mgqc6e76umdcgumnkx7ph70tcscs5pcauz0esp4ehsttav5t
   - &hetzner age1kedaufmt9rah4h65gvmml0vfxdjngqsteqqy79rvs4hqs0j9rfaq858cg0
   - &rpi-4b-plus age1h2339ke56fkn0svx7jlejcnwdf83hl4tg5vaa7e0aqgnhr7qedqstxcxcg
-  - &homeserver age1yfnk76q5velf4ydxvcajm008w42nkfk3tz2euz6666j89pxe2yjqyl4g03
   - &work age14tstqskklfdq4uclxvxeygh6xj40f6axfm82r8umzvvs0de2f5zqen9vrd
   - &optiplex age13yardd2dl3ex60phynx4t9sgxm3wy07jxhee6yu2dxzs99ld34ns9zpve7
 
 creation_rules:
-  - path_regex: systems/secrets/hetzner/[^/]+\.(yaml|json|env|ini)$
+  - path_regex: systems/hetzner/secrets\.yaml$
     key_groups:
       - age:
           - *framework13h
           - *hetzner
-  - path_regex: systems/secrets/rpi-4b-plus/[^/]+\.(yaml|json|env|ini)$
+  - path_regex: systems/rpi-4b-plus/secrets\.yaml$
     key_groups:
       - age:
           - *framework13h
           - *rpi-4b-plus
-  - path_regex: systems/secrets/framework13/[^/]+\.(yaml|json|env|ini)$
+  - path_regex: systems/framework13/secrets\.yaml$
     key_groups:
       - age:
           - *framework13h
           - *framework13
-  - path_regex: systems/secrets/homeserver/[^/]+\.(yaml|json|env|ini)$
-    key_groups:
-      - age:
-          - *framework13h
-          - *homeserver
-  - path_regex: systems/secrets/work/[^/]+\.(yaml|json|env|ini)$
+  - path_regex: systems/thinkpad-work/secrets\.yaml$
     key_groups:
       - age:
           - *framework13h
           - *work
-  - path_regex: systems/secrets/optiplex/[^/]+\.(yaml|json|env|ini)$
+  - path_regex: systems/optiplex/secrets\.yaml$
     key_groups:
       - age:
           - *optiplex

@@ -11,7 +11,7 @@ let
 in
 {
   imports = [
-    ./hardware/hardware-configuration.nix
+    ./hardware-configuration.nix
 
     self.nixosModules.fish
     {
@@ -28,7 +28,7 @@ in
       system.activationScripts.populateEtcNixos =
         let
           configSrc = builtins.path {
-            path = ../.;
+            path = ../..;
             name = "nixos-config-src";
           };
         in

@@ -21,7 +21,7 @@ in
     inputs.sops-nix.nixosModules.sops
     {
       sops = {
-        defaultSopsFile = ./secrets/${hostname}/default.yaml;
+        defaultSopsFile = ./secrets.yaml;
         age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
 
         secrets = {
@@ -38,15 +38,15 @@ in
       };
     }
     inputs.disko.nixosModules.disko
-    ./hardware/disks/simple-disk.nix
+    ./disk.nix
 
     ./services/caddy.nix
-    ./services/crowdsec.nix
-    ./services/oauth2-proxy.nix
+    self.nixosModules.crowdsec
+    self.nixosModules.oauth2-proxy
     ./services/kitchenowl.nix
-    ./services/kitchenowl-notify.nix
-    ./services/kitchenowl-meal-plan.nix
-    # ./services/kitchenowl-mcp.nix
+    self.nixosModules.kitchenowl-notify
+    self.nixosModules.kitchenowl-meal-plan
+    # self.nixosModules.kitchenowl-mcp
     ./services/trilium.nix
     ./services/ntfy.nix
     ./services/minecraft-gate.nix

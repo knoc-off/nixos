@@ -39,14 +39,22 @@ in
     self.nixosModules.misc
     self.nixosModules.console
 
-    inputs.disko.nixosModules.disko
-    { disko.devices.disk.vdb.device = "/dev/nvme0n1"; }
+    self.nixosModules.btrfs-luks
+    {
+      disks.btrfsLuks = {
+        enable = true;
+        device = "/dev/nvme0n1";
+        # Kept as "vdb" rather than the module default: renaming the disko
+        # attribute would rewrite the generated device aliases on an
+        # already-installed machine for no benefit.
+        diskName = "vdb";
+        swapSize = "32G";
+      };
+    }
 
-    ./hardware/disks/btrfs-luks.nix
-
-    ./hardware/hardware-configuration.nix
-    ./hardware/bluetooth.nix
-    ./hardware/fingerprint
+    ./hardware-configuration.nix
+    self.nixosModules.bluetooth
+    self.nixosModules.fingerprint
 
     self.nixosModules.hyprland
     self.nixosModules.noctalia
@@ -64,12 +72,12 @@ in
     self.nixosModules.lspmux
     { services.lspmux.enable = true; }
 
-    ./hardware/boot.nix
+    self.nixosModules.boot
 
     inputs.sops-nix.nixosModules.sops
     {
       sops = {
-        defaultSopsFile = ./secrets/${hostname}/default.yaml;
+        defaultSopsFile = ./secrets.yaml;
         age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
         secrets = {
           "shell_environment/OPENROUTER_API_KEY" = {
@@ -264,9 +272,13 @@ in
     };
   };
 
-  bootloader = {
+  boot.custom = {
+    enable = true;
     type = "lanzaboote";
     efiSupport = true;
+    # The pre-module ./boot.nix left systemd-boot's editor enabled; keep it
+    # rather than silently taking the module's hardened default.
+    editor = true;
   };
 
   boot = {

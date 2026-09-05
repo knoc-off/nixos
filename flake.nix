@@ -50,7 +50,7 @@
             upkgs = unstablePkgs system;
           };
           modules = [
-            ./systems/${hostname}.nix
+            ./systems/${hostname}
             { networking.hostName = lib.mkDefault hostname; }
           ]
           ++ extraModules;
@@ -70,7 +70,7 @@
         in
         (mkConfig {
           inherit hostname system;
-          extraModules = [ ./systems/modules/${imageType}.nix ] ++ imageOverrides;
+          extraModules = [ ./systems/image/${imageType}.nix ] ++ imageOverrides;
         }).config.system.build.${imageType};
 
       unstablePkgs =
@@ -135,65 +135,65 @@
           # Building it end-to-end through homeManagerConfiguration means
           # this check runs the actual production code path, not a copy.
           keyLayersFixture = inputs.home-manager.lib.homeManagerConfiguration {
-              inherit pkgs;
-              extraSpecialArgs = { inherit self; };
-              modules = [
-                self.homeModules.kanata
-                self.homeModules.keylayers
-                {
-                  home.username = "fixture";
-                  home.homeDirectory = "/home/fixture";
-                  home.stateVersion = "24.05";
-                  services.kanata.package = pkgs.kanata-with-cmd;
-                  services.kanata.keyboards.main.port = 12345;
-                  services.kanata.keyboards.main.extraDefCfg = "danger-enable-cmd yes";
-                  keyLayers.enable = true;
-                  # `dbl` is always injected in real configs (see
-                  # modules/noctalia.nix) and is referenced unconditionally by
-                  # every generated `cap-<layer>` alias, so the fixture must
-                  # supply it too.
-                  keyLayers.extraAliases = ''
-                    dbl (tap-dance-eager 250 (XX XX))
-                  '';
-                  keyLayers.layers = {
-                    base.capsbinds = {
-                      ctrl = [
-                        "a"
-                        "b"
-                        "c"
-                      ];
-                      keys.h.key = "left";
-                      keys.f5.cmd = "notify-send hello";
-                    };
-                    browser = {
-                      classes = [
-                        "firefox"
-                        "chromium-browser"
-                      ];
-                      capsbinds.ctrl = [
-                        "a"
-                        "c"
-                        "f"
-                        "t"
-                        "v"
-                        "w"
-                      ];
-                      binds.tab = {
-                        default = "down";
-                        shift = "up";
-                      };
-                    };
-                    terminal = {
-                      classes = [
-                        "com.mitchellh.ghostty"
-                        "foot"
-                      ];
-                      capsbinds.alt = [ "e" ];
+            inherit pkgs;
+            extraSpecialArgs = { inherit self; };
+            modules = [
+              self.homeModules.kanata
+              self.homeModules.keylayers
+              {
+                home.username = "fixture";
+                home.homeDirectory = "/home/fixture";
+                home.stateVersion = "24.05";
+                services.kanata.package = pkgs.kanata-with-cmd;
+                services.kanata.keyboards.main.port = 12345;
+                services.kanata.keyboards.main.extraDefCfg = "danger-enable-cmd yes";
+                keyLayers.enable = true;
+                # `dbl` is always injected in real configs (see
+                # modules/noctalia.nix) and is referenced unconditionally by
+                # every generated `cap-<layer>` alias, so the fixture must
+                # supply it too.
+                keyLayers.extraAliases = ''
+                  dbl (tap-dance-eager 250 (XX XX))
+                '';
+                keyLayers.layers = {
+                  base.capsbinds = {
+                    ctrl = [
+                      "a"
+                      "b"
+                      "c"
+                    ];
+                    keys.h.key = "left";
+                    keys.f5.cmd = "notify-send hello";
+                  };
+                  browser = {
+                    classes = [
+                      "firefox"
+                      "chromium-browser"
+                    ];
+                    capsbinds.ctrl = [
+                      "a"
+                      "c"
+                      "f"
+                      "t"
+                      "v"
+                      "w"
+                    ];
+                    binds.tab = {
+                      default = "down";
+                      shift = "up";
                     };
                   };
-                }
-              ];
-            };
+                  terminal = {
+                    classes = [
+                      "com.mitchellh.ghostty"
+                      "foot"
+                    ];
+                    capsbinds.alt = [ "e" ];
+                  };
+                };
+              }
+            ];
+          };
         in
         {
           color-lib =
@@ -228,8 +228,7 @@
               {
                 nativeBuildInputs = [ pkgs.lua5_4 ];
                 kanataConfig = keyLayersFixture.config.services.kanata.keyboards.main.configFile;
-                luaFragment =
-                  keyLayersFixture.config.xdg.configFile."hypr/kanata-app-layers.lua".text;
+                luaFragment = keyLayersFixture.config.xdg.configFile."hypr/kanata-app-layers.lua".text;
                 checkScript = ./lib/key-layers-check.lua;
                 passAsFile = [
                   "luaFragment"

@@ -64,9 +64,9 @@ in
 
     self.nixosModules.btrfs-luks
 
-    ./hardware/hardware-configuration-thinkpad-work.nix
-    ./hardware/bluetooth.nix
-    ./hardware/fingerprint
+    ./hardware-configuration.nix
+    self.nixosModules.bluetooth
+    self.nixosModules.fingerprint
 
     self.nixosModules.hyprland
     self.nixosModules.noctalia
@@ -101,7 +101,7 @@ in
       # todo: setup a systemd service, that will initialize the sops stuff.
       # would need to generate a pub key and ideally write it to the file.
       sops = {
-        defaultSopsFile = ./secrets/${hostname}/default.yaml;
+        defaultSopsFile = ./secrets.yaml;
         age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
         # age.sshKeyPaths = ["/home/niko/.ssh/id_ed25519"];
         secrets = {
