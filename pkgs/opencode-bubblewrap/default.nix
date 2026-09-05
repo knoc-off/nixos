@@ -137,6 +137,21 @@ let
       echo "jailed-opencode: no free port in $1-$limit" >&2
       return 1
     }
+
+    # Unmount every host_mount grant directly under $1, leaving $1 itself.
+    #
+    # Must be the *setuid* fusermount3 from /run/wrappers -- the store one
+    # lacks the privilege to unmount and fails with EPERM, leaving the mounts
+    # (and the session's grant dirs) behind.
+    unmount_grants() {
+      [ -n "''${1:-}" ] || return 0
+      local _grant
+      for _grant in "$1"/*; do
+        [ -d "$_grant" ] || continue
+        /run/wrappers/bin/fusermount3 -u "$_grant" 2>/dev/null || true
+        ${pkgs.coreutils}/bin/rmdir "$_grant" 2>/dev/null || true
+      done
+    }
   '';
 
   lspmux = selfPkgs.lspmux;
@@ -269,15 +284,11 @@ jail "jailed-opencode" upkgs.fish (
     no-new-session
     (set-argv [ ])
     (add-cleanup "kill $HOST_QUERY_PID 2>/dev/null || true")
-    # Tear down host_mount grants. Must be the *setuid* fusermount3 from
-    # /run/wrappers -- the store one lacks the privilege to unmount and fails
-    # with EPERM, leaving the mounts (and the session's grant dirs) behind.
+    # Tear down this session's host_mount grants. unmount_grants is defined in
+    # add-runtime, which shares scope with cleanup.
     (add-cleanup ''
-      for _grant in "''${JAIL_GRANT_ROOT:-}"/*; do
-        [ -d "$_grant" ] || continue
-        /run/wrappers/bin/fusermount3 -u "$_grant" 2>/dev/null || true
-        ${pkgs.coreutils}/bin/rmdir "$_grant" 2>/dev/null || true
-      done
+      unmount_grants "''${JAIL_GRANT_ROOT:-}"
+      ${pkgs.coreutils}/bin/rmdir "''${JAIL_GRANT_ROOT:-/nonexistent}" 2>/dev/null || true
     '')
 
     (add-runtime ''
@@ -411,12 +422,41 @@ jail "jailed-opencode" upkgs.fish (
         JAIL_STATE_DIR="$HOME/.local/state/opencode-jails/_shared"
       fi
       ${pkgs.coreutils}/bin/mkdir -p "$JAIL_STATE_DIR"
-      # Read-only host directory grants (host_mount) land here. It sits under
-      # the ~/scratch backing dir on purpose: that bind is a propagation slave
-      # of the host's /home, so a bindfs mount made here shows up inside the
+      # Host directory grants (host_mount) land here. It sits under the
+      # ~/scratch backing dir on purpose: that bind is a propagation slave of
+      # the host's /home, so a bindfs mount made here shows up inside the
       # *running* jail without a restart.
-      JAIL_GRANT_ROOT="$JAIL_SCRATCH_BACKING/granted"
+      #
+      # One subdir per session (keyed on the launcher's PID) so concurrent
+      # unnamed jails -- which share a persist dir -- don't unmount each
+      # other's grants on exit. The subdir is bound over ~/scratch/granted so
+      # the in-jail path stays ~/scratch/granted/<name> regardless.
+      JAIL_GRANT_SESSIONS="$JAIL_SCRATCH_BACKING/granted"
+      JAIL_GRANT_ROOT="$JAIL_GRANT_SESSIONS/$$"
+      # Sweep grants leaked by sessions that died without running their EXIT
+      # trap (SIGKILL, power loss). A live PID is left alone; PID reuse can
+      # only make this skip a sweep, never unmount a running jail's grants.
+      for _sess in "$JAIL_GRANT_SESSIONS"/*; do
+        [ -d "$_sess" ] || continue
+        # Anything not named after a live PID is stale: a dead session's dir,
+        # or a grant left by the old flat layout (named after the grant, so
+        # kill rejects it as a PID).
+        kill -0 "''${_sess##*/}" 2>/dev/null && continue
+        # Flat-layout leftover: the entry *itself* is the mount. Unmount it
+        # before descending -- sweeping the children of a still-mounted
+        # writable grant would be rmdir-ing real host directories. If the
+        # unmount fails the dir is still on a different device than its
+        # parent, so leave it entirely rather than reaching inside.
+        /run/wrappers/bin/fusermount3 -u "$_sess" 2>/dev/null || true
+        if [[ "$(${pkgs.coreutils}/bin/stat -c %d "$_sess" 2>/dev/null)" \
+           != "$(${pkgs.coreutils}/bin/stat -c %d "$JAIL_GRANT_SESSIONS" 2>/dev/null)" ]]; then
+          continue
+        fi
+        unmount_grants "$_sess"
+        ${pkgs.coreutils}/bin/rmdir "$_sess" 2>/dev/null || true
+      done
       ${pkgs.coreutils}/bin/mkdir -p "$JAIL_GRANT_ROOT"
+      RUNTIME_ARGS+=(--bind "$JAIL_GRANT_ROOT" "$HOME/scratch/granted")
       ${lib.getExe hostQuery} "$HOST_QUERY_PORT" "$JAIL_GRANT_ROOT" \
         > "$JAIL_STATE_DIR/host-query.log" 2>&1 &
       HOST_QUERY_PID=$!

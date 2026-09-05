@@ -1,7 +1,7 @@
 // OpenCode plugin for host-query.
 // Exposes two tools that act on the host (outside the jail):
 //   host_exec  -- run a shell command
-//   host_mount -- grant a host directory read-only into the jail
+//   host_mount -- grant a host directory into the jail (ro by default, rw opt-in)
 // Both are permission "ask" so the user approves each one.
 
 import { createRequire } from "node:module";
@@ -62,11 +62,13 @@ export default async (_ctx) => ({
 
     host_mount: {
       description:
-        "Grant a host directory into the sandbox, read-only. Use when you " +
-        "need to browse or search files outside the mounted projects with " +
+        "Grant a host directory into the sandbox. Use when you need to " +
+        "browse, search or edit files outside the mounted projects with " +
         "the normal file tools. The directory appears at " +
         "~/scratch/granted/<name> and stays for the rest of the session. " +
-        "Read-only: use host_exec if you need to write.",
+        "Read-only by default; pass write:true to mount it read-write. " +
+        "Re-granting an existing name remounts it, so switching a grant to " +
+        "writable is just another call.",
       args: {
         path: z
           .string()
@@ -75,30 +77,37 @@ export default async (_ctx) => ({
           .string()
           .optional()
           .describe("Mount name under ~/scratch/granted (default: basename)"),
+        write: z
+          .boolean()
+          .optional()
+          .describe("Mount read-write instead of read-only (default: false)"),
       },
       async execute(args, context) {
         const path = String(args.path || "").trim();
         if (!path) return "Error: empty path";
         const name = String(args.name || "").trim();
+        const write = Boolean(args.write);
 
         await context.ask({
           permission: "host_mount",
-          patterns: [path],
+          patterns: [write ? `${path} (write)` : path],
           always: [],
-          metadata: { path, name },
+          metadata: { path, name, write },
         });
 
         try {
           const r = await fetch(`${BASE}/mount`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(name ? { path, name } : { path }),
+            body: JSON.stringify({ path, ...(name && { name }), write }),
             signal: AbortSignal.timeout(35000),
           });
           const data = await r.json();
 
           if (!r.ok) return `Error: ${data.error || r.statusText}`;
-          return `Mounted ${data.source} read-only at ${data.jail_path}`;
+          const mode = data.mode === "rw" ? "read-write" : "read-only";
+          const how = data.remounted ? "Remounted" : "Mounted";
+          return `${how} ${data.source} ${mode} at ${data.jail_path}`;
         } catch (e) {
           return `host-query service unavailable: ${e.message}`;
         }

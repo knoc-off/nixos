@@ -56,14 +56,18 @@ You are running inside a bubblewrap (bwrap) sandbox. This changes how you should
 ## Host directory grants — `host_mount`
 
 - Need to read files on the host outside the mounted projects? `host_mount`
-  binds a host directory **read-only** at `~/scratch/granted/<name>`, where the
-  normal file tools (Read, Grep, Glob) work on it. Takes effect immediately —
-  no restart. The user approves each grant.
-- The grant is at a _translated_ path, not the real host path, so it is for
-  reading and searching. For a repo you want to edit or run an LSP against, use
-  `~/workspaces` instead — that keeps host-identical paths.
-- Grants last for the session and are unmounted on exit. Read-only: use
-  `host_exec` to write.
+  binds a host directory at `~/scratch/granted/<name>`, where the normal file
+  tools (Read, Grep, Glob) work on it. Read-only by default; pass `write: true`
+  to mount it read-write. Takes effect immediately — no restart. The user
+  approves each grant.
+- Re-granting a name that is already mounted remounts it, so switching a grant
+  from read-only to writable is just another `host_mount` call with
+  `write: true` — no unmount step.
+- The grant is at a _translated_ path, not the real host path. For a repo you
+  want to edit or run an LSP against, use `~/workspaces` instead — that keeps
+  host-identical paths, which language servers and your own file references
+  depend on.
+- Grants are per-session and unmounted on exit.
 
 ## Per-directory environments — direnv
 
@@ -160,11 +164,11 @@ you are not investigating -- you are reading. Dispatching for contents you
 could `Read` spends two context windows moving bytes you already knew how to
 find, and relays them through a model that can silently reformat them.
 
-| Agent           | Model  | Use for                                                                                |
-| --------------- | ------ | -------------------------------------------------------------------------------------- |
-| `explore-quick` | Haiku  | **Default.** Locating files, grep/glob, "where is X", confirming an assumption         |
-| `explore-mid`   | Sonnet | Lookups needing real reasoning: tracing logic across files, picking between candidates |
-| `explore-deep`  | Opus   | Rare. Ambiguous scope, subtle cross-cutting bugs, synthesis a cheap model would botch  |
+| Agent           | Model      | Use for                                                                                |
+| --------------- | ---------- | -------------------------------------------------------------------------------------- |
+| `explore-quick` | Sonnet 4.5 | **Default.** Locating files, grep/glob, "where is X", confirming an assumption          |
+| `explore-mid`   | Sonnet 5   | Lookups needing real reasoning: tracing logic across files, picking between candidates |
+| `explore-deep`  | Opus 5     | Rare. Ambiguous scope, subtle cross-cutting bugs, synthesis a cheap model would botch  |
 
 **Any time you catch yourself searching or exploring, ask: "could a dumber
 agent do this?"**

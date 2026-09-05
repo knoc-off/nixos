@@ -7,7 +7,7 @@ The agent's tool permission is set to "ask", so the user always approves
 each command in the opencode TUI before it reaches this server.
 
 Usage: host-query <port> [grant-root]
-  grant-root enables POST /mount (read-only host directory grants).
+  grant-root enables POST /mount (host directory grants, ro unless write).
 """
 import http.server
 import json
@@ -20,11 +20,21 @@ import signal
 MAX_OUTPUT = 200_000  # Truncate very large outputs
 TIMEOUT = 30
 
-# Where read-only grants are mounted. Set from argv[2]; when absent the
-# /mount endpoint is disabled. This is the *host-side* backing dir of the
-# jail's ~/scratch, so mounts made here propagate into the running jail.
+# Where grants are mounted. Set from argv[2]; when absent the /mount endpoint
+# is disabled. This is the *host-side* backing dir of the jail's ~/scratch, so
+# mounts made here propagate into the running jail.
 GRANT_ROOT = None
 GRANT_JAIL_PREFIX = "~/scratch/granted"
+
+# name -> (source, write). Lets a repeat grant tell "same thing again" (no-op)
+# from "same name, different source or mode" (remount) without shelling out to
+# parse /proc/mounts. The grant root is per-session and swept at jail startup,
+# so this process's view is authoritative for its own lifetime.
+MOUNTS = {}
+
+# The *setuid* fusermount3 from /run/wrappers: the store one lacks the
+# privilege to unmount and fails with EPERM.
+FUSERMOUNT = "/run/wrappers/bin/fusermount3"
 
 # Mount names must start alphanumeric: a leading dot would hide the grant from
 # the session-exit cleanup glob, leaking the mount past the jail's lifetime.
@@ -69,7 +79,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(500, {"error": str(e), "command": command})
 
     def _mount(self):
-        """Bind a host directory read-only into the jail's ~/scratch/granted.
+        """Bind a host directory into the jail's ~/scratch/granted.
+
+        Read-only by default; `"write": true` drops the `-o ro`. Granting a
+        name that is already mounted remounts it rather than erroring, so
+        re-granting a read-only dir as writable needs no explicit unmount.
 
         bindfs rather than `mount --bind` because this runs as the unprivileged
         user: fusermount3 is setuid so FUSE mounts need no root, and bindfs
@@ -100,15 +114,39 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._json(400, {"error": f"Invalid mount name: {name!r}"})
 
         target = os.path.join(GRANT_ROOT, name)
-        # os.path.ismount is the check that matters: a leftover empty dir from a
-        # previous grant is fine to reuse, an active mount is not.
+        write = bool(body.get("write"))
+        # A leftover empty dir from a previous grant is fine to reuse; an
+        # active mount is not. Rather than making the agent unmount by hand,
+        # remount in place: identical requests are a no-op, and a changed
+        # source or mode (typically ro -> rw) just works.
         if os.path.ismount(target):
-            return self._json(409, {"error": f"Already mounted: {name}"})
+            if MOUNTS.get(name) == (src, write):
+                return self._json(200, {
+                    "source": src,
+                    "jail_path": f"{GRANT_JAIL_PREFIX}/{name}",
+                    "mode": "rw" if write else "ro",
+                    "remounted": False,
+                })
+            u = subprocess.run(
+                [FUSERMOUNT, "-u", target],
+                capture_output=True, text=True, timeout=TIMEOUT,
+            )
+            if u.returncode != 0:
+                return self._json(409, {
+                    "error": f"Already mounted and could not unmount {name}: "
+                             f"{(u.stderr or u.stdout).strip()}"
+                })
+            MOUNTS.pop(name, None)
+            remounted = True
+        else:
+            remounted = False
 
         try:
             os.makedirs(target, exist_ok=True)
             r = subprocess.run(
-                ["bindfs", "--no-allow-other", "-o", "ro", src, target],
+                ["bindfs", "--no-allow-other"]
+                + ([] if write else ["-o", "ro"])
+                + [src, target],
                 capture_output=True, text=True, timeout=TIMEOUT,
             )
         except Exception as e:
@@ -119,10 +157,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 os.rmdir(target)
             return self._json(500, {"error": (r.stderr or r.stdout).strip()})
 
+        MOUNTS[name] = (src, write)
         self._json(200, {
             "source": src,
             "jail_path": f"{GRANT_JAIL_PREFIX}/{name}",
-            "mode": "ro",
+            "mode": "rw" if write else "ro",
+            "remounted": remounted,
         })
 
     def do_GET(self):
