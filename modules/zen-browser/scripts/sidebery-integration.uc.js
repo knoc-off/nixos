@@ -246,11 +246,12 @@ const handleCompactMode = //collapsed toolbar goes down to 60px (see sidebery-co
         margin-right: auto;
     }
 
-    /* The search bar is just a magnifier glyph at this width -- 32px of the
-       rail spent on something unusable until it is expanded. */
-    #search_bar {
-        display: none;
-    }
+    /* The search bar deliberately stays visible in the collapsed rail, as an
+       icon-only 32px row (sidebery.css centres .search-icon and hides
+       .placeholder/.input below 90px). Hiding it here instead would make it
+       appear on hover, and because .TabsPanel is laid out below it, every tab
+       would jump down 32px at the start of the expand animation. Costing 32px
+       of rail is the cheaper trade against that shift. */
 
     .BottomBar {
         display:none;

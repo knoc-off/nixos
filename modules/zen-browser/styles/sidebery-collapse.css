@@ -1022,3 +1022,48 @@ not (-moz-bool-pref: "zen.view.use-single-toolbar") {
     }
   }
 }
+
+/* LOCAL OVERRIDE (not upstream chrome.css).
+ *
+ * Cancels upstream's translateY(30px) on #navigator-toolbox (and the 35px
+ * bottom padding that compensates for it), applied above under "makes nav
+ * buttons clickable on left sided sidebar".
+ *
+ * That shift exists so Zen's #zen-sidebar-top-buttons row -- back/forward/
+ * reload, which upstream keeps at the top of the sidebar -- clears the
+ * horizontal #nav-bar overlapping it. Our integration script hides that row
+ * outright (sidebery-integration.uc.js, "Hiding original Zen Tabs"), because
+ * Sidebery replaces Zen's tab strip and those buttons already live in #nav-bar.
+ * With nothing left to clear, the translate only opened a 30px dead band
+ * between the nav-bar's bottom edge (y=38) and the top of the Sidebery frame
+ * (y=68) -- the blank strip above the panel icons.
+ *
+ * #titlebar's own padding-top is --zen-toolbar-height (38px), i.e. exactly the
+ * nav-bar's height, so untranslated the frame starts flush beneath it with no
+ * gap. Bottom padding drops to 8px to match #zen-tabbox-wrapper's
+ * margin-bottom, so the rail's foot buttons line up with the page's bottom
+ * edge instead of hanging 35px short.
+ *
+ * Gated identically to the upstream rule it cancels.
+ */
+@media not all and (-moz-bool-pref: "zen.view.use-single-toolbar") {
+  @media not (-moz-platform: macos) {
+    @media not (-moz-bool-pref: "zen.view.compact.enable-at-startup") {
+      @media not (-moz-bool-pref: "zen.tabs.vertical.right-side") {
+        /* :not([zen-right-side="true"]) is redundant with the media query
+           above and is present purely for specificity: the rule being
+           cancelled resolves to the same (1,2,0) as a plain
+           `:root:not([sizemode="fullscreen"]) #navigator-toolbox`, which would
+           leave the !important padding-bottom decided by source order alone.
+           The extra attribute makes this win outright. */
+        :root:not([sizemode="fullscreen"]) #navigator-toolbox:not([zen-right-side="true"]) {
+          transform: none !important;
+          padding-bottom: 8px !important;
+        }
+        :root:not([sizemode="fullscreen"]) #zen-drag-indicator {
+          transform: none !important;
+        }
+      }
+    }
+  }
+}

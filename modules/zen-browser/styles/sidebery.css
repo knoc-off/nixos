@@ -129,6 +129,15 @@
    headroom on both sides so drift in padding/scrollbar width can't push
    the frame's real size to the wrong side of the line. */
 @media screen and (max-width: 90px) {
+  /* Counters handleCompactMode's historical `#search_bar { display: none }`
+     in sidebery-integration.uc.js. That sheet is injected at Sidebery load and
+     wins on source order, so the search bar has to be un-hidden from here.
+     Keeping it laid out in both states is what stops .TabsPanel jumping 32px
+     down as the sidebar expands. */
+  #search_bar {
+    display: flex !important;
+  }
+
   /* Hide all text elements */
   .Tab .t-box,
   .Tab .close,
