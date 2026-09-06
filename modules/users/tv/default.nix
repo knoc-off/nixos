@@ -28,11 +28,11 @@
 
       # The bridge is D-Bus activated by xdg-desktop-portal, so its
       # share/dbus-1/services entry has to be on the session bus search path.
-      services.dbus.packages = [ self.packages.${pkgs.system}.hypr-kdeconnect-portal ];
+      services.dbus.packages = [ self.packages.${pkgs.stdenv.hostPlatform.system}.hypr-kdeconnect-portal ];
 
       # That activation file delegates via SystemdService=, so the user manager
       # has to be able to resolve the unit by name.
-      systemd.packages = [ self.packages.${pkgs.system}.hypr-kdeconnect-portal ];
+      systemd.packages = [ self.packages.${pkgs.stdenv.hostPlatform.system}.hypr-kdeconnect-portal ];
 
       # Portals are declared here rather than per-user because
       # NIX_XDG_DESKTOP_PORTAL_DIR names a single directory: xdg-desktop-portal
@@ -43,7 +43,7 @@
       # common.default is left to the hyprland module; config is attrsOf attrsOf
       # str, so these merge per key.
       xdg.portal = {
-        extraPortals = [ self.packages.${pkgs.system}.hypr-kdeconnect-portal ];
+        extraPortals = [ self.packages.${pkgs.stdenv.hostPlatform.system}.hypr-kdeconnect-portal ];
         config.common = {
           # ScreenCast/Screenshot go to hyprland: xdp-kde implements these
           # against KWin, which doesn't exist in this session.

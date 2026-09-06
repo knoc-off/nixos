@@ -132,7 +132,7 @@ in
       enable = true;
       libraries = with pkgs; [
         libxcursor
-        xorg.libXrandr
+        libxrandr
         libx11
         libGL
         stdenv.cc.cc

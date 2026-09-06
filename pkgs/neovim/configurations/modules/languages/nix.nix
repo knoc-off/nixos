@@ -16,7 +16,7 @@
   ...
 }:
 let
-  nixfmt = lib.getExe pkgs.nixfmt-rfc-style;
+  nixfmt = lib.getExe pkgs.nixfmt;
   # Host whose evaluated options power nixd's NixOS option completion/docs.
   # Change if you primarily edit a different machine's config.
   optionsHost = "thinkpad-work";
@@ -59,7 +59,7 @@ in
   # nixd + the RFC-style formatter available to the editor's runtime.
   extraPackages = [
     pkgs.nixd
-    pkgs.nixfmt-rfc-style
+    pkgs.nixfmt
   ];
 
   plugins.conform-nvim.settings = {

@@ -1067,3 +1067,57 @@ not (-moz-bool-pref: "zen.view.use-single-toolbar") {
     }
   }
 }
+
+/* LOCAL OVERRIDE (not upstream chrome.css).
+ *
+ * Foot buttons (downloads + new-tab). Two defects, one cause.
+ *
+ * Zen's vertical-tabs.css lays #zen-sidebar-foot-buttons out as a COLUMN, and
+ * upstream's collapsed rules then hide everything except #zen-workspaces-button
+ * by opacity. In this profile #zen-workspaces-button is display:none (Sidebery
+ * owns workspace switching), so the footer is left permanently blank, and the
+ * two remaining buttons stay stacked even at 300px.
+ *
+ * The container is a child of #titlebar and does not inherit the toolbox's
+ * animated width, hence the explicit width:100%.
+ *
+ * Height is PINNED. #sidebery is a sibling, so any change in this box's height
+ * resizes the remote frame -- the expensive reflow this whole file is arranged
+ * to avoid. 80px is the natural column height (2 x 36px + 8px padding), so
+ * pinning it costs nothing collapsed and merely leaves slack expanded.
+ */
+@media not (-moz-bool-pref: "zen.view.compact.enable-at-startup"),
+not (-moz-bool-pref: "zen.view.use-single-toolbar") {
+  @media not (-moz-bool-pref: "zen.view.compact.enable-at-startup"),
+  not (-moz-bool-pref: "zen.view.compact.hide-tabbar") {
+    :root:not([sizemode="fullscreen"]) #zen-sidebar-foot-buttons {
+      width: 100% !important;
+      height: 80px !important;
+      justify-content: center !important;
+      align-items: center !important;
+    }
+
+    /* Extra #navigator-toolbox lifts this to (3,2,0) so it beats upstream's
+       equally-specific (2,2,0) `opacity: 0 !important` outright rather than on
+       source order. */
+    :root:not([sizemode="fullscreen"]) #navigator-toolbox #zen-sidebar-foot-buttons > *:not(#zen-workspaces-button) {
+      opacity: 1 !important;
+    }
+
+    /* Row only once there is room for it: two 48px buttons do not fit across a
+       60px rail (they overflow to x=-21), so the collapsed state keeps Zen's
+       column. Triggers mirror the width rule at the top of this file. */
+    :root:not([sizemode="fullscreen"]) #navigator-toolbox:is(:hover, [has-popup-menu="true"], [movingtab], [flash-popup]) #zen-sidebar-foot-buttons,
+    :root:not([sizemode="fullscreen"]) #navigator-toolbox:has(#urlbar[open], toolbarbutton[open="true"]:not(#zen-sidepanel-button)) #zen-sidebar-foot-buttons {
+      flex-direction: row !important;
+    }
+
+    /* Upstream centres this button by translating it half the DIFFERENCE
+       between the two widths -- a large negative X offset that is only correct
+       while it is the sole visible item in a column. It is display:none here,
+       so the transform just drags empty space around mid-animation. */
+    :root:not([sizemode="fullscreen"]) #navigator-toolbox:not([zen-right-side="true"]) #zen-workspaces-button {
+      transform: none !important;
+    }
+  }
+}

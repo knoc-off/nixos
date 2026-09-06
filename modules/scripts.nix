@@ -402,7 +402,7 @@
           '';
         })
       ]
-      ++ lib.optionals pkgs.stdenv.isLinux [
+      ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
         (mkComplgenScript {
           name = "cli";
           text = ''

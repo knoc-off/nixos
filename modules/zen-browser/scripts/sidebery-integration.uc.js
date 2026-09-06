@@ -24,26 +24,60 @@ const { ExtensionUtils } = ChromeUtils.importESModule(
 
 var { promiseEvent } = ExtensionUtils;
 
+// LOCAL: Sidebery's addon id. Looking the policy up by id rather than by
+// display name is both cheaper and immune to a localized/renamed extension.
+const SIDEBERY_ID = "{3c078156-979c-498b-8990-85f7987dd929}";
+
 let sidebery_policy;
 let sidebery_url;
 let sidebery_extension;
 
-
-// Fetch first extension matching the name if any
-sidebery_policy = WebExtensionPolicy.getActiveExtensions().filter((ext) => ext.name === "Sidebery")[0];
-if (sidebery_policy) {
-    sidebery_extension = sidebery_policy.extension;
-    sidebery_url = sidebery_extension.manifest.sidebar_action.default_panel;
-
-    // LOCAL: upstream rewrites Sidebery's baseCSP here to permit 'unsafe-eval',
-    // 'unsafe-inline' and script-src from https://*, which permanently weakens
-    // the extension's own sandbox for the whole session. Left disabled to see
-    // whether Sidebery works without it. If the panel renders blank or its
-    // console shows CSP violations, re-enable and accept the tradeoff.
-    // sidebery_policy.baseCSP = "script-src 'self' https://* http://localhost:* http://127.0.0.1:* moz-extension: chrome: blob: filesystem: 'unsafe-eval' 'wasm-unsafe-eval' 'unsafe-inline' chrome:;"
-
-    console.log("1. Found Sidebery extension.");
+// LOCAL: resolve the policy live instead of caching one at script-load time.
+//
+// The frame we build below must be created in the extension's browsing context
+// group (see initialBrowsingContextGroupId in setupSideberyPanel). That group id
+// only exists once the extension has actually started. This script is injected
+// per window, and the FIRST window is typically injected before Sidebery has
+// finished starting up, so a load-time lookup there found no policy (or one
+// without a usable group) and the frame was constructed in the wrong group.
+//
+// A cross-group frame still renders -- it loads the sidebar document and paints
+// whatever Sidebery persisted last session -- but every IPC-backed WebExtension
+// API (tabs.*, storage.*, windows.*) hangs on it forever. The visible symptom is
+// a tab list that silently disagrees with the window's real tabs, including tabs
+// that no longer exist, and panels that never populate.
+function resolveSideberyPolicy() {
+    // getByID returns the policy whether or not startup has completed; the
+    // group id is what we actually gate on, so check it explicitly.
+    const policy = WebExtensionPolicy.getByID(SIDEBERY_ID);
+    if (!policy || !policy.active) return null;
+    if (typeof policy.browsingContextGroupId !== "number") return null;
+    return policy;
 }
+
+// Resolves once Sidebery is started and its browsing context group is usable.
+// Polls rather than listening for Extension.sys.mjs's Management "ready" event:
+// the event can fire before this window is injected, so a listener needs a poll
+// as a fallback anyway, and the poll alone is a fraction of the code.
+async function whenSideberyReady(win) {
+    for (let i = 0; i < 150; i++) {
+        const policy = resolveSideberyPolicy();
+        if (policy) return policy;
+        await new Promise((r) => win.setTimeout(r, 100));
+    }
+    return null; // ~15s; setup() reports the failure.
+}
+
+// The load-time lookup that used to live here is gone: on the first window it
+// ran before Sidebery had started, so it found nothing and setup() bailed. All
+// three vars above are assigned by setup() once whenSideberyReady() resolves.
+//
+// LOCAL: upstream also rewrites Sidebery's baseCSP at this point to permit
+// 'unsafe-eval', 'unsafe-inline' and script-src from https://*, which
+// permanently weakens the extension's own sandbox for the whole session. Left
+// disabled to see whether Sidebery works without it. If the panel renders blank
+// or its console shows CSP violations, re-enable and accept the tradeoff:
+// sidebery_policy.baseCSP = "script-src 'self' https://* http://localhost:* http://127.0.0.1:* moz-extension: chrome: blob: filesystem: 'unsafe-eval' 'wasm-unsafe-eval' 'unsafe-inline' chrome:;"
 
 
 
@@ -100,6 +134,30 @@ async function setupSideberyPanel(win) {
     oldTabsContainer.insertAdjacentElement('afterend', win.sidebery_browser);
     console.log("2. Sidebery's browser frame element has been set up.");
     await awaitFrameLoader;
+
+    // LOCAL: verify the frame actually landed in the extension's browsing
+    // context group. initialBrowsingContextGroupId is honored only at frame
+    // construction, so a frame built in the wrong group cannot be moved -- it
+    // has to be discarded and rebuilt. Silently leaving it in place yields a
+    // panel that renders stale persisted tabs and hangs on every tabs.*/storage.*
+    // call, which is far harder to diagnose than a rebuild.
+    const wantGroup = resolveSideberyPolicy()?.browsingContextGroupId;
+    const gotGroup = win.sidebery_browser.browsingContext?.group?.id;
+    if (wantGroup !== undefined && gotGroup !== undefined && gotGroup !== wantGroup) {
+        console.warn(
+            `Sidebery frame built in browsing context group ${gotGroup}, expected ` +
+            `${wantGroup}; rebuilding.`
+        );
+        win.sidebery_browser.remove();
+        win.sidebery_browser = null;
+        if (!win.__sideberyRegroupAttempted) {
+            win.__sideberyRegroupAttempted = true;
+            return setupSideberyPanel(win);
+        }
+        console.error("Sidebery frame still in the wrong group after a rebuild; giving up.");
+        return;
+    }
+
     //oldTabsContainer.style.display = "none";
     loadSideberyPanel(win);
 }
@@ -465,8 +523,18 @@ function sideberyMissing(win) {
     ASRouter.routeCFRMessage(spotlight, win, spotlight.trigger, true);
 }
 
-function setup(win = window) {
-    if (sidebery_policy) {
+async function setup(win = window) {
+    // LOCAL: was a synchronous check of the load-time `sidebery_policy`. On the
+    // first window that variable is usually unset, because this script is
+    // injected before Sidebery finishes starting -- which both skipped setup and,
+    // when it did run, built the frame in the wrong browsing context group.
+    // Wait for the extension instead, and only report it missing if it never
+    // turns up.
+    const policy = await whenSideberyReady(win);
+    if (policy) {
+        sidebery_policy = policy;
+        sidebery_extension = policy.extension;
+        sidebery_url = sidebery_extension.manifest.sidebar_action.default_panel;
         setupSideberyPanel(win);
     } else {
         // LOCAL: upstream called this with no argument, but the signature takes

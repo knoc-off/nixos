@@ -66,13 +66,29 @@
   font-weight: 400;
 }
 
+/* No padding transition here: .TabsPanel is frame-sized, and the rule below
+   pins it to `transition: none` for the reason documented there. */
 .TabsPanel,
 .bookmarks-tree {
   padding-left: 5px;
   padding-right: 4px;
-  transition: padding var(--transition-duration) var(--transition-ease);
 }
 
+/* The NavigationBar is deliberately excluded from ALL transitions.
+ *
+ * Its layout is driven entirely by the frame's width (the @media blocks below
+ * switch .static-btns between a column and a row, and Sidebery's own CSS
+ * collapses the panel labels). The reparented frame is a REMOTE browser, so it
+ * does not resize continuously with the chrome animation -- it is re-laid out
+ * in one jump near the end. Transitioning position or width here animates FROM
+ * a stale layout TOWARD the new one, which made panel icons appear to slide to
+ * the right edge on expand and stack on collapse.
+ *
+ * Opacity is no exception, despite the temptation: fading the bar in after the
+ * reflow reads as the top of the sidebar flickering empty and then populating,
+ * because the fade STARTS at the moment the new layout appears. Snapping is
+ * both cheaper and visually correct -- by the time the frame has resized, the
+ * final layout is already known, so there is nothing to ease into. */
 .NavigationBar,
 .nav-item,
 .static-btns,
@@ -80,8 +96,23 @@
   transition: none !important;
 }
 
-#root:not(.NavigationBar),
-.TabsPanel,
+/* #root and .TabsPanel are pinned to no transition, not merely omitted.
+ *
+ * Both are sized by the frame itself, and any transition on a frame-sized box
+ * animates its width/position starting from the PRE-resize geometry. Since the
+ * remote frame reflows in one jump at the end of the chrome animation, that
+ * plays a 200ms catch-up afterwards -- seen as the top of the sidebar flashing
+ * empty and then filling in.
+ *
+ * Stated as an explicit `none` rather than by dropping them from the rule
+ * below: with both removed they still computed to a 0.2s transition that no
+ * matching rule and no inline style accounted for, so something outside this
+ * file supplies it. Asserting none is origin-independent. */
+#root,
+.TabsPanel {
+  transition: none !important;
+}
+
 .bookmarks-tree,
 .close,
 .BookmarkNode > .body::before,
@@ -152,6 +183,13 @@
   .main-items > .nav-item[data-active="true"] {
     opacity: 1 !important;
     transform: none !important;
+  }
+
+  /* Inactive panels are laid out but zero-width in the rail, so only the
+     active one shows. Without this they keep their width and the active icon
+     is pushed off-centre (measured x=9 in a 55px frame instead of centred). */
+  .main-items > .nav-item:not([data-active="true"]) {
+    display: none !important;
   }
 
   /* Center the favicon/icon */

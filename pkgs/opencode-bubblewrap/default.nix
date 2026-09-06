@@ -6,8 +6,8 @@
   ...
 }:
 let
-  jail = inputs.jail-nix.lib.init (
-    pkgs.extend (
+  jail = inputs.jail-nix.lib.extend {
+    pkgs = pkgs.extend (
       _: prev: {
         writeShellApplication =
           args:
@@ -18,8 +18,11 @@ let
             }
           );
       }
-    )
-  );
+    );
+    # overlay-tmp is marked experimental upstream but is stable enough for our use
+    # (tmpfs overlay for jailed writable dirs); suppress the per-eval warning noise.
+    suppressExperimentalWarnings = true;
+  };
   inherit (pkgs) lib;
   system = pkgs.stdenv.hostPlatform.system;
   selfPkgs = self.packages.${system};
@@ -161,7 +164,7 @@ let
   # path, e.g. `, magick photo.png`. comma-with-db bundles a prebuilt weekly
   # index (nix-index-database) rather than building one on first use inside
   # the jail (~10min, and stale the moment nixpkgs moves).
-  commaWithDb = inputs.nix-index-database.legacyPackages.${system}.comma-with-db;
+  commaWithDb = inputs.nix-index-database.packages.${system}.comma-with-db;
 
   # direnv integration for the jail's fish shell.
   #

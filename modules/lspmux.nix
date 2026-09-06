@@ -130,10 +130,10 @@ in
         home.packages = [ sessionTools ];
 
         # The `directories` crate uses platform-native config paths
-        home.file = lib.mkIf pkgs.stdenv.isDarwin {
+        home.file = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
           "Library/Application Support/lspmux/config.toml".source = configFile;
         };
-        xdg.configFile = lib.mkIf (!pkgs.stdenv.isDarwin) {
+        xdg.configFile = lib.mkIf (!pkgs.stdenv.hostPlatform.isDarwin) {
           "lspmux/config.toml".source = configFile;
         };
       };

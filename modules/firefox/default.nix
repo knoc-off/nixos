@@ -150,7 +150,7 @@ in
         };
       };
 
-      xdg.desktopEntries = lib.mkIf pkgs.stdenv.isLinux (
+      xdg.desktopEntries = lib.mkIf pkgs.stdenv.hostPlatform.isLinux (
         let
           mkFirefoxDesktopEntry = profile: {
             name = "Firefox (${profile.name})";

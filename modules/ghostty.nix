@@ -137,7 +137,7 @@
       # Ghostty's progress bar (OSC 9;4) is a GTK widget on Linux/GTK; its default
       # trough/progress is only ~2px tall. Thicken it via GTK4 CSS by bumping the
       # min-height on the progressbar trough/progress nodes.
-      gtk.gtk4.extraCss = lib.mkIf pkgs.stdenv.isLinux ''
+      stylix.targets.gtk.extraCss = lib.mkIf pkgs.stdenv.hostPlatform.isLinux ''
         progressbar > trough,
         progressbar > trough > progress {
           min-height: 8px;
@@ -196,8 +196,8 @@
 
           keybind =
             let
-              isLinux = pkgs.stdenv.isLinux;
-              isDarwin = pkgs.stdenv.isDarwin;
+              isLinux = pkgs.stdenv.hostPlatform.isLinux;
+              isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
             in
             [
               "clear"
