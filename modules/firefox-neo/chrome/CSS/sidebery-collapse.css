@@ -1,0 +1,81 @@
+/* Sidebery collapse-to-rail, for Firefox's native sidebar.
+ *
+ * Replaces the 1100-line Zen version. That one fought #zen-* internals because
+ * Sidebery had been reparented into Zen's tab strip by hand; here Sidebery sits
+ * in the native sidebar where it belongs, and the whole effect is width clamps
+ * on #sidebar-box.
+ *
+ * Layered on top of MrOtherGuy's autohide_sidebar.css (imported separately),
+ * which supplies the hover machinery. This file only retargets it:
+ *
+ *   - scope to Sidebery, so other sidebars (History, Bookmarks) stay normal
+ *   - 60px rail / 300px expanded, matching the Zen setup
+ *
+ * The sidebarcommand value is "_<uuid-without-braces>_-sidebar-action", which
+ * is upstream's documented way to single out one extension's sidebar.
+ */
+
+:root {
+  --neo-sidebar-rail-width: 60px;
+  --neo-sidebar-hover-width: 300px;
+  --neo-sidebar-delay: 100ms;
+  --neo-sidebar-duration: 200ms;
+}
+
+/* Retarget the csshacks variables. They are declared on #browser, so the
+   override has to land there too. */
+:where(#main-window) #browser {
+  --uc-sidebar-width: var(--neo-sidebar-rail-width);
+  --uc-sidebar-hover-width: var(--neo-sidebar-hover-width);
+}
+
+#sidebar-box {
+  --uc-autohide-sidebar-delay: var(--neo-sidebar-delay);
+  --uc-autohide-transition-duration: var(--neo-sidebar-duration);
+  --uc-autohide-transition-type: ease-in-out;
+}
+
+/* The sidebar header is Firefox's own title/close row. Sidebery draws its own
+   controls, so it is redundant and costs 32px of vertical space. */
+#sidebar-header {
+  display: none !important;
+}
+
+/* Keep the expanded sidebar above page content rather than displacing it, so
+   hovering does not reflow the page. */
+#sidebar-box {
+  z-index: 3 !important;
+}
+
+/* Non-static layout: the frame itself resizes, 60px <-> 300px.
+ *
+ * The alternative (userchrome.autohide-sidebar.static-layout.enabled) pins
+ * #sidebar at 300px and animates a clipping container over it. Smoother, but
+ * fatal here: Sidebery drives its own layout from @media queries on the frame's
+ * viewport, and under static layout that viewport is permanently 300px, so the
+ * collapsed view never engages -- the rail shows the left 60px of the expanded
+ * layout, with clipped titles and off-screen nav buttons.
+ *
+ * The remote-frame reflow lag that justified static layout in the Zen setup was
+ * measured here and does not occur: chrome and content widths track within 1px
+ * across the whole transition. See the pref comment in modules/firefox-neo. */
+
+/* Reclaim the space Firefox's own vertical tabs occupy.
+ *
+ * With sidebar.verticalTabs the tab strip moves out of the titlebar and into
+ * #sidebar-container (a sidebar-main custom element holding #vertical-tabs),
+ * which sits at x=0 as a *sibling* of #sidebar-box -- measured at 252px, with
+ * its own 2px splitter, pushing Sidebery to x=254. Sidebery duplicates that
+ * strip entirely, so the native one is dead weight in front of it.
+ *
+ * Hiding the container rather than #vertical-tabs itself: sidebar-main also
+ * renders the extension/tool launcher icons, and leaving an empty flex box
+ * behind still reserves its padding.
+ *
+ * Note this is NOT scoped to [sidebarcommand] -- the native strip should stay
+ * hidden whichever sidebar panel happens to be open, otherwise switching to
+ * History would make the tab strip reappear and shove everything sideways. */
+#sidebar-container,
+#sidebar-launcher-splitter {
+  display: none !important;
+}

@@ -1,0 +1,56 @@
+/* ==UserScript==
+// @name           webext-panel-header
+// @description    Hide the sidebar panel header Firefox draws above extension sidebars
+// @stylemode      agent_sheet
+// ==/UserScript== */
+
+/* The header block above is not free-form, and the obvious spelling silently
+ * fails. extractStyleHeader (utils.sys.mjs:691) matches this exact shape:
+ *
+ *   /^\/\* ==UserScript==\s*[\n\r]+(?:.*[\n\r]+)*?\/\/ ==\/UserScript==\s*\*\//m
+ *
+ * So even in a .css file it must say UserScript (not UserStyle), and the whole
+ * block must be wrapped in a CSS comment -- opening with "/* ==UserScript=="
+ * and closing with "// ==/UserScript== *​/". Get it wrong and the match returns
+ * "", @stylemode is never seen, and the sheet loads as an AUTHOR sheet with no
+ * error anywhere: it just does nothing. That is exactly how the first version
+ * of this file failed. */
+
+/* Remove the "Sidebery [x]" title bar above the extension's sidebar panel.
+ *
+ * This lives in a THIRD document, which is why it survived every earlier
+ * attempt to style it away. The nesting is:
+ *
+ *   chrome window (browser.xhtml)
+ *     #sidebar-box > .sidebar-browser-stack
+ *       <browser id="sidebar">          -> chrome://browser/content/webext-panels.xhtml
+ *         <sidebar-panel-header>        <- THIS, in shadow DOM
+ *         <browser id="webext-panels-browser">  -> moz-extension://.../sidebar.html
+ *
+ * userChrome.css only applies to the outer chrome window, and Sidebery's own
+ * sidebarCSS only applies to the innermost extension page. The header sits
+ * between them, in a document that loads just global.css, usercontext.css and
+ * webext-panels.css -- so neither reaches it.
+ *
+ * An agent sheet does, because agent sheets are registered globally with
+ * nsIStyleSheetService rather than per-document. fx-autoconfig registers any
+ * *.uc.css carrying "@stylemode agent_sheet" that way (boot.sys.mjs:450,472).
+ *
+ * NOT wrapped in @-moz-document, which was the second silent failure here:
+ * layout.css.moz-document.content.enabled defaults to false, so the whole block
+ * is dropped and the rule never applies. Verified by A/B on the live browser --
+ * with the wrapper the header stayed display:block, without it display:none.
+ *
+ * Leaving it unscoped is safe because #sidebar-panel-header is specific to
+ * webext-panels.xhtml; no other chrome document defines that id.
+ *
+ * Worth 55px of vertical space, not just tidiness: with the header gone the
+ * extension viewport grows from 497px to the full 552px (measured), because
+ * #webext-panels-stack starts at y=0 instead of y=54.
+ *
+ * Targeting the host element rather than anything inside its shadow root --
+ * ::part() would be needed to reach in, and there is no reason to: the whole
+ * header goes. */
+#sidebar-panel-header {
+  display: none !important;
+}
