@@ -1,18 +1,17 @@
-/* Sidebery collapse-to-rail, for Firefox's native sidebar.
+/* Collapse-to-rail for the dedicated Sidebery sidebar (chrome/JS/neo-sidebar.uc.js).
  *
- * Replaces the 1100-line Zen version. That one fought #zen-* internals because
- * Sidebery had been reparented into Zen's tab strip by hand; here Sidebery sits
- * in the native sidebar where it belongs, and the whole effect is width clamps
- * on #sidebar-box.
+ * Previously this file retargeted MrOtherGuy's autohide_sidebar.css from
+ * #sidebar-box onto Sidebery. That import is gone now, and this is written
+ * standalone, because csshacks hardcodes #sidebar-box throughout -- keeping it
+ * would clamp the *native* sidebar to 60px too, leaving Bitwarden's panel
+ * unusable. Un-retargeting all of that took more overrides than just owning
+ * the ~15 lines of hover outright.
  *
- * Layered on top of MrOtherGuy's autohide_sidebar.css (imported separately),
- * which supplies the hover machinery. This file only retargets it:
- *
- *   - scope to Sidebery, so other sidebars (History, Bookmarks) stay normal
- *   - 60px rail / 300px expanded, matching the Zen setup
- *
- * The sidebarcommand value is "_<uuid-without-braces>_-sidebar-action", which
- * is upstream's documented way to single out one extension's sidebar.
+ * The mechanism (kept from csshacks, it is the good part): the BOX stays
+ * pinned at rail width while the inner BROWSER expands on hover. The box is
+ * what participates in layout, so page content never reflows; the browser
+ * simply overflows on top of it. This depends on the box NOT clipping -- do
+ * not add overflow:hidden here, it clips the expansion to 60px.
  */
 
 :root {
@@ -20,62 +19,222 @@
   --neo-sidebar-hover-width: 300px;
   --neo-sidebar-delay: 100ms;
   --neo-sidebar-duration: 200ms;
+  /* Radius of the inverted corner; also how far the cover overhangs the rail. */
+  --neo-sidebar-notch: 8px;
+  --neo-sidebar-border: var(--chrome-content-separator-color, rgb(75, 91, 100));
+
+  /* Toolbar colour, tracking window focus.
+   *
+   * NOT --toolbar-bgcolor: that is a static #323F47, which is exactly
+   * --lwt-accent-color-inactive. Using it looked correct while the window was
+   * unfocused and too light the moment it was focused, because Firefox swaps
+   * the real toolbar between --lwt-accent-color (rgb(27,36,41), active) and
+   * --lwt-accent-color-inactive (rgb(50,63,71)) while the literal stayed put.
+   * Reading the same pair keeps the sidebar in lockstep with the toolbar for
+   * free, including the fade between states. */
+  --neo-sidebar-bg: var(--lwt-accent-color, #323f47);
 }
 
-/* Retarget the csshacks variables. They are declared on #browser, so the
-   override has to land there too. */
-:where(#main-window) #browser {
-  --uc-sidebar-width: var(--neo-sidebar-rail-width);
-  --uc-sidebar-hover-width: var(--neo-sidebar-hover-width);
+:root:-moz-window-inactive {
+  --neo-sidebar-bg: var(--lwt-accent-color-inactive, #323f47);
 }
 
-#sidebar-box {
-  --uc-autohide-sidebar-delay: var(--neo-sidebar-delay);
-  --uc-autohide-transition-duration: var(--neo-sidebar-duration);
-  --uc-autohide-transition-type: ease-in-out;
+#neo-sidebar-box {
+  position: relative;
+  min-width: var(--neo-sidebar-rail-width) !important;
+  width: var(--neo-sidebar-rail-width) !important;
+  max-width: var(--neo-sidebar-rail-width) !important;
+  overflow: visible;
+
+  /* Toolbar colour, not `inherit` -- the ::after notch blends into this, and
+     an inherited transparent background shows the separator line through the
+     rail. */
+  background-color: var(--toolbar-bgcolor);
+
+  /* Above the native sidebar, not merely equal to it. Both boxes sit at
+     z-index 3 and #sidebar-box comes later in DOM order, so an equal value
+     loses the tie and the expanded panel paints *behind* the native one. */
+  z-index: 4;
 }
 
-/* The sidebar header is Firefox's own title/close row. Sidebery draws its own
-   controls, so it is redundant and costs 32px of vertical space. */
-#sidebar-header {
-  display: none !important;
+#neo-sidebar {
+  min-width: var(--neo-sidebar-rail-width) !important;
+  transition: min-width var(--neo-sidebar-duration) ease-in-out
+    var(--neo-sidebar-delay) !important;
+  will-change: min-width;
+
+  /* Without this the browser is flex: 0 1 auto inside a 1186px-tall box and
+     resolves to height 0 -- Sidebery renders fully (73KB of DOM) into a frame
+     with no height, which looks exactly like "the extension failed to load".
+     The native #sidebar-box gets its height from Firefox's own rules, which a
+     hand-built box does not inherit. */
+  flex: 1;
+  min-height: 0;
+
+  /* Ride 1px up into the toolbar so the panel's top edge tucks under it rather
+     than butting flush against the seam. Negative margin rather than a
+     position offset: the browser is the flex child that owns the box's height,
+     so shifting it here moves the panel without detaching it from layout. */
+  margin-top: -1px;
+
+  /* Deliberately NOT mirroring the native sidebar's border-radius/box-shadow.
+     This panel is flush: the inverted corner below is the only rounding, and a
+     radius here would fight it at the top while squaring off the seam. */
 }
 
-/* Keep the expanded sidebar above page content rather than displacing it, so
-   hovering does not reflow the page. */
-#sidebar-box {
-  z-index: 3 !important;
+#neo-sidebar-box:hover > #neo-sidebar {
+  min-width: var(--neo-sidebar-hover-width) !important;
+  /* Expand immediately, but keep the delay on the way out so brushing past
+     the rail does not flicker it open. */
+  transition-delay: 0ms !important;
+}
+
+/* Right-hand border, running the full height of the panel.
+ *
+ * A pseudo-element rather than border-right on #neo-sidebar: that element is a
+ * <browser>, where a border would inset the rendered content instead of
+ * sitting alongside it. This strip is purely decorative and overlays instead.
+ *
+ * Starts at top:7px -- one pixel below where the notch's arc meets the
+ * vertical, so the curve hands off to the straight edge with no doubled pixel.
+ * It sits at z-index 5, below the ::after corner (6), so the arc paints over
+ * the border's top end rather than butting into it; that overlap is what keeps
+ * the junction from reading as two separate strokes.
+ *
+ * Width tracks the panel (not the box, which is clamped to rail width) on the
+ * same timing, so the border travels with the expanding edge. */
+#neo-sidebar-box::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  bottom: 0;
+  left: 0;
+  width: var(--neo-sidebar-rail-width);
+  box-sizing: border-box;
+  border-right: 1px solid var(--neo-sidebar-border);
+
+  pointer-events: none;
+  z-index: 5;
+
+  transition: width var(--neo-sidebar-duration) ease-in-out
+    var(--neo-sidebar-delay);
+}
+
+#neo-sidebar-box:hover::before {
+  width: var(--neo-sidebar-hover-width);
+  transition-delay: 0ms;
+}
+
+/* Inverted ("flared out") corner where the sidebar meets the toolbar, plus
+ * cover for the chrome/content separator line along the sidebar's width.
+ *
+ * Two things worth knowing before touching the numbers:
+ *
+ * 1. The notch is a GRADIENT, not a border-radius. border-radius can only
+ *    round a corner inward; flaring outward means painting toolbar colour over
+ *    the seam and biting a quarter-circle out of it. The circle is anchored to
+ *    the element's BOTTOM-RIGHT (background-position: right bottom), so height
+ *    and top move the curve together -- raising `top` without shrinking
+ *    `height` by the same amount just slides the curve down.
+ *
+ * 2. The separator at the seam is a real 1px line of
+ *    --chrome-content-separator-color (verified by pixel scan: one crisp row
+ *    of rgb(75,91,100), not a shadow gradient), painted by the toolbox itself
+ *    rather than by any element's border. It cannot be turned off from the
+ *    element side, so it is covered instead -- hence the 1px overhang above
+ *    the box and the +8px width past the notch.
+ *
+ * The width is driven off the sidebar widths rather than the box's own edges:
+ * the box is clamped to rail width and never grows, so anchoring to it froze
+ * the cover at 68px and left the separator visible across the expanded panel.
+ */
+#neo-sidebar-box::after {
+  content: "";
+  position: absolute;
+  /* -2px, one row above the panel's own -1px margin-top, so the cover still
+     leads the edge it is hiding. Height is 9px, not 10: the circle is anchored
+     to the bottom edge, so the curve sits at top+height-notch. With the panel
+     riding 1px up, the curve has to come up with it -- shrinking height lifts
+     the curve without giving up the covering rows above. */
+  top: -2px;
+  left: 0;
+  height: 9px;
+  width: calc(var(--neo-sidebar-rail-width) + var(--neo-sidebar-notch));
+
+  /* Two stacked gradients, both sized to the whole element rather than to the
+     notch: an arc of border colour, and the toolbar-coloured fill beneath it.
+     Layer order is paint order, so the arc sits on top of the fill.
+
+     This replaces an earlier mask-image approach. The mask was sized 8x8
+     no-repeat, which meant everything outside the corner was masked away
+     entirely -- the strip's width and transition were inert, and the fill it
+     appeared to provide was really coming from the box background. Painting
+     with background gradients keeps the full width live so the corner and the
+     border below it move together.
+
+     Radii are offset by fractions of a pixel (7.6/8.6 for the ring, 8.1 for
+     the fill) so the arc's inner edge lands just outside the fill's cutout;
+     equal radii leave a hairline of toolbar colour bleeding through the
+     curve. */
+  background-color: transparent;
+  background-image:
+    radial-gradient(
+      circle at 100% 100%,
+      transparent 0 calc(var(--neo-sidebar-notch) - 0.4px),
+      var(--neo-sidebar-border) calc(var(--neo-sidebar-notch) - 0.4px),
+      var(--neo-sidebar-border) calc(var(--neo-sidebar-notch) + 0.6px),
+      transparent calc(var(--neo-sidebar-notch) + 0.6px)
+    ),
+    radial-gradient(
+      circle at 100% 100%,
+      transparent 0 calc(var(--neo-sidebar-notch) + 0.1px),
+      var(--toolbar-bgcolor) calc(var(--neo-sidebar-notch) + 0.1px)
+    );
+  background-size: 100% 100%;
+  background-position: right bottom;
+  background-repeat: no-repeat;
+
+  pointer-events: none;
+  /* Above ::before (5) so the arc overlaps the border's top end. */
+  z-index: 6;
+
+  /* Matches the panel's own timing so the notch travels with the edge instead
+     of snapping to the new width ahead of it. */
+  transition: width var(--neo-sidebar-duration) ease-in-out
+    var(--neo-sidebar-delay);
+}
+
+#neo-sidebar-box:hover::after {
+  width: calc(var(--neo-sidebar-hover-width) + var(--neo-sidebar-notch));
+  transition-delay: 0ms;
 }
 
 /* Non-static layout: the frame itself resizes, 60px <-> 300px.
  *
- * The alternative (userchrome.autohide-sidebar.static-layout.enabled) pins
- * #sidebar at 300px and animates a clipping container over it. Smoother, but
- * fatal here: Sidebery drives its own layout from @media queries on the frame's
- * viewport, and under static layout that viewport is permanently 300px, so the
- * collapsed view never engages -- the rail shows the left 60px of the expanded
- * layout, with clipped titles and off-screen nav buttons.
- *
- * The remote-frame reflow lag that justified static layout in the Zen setup was
- * measured here and does not occur: chrome and content widths track within 1px
- * across the whole transition. See the pref comment in modules/firefox-neo. */
+ * The alternative (userchrome.autohide-sidebar.static-layout.enabled) pins the
+ * frame at 300px and animates a clipping container over it. Smoother, but
+ * fatal here: Sidebery drives its own layout from @media queries on the
+ * frame's viewport, and under static layout that viewport is permanently
+ * 300px, so the collapsed view never engages -- the rail would show the left
+ * 60px of the expanded layout, with clipped titles and off-screen buttons. */
 
 /* Reclaim the space Firefox's own vertical tabs occupy.
  *
- * With sidebar.verticalTabs the tab strip moves out of the titlebar and into
+ * With sidebar.verticalTabs the tab strip moves out of the titlebar into
  * #sidebar-container (a sidebar-main custom element holding #vertical-tabs),
- * which sits at x=0 as a *sibling* of #sidebar-box -- measured at 252px, with
- * its own 2px splitter, pushing Sidebery to x=254. Sidebery duplicates that
- * strip entirely, so the native one is dead weight in front of it.
+ * which sits at x=0 as a sibling of the sidebar boxes. Sidebery duplicates
+ * that strip entirely, so the native one is dead weight in front of it.
  *
  * Hiding the container rather than #vertical-tabs itself: sidebar-main also
- * renders the extension/tool launcher icons, and leaving an empty flex box
- * behind still reserves its padding.
- *
- * Note this is NOT scoped to [sidebarcommand] -- the native strip should stay
- * hidden whichever sidebar panel happens to be open, otherwise switching to
- * History would make the tab strip reappear and shove everything sideways. */
+ * renders the tool launcher icons, and leaving an empty flex box behind still
+ * reserves its padding. */
 #sidebar-container,
 #sidebar-launcher-splitter {
   display: none !important;
 }
+
+/* The native sidebar is deliberately left at its default width and behaviour
+ * -- it still hosts Bitwarden and anything else that registers a sidebar tool.
+ * Its header is Firefox's own title/close row, which is wanted there (it is
+ * how you close the panel); only Sidebery drew its own controls, and Sidebery
+ * no longer lives in that box. */

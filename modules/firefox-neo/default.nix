@@ -31,13 +31,6 @@ in
       firefox-neo = self.packages.${pkgs.stdenv.hostPlatform.system}.firefox-neo;
       fxAutoconfig = inputs.fx-autoconfig;
 
-      # MrOtherGuy's csshacks, same source the firefox module uses.
-      firefox-csshacks = pkgs.stdenv.mkDerivation {
-        name = "firefox-csshacks-neo";
-        src = inputs.firefox-csshacks;
-        installPhase = "cp -r . $out";
-      };
-
       profileName = "neo";
       configPath = ".mozilla/firefox-neo";
       profileDir = "${configPath}/${profileName}";
@@ -94,16 +87,16 @@ in
 
           # neoTheme.userChrome defines the --lwt-*/--toolbar-* custom
           # properties Firefox's chrome reads, so it has to come first --
-          # the imported sheets below consume those variables.
+          # the imported sheet below consumes those variables.
           #
-          # autohide_sidebar supplies the hover machinery; sidebery-collapse.css
-          # retargets it (60px rail, 300px expanded, Sidebery-scoped). Order
-          # matters -- the override has to come second.
+          # sidebery-collapse.css is standalone now; the autohide_sidebar.css
+          # import it used to retarget is gone, since Sidebery has its own
+          # frame (chrome/JS/neo-sidebar.uc.js) and csshacks' hardcoded
+          # #sidebar-box rules would clamp the native sidebar along with it.
           #
           # @import must precede all other rules in a stylesheet, so the
-          # imports lead and the variable block follows.
+          # import leads and the variable block follows.
           userChrome = ''
-            @import "${firefox-csshacks}/chrome/autohide_sidebar.css";
             @import "${chromeSrc}/CSS/sidebery-collapse.css";
 
             ${neoTheme.userChrome}
@@ -172,6 +165,23 @@ in
             # but set explicitly so the layout cannot silently change.
             "sidebar.verticalTabs" = true;
             "sidebar.revamp" = true;
+
+            # The built-in AI chat registers itself as a sidebar tool, and the
+            # revamp sidebar has exactly one slot -- so enabling it evicts
+            # whatever was in there. Unused here, so turn it off at the source
+            # rather than just hiding its entry.
+            #
+            # Note this is no longer load-bearing for keeping tabs visible:
+            # Sidebery has its own frame now (chrome/JS/neo-sidebar.uc.js) and
+            # cannot be evicted by anything. It is off because it is unwanted,
+            # not because it would break the layout.
+            "browser.ml.chat.enabled" = false;
+
+            # NOTE: Sidebery is kept out of sidebar.main.tools too, but that
+            # cannot be done here -- its manifest sets open_at_install, so
+            # Firefox appends the id back after prefs load and a declarative
+            # value loses the race. chrome/JS/neo-sidebar.uc.js strips it at
+            # runtime instead. Bitwarden keeps the native sidebar.
 
             # The debug bridge needs chrome-level devtools access.
             "devtools.chrome.enabled" = true;
@@ -244,6 +254,12 @@ in
 
         "${profileDir}/chrome/JS/debug-bridge.uc.js".source =
           "${chromeSrc}/JS/debug-bridge.uc.js";
+
+        # Builds the dedicated Sidebery sidebar, so the extension is not
+        # competing with Bitwarden/AI chat/etc for the single native slot.
+        # Styled by the #neo-sidebar-box rules in sidebery-collapse.css.
+        "${profileDir}/chrome/JS/neo-sidebar.uc.js".source =
+          "${chromeSrc}/JS/neo-sidebar.uc.js";
 
         # Agent sheet, hiding the "Sidebery [x]" header Firefox draws above
         # extension sidebars. Must live in chrome/CSS (the "userstyles"
