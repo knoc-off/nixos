@@ -20,7 +20,11 @@ pub struct Message {
 // -- Setting: read-only HA -> MQTT value --------------------------------------
 
 /// Types that can be parsed from MQTT JSON payloads.
-pub trait FromMqttPayload: Copy {
+///
+/// `Serialize` is required too: [`Runtime::setting`] publishes the initial
+/// value back to the topic (retained) when nothing is retained there yet, so
+/// a brand-new HA entity doesn't show "Unknown" forever.
+pub trait FromMqttPayload: Copy + Serialize {
     fn from_payload(value: &serde_json::Value) -> Option<Self>;
 }
 
@@ -166,6 +170,16 @@ impl Runtime {
         Ok(())
     }
 
+    /// Publish a JSON-serializable payload to a topic with the retain flag set.
+    async fn publish_retained(&self, topic: &str, payload: impl Serialize) -> Result<()> {
+        let json = serde_json::to_vec(&payload)?;
+        self.client
+            .publish(topic, QoS::AtMostOnce, true, json)
+            .await
+            .context("mqtt publish (retained)")?;
+        Ok(())
+    }
+
     /// Subscribe to a topic and receive messages on a channel.
     pub async fn subscribe(&self, topic: &str) -> Result<mpsc::UnboundedReceiver<Message>> {
         let (tx, rx) = mpsc::unbounded_channel();
@@ -181,6 +195,10 @@ impl Runtime {
     ///
     /// `topic_env` is the name of the env var holding the MQTT topic.
     /// If the env var is empty or unset, the setting always returns `initial`.
+    ///
+    /// If the topic has no retained message yet (a brand-new HA entity),
+    /// `initial` is published back to it retained, so the entity shows a
+    /// real value instead of "Unknown" until someone changes it.
     pub async fn setting<T: FromMqttPayload>(
         &self,
         topic_env: &str,
@@ -193,7 +211,17 @@ impl Runtime {
                 current: initial,
             });
         }
-        let rx = self.subscribe(&topic).await?;
+        let mut rx = self.subscribe(&topic).await?;
+
+        // Give the broker a moment to deliver any retained message before
+        // deciding the topic is unseeded.
+        if tokio::time::timeout(Duration::from_secs(2), rx.recv())
+            .await
+            .is_err()
+        {
+            self.publish_retained(&topic, initial).await?;
+        }
+
         Ok(Setting {
             rx: Some(rx),
             current: initial,
@@ -255,5 +283,38 @@ impl Runtime {
             _ = sigterm.recv() => {}
             _ = sigint.recv() => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `Runtime::setting`'s seed-back path serializes `initial` with
+    /// `serde_json` and relies on `FromMqttPayload::from_payload` being able
+    /// to parse it straight back. Every impl must round-trip.
+    #[test]
+    fn naive_time_round_trips_through_serde() {
+        let t = chrono::NaiveTime::from_hms_opt(6, 30, 0).unwrap();
+        let json = serde_json::to_value(t).unwrap();
+        assert_eq!(chrono::NaiveTime::from_payload(&json), Some(t));
+    }
+
+    #[test]
+    fn uint_round_trips_through_serde() {
+        let json = serde_json::to_value(45u64).unwrap();
+        assert_eq!(u64::from_payload(&json), Some(45u64));
+    }
+
+    #[test]
+    fn bool_round_trips_through_serde() {
+        let json = serde_json::to_value(true).unwrap();
+        assert_eq!(bool::from_payload(&json), Some(true));
+    }
+
+    #[test]
+    fn f64_round_trips_through_serde() {
+        let json = serde_json::to_value(2.2f64).unwrap();
+        assert_eq!(f64::from_payload(&json), Some(2.2f64));
     }
 }
