@@ -105,6 +105,20 @@
           "$r" "$g" "$b" "$linear_url" "$ticket"
       '';
 
+      ghStackPosition = pkgs.writeShellScriptBin "gh-stack-position" ''
+        gitdir=$(${gitBin} rev-parse --git-dir 2>/dev/null) || exit 0
+        [ -f "$gitdir/gh-stack" ] || exit 0
+        read -r head < "$gitdir/HEAD" || exit 0
+        case "$head" in ref:*) branch=''${head#ref: refs/heads/} ;; *) exit 0 ;; esac
+
+        ${jqBin} -rj --arg b "$branch" '
+          [.stacks[] | select(.branches | any(.branch == $b))][0] as $s
+          | if $s == null then "" else
+              " \u001b[2;37m" + (([$s.branches[].branch] | index($b)) + 1 | tostring)
+              + "/" + ($s.branches | length | tostring) + "\u001b[0m"
+            end' "$gitdir/gh-stack"
+      '';
+
       upstreamLink = pkgs.writeShellScriptBin "upstream-link" ''
         branch=$(${gitBin} rev-parse --abbrev-ref HEAD 2>/dev/null) || exit 0
         remote_url=$(${gitBin} remote get-url origin 2>/dev/null) || exit 0
@@ -193,6 +207,21 @@
                 exec_in_cwd = true;
                 idle_timeout = "30m";
               };
+              gh_stack = {
+                run = "${ghStackPosition}/bin/gh-stack-position";
+                watch = [
+                  ".git/gh-stack"
+                  ".git/HEAD"
+                ];
+                env = [ "CWD" ];
+                exec_in_cwd = true;
+                stale = {
+                  on_context_mismatch = "";
+                  on_expired = "";
+                  on_empty = "";
+                  on_error = "";
+                };
+              };
             };
           };
         }
@@ -204,7 +233,7 @@
         settings = {
           add_newline = false;
 
-          format = "((($python )(\${custom.rust} )$nix_shell )(\${custom.upstream_link} ${lib.optionalString cfg.enable "(\${custom.linear_ticket}-)"}\${custom.git_branch} )\n)$directory( $cmd_duration)$line_break$character";
+          format = "((($python )(\${custom.rust} )$nix_shell )(\${custom.upstream_link} ${lib.optionalString cfg.enable "(\${custom.linear_ticket}-)"}\${custom.git_branch}\${custom.gh_stack} )\n)$directory( $cmd_duration)$line_break$character";
           command_timeout = 500;
 
           character = {
@@ -280,6 +309,16 @@
 
           custom.git_branch = {
             command = "git_branch";
+            use_stdin = false;
+            shell = promptClient;
+            detect_folders = [ ".git" ];
+            when = "true";
+            style = "";
+            symbol = "";
+            format = "$output";
+          };
+          custom.gh_stack = {
+            command = "gh_stack";
             use_stdin = false;
             shell = promptClient;
             detect_folders = [ ".git" ];
