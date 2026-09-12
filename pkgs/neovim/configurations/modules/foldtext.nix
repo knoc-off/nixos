@@ -13,12 +13,24 @@
       local consumed = 0
       local chunk = ""
       local hl = nil
+      local i = 1
 
-      for i = 1, #text do
-        if consumed >= budget then break end
-        local char = text:sub(i, i)
-        local new_hl = nil
+      -- Query once per token (a run of word chars, or one punctuation char)
+      -- instead of once per character. Treesitter highlight captures always
+      -- span a whole identifier/keyword/number, never split mid-word, so this
+      -- is exact for the overwhelmingly common case while cutting the number
+      -- of get_captures_at_pos calls roughly to (unique tokens) instead of
+      -- (characters).
+      while i <= #text and consumed < budget do
+        local token_end = text:find("[^%w_]", i) or (#text + 1)
+        if token_end == i then
+          token_end = i + 1 -- single punctuation char
+        end
+        local remaining = budget - consumed
+        token_end = math.min(token_end, i + remaining)
+
         local captures = vim.treesitter.get_captures_at_pos(0, lnum_0, col_offset + i - 1)
+        local new_hl = nil
         if #captures > 0 then
           local cap = captures[#captures]
           new_hl = "@" .. cap.capture
@@ -27,16 +39,20 @@
           end
         end
 
+        local piece = text:sub(i, token_end - 1)
         if new_hl ~= hl then
           if #chunk > 0 then
             table.insert(result, { chunk, hl })
           end
-          chunk = char
+          chunk = piece
           hl = new_hl
         else
-          chunk = chunk .. char
+          chunk = chunk .. piece
         end
-        consumed = consumed + 1
+
+        local piece_len = token_end - i
+        consumed = consumed + piece_len
+        i = token_end
       end
 
       if #chunk > 0 then

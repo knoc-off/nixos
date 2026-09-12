@@ -4,12 +4,6 @@
 }:
 {
   overlay = self: super: {
-    window-manager = vimUtils.buildVimPlugin {
-      pname = "windowServer";
-      version = "0.1.0";
-      src = ./window-server;
-    };
-
     smart-paste-nvim = import ./plugins/smart-paste/package.nix {
       inherit vimUtils fetchFromGitHub;
     };

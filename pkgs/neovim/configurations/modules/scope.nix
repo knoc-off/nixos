@@ -28,7 +28,7 @@ let
   ];
 
   # Language-aware treesitter node types for scope highlighting
-  scopeNodeTypes = {
+  scopeNodeTypes = rec {
     rust = [
       "function_item"
       "impl_item"
@@ -74,35 +74,15 @@ let
       "parenthesized_expression"
     ];
 
-    tsx = [
-      # TSX reuses most TS nodes, plus JSX containers
-      "function_declaration"
-      "function"
-      "method_definition"
-      "arrow_function"
-      "class_declaration"
-      "class_body"
-      "if_statement"
-      "for_statement"
-      "for_in_statement"
-      "for_of_statement"
-      "while_statement"
-      "do_statement"
-      "switch_statement"
-      "switch_body"
-      "try_statement"
-      "catch_clause"
-      "finally_clause"
-      "statement_block"
-      "object"
-      "array"
-      "call_expression"
-      "arguments"
-      "parenthesized_expression"
-      "jsx_element"
-      "jsx_self_closing_element"
-      "jsx_fragment"
-    ];
+    # TSX reuses every TS node (drops the two pattern-destructuring nodes,
+    # which JSX doesn't have) plus JSX containers.
+    tsx =
+      (lib.subtractLists [ "object_pattern" "array_pattern" ] scopeNodeTypes.typescript)
+      ++ [
+        "jsx_element"
+        "jsx_self_closing_element"
+        "jsx_fragment"
+      ];
 
     lua = [
       "function_declaration"
@@ -162,15 +142,14 @@ let
       "fenced_code_block"
     ];
 
-    # Fallback for anything else
+    # Fallback for anything else. IBL matches node types by exact string
+    # equality (no glob/regex support), so only literal node-type names work
+    # here -- "^if"/"^for"/"^while" would never match anything.
     "*" = [
       "function"
       "method"
       "class"
       "block"
-      "^if"
-      "^for"
-      "^while"
       "try_statement"
       "catch_clause"
       "arguments"

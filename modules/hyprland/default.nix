@@ -4,6 +4,7 @@
 {
   nixos =
     {
+      lib,
       pkgs,
       upkgs,
       ...
@@ -20,6 +21,34 @@
       };
 
       security.polkit.enable = true;
+
+      # programs.uwsm puts uwsm's session units into /etc/systemd/user via
+      # systemd.packages, so switch-to-configuration treats them as its own and
+      # stops/starts them whenever the uwsm store path changes -- which happens
+      # on any nixpkgs bump that rebuilds uwsm, since ExecStart= embeds the path.
+      # Stopping wayland-session-bindpid@ fires its
+      # OnSuccess=wayland-session-shutdown.target, i.e. a full session teardown,
+      # which systemd then refuses ("Found ordering cycle ... Unable to break
+      # cycle") while wayland-wm-env@'s ExecStopPost has already run cleanup-env
+      # and wiped WAYLAND_DISPLAY/XDG_* from the user manager. Net result: a
+      # half-torn-down session and activation exit code 4.
+      systemd.user.services = lib.genAttrs [
+        "wayland-session-bindpid@"
+        "wayland-wm@"
+        "wayland-wm-app-daemon"
+        "wayland-session-waitenv"
+      ] (_: {
+        # These units come from the uwsm package, not from NixOS, so the
+        # override has to be a drop-in rather than a replacement file.
+        overrideStrategy = "asDropin";
+        restartIfChanged = false;
+        # A NixOS service drop-in defaults to injecting Environment=PATH/
+        # LOCALE_ARCHIVE/TZDIR. Drop-ins are parsed after the main unit, so
+        # those would win over uwsm's EnvironmentFile=%t/uwsm/env_session.conf
+        # and hand the compositor a stub PATH. Only X-RestartIfChanged is wanted.
+        environment = lib.mkForce { };
+        path = lib.mkForce [ ];
+      });
 
       environment.systemPackages = with pkgs; [
         wl-clipboard

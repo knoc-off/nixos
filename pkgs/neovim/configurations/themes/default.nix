@@ -6,30 +6,8 @@
   ...
 }:
 let
-  # Generate highlights for all theme colors
-  flattenThemeToHighlights =
-    attrPrefix: attrs:
-    lib.foldl' (
-      acc: name:
-      let
-        value = attrs.${name};
-        attrPath = if attrPrefix == "" then name else "${attrPrefix}_${name}";
-      in
-      if builtins.isString value then
-        acc
-        // {
-          ${attrPath} = {
-            bg = "#${value}";
-            fg = "#${color-lib.ensureTextContrast value value 4.5}";
-          };
-        }
-      else if builtins.isAttrs value then
-        acc // flattenThemeToHighlights attrPath value
-      else
-        acc # skip lists, numbers, etc.
-    ) { } (builtins.attrNames attrs);
-
-  themeHighlights = flattenThemeToHighlights "theme" theme;
+  # Highlight groups that share identical settings, keyed by group name.
+  mkGroup = names: attrs: lib.genAttrs names (_: attrs);
 in
 {
   colorschemes.onedark = {
@@ -63,21 +41,17 @@ in
         purple = "#${theme.dark.base0E}"; # Keywords, special methods
 
         # Create variations using color-lib
+        # dark_orange/green/blue and bright_red/green/blue/purple are unused --
+        # onedark only reads dark_{red,yellow,cyan,purple} (diagnostics.darker,
+        # on by default) and bright_{cyan,orange,yellow} (below).
         dark_red = "#${color-lib.adjustOkhslLightness (-0.1) theme.dark.base08}";
-        dark_orange = "#${color-lib.adjustOkhslLightness (-0.1) theme.dark.base09}";
         dark_yellow = "#${color-lib.adjustOkhslLightness (-0.1) theme.dark.base0A}";
-        dark_green = "#${color-lib.adjustOkhslLightness (-0.1) theme.dark.base0B}";
         dark_cyan = "#${color-lib.adjustOkhslLightness (-0.1) theme.dark.base0C}";
-        dark_blue = "#${color-lib.adjustOkhslLightness (-0.1) theme.dark.base0D}";
         dark_purple = "#${color-lib.adjustOkhslLightness (-0.1) theme.dark.base0E}";
 
-        bright_red = "#${color-lib.adjustOkhslLightness 0.1 theme.dark.base08}";
         bright_orange = "#${color-lib.adjustOkhslLightness 0.1 theme.dark.base09}";
         bright_yellow = "#${color-lib.adjustOkhslLightness 0.1 theme.dark.base0A}";
-        bright_green = "#${color-lib.adjustOkhslLightness 0.1 theme.dark.base0B}";
         bright_cyan = "#${color-lib.adjustOkhslLightness 0.1 theme.dark.base0C}";
-        bright_blue = "#${color-lib.adjustOkhslLightness 0.1 theme.dark.base0D}";
-        bright_purple = "#${color-lib.adjustOkhslLightness 0.1 theme.dark.base0E}";
 
         # Specialized/desaturated colors for specific UI elements
         diff_add = "#${color-lib.adjustOkhslSaturation (-0.2) theme.dark.base0B}";
@@ -225,58 +199,34 @@ in
           fg = "$fg";
           fmt = "${code_style.variables}";
         };
-        Statement = {
+      }
+      // mkGroup
+        [
+          "Statement"
+          "Keyword"
+          "Conditional"
+          "Repeat"
+          "Label"
+          "Operator"
+          "Exception"
+        ]
+        {
           fg = "$purple";
           fmt = "${code_style.keywords}";
-        };
-        Keyword = {
-          fg = "$purple";
-          fmt = "${code_style.keywords}";
-        };
-        Conditional = {
-          fg = "$purple";
-          fmt = "${code_style.keywords}";
-        };
-        Repeat = {
-          fg = "$purple";
-          fmt = "${code_style.keywords}";
-        };
-        Label = {
-          fg = "$purple";
-          fmt = "${code_style.keywords}";
-        };
-        Operator = {
-          fg = "$purple";
-          fmt = "${code_style.keywords}";
-        };
-        Exception = {
-          fg = "$purple";
-          fmt = "${code_style.keywords}";
-        };
-        PreProc = {
-          fg = "$purple";
-        };
-        Include = {
-          fg = "$purple";
-        };
-        Define = {
-          fg = "$purple";
-        };
-        Macro = {
-          fg = "$purple";
-        };
-        Type = {
-          fg = "$yellow";
-        };
-        StorageClass = {
-          fg = "$yellow";
-        };
-        Structure = {
-          fg = "$yellow";
-        };
-        Typedef = {
-          fg = "$yellow";
-        };
+        }
+      // mkGroup [
+        "PreProc"
+        "Include"
+        "Define"
+        "Macro"
+      ] { fg = "$purple"; }
+      // mkGroup [
+        "Type"
+        "StorageClass"
+        "Structure"
+        "Typedef"
+      ] { fg = "$yellow"; }
+      // {
         Special = {
           fg = "$orange";
         };
@@ -307,15 +257,6 @@ in
         };
         Character = {
           fg = "$green";
-        };
-        Number = {
-          fg = "$orange";
-        };
-        Boolean = {
-          fg = "$orange";
-        };
-        Float = {
-          fg = "$orange";
         };
         Constant = {
           fg = "$orange";
@@ -436,35 +377,23 @@ in
         };
 
         # Dimmed rainbow indent guides (parent scope hierarchy)
-        IblRainbowRed = {
-          fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base08}";
+      }
+      // lib.mapAttrs' (name: base: {
+        name = "IblRainbow${name}";
+        value = {
+          fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.${base}}";
           nocombine = true;
         };
-        IblRainbowYellow = {
-          fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0A}";
-          nocombine = true;
-        };
-        IblRainbowBlue = {
-          fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0D}";
-          nocombine = true;
-        };
-        IblRainbowOrange = {
-          fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base09}";
-          nocombine = true;
-        };
-        IblRainbowGreen = {
-          fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0B}";
-          nocombine = true;
-        };
-        IblRainbowViolet = {
-          fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0E}";
-          nocombine = true;
-        };
-        IblRainbowCyan = {
-          fg = "#${color-lib.setOkhslLightness 0.25 theme.dark.base0C}";
-          nocombine = true;
-        };
-
+      }) {
+        Red = "base08";
+        Yellow = "base0A";
+        Blue = "base0D";
+        Orange = "base09";
+        Green = "base0B";
+        Violet = "base0E";
+        Cyan = "base0C";
+      }
+      // {
         # vim-matchup - bright active pair highlighting
         MatchWord = {
           fg = "$bright_cyan";
@@ -478,29 +407,12 @@ in
           fg = "$bright_orange";
           fmt = "bold";
         };
-
-        # Custom highlights from core.nix
-        TODO = {
-          fg = "$bg0";
-          bg = "#${color-lib.setOkhsvValue 0.9 theme.dark.base0A}";
-        };
-        FIXME = {
-          fg = "$bg0";
-          bg = "#${color-lib.setOkhsvValue 0.9 theme.dark.base0E}";
-        };
-        HACK = {
-          fg = "$bg0";
-          bg = "#${color-lib.setOkhsvValue 0.9 theme.dark.base0C}";
-        };
-        SnippetCursor = {
-          fg = "$bg0";
-          bg = "$green";
-        };
-        ExtraWhitespace = {
-          bg = "$bg2";
-        };
       }
-      // themeHighlights;
+      // mkGroup [
+        "Number"
+        "Boolean"
+        "Float"
+      ] { fg = "$orange"; };
     };
   };
 }

@@ -75,15 +75,8 @@
 
   keymaps =
     let
-      mk = key: fn: desc: {
-        mode = "n";
-        inherit key;
-        action = lib.nixvim.mkRaw "function() ${fn} end";
-        options = {
-          silent = true;
-          inherit desc;
-        };
-      };
+      inherit (import ./keymap-helpers.nix { inherit lib; }) mkFn;
+      mk = mkFn;
     in
     [
       # Flow control. F-keys follow the VSCode convention every nvim-dap tutorial

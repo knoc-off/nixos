@@ -46,6 +46,15 @@
 
   time.timeZone = "Europe/Berlin";
 
+  # modules/nix.nix pre-sizes the Boehm GC heap to 6 GiB, which is more than
+  # this host's 1.8 GiB RAM + 1.9 GiB swap. With vm.overcommit_memory = 0 the
+  # kernel refuses the mapping and Boehm aborts ("Failed to expand heap ...
+  # Can't start up: not enough memory") before nix does any work -- killing
+  # every nix invocation here, including the nix-daemon that remote
+  # `--target-host` deploys connect to. Nothing is lost by unsetting it: with
+  # max-jobs = 0 above, this host never evaluates a system closure anyway.
+  environment.variables.GC_INITIAL_HEAP_SIZE = null;
+
   boot = {
     # Use the mainline aarch64 kernel: it is prebuilt on cache.nixos.org, whereas
     # the Raspberry Pi vendor kernel (linux-rpi) is cached nowhere and rebuilds

@@ -58,7 +58,7 @@
         concatStringsSep "\n      " [
           (osc "10" v.base05) # foreground
           (osc "11" v.base00) # background
-          (osc "12" v.base09) # cursor
+          (osc "12" v.base0D) # cursor (blue accent)
           (osc "17" v.base02) # selection background
           (osc "19" v.base06) # selection foreground
           (osc "4;0" v.base00) # palette 0:  black
@@ -182,7 +182,7 @@
           background = "${base.base00}";
           foreground = "${base.base06}";
 
-          cursor-color = "${base.base09}";
+          cursor-color = "${base.base0D}"; # blue accent
           cursor-style = "bar";
           cursor-style-blink = false;
           adjust-cursor-thickness = "200%";

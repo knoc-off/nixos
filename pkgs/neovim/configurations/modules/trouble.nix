@@ -17,15 +17,8 @@
 
   keymaps =
     let
-      mk = key: cmd: desc: {
-        mode = "n";
-        inherit key;
-        action = "<cmd>Trouble ${cmd}<cr>";
-        options = {
-          silent = true;
-          inherit desc;
-        };
-      };
+      inherit (import ./keymap-helpers.nix { inherit lib; }) mkCmd;
+      mk = key: cmd: mkCmd key "Trouble ${cmd}";
     in
     [
       (mk "<leader>tr" "lsp_references toggle focus=true" "References (panel)")

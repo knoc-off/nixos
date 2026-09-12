@@ -46,15 +46,8 @@
 
   keymaps =
     let
-      mk = key: cmd: desc: {
-        mode = "n";
-        inherit key;
-        action = "<cmd>${cmd}<cr>";
-        options = {
-          silent = true;
-          inherit desc;
-        };
-      };
+      inherit (import ./keymap-helpers.nix { inherit lib; }) mkCmd;
+      mk = mkCmd;
     in
     [
       # Diff view against the shared GitState base (same as gutter signs /

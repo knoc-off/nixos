@@ -1,5 +1,5 @@
 { inputs, self, ... }: {
-  nixos = { ... }: {
+  nixos = { lib, ... }: {
     nixpkgs.config.allowUnfree = true;
     # Local builders (mkComplgenScript, writeLuaScript, writeNuScript) as
     # pkgs.* on the host's own pkgs instance -- the same instance home-manager
@@ -12,7 +12,10 @@
     # heap to ~4.3GB and triggers 2 GC cycles; starting at 6GB avoids one of them
     # (~5-10% faster eval). Untouched pages cost no physical RAM (demand-paged),
     # so small nix commands are unaffected.
-    environment.variables.GC_INITIAL_HEAP_SIZE = "6442450944"; # 6 GiB
+    # mkDefault: hosts with less than ~6GB of RAM+swap must unset this (set it to
+    # null), since the kernel's overcommit heuristic refuses the mapping outright
+    # and Boehm aborts before nix starts -- see systems/rpi-4b-plus.
+    environment.variables.GC_INITIAL_HEAP_SIZE = lib.mkDefault "6442450944"; # 6 GiB
 
     nix = {
       registry = {

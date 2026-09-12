@@ -63,23 +63,14 @@
             return default_settings
           end
         '';
-
-        # Standalone file support (for single .rs files outside cargo projects)
-        standalone = true;
       };
 
       tools = {
-        hover_actions = {
-          replace_builtin_hover = true;
-        };
         code_actions = {
           ui_select_fallback = true;
         };
         float_win_config = {
           border = "rounded";
-        };
-        inlay_hints = {
-          auto = true;
         };
       };
     };
@@ -92,181 +83,63 @@
     };
   };
 
-  keymaps = [
-    {
-      mode = "n";
-      key = "<leader>rh";
-      action = lib.nixvim.mkRaw ''
-        function()
-          vim.cmd.RustLsp({ 'hover', 'actions' })
-        end
-      '';
-      options = {
-        silent = true;
-        desc = "Rust: Hover actions";
+  keymaps =
+    let
+      # Most RustLsp keymaps are `vim.cmd.RustLsp(<arg>)` one-liners; only the
+      # arg, key and desc differ. `arg` may be a Lua string or table literal.
+      rustLsp = key: arg: desc: {
+        mode = "n";
+        inherit key;
+        action = lib.nixvim.mkRaw "function() vim.cmd.RustLsp(${arg}) end";
+        options = {
+          silent = true;
+          inherit desc;
+        };
       };
-    }
-    {
-      mode = "n";
-      key = "<leader>ra";
-      action = lib.nixvim.mkRaw ''
-        function()
-          vim.cmd.RustLsp('codeAction')
-        end
-      '';
-      options = {
-        silent = true;
-        desc = "Rust: Code action";
-      };
-    }
-    {
-      mode = "n";
-      key = "<leader>rr";
-      action = lib.nixvim.mkRaw ''
-        function()
-          vim.cmd.RustLsp('runnables')
-        end
-      '';
-      options = {
-        silent = true;
-        desc = "Rust: Runnables";
-      };
-    }
-    {
-      mode = "n";
-      key = "<leader>rd";
-      action = lib.nixvim.mkRaw ''
-        function()
-          vim.cmd.RustLsp('debuggables')
-        end
-      '';
-      options = {
-        silent = true;
-        desc = "Rust: Debuggables";
-      };
-    }
-    {
-      mode = "n";
-      key = "<leader>rt";
-      action = lib.nixvim.mkRaw ''
-        function()
-          vim.cmd.RustLsp('testables')
-        end
-      '';
-      options = {
-        silent = true;
-        desc = "Rust: Testables";
-      };
-    }
-    {
-      mode = "n";
-      key = "<leader>rm";
-      action = lib.nixvim.mkRaw ''
-        function()
-          vim.cmd.RustLsp('expandMacro')
-        end
-      '';
-      options = {
-        silent = true;
-        desc = "Rust: Expand macro";
-      };
-    }
-    {
-      mode = "n";
-      key = "<leader>rc";
-      action = lib.nixvim.mkRaw ''
-        function()
-          vim.cmd.RustLsp('openCargo')
-        end
-      '';
-      options = {
-        silent = true;
-        desc = "Rust: Open Cargo.toml";
-      };
-    }
-    {
-      mode = "n";
-      key = "<leader>rp";
-      action = lib.nixvim.mkRaw ''
-        function()
-          vim.cmd.RustLsp('parentModule')
-        end
-      '';
-      options = {
-        silent = true;
-        desc = "Rust: Parent module";
-      };
-    }
-    {
-      mode = "n";
-      key = "<leader>rj";
-      action = lib.nixvim.mkRaw ''
-        function()
-          vim.cmd.RustLsp('joinLines')
-        end
-      '';
-      options = {
-        silent = true;
-        desc = "Rust: Join lines";
-      };
-    }
-    {
-      mode = "n";
-      key = "<leader>re";
-      action = lib.nixvim.mkRaw ''
-        function()
-          vim.cmd.RustLsp('explainError')
-        end
-      '';
-      options = {
-        silent = true;
-        desc = "Rust: Explain error";
-      };
-    }
-    {
-      mode = "n";
-      key = "<leader>rD";
-      action = lib.nixvim.mkRaw ''
-        function()
-          vim.cmd.RustLsp('renderDiagnostic')
-        end
-      '';
-      options = {
-        silent = true;
-        desc = "Rust: Render diagnostic";
-      };
-    }
-    {
-      mode = "n";
-      key = "<leader>dd";
-      action = lib.nixvim.mkRaw ''
-        function()
-          if vim.bo.filetype ~= "rust" then
-            vim.notify("Debug-at-cursor is Rust-only for now", vim.log.levels.WARN)
-            return
+    in
+    [
+      (rustLsp "<leader>rh" "{ 'hover', 'actions' }" "Rust: Hover actions")
+      (rustLsp "<leader>ra" "'codeAction'" "Rust: Code action")
+      (rustLsp "<leader>rr" "'runnables'" "Rust: Runnables")
+      (rustLsp "<leader>rd" "'debuggables'" "Rust: Debuggables")
+      (rustLsp "<leader>rt" "'testables'" "Rust: Testables")
+      (rustLsp "<leader>rm" "'expandMacro'" "Rust: Expand macro")
+      (rustLsp "<leader>rc" "'openCargo'" "Rust: Open Cargo.toml")
+      (rustLsp "<leader>rp" "'parentModule'" "Rust: Parent module")
+      (rustLsp "<leader>rj" "'joinLines'" "Rust: Join lines")
+      (rustLsp "<leader>re" "'explainError'" "Rust: Explain error")
+      (rustLsp "<leader>rD" "'renderDiagnostic'" "Rust: Render diagnostic")
+      {
+        mode = "n";
+        key = "<leader>dd";
+        action = lib.nixvim.mkRaw ''
+          function()
+            if vim.bo.filetype ~= "rust" then
+              vim.notify("Debug-at-cursor is Rust-only for now", vim.log.levels.WARN)
+              return
+            end
+            vim.cmd.RustLsp('debug')
           end
-          vim.cmd.RustLsp('debug')
-        end
-      '';
-      options = {
-        silent = true;
-        desc = "Rust: Debug target at cursor";
-      };
-    }
-    {
-      mode = "n";
-      key = "<leader>rT";
-      action = lib.nixvim.mkRaw ''
-        function()
-          require('rust-session').pick()
-        end
-      '';
-      options = {
-        silent = true;
-        desc = "Rust: Switch lspmux session";
-      };
-    }
-  ];
+        '';
+        options = {
+          silent = true;
+          desc = "Rust: Debug target at cursor";
+        };
+      }
+      {
+        mode = "n";
+        key = "<leader>rT";
+        action = lib.nixvim.mkRaw ''
+          function()
+            require('rust-session').pick()
+          end
+        '';
+        options = {
+          silent = true;
+          desc = "Rust: Switch lspmux session";
+        };
+      }
+    ];
 
   extraConfigLua = ''
     do

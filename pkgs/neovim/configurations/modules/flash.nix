@@ -10,15 +10,8 @@
 
   keymaps =
     let
-      mk = modes: key: fn: desc: {
-        mode = modes;
-        inherit key;
-        action = lib.nixvim.mkRaw "function() require('flash').${fn} end";
-        options = {
-          silent = true;
-          inherit desc;
-        };
-      };
+      inherit (import ./keymap-helpers.nix { inherit lib; }) mkFnModes;
+      mk = modes: key: fn: mkFnModes modes key "require('flash').${fn}";
     in
     [
       (mk [ "n" "x" "o" ] "s" "jump()" "Flash jump")

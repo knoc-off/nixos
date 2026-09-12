@@ -173,15 +173,8 @@
 
   keymaps =
     let
-      mk = key: fn: desc: {
-        mode = "n";
-        inherit key;
-        action = lib.nixvim.mkRaw "function() ${fn} end";
-        options = {
-          silent = true;
-          inherit desc;
-        };
-      };
+      inherit (import ./keymap-helpers.nix { inherit lib; }) mkFn;
+      mk = mkFn;
     in
     [
       # Scoped to _G.PickScope.get() — auto-narrows to the current crate/package

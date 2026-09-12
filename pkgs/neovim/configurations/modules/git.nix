@@ -77,7 +77,7 @@
     {
       mode = "n";
       key = "<leader>gu";
-      action = lib.nixvim.mkRaw "function() require('gitsigns').stage_hunk() end";
+      action = lib.nixvim.mkRaw "function() require('gitsigns').undo_stage_hunk() end";
       options = {
         silent = true;
         desc = "Unstage hunk (toggle on staged sign)";

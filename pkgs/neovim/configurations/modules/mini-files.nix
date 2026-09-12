@@ -281,9 +281,6 @@
       }
     end
 
-    -- Expose for external integration
-    _G.MiniFilesGitInvalidate = clearCache
-
     local augroup = vim.api.nvim_create_augroup("MiniFilesGit", { clear = true })
 
     -- Refresh on explorer open

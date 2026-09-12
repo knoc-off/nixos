@@ -1,4 +1,4 @@
-# Text objects via mini.ai and hardtime for building good habits
+# Text objects via mini.ai
 { ... }: {
   # Provides the @function/@class/@conditional/@loop treesitter queries that
   # mini.ai consumes below. Its own select/move/swap mappings stay off so they
@@ -23,6 +23,4 @@
       '';
     };
   };
-
-  plugins.hardtime.enable = false;
 }
