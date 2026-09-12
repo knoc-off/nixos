@@ -72,10 +72,11 @@ in
                   # there is no init to hook -- and sending InitBrowser to a
                   # *live* frame tears it down (verified: it killed the browser).
                   #
-                  # Reading the file at eval time rather than pointing at a
-                  # chrome:// URL: this value is stored in extension storage, so
-                  # it has to be the CSS text, not a reference to it.
-                  sidebarCSS = builtins.readFile ./chrome/CSS/sidebery.css;
+                  # Built in theme.nix rather than read directly here: it needs
+                  # the palette prepended as --neo-base* custom properties. This
+                  # value is stored in extension storage, so it has to be the
+                  # CSS text, not a reference to it.
+                  sidebarCSS = neoTheme.sidebarCSS;
                 };
               };
               "FirefoxColor@mozilla.com" = {

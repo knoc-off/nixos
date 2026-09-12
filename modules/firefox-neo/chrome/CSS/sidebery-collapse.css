@@ -48,8 +48,8 @@
 
   /* Toolbar colour, not `inherit` -- the ::after notch blends into this, and
      an inherited transparent background shows the separator line through the
-     rail. */
-  background-color: var(--toolbar-bgcolor);
+     rail. Uses the focus-tracking var so the rail shifts with the toolbar. */
+  background-color: var(--neo-sidebar-bg);
 
   /* Above the native sidebar, not merely equal to it. Both boxes sit at
      z-index 3 and #sidebar-box comes later in DOM order, so an equal value
@@ -161,16 +161,19 @@
   height: 9px;
   width: calc(var(--neo-sidebar-rail-width) + var(--neo-sidebar-notch));
 
-  /* Two stacked gradients, both sized to the whole element rather than to the
-     notch: an arc of border colour, and the toolbar-coloured fill beneath it.
-     Layer order is paint order, so the arc sits on top of the fill.
+  /* Two gradients, both sized to the notch square and pinned to the
+     bottom-right corner: an arc of border colour, and the fill beneath it.
+     Layer order is paint order, so the arc sits on top.
 
-     This replaces an earlier mask-image approach. The mask was sized 8x8
-     no-repeat, which meant everything outside the corner was masked away
-     entirely -- the strip's width and transition were inert, and the fill it
-     appeared to provide was really coming from the box background. Painting
-     with background gradients keeps the full width live so the corner and the
-     border below it move together.
+     Sized to the notch, NEVER to 100%. Any layer here that spans the full
+     strip paints a bar across the top of the tabs panel -- this has now been
+     got wrong twice, once via background-size:100% and once via a "base fill"
+     layer added to cover the seam. Only the corner square belongs to this
+     element.
+
+     The two rows above the box (top:-2px) are deliberately left transparent:
+     that is the real toolbar showing through, and the toolbar recolours itself
+     on focus change, so there is nothing to cover and nothing to keep in sync.
 
      Radii are offset by fractions of a pixel (7.6/8.6 for the ring, 8.1 for
      the fill) so the arc's inner edge lands just outside the fill's cutout;
@@ -188,9 +191,9 @@
     radial-gradient(
       circle at 100% 100%,
       transparent 0 calc(var(--neo-sidebar-notch) + 0.1px),
-      var(--toolbar-bgcolor) calc(var(--neo-sidebar-notch) + 0.1px)
+      var(--neo-sidebar-bg) calc(var(--neo-sidebar-notch) + 0.1px)
     );
-  background-size: 100% 100%;
+  background-size: var(--neo-sidebar-notch) var(--neo-sidebar-notch);
   background-position: right bottom;
   background-repeat: no-repeat;
 

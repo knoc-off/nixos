@@ -300,6 +300,25 @@ let
 
   d = theme.dark;
   l = theme.light;
+
+  # Sidebery runs in the extension's content process, where the chrome's
+  # --lwt-* properties are not visible, so the palette has to be handed to it
+  # explicitly. The stylesheet is stored as text in extension storage (see
+  # sidebarCSS in default.nix), so this is a plain string prepend rather than
+  # an @import.
+  #
+  # Dark only: Sidebery's panel is themed against the chrome, which this module
+  # pins to the dark palette.
+  sidebarPalette = ''
+    :root {
+    ${builtins.concatStringsSep "\n" (
+      map (n: "  --neo-base${n}: ${css d."base${n}"};") [
+        "00" "01" "02" "03" "04" "05" "06" "07"
+        "08" "09" "0A" "0B" "0C" "0D" "0E" "0F"
+      ]
+    )}
+    }
+  '';
 in
 {
   # Content-area colors. These are global rather than per-scheme; Firefox picks
@@ -368,6 +387,10 @@ in
   # about:preferences, about:profiles, the error pages). The design tokens are
   # the only thing that colors these; --lwt-* does not apply here.
   userContent = contentTokens;
+
+  # Sidebery's in-panel stylesheet, with the palette prepended so the CSS can
+  # reference --neo-base00..0F instead of hardcoding hex.
+  sidebarCSS = sidebarPalette + builtins.readFile ./chrome/CSS/sidebery.css;
 
   # firefox-color's stored theme. Same colors as the chrome CSS, routed through
   # the official theme API -- which reaches a few surfaces (notably the new tab

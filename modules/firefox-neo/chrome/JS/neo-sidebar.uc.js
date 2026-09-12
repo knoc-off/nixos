@@ -143,16 +143,155 @@
     return true;
   }
 
+  // Push the window's focus state into the sidebar frame.
+  //
+  // The chrome swaps --lwt-accent-color (active) for
+  // --lwt-accent-color-inactive when the window loses focus, and
+  // sidebery-collapse.css follows that for the rail via :-moz-window-inactive.
+  // Sidebery's header cannot: it lives inside the extension frame, a separate
+  // content process, where neither the chrome's custom properties nor that
+  // pseudo-class are visible. So the state is mirrored in as a plain attribute
+  // on <html>, and chrome/CSS/sidebery.css keys the header colour off it.
+  //
+  // A frame script rather than insertCSS: the values have to change per focus
+  // event, and this only touches one attribute rather than re-injecting a
+  // sheet each time. Note the frame gets no WebExtension `browser` API, so
+  // going through Sidebery's own storage is not an option here.
+  const FOCUS_FRAME_SCRIPT =
+    "data:application/javascript;charset=utf-8," +
+    encodeURIComponent(`
+      addMessageListener("neo-sidebar:focus", (msg) => {
+        const el = content && content.document && content.document.documentElement;
+        if (!el) return;
+        if (msg.data.active) {
+          el.setAttribute("neo-window-active", "true");
+        } else {
+          el.removeAttribute("neo-window-active");
+        }
+      });
+    `);
+
+  function watchFocus(win) {
+    const browser = win.document.getElementById(BROWSER_ID);
+    if (!browser) return;
+
+    // Look the message manager up on every use rather than caching it. Cheap,
+    // and it cannot go stale if the frame loader is ever swapped out.
+    const getMM = () => browser.messageManager;
+
+    const send = () => {
+      try {
+        const mm = getMM();
+        if (!mm) return;
+        // :-moz-window-inactive, NOT Services.focus.activeWindow.
+        //
+        // activeWindow still points at this window while the deactivate event
+        // is being dispatched, so the obvious predicate reports "focused" on
+        // the way out and the panel never leaves the active colour. Measured
+        // across six transitions: activeWindow === win was true on every
+        // deactivate, while the pseudo-class was correct every time.
+        //
+        // It also has to be this, not a focus API, for a second reason: the
+        // rail is styled by :-moz-window-inactive, and if the panel disagrees
+        // with it the two halves recolour out of step at the seam.
+        const active = !win.document.documentElement.matches(
+          ":-moz-window-inactive",
+        );
+        mm.sendAsyncMessage("neo-sidebar:focus", { active });
+      } catch (e) {
+        // Frame may be mid-teardown; nothing useful to do.
+      }
+    };
+
+    // Register the listener, then seed the current state -- but seed twice.
+    //
+    // The frame script itself lands reliably at STATE_STOP. The seeding send()
+    // does not: at that moment the extension's document is still coming up, and
+    // a message delivered before it is ready is accepted and dropped. Nothing
+    // errors, the listener stays alive, and the panel simply sits on the
+    // default colour until some later focus change happens to push the state.
+    //
+    // Measured directly: send at STATE_STOP -> attribute stays null; the exact
+    // same send a few hundred ms later -> attribute set and #root computes to
+    // rgb(27,36,41). Hence the delayed repeat. It is idempotent -- worst case
+    // it re-sets the value it already had.
+    const register = () => {
+      try {
+        const mm = getMM();
+        if (!mm) return;
+        mm.loadFrameScript(FOCUS_FRAME_SCRIPT, false);
+        send();
+        win.setTimeout(send, 300);
+      } catch (e) {
+        // Frame mid-teardown; a later trigger will retry.
+      }
+    };
+
+    const progress = {
+      QueryInterface: ChromeUtils.generateQI([
+        "nsIWebProgressListener",
+        "nsISupportsWeakReference",
+      ]),
+      onStateChange(webProgress, request, flags) {
+        const done = Ci.nsIWebProgressListener.STATE_STOP;
+        const network = Ci.nsIWebProgressListener.STATE_IS_NETWORK;
+        if (webProgress.isTopLevel && flags & done && flags & network) {
+          register();
+        }
+      },
+    };
+
+    try {
+      browser.addProgressListener(
+        progress,
+        Ci.nsIWebProgress.NOTIFY_STATE_ALL,
+      );
+    } catch (e) {
+      console.error("neo-sidebar: progress listener failed", e);
+    }
+
+    // Re-register per document: a new document means a new frame loader, and
+    // the listener does not survive it.
+    if (browser.browsingContext?.currentWindowGlobal) register();
+
+    win.addEventListener("activate", send);
+    win.addEventListener("deactivate", send);
+
+    // No re-seed hook after a frame reload: the delayedLoad=true registration
+    // re-runs the script in the new document, and the next focus change pushes
+    // the state. A reloaded frame can therefore sit on the default colour until
+    // the window is next focused or blurred. Not worth more machinery -- the
+    // obvious hook, a "load" listener on the browser element, does not fire for
+    // this remote frame anyway (measured: zero events across a full reload).
+
+    // Seed the current state: the frame may load already focused, in which
+    // case no activate event is coming.
+    send();
+
+    win.addEventListener(
+      "unload",
+      () => {
+        win.removeEventListener("activate", send);
+        win.removeEventListener("deactivate", send);
+      },
+      { once: true },
+    );
+  }
+
   function init(win) {
     watchToolsPref(win);
     unregisterNativeTool(win);
-    if (build(win)) return;
+    if (build(win)) {
+      watchFocus(win);
+      return;
+    }
     // The extension may not be started yet on a cold profile. Retry on the
     // extension-ready notification rather than polling.
     const obs = {
       observe() {
         unregisterNativeTool(win);
         if (build(win)) {
+          watchFocus(win);
           Services.obs.removeObserver(obs, "webextension-ready");
         }
       },

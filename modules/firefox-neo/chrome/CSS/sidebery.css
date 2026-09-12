@@ -18,6 +18,84 @@
  * both are visible together rather than guessing blind.
  */
 
+/* Window-focus reactivity for the whole panel.
+ *
+ * The browser toolbar is not one flat colour: Firefox swaps the frame accent
+ * between base00 (active) and base01 (inactive, lighter) as the window gains
+ * and loses focus. Sidebery sits in the extension's content process, where
+ * neither the chrome's --lwt-* properties nor :-moz-window-inactive are
+ * visible, so it cannot follow that on its own.
+ *
+ * neo-sidebar.uc.js bridges it: a frame script mirrors the window's focus
+ * state in as [neo-window-active] on <html> (see watchFocus there). This file
+ * only has to key off that attribute.
+ *
+ * #root carries the panel background for everything -- .TabsPanel, .Tab,
+ * .panel-box and .main-box are all transparent (verified in-frame), so
+ * recolouring #root recolours the whole tab area, not just the header strip.
+ *
+ * Active is the attribute-PRESENT state. The attribute is absent until the
+ * first focus message arrives, so the inactive/lighter colour is what shows
+ * during that window; matching Sidebery's own default here (base00) would
+ * instead flash dark-then-light on an unfocused start.
+ *
+ * Colors come from theme.nix, which prepends a :root block defining
+ * --neo-base00..--neo-base0F before this file (see sidebarCSS there). Always
+ * reference those variables -- a literal hex here silently drifts from the
+ * theme. */
+#root.root {
+  --neo-window-bg: var(--neo-base01);
+}
+
+:root[neo-window-active] #root.root {
+  --neo-window-bg: var(--neo-base00);
+}
+
+/* .bottom-space and .new-tab-btns paint their own opaque base00 rather than
+ * letting #root show through, so without this they stay dark while everything
+ * around them lightens on blur. */
+#root.root,
+.NavigationBar,
+.Navigation,
+.SearchBar,
+.bottom-space,
+.new-tab-btns {
+  background-color: var(--neo-window-bg) !important;
+  transition: background-color 120ms ease;
+}
+
+/* Hold the tabs off the right edge. Has to be padding on the list, not margin
+ * on .Tab: Sidebery sets an explicit width on .Tab, so a margin there does not
+ * narrow it (measured: right edge unmoved at 61px).
+ *
+ * .bottom-space and .new-tab-btns are inside this list and must still paint
+ * full width, so the padding is cancelled on them. */
+.AnimatedTabList {
+  padding-right: 6px;
+}
+
+/* Cancel the padding on the two full-width rows. .new-tab-btns also carries an
+ * explicit width from Sidebery, so the negative margin alone would move it
+ * right without widening it -- width:auto lets it span the row. */
+.AnimatedTabList .bottom-space,
+.AnimatedTabList .new-tab-btns {
+  margin-right: -6px;
+}
+
+.AnimatedTabList .new-tab-btns {
+  width: auto !important;
+}
+
+/* The separator above the new-tab button reads as a highlight, so it sits
+ * lighter than the panel rather than tracking it. */
+.TabsPanel .new-tab-btns::after {
+  background-color: var(--neo-base02) !important;
+}
+
+:root[neo-window-active] .TabsPanel .new-tab-btns::after {
+  background-color: var(--neo-base03) !important;
+}
+
 #root.root {
   --nav-btn-width: 37px;
   --nav-btn-height: 37px;
@@ -335,7 +413,7 @@
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background-color: var(--tab-color, #4a9eff);
+  background-color: var(--tab-color, var(--neo-base0D));
   filter: saturate(2) brightness(1.5);
 }
 
