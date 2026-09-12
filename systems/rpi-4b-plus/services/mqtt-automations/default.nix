@@ -1,6 +1,7 @@
 # MQTT automations -- Rust binaries from pkgs/mqtt-automations.
-# Config via environment variables; buttons get a generated JSON file.
-# HA sliders are bridged bidirectionally to MQTT retained topics via mkMqttSlider.
+# Config via environment variables. HA number/switch entities are wired
+# directly to the retained MQTT topics (native `mqtt:` platform) — no
+# custom sync automations needed.
 {
   config,
   lib,
@@ -11,15 +12,12 @@
 let
   mqttPkg = self.packages.${pkgs.stdenv.hostPlatform.system}.mqtt-automations;
 
-  # Helpers
-
   mkAutomation =
     {
       name,
       bin,
       description ? "MQTT automation: ${name}",
       env ? { },
-      args ? [ ],
     }:
     {
       "mqtt-auto-${name}" = {
@@ -34,8 +32,7 @@ let
         ];
         wantedBy = [ "multi-user.target" ];
         serviceConfig = {
-          ExecStart =
-            "${mqttPkg}/bin/${bin}" + lib.optionalString (args != [ ]) (" " + lib.concatStringsSep " " args);
+          ExecStart = "${mqttPkg}/bin/${bin}";
           Restart = "always";
           RestartSec = "10s";
           Environment = lib.mapAttrsToList (k: v: ''"${k}=${v}"'') env;
@@ -47,231 +44,19 @@ let
       };
     };
 
-  # Bidirectional HA slider ↔ MQTT retained topic.
-  # Generates an input_number + two automations (forward: HA→MQTT, reverse: MQTT→HA).
-  mkMqttSlider =
-    {
-      entity,
-      name,
-      topic,
-      min ? 0,
-      max ? 100,
-      step ? 1,
-      unit ? "",
-      icon ? "mdi:tune",
-      initial ? 0,
-      float ? false,
-    }:
-    let
-      filter = if float then "float" else "int";
-    in
-    {
-      input_number.${entity} = {
-        inherit
-          name
-          min
-          max
-          step
-          initial
-          icon
-          ;
-        mode = "slider";
-        unit_of_measurement = unit;
-      };
-      automation = [
-        {
-          id = "${entity}_to_mqtt";
-          alias = "Sync ${name} to MQTT";
-          mode = "single";
-          trigger = [
-            {
-              platform = "state";
-              entity_id = "input_number.${entity}";
-            }
-          ];
-          action = [
-            {
-              service = "mqtt.publish";
-              data = {
-                inherit topic;
-                retain = true;
-                payload = "{{ states('input_number.${entity}') | ${filter} }}";
-              };
-            }
-          ];
-        }
-        {
-          id = "${entity}_from_mqtt";
-          alias = "Sync ${name} from MQTT";
-          mode = "single";
-          trigger = [
-            {
-              platform = "mqtt";
-              inherit topic;
-            }
-          ];
-          condition = [
-            {
-              condition = "template";
-              value_template = "{{ trigger.payload | ${filter} != states('input_number.${entity}') | ${filter} }}";
-            }
-          ];
-          action = [
-            {
-              service = "input_number.set_value";
-              target.entity_id = "input_number.${entity}";
-              data.value = "{{ trigger.payload | ${filter} }}";
-            }
-          ];
-        }
-      ];
-    };
-
-  # Bidirectional HA toggle ↔ MQTT retained topic.
-  # Generates an input_boolean + two automations (forward: HA→MQTT, reverse: MQTT→HA).
-  mkMqttToggle =
-    {
-      entity,
-      name,
-      topic,
-      icon ? "mdi:toggle-switch",
-      initial ? false,
-    }:
-    {
-      input_boolean.${entity} = {
-        inherit name initial icon;
-      };
-      automation = [
-        {
-          id = "${entity}_to_mqtt";
-          alias = "Sync ${name} to MQTT";
-          mode = "single";
-          trigger = [
-            {
-              platform = "state";
-              entity_id = "input_boolean.${entity}";
-            }
-          ];
-          action = [
-            {
-              service = "mqtt.publish";
-              data = {
-                inherit topic;
-                retain = true;
-                payload = "{{ states('input_boolean.${entity}') }}";
-              };
-            }
-          ];
-        }
-        {
-          id = "${entity}_from_mqtt";
-          alias = "Sync ${name} from MQTT";
-          mode = "single";
-          trigger = [
-            {
-              platform = "mqtt";
-              inherit topic;
-            }
-          ];
-          condition = [
-            {
-              condition = "template";
-              value_template = "{{ trigger.payload != states('input_boolean.${entity}') }}";
-            }
-          ];
-          action = [
-            {
-              service = "input_boolean.turn_{{ trigger.payload }}";
-              target.entity_id = "input_boolean.${entity}";
-            }
-          ];
-        }
-      ];
-    };
-
-  mergeHaConfigs =
-    lib.foldl'
-      (acc: c: {
-        input_number = acc.input_number // (c.input_number or { });
-        input_boolean = acc.input_boolean // (c.input_boolean or { });
-        automation = acc.automation ++ (c.automation or [ ]);
-      })
-      {
-        input_number = { };
-        input_boolean = { };
-        automation = [ ];
-      };
-
   # MQTT topics for HA-controlled settings
-
-  delayTopic = "mqtt-auto/sunrise-lights/delay";
+  startTimeTopic = "mqtt-auto/sunrise-lights/start-time";
+  durationTopic = "mqtt-auto/sunrise-lights/duration";
   maxBrightnessTopic = "mqtt-auto/sunrise-lights/max-brightness";
   gammaTopic = "mqtt-auto/sunrise-lights/gamma";
   hueEnabledTopic = "mqtt-auto/color-temp-cycle/enabled";
 
-  # Button config
-
-  buttonConfig = pkgs.writeText "button-dispatcher.json" (
-    builtins.toJSON {
-      buttons = {
-        "zigbee2mqtt/button_1/action" = {
-          single = {
-            topic = "zigbee2mqtt/light_1/set";
-            payload = {
-              state = "TOGGLE";
-            };
-          };
-          double = {
-            group = "living_room";
-          };
-          hold = {
-            group = "living_room";
-          };
-        };
-      };
-      groups = {
-        living_room.members = [
-          {
-            topic = "zigbee2mqtt/light_1/set";
-            on = {
-              state = "ON";
-              brightness = 254;
-            };
-            off = {
-              state = "OFF";
-            };
-          }
-          {
-            topic = "zigbee2mqtt/plug_1/set";
-            on = {
-              state = "ON";
-            };
-            off = {
-              state = "OFF";
-            };
-          }
-          {
-            topic = "zigbee2mqtt/plug_2/set";
-            on = {
-              state = "ON";
-            };
-            off = {
-              state = "OFF";
-            };
-          }
-          {
-            topic = "zigbee2mqtt/plug_3/set";
-            on = {
-              state = "ON";
-            };
-            off = {
-              state = "OFF";
-            };
-          }
-        ];
-      };
-    }
-  );
+  # Location for color-temp-cycle, which genuinely tracks the real sun.
+  # sunrise-lights deliberately does not — it runs on a fixed clock.
+  sunEnv = {
+    LATITUDE = "52.52";
+    LONGITUDE = "13.405";
+  };
 
   # Service definitions
 
@@ -293,29 +78,18 @@ let
     {
       name = "sunrise-lights";
       bin = "sunrise-lights";
-      description = "Gradually turn on lights at sunrise";
+      description = "Wake-up light: smooth brightness ramp on a fixed schedule";
       env = {
         LIGHT_TOPIC = "zigbee2mqtt/light_3/set";
-        LATITUDE = "52.52";
-        LONGITUDE = "13.405";
-        RAMP_MINUTES = "60";
-        OFFSET_MINUTES = "0";
         UPDATE_INTERVAL = "30";
-        COLOR_TEMP_START = "454";
-        COLOR_TEMP_END = "250";
-        TIMEZONE = "Europe/Berlin";
-        ELEVATION_END = "11";
         MAX_BRIGHTNESS = "30";
-        DELAY_TOPIC = delayTopic;
+        START_TIME = "06:30:00";
+        DURATION = "45";
+        START_TIME_TOPIC = startTimeTopic;
+        DURATION_TOPIC = durationTopic;
         MAX_BRIGHTNESS_TOPIC = maxBrightnessTopic;
         GAMMA_TOPIC = gammaTopic;
       };
-    }
-    {
-      name = "button-dispatcher";
-      bin = "button-dispatcher";
-      description = "Button action dispatcher";
-      args = [ "${buttonConfig}" ];
     }
     {
       name = "bedtime-button";
@@ -329,21 +103,17 @@ let
         EVENING_START_HOUR = "21";
         DAY_START_HOUR = "6";
         HOLD_OFF_MINUTES = "5";
-        TIMEZONE = "Europe/Berlin";
       };
     }
     {
       name = "color-temp-cycle";
       bin = "color-temp-cycle";
       description = "Adjust light color temperature through the day";
-      env = {
+      env = sunEnv // {
         LIGHT_TOPIC = "zigbee2mqtt/light_3/set";
-        LATITUDE = "52.52";
-        LONGITUDE = "13.405";
         CT_WARM = "454";
         CT_COOL = "250";
         UPDATE_INTERVAL = "60";
-        TIMEZONE = "Europe/Berlin";
         ENABLED_TOPIC = hueEnabledTopic;
       };
     }
@@ -351,15 +121,12 @@ let
       name = "color-temp-cycle-living-room";
       bin = "color-temp-cycle";
       description = "Adjust living room light color temperature through the day";
-      env = {
+      env = sunEnv // {
         MQTT_CLIENT_ID = "color-temp-cycle-living-room";
         LIGHT_TOPIC = "zigbee2mqtt/light_1/set";
-        LATITUDE = "52.52";
-        LONGITUDE = "13.405";
         CT_WARM = "454";
         CT_COOL = "250";
         UPDATE_INTERVAL = "60";
-        TIMEZONE = "Europe/Berlin";
         ENABLED_TOPIC = hueEnabledTopic;
       };
     }
@@ -370,43 +137,122 @@ in
 {
   systemd.services = allServices;
 
-  services.home-assistant.config = mergeHaConfigs [
-    (mkMqttSlider {
-      entity = "sunrise_delay_minutes";
-      name = "Sunrise delay";
-      topic = delayTopic;
-      max = 180;
-      step = 15;
-      unit = "min";
-      icon = "mdi:sleep";
-    })
-    (mkMqttSlider {
-      entity = "sunrise_max_brightness";
-      name = "Sunrise max brightness";
-      topic = maxBrightnessTopic;
-      max = 100;
-      step = 5;
-      unit = "%";
-      icon = "mdi:brightness-percent";
-      initial = 30;
-    })
-    (mkMqttSlider {
-      entity = "sunrise_ramp_speed";
-      name = "Sunrise ramp speed";
-      topic = gammaTopic;
-      min = 0.5;
-      max = 4.0;
-      step = 0.1;
-      icon = "mdi:speedometer";
-      initial = 2.0;
-      float = true;
-    })
-    (mkMqttToggle {
-      entity = "lights_follow_hue";
-      name = "Lights follow hue";
-      topic = hueEnabledTopic;
-      icon = "mdi:palette";
-      initial = true;
-    })
-  ];
+  services.home-assistant.config = {
+    # Native MQTT number/switch entities, bound directly to the retained
+    # topics the Rust daemons read via Runtime::setting. Replaces the old
+    # input_number/input_boolean + 8 hand-written sync automations.
+    mqtt.time = [
+      {
+        unique_id = "sunrise_start_time";
+        name = "Sunrise start time";
+        command_topic = startTimeTopic;
+        state_topic = startTimeTopic;
+        retain = true;
+        icon = "mdi:clock-start";
+      }
+    ];
+
+    mqtt.number = [
+      {
+        unique_id = "sunrise_duration";
+        name = "Sunrise duration";
+        command_topic = durationTopic;
+        state_topic = durationTopic;
+        retain = true;
+        min = 10;
+        max = 120;
+        step = 5;
+        unit_of_measurement = "min";
+        icon = "mdi:timer-sand";
+        mode = "slider";
+      }
+      {
+        unique_id = "sunrise_max_brightness";
+        name = "Sunrise max brightness";
+        command_topic = maxBrightnessTopic;
+        state_topic = maxBrightnessTopic;
+        retain = true;
+        min = 0;
+        max = 100;
+        step = 5;
+        unit_of_measurement = "%";
+        icon = "mdi:brightness-percent";
+        mode = "slider";
+      }
+      {
+        unique_id = "sunrise_ramp_speed";
+        name = "Sunrise ramp speed";
+        command_topic = gammaTopic;
+        state_topic = gammaTopic;
+        retain = true;
+        min = 0.5;
+        max = 4.0;
+        step = 0.1;
+        icon = "mdi:speedometer";
+        mode = "slider";
+      }
+    ];
+
+    mqtt.switch = [
+      {
+        unique_id = "lights_follow_hue";
+        name = "Lights follow hue";
+        command_topic = hueEnabledTopic;
+        state_topic = hueEnabledTopic;
+        retain = true;
+        payload_on = "true";
+        payload_off = "false";
+        icon = "mdi:palette";
+      }
+    ];
+
+    # button_1: single press toggles the living-room light; double/hold
+    # toggles the whole living-room group. Z2M discovery (homeassistant.enabled
+    # in zigbee2mqtt config) already exposes each device as an HA entity, so
+    # this is plain HA automation -- no custom dispatcher needed.
+    automation = [
+      {
+        alias = "button_1 single -> toggle light_1";
+        trigger = [
+          {
+            platform = "mqtt";
+            topic = "zigbee2mqtt/button_1/action";
+            payload = "single";
+          }
+        ];
+        action = [
+          {
+            service = "light.toggle";
+            target.entity_id = "light.light_1";
+          }
+        ];
+      }
+      {
+        alias = "button_1 double/hold -> toggle living room group";
+        trigger = [
+          {
+            platform = "mqtt";
+            topic = "zigbee2mqtt/button_1/action";
+            payload = "double";
+          }
+          {
+            platform = "mqtt";
+            topic = "zigbee2mqtt/button_1/action";
+            payload = "hold";
+          }
+        ];
+        action = [
+          {
+            service = "homeassistant.toggle";
+            target.entity_id = [
+              "light.light_1"
+              "switch.plug_1"
+              "switch.plug_2"
+              "switch.plug_3"
+            ];
+          }
+        ];
+      }
+    ];
+  };
 }

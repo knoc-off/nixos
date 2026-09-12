@@ -1,6 +1,5 @@
 use anyhow::Result;
 use chrono::{Local, TimeDelta};
-use chrono_tz::Tz;
 use mqtt_automations::Runtime;
 use serde_json::json;
 use std::f64::consts::PI;
@@ -22,11 +21,6 @@ async fn main() -> Result<()> {
     let ct_cool: u16 = rt.env_parse("CT_COOL", 250); // ~4000K daylight
 
     let interval: u64 = rt.env_parse("UPDATE_INTERVAL", 60);
-    let tz_name = rt.env_or("TIMEZONE", "Europe/Berlin");
-    let tz: Tz = tz_name.parse().unwrap_or_else(|_| {
-        tracing::warn!("invalid TIMEZONE '{tz_name}', falling back to UTC");
-        chrono_tz::UTC
-    });
 
     // Tolerance for manual color_temp changes (mireds).
     let ct_tolerance: u16 = rt.env_parse("CT_TOLERANCE", 15);
@@ -36,35 +30,34 @@ async fn main() -> Result<()> {
 
     let mut state_msgs = rt.subscribe(&state_topic).await?;
 
-    tracing::info!(
-        set = %set_topic, state = %state_topic,
-        %lat, %lon, ct_warm, ct_cool,
-        %tz_name, "color-temp-cycle started"
+    eprintln!(
+        "color-temp-cycle started: set={set_topic} state={state_topic} lat={lat} lon={lon} \
+         ct_warm={ct_warm} ct_cool={ct_cool}"
     );
 
     // -- main loop: one cycle per day ----------------------------------------
 
     loop {
-        let now = Local::now().with_timezone(&tz);
+        let now = Local::now();
         let today = now.date_naive();
 
-        let sunrise = mqtt_automations::sun::sunrise(lat, lon, today, &tz);
-        let sunset = mqtt_automations::sun::sunset(lat, lon, today, &tz);
-        let noon = mqtt_automations::sun::solar_noon(lon, today, &tz);
+        let sunrise = mqtt_automations::sun::sunrise(lat, lon, today, Local);
+        let sunset = mqtt_automations::sun::sunset(lat, lon, today, Local);
+        let noon = mqtt_automations::sun::solar_noon(lon, today, Local);
 
         // Outside daylight hours — sleep until next sunrise.
         if now < sunrise || now >= sunset {
             let next_sunrise = if now >= sunset {
                 let tomorrow = today + TimeDelta::days(1);
-                mqtt_automations::sun::sunrise(lat, lon, tomorrow, &tz)
+                mqtt_automations::sun::sunrise(lat, lon, tomorrow, Local)
             } else {
                 sunrise
             };
 
             let wait_ms = (next_sunrise - now).num_milliseconds().max(0) as u64;
-            tracing::info!(
-                next_sunrise = %next_sunrise.format("%H:%M"),
-                "outside daylight, sleeping until sunrise"
+            eprintln!(
+                "outside daylight, sleeping until sunrise {}",
+                next_sunrise.format("%H:%M")
             );
 
             tokio::select! {
@@ -80,11 +73,11 @@ async fn main() -> Result<()> {
         // -- active phase: sunrise to sunset ----------------------------------
 
         let mut last_set_ct: Option<u16> = None;
-        tracing::info!(
-            sunrise = %sunrise.format("%H:%M"),
-            noon = %noon.format("%H:%M"),
-            sunset = %sunset.format("%H:%M"),
-            "entering daylight color cycle"
+        eprintln!(
+            "entering daylight color cycle: sunrise={} noon={} sunset={}",
+            sunrise.format("%H:%M"),
+            noon.format("%H:%M"),
+            sunset.format("%H:%M")
         );
 
         'cycle: loop {
@@ -106,9 +99,9 @@ async fn main() -> Result<()> {
                         let reported = reported as u16;
                         let diff = (reported as i32 - expected as i32).unsigned_abs() as u16;
                         if diff > ct_tolerance {
-                            tracing::info!(
-                                expected, reported, diff,
-                                "color_temp changed externally, stopping cycle for today"
+                            eprintln!(
+                                "color_temp changed externally ({expected} -> {reported}), \
+                                 stopping cycle for today"
                             );
                             break 'cycle;
                         }
@@ -116,9 +109,9 @@ async fn main() -> Result<()> {
                 }
             }
 
-            let now = Local::now().with_timezone(&tz);
+            let now = Local::now();
             if now >= sunset {
-                tracing::info!("sunset reached, cycle done");
+                eprintln!("sunset reached, cycle done");
                 break;
             }
 
@@ -139,12 +132,6 @@ async fn main() -> Result<()> {
             if enabled.get() && last_set_ct != Some(ct) {
                 rt.publish(&set_topic, json!({ "color_temp": ct })).await?;
                 last_set_ct = Some(ct);
-
-                tracing::debug!(
-                    %ct,
-                    progress = format!("{:.0}%", progress * 100.0),
-                    "tick"
-                );
             }
 
             tokio::select! {

@@ -1,6 +1,5 @@
 use anyhow::Result;
 use chrono::{Local, Timelike};
-use chrono_tz::Tz;
 use mqtt_automations::{Message, Runtime};
 use serde_json::json;
 use tokio::sync::mpsc::UnboundedReceiver;
@@ -33,12 +32,6 @@ async fn main() -> Result<()> {
     // Press-and-hold: go to low light, then turn off by itself after this delay.
     let hold_off_minutes: u64 = rt.env_parse("HOLD_OFF_MINUTES", 5);
 
-    let tz_name = rt.env_or("TIMEZONE", "Europe/Berlin");
-    let tz: Tz = tz_name.parse().unwrap_or_else(|_| {
-        tracing::warn!("invalid TIMEZONE '{tz_name}', falling back to UTC");
-        chrono_tz::UTC
-    });
-
     let mut button_msgs = rt.subscribe(&button_topic).await?;
     let mut state_msgs = rt.subscribe(&state_topic).await?;
 
@@ -46,11 +39,10 @@ async fn main() -> Result<()> {
     let mut light_on = false;
     let mut brightness: u8 = day_brightness;
 
-    tracing::info!(
-        button = %button_topic, set = %set_topic, state = %state_topic,
-        low_brightness, day_brightness, evening_start_hour, day_start_hour,
-        hold_off_minutes, %tz_name,
-        "bedtime-button started"
+    eprintln!(
+        "bedtime-button started: button={button_topic} set={set_topic} state={state_topic} \
+         low={low_brightness} day={day_brightness} evening=[{evening_start_hour}-{day_start_hour}) \
+         hold_off={hold_off_minutes}m"
     );
 
     loop {
@@ -60,13 +52,13 @@ async fn main() -> Result<()> {
             }
             Some(msg) = button_msgs.recv() => {
                 let action = action_of(&msg);
-                let hour = Local::now().with_timezone(&tz).hour();
+                let hour = Local::now().hour();
                 let evening = is_evening(hour, evening_start_hour, day_start_hour);
                 // "Low" with a small margin so bulb rounding still counts.
                 let is_low = brightness <= low_brightness.saturating_add(LOW_MARGIN);
 
                 if action == hold_action {
-                    tracing::info!(hour, "hold — low light, auto-off in {hold_off_minutes}m");
+                    eprintln!("hold at hour {hour} — low light, auto-off in {hold_off_minutes}m");
                     hold_to_off(
                         &rt,
                         &set_topic,
@@ -81,23 +73,23 @@ async fn main() -> Result<()> {
                 } else if action == single_action {
                     if light_on && is_low {
                         // Already dim → turn off.
-                        tracing::info!(hour, "single — on & low → OFF");
+                        eprintln!("single at hour {hour} — on & low → OFF");
                         rt.publish(&set_topic, json!({ "state": "OFF" })).await?;
                     } else if light_on && evening {
                         // On & bright, evening → drop to low light.
-                        tracing::info!(hour, "single — on & bright, evening → low");
+                        eprintln!("single at hour {hour} — on & bright, evening → low");
                         set_low(&rt, &set_topic, low_brightness).await?;
                     } else if light_on {
                         // On & bright, daytime → plain toggle off.
-                        tracing::info!(hour, "single — on & bright, day → OFF");
+                        eprintln!("single at hour {hour} — on & bright, day → OFF");
                         rt.publish(&set_topic, json!({ "state": "OFF" })).await?;
                     } else if evening {
                         // Off, evening → low light (never full brightness).
-                        tracing::info!(hour, "single — off, evening → low");
+                        eprintln!("single at hour {hour} — off, evening → low");
                         set_low(&rt, &set_topic, low_brightness).await?;
                     } else {
                         // Off, daytime → full brightness.
-                        tracing::info!(hour, "single — off, day → full");
+                        eprintln!("single at hour {hour} — off, day → full");
                         rt.publish(
                             &set_topic,
                             json!({ "state": "ON", "brightness": day_brightness }),
@@ -178,12 +170,12 @@ async fn hold_to_off(
 
     tokio::select! {
         _ = tokio::time::sleep(std::time::Duration::from_secs(delay_secs)) => {
-            tracing::info!("hold timer elapsed — light off");
+            eprintln!("hold timer elapsed — light off");
             rt.publish(set_topic, json!({ "state": "OFF", "transition": 2 })).await?;
             *light_on = false;
         }
         Some(_) = button_msgs.recv() => {
-            tracing::info!("hold countdown cancelled by button — turning off now");
+            eprintln!("hold countdown cancelled by button — turning off now");
             rt.publish(set_topic, json!({ "state": "OFF" })).await?;
             *light_on = false;
         }

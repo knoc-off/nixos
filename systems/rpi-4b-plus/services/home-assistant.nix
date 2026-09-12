@@ -10,7 +10,6 @@ in
 {
   imports = [
     ./mqtt-automations
-    ./sunrise-dashboard.nix
   ];
 
   services.mosquitto = {

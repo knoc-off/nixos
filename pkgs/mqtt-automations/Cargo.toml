@@ -8,16 +8,8 @@ name = "mqtt_automations"
 path = "src/lib.rs"
 
 [[bin]]
-name = "button-dispatcher"
-path = "src/bin/button_dispatcher.rs"
-
-[[bin]]
 name = "cat-doorbell"
 path = "src/bin/cat_doorbell.rs"
-
-[[bin]]
-name = "plug-auto-off"
-path = "src/bin/plug_auto_off.rs"
 
 [[bin]]
 name = "sunrise-lights"
@@ -36,11 +28,8 @@ rumqttc = { version = "0.24", default-features = false }
 tokio = { version = "1", features = ["rt", "macros", "signal", "time", "sync"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1"
 chrono = { version = "0.4", features = ["serde"] }
-chrono-tz = { version = "0.10", features = ["filter-by-regex"] }
 
 [profile.release]
 opt-level = 1

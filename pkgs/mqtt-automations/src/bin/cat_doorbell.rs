@@ -17,14 +17,14 @@ async fn main() -> Result<()> {
 
     let token = read_token(&rt)?;
     if token.is_empty() {
-        tracing::error!("no ntfy token configured — set NTFY_TOKEN_FILE or NTFY_TOKEN");
+        eprintln!("no ntfy token configured — set NTFY_TOKEN_FILE or NTFY_TOKEN");
     }
 
     let mut msgs = rt.subscribe(&sensor).await?;
     let mut last_notification: Option<Instant> = None;
     let mut notified_this_session = false;
 
-    tracing::info!(topic = %sensor, cooldown, "watching sensor");
+    eprintln!("watching sensor {sensor}, cooldown={cooldown}s");
 
     loop {
         tokio::select! {
@@ -36,7 +36,7 @@ async fn main() -> Result<()> {
 
                 if !presence {
                     if notified_this_session {
-                        tracing::info!("presence ended, resetting");
+                        eprintln!("presence ended, resetting");
                     }
                     notified_this_session = false;
                     continue;
@@ -45,7 +45,7 @@ async fn main() -> Result<()> {
                 if !notified_this_session && matches!(motion, "large" | "small") {
                     if let Some(last) = last_notification {
                         if last.elapsed().as_secs() < cooldown {
-                            tracing::info!("cooldown active, skipping");
+                            eprintln!("cooldown active, skipping");
                             continue;
                         }
                     }
@@ -55,9 +55,9 @@ async fn main() -> Result<()> {
                         Ok(()) => {
                             last_notification = Some(Instant::now());
                             notified_this_session = true;
-                            tracing::info!(%message, "notification sent");
+                            eprintln!("notification sent: {message}");
                         }
-                        Err(e) => tracing::error!("notification failed: {e}"),
+                        Err(e) => eprintln!("notification failed: {e}"),
                     }
                 }
             }
@@ -73,11 +73,11 @@ fn read_token(rt: &Runtime) -> Result<String> {
         let token = std::fs::read_to_string(&token_file)
             .map(|s| s.trim().to_string())
             .unwrap_or_else(|e| {
-                tracing::warn!("could not read token file {token_file}: {e}");
+                eprintln!("could not read token file {token_file}: {e}");
                 String::new()
             });
         if !token.is_empty() {
-            tracing::info!("loaded ntfy token from {token_file}");
+            eprintln!("loaded ntfy token from {token_file}");
             return Ok(token);
         }
     }

@@ -2,26 +2,28 @@
 //!
 //! Accurate to ~1 minute for latitudes below ~65 degrees.
 //! Reference: <https://gml.noaa.gov/grad/solcalc/solareqns.PDF>
+//!
+//! Generic over any [`chrono::TimeZone`] — callers pass `chrono::Local` to get
+//! times in the host's configured timezone (`time.timeZone` in NixOS).
 
-use chrono::{DateTime, Datelike, Duration, NaiveDate, Timelike, Utc};
-use chrono_tz::Tz;
+use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Timelike, Utc};
 
 use std::f64::consts::PI;
 
 /// Calculate sunrise time for a given location and date.
-pub fn sunrise(lat: f64, lon: f64, date: NaiveDate, tz: &Tz) -> DateTime<Tz> {
+pub fn sunrise<Tz: TimeZone>(lat: f64, lon: f64, date: NaiveDate, tz: Tz) -> DateTime<Tz> {
     solar_event(lat, lon, date, tz, true)
 }
 
 /// Calculate sunset time for a given location and date.
-pub fn sunset(lat: f64, lon: f64, date: NaiveDate, tz: &Tz) -> DateTime<Tz> {
+pub fn sunset<Tz: TimeZone>(lat: f64, lon: f64, date: NaiveDate, tz: Tz) -> DateTime<Tz> {
     solar_event(lat, lon, date, tz, false)
 }
 
 /// Solar noon — the moment the sun reaches its highest point.
 ///
 /// Only depends on longitude (not latitude) and the equation of time.
-pub fn solar_noon(lon: f64, date: NaiveDate, tz: &Tz) -> DateTime<Tz> {
+pub fn solar_noon<Tz: TimeZone>(lon: f64, date: NaiveDate, tz: Tz) -> DateTime<Tz> {
     let day_of_year = date.ordinal() as f64;
     let gamma = 2.0 * PI / 365.0 * (day_of_year - 1.0);
     let (eqtime, _) = solar_params(gamma);
@@ -32,7 +34,7 @@ pub fn solar_noon(lon: f64, date: NaiveDate, tz: &Tz) -> DateTime<Tz> {
         .expect("valid midnight")
         .and_utc();
     let utc = base + Duration::seconds((noon_minutes_utc * 60.0) as i64);
-    utc.with_timezone(tz)
+    utc.with_timezone(&tz)
 }
 
 /// Solar elevation angle (degrees above horizon) at a given instant.
@@ -43,7 +45,7 @@ pub fn solar_noon(lon: f64, date: NaiveDate, tz: &Tz) -> DateTime<Tz> {
 ///   -12  nautical twilight
 ///    -6  civil twilight (sky noticeably brightening)
 ///     0  geometric sunrise/sunset
-pub fn elevation(lat: f64, lon: f64, dt: DateTime<Tz>) -> f64 {
+pub fn elevation<Tz: TimeZone>(lat: f64, lon: f64, dt: DateTime<Tz>) -> f64 {
     let utc = dt.with_timezone(&Utc);
     let day_of_year = utc.ordinal() as f64;
 
@@ -81,7 +83,13 @@ fn solar_params(gamma: f64) -> (f64, f64) {
     (eqtime, decl)
 }
 
-fn solar_event(lat: f64, lon: f64, date: NaiveDate, tz: &Tz, is_rise: bool) -> DateTime<Tz> {
+fn solar_event<Tz: TimeZone>(
+    lat: f64,
+    lon: f64,
+    date: NaiveDate,
+    tz: Tz,
+    is_rise: bool,
+) -> DateTime<Tz> {
     let day_of_year = date.ordinal() as f64;
     let gamma = 2.0 * PI / 365.0 * (day_of_year - 1.0);
 
@@ -105,40 +113,40 @@ fn solar_event(lat: f64, lon: f64, date: NaiveDate, tz: &Tz, is_rise: bool) -> D
         .expect("valid midnight")
         .and_utc();
     let utc = base + Duration::seconds((minutes_utc * 60.0) as i64);
-    utc.with_timezone(tz)
+    utc.with_timezone(&tz)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::NaiveDate;
+    use chrono::{NaiveDate, Utc};
 
+    // Tests use UTC directly rather than a named timezone (no chrono-tz
+    // dependency) — Berlin is UTC+1/+2, so expected hours are shifted
+    // accordingly relative to local-time intuition.
     const BERLIN_LAT: f64 = 52.52;
     const BERLIN_LON: f64 = 13.405;
 
-    fn berlin() -> Tz {
-        "Europe/Berlin".parse().unwrap()
-    }
-
     #[test]
     fn berlin_summer_sunrise_is_reasonable() {
+        // Local sunrise ~04:45 CEST (UTC+2) => ~02:45 UTC.
         let date = NaiveDate::from_ymd_opt(2025, 6, 21).unwrap();
-        let rise = sunrise(BERLIN_LAT, BERLIN_LON, date, &berlin());
-        assert!(rise.hour() >= 4 && rise.hour() <= 5, "got {rise}");
+        let rise = sunrise(BERLIN_LAT, BERLIN_LON, date, Utc);
+        assert!(rise.hour() >= 2 && rise.hour() <= 3, "got {rise}");
     }
 
     #[test]
     fn berlin_winter_sunrise_is_reasonable() {
+        // Local sunrise ~08:15 CET (UTC+1) => ~07:15 UTC.
         let date = NaiveDate::from_ymd_opt(2025, 12, 21).unwrap();
-        let rise = sunrise(BERLIN_LAT, BERLIN_LON, date, &berlin());
-        assert!(rise.hour() >= 7 && rise.hour() <= 9, "got {rise}");
+        let rise = sunrise(BERLIN_LAT, BERLIN_LON, date, Utc);
+        assert!(rise.hour() >= 6 && rise.hour() <= 8, "got {rise}");
     }
 
     #[test]
     fn elevation_near_zero_at_sunrise() {
-        let tz = berlin();
         let date = NaiveDate::from_ymd_opt(2025, 6, 21).unwrap();
-        let rise = sunrise(BERLIN_LAT, BERLIN_LON, date, &tz);
+        let rise = sunrise(BERLIN_LAT, BERLIN_LON, date, Utc);
         let elev = elevation(BERLIN_LAT, BERLIN_LON, rise);
         assert!(
             elev.abs() < 2.0,
@@ -148,27 +156,23 @@ mod tests {
 
     #[test]
     fn elevation_negative_at_midnight() {
-        let tz = berlin();
         let dt = NaiveDate::from_ymd_opt(2025, 6, 21)
             .unwrap()
             .and_hms_opt(0, 0, 0)
             .unwrap()
-            .and_utc()
-            .with_timezone(&tz);
+            .and_utc();
         let elev = elevation(BERLIN_LAT, BERLIN_LON, dt);
         assert!(elev < -5.0, "should be well below horizon at midnight, got {elev:.2}");
     }
 
     #[test]
     fn elevation_peaks_at_solar_noon_summer() {
-        let tz = berlin();
         // Solar noon in Berlin summer solstice is ~13:15 CEST = 11:15 UTC.
         let dt = NaiveDate::from_ymd_opt(2025, 6, 21)
             .unwrap()
             .and_hms_opt(11, 15, 0)
             .unwrap()
-            .and_utc()
-            .with_timezone(&tz);
+            .and_utc();
         let elev = elevation(BERLIN_LAT, BERLIN_LON, dt);
         assert!(
             elev > 55.0 && elev < 65.0,
@@ -177,52 +181,25 @@ mod tests {
     }
 
     #[test]
-    fn print_elevation_at_8am() {
-        let tz = berlin();
-        // April 1 (tomorrow-ish)
-        for (label, month, day) in [
-            ("Apr 1 ", 4, 1),
-            ("Jun 21", 6, 21),
-            ("Sep 21", 9, 21),
-            ("Dec 21", 12, 21),
-        ] {
-            let dt = NaiveDate::from_ymd_opt(2026, month, day)
-                .unwrap()
-                .and_hms_opt(6, 0, 0) // 08:00 CEST/CET = 06:00 UTC
-                .unwrap()
-                .and_utc()
-                .with_timezone(&tz);
-            let elev = elevation(BERLIN_LAT, BERLIN_LON, dt);
-            let rise = sunrise(BERLIN_LAT, BERLIN_LON,
-                NaiveDate::from_ymd_opt(2026, month, day).unwrap(), &tz);
-            eprintln!("{label}: sunrise={} elev@08:00={:.1}°", rise.format("%H:%M"), elev);
-        }
-    }
-
-    #[test]
     fn solar_noon_is_reasonable() {
-        let tz = berlin();
+        // Berlin solar noon is ~13:15 CEST in summer = ~11:15 UTC.
         let date = NaiveDate::from_ymd_opt(2025, 6, 21).unwrap();
-        let noon = solar_noon(BERLIN_LON, date, &tz);
-        // Berlin solar noon is ~13:15 CEST in summer
-        assert!(noon.hour() >= 13 && noon.hour() <= 14, "got {noon}");
+        let noon = solar_noon(BERLIN_LON, date, Utc);
+        assert!(noon.hour() >= 11 && noon.hour() <= 12, "got {noon}");
     }
 
     #[test]
     fn elevation_increases_during_morning() {
-        let tz = berlin();
         let early = NaiveDate::from_ymd_opt(2025, 3, 21)
             .unwrap()
             .and_hms_opt(5, 0, 0)
             .unwrap()
-            .and_utc()
-            .with_timezone(&tz);
+            .and_utc();
         let later = NaiveDate::from_ymd_opt(2025, 3, 21)
             .unwrap()
             .and_hms_opt(8, 0, 0)
             .unwrap()
-            .and_utc()
-            .with_timezone(&tz);
+            .and_utc();
         let e1 = elevation(BERLIN_LAT, BERLIN_LON, early);
         let e2 = elevation(BERLIN_LAT, BERLIN_LON, later);
         assert!(e2 > e1, "elevation should increase during morning: {e1:.2} -> {e2:.2}");
