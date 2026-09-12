@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use tokio::net::UnixStream;
 
 use prompt_daemon::config::socket_path;
@@ -37,27 +39,13 @@ async fn main() {
 }
 
 async fn run_query(command: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let cwd = std::env::current_dir()?
-        .to_string_lossy()
-        .into_owned();
+    let cwd = std::env::current_dir()?.to_string_lossy().into_owned();
+    let env: HashMap<String, String> = std::env::vars().collect();
 
     let stream = UnixStream::connect(socket_path()).await?;
     let (mut reader, mut writer) = stream.into_split();
 
-    // Phase 1: send command name + CWD
-    protocol::write_command(&mut writer, command, &cwd).await?;
-
-    // Phase 2: read required env var names from daemon
-    let var_names = protocol::read_env_request(&mut reader).await?;
-
-    // Phase 3: look up each var in our environment, send values back
-    let values: Vec<String> = var_names
-        .iter()
-        .map(|name| std::env::var(name).unwrap_or_default())
-        .collect();
-    protocol::write_env_values(&mut writer, &values).await?;
-
-    // Phase 4: read response
+    protocol::write_request(&mut writer, command, &cwd, &env).await?;
     let (_status, value) = protocol::read_response(&mut reader).await?;
 
     print!("{value}");
@@ -68,10 +56,7 @@ async fn run_status() -> Result<(), Box<dyn std::error::Error>> {
     let stream = UnixStream::connect(socket_path()).await?;
     let (mut reader, mut writer) = stream.into_split();
 
-    // Status query: send empty command + empty CWD
-    protocol::write_command(&mut writer, "", "").await?;
-
-    // Daemon skips phases 2-3, goes straight to response
+    protocol::write_request(&mut writer, "", "", &HashMap::new()).await?;
     let (_status, value) = protocol::read_response(&mut reader).await?;
 
     print!("{value}");

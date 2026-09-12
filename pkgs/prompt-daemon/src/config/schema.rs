@@ -16,8 +16,6 @@ pub struct DaemonConfig {
 
 #[derive(Debug, Deserialize)]
 pub struct DaemonSection {
-    #[serde(default = "default_workers")]
-    pub workers: usize,
     #[serde(default = "default_idle_timeout")]
     pub idle_timeout: Duration,
     #[serde(default = "default_log_level")]
@@ -27,15 +25,10 @@ pub struct DaemonSection {
 impl Default for DaemonSection {
     fn default() -> Self {
         Self {
-            workers: default_workers(),
             idle_timeout: default_idle_timeout(),
             log_level: default_log_level(),
         }
     }
-}
-
-fn default_workers() -> usize {
-    4
 }
 
 fn default_idle_timeout() -> Duration {

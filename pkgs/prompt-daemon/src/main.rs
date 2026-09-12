@@ -1,5 +1,3 @@
-mod reload;
-
 use std::sync::Arc;
 
 use prompt_daemon::config;
@@ -7,7 +5,7 @@ use prompt_daemon::ipc::server::run_server;
 use prompt_daemon::state::DaemonState;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Parse --config flag
     let config_path_arg = std::env::args().skip_while(|a| a != "--config").nth(1);
 
@@ -31,12 +29,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("config loaded from {}", config_path.display());
 
     let socket_path = config::socket_path();
-    let workers = daemon_config.daemon.workers;
     let idle_timeout = daemon_config.daemon.idle_timeout.0;
 
     tracing::info!(
         commands = daemon_config.commands.len(),
-        workers,
         ?idle_timeout,
         socket = %socket_path.display(),
         "daemon configured"
@@ -53,10 +49,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    let state = Arc::new(DaemonState::new(daemon_config, workers, idle_timeout));
-
-    // Start config file watcher
-    let _watcher = reload::spawn_config_watcher(&config_path, Arc::clone(&state))?;
+    let state = Arc::new(DaemonState::new(daemon_config, idle_timeout));
 
     // Run the IPC server (blocks forever)
     run_server(socket_path.to_str().unwrap(), state).await?;

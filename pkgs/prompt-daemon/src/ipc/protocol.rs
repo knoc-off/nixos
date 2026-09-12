@@ -1,136 +1,99 @@
-//! 4-phase IPC wire protocol.
+//! 2-message IPC wire protocol.
 //!
-//! Normal query (4 messages on one connection):
-//!   1. Client → Daemon:  [cmd_len: u16 LE] [cwd_len: u16 LE] [command] [cwd]
-//!   2. Daemon → Client:  [env_count: u8] [var_name\0 ...]
-//!   3. Client → Daemon:  [env_count: u8] [env_val\0 ...]
-//!   4. Daemon → Client:  [status: u8] [value_len: u16 LE] [value: bytes]
-//!
-//! Status query (2 messages):
-//!   1. Client → Daemon:  [cmd_len: u16 LE = 0] [cwd_len: u16 LE = 0]
+//! Normal query:
+//!   1. Client → Daemon:  [payload_len: u32 LE] [command\0 cwd\0 (KEY=VALUE\0)*]
 //!   2. Daemon → Client:  [status: u8] [value_len: u16 LE] [value: bytes]
+//!
+//! Status query:
+//!   1. Client → Daemon:  [payload_len: u32 LE = 0]
+//!   2. Daemon → Client:  [status: u8] [value_len: u16 LE] [value: bytes]
+//!
+//! The client sends its full environment; the daemon picks out whatever
+//! variables the requested command declared in its `env` list.
+
+use std::collections::HashMap;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-// ── Phase 1: Client sends command name + CWD ───────────────────────
+/// A parsed request, or `None` for a status query.
+pub struct Request {
+    pub command: String,
+    pub cwd: String,
+    pub env: HashMap<String, String>,
+}
 
-/// Write command name and CWD to the wire (client side).
-/// Send cmd_len=0 and cwd_len=0 for a status query.
-pub async fn write_command<W: AsyncWriteExt + Unpin>(
+// ── Message 1: Client sends command + CWD + full environment ───────
+
+/// Write a request (client side). Pass `env` as an empty map for a status query.
+pub async fn write_request<W: AsyncWriteExt + Unpin>(
     writer: &mut W,
     command: &str,
     cwd: &str,
+    env: &HashMap<String, String>,
 ) -> std::io::Result<()> {
-    let cmd_bytes = command.as_bytes();
-    let cwd_bytes = cwd.as_bytes();
-    let cmd_len = cmd_bytes.len().min(u16::MAX as usize) as u16;
-    let cwd_len = cwd_bytes.len().min(u16::MAX as usize) as u16;
+    if command.is_empty() && cwd.is_empty() && env.is_empty() {
+        writer.write_u32_le(0).await?;
+        writer.flush().await?;
+        return Ok(());
+    }
 
-    writer.write_u16_le(cmd_len).await?;
-    writer.write_u16_le(cwd_len).await?;
-    if cmd_len > 0 {
-        writer.write_all(&cmd_bytes[..cmd_len as usize]).await?;
+    let mut payload = Vec::new();
+    payload.extend_from_slice(command.as_bytes());
+    payload.push(0);
+    payload.extend_from_slice(cwd.as_bytes());
+    payload.push(0);
+    for (k, v) in env {
+        payload.extend_from_slice(k.as_bytes());
+        payload.push(b'=');
+        payload.extend_from_slice(v.as_bytes());
+        payload.push(0);
     }
-    if cwd_len > 0 {
-        writer.write_all(&cwd_bytes[..cwd_len as usize]).await?;
-    }
+
+    writer.write_u32_le(payload.len() as u32).await?;
+    writer.write_all(&payload).await?;
     writer.flush().await?;
     Ok(())
 }
 
-/// Read command name and CWD from the wire (daemon side).
-/// Returns `(command, cwd, is_status_query)`.
-pub async fn read_command<R: AsyncReadExt + Unpin>(
+/// Read a request (daemon side). Returns `None` for a status query.
+pub async fn read_request<R: AsyncReadExt + Unpin>(
     reader: &mut R,
-) -> std::io::Result<(String, String, bool)> {
-    let cmd_len = reader.read_u16_le().await?;
-    let cwd_len = reader.read_u16_le().await?;
-
-    if cmd_len == 0 && cwd_len == 0 {
-        return Ok((String::new(), String::new(), true));
+) -> std::io::Result<Option<Request>> {
+    let len = reader.read_u32_le().await?;
+    if len == 0 {
+        return Ok(None);
     }
 
-    let command = if cmd_len > 0 {
-        let mut buf = vec![0u8; cmd_len as usize];
-        reader.read_exact(&mut buf).await?;
-        String::from_utf8(buf)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
-    } else {
-        String::new()
-    };
+    let mut buf = vec![0u8; len as usize];
+    reader.read_exact(&mut buf).await?;
 
-    let cwd = if cwd_len > 0 {
-        let mut buf = vec![0u8; cwd_len as usize];
-        reader.read_exact(&mut buf).await?;
-        String::from_utf8(buf)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?
-    } else {
-        String::new()
-    };
+    let mut parts = buf.split(|&b| b == 0).map(|s| {
+        String::from_utf8(s.to_vec())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+    });
 
-    Ok((command, cwd, false))
-}
+    let command = parts
+        .next()
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "missing command"))??;
+    let cwd = parts
+        .next()
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::InvalidData, "missing cwd"))??;
 
-// ── Phase 2: Daemon sends required env var names ────────────────────
-
-/// Write the list of required env var names (daemon side).
-pub async fn write_env_request<W: AsyncWriteExt + Unpin>(
-    writer: &mut W,
-    var_names: &[String],
-) -> std::io::Result<()> {
-    let count = var_names.len().min(u8::MAX as usize) as u8;
-    writer.write_u8(count).await?;
-    for name in var_names.iter().take(count as usize) {
-        writer.write_all(name.as_bytes()).await?;
-        writer.write_u8(0).await?;
+    let mut env = HashMap::new();
+    for entry in parts {
+        let entry = entry?;
+        if entry.is_empty() {
+            continue;
+        }
+        if let Some((k, v)) = entry.split_once('=') {
+            env.insert(k.to_string(), v.to_string());
+        }
     }
-    writer.flush().await?;
-    Ok(())
+
+    Ok(Some(Request { command, cwd, env }))
 }
 
-/// Read the list of required env var names (client side).
-pub async fn read_env_request<R: AsyncReadExt + Unpin>(
-    reader: &mut R,
-) -> std::io::Result<Vec<String>> {
-    let count = reader.read_u8().await?;
-    let mut names = Vec::with_capacity(count as usize);
-    for _ in 0..count {
-        names.push(read_null_terminated(reader).await?);
-    }
-    Ok(names)
-}
-
-// ── Phase 3: Client sends env var values ────────────────────────────
-
-/// Write env var values back to the daemon (client side).
-/// Values must be in the same order as the names from phase 2.
-pub async fn write_env_values<W: AsyncWriteExt + Unpin>(
-    writer: &mut W,
-    values: &[String],
-) -> std::io::Result<()> {
-    let count = values.len().min(u8::MAX as usize) as u8;
-    writer.write_u8(count).await?;
-    for val in values.iter().take(count as usize) {
-        writer.write_all(val.as_bytes()).await?;
-        writer.write_u8(0).await?;
-    }
-    writer.flush().await?;
-    Ok(())
-}
-
-/// Read env var values from the client (daemon side).
-pub async fn read_env_values<R: AsyncReadExt + Unpin>(
-    reader: &mut R,
-) -> std::io::Result<Vec<String>> {
-    let count = reader.read_u8().await?;
-    let mut values = Vec::with_capacity(count as usize);
-    for _ in 0..count {
-        values.push(read_null_terminated(reader).await?);
-    }
-    Ok(values)
-}
-
-// ── Phase 4: Daemon sends response ──────────────────────────────────
+// ── Message 2: Daemon sends response ────────────────────────────────
 
 /// Write a response (daemon side).
 pub async fn write_response<W: AsyncWriteExt + Unpin>(
@@ -160,82 +123,59 @@ pub async fn read_response<R: AsyncReadExt + Unpin>(
     Ok((status, value))
 }
 
-// ── Helpers ─────────────────────────────────────────────────────────
-
-async fn read_null_terminated<R: AsyncReadExt + Unpin>(
-    reader: &mut R,
-) -> std::io::Result<String> {
-    let mut buf = Vec::new();
-    loop {
-        let byte = reader.read_u8().await?;
-        if byte == 0 {
-            break;
-        }
-        buf.push(byte);
-    }
-    String::from_utf8(buf)
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::io::Cursor;
 
     #[tokio::test]
-    async fn command_round_trip() {
+    async fn request_round_trip() {
+        let mut env = HashMap::new();
+        env.insert("GIT_BRANCH".to_string(), "main".to_string());
+
         let mut buf = Vec::new();
-        write_command(&mut buf, "git_status", "/home/user").await.unwrap();
+        write_request(&mut buf, "git_branch", "/repo", &env).await.unwrap();
 
         let mut reader = Cursor::new(buf);
-        let (cmd, cwd, is_status) = read_command(&mut reader).await.unwrap();
-        assert_eq!(cmd, "git_status");
-        assert_eq!(cwd, "/home/user");
-        assert!(!is_status);
+        let req = read_request(&mut reader).await.unwrap().unwrap();
+        assert_eq!(req.command, "git_branch");
+        assert_eq!(req.cwd, "/repo");
+        assert_eq!(req.env.get("GIT_BRANCH"), Some(&"main".to_string()));
+    }
+
+    #[tokio::test]
+    async fn request_with_no_env() {
+        let mut buf = Vec::new();
+        write_request(&mut buf, "uptime", "", &HashMap::new()).await.unwrap();
+
+        let mut reader = Cursor::new(buf);
+        let req = read_request(&mut reader).await.unwrap().unwrap();
+        assert_eq!(req.command, "uptime");
+        assert_eq!(req.cwd, "");
+        assert!(req.env.is_empty());
     }
 
     #[tokio::test]
     async fn status_query_round_trip() {
         let mut buf = Vec::new();
-        write_command(&mut buf, "", "").await.unwrap();
+        write_request(&mut buf, "", "", &HashMap::new()).await.unwrap();
 
         let mut reader = Cursor::new(buf);
-        let (cmd, cwd, is_status) = read_command(&mut reader).await.unwrap();
-        assert_eq!(cmd, "");
-        assert_eq!(cwd, "");
-        assert!(is_status);
+        let req = read_request(&mut reader).await.unwrap();
+        assert!(req.is_none());
     }
 
     #[tokio::test]
-    async fn env_request_round_trip() {
-        let names = vec!["GIT_BRANCH".into(), "HOSTNAME".into()];
+    async fn env_value_containing_equals() {
+        let mut env = HashMap::new();
+        env.insert("FOO".to_string(), "a=b=c".to_string());
+
         let mut buf = Vec::new();
-        write_env_request(&mut buf, &names).await.unwrap();
+        write_request(&mut buf, "cmd", "/x", &env).await.unwrap();
 
         let mut reader = Cursor::new(buf);
-        let result = read_env_request(&mut reader).await.unwrap();
-        assert_eq!(result, vec!["GIT_BRANCH", "HOSTNAME"]);
-    }
-
-    #[tokio::test]
-    async fn env_request_empty() {
-        let mut buf = Vec::new();
-        write_env_request(&mut buf, &[]).await.unwrap();
-
-        let mut reader = Cursor::new(buf);
-        let result = read_env_request(&mut reader).await.unwrap();
-        assert!(result.is_empty());
-    }
-
-    #[tokio::test]
-    async fn env_values_round_trip() {
-        let values = vec!["main".into(), "myhost".into()];
-        let mut buf = Vec::new();
-        write_env_values(&mut buf, &values).await.unwrap();
-
-        let mut reader = Cursor::new(buf);
-        let result = read_env_values(&mut reader).await.unwrap();
-        assert_eq!(result, vec!["main", "myhost"]);
+        let req = read_request(&mut reader).await.unwrap().unwrap();
+        assert_eq!(req.env.get("FOO"), Some(&"a=b=c".to_string()));
     }
 
     #[tokio::test]
@@ -261,37 +201,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn full_4_phase_exchange() {
-        // Simulate a complete client<->daemon exchange in a single buffer
+    async fn full_exchange() {
         let mut wire = Vec::new();
 
-        // Phase 1: client writes command + CWD
-        write_command(&mut wire, "git_branch", "/repo").await.unwrap();
-
-        // Phase 2: daemon writes env request
-        let env_names = vec!["GIT_BRANCH".into()];
-        write_env_request(&mut wire, &env_names).await.unwrap();
-
-        // Phase 3: client writes env values
-        let env_vals = vec!["main".into()];
-        write_env_values(&mut wire, &env_vals).await.unwrap();
-
-        // Phase 4: daemon writes response
+        let mut env = HashMap::new();
+        env.insert("GIT_BRANCH".to_string(), "main".to_string());
+        write_request(&mut wire, "git_branch", "/repo", &env).await.unwrap();
         write_response(&mut wire, 0x01, "main").await.unwrap();
 
-        // Now read it all back
         let mut reader = Cursor::new(wire);
 
-        let (cmd, cwd, is_status) = read_command(&mut reader).await.unwrap();
-        assert_eq!(cmd, "git_branch");
-        assert_eq!(cwd, "/repo");
-        assert!(!is_status);
-
-        let names = read_env_request(&mut reader).await.unwrap();
-        assert_eq!(names, vec!["GIT_BRANCH"]);
-
-        let vals = read_env_values(&mut reader).await.unwrap();
-        assert_eq!(vals, vec!["main"]);
+        let req = read_request(&mut reader).await.unwrap().unwrap();
+        assert_eq!(req.command, "git_branch");
+        assert_eq!(req.cwd, "/repo");
+        assert_eq!(req.env.get("GIT_BRANCH"), Some(&"main".to_string()));
 
         let (status, value) = read_response(&mut reader).await.unwrap();
         assert_eq!(status, 0x01);

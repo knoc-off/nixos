@@ -11,12 +11,6 @@ pub struct ActivityTracker {
     pub request_count: u64,
 }
 
-impl Default for ActivityTracker {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ActivityTracker {
     pub fn new() -> Self {
         Self {
@@ -46,12 +40,6 @@ pub struct StoreEntry {
     pub last_check_output: Option<String>,
 }
 
-impl Default for StoreEntry {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl StoreEntry {
     pub fn new() -> Self {
         Self {
@@ -67,12 +55,6 @@ impl StoreEntry {
 #[derive(Debug)]
 pub struct CacheStore {
     entries: HashMap<String, StoreEntry>,
-}
-
-impl Default for CacheStore {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl CacheStore {
@@ -97,28 +79,8 @@ impl CacheStore {
         self.entries.get_mut(key)
     }
 
-    pub fn remove(&mut self, key: &str) -> Option<StoreEntry> {
-        self.entries.remove(key)
-    }
-
     /// Iterate all entries (for status dump).
     pub fn iter(&self) -> impl Iterator<Item = (&String, &StoreEntry)> {
         self.entries.iter()
-    }
-
-    /// Remove all cache entries for a given command name.
-    /// Cache keys have the format `command_name\0KEY=val\0...` or just `command_name`.
-    pub fn remove_command(&mut self, command: &str) {
-        self.entries.retain(|key, _| {
-            key.split('\0').next().unwrap_or(key) != command
-        });
-    }
-
-    /// Remove entries whose command names are no longer in the config.
-    pub fn retain_commands(&mut self, valid_commands: &[String]) {
-        self.entries.retain(|key, _| {
-            let cmd_name = key.split('\0').next().unwrap_or(key);
-            valid_commands.iter().any(|name| name == cmd_name)
-        });
     }
 }

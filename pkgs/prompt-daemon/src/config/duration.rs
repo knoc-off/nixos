@@ -1,5 +1,3 @@
-use std::fmt;
-
 use serde::de;
 
 /// A wrapper around `std::time::Duration` that deserializes from strings like
@@ -47,26 +45,6 @@ fn parse_duration(s: &str) -> Result<std::time::Duration, String> {
         "d" => Ok(std::time::Duration::from_secs(value * 86400)),
         "" => Err(format!("missing duration suffix in '{s}' (use ms, s, m, h, or d)")),
         _ => Err(format!("unknown duration suffix '{suffix}' (use ms, s, m, h, or d)")),
-    }
-}
-
-impl fmt::Display for Duration {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let millis = self.0.as_millis();
-        let secs = self.0.as_secs();
-        if secs > 0 && self.0.subsec_millis() == 0 {
-            if secs.is_multiple_of(86400) {
-                write!(f, "{}d", secs / 86400)
-            } else if secs.is_multiple_of(3600) {
-                write!(f, "{}h", secs / 3600)
-            } else if secs.is_multiple_of(60) {
-                write!(f, "{}m", secs / 60)
-            } else {
-                write!(f, "{secs}s")
-            }
-        } else {
-            write!(f, "{millis}ms")
-        }
     }
 }
 

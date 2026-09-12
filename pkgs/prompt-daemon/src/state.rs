@@ -8,17 +8,17 @@ use crate::scheduler::Scheduler;
 
 /// Shared daemon state passed to each connection handler.
 pub struct DaemonState {
-    pub config: RwLock<DaemonConfig>,
+    pub config: DaemonConfig,
     pub store: RwLock<CacheStore>,
     pub scheduler: Scheduler,
 }
 
 impl DaemonState {
-    pub fn new(config: DaemonConfig, workers: usize, idle_timeout: Duration) -> Self {
+    pub fn new(config: DaemonConfig, idle_timeout: Duration) -> Self {
         Self {
-            config: RwLock::new(config),
+            config,
             store: RwLock::new(CacheStore::new()),
-            scheduler: Scheduler::new(workers, idle_timeout),
+            scheduler: Scheduler::new(idle_timeout),
         }
     }
 }

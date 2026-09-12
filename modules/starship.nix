@@ -12,6 +12,8 @@
       jqBin = "${pkgs.jq}/bin/jq";
       grepBin = "${pkgs.gnugrep}/bin/grep";
       sedBin = "${pkgs.gnused}/bin/sed";
+      promptDaemonPkg = self.packages.${pkgs.stdenv.hostPlatform.system}.prompt-daemon;
+      promptClient = [ "${promptDaemonPkg}/bin/prompt-client" ];
       branchColors = [
         "#e06c75"
         "#98c379"
@@ -148,9 +150,8 @@
         {
           services.prompt-daemon = {
             enable = true;
-            package = self.packages.${pkgs.stdenv.hostPlatform.system}.prompt-daemon;
+            package = promptDaemonPkg;
             daemon = {
-              workers = 4;
               idle_timeout = "60s";
             };
             defaults = {
@@ -203,7 +204,6 @@
         settings = {
           add_newline = false;
 
-          # format = "((($python )(\${custom.rust} )$nix_shell )(\${custom.upstream_link} (\${custom.linear_ticket}-)\${custom.git_branch} )\n)$directory( $cmd_duration)$line_break$character";
           format = "((($python )(\${custom.rust} )$nix_shell )(\${custom.upstream_link} ${lib.optionalString cfg.enable "(\${custom.linear_ticket}-)"}\${custom.git_branch} )\n)$directory( $cmd_duration)$line_break$character";
           command_timeout = 500;
 
@@ -267,16 +267,10 @@
             show_milliseconds = false;
           };
 
-          git_branch = {
-            symbol = "󰘬 ";
-            style = "bold purple";
-            format = "[$symbol$branch]($style)";
-          };
-
           custom.rust = {
             command = "rust_version";
             use_stdin = false;
-            shell = [ "${self.packages.${pkgs.stdenv.hostPlatform.system}.prompt-daemon}/bin/prompt-client" ];
+            shell = promptClient;
             detect_files = [ "Cargo.toml" ];
             detect_extensions = [ "rs" ];
             style = "italic red";
@@ -287,7 +281,7 @@
           custom.git_branch = {
             command = "git_branch";
             use_stdin = false;
-            shell = [ "${self.packages.${pkgs.stdenv.hostPlatform.system}.prompt-daemon}/bin/prompt-client" ];
+            shell = promptClient;
             detect_folders = [ ".git" ];
             when = "true";
             style = "";
@@ -297,7 +291,7 @@
           custom.linear_ticket = lib.mkIf cfg.enable {
             command = "linear_ticket";
             use_stdin = false;
-            shell = [ "${self.packages.${pkgs.stdenv.hostPlatform.system}.prompt-daemon}/bin/prompt-client" ];
+            shell = promptClient;
             detect_folders = [ ".git" ];
             when = "true";
             style = "";
@@ -307,7 +301,7 @@
           custom.upstream_link = {
             command = "upstream_link";
             use_stdin = false;
-            shell = [ "${self.packages.${pkgs.stdenv.hostPlatform.system}.prompt-daemon}/bin/prompt-client" ];
+            shell = promptClient;
             detect_folders = [ ".git" ];
             when = "true";
             style = "";

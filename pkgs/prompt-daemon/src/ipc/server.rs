@@ -6,11 +6,12 @@ use tokio::net::UnixListener;
 use crate::cache::key::derive_cache_key;
 use crate::cache::resolve;
 use crate::config::schema::ENV_CWD;
-use crate::error::Error;
 use crate::state::DaemonState;
 
 use super::protocol;
 use super::status::format_status_dump;
+
+type Error = Box<dyn std::error::Error + Send + Sync>;
 
 /// Start the IPC server on the given unix socket path.
 pub async fn run_server(socket_path: &str, state: Arc<DaemonState>) -> Result<(), Error> {
@@ -42,50 +43,44 @@ async fn handle_connection(
 ) -> Result<(), Error> {
     let (mut reader, mut writer) = stream.into_split();
 
-    // Phase 1: read command name + CWD
-    let (command, cwd, is_status) = protocol::read_command(&mut reader).await?;
-
-    // Status query shortcut (skip phases 2-3)
-    if is_status {
-        tracing::debug!("status query");
-        let store = state.store.read().await;
-        let dump = format_status_dump(&store);
-        protocol::write_response(&mut writer, 0x01, &dump).await?;
-        return Ok(());
-    }
+    let request = match protocol::read_request(&mut reader).await? {
+        Some(req) => req,
+        None => {
+            tracing::debug!("status query");
+            let store = state.store.read().await;
+            let dump = format_status_dump(&store);
+            protocol::write_response(&mut writer, 0x01, &dump).await?;
+            return Ok(());
+        }
+    };
+    let (command, cwd, client_env) = (request.command, request.cwd, request.env);
 
     tracing::debug!(cmd = %command, cwd = %cwd, "request");
 
     // Look up command in config
-    let config = state.config.read().await;
-    let cmd_config = match config.commands.get(&command) {
+    let cmd_config = match state.config.commands.get(&command) {
         Some(cmd) => cmd,
         None => {
             tracing::debug!(cmd = %command, "unknown command");
-            protocol::write_env_request(&mut writer, &[]).await?;
-            let _ = protocol::read_env_values(&mut reader).await?;
             protocol::write_response(&mut writer, 0x04, "").await?;
             return Ok(());
         }
     };
 
-    // Phase 2: send required env var names
-    let client_vars = cmd_config.client_env_vars();
-    protocol::write_env_request(&mut writer, &client_vars).await?;
-
-    // Phase 3: receive env var values
-    let client_values = protocol::read_env_values(&mut reader).await?;
-    let mut env: HashMap<String, String> =
-        client_vars.into_iter().zip(client_values).collect();
+    // Filter the client's full environment down to what this command declared.
+    let mut env: HashMap<String, String> = cmd_config
+        .client_env_vars()
+        .into_iter()
+        .filter_map(|name| client_env.get(&name).map(|v| (name, v.clone())))
+        .collect();
 
     if cmd_config.uses_cwd() {
         env.insert(ENV_CWD.to_string(), cwd);
     }
 
-    // Clone config data we need, then release the read lock
+    // Clone config data we need (state.config is immutable for the daemon's lifetime)
     let cmd_config = cmd_config.clone();
-    let defaults = config.defaults.clone();
-    drop(config);
+    let defaults = state.config.defaults.clone();
 
     // Derive cache key and resolve response
     let cache_key = derive_cache_key(&command, &env);
@@ -136,7 +131,7 @@ async fn handle_connection(
         .ensure_active(&state, &cache_key, &cmd_config, &defaults)
         .await;
 
-    // Phase 4: send response
+    // Send response
     protocol::write_response(&mut writer, status, &value).await?;
 
     Ok(())

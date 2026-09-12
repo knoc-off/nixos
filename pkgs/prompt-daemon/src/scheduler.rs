@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
-use tokio::sync::{Mutex, Semaphore};
+use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tokio::time::{interval, sleep, Interval, MissedTickBehavior};
 
@@ -14,15 +14,13 @@ use crate::state::DaemonState;
 
 /// Manages background scheduler tasks for cache key refresh.
 pub struct Scheduler {
-    semaphore: Arc<Semaphore>,
     idle_timeout: Duration,
     tasks: Mutex<HashMap<String, JoinHandle<()>>>,
 }
 
 impl Scheduler {
-    pub fn new(workers: usize, idle_timeout: Duration) -> Self {
+    pub fn new(idle_timeout: Duration) -> Self {
         Self {
-            semaphore: Arc::new(Semaphore::new(workers)),
             idle_timeout,
             tasks: Mutex::new(HashMap::new()),
         }
@@ -63,22 +61,6 @@ impl Scheduler {
         });
 
         tasks.insert(cache_key.to_string(), handle);
-    }
-
-    /// Cancel all scheduler tasks for a given command name.
-    /// Used on config reload when a command's config has changed.
-    pub async fn cancel_for_command(&self, command: &str) {
-        let mut tasks = self.tasks.lock().await;
-        tasks.retain(|key, handle| {
-            let cmd_name = key.split('\0').next().unwrap_or(key);
-            if cmd_name == command {
-                tracing::info!("cancelling scheduler for changed command '{command}' (key '{key}')");
-                handle.abort();
-                false
-            } else {
-                true
-            }
-        });
     }
 
     /// Execute a command immediately (one-shot, for cache misses).
@@ -192,13 +174,13 @@ async fn scheduler_loop(
         match trigger {
             Trigger::Interval => {
                 tracing::trace!("interval tick for '{key}'");
-                execute_run(&state, &key, &cmd_config.run, shell, timeout, exec_in_cwd).await;
+                execute(&state, &key, &cmd_config.run, shell, timeout, exec_in_cwd, false).await;
             }
             Trigger::Check => {
                 if let Some(ref check) = check_cmd {
                     if run_check(&state, &key, check, shell, timeout, exec_in_cwd).await {
                         tracing::debug!("check changed for '{key}', re-executing");
-                        execute_run(&state, &key, &cmd_config.run, shell, timeout, exec_in_cwd)
+                        execute(&state, &key, &cmd_config.run, shell, timeout, exec_in_cwd, false)
                             .await;
                     }
                 }
@@ -210,7 +192,7 @@ async fn scheduler_loop(
                 // Run inline (blocking this loop) so the command finishes before
                 // we return to select!. This prevents a feedback loop where the
                 // command reads the watched file and triggers another event.
-                execute_inline(&state, &key, &cmd_config.run, shell, timeout, exec_in_cwd)
+                execute(&state, &key, &cmd_config.run, shell, timeout, exec_in_cwd, true)
                     .await;
                 // Post-execution drain: catch events caused by the execution itself
                 sleep(debounce_dur).await;
@@ -230,14 +212,20 @@ fn make_timer(dur: Option<Duration>) -> Interval {
     t
 }
 
-/// Run the main command via the scheduler and update the cache.
-async fn execute_run(
+/// Run the main command and update the cache.
+///
+/// When `inline` is true, the execution is awaited before returning instead of
+/// spawned in the background. Used for watch-triggered executions to prevent a
+/// feedback loop: the command must finish before we return to `tokio::select!`
+/// in the caller so it can drain any inotify events the command itself caused.
+async fn execute(
     state: &Arc<DaemonState>,
     key: &str,
     run: &str,
     shell: bool,
     timeout: Duration,
     exec_in_cwd: bool,
+    inline: bool,
 ) {
     // Skip if already running
     {
@@ -248,14 +236,6 @@ async fn execute_run(
             }
         }
     }
-
-    let permit = match state.scheduler.semaphore.clone().try_acquire_owned() {
-        Ok(p) => p,
-        Err(_) => {
-            tracing::trace!("no worker permits, skipping execution for '{key}'");
-            return;
-        }
-    };
 
     let env_snapshot;
     {
@@ -276,84 +256,37 @@ async fn execute_run(
         None
     };
 
-    let run = run.to_string();
-    let key = key.to_string();
-    let state = Arc::clone(state);
+    let run_fut = run_and_store(
+        Arc::clone(state),
+        key.to_string(),
+        run.to_string(),
+        shell,
+        timeout,
+        exec_cwd,
+        env_snapshot,
+    );
 
-    tokio::spawn(async move {
-        let _permit = permit;
-        let result = run_command(&run, shell, &env_snapshot, timeout, exec_cwd.as_deref()).await;
-
-        let mut store = state.store.write().await;
-        if let Some(entry) = store.get_mut(&key) {
-            match result {
-                Ok(output) => {
-                    tracing::debug!("scheduler: '{key}' completed: {output}");
-                    entry.cache.complete(output, env_snapshot);
-                }
-                Err(e) => {
-                    tracing::warn!("scheduler: '{key}' failed: {e}");
-                    entry.cache.fail(e);
-                }
-            }
-        }
-    });
+    if inline {
+        run_fut.await;
+    } else {
+        tokio::spawn(run_fut);
+    }
 }
 
-/// Run the main command inline (blocking the scheduler loop).
-/// Used for watch-triggered executions to prevent feedback loops: the command
-/// must finish before we return to `tokio::select!` so we can drain any
-/// inotify events it caused.
-async fn execute_inline(
-    state: &Arc<DaemonState>,
-    key: &str,
-    run: &str,
+/// Run a command and write its outcome back into the cache entry for `key`.
+async fn run_and_store(
+    state: Arc<DaemonState>,
+    key: String,
+    run: String,
     shell: bool,
     timeout: Duration,
-    exec_in_cwd: bool,
+    exec_cwd: Option<String>,
+    env_snapshot: HashMap<String, String>,
 ) {
-    // Skip if already running
-    {
-        let store = state.store.read().await;
-        if let Some(entry) = store.get(key) {
-            if entry.cache.is_running() {
-                return;
-            }
-        }
-    }
-
-    let permit = match state.scheduler.semaphore.clone().try_acquire_owned() {
-        Ok(p) => p,
-        Err(_) => {
-            tracing::trace!("no worker permits, skipping inline execution for '{key}'");
-            return;
-        }
-    };
-
-    let env_snapshot;
-    {
-        let mut store = state.store.write().await;
-        if let Some(entry) = store.get_mut(key) {
-            if !entry.cache.start() {
-                return;
-            }
-            env_snapshot = entry.last_env.clone();
-        } else {
-            return;
-        }
-    }
-
-    let exec_cwd = if exec_in_cwd {
-        env_snapshot.get(ENV_CWD).cloned()
-    } else {
-        None
-    };
-
-    let result = run_command(run, shell, &env_snapshot, timeout, exec_cwd.as_deref()).await;
-    drop(permit);
+    let result = run_command(&run, shell, &env_snapshot, timeout, exec_cwd.as_deref()).await;
 
     let mut store = state.store.write().await;
-    if let Some(entry) = store.get_mut(key) {
+    if let Some(entry) = store.get_mut(&key) {
         match result {
             Ok(output) => {
                 tracing::debug!("scheduler: '{key}' completed: {output}");

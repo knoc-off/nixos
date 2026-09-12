@@ -3,7 +3,6 @@ pub mod schema;
 
 use std::path::PathBuf;
 
-use crate::error::Error;
 use schema::DaemonConfig;
 
 /// Well-known socket path: $XDG_RUNTIME_DIR/prompt-daemon.sock
@@ -39,7 +38,9 @@ pub fn resolve_config_path(explicit: Option<&str>) -> Option<PathBuf> {
 }
 
 /// Load and parse the config file.
-pub fn load_config(path: &std::path::Path) -> Result<DaemonConfig, Error> {
+pub fn load_config(
+    path: &std::path::Path,
+) -> Result<DaemonConfig, Box<dyn std::error::Error + Send + Sync>> {
     let contents = std::fs::read_to_string(path)?;
     let config: DaemonConfig = serde_yaml_ng::from_str(&contents)?;
     Ok(config)

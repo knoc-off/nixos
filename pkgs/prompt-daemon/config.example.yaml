@@ -1,5 +1,4 @@
 daemon:
-  workers: 2
   idle_timeout: 60s
 
 defaults:

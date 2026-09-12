@@ -22,20 +22,26 @@ impl CacheEntry {
     pub fn start(&mut self) -> bool {
         let prev = std::mem::replace(self, CacheEntry::Empty(Empty));
         match prev {
-            CacheEntry::Empty(s) => {
-                *self = CacheEntry::Running(s.start());
+            CacheEntry::Empty(_) => {
+                *self = CacheEntry::Running(Running { previous_value: None });
                 true
             }
             CacheEntry::Cached(s) => {
-                *self = CacheEntry::Running(s.refresh());
+                *self = CacheEntry::Running(Running {
+                    previous_value: Some(s.value),
+                });
                 true
             }
             CacheEntry::Expired(s) => {
-                *self = CacheEntry::Running(s.retry());
+                *self = CacheEntry::Running(Running {
+                    previous_value: Some(s.last_value),
+                });
                 true
             }
             CacheEntry::Errored(s) => {
-                *self = CacheEntry::Running(s.retry());
+                *self = CacheEntry::Running(Running {
+                    previous_value: s.last_good_value,
+                });
                 true
             }
             CacheEntry::Running(_) => {
@@ -50,8 +56,12 @@ impl CacheEntry {
     pub fn complete(&mut self, value: String, env: HashMap<String, String>) {
         let prev = std::mem::replace(self, CacheEntry::Empty(Empty));
         match prev {
-            CacheEntry::Running(s) => {
-                *self = CacheEntry::Cached(s.complete(value, env));
+            CacheEntry::Running(_) => {
+                *self = CacheEntry::Cached(Cached {
+                    value,
+                    computed_at: tokio::time::Instant::now(),
+                    env_snapshot: env,
+                });
             }
             other => {
                 // Shouldn't happen — restore and log
@@ -66,7 +76,10 @@ impl CacheEntry {
         let prev = std::mem::replace(self, CacheEntry::Empty(Empty));
         match prev {
             CacheEntry::Running(s) => {
-                *self = CacheEntry::Errored(s.fail(error));
+                *self = CacheEntry::Errored(Errored {
+                    error,
+                    last_good_value: s.previous_value,
+                });
             }
             other => {
                 *self = other;
@@ -81,7 +94,7 @@ impl CacheEntry {
         if should_expire {
             let prev = std::mem::replace(self, CacheEntry::Empty(Empty));
             if let CacheEntry::Cached(s) = prev {
-                *self = CacheEntry::Expired(s.expire());
+                *self = CacheEntry::Expired(Expired { last_value: s.value });
             }
         }
     }
@@ -98,12 +111,6 @@ impl CacheEntry {
             CacheEntry::Expired(_) => "Expired",
             CacheEntry::Errored(_) => "Errored",
         }
-    }
-}
-
-impl Default for CacheEntry {
-    fn default() -> Self {
-        Self::new()
     }
 }
 
