@@ -92,6 +92,57 @@ let
     --success-text-color: ${css c.base0B};
   '';
 
+  # Native menus (right-click context menu, the menubar drop-downs) are NOT
+  # covered by chromeVars above, and this is not an oversight in the list: they
+  # do not read --arrowpanel-* at all. chrome://global/skin/popup.css:9-10 sets
+  #
+  #   :is(menupopup, panel):where(:not([type="arrow"])) {
+  #     --panel-background-color: Menu;
+  #     --panel-text-color: MenuText;
+  #   }
+  #
+  # -- different variables, and hardcoded to the *system* palette. Two
+  # consequences, both verified over the debug bridge:
+  #
+  #   1. It has to be its own selector. popup.css sets the variable on the
+  #      menupopup element itself, so a value inherited from :root loses; an
+  #      inline style on the shadow part loses too (measured: no effect).
+  #   2. Menu/MenuText resolve from Firefox's built-in dark theme, not from
+  #      anything themeable -- Menu measured as rgb(54,54,58) against our
+  #      base01 #323F47, which is exactly the mismatch that showed up.
+  #
+  # Hover is a third case again: chrome://global/skin/menu.css:252-253 uses the
+  # bare keywords -moz-menuhover / -moz-menuhovertext with no variable in
+  # between (measured rgb(21,83,158), the stock blue), so it needs a direct
+  # rule rather than a variable override.
+  #
+  # !important throughout, for the same reason contentTokens needs it:
+  # userChrome.css is a USER sheet and popup.css is an AUTHOR sheet, and both
+  # selectors land on the same specificity (:is() takes its most specific
+  # argument = one element, :where() contributes nothing, so popup.css is
+  # (0,0,1) exactly like `menupopup, panel`). A specificity tie across origins
+  # is decided by origin, and author beats user -- verified by shipping this
+  # block without !important, where --panel-background-color stayed `Menu`.
+  #
+  # This is why chromeVars gets away with plain declarations and this does not:
+  # nothing in the stock chrome declares --lwt-*/--arrowpanel-*, so there is no
+  # competing author rule to lose to.
+  menuVars = c: ''
+    menupopup,
+    panel {
+      --panel-background-color: ${css c.base01} !important;
+      --panel-text-color: ${css c.base05} !important;
+      --panel-separator-color: ${css c.base02} !important;
+    }
+
+    /* :where() keeps specificity at the bare element selector, so a more
+       specific stock rule for a particular menu still wins. */
+    menupopup :is(menu, menuitem):where([_moz-menuactive="true"]:not([disabled="true"])) {
+      background-color: ${css c.base03} !important;
+      color: ${css c.base06} !important;
+    }
+  '';
+
   # The theme API's color keys, per
   # developer.mozilla.org/docs/Mozilla/Add-ons/WebExtensions/manifest.json/theme
   themeApiColors = c: {
@@ -150,23 +201,29 @@ let
   # ramp (tokens-platform.css:231, tokens-shared.css:1063) and userChrome.css
   # never reaches content documents.
   #
-  # Two facts make this a clean override rather than an !important war:
+  # The graph is well-factored -- most tokens derive from a small root set via
+  # var(), so redefining the roots recolors everything downstream. The violet
+  # primitives are overridden too, to catch tokens referencing the ramp directly.
   #
-  #   1. Every token is declared inside an @layer (tokens-foundation,
-  #      tokens-browser-theme-nova, ...). Unlayered declarations beat layered
-  #      ones at the same specificity regardless of order, so a plain :root
-  #      block in userContent.css wins outright.
-  #   2. The graph is well-factored -- most tokens derive from a small root set
-  #      via var(), so redefining the roots recolors everything downstream.
-  #      The violet primitives are overridden too, to catch the tokens that
-  #      reference the ramp directly.
+  # Every declaration is !important, which is load-bearing, not belt-and-braces.
+  # The tokens are declared inside @layers (tokens-foundation,
+  # tokens-browser-theme-nova, ...) and unlayered does beat layered -- but only
+  # *within one origin*. userContent.css is a USER sheet while chrome://newtab
+  # and chrome://global/skin/design-system are AUTHOR sheets, and for normal
+  # declarations author beats user outright; layers never enter into it.
+  # !important inverts the origin order, which is the only thing that wins here.
+  #
+  # Verified over the debug bridge: two otherwise identical user sheets, the
+  # !important one won and the plain one lost to Firefox's violet
+  # (light-dark(#764EDD, #B89CFF)) the moment the important sheet was dropped.
   #
   # light-dark() is used rather than a media query so each token follows the
   # page's own color-scheme, which is what the stock tokens do.
   contentTokens =
     let
-      # light-dark() takes the light value first.
-      ld = lightHex: darkHex: "light-dark(${css lightHex}, ${css darkHex})";
+      # light-dark() takes the light value first. !important is applied here so
+      # every token below carries it without repeating it 40 times.
+      ld = lightHex: darkHex: "light-dark(${css lightHex}, ${css darkHex}) !important";
     in
     ''
       :root {
@@ -294,10 +351,14 @@ in
     ${chromeVars d}
     }
 
+    ${menuVars d}
+
     @media (prefers-color-scheme: light) {
       :root {
     ${chromeVars l}
       }
+
+    ${menuVars l}
     }
 
     ${contentTokens}

@@ -119,6 +119,26 @@ in
             # Required for userChrome.css to be read at all.
             "toolkit.legacyUserProfileCustomizations.stylesheets" = true;
 
+            # Suppresses fx-autoconfig's own first-run infobar ("Firefox is
+            # being modified with custom autoconfig scripting"). boot.sys.mjs
+            # shows it via `Pref.setIfUnset("userChromeJS.firstRunShown", true)`,
+            # which returns true only when it actually had to set the pref --
+            # so presetting it means the notification never fires. Worth doing
+            # declaratively rather than dismissing it once: pkgs/jailed-firefox-neo
+            # gets a fresh profile on every launch, where "once" is every time.
+            "userChromeJS.firstRunShown" = true;
+
+            # Drag-and-drop fix. Under GTK/Wayland the compositor sends a
+            # spurious LeaveNotify during a drag, which Firefox reads as the
+            # pointer having left the window -- so the drag aborts partway and
+            # the drop never lands. Tab reordering and dragging a tab into
+            # Sidebery are the visible symptoms.
+            #
+            # Carried over from modules/firefox (settings/default.nix); it was
+            # needed for Zen too. Not inherited automatically because this
+            # module deliberately does not import that one.
+            "widget.gtk.ignore-bogus-leave-notify" = 1;
+
             # Static layout is deliberately OFF.
             #
             # It holds #sidebar at the full 300px and animates a clipping
