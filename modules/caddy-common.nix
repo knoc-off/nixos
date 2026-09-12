@@ -1,9 +1,8 @@
 # Shared Caddy configuration usable by any host that enables Caddy.
 # Provides the (security-headers) snippet plus the Cloudflare DNS-01 wiring so
 # every node issues its own niko.ink certificates (no public IP / port-80
-# reachability required). CLOUDFLARE_API_TOKEN is one Cloudflare token shared
-# by every host (modules/shared-secrets.yaml), wired up here so hosts don't
-# repeat it.
+# reachability required). One Cloudflare token is shared by every host
+# (modules/shared-secrets.yaml), wired up here so hosts don't repeat it.
 #
 # Certificates come from security.acme (lego), not from Caddy itself. Caddy's
 # own DNS-01 needs the caddy-dns/cloudflare plugin, which means
@@ -32,14 +31,23 @@
         # shared secret here rather than repeating it per host. The caddy
         # module supplies the rest of each cert (group, reloadServices)
         # automatically for any name referenced by useACMEHost.
-        sops.secrets."services/caddy/cloudflare-env".sopsFile = ./shared-secrets.yaml;
+        sops.secrets."services/caddy/cloudflare-api-token".sopsFile = ./shared-secrets.yaml;
 
         security.acme = {
           acceptTerms = true;
           defaults = {
             email = "acme@niko.ink";
             dnsProvider = "cloudflare";
-            environmentFile = config.sops.secrets."services/caddy/cloudflare-env".path;
+
+            # credentialFiles rather than environmentFile: lego resolves any
+            # <VAR>_FILE by reading the referenced file (platform/config/env
+            # GetOrFile), and NixOS passes these through systemd
+            # LoadCredential, so the token is never rendered into a second
+            # file. The name must be CLOUDFLARE_DNS_API_TOKEN -- lego only
+            # accepts CLOUDFLARE_/CF_ DNS_API_TOKEN for scoped tokens, never
+            # the CLOUDFLARE_API_TOKEN that the old caddy-dns plugin used.
+            credentialFiles."CLOUDFLARE_DNS_API_TOKEN_FILE" =
+              config.sops.secrets."services/caddy/cloudflare-api-token".path;
 
             # Same reason the old Caddy cert_issuer block pinned resolvers: the
             # DNS-01 solver finds the owning zone with an SOA query through the
