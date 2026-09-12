@@ -76,11 +76,10 @@ in
       sops = {
         defaultSopsFile = ./secrets.yaml;
         secrets = {
-          "shell_environment/OPENROUTER_API_KEY" = {
-            mode = "0644";
-          };
+          "shell_environment/OPENROUTER_API_KEY".owner = "knoff";
           "shell_environment/RHIZOME_TOKEN" = {
-            mode = "0644";
+            owner = "knoff";
+            sopsFile = ../../modules/shared-secrets.yaml;
           };
         };
       };

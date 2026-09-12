@@ -28,7 +28,20 @@
         reverse_proxy localhost:8123
       '';
     };
+
+    # z2m frontend: token-gated (frontend.auth_token, set via env in
+    # home-assistant.nix), only reachable through here. Shares the Pi's cert
+    # as a SAN rather than issuing a second one.
+    virtualHosts."z2m.niko.ink" = {
+      useACMEHost = "home.niko.ink";
+      extraConfig = ''
+        import security-headers
+        reverse_proxy localhost:7768
+      '';
+    };
   };
+
+  security.acme.certs."home.niko.ink".extraDomainNames = [ "z2m.niko.ink" ];
 
   systemd.tmpfiles.rules = [
     "d /var/log/caddy 0750 caddy caddy -"

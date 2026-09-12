@@ -42,12 +42,26 @@ in
       frontend = {
         enabled = true;
         port = 7768;
-        host = "0.0.0.0";
+        host = "127.0.0.1";
       };
 
       serial = {
         port = "tcp://${slzb06Ip}:6638";
         adapter = "zstack";
+      };
+
+      # Declared here (not groups.yaml) so it survives rebuilds; z2m only
+      # writes back to `devices`, never to `groups`. No Zigbee-level bind yet
+      # (button-dispatcher handles button_1 in software) -- binding button_1
+      # to this group would let it keep working with the Pi off.
+      groups."1" = {
+        friendly_name = "living_room";
+        devices = [
+          "light_1"
+          "plug_1"
+          "plug_2"
+          "plug_3"
+        ];
       };
     };
   };
@@ -94,14 +108,19 @@ in
 
       # MQTT configured via HA UI -- declarative config conflicts with it
 
-      # Notifications are sent directly to individual mobile apps
-      # by the cat-doorbell service (NOTIFY_SERVICES env var).
+      # cat-doorbell notifies via ntfy directly (NTFY_TOKEN_FILE), bypassing
+      # HA's notify/mobile_app entirely.
     };
   };
 
+  # z2m frontend: localhost-only, reverse-proxied by Caddy with auth_token
+  # (see caddy-lan.nix). ZIGBEE2MQTT_CONFIG_FRONTEND_AUTH_TOKEN overrides
+  # settings.frontend.auth_token at runtime, keeping it out of /nix/store.
+  # Secret file must contain: ZIGBEE2MQTT_CONFIG_FRONTEND_AUTH_TOKEN=<token>
+  sops.secrets."zigbee2mqtt/auth-token-env" = { };
+
   networking.firewall.allowedTCPPorts = [
     8123
-    7768
   ];
 
   systemd.tmpfiles.rules = [
@@ -133,6 +152,7 @@ in
       RestartSec = lib.mkForce "5s";
       MemoryMax = "256M";
       MemoryHigh = "200M";
+      EnvironmentFile = config.sops.secrets."zigbee2mqtt/auth-token-env".path;
     };
     unitConfig = {
       StartLimitIntervalSec = 300;

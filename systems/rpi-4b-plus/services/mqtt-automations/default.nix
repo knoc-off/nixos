@@ -71,7 +71,7 @@ let
         NTFY_TOPIC = "cat-doorbell";
         COOLDOWN_SECONDS = "300";
         NOTIFICATION_TITLE = "Cat Doorbell";
-        NTFY_TOKEN_FILE = config.sops.secrets."ntfy/token".path;
+        NTFY_TOKEN_FILE = config.sops.secrets."services/ntfy/publish-token".path;
         CURL_BIN = "${pkgs.curl}/bin/curl";
       };
     }
@@ -128,6 +128,16 @@ let
         CT_COOL = "250";
         UPDATE_INTERVAL = "60";
         ENABLED_TOPIC = hueEnabledTopic;
+      };
+    }
+    {
+      name = "button-dispatcher";
+      bin = "button-dispatcher";
+      description = "button_1: single toggles light_1, double/hold toggles the living-room group";
+      env = {
+        BUTTON_TOPIC = "zigbee2mqtt/button_1/action";
+        SINGLE_TOPICS = "zigbee2mqtt/light_1/set";
+        GROUP_TOPICS = "zigbee2mqtt/light_1/set,zigbee2mqtt/plug_1/set,zigbee2mqtt/plug_2/set,zigbee2mqtt/plug_3/set";
       };
     }
   ];
@@ -203,55 +213,6 @@ in
         payload_on = "true";
         payload_off = "false";
         icon = "mdi:palette";
-      }
-    ];
-
-    # button_1: single press toggles the living-room light; double/hold
-    # toggles the whole living-room group. Z2M discovery (homeassistant.enabled
-    # in zigbee2mqtt config) already exposes each device as an HA entity, so
-    # this is plain HA automation -- no custom dispatcher needed.
-    automation = [
-      {
-        alias = "button_1 single -> toggle light_1";
-        trigger = [
-          {
-            platform = "mqtt";
-            topic = "zigbee2mqtt/button_1/action";
-            payload = "single";
-          }
-        ];
-        action = [
-          {
-            service = "light.toggle";
-            target.entity_id = "light.light_1";
-          }
-        ];
-      }
-      {
-        alias = "button_1 double/hold -> toggle living room group";
-        trigger = [
-          {
-            platform = "mqtt";
-            topic = "zigbee2mqtt/button_1/action";
-            payload = "double";
-          }
-          {
-            platform = "mqtt";
-            topic = "zigbee2mqtt/button_1/action";
-            payload = "hold";
-          }
-        ];
-        action = [
-          {
-            service = "homeassistant.toggle";
-            target.entity_id = [
-              "light.light_1"
-              "switch.plug_1"
-              "switch.plug_2"
-              "switch.plug_3"
-            ];
-          }
-        ];
       }
     ];
   };

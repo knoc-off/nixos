@@ -15,7 +15,7 @@
 set -euo pipefail
 
 HOSTNAME="${1:?Usage: $0 <hostname>}"
-SECRETS_FILE="systems/secrets/${HOSTNAME}/default.yaml"
+SECRETS_FILE="systems/${HOSTNAME}/secrets.yaml"
 SOPS_YAML=".sops.yaml"
 
 # Verify we're in the flake root
@@ -66,7 +66,7 @@ echo "  1. Under 'keys:', add or replace the entry for ${HOSTNAME}:"
 echo "       - &${HOSTNAME} ${AGE_KEY}"
 echo ""
 echo "  2. Under 'creation_rules:', ensure a rule exists:"
-echo "       - path_regex: systems/secrets/${HOSTNAME}/[^/]+\.(yaml|json|env|ini)\$"
+echo "       - path_regex: systems/${HOSTNAME}/secrets\.yaml\$"
 echo "         key_groups:"
 echo "           - age:"
 echo "               - *framework13h"

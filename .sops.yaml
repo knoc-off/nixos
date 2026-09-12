@@ -33,3 +33,14 @@ creation_rules:
       - age:
           - *optiplex
           - *framework13h
+  # Secrets shared across every host (colocated under modules/ rather than
+  # systems/ so it isn't mistaken for a per-host directory -- it isn't one).
+  - path_regex: modules/shared-secrets\.yaml$
+    key_groups:
+      - age:
+          - *framework13h
+          - *framework13
+          - *hetzner
+          - *rpi-4b-plus
+          - *work
+          - *optiplex

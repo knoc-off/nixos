@@ -58,6 +58,12 @@ in
             type = "A";
             value = tailnet.rpi-4b-plus;
           }
+          # z2m (Zigbee2MQTT frontend, token-gated) also served locally by the Pi.
+          {
+            name = "z2m.niko.ink";
+            type = "A";
+            value = tailnet.rpi-4b-plus;
+          }
           # kitchenowl + notes run on the hub; tailnet clients reach the hub
           # over the tailnet so Caddy sees a trusted source and skips OAuth.
           {

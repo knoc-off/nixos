@@ -22,7 +22,7 @@ in
         defaultSopsFile = ./secrets.yaml;
 
         secrets = {
-          "services/ntfy/publish-token" = { };
+          "services/ntfy/publish-token".sopsFile = ../../modules/shared-secrets.yaml;
           "services/minecraft/RCON_PASSWORD" = { };
           "services/nix-autobuild/deploy-key" = { };
           "services/anki-sync-server/password" = { };

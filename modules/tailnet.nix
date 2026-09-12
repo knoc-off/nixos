@@ -1,7 +1,7 @@
 # Tailscale data-plane node pointed at the self-hosted Headscale control
-# plane. Used by every host on the tailnet. authKeyFile holds a Headscale
-# pre-auth key (one per host, from sops); the node registers declaratively on
-# first start.
+# plane. Used by every host on the tailnet. authKeyFile holds a reusable
+# Headscale pre-auth key shared across all hosts (modules/shared-secrets.yaml);
+# the node registers declaratively on first start.
 #
 # acceptDns controls --accept-dns. Servers keep it false: they run their own
 # resolver and must keep resolving LAN names (e.g. the Zigbee coordinator) and
@@ -28,7 +28,7 @@
       };
 
       config = lib.mkIf cfg.enable {
-        sops.secrets."services/tailscale/authkey" = { };
+        sops.secrets."services/tailscale/authkey".sopsFile = ./shared-secrets.yaml;
 
         services.tailscale = {
           enable = true;

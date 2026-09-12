@@ -1,7 +1,9 @@
 # Shared Caddy configuration usable by any host that enables Caddy.
 # Provides the (security-headers) snippet plus the Cloudflare DNS-01 wiring so
 # every node issues its own niko.ink certificates (no public IP / port-80
-# reachability required).
+# reachability required). CLOUDFLARE_API_TOKEN is one Cloudflare token shared
+# by every host (modules/shared-secrets.yaml), wired up here so hosts don't
+# repeat it.
 #
 # Certificates come from security.acme (lego), not from Caddy itself. Caddy's
 # own DNS-01 needs the caddy-dns/cloudflare plugin, which means
@@ -26,11 +28,11 @@
     }:
     {
       config = lib.mkIf config.services.caddy.enable {
-        # Every host that enables Caddy needs the same token, so declare the
-        # secret here rather than repeating it per host. The caddy module
-        # supplies the rest of each cert (group, reloadServices) automatically
-        # for any name referenced by useACMEHost.
-        sops.secrets."services/caddy/cloudflare-env" = { };
+        # Every host that enables Caddy needs the same token, so point at the
+        # shared secret here rather than repeating it per host. The caddy
+        # module supplies the rest of each cert (group, reloadServices)
+        # automatically for any name referenced by useACMEHost.
+        sops.secrets."services/caddy/cloudflare-env".sopsFile = ./shared-secrets.yaml;
 
         security.acme = {
           acceptTerms = true;

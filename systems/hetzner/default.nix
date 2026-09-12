@@ -32,7 +32,7 @@ in
           "services/ntfy/admin-hash" = { };
           "services/ntfy/normal-hash" = { };
           "services/ntfy/publisher-hash" = { };
-          "services/ntfy/publish-token" = { };
+          "services/ntfy/publish-token".sopsFile = ../../modules/shared-secrets.yaml;
         };
       };
     }

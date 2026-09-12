@@ -34,7 +34,7 @@
   sops = {
     defaultSopsFile = ./secrets.yaml;
     secrets."wifi/home/fritz" = { };
-    secrets."ntfy/token" = { };
+    secrets."services/ntfy/publish-token".sopsFile = ../../modules/shared-secrets.yaml;
   };
 
   time.timeZone = "Europe/Berlin";

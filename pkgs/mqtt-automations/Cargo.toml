@@ -23,6 +23,10 @@ path = "src/bin/color_temp_cycle.rs"
 name = "bedtime-button"
 path = "src/bin/bedtime_button.rs"
 
+[[bin]]
+name = "button-dispatcher"
+path = "src/bin/button_dispatcher.rs"
+
 [dependencies]
 rumqttc = { version = "0.24", default-features = false }
 tokio = { version = "1", features = ["rt", "macros", "signal", "time", "sync"] }

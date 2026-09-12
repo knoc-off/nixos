@@ -100,21 +100,14 @@ in
       sops = {
         defaultSopsFile = ./secrets.yaml;
         secrets = {
-          "shell_environment/_ANTHROPIC_API_KEY" = {
-            mode = "0644";
-          };
+          "shell_environment/_ANTHROPIC_API_KEY".owner = "niko";
           "shell_environment/RHIZOME_TOKEN" = {
-            mode = "0644";
+            owner = "niko";
+            sopsFile = ../../modules/shared-secrets.yaml;
           };
-          "shell_environment/FIGMA_CLIENTID" = {
-            mode = "0644";
-          };
-          "shell_environment/FIGMA_CLIENTSECRET" = {
-            mode = "0644";
-          };
-          "shell_environment/GOOGLE_TOTP_KEY" = {
-            mode = "0644";
-          };
+          "shell_environment/FIGMA_CLIENTID".owner = "niko";
+          "shell_environment/FIGMA_CLIENTSECRET".owner = "niko";
+          "shell_environment/GOOGLE_TOTP_KEY".owner = "niko";
         };
       };
     }
