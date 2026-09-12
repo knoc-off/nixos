@@ -116,8 +116,12 @@ in
   # z2m frontend: localhost-only, reverse-proxied by Caddy with auth_token
   # (see caddy-lan.nix). ZIGBEE2MQTT_CONFIG_FRONTEND_AUTH_TOKEN overrides
   # settings.frontend.auth_token at runtime, keeping it out of /nix/store.
-  # Secret file must contain: ZIGBEE2MQTT_CONFIG_FRONTEND_AUTH_TOKEN=<token>
-  sops.secrets."zigbee2mqtt/auth-token-env" = { };
+  # The secret itself is a bare token; the template adds the VAR= prefix
+  # z2m expects in an EnvironmentFile.
+  sops.secrets."zigbee2mqtt/frontend-auth-token" = { };
+  sops.templates."z2m.env".content = ''
+    ZIGBEE2MQTT_CONFIG_FRONTEND_AUTH_TOKEN=${config.sops.placeholder."zigbee2mqtt/frontend-auth-token"}
+  '';
 
   networking.firewall.allowedTCPPorts = [
     8123
@@ -152,7 +156,7 @@ in
       RestartSec = lib.mkForce "5s";
       MemoryMax = "256M";
       MemoryHigh = "200M";
-      EnvironmentFile = config.sops.secrets."zigbee2mqtt/auth-token-env".path;
+      EnvironmentFile = config.sops.templates."z2m.env".path;
     };
     unitConfig = {
       StartLimitIntervalSec = 300;

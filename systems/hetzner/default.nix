@@ -24,7 +24,6 @@ in
         defaultSopsFile = ./secrets.yaml;
 
         secrets = {
-          "services/website/env" = { };
           "services/kitchenowl/jwt-secret" = { };
           "services/kitchenowl/api-token" = { };
           "services/ntfy/admin-hash" = { };

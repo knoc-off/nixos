@@ -33,8 +33,15 @@
 
   sops = {
     defaultSopsFile = ./secrets.yaml;
-    secrets."wifi/home/fritz" = { };
+    secrets."wifi/home/fritz/PSK0" = { };
     secrets."services/ntfy/publish-token".sopsFile = ../../modules/shared-secrets.yaml;
+
+    # wpa_supplicant's secretsFile wants literal `varname=value` lines (see
+    # networking.wireless.secretsFile below), which a plain secret can't be --
+    # the PSK is a nested leaf, not a flat file. Render the one line it needs.
+    templates."wireless.env".content = ''
+      PSK0=${config.sops.placeholder."wifi/home/fritz/PSK0"}
+    '';
   };
 
   time.timeZone = "Europe/Berlin";
@@ -92,7 +99,7 @@
     # enable back to true.
     wireless = {
       enable = false;
-      secretsFile = config.sops.secrets."wifi/home/fritz".path;
+      secretsFile = config.sops.templates."wireless.env".path;
       networks."FRITZ!Box 7590 SI".pskRaw = "ext:PSK0";
     };
     # Static IP on ethernet so end0 deterministically owns .54, matching
