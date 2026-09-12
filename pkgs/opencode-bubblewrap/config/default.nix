@@ -9,6 +9,7 @@
   hostQuery,
   scriptExec,
   lspmuxSession,
+  datadog,
 }:
 
 # The jail's entire ~/.config/opencode, built in the store.
@@ -339,8 +340,8 @@ let
   # needs to hold half a codebase in context.
   exploreTiers = {
     quick = {
-      model = "anthropic/claude-sonnet-4-5";
-      contextBudget = 80000;
+      model = "anthropic/claude-sonnet-5";
+      contextBudget = 40000;
       description = "PREFERRED FIRST PASS for all codebase and filesystem investigation. Fast, cheap tier (Sonnet 4.5). Read-only: locating files, keyword/regex search, finding definitions and call sites, reconnaissance before an edit, confirming assumptions. Reach for this by default instead of running Grep/Glob yourself, and dispatch several in ONE message to run them in parallel. Escalate to explore-mid only if a lookup genuinely needs reasoning.";
     };
     mid = {
@@ -494,6 +495,15 @@ let
       nixos = {
         type = "local";
         command = [ "${upkgs.mcp-nixos}/bin/mcp-nixos" ];
+      };
+    }
+    # No `oauth` key: omitting it leaves opencode's auto-detection on. Auth is
+    # a one-time `opencode mcp auth datadog` per jail identity; the token
+    # persists in ~/.local/share/opencode/mcp-auth.json.
+    // lib.optionalAttrs datadog {
+      datadog = {
+        type = "remote";
+        url = "https://mcp.datadoghq.eu/v1/mcp";
       };
     };
 

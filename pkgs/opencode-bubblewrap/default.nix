@@ -3,6 +3,8 @@
   self,
   upkgs,
   pkgs,
+  # Opt-in per user via `.override` (modules/users/niko.nix).
+  datadog ? false,
   ...
 }:
 let
@@ -47,6 +49,7 @@ let
       hostQuery
       scriptExec
       lspmuxSession
+      datadog
       ;
     jailContext = ./jail-context.md;
   };

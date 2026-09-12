@@ -196,7 +196,9 @@
               upkgs.foliate
               upkgs.readest
 
-              self.packages.${pkgs.stdenv.hostPlatform.system}.opencode-bubblewrap
+              (self.packages.${pkgs.stdenv.hostPlatform.system}.opencode-bubblewrap.override {
+                datadog = true;
+              })
               self.packages.${pkgs.stdenv.hostPlatform.system}.neovim
 
               spotify
