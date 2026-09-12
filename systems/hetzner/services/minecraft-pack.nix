@@ -33,21 +33,24 @@ let
   packSite = inputs.minecraft-modpack.packages.${pkgs.stdenv.hostPlatform.system}.packSite;
 in
 {
-  services.caddy.virtualHosts."mc.niko.ink".extraConfig = ''
-    import security-headers
+  services.caddy.virtualHosts."mc.niko.ink" = {
+    useACMEHost = "niko.ink";
+    extraConfig = ''
+      import security-headers
 
-    handle_path /pack/* {
-      root * ${packSite}
+      handle_path /pack/* {
+        root * ${packSite}
 
-      # Jar filenames carry their version, so a given URL's bytes never
-      # change and the client can keep them indefinitely. The two TOMLs are
-      # the opposite: they are how a client learns an update exists, so a
-      # cached copy would pin players to a stale mod set.
-      header /jars/* Cache-Control "public, max-age=31536000, immutable"
-      header /pack.toml Cache-Control "no-cache"
-      header /index.toml Cache-Control "no-cache"
+        # Jar filenames carry their version, so a given URL's bytes never
+        # change and the client can keep them indefinitely. The two TOMLs are
+        # the opposite: they are how a client learns an update exists, so a
+        # cached copy would pin players to a stale mod set.
+        header /jars/* Cache-Control "public, max-age=31536000, immutable"
+        header /pack.toml Cache-Control "no-cache"
+        header /index.toml Cache-Control "no-cache"
 
-      file_server
-    }
-  '';
+        file_server
+      }
+    '';
+  };
 }

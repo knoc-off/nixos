@@ -1,6 +1,5 @@
 {
   self,
-  config,
   ...
 }:
 let
@@ -11,12 +10,14 @@ in
 {
   imports = [ self.nixosModules.caddy-common ];
 
-  sops.secrets."services/caddy/cloudflare-env" = { };
+  # One wildcard cert for every public vhost on this host. New *.niko.ink
+  # services -- including kitchenowl-mcp's optional domain -- need no cert
+  # change, only useACMEHost = "niko.ink". The apex is listed separately
+  # because a wildcard does not cover it.
+  security.acme.certs."niko.ink".extraDomainNames = [ "*.niko.ink" ];
 
   services.caddy = {
     enable = true;
-    email = "acme@niko.ink";
-    environmentFile = config.sops.secrets."services/caddy/cloudflare-env".path;
 
     logFormat = ''
       output file /var/log/caddy/access.log {
@@ -53,16 +54,23 @@ in
       }
     '';
 
-    virtualHosts."niko.ink".extraConfig = ''
-      import security-headers
-      reverse_proxy localhost:3000
-    '';
+    virtualHosts."niko.ink" = {
+      useACMEHost = "niko.ink";
+      extraConfig = ''
+        import security-headers
+        reverse_proxy localhost:3000
+      '';
+    };
 
-    virtualHosts."auth.niko.ink".extraConfig = ''
-      import security-headers
-      reverse_proxy localhost:4180
-    '';
+    virtualHosts."auth.niko.ink" = {
+      useACMEHost = "niko.ink";
+      extraConfig = ''
+        import security-headers
+        reverse_proxy localhost:4180
+      '';
+    };
 
+    # Plaintext catch-all: no TLS, so no cert.
     virtualHosts."http://".extraConfig = ''
       abort
     '';

@@ -224,15 +224,14 @@ in
         ];
       };
 
-      sops.secrets."services/caddy/cloudflare-env" = { };
-
       services.caddy = {
         enable = true;
-        email = "acme@niko.ink";
-        environmentFile = config.sops.secrets."services/caddy/cloudflare-env".path;
-        virtualHosts."optiplex.tail.niko.ink".extraConfig = ''
-          reverse_proxy localhost:27701
-        '';
+        virtualHosts."optiplex.tail.niko.ink" = {
+          useACMEHost = "optiplex.tail.niko.ink";
+          extraConfig = ''
+            reverse_proxy localhost:27701
+          '';
+        };
       };
 
       # Tailnet-only: no openFirewall, just the tailscale interface. Cert

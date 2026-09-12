@@ -122,15 +122,21 @@ in
     logRefusedConnections = true;
   };
 
-  services.caddy.virtualHosts."headscale.niko.ink".extraConfig = ''
-    import security-headers
-    reverse_proxy localhost:8085
-  '';
+  services.caddy.virtualHosts."headscale.niko.ink" = {
+    useACMEHost = "niko.ink";
+    extraConfig = ''
+      import security-headers
+      reverse_proxy localhost:8085
+    '';
+  };
 
-  services.caddy.virtualHosts."ntfy.niko.ink".extraConfig = ''
-    import security-headers
-    reverse_proxy localhost:2586
-  '';
+  services.caddy.virtualHosts."ntfy.niko.ink" = {
+    useACMEHost = "niko.ink";
+    extraConfig = ''
+      import security-headers
+      reverse_proxy localhost:2586
+    '';
+  };
 
   # Cap journal size so it doesn't eat disk over time
   services.journald.extraConfig = "SystemMaxUse=500M";

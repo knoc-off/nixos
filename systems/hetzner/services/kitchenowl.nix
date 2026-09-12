@@ -24,9 +24,12 @@
     "d /var/lib/kitchenowl 0755 root root -"
   ];
 
-  services.caddy.virtualHosts."kitchenowl.niko.ink".extraConfig = ''
-    import security-headers
-    import auth-public
-    reverse_proxy localhost:3043
-  '';
+  services.caddy.virtualHosts."kitchenowl.niko.ink" = {
+    useACMEHost = "niko.ink";
+    extraConfig = ''
+      import security-headers
+      import auth-public
+      reverse_proxy localhost:3043
+    '';
+  };
 }

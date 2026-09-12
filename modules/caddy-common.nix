@@ -1,37 +1,52 @@
 # Shared Caddy configuration usable by any host that enables Caddy.
-# Provides the (security-headers) snippet plus the Cloudflare DNS-01
-# wiring so every node self-issues its own *.niko.ink certificates
-# (no public IP / port-80 reachability required). The CLOUDFLARE_API_TOKEN
-# referenced by acme_dns is supplied per host via
-# services.caddy.environmentFile (a sops secret).
+# Provides the (security-headers) snippet plus the Cloudflare DNS-01 wiring so
+# every node issues its own niko.ink certificates (no public IP / port-80
+# reachability required).
+#
+# Certificates come from security.acme (lego), not from Caddy itself. Caddy's
+# own DNS-01 needs the caddy-dns/cloudflare plugin, which means
+# pkgs.caddy.withPlugins -- a fixed-output derivation whose builder runs
+# `xcaddy` + `go mod vendor` against the live Go module proxy. Its output hash
+# therefore depends on pkgs.go and pkgs.xcaddy, neither of which can be pinned
+# from here, so every nixpkgs bump that moves the Go toolchain rerolls the hash
+# and breaks the autobuild for every host at once. lego is an ordinary Go
+# package with a pinned vendorHash and no such drift, and the caddy module
+# already knows how to consume its output via virtualHosts.<name>.useACMEHost.
+#
+# Each host names its own cert (see the useACMEHost call sites) rather than
+# sharing one wildcard: identical domain sets across hosts would race against
+# Let's Encrypt's 5-duplicate-certificates-per-week limit, and it keeps each
+# node's private key scoped to the names it actually serves.
 { ... }: {
   nixos =
     {
       config,
       lib,
-      pkgs,
       ...
     }:
     {
       config = lib.mkIf config.services.caddy.enable {
-        services.caddy.package = pkgs.caddy.withPlugins {
-          plugins = [ "github.com/caddy-dns/cloudflare@v0.2.4" ];
-          hash = "sha256-8yZDrejNKsaUnUaTUFYbarWNmxafqp2z2rWo+XRsxV8=";
-        };
+        # Every host that enables Caddy needs the same token, so declare the
+        # secret here rather than repeating it per host. The caddy module
+        # supplies the rest of each cert (group, reloadServices) automatically
+        # for any name referenced by useACMEHost.
+        sops.secrets."services/caddy/cloudflare-env" = { };
 
-        # cert_issuer (not acme_dns): the DNS-01 solver looks up the owning
-        # zone with an SOA query through the system resolver, and on hosts
-        # with acceptDns = true that resolver is MagicDNS, which only speaks
-        # A/AAAA and answers NOTIMP to everything else. Explicit resolvers
-        # bypass it for ACME only. Same nameservers as headscale's global
-        # fallback. Note cert_issuer replaces the default issuer list, so
-        # this drops the ZeroSSL fallback -- fine for these internal certs.
-        services.caddy.globalConfig = ''
-          cert_issuer acme {
-            dns cloudflare {env.CLOUDFLARE_API_TOKEN}
-            resolvers 1.1.1.1 9.9.9.9
-          }
-        '';
+        security.acme = {
+          acceptTerms = true;
+          defaults = {
+            email = "acme@niko.ink";
+            dnsProvider = "cloudflare";
+            environmentFile = config.sops.secrets."services/caddy/cloudflare-env".path;
+
+            # Same reason the old Caddy cert_issuer block pinned resolvers: the
+            # DNS-01 solver finds the owning zone with an SOA query through the
+            # system resolver, and on hosts with acceptDns = true that resolver
+            # is MagicDNS, which only speaks A/AAAA and answers NOTIMP to
+            # everything else. An explicit resolver bypasses it for ACME only.
+            dnsResolver = "1.1.1.1:53";
+          };
+        };
 
         # mkBefore so the snippet is declared earlier in the generated
         # Caddyfile than any vhost that `import`s it.
