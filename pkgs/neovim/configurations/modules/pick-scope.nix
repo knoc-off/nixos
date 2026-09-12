@@ -38,23 +38,59 @@
     -- function, never mixed — so is_ext_marker must be its own tier.
     local MARKERS = { MARKER_NAMES, is_ext_marker, ".git" }
 
+    -- Both roots are resolved by walking the filesystem upward, and the
+    -- statusline calls Scope.label() on every redraw -- so an uncached walk is
+    -- paid per cursor move. The worst case is a buffer with no marker and no
+    -- .git anywhere above it (e.g. the /tmp/<random>/ file `sops edit` opens):
+    -- neither walk can short-circuit, so both run to / every time. Memoize per
+    -- buffer; the invalidation autocmd below covers everything a root depends
+    -- on (buffer path, cwd, attached LSP clients).
+    --
+    -- vim.b can't hold nil, so repo_root stores "" for "walked, found nothing".
     local function repo_root(bufnr)
-      return vim.fs.root(bufnr or 0, ".git")
+      if bufnr == nil or bufnr == 0 then bufnr = vim.api.nvim_get_current_buf() end
+      local cached = vim.b[bufnr].pick_scope_repo_root
+      if cached ~= nil then return cached ~= "" and cached or nil end
+      local dir = vim.fs.root(bufnr, ".git")
+      vim.b[bufnr].pick_scope_repo_root = dir or ""
+      return dir
     end
 
     local function auto_root(bufnr)
-      bufnr = bufnr or 0
+      if bufnr == nil or bufnr == 0 then bufnr = vim.api.nvim_get_current_buf() end
+      local cached = vim.b[bufnr].pick_scope_auto_root
+      if cached ~= nil then return cached end
       local dir = vim.fs.root(bufnr, MARKERS)
-      if dir then return dir end
-      -- No marker found anywhere up to (and including) the git root: fall back
-      -- to the narrowest attached LSP root_dir, if any.
-      local narrowest
-      for _, client in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
-        local rd = client.root_dir
-        if rd and (not narrowest or #rd > #narrowest) then narrowest = rd end
+      if not dir then
+        -- No marker found anywhere up to (and including) the git root: fall back
+        -- to the narrowest attached LSP root_dir, if any.
+        local narrowest
+        for _, client in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
+          local rd = client.root_dir
+          if rd and (not narrowest or #rd > #narrowest) then narrowest = rd end
+        end
+        dir = narrowest or repo_root(bufnr) or vim.fn.getcwd()
       end
-      return narrowest or repo_root(bufnr) or vim.fn.getcwd()
+      vim.b[bufnr].pick_scope_auto_root = dir
+      return dir
     end
+
+    -- A cached root goes stale when the buffer is renamed (BufFilePost) or an
+    -- LSP client attaches (auto_root consults client.root_dir). DirChanged
+    -- affects the getcwd() fallback, which any buffer may have landed on, so
+    -- that one clears every buffer.
+    vim.api.nvim_create_autocmd({ "BufFilePost", "LspAttach", "DirChanged" }, {
+      desc = "Invalidate cached pick-scope roots",
+      callback = function(args)
+        local bufs = args.event == "DirChanged" and vim.api.nvim_list_bufs() or { args.buf }
+        for _, b in ipairs(bufs) do
+          if vim.api.nvim_buf_is_valid(b) then
+            vim.b[b].pick_scope_auto_root = nil
+            vim.b[b].pick_scope_repo_root = nil
+          end
+        end
+      end,
+    })
 
     -- Repo root, for display (relativizing labels) and as the floor for `up()`.
     Scope.get_repo_root = function()

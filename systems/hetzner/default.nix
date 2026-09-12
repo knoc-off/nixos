@@ -27,8 +27,6 @@ in
           "services/website/env" = { };
           "services/kitchenowl/jwt-secret" = { };
           "services/kitchenowl/api-token" = { };
-          "services/kitchenowl/oauth-client-id" = { };
-          "services/kitchenowl/oauth-client-secret" = { };
           "services/ntfy/admin-hash" = { };
           "services/ntfy/normal-hash" = { };
           "services/ntfy/publisher-hash" = { };

@@ -72,4 +72,36 @@
     # gf extension fallback
     suffixesadd = ".md,.txt,.nix";
   };
+
+  # Never persist undo history for files under a temp dir. `sops edit` decrypts
+  # to /tmp/<random>/<name>.yaml and hands that path to $EDITOR, so with the
+  # global `undofile` on, every secret edited this way left its plaintext --
+  # including every intermediate state -- in an undofile under stdpath("state").
+  # Same applies to `git commit` messages, `crontab -e`, and similar temp-file
+  # editor handoffs. Matching on path keeps this independent of sops.
+  #
+  # BufReadPre/BufNewFile fires before the undofile would be read or written.
+  # (`swapfile` is already globally off above, so it needs no guard here.)
+  autoCmd = [
+    {
+      event = [
+        "BufReadPre"
+        "BufNewFile"
+      ];
+      pattern = [
+        "/tmp/*"
+        "/var/tmp/*"
+        "/dev/shm/*"
+      ];
+      callback.__raw = ''
+        function(args)
+          -- ponytail: path-prefix match only; a TMPDIR outside these three
+          -- roots is not covered. Add it here if that ever matters.
+          vim.bo[args.buf].undofile = false
+          vim.bo[args.buf].swapfile = false
+        end
+      '';
+      desc = "No undo/swap persistence for temp-dir buffers (sops edit, git commit, ...)";
+    }
+  ];
 }
