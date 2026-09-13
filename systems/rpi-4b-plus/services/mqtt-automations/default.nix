@@ -10,6 +10,14 @@
   ...
 }:
 let
+  inherit (import ../../devices.nix) devices kinds;
+
+  # Zigbee2mqtt topics for a registry device, so every consumer derives its
+  # topic from the same friendly name instead of re-typing it.
+  zSet = d: "zigbee2mqtt/${d.name}/set";
+  zTopic = d: "zigbee2mqtt/${d.name}";
+  zAction = d: "zigbee2mqtt/${d.name}/action";
+
   mqttPkg = self.packages.${pkgs.stdenv.hostPlatform.system}.mqtt-automations;
 
   mkAutomation =
@@ -67,8 +75,7 @@ let
 
   mkSunFollow =
     {
-      device, # zigbee2mqtt friendly name, e.g. "light_1"
-      mode, # "brightness" (dimmable light) or "switch" (on/off plug)
+      device, # registry device record (see ../../devices.nix)
       label, # display name for HA, e.g. "Living room light"
       defaultFollowSunrise ? true,
       defaultFollowSunset ? true,
@@ -83,13 +90,30 @@ let
       publishDaylightSensor ? false, # only one instance needs to -- see daylightSensorTopic
     }:
     let
-      base = "mqtt-auto/sun-follow/${device}";
+      name = device.name;
+
+      # HA identity is keyed on the IEEE address, never the friendly name.
+      # unique_id is what the entity registry stores permanently, so keying
+      # it on a renameable name means every rename orphans the old entity and
+      # registers a duplicate (HA has no GC for YAML-configured MQTT entities
+      # -- they linger as `unavailable` rows forever). The IEEE address is
+      # hardware-anchored, so renaming a device in the registry is now free.
+      hid = device.id;
+
+      # MQTT topics stay name-based: they're operational surface, meant to be
+      # readable in `mosquitto_sub` output, and the daemons are restarted with
+      # new topics on rename anyway.
+      base = "mqtt-auto/sun-follow/${name}";
       t = suffix: "${base}/${suffix}";
-      isSwitch = mode == "switch";
+
+      # A plug has no brightness channel, so mode follows from kind rather
+      # than being restated per entry (where it could silently disagree).
+      isSwitch = device.kind == kinds.plug;
+      mode = if isSwitch then "switch" else "brightness";
 
       env = sunEnv // {
-        MQTT_CLIENT_ID = "sun-follow-${device}";
-        DEVICE_TOPIC = "zigbee2mqtt/${device}/set";
+        MQTT_CLIENT_ID = "sun-follow-${name}";
+        DEVICE_TOPIC = "zigbee2mqtt/${name}/set";
         MODE = mode;
         ENABLED_TOPIC = t "enabled";
         FOLLOW_SUNRISE_TOPIC = t "follow-sunrise";
@@ -117,23 +141,25 @@ let
       };
 
       deviceInfo = {
-        identifiers = [ "sun-follow-${device}" ];
+        identifiers = [ "sun-follow-${hid}" ];
         name = "${label} (sun-follow)";
       };
 
-      mkSwitch = suffix: name: icon: {
-        unique_id = "sun_follow_${device}_${suffix}";
-        inherit name icon;
+      mkSwitch = suffix: entityName: icon: {
+        unique_id = "sun_follow_${hid}_${suffix}";
+        name = entityName;
+        inherit icon;
         command_topic = t suffix;
         state_topic = t suffix;
         retain = true;
         payload_on = "true";
         payload_off = "false";
+        entity_category = "config";
         device = deviceInfo;
       };
 
       mkNumber =
-        suffix: name: icon:
+        suffix: entityName: icon:
         {
           min,
           max,
@@ -141,21 +167,25 @@ let
           unit ? "%",
         }:
         {
-          unique_id = "sun_follow_${device}_${suffix}";
-          inherit name icon min max step;
+          unique_id = "sun_follow_${hid}_${suffix}";
+          name = entityName;
+          inherit icon min max step;
           unit_of_measurement = unit;
           mode = "slider";
           command_topic = t suffix;
           state_topic = t suffix;
           retain = true;
+          entity_category = "config";
           device = deviceInfo;
         };
 
-      mkButton = suffix: name: icon: {
-        unique_id = "sun_follow_${device}_${suffix}";
-        inherit name icon;
+      mkButton = suffix: entityName: icon: {
+        unique_id = "sun_follow_${hid}_${suffix}";
+        name = entityName;
+        inherit icon;
         command_topic = t suffix;
         payload_press = "reset";
+        entity_category = "config";
         device = deviceInfo;
       };
 
@@ -202,9 +232,9 @@ let
     in
     {
       service = mkAutomation {
-        name = "sun-follow-${device}";
+        name = "sun-follow-${name}";
         bin = "sun-follow";
-        description = "Sun-following ${mode} for ${device}";
+        description = "Sun-following ${mode} for ${name}";
         inherit env;
       };
       inherit switches numbers buttons;
@@ -212,32 +242,27 @@ let
 
   sunFollowDevices = [
     {
-      device = "light_1";
-      mode = "brightness";
+      device = devices.living-room.light;
       label = "Living room light";
       publishDaylightSensor = true;
     }
     {
-      device = "light_3";
-      mode = "brightness";
+      device = devices.bedroom.light;
       label = "Bedroom light";
       # sunrise-lights already owns the fixed-clock wake-up ramp; leave the
       # morning to it by default. Flip on in HA if ever wanted.
       defaultFollowSunrise = false;
     }
     {
-      device = "plug_1";
-      mode = "switch";
+      device = devices.living-room.plug_1;
       label = "Plug 1";
     }
     {
-      device = "plug_2";
-      mode = "switch";
+      device = devices.living-room.plug_2;
       label = "Plug 2";
     }
     {
-      device = "plug_3";
-      mode = "switch";
+      device = devices.living-room.plug_3;
       label = "Plug 3";
     }
   ];
@@ -256,7 +281,7 @@ let
       bin = "cat-doorbell";
       description = "Notify phone on motion detection (cat doorbell)";
       env = {
-        SENSOR_TOPIC = "zigbee2mqtt/motion_sensor";
+        SENSOR_TOPIC = zTopic devices.kitchen.motion;
         NTFY_URL = "https://ntfy.niko.ink";
         NTFY_TOPIC = "cat-doorbell";
         COOLDOWN_SECONDS = "300";
@@ -270,7 +295,7 @@ let
       bin = "sunrise-lights";
       description = "Wake-up light: smooth brightness ramp on a fixed schedule";
       env = {
-        LIGHT_TOPIC = "zigbee2mqtt/light_3/set";
+        LIGHT_TOPIC = zSet devices.bedroom.light;
         UPDATE_INTERVAL = "30";
         MAX_BRIGHTNESS = "30";
         START_TIME = "06:30:00";
@@ -284,10 +309,10 @@ let
     {
       name = "bedtime-button";
       bin = "bedtime-button";
-      description = "button_2: time-aware low-light toggle for light_3, hold for auto-off";
+      description = "bedroom.button: time-aware low-light toggle for bedroom.light, hold for auto-off";
       env = {
-        BUTTON_TOPIC = "zigbee2mqtt/button_2/action";
-        LIGHT_TOPIC = "zigbee2mqtt/light_3/set";
+        BUTTON_TOPIC = zAction devices.bedroom.button;
+        LIGHT_TOPIC = zSet devices.bedroom.light;
         LOW_BRIGHTNESS = "25";
         DAY_BRIGHTNESS = "254";
         EVENING_START_HOUR = "21";
@@ -300,7 +325,7 @@ let
       bin = "color-temp-cycle";
       description = "Adjust light color temperature through the day";
       env = sunEnv // {
-        LIGHT_TOPIC = "zigbee2mqtt/light_3/set";
+        LIGHT_TOPIC = zSet devices.bedroom.light;
         CT_WARM = "454";
         CT_COOL = "250";
         UPDATE_INTERVAL = "60";
@@ -313,7 +338,7 @@ let
       description = "Adjust living room light color temperature through the day";
       env = sunEnv // {
         MQTT_CLIENT_ID = "color-temp-cycle-living-room";
-        LIGHT_TOPIC = "zigbee2mqtt/light_1/set";
+        LIGHT_TOPIC = zSet devices.living-room.light;
         CT_WARM = "454";
         CT_COOL = "250";
         UPDATE_INTERVAL = "60";
@@ -323,11 +348,16 @@ let
     {
       name = "button-dispatcher";
       bin = "button-dispatcher";
-      description = "button_1: single toggles light_1, double/hold toggles the living-room group";
+      description = "living-room.button: single toggles the light, double/hold toggles the living-room group";
       env = {
-        BUTTON_TOPIC = "zigbee2mqtt/button_1/action";
-        SINGLE_TOPICS = "zigbee2mqtt/light_1/set";
-        GROUP_TOPICS = "zigbee2mqtt/light_1/set,zigbee2mqtt/plug_1/set,zigbee2mqtt/plug_2/set,zigbee2mqtt/plug_3/set";
+        BUTTON_TOPIC = zAction devices.living-room.button;
+        SINGLE_TOPICS = zSet devices.living-room.light;
+        GROUP_TOPICS = lib.concatMapStringsSep "," zSet [
+          devices.living-room.light
+          devices.living-room.plug_1
+          devices.living-room.plug_2
+          devices.living-room.plug_3
+        ];
       };
     }
   ];

@@ -6,6 +6,26 @@
 }:
 let
   slzb06Ip = "slzb-06";
+
+  inherit (import ../devices.nix) allDevices zigbeeGroups;
+
+  # `devices-nix.yaml`: z2m's IEEE -> friendly_name/area map, generated from
+  # the registry. Layered *after* the mutable `devices.yaml` in
+  # `settings.devices` below (z2m merges the list in order and only ever
+  # writes newly-paired devices back to the first file), so declaring a name
+  # here never blocks z2m from persisting a name for a device you haven't
+  # added to the registry yet.
+  z2mDevicesFile = (pkgs.formats.yaml { }).generate "devices-nix.yaml" (
+    lib.listToAttrs (
+      map (d: {
+        name = d.id;
+        value = {
+          friendly_name = d.name;
+          homeassistant.device.suggested_area = d.room.label;
+        };
+      }) allDevices
+    )
+  );
 in
 {
   imports = [
@@ -50,19 +70,25 @@ in
         adapter = "zstack";
       };
 
-      # Declared here (not groups.yaml) so it survives rebuilds; z2m only
-      # writes back to `devices`, never to `groups`. No Zigbee-level bind yet
-      # (button-dispatcher handles button_1 in software) -- binding button_1
-      # to this group would let it keep working with the Pi off.
-      groups."1" = {
-        friendly_name = "living_room";
-        devices = [
-          "light_1"
-          "plug_1"
-          "plug_2"
-          "plug_3"
-        ];
-      };
+      # Layered device list: z2m keeps writing newly-paired devices into the
+      # first file (`devices.yaml`, mutable); the second is our declarative
+      # overlay, regenerated from ../devices.nix on every rebuild. See
+      # z2mDevicesFile above for why this order matters.
+      devices = [
+        "devices.yaml"
+        z2mDevicesFile
+      ];
+
+      # Only `friendly_name` is settable here: z2m removed
+      # `groups.<id>.devices` in settings version 2 (see
+      # /var/lib/zigbee2mqtt/migration-1-to-2.log on the host) and silently
+      # strips it on every start. Declaring the group here is still what
+      # bootstraps it -- z2m lazily creates a group in its database the first
+      # time something resolves a name from configuration.yaml -- but the
+      # members come from the z2m-groups oneshot (see services/z2m-groups.nix).
+      groups = lib.mapAttrs' (
+        gName: g: lib.nameValuePair (toString g.id) { friendly_name = gName; }
+      ) zigbeeGroups;
     };
   };
 

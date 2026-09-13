@@ -14,6 +14,9 @@
     inputs.hardware.nixosModules.raspberry-pi-4
 
     ./services/home-assistant.nix
+    ./services/home-assistant/dashboard.nix
+    ./services/ha-registry-gc.nix
+    ./services/z2m-groups.nix
     ./services/caddy-lan.nix
     self.nixosModules.tailnet
     { services.tailnet.enable = true; }
