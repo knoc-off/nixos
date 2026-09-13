@@ -42,7 +42,7 @@ enum Phase {
 /// Brightness-mode ownership state. See module docs for the adoption model.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum LightState {
-    /// No report received yet (just started, or reset).
+    /// No report received yet (just started).
     Unknown,
     /// On, but not close enough to the curve's target to take over.
     Free,
@@ -52,6 +52,9 @@ enum LightState {
     UserOff,
     /// We turned it off (curve hit zero) -- may auto-wake when it rises again.
     AutoOff,
+    /// Reset button was pressed: take over unconditionally on the next tick,
+    /// regardless of tolerance or current on/off state.
+    Claim,
 }
 
 /// Switch-mode ownership state.
@@ -60,6 +63,9 @@ enum SwitchState {
     Unknown,
     Driving,
     NotDriving,
+    /// Reset button was pressed: take over unconditionally on the next tick,
+    /// regardless of tolerance or where the switch currently sits.
+    Claim,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -184,16 +190,9 @@ async fn main() -> Result<()> {
                     None => std::future::pending::<()>().await,
                 }
             } => {
-                eprintln!("reset requested, dropping ownership state");
-                light_state = LightState::Unknown;
-                switch_state = SwitchState::Unknown;
-                last_set_brightness = None;
-                last_set_switch = None;
-                last_desired_switch = None;
-                reported_on = None;
-                reported_bri = None;
-                settle_until = None;
-                rt.publish(&get_topic, json!({ "state": "" })).await?;
+                eprintln!("reset requested, claiming device on next tick");
+                light_state = LightState::Claim;
+                switch_state = SwitchState::Claim;
             }
             _ = tokio::time::sleep(std::time::Duration::from_secs(interval)) => {
                 let now = Local::now();
@@ -359,6 +358,9 @@ fn light_on_message(
             Some(true) => LightState::Free,
             _ => state,
         },
+        // Waiting for the next tick to apply the claim -- ignore reports
+        // in the meantime so a stray echo can't cancel it.
+        LightState::Claim => state,
     }
 }
 
@@ -428,6 +430,27 @@ fn light_on_tick(
                 (state, None)
             }
         }
+        // Reset button: take over unconditionally, no tolerance check, no
+        // matter what the light is currently doing.
+        LightState::Claim => {
+            if should_be_off {
+                (
+                    LightState::AutoOff,
+                    Some(LightAction {
+                        set_on: Some(false),
+                        brightness: target,
+                    }),
+                )
+            } else {
+                (
+                    LightState::Driving,
+                    Some(LightAction {
+                        set_on: Some(true),
+                        brightness: target,
+                    }),
+                )
+            }
+        }
     }
 }
 
@@ -484,6 +507,8 @@ fn switch_on_tick(
                 (state, None)
             }
         }
+        // Reset button: take over unconditionally, no crossing required.
+        SwitchState::Claim => (SwitchState::Driving, Some(desired)),
     }
 }
 
@@ -707,6 +732,33 @@ mod tests {
     }
 
     #[test]
+    fn light_tick_claim_turns_on_regardless_of_distance() {
+        // Light reported far outside adopt_tolerance (or not reported at
+        // all) -- claim takes over anyway, unconditionally.
+        let (state, action) = light_on_tick(LightState::Claim, Some(10), None, 240, false, 25, true);
+        assert_eq!(state, LightState::Driving);
+        let action = action.expect("claim must always act");
+        assert_eq!(action.set_on, Some(true));
+        assert_eq!(action.brightness, 240);
+    }
+
+    #[test]
+    fn light_tick_claim_turns_off_when_curve_wants_off() {
+        let (state, action) = light_on_tick(LightState::Claim, Some(200), None, 1, true, 25, true);
+        assert_eq!(state, LightState::AutoOff);
+        assert_eq!(action.unwrap().set_on, Some(false));
+    }
+
+    #[test]
+    fn light_claim_ignores_reports_until_tick_applies_it() {
+        // A stray echo while a claim is pending must not cancel it.
+        assert_eq!(
+            light_on_message(LightState::Claim, Some(false), Some(5), None, 5, false),
+            LightState::Claim
+        );
+    }
+
+    #[test]
     fn switch_driving_releases_on_unexpected_change() {
         assert_eq!(
             switch_on_message(SwitchState::Driving, Some(false), Some(true), false),
@@ -771,5 +823,20 @@ mod tests {
         let (state, publish) = switch_on_tick(SwitchState::NotDriving, false, Some(true), Some(true), None);
         assert_eq!(state, SwitchState::Driving);
         assert_eq!(publish, Some(false));
+    }
+
+    #[test]
+    fn switch_tick_claim_publishes_regardless() {
+        let (state, publish) = switch_on_tick(SwitchState::Claim, true, Some(false), None, None);
+        assert_eq!(state, SwitchState::Driving);
+        assert_eq!(publish, Some(true));
+    }
+
+    #[test]
+    fn switch_claim_ignores_reports_until_tick_applies_it() {
+        assert_eq!(
+            switch_on_message(SwitchState::Claim, Some(false), None, false),
+            SwitchState::Claim
+        );
     }
 }
