@@ -58,6 +58,196 @@ let
     LONGITUDE = "13.405";
   };
 
+  # -- sun-follow: generic sun-tracking dimmer/switch, one instance per device --
+  #
+  # Extending a device with sun-following is just adding an entry to
+  # `sunFollowDevices` below — the systemd service and HA entities are both
+  # generated from it, so no other file needs to change.
+  daylightSensorTopic = "mqtt-auto/sun-follow/daylight-pct";
+
+  mkSunFollow =
+    {
+      device, # zigbee2mqtt friendly name, e.g. "light_1"
+      mode, # "brightness" (dimmable light) or "switch" (on/off plug)
+      label, # display name for HA, e.g. "Living room light"
+      defaultFollowSunrise ? true,
+      defaultFollowSunset ? true,
+      defaultMin ? 1,
+      defaultMax ? 100,
+      defaultGamma ? 1.0,
+      # Normalized daylight %, not raw sun elevation -- see the writeup in
+      # git history for why. 15% lands within ~40min of true sunset/sunrise
+      # year-round at Berlin's latitude; the seasonal drift below that is
+      # negligible.
+      defaultThreshold ? 15,
+      publishDaylightSensor ? false, # only one instance needs to -- see daylightSensorTopic
+    }:
+    let
+      base = "mqtt-auto/sun-follow/${device}";
+      t = suffix: "${base}/${suffix}";
+      isSwitch = mode == "switch";
+
+      env = sunEnv // {
+        MQTT_CLIENT_ID = "sun-follow-${device}";
+        DEVICE_TOPIC = "zigbee2mqtt/${device}/set";
+        MODE = mode;
+        ENABLED_TOPIC = t "enabled";
+        FOLLOW_SUNRISE_TOPIC = t "follow-sunrise";
+        FOLLOW_SUNSET_TOPIC = t "follow-sunset";
+        INVERT_TOPIC = t "invert";
+        RESET_TOPIC = t "reset";
+        FOLLOW_SUNRISE = lib.boolToString defaultFollowSunrise;
+        FOLLOW_SUNSET = lib.boolToString defaultFollowSunset;
+      }
+      // lib.optionalAttrs (!isSwitch) {
+        ALLOW_WAKE_TOPIC = t "allow-wake";
+        MIN_BRIGHTNESS_TOPIC = t "min-brightness";
+        MAX_BRIGHTNESS_TOPIC = t "max-brightness";
+        GAMMA_TOPIC = t "gamma";
+        MIN_BRIGHTNESS = toString defaultMin;
+        MAX_BRIGHTNESS = toString defaultMax;
+        GAMMA = toString defaultGamma;
+      }
+      // lib.optionalAttrs isSwitch {
+        THRESHOLD_TOPIC = t "threshold";
+        THRESHOLD = toString defaultThreshold;
+      }
+      // lib.optionalAttrs publishDaylightSensor {
+        DAYLIGHT_SENSOR_TOPIC = daylightSensorTopic;
+      };
+
+      deviceInfo = {
+        identifiers = [ "sun-follow-${device}" ];
+        name = "${label} (sun-follow)";
+      };
+
+      mkSwitch = suffix: name: icon: {
+        unique_id = "sun_follow_${device}_${suffix}";
+        inherit name icon;
+        command_topic = t suffix;
+        state_topic = t suffix;
+        retain = true;
+        payload_on = "true";
+        payload_off = "false";
+        device = deviceInfo;
+      };
+
+      mkNumber =
+        suffix: name: icon:
+        {
+          min,
+          max,
+          step ? 1,
+          unit ? "%",
+        }:
+        {
+          unique_id = "sun_follow_${device}_${suffix}";
+          inherit name icon min max step;
+          unit_of_measurement = unit;
+          mode = "slider";
+          command_topic = t suffix;
+          state_topic = t suffix;
+          retain = true;
+          device = deviceInfo;
+        };
+
+      mkButton = suffix: name: icon: {
+        unique_id = "sun_follow_${device}_${suffix}";
+        inherit name icon;
+        command_topic = t suffix;
+        payload_press = "reset";
+        device = deviceInfo;
+      };
+
+      switches = [
+        (mkSwitch "enabled" "${label} sun-follow" "mdi:sun-clock")
+        (mkSwitch "follow-sunrise" "${label} follow sunrise" "mdi:weather-sunset-up")
+        (mkSwitch "follow-sunset" "${label} follow sunset" "mdi:weather-sunset-down")
+        (mkSwitch "invert" "${label} sun-follow invert" "mdi:swap-vertical")
+      ]
+      ++ lib.optional (!isSwitch) (mkSwitch "allow-wake" "${label} sun-follow can turn on" "mdi:power");
+
+      numbers =
+        if isSwitch then
+          [
+            (mkNumber "threshold" "${label} sun threshold" "mdi:brightness-6" {
+              min = 0;
+              max = 100;
+              step = 5;
+            })
+          ]
+        else
+          [
+            (mkNumber "min-brightness" "${label} min brightness" "mdi:brightness-4" {
+              min = 0;
+              max = 100;
+              step = 5;
+            })
+            (mkNumber "max-brightness" "${label} max brightness" "mdi:brightness-7" {
+              min = 0;
+              max = 100;
+              step = 5;
+            })
+            (mkNumber "gamma" "${label} brightness curve" "mdi:chart-bell-curve" {
+              min = 0.3;
+              max = 3.0;
+              step = 0.1;
+              unit = "";
+            })
+          ];
+
+      buttons = [
+        (mkButton "reset" "${label} sun-follow reset" "mdi:restart")
+      ];
+    in
+    {
+      service = mkAutomation {
+        name = "sun-follow-${device}";
+        bin = "sun-follow";
+        description = "Sun-following ${mode} for ${device}";
+        inherit env;
+      };
+      inherit switches numbers buttons;
+    };
+
+  sunFollowDevices = [
+    {
+      device = "light_1";
+      mode = "brightness";
+      label = "Living room light";
+      publishDaylightSensor = true;
+    }
+    {
+      device = "light_3";
+      mode = "brightness";
+      label = "Bedroom light";
+      # sunrise-lights already owns the fixed-clock wake-up ramp; leave the
+      # morning to it by default. Flip on in HA if ever wanted.
+      defaultFollowSunrise = false;
+    }
+    {
+      device = "plug_1";
+      mode = "switch";
+      label = "Plug 1";
+    }
+    {
+      device = "plug_2";
+      mode = "switch";
+      label = "Plug 2";
+    }
+    {
+      device = "plug_3";
+      mode = "switch";
+      label = "Plug 3";
+    }
+  ];
+
+  sunFollowResults = map mkSunFollow sunFollowDevices;
+  sunFollowServices = lib.mergeAttrsList (map (r: r.service) sunFollowResults);
+  sunFollowSwitches = lib.concatMap (r: r.switches) sunFollowResults;
+  sunFollowNumbers = lib.concatMap (r: r.numbers) sunFollowResults;
+  sunFollowButtons = lib.concatMap (r: r.buttons) sunFollowResults;
+
   # Service definitions
 
   automations = [
@@ -142,7 +332,7 @@ let
     }
   ];
 
-  allServices = lib.mergeAttrsList (map mkAutomation automations);
+  allServices = lib.mergeAttrsList (map mkAutomation automations) // sunFollowServices;
 in
 {
   systemd.services = allServices;
@@ -201,7 +391,8 @@ in
         icon = "mdi:speedometer";
         mode = "slider";
       }
-    ];
+    ]
+    ++ sunFollowNumbers;
 
     mqtt.switch = [
       {
@@ -214,6 +405,20 @@ in
         payload_off = "false";
         icon = "mdi:palette";
       }
+    ]
+    ++ sunFollowSwitches;
+
+    mqtt.sensor = [
+      {
+        unique_id = "sun_follow_daylight_pct";
+        name = "Daylight percentage";
+        state_topic = daylightSensorTopic;
+        value_template = "{{ value_json.daylight_pct }}";
+        unit_of_measurement = "%";
+        icon = "mdi:sun-clock";
+      }
     ];
+
+    mqtt.button = sunFollowButtons;
   };
 }

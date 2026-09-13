@@ -196,6 +196,11 @@ in
 
     libinput.enable = true;
 
+    # brightnessctl ships its own udev rule granting the `video` group write
+    # access to backlight sysfs nodes; without it, brightness keybinds silently
+    # fail to change /sys/class/backlight/*/brightness.
+    udev.packages = [ pkgs.brightnessctl ];
+
     udev.extraRules = ''
       SUBSYSTEM=="usb", ATTRS{idVendor}=="0483", ATTRS{idProduct}=="3748", MODE="0666"
       SUBSYSTEM=="usb", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", MODE="0666"

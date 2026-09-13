@@ -27,6 +27,10 @@ path = "src/bin/bedtime_button.rs"
 name = "button-dispatcher"
 path = "src/bin/button_dispatcher.rs"
 
+[[bin]]
+name = "sun-follow"
+path = "src/bin/sun_follow.rs"
+
 [dependencies]
 rumqttc = { version = "0.24", default-features = false }
 tokio = { version = "1", features = ["rt", "macros", "signal", "time", "sync"] }

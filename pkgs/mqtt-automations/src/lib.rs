@@ -214,17 +214,25 @@ impl Runtime {
         let mut rx = self.subscribe(&topic).await?;
 
         // Give the broker a moment to deliver any retained message before
-        // deciding the topic is unseeded.
-        if tokio::time::timeout(Duration::from_secs(2), rx.recv())
-            .await
-            .is_err()
-        {
-            self.publish_retained(&topic, initial).await?;
+        // deciding the topic is unseeded. If one arrives, use it -- otherwise
+        // a reboot would silently revert the setting to `initial` while HA's
+        // UI still shows the last value it sent.
+        let mut current = initial;
+        match tokio::time::timeout(Duration::from_secs(2), rx.recv()).await {
+            Ok(Some(msg)) => {
+                if let Some(v) = T::from_payload(&msg.payload) {
+                    current = v;
+                }
+            }
+            Ok(None) => {}
+            Err(_) => {
+                self.publish_retained(&topic, initial).await?;
+            }
         }
 
         Ok(Setting {
             rx: Some(rx),
-            current: initial,
+            current,
         })
     }
 

@@ -66,6 +66,27 @@ pub fn elevation<Tz: TimeZone>(lat: f64, lon: f64, dt: DateTime<Tz>) -> f64 {
     sin_elev.clamp(-1.0, 1.0).asin().to_degrees()
 }
 
+/// Fraction of daylight brightness at a given instant, in `0.0..=1.0`.
+///
+/// Normalized against *today's* peak elevation (at solar noon) rather than a
+/// fixed angle, so it reaches 1.0 at local noon year-round -- Berlin's ~14
+/// degree winter noon would otherwise never be "bright" relative to a
+/// summer-calibrated scale. Civil twilight (-6 degrees) and below is 0.0.
+pub fn daylight_fraction<Tz: TimeZone>(lat: f64, lon: f64, dt: DateTime<Tz>) -> f64 {
+    const HORIZON: f64 = -6.0;
+
+    let date = dt.with_timezone(&Utc).date_naive();
+    let noon = solar_noon(lon, date, Utc);
+    let peak = elevation(lat, lon, noon);
+
+    if peak <= HORIZON {
+        return 0.0; // polar night -- sun never clears twilight today
+    }
+
+    let elev = elevation(lat, lon, dt);
+    ((elev - HORIZON) / (peak - HORIZON)).clamp(0.0, 1.0)
+}
+
 /// Equation of time (minutes) and solar declination (radians).
 fn solar_params(gamma: f64) -> (f64, f64) {
     let eqtime = 229.18
@@ -203,5 +224,56 @@ mod tests {
         let e1 = elevation(BERLIN_LAT, BERLIN_LON, early);
         let e2 = elevation(BERLIN_LAT, BERLIN_LON, later);
         assert!(e2 > e1, "elevation should increase during morning: {e1:.2} -> {e2:.2}");
+    }
+
+    #[test]
+    fn daylight_fraction_zero_at_midnight() {
+        let dt = NaiveDate::from_ymd_opt(2025, 6, 21)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_utc();
+        let f = daylight_fraction(BERLIN_LAT, BERLIN_LON, dt);
+        assert_eq!(f, 0.0, "got {f}");
+    }
+
+    #[test]
+    fn daylight_fraction_peaks_at_solar_noon() {
+        let date = NaiveDate::from_ymd_opt(2025, 6, 21).unwrap();
+        let noon = solar_noon(BERLIN_LON, date, Utc);
+        let f = daylight_fraction(BERLIN_LAT, BERLIN_LON, noon);
+        assert!((f - 1.0).abs() < 0.01, "got {f}");
+    }
+
+    #[test]
+    fn daylight_fraction_near_zero_at_sunrise() {
+        let date = NaiveDate::from_ymd_opt(2025, 6, 21).unwrap();
+        let rise = sunrise(BERLIN_LAT, BERLIN_LON, date, Utc);
+        let f = daylight_fraction(BERLIN_LAT, BERLIN_LON, rise);
+        assert!(f < 0.1, "got {f}");
+    }
+
+    #[test]
+    fn daylight_fraction_monotonic_through_morning() {
+        let date = NaiveDate::from_ymd_opt(2025, 6, 21).unwrap();
+        let noon = solar_noon(BERLIN_LON, date, Utc);
+        let mut prev = -1.0;
+        let mut t = noon - Duration::hours(6);
+        while t <= noon {
+            let f = daylight_fraction(BERLIN_LAT, BERLIN_LON, t);
+            assert!(f >= prev, "not monotonic at {t}: {prev} -> {f}");
+            prev = f;
+            t += Duration::minutes(30);
+        }
+    }
+
+    #[test]
+    fn daylight_fraction_nonzero_at_winter_noon() {
+        // The whole point of normalizing against today's peak: Berlin's ~14
+        // degree winter noon must still read as "full brightness" locally.
+        let date = NaiveDate::from_ymd_opt(2025, 12, 21).unwrap();
+        let noon = solar_noon(BERLIN_LON, date, Utc);
+        let f = daylight_fraction(BERLIN_LAT, BERLIN_LON, noon);
+        assert!((f - 1.0).abs() < 0.01, "winter noon should still be 1.0, got {f}");
     }
 }
