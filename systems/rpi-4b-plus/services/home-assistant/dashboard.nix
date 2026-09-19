@@ -4,16 +4,14 @@
 # device to the registry puts it on the dashboard in the right room with no
 # edit here.
 #
-# The one thing that cannot be derived is the HA entity_id: it is anchored at
-# first discovery and does NOT follow later zigbee2mqtt renames, so the
-# devices that were registered under their old friendly names still answer to
-# those ids (`light.light_1`, not `light.livingroom_light`). `entityBase`
-# below is that mapping, keyed on IEEE address -- the one stable identifier --
-# and is the *only* place the legacy names appear.
+# Entity ids are derived too: the ha-entity-rename oneshot renames each
+# light/plug's primary entity to `<domain>.<device name>` after HA starts, so
+# `light.livingroom_light` is simply correct. HA would otherwise keep whatever
+# id the entity was first discovered under (`light.light_1`) forever.
 #
-# To retire the table: delete a device in HA's UI, let z2m rediscover it, and
-# it comes back as `<friendly_name>`; then drop its entry here. Not worth
-# doing for its own sake -- it loses that entity's history.
+# Devices without a controllable primary (buttons, sensors) are still
+# addressed by their discovered id -- they are not renamed, since only the
+# primary matters for card addressing.
 {
   lib,
   ...
@@ -21,46 +19,22 @@
 let
   inherit (import ../../devices.nix) kinds rooms devices;
 
-  # IEEE -> entity_id stem as actually registered in HA. Verified against
-  # /var/lib/hass/.storage/core.entity_registry, not assumed from the name.
-  entityBase = {
-    "0x001788010ffdd431" = "light_1"; # livingroom_light
-    "0x001788010f2c225a" = "light_2"; # kitchen_light
-    "0x001788010f2c1a11" = "light_3"; # bedroom_light
-    "0xa4c1385aef501143" = "plug_1"; # livingroom_plug_1
-    "0xa4c13861447acbe2" = "plug_2"; # livingroom_plug_2
-    "0xa4c1388762b9e41c" = "plug_3"; # livingroom_plug_3
-    "0xa4c1388806d132cb" = "plug_4"; # kitchen_plug
-    "0xa4c138ce243fe709" = "motion_sensor"; # kitchen_motion
-    "0xa4c1381618f0f10c" = "button_1"; # livingroom_button
-    "0xa4c138aa5aaccfa5" = "button_2"; # bedroom_button
-    # Never got a friendly-name-based id; still addressed by raw IEEE.
-    "0xa4c13880fa2af7d7" = "0xa4c13880fa2af7d7"; # bedroom_dial
-    "0xa4c1380900f2ffff" = "0xa4c1380900f2ffff"; # kitchen_temp_probe
-  };
-
-  # Fail loudly at eval time rather than emitting a card pointing at an
-  # entity that doesn't exist -- a silently dead card is easy to miss in the
-  # UI and impossible to explain later.
-  baseOf =
-    d:
-    entityBase.${d.id}
-      or (throw "dashboard: device '${d.name}' (${d.id}) has no entityBase entry; look up its entity_id in core.entity_registry and add it");
-
   domainOf = d: if d.kind == kinds.light then "light" else "switch";
-  entityOf = d: "${domainOf d}.${baseOf d}";
+  entityOf = d: "${domainOf d}.${d.name}";
 
   # Sun-follow entity ids are built from the *label* passed to mkSunFollow
   # (HA slugifies "<device name> <entity name>"), which is why they read
   # `switch.plug_1_sun_follow_plug_1_sun_follow`. Kept as an explicit map for
   # the same reason as entityBase: derived slugification would be guesswork.
-  sunFollow = {
-    "0x001788010ffdd431" = "living_room_light_sun_follow_living_room_light";
-    "0x001788010f2c1a11" = "bedroom_light_sun_follow_bedroom_light";
-    "0xa4c1385aef501143" = "plug_1_sun_follow_plug_1";
-    "0xa4c13861447acbe2" = "plug_2_sun_follow_plug_2";
-    "0xa4c1388762b9e41c" = "plug_3_sun_follow_plug_3";
-  };
+  # Sun-follow entities are named `<domain>.<device>_sun_follow_<suffix>` by
+  # the ha-entity-rename oneshot, from the same device registry.
+  sunFollowDevices = [
+    devices.living-room.light
+    devices.bedroom.light
+    devices.living-room.plug_1
+    devices.living-room.plug_2
+    devices.living-room.plug_3
+  ];
 
   roomDevices = roomKey: builtins.attrValues devices.${roomKey};
   ofKind = kind: ds: builtins.filter (d: d.kind == kind) ds;
@@ -115,7 +89,7 @@ let
         ]
         ++ (map (d: {
           type = "tile";
-          entity = "sensor.${baseOf d}_power";
+          entity = "sensor.${d.name}_power";
           name = prettyName d;
         }) plugs);
       }
@@ -152,17 +126,17 @@ let
           }
           {
             type = "tile";
-            entity = "binary_sensor.motion_sensor_presence";
+            entity = "binary_sensor.${devices.kitchen.motion.name}_presence";
             name = "Kitchen presence";
           }
           {
             type = "tile";
-            entity = "sensor.motion_sensor_illuminance";
+            entity = "sensor.${devices.kitchen.motion.name}_illuminance";
             name = "Kitchen light level";
           }
           {
             type = "tile";
-            entity = "sensor.0xa4c1380900f2ffff_temperature";
+            entity = "sensor.${devices.kitchen.temp_probe.name}_temperature";
             name = "Kitchen temp probe";
           }
           {
@@ -183,7 +157,7 @@ let
         ]
         ++ map (d: {
           type = "tile";
-          entity = "sensor.${baseOf d}_battery";
+          entity = "sensor.${d.name}_battery";
           name = "${d.room.label} ${prettyName d}";
         }) (builtins.filter (d: d.kind == kinds.button || d.kind == kinds.motion || d.kind == kinds.sensor) allDevices);
       }
@@ -193,11 +167,26 @@ let
   # One section per sun-following device: the master toggle and the tuning
   # knobs that differ by kind (lights ramp a brightness curve, plugs flip at a
   # single sun-elevation threshold).
+  #
+  # Entity ids mirror the sun-follow unique_id suffixes from
+  # mqtt-automations/default.nix, with kebab-case normalised to snake_case the
+  # way HA slugifies them.
   sunFollowSection =
     d:
     let
-      sf = sunFollow.${d.id};
+      sf = suffix: "${d.name}_sun_follow_${suffix}";
       isLight = d.kind == kinds.light;
+      toggle = suffix: label: {
+        type = "tile";
+        entity = "switch.${sf suffix}";
+        name = label;
+      };
+      knob = suffix: label: {
+        type = "tile";
+        entity = "number.${sf suffix}";
+        name = label;
+        features = [ { type = "numeric-input"; } ];
+      };
     in
     {
       type = "grid";
@@ -207,64 +196,24 @@ let
           heading = "${d.room.label} ${prettyName d}";
           heading_style = "title";
         }
-        {
-          type = "tile";
-          entity = "switch.${sf}_sun_follow";
-          name = "Enabled";
-        }
-        {
-          type = "tile";
-          entity = "switch.${sf}_follow_sunrise";
-          name = "Follow sunrise";
-        }
-        {
-          type = "tile";
-          entity = "switch.${sf}_follow_sunset";
-          name = "Follow sunset";
-        }
-        {
-          type = "tile";
-          entity = "switch.${sf}_sun_follow_invert";
-          name = "Invert";
-        }
+        (toggle "enabled" "Enabled")
+        (toggle "follow_sunrise" "Follow sunrise")
+        (toggle "follow_sunset" "Follow sunset")
+        (toggle "invert" "Invert")
       ]
       ++ lib.optionals isLight [
-        {
-          type = "tile";
-          entity = "switch.${sf}_sun_follow_can_turn_on";
-          name = "Can turn on";
-        }
-        {
-          type = "tile";
-          entity = "number.${sf}_min_brightness";
-          name = "Min brightness";
-          features = [ { type = "numeric-input"; } ];
-        }
-        {
-          type = "tile";
-          entity = "number.${sf}_max_brightness";
-          name = "Max brightness";
-          features = [ { type = "numeric-input"; } ];
-        }
-        {
-          type = "tile";
-          entity = "number.${sf}_brightness_curve";
-          name = "Curve";
-          features = [ { type = "numeric-input"; } ];
-        }
+        (toggle "allow_wake" "Can turn on")
+        (knob "min_brightness" "Min brightness")
+        (knob "max_brightness" "Max brightness")
+        (knob "gamma" "Curve")
       ]
       ++ lib.optionals (!isLight) [
-        {
-          type = "tile";
-          entity = "number.${sf}_sun_threshold";
-          name = "Sun threshold";
-          features = [ { type = "numeric-input"; } ];
-        }
+        (knob "threshold" "Sun threshold")
       ]
       ++ [
         {
           type = "tile";
-          entity = "button.${sf}_sun_follow_reset";
+          entity = "button.${sf "reset"}";
           name = "Reset";
         }
       ];
@@ -276,7 +225,7 @@ let
     icon = "mdi:weather-sunset";
     type = "sections";
     max_columns = 3;
-    sections = map sunFollowSection (builtins.filter (d: sunFollow ? ${d.id}) allDevices);
+    sections = map sunFollowSection sunFollowDevices;
   };
 in
 {

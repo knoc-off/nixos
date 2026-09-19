@@ -16,6 +16,7 @@
     ./services/home-assistant.nix
     ./services/home-assistant/dashboard.nix
     ./services/ha-registry-gc.nix
+    ./services/ha-entity-rename.nix
     ./services/z2m-groups.nix
     ./services/caddy-lan.nix
     self.nixosModules.tailnet
