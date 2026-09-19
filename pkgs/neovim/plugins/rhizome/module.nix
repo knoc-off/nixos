@@ -77,6 +77,27 @@ in
       '';
     };
 
+    linkTitles = mkOption {
+      type = types.bool;
+      default = false;
+      description = ''
+        Render `[[noteId|Title]]` links as just their live title, by concealing
+        the link syntax around it.
+
+        Off by default, because `conceallevel` is window-global: there is no way
+        to conceal the link scaffolding without also concealing every other
+        markdown construct in the note (`**bold**`, `[text](url)`, code fences).
+        Concealed cells also still occupy layout columns
+        (neovim/neovim#14409), so with `softWrap` a line of links wraps earlier
+        than its visible text needs.
+
+        TODO: flip the default back to `true` once conceal-aware `'wrap'` lands
+        (neovim/neovim#40897, milestoned for 0.13) and the pinned neovim is new
+        enough -- the wrap penalty is the reason this is off, and the machinery
+        it gates is still in place.
+      '';
+    };
+
     softWrap = mkOption {
       type = types.bool;
       default = true;
@@ -146,6 +167,7 @@ in
           token_env = ${luaString cfg.tokenEnv},
           token_cmd = ${tokenCommandLua},
           soft_wrap = ${lib.boolToString cfg.softWrap},
+          link_titles = ${lib.boolToString cfg.linkTitles},
         })
       '';
 

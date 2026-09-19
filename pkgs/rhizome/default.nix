@@ -73,12 +73,21 @@ let
     # anchoring that keeps "today" from flipping to tomorrow after local
     # noon, and from drifting across DST transitions) is checked directly
     # with a plain `lua` interpreter rather than a Neovim test harness.
+    #
+    # links.lua does need a `vim`, since what it asserts is what actually
+    # lands on screen -- that concealed links render as titles, and that a
+    # line of them still fits in the width its visible text needs. It runs
+    # under headless neovim against a seeded title cache, no server.
     doCheck = true;
-    nativeCheckInputs = [ pkgs.lua ];
+    nativeCheckInputs = [
+      pkgs.lua
+      pkgs.neovim-unwrapped
+    ];
     checkPhase = ''
       runHook preCheck
       TZ=Europe/Berlin TZDIR=${pkgs.tzdata}/share/zoneinfo LUA_PATH="$PWD/lua/?.lua;;" \
         lua ${./tests/date.lua}
+      HOME=$TMPDIR RHIZOME_LUA="$PWD/lua" nvim --headless -u NORC -l ${./tests/links.lua}
       runHook postCheck
     '';
     meta.description = "Neovim client for Trilium notes over ETAPI";

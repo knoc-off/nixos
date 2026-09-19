@@ -404,21 +404,6 @@
       ]
       ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [
         (mkComplgenScript {
-          name = "cli";
-          text = ''
-            if [ $# -eq 0 ]; then
-              echo "Usage: cli <command> [args...]"
-              exit 1
-            fi
-            fabric -p cli "$@" --stream
-          '';
-          grammar = ''
-            cli <_>...;
-          '';
-          runtimeInputs = [ pkgs.fabric-ai ];
-        })
-
-        (mkComplgenScript {
           name = "pipewire-combine-sinks";
           text = ''
             die() { echo "Error: $*" >&2; exit 1; }

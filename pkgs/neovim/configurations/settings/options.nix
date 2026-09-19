@@ -49,7 +49,16 @@
     list = false;
 
     termguicolors = true;
+    # Left off globally and switched on per-filetype -- see
+    # `modules/languages/spell.nix` for why, and for the deny-list. That module
+    # also sets `spellfile`, which needs a runtime `stdpath` lookup.
     spell = false;
+    # `en`, not `en_us`: only `en.utf-8.spl` ships in the Neovim runtime, and a
+    # region-specific `spelllang` makes Neovim offer to *download* the missing
+    # file into `stdpath("config")`, which is a read-only nix store path here.
+    # `en` accepts both US and GB spellings, which is the right trade for a
+    # prompt that could never succeed.
+    spelllang = "en";
     wrap = false;
 
     # Tab/indent (consistent: 2 spaces everywhere)

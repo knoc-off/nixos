@@ -46,7 +46,17 @@ local defaults = {
   fold_opaque = true,
   --- Render `[[noteId|Title]]` links with their live title instead of
   --- whatever text is stored in the link (which Trilium itself ignores).
-  link_titles = true,
+  ---
+  --- Off by default: showing the title means concealing the link syntax, and
+  --- `conceallevel` is window-global, so it also conceals every other markdown
+  --- construct in the note. Concealed cells still occupy layout columns
+  --- (neovim/neovim#14409), so with `soft_wrap` a line of links also wraps
+  --- earlier than its visible text needs.
+  ---
+  --- TODO: default back to `true` once conceal-aware `'wrap'` lands
+  --- (neovim/neovim#40897, milestoned for 0.13). Everything it gates --
+  --- `rhizome.links` and the window options below -- is still here.
+  link_titles = false,
   --- Where a note opens when the triggering command carries no explicit
   --- `:split`/`:vsplit`/`:tab` modifier of its own: "current" (switch the
   --- current window's buffer -- the note becomes a listed buffer, so it
@@ -384,6 +394,12 @@ local function apply_window_options(bufnr, read_only)
         -- cursor is `rhizome.links`' job, done synchronously so it never
         -- flashes back to raw before the title catches up.
         vim.wo[win].concealcursor = "nvic"
+      else
+        -- `conceallevel` is window-local and sticky: a window that previously
+        -- displayed a buffer with concealing on keeps the value when a note is
+        -- loaded into it. Leaving it inherited would conceal markdown syntax
+        -- in a note that has no link marks placed to justify it, so pin it.
+        vim.wo[win].conceallevel = 0
       end
       if state.opts.soft_wrap then
         vim.wo[win].wrap = true

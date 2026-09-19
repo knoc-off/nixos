@@ -66,6 +66,9 @@ hl.config({
 	},
 
 	input = {
+		-- See modules/hyprland/hyprland.lua for why: stops a stray Caps_Lock
+		-- keysym (kanata startup race, wtype, VMs) from latching the XKB lock.
+		kb_options = "caps:none",
 		follow_mouse = 1,
 		repeat_rate = 25,
 		repeat_delay = 200,

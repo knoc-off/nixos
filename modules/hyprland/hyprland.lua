@@ -56,6 +56,13 @@ hl.config({
 	},
 
 	input = {
+		-- Kanata owns the physical Caps key (remapped to rmet + a held layer).
+		-- Disabling the Caps_Lock keysym in the compositor keymap means a press
+		-- during kanata's 2s startup grab delay -- or from wtype/VMs/remote apps,
+		-- which bypass kanata entirely -- can never latch the XKB lock. A latched
+		-- lock survives on the physical device and gets reasserted on every focus
+		-- change, which reads as "caps lock keeps coming back".
+		kb_options = "caps:none",
 		follow_mouse = 1,
 		repeat_rate = 25,
 		repeat_delay = 200,
