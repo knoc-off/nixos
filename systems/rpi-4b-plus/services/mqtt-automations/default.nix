@@ -10,7 +10,7 @@
   ...
 }:
 let
-  inherit (import ../../devices.nix) devices kinds;
+  inherit (import ../../devices.nix) devices kinds zigbeeGroups;
 
   # Zigbee2mqtt topics for a registry device, so every consumer derives its
   # topic from the same friendly name instead of re-typing it.
@@ -254,15 +254,15 @@ let
       defaultFollowSunrise = false;
     }
     {
-      device = devices.living-room.plug_1;
+      device = devices.living-room.carla_desk_lamp;
       label = "Plug 1";
     }
     {
-      device = devices.living-room.plug_2;
+      device = devices.living-room.standing_lamp;
       label = "Plug 2";
     }
     {
-      device = devices.living-room.plug_3;
+      device = devices.living-room.niko_desk_lamp;
       label = "Plug 3";
     }
   ];
@@ -352,12 +352,7 @@ let
       env = {
         BUTTON_TOPIC = zAction devices.living-room.button;
         SINGLE_TOPICS = zSet devices.living-room.light;
-        GROUP_TOPICS = lib.concatMapStringsSep "," zSet [
-          devices.living-room.light
-          devices.living-room.plug_1
-          devices.living-room.plug_2
-          devices.living-room.plug_3
-        ];
+        GROUP_TOPICS = lib.concatMapStringsSep "," zSet zigbeeGroups.living_room.members;
       };
     }
   ];

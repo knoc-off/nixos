@@ -191,6 +191,10 @@ in
       ExecStart = lib.getExe reconcile;
       RemainAfterExit = false;
       DynamicUser = true;
+      # systemd considers zigbee2mqtt started well before its MQTT bridge
+      # announces state:online, so the first run usually finds it offline.
+      Restart = "on-failure";
+      RestartSec = 30;
     };
   };
 }

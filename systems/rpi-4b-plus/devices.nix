@@ -19,11 +19,14 @@
 # typo like `kinds.ligth` fails at eval time instead of silently producing a
 # `kind` that matches no case downstream.
 #
-# Renaming/moving a device does NOT rename its already-registered HA
-# entity_id (e.g. `light.light_1` stays `light.light_1` even after z2m's
-# friendly_name becomes `livingroom_light`) -- entity_id is anchored once at
-# first discovery. The dashboard's entity-id table therefore records the
-# current, pre-rename entity_ids explicitly; see the comment there.
+# Renaming or moving a device here also renames its HA entity_ids: the
+# ha-entity-rename oneshot reconciles them against this table on every start
+# (see services/ha-entity-rename.nix), matching on unique_id so the IEEE
+# address -- not the old name -- is what anchors the identity. Recorder
+# migrates the history along with it.
+#
+# The `id` below is therefore the only value that must never change. Edit a
+# device's key freely; edit its `id` and HA will treat it as a new device.
 let
   kinds = {
     light = "light";
@@ -57,15 +60,15 @@ let
         id = "0x001788010ffdd431";
         kind = kinds.light;
       };
-      plug_1 = {
+      carla_desk_lamp = {
         id = "0xa4c1385aef501143";
         kind = kinds.plug;
       };
-      plug_2 = {
+      standing_lamp = {
         id = "0xa4c13861447acbe2";
         kind = kinds.plug;
       };
-      plug_3 = {
+      niko_desk_lamp = {
         id = "0xa4c1388762b9e41c";
         kind = kinds.plug;
       };
@@ -134,9 +137,9 @@ rec {
       id = 1;
       members = with devices.living-room; [
         light
-        plug_1
-        plug_2
-        plug_3
+        carla_desk_lamp
+        standing_lamp
+        niko_desk_lamp
       ];
     };
   };

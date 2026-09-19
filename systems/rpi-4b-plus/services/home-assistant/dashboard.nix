@@ -22,18 +22,14 @@ let
   domainOf = d: if d.kind == kinds.light then "light" else "switch";
   entityOf = d: "${domainOf d}.${d.name}";
 
-  # Sun-follow entity ids are built from the *label* passed to mkSunFollow
-  # (HA slugifies "<device name> <entity name>"), which is why they read
-  # `switch.plug_1_sun_follow_plug_1_sun_follow`. Kept as an explicit map for
-  # the same reason as entityBase: derived slugification would be guesswork.
   # Sun-follow entities are named `<domain>.<device>_sun_follow_<suffix>` by
   # the ha-entity-rename oneshot, from the same device registry.
   sunFollowDevices = [
     devices.living-room.light
     devices.bedroom.light
-    devices.living-room.plug_1
-    devices.living-room.plug_2
-    devices.living-room.plug_3
+    devices.living-room.carla_desk_lamp
+    devices.living-room.standing_lamp
+    devices.living-room.niko_desk_lamp
   ];
 
   roomDevices = roomKey: builtins.attrValues devices.${roomKey};
