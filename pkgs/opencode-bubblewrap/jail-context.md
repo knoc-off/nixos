@@ -83,13 +83,21 @@ You are running inside a bubblewrap (bwrap) sandbox. This changes how you should
   `beautifulsoup4`, ...) and `nixPackages` (system tools on PATH: `ffmpeg`, ...)
   and they are provided automatically. Prefer it over hand-rolling
   `nix shell` + heredocs in bash for anything beyond a one-liner.
-- Pass `script` alone for a throwaway run. Add `name` to save it to
-  `~/scratch/scripts/<name>.py` (persists across sessions). Pass `name` alone
-  to re-run a saved script.
-- Saved scripts carry their deps in a `# /// script-exec` header inside the
-  file — plain files, so `ls ~/scratch/scripts/` to browse, `Edit` to change
-  (including the header to change deps), then re-run by name. Build up a
-  library of useful scripts there.
+- Before writing a new script, call `script_exec` with `list: true` (or
+  `list: "keyword"` to filter). It's a header scan, not a run — check whether
+  a saved script already does this, or is close enough to extend instead of
+  duplicating.
+- Pass `script` alone for a throwaway run (kept under
+  `~/scratch/scripts/.temp/`, not deleted — promote a useful one by moving it
+  into `~/scratch/scripts/`). Add `name` + `description` to save it to
+  `~/scratch/scripts/<name>.py` and run it. Pass `name` alone to re-run a
+  saved script.
+- Saved scripts carry their description and deps in a `# /// script-exec`
+  header inside the file — plain files, so `Edit` can change either
+  (including deps) directly. `~/scratch/scripts/` is a git repo; every save
+  is a commit, so pass `message` describing what changed (e.g. "extended
+  fxdbg to accept a port") and an overwrite is always recoverable via git
+  history.
 
 ## Available tools
 

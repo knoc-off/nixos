@@ -274,6 +274,23 @@
                 lua "$checkScript" "$luaFragmentPath"
                 touch $out
               '';
+
+          # node:test over the pure header functions (makeHeader/parseHeader/
+          # stripHeader/withHeader) in the script-exec opencode plugin --
+          # round-trip metadata, legacy files with no description, malformed
+          # lines, whitespace-tolerant marker matching. See
+          # pkgs/script-exec/test.mjs.
+          script-exec =
+            pkgs.runCommand "script-exec-check"
+              {
+                nativeBuildInputs = [ pkgs.nodejs ];
+                src = ./pkgs/script-exec;
+              }
+              ''
+                cp $src/opencode-plugin.js $src/test.mjs .
+                node --test test.mjs
+                touch $out
+              '';
         }
       );
 
