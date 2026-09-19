@@ -76,6 +76,14 @@ in
             type = "A";
             value = tailnet.hetzner;
           }
+          # anki-sync-server on optiplex. MagicDNS only auto-names a node's
+          # own hostname (optiplex.tail.niko.ink); a subdomain of that still
+          # needs its own record, same as any other service name here.
+          {
+            name = "anki.optiplex.tail.niko.ink";
+            type = "A";
+            value = tailnet.optiplex;
+          }
           # No mc.niko.ink record on purpose: Gate on the hub is the only
           # player-facing entrypoint, and optiplex's firewall only accepts the
           # game port from Gate's address. A split-horizon record here would

@@ -15,6 +15,9 @@ in
     ./services/minecraft.nix
     ./services/minecraft-snapshots.nix
     ./services/nix-autobuild.nix
+    ./services/anki.nix
+    self.nixosModules.compat-proxy
+    ./services/ai.nix
 
     self.nixosModules.sops
     {
@@ -207,39 +210,6 @@ in
       };
     }
 
-    {
-      # Anki sync for AnkiDroid over the tailnet; marki pushes markdown cards
-      # from /srv/flashcards directly into the served collection file. Caddy
-      # terminates TLS (DNS-01 via caddy-common, no public reachability
-      # needed); the sync server itself only listens on loopback.
-      services.anki-sync-server = {
-        enable = true;
-        address = "127.0.0.1";
-        port = 27701;
-        users = [
-          {
-            username = "tv";
-            passwordFile = config.sops.secrets."services/anki-sync-server/password".path;
-          }
-        ];
-      };
-
-      services.caddy = {
-        enable = true;
-        virtualHosts."optiplex.tail.niko.ink" = {
-          useACMEHost = "optiplex.tail.niko.ink";
-          extraConfig = ''
-            reverse_proxy localhost:27701
-          '';
-        };
-      };
-
-      # Tailnet-only: no openFirewall, just the tailscale interface. Cert
-      # issuance is DNS-01, so no inbound port 80 required.
-      networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 443 ];
-
-      systemd.tmpfiles.rules = [ "d /srv/flashcards 0755 ${user} users -" ];
-    }
     self.nixosModules.caddy-common
 
     self.nixosModules.btrfs-luks
@@ -589,6 +559,12 @@ in
   services.openssh.enable = true;
 
   time.timeZone = "Europe/Berlin";
+
+  # Shared by every tailnet-only vhost (anki.nix, services/ai.nix): DNS-01
+  # via caddy-common needs no inbound :80, so only :443 on the tailscale
+  # interface has to open.
+  services.caddy.enable = true;
+  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 443 ];
 
   environment.systemPackages = [
     pkgs.curl
