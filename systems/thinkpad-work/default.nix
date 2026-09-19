@@ -141,6 +141,21 @@ in
     awscli2
     podman-compose
     postgresql
+
+    (writeShellApplication {
+      name = "staging_aws_run";
+      runtimeInputs = [ awscli2 ];
+      text = ''
+        if [ "$#" -eq 0 ]; then
+          echo "usage: staging_aws_run <command> [args...]" >&2
+          exit 2
+        fi
+        AWS_PROFILE="''${STAGING_AWS_PROFILE:-nelly-db-service-user}"
+        export AWS_PROFILE
+        aws sts get-caller-identity >/dev/null 2>&1 || aws sso login
+        exec "$@"
+      '';
+    })
   ];
 
   services.power-profiles-daemon.enable = true;

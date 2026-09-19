@@ -154,6 +154,12 @@
               }
 
               self.homeModules.xdg
+
+              {
+                programs.fish.functions.win-to-desktop = ''
+                  windows-vm-scp $argv[1] vmadmin@127.0.0.1:'C:/Users/vmadmin.TEMPLATE--KHGDG/Desktop/'
+                '';
+              }
             ];
 
             home = {

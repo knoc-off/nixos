@@ -50,9 +50,14 @@
         path = lib.mkForce [ ];
       });
 
-      environment.systemPackages = with pkgs; [
-        wl-clipboard
-        xdg-utils
+      environment.systemPackages = [
+        pkgs.wl-clipboard
+        pkgs.xdg-utils
+        # Replaces the portal's built-in Qt share picker -- see the xdph.conf
+        # comment on the home side. slurp is what the picker shells out to for
+        # region selection, so it has to be on the session PATH.
+        upkgs.hyprland-preview-share-picker
+        pkgs.slurp
       ];
 
       xdg.portal = {
@@ -66,13 +71,19 @@
 
       environment.sessionVariables.NIXOS_OZONE_WL = "1";
 
-      # The share-picker used to segfault loading the session's Kvantum style
-      # plugin, because hyprnix built it against a different Qt patch release
-      # than nixpkgs (6.10.2 vs 6.10.1) and the plugin ABI did not match. That
-      # needed hyprqt6engine built against hyprnix's Qt to work around. Now
-      # that the whole stack comes from one nixpkgs there is only one Qt, so
-      # the override is gone -- if the picker ever crashes on a style plugin
-      # again, suspect a reintroduced Qt split rather than restoring this.
+      # The portal's bundled hyprland-share-picker is Qt, and it segfaults
+      # whenever the session's Qt style plugin was built against a different
+      # qtbase patch release than the portal: loading it recurses forever in
+      # QProxyStyle::standardPalette until the stack blows. That is not a
+      # hypothetical -- the portal comes from upkgs (qtbase 6.11.2) while
+      # stylix's qt target pulls Kvantum/qt6ct from stable pkgs (6.11.1), and
+      # QT_STYLE_OVERRIDE=kvantum makes the picker load the mismatched plugin.
+      # The crash surfaces as "you must give permission" in the client, because
+      # the portal reports the dead picker as a denial.
+      #
+      # Rather than keep the two Qt stacks in lockstep forever, the picker is
+      # swapped for a GTK4 one (hyprland-preview-share-picker) which has no Qt
+      # plugin path to get wrong. Wired up via xdph.conf on the home side.
     };
 
   home =
@@ -167,6 +178,18 @@
       xdg.configFile."hypr/hyprland.lua".source = ./hyprland.lua;
       xdg.configFile."hypr/nix-env.lua".source = nixEnvLua;
       xdg.configFile."hypr/plugins.lua".source = pluginsLua;
+
+      # Point xdg-desktop-portal-hyprland at the GTK4 picker instead of its
+      # bundled Qt one, which crashes on the Qt patch-version split between the
+      # upkgs portal and stylix's stable Qt stack (see the NixOS side).
+      # Absolute store path, not a bare binary name: the portal unit ships an
+      # empty Environment= and would otherwise depend on the user manager's
+      # inherited PATH.
+      xdg.configFile."hypr/xdph.conf".text = ''
+        screencopy {
+          custom_picker_binary = ${lib.getExe upkgs.hyprland-preview-share-picker}
+        }
+      '';
 
       home.activation.seedHyprUserConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         target="$HOME/.config/hypr/user.lua"

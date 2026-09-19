@@ -89,6 +89,12 @@ hl.device({
 	accel_profile = "flat",
 })
 
+-- thinkpad-work only; no-op on hosts without this device.
+hl.device({
+	name = "tpps/2-elan-trackpoint",
+	enabled = false,
+})
+
 -- Gestures
 hl.gesture({ fingers = 3, direction = "horizontal", action = "scroll_move", scale = 1.0 })
 hl.gesture({ fingers = 3, direction = "vertical", action = "workspace" })

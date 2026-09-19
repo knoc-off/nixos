@@ -45,7 +45,11 @@ export default async (_ctx) => ({
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ command }),
-            signal: AbortSignal.timeout(35000),
+            // Above the server's own 120s exec budget, so a slow command
+            // surfaces the server's timeout error rather than a bare client
+            // abort. The budget is generous because a sudo askpass dialog
+            // blocks on a human noticing it.
+            signal: AbortSignal.timeout(130000),
           });
           const data = await r.json();
 

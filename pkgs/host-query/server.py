@@ -8,6 +8,10 @@ each command in the opencode TUI before it reaches this server.
 
 Usage: host-query <port> [grant-root]
   grant-root enables POST /mount (host directory grants, ro unless write).
+
+Commands run in their own session (no controlling terminal), so a password
+prompt can never leak into the TUI. Set HOST_QUERY_ASKPASS to a GUI askpass
+helper to make sudo prompt in a window instead of failing.
 """
 import http.server
 import json
@@ -19,6 +23,16 @@ import signal
 
 MAX_OUTPUT = 200_000  # Truncate very large outputs
 TIMEOUT = 30
+# Commands get their own, much longer budget: a sudo askpass prompt blocks on a
+# human, and 30s is not enough time to notice a dialog and touch the reader.
+# Mount operations keep TIMEOUT -- they never wait on a person.
+EXEC_TIMEOUT = 120
+
+# GUI password prompt for sudo, injected by the Nix wrapper. sudo falls back to
+# an askpass helper on its own whenever no terminal is available (no -A needed),
+# which is exactly the case below thanks to start_new_session. Absent outside
+# Nix, where sudo then just fails with "a terminal is required" -- still no hang.
+ASKPASS = os.environ.get("HOST_QUERY_ASKPASS")
 
 # Where grants are mounted. Set from argv[2]; when absent the /mount endpoint
 # is disabled. This is the *host-side* backing dir of the jail's ~/scratch, so
@@ -61,7 +75,21 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         try:
             result = subprocess.run(
-                command, shell=True, capture_output=True, text=True, timeout=TIMEOUT
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=EXEC_TIMEOUT,
+                # Detach into a new session, severing the controlling terminal.
+                # Without this the child inherits the *opencode TUI's* tty (the
+                # launcher backgrounds this server from the same shell), and
+                # anything that reads a password -- sudo, ssh, git -- opens
+                # /dev/tty directly, bypassing the pipes above: the prompt is
+                # drawn into the TUI, echo goes off, and the agent's keystrokes
+                # are swallowed until the timeout. With no tty, sudo instead
+                # uses SUDO_ASKPASS (a GUI dialog), or fails fast and legibly.
+                start_new_session=True,
+                env={**os.environ, **({"SUDO_ASKPASS": ASKPASS} if ASKPASS else {})},
             )
             output = result.stdout
             if result.stderr:
@@ -74,7 +102,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 "output": output,
             })
         except subprocess.TimeoutExpired:
-            self._json(504, {"error": f"Timed out after {TIMEOUT}s", "command": command})
+            self._json(504, {"error": f"Timed out after {EXEC_TIMEOUT}s", "command": command})
         except Exception as e:
             self._json(500, {"error": str(e), "command": command})
 
