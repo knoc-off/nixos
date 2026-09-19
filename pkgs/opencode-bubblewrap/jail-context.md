@@ -99,6 +99,27 @@ You are running inside a bubblewrap (bwrap) sandbox. This changes how you should
   fxdbg to accept a port") and an overwrite is always recoverable via git
   history.
 
+## Browser automation — `browser_exec`
+
+- `browser_exec` evaluates JavaScript against a running firefox-neo over a
+  unix socket (`pkgs/browser-exec`; protection is the socket's filesystem
+  permissions, not a password). `world: "chrome"` (default) gets full
+  browser UI/XPCOM access and sandbox helpers (`tabs()`, `openTab(url)`,
+  `$`/`$$`, `cs()`, `R()`, `readable()` for Readability-based article
+  extraction, `contentEval()`/`pageEval()`); `world: "page"` runs scoped to
+  the active tab's own content window.
+- Requires firefox-neo actually running with the bridge loaded — if the
+  socket isn't there, the tool says so plainly rather than hanging.
+- Same save/list/re-run shapes as `script_exec`, against
+  `~/.local/share/browser-exec/snippets/` (also a git repo). Call with
+  `list: true` before writing a new snippet.
+- Userscripts are a separate, file-based mechanism: write a Tampermonkey-
+  style `*.user.js` (with `@match`) into
+  `~/.local/share/browser-exec/userscripts/` using the normal file tools,
+  then call `browser_exec` with `reload: true` to pick it up. `browser_exec`
+  itself never writes userscript files — it's eval and orchestration, not
+  the library.
+
 ## Available tools
 
 git, ripgrep, fd, jq, curl, bat, sed, awk, grep, tree, tar, nix (build/shell/run via daemon)

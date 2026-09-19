@@ -75,6 +75,30 @@ jail "jailed-firefox-neo" ffCfg.finalPackage (
     # on the root tmpfs bwrap sets up, hence the mkdir in wrap-entry.
     (set-env "HOME" jailHome)
 
+    # browser-exec's bridge (loaded via modules/firefox-neo) binds a unix
+    # socket under the real $XDG_RUNTIME_DIR, not under jailHome -- bound at
+    # its real host path so opencode's jail (which binds the identical path,
+    # see pkgs/opencode-bubblewrap) can reach whichever firefox-neo instance
+    # happens to be running, this jailed one or the real profile.
+    (add-runtime ''
+      mkdir -p "$XDG_RUNTIME_DIR/browser-exec"
+    '')
+    (try-rw-bind (noescape "\"$XDG_RUNTIME_DIR/browser-exec\"") (noescape "\"$XDG_RUNTIME_DIR/browser-exec\""))
+
+    # The userscript library ($HOME/.local/share/browser-exec) is read by
+    # ScriptStore off *this jail's* $HOME, which is jailHome, not the real
+    # host $HOME -- and jailHome is a fresh tmpfs wiped every launch, so
+    # without this bind the library would silently look empty every time.
+    # `add-runtime` still sees the real host $HOME (it runs before `set-env
+    # "HOME"` takes effect inside the jail), so bind that real, persistent
+    # dir at the jail-side jailHome path -- the same real directory
+    # opencode's jail binds at its own $HOME, so a userscript written by one
+    # jail is immediately visible to the other.
+    (add-runtime ''
+      mkdir -p "$HOME/.local/share/browser-exec/userscripts" "$HOME/.local/share/browser-exec/snippets"
+    '')
+    (rw-bind (noescape "\"$HOME/.local/share/browser-exec\"") "${jailHome}/.local/share/browser-exec")
+
     # Seed the throwaway home from the store, inside the jail -- nothing is
     # written on the host, so there is no temp dir to clean up.
     #

@@ -29,6 +29,7 @@ in
       addons = inputs.firefox-addons.packages.${pkgs.stdenv.hostPlatform.system};
 
       firefox-neo = self.packages.${pkgs.stdenv.hostPlatform.system}.firefox-neo;
+      browserExec = self.packages.${pkgs.stdenv.hostPlatform.system}.browser-exec;
       fxAutoconfig = inputs.fx-autoconfig;
 
       profileName = "neo";
@@ -37,6 +38,7 @@ in
 
       # Userscripts and userstyles, installed into the profile below.
       chromeSrc = ./chrome;
+      browserExecChrome = "${browserExec}/lib/browser-exec/chrome";
     in
     {
       programs.firefox = {
@@ -184,7 +186,8 @@ in
             # value loses the race. chrome/JS/neo-sidebar.uc.js strips it at
             # runtime instead. Bitwarden keeps the native sidebar.
 
-            # The debug bridge needs chrome-level devtools access.
+            # Chrome-level devtools access, used by browser-exec's bridge
+            # sandbox (system-principal Cu.Sandbox needs this to eval).
             "devtools.chrome.enabled" = true;
             "devtools.debugger.remote-enabled" = true;
 
@@ -253,8 +256,19 @@ in
         # directory the manifest names has to exist, even when empty.
         "${profileDir}/chrome/resources/.keep".text = "";
 
-        "${profileDir}/chrome/JS/debug-bridge.uc.js".source =
-          "${chromeSrc}/JS/debug-bridge.uc.js";
+        # browser-exec: unix-socket chrome/page eval bridge (supersedes the
+        # old TCP debug-bridge.uc.js) and the fx-autoconfig userscript loader
+        # it exposes reloadUserscripts() for. See pkgs/browser-exec.
+        "${profileDir}/chrome/JS/bridge.uc.js".source =
+          "${browserExecChrome}/JS/bridge.uc.js";
+        "${profileDir}/chrome/JS/loader.sys.mjs".source =
+          "${browserExecChrome}/JS/loader.sys.mjs";
+        "${profileDir}/chrome/JS/match.mjs".source =
+          "${browserExecChrome}/JS/match.mjs";
+        "${profileDir}/chrome/JS/actor" = {
+          source = "${browserExecChrome}/JS/actor";
+          recursive = true;
+        };
 
         # Builds the dedicated Sidebery sidebar, so the extension is not
         # competing with Bitwarden/AI chat/etc for the single native slot.

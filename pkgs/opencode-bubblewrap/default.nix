@@ -39,6 +39,7 @@ let
   claudeMem = selfPkgs.claude-mem;
   hostQuery = selfPkgs.host-query;
   scriptExec = selfPkgs.script-exec;
+  browserExec = selfPkgs.browser-exec;
 
   # The jail's entire ~/.config/opencode, generated in the store. See
   # config/default.nix for why this is a store path rather than the host's
@@ -48,6 +49,7 @@ let
       claudeMem
       hostQuery
       scriptExec
+      browserExec
       lspmuxSession
       datadog
       ;
@@ -288,6 +290,10 @@ jail "jailed-opencode" upkgs.fish (
     network
     time-zone
     no-new-session
+    # Forwarded (not just used host-side) so the browser-exec plugin's
+    # default socket path -- $XDG_RUNTIME_DIR/browser-exec/bridge.sock --
+    # resolves to the same value inside the jail as the bind below uses.
+    (fwd-env "XDG_RUNTIME_DIR")
     (set-argv [ ])
     (add-cleanup "kill $HOST_QUERY_PID 2>/dev/null || true")
     # Tear down this session's host_mount grants. unmount_grants is defined in
@@ -362,6 +368,26 @@ jail "jailed-opencode" upkgs.fish (
       # explicit projects or require a jail restart.
       ${pkgs.coreutils}/bin/mkdir -p "$HOME/workspaces"
       RUNTIME_ARGS+=(--bind "$HOME/workspaces" "$HOME/workspaces")
+
+      # browser-exec's bridge (pkgs/browser-exec, loaded into firefox-neo)
+      # listens on a unix socket under $XDG_RUNTIME_DIR rather than the
+      # host's ~, so it needs its own bind at an identical path -- mkdir'd
+      # eagerly here (not left to Firefox) so the bind exists even if the
+      # bridge hasn't been started yet; Firefox then creates the socket file
+      # inside this already-bound directory, which the jail sees live.
+      BROWSER_EXEC_RUNTIME_DIR="''${XDG_RUNTIME_DIR:-/run/user/$(${pkgs.coreutils}/bin/id -u)}/browser-exec"
+      ${pkgs.coreutils}/bin/mkdir -p "$BROWSER_EXEC_RUNTIME_DIR"
+      RUNTIME_ARGS+=(--bind "$BROWSER_EXEC_RUNTIME_DIR" "$BROWSER_EXEC_RUNTIME_DIR")
+
+      # The library itself (userscripts the agent writes, snippets it saves)
+      # is separate from the runtime socket dir above and lives under
+      # ~/.local/share, so it needs its own bind -- otherwise browser_exec's
+      # save/list and any userscript the agent writes vanish when the jail
+      # exits. This jail's $HOME is the real host $HOME (unlike
+      # jailed-firefox-neo's, see there), so binding at the same path is
+      # enough for both jails to agree on one real directory.
+      ${pkgs.coreutils}/bin/mkdir -p "$HOME/.local/share/browser-exec/userscripts" "$HOME/.local/share/browser-exec/snippets"
+      RUNTIME_ARGS+=(--bind "$HOME/.local/share/browser-exec" "$HOME/.local/share/browser-exec")
 
       if [[ ''${#JAIL_PROJECTS[@]} -eq 0 ]]; then
         # No explicit project: work on the current dir.

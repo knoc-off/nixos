@@ -291,6 +291,21 @@
                 node --test test.mjs
                 touch $out
               '';
+
+          # node:test over match.mjs (userscript header parsing, glob
+          # matching) and the header helpers in the browser-exec opencode
+          # plugin. See pkgs/browser-exec/test.mjs.
+          browser-exec =
+            pkgs.runCommand "browser-exec-check"
+              {
+                nativeBuildInputs = [ pkgs.nodejs ];
+                src = ./pkgs/browser-exec;
+              }
+              ''
+                cp $src/opencode-plugin.js $src/match.mjs $src/test.mjs .
+                node --test test.mjs
+                touch $out
+              '';
         }
       );
 

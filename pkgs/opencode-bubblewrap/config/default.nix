@@ -8,6 +8,7 @@
   claudeMem,
   hostQuery,
   scriptExec,
+  browserExec,
   lspmuxSession,
   datadog,
 }:
@@ -457,6 +458,11 @@ let
       # can do nothing bash can't already do, just with structured deps.
       script_exec = "allow";
 
+      # Browser exec — same trust tier: chrome/page eval against firefox-neo
+      # over a filesystem-permission-protected unix socket, no host access
+      # beyond what that browser process already has.
+      browser_exec = "allow";
+
       # Edit — user approves each file modification
       edit = "ask";
 
@@ -626,4 +632,5 @@ pkgs.runCommand "opencode-jail-config" { } ''
   cp ${claudeMem}/lib/claude-mem/dist/opencode-plugin/index.js $out/plugins/claude-mem.js
   cp ${hostQuery}/lib/host-query/plugin/index.js $out/plugins/host-query.js
   cp ${scriptExec}/lib/script-exec/plugin/index.js $out/plugins/script-exec.js
+  cp ${browserExec}/lib/browser-exec/plugin/index.js $out/plugins/browser-exec.js
 ''

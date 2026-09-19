@@ -20,9 +20,7 @@
   services.compat-proxy = {
     enable = true;
     ntfyTokenFile = config.sops.secrets."services/ntfy/publish-token".path;
-    # `claude setup-token` mints a 1y token; re-set alongside re-minting the
-    # services/compat-proxy/oauth-token secret in shared-secrets.yaml.
-    token.expiresAt = 1821299396000; # 2027-09-18T20:29:56Z (minted 2026-09-18)
+    token.expiresAt = 1821299396000;
   };
 
   services.caddy.virtualHosts."optiplex.tail.niko.ink" = {
