@@ -27,6 +27,16 @@
   # Appended to mozilla.cfg after the loader. Exposed so a caller can build a
   # variant with extra autoconfig prefs without editing this file.
   extraPrefs ? "",
+  # pkgs.callPackage wraps this file's own lambda in makeOverridable, which
+  # replaces firefox.override's chainable .override below with one bound to
+  # *this* signature -- see home-manager's wrapPackage (mkFirefoxModule.nix),
+  # which calls `package.override (old: { cfg = ...; extraPolicies = ...;
+  # pkcs11Modules = ...; })` on whatever package it is given. Without these
+  # three accepted (and threaded through) here, that override crashes with
+  # "called with unexpected argument 'cfg'".
+  cfg ? { },
+  extraPolicies ? { },
+  pkcs11Modules ? [ ],
 }:
 let
   fxAutoconfig = inputs.fx-autoconfig;
@@ -41,5 +51,10 @@ in
 # from this one derivation.
 firefox.override {
   extraPrefsFiles = [ "${fxAutoconfig}/program/config.js" ];
-  inherit extraPrefs;
+  inherit
+    extraPrefs
+    cfg
+    extraPolicies
+    pkcs11Modules
+    ;
 }

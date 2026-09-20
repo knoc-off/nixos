@@ -68,7 +68,7 @@
 
               self.homeModules.editor
 
-              self.homeModules.firefox
+              self.homeModules.firefox-neo
               self.homeModules.zen-browser
 
               self.homeModules.environment
