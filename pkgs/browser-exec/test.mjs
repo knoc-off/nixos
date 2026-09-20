@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseUserscript, globToRegExp, matchesAny } from "./match.mjs";
-import { makeHeader, parseHeader, stripHeader, withHeader } from "./opencode-plugin.js";
+import { makeHeader, parseHeader, stripHeader, withHeader, wrapForWorld } from "./opencode-plugin.js";
 
 test("parseUserscript extracts name/description/match/run-at", () => {
   const src = [
@@ -97,4 +97,27 @@ test("withHeader replaces an existing header rather than stacking", () => {
   assert.equal((twice.match(/\/\/\/ browser-exec/g) || []).length, 1);
   assert.equal(parseHeader(twice).world, "page");
   assert.equal(parseHeader(twice).description, "second");
+});
+
+test("wrapForWorld leaves a chrome-world body untouched", () => {
+  assert.equal(wrapForWorld("return 1;", "chrome", 15000), "return 1;");
+});
+
+// Regression: the bridge's own content probe defaults to 8s, so a page-world
+// snippet used to be capped there no matter what `timeout` the caller asked
+// for -- it has to receive an explicit budget derived from that timeout.
+test("wrapForWorld budgets the page-world probe under the caller's timeout", () => {
+  const wrapped = wrapForWorld("return 1;", "page", 60000);
+  const budget = Number(wrapped.match(/,\s*null,\s*(\d+)\)/)[1]);
+  assert.ok(budget > 8000, "budget must exceed the bridge's 8s default");
+  assert.ok(budget < 60000, "budget must stay under the socket timeout");
+});
+
+test("wrapForWorld escapes backticks and ${} so a body can't break out", () => {
+  const wrapped = wrapForWorld("return `a${b}` + '\\\\';", "page", 15000);
+  // Everything between the pageEval backticks must be inert: no unescaped
+  // backtick or interpolation can survive into the template literal.
+  const inner = wrapped.slice(wrapped.indexOf("`") + 1, wrapped.lastIndexOf("`"));
+  assert.ok(!/(^|[^\\])`/.test(inner), "no unescaped backtick");
+  assert.ok(!/(^|[^\\])\$\{/.test(inner), "no unescaped interpolation");
 });

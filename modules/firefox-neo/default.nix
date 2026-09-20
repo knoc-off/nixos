@@ -33,7 +33,7 @@ in
       fxAutoconfig = inputs.fx-autoconfig;
 
       profileName = "neo";
-      configPath = ".mozilla/firefox-neo";
+      configPath = "${config.xdg.configHome}/mozilla/firefox";
       profileDir = "${configPath}/${profileName}";
 
       # Userscripts and userstyles, installed into the profile below.
@@ -269,7 +269,12 @@ in
         # browser-exec: unix-socket chrome/page eval bridge (supersedes the
         # old TCP debug-bridge.uc.js) and the fx-autoconfig userscript loader
         # it exposes reloadUserscripts() for. See pkgs/browser-exec.
-        "${profileDir}/chrome/JS/bridge.uc.js".source = "${browserExecChrome}/JS/bridge.uc.js";
+        #
+        # The bridge is a *.sys.mjs, not a *.uc.js: it must be imported once
+        # per process into the shared module global rather than injected into
+        # each chrome window, or the socket it binds dies with whichever
+        # window happened to load it.
+        "${profileDir}/chrome/JS/bridge.sys.mjs".source = "${browserExecChrome}/JS/bridge.sys.mjs";
         "${profileDir}/chrome/JS/loader.sys.mjs".source = "${browserExecChrome}/JS/loader.sys.mjs";
         "${profileDir}/chrome/JS/match.mjs".source = "${browserExecChrome}/JS/match.mjs";
         "${profileDir}/chrome/JS/actor" = {

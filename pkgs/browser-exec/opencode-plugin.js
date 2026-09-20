@@ -1,6 +1,6 @@
 // OpenCode plugin for browser-exec.
 // One tool, browser_exec: evaluate JS against a Firefox instance running
-// pkgs/browser-exec/bridge.uc.js, over the unix socket it listens on.
+// pkgs/browser-exec/bridge.sys.mjs, over the unix socket it listens on.
 //
 // Silhouette matches script-exec's opencode-plugin.js deliberately (same
 // header format, same save/list/re-run shapes) but there is no `nix build`
@@ -125,7 +125,7 @@ function clip(s) {
 }
 
 // One base64-encoded JS body per connection, newline-terminated; reply is one
-// line of JSON then EOF. See pkgs/browser-exec/bridge.uc.js for the server
+// line of JSON then EOF. See pkgs/browser-exec/bridge.sys.mjs for the server
 // side of this protocol.
 function evalOverBridge(source, timeoutMs) {
   return new Promise((resolve, reject) => {
@@ -151,7 +151,7 @@ function evalOverBridge(source, timeoutMs) {
       // calls, both reproduce the client reading a clean close with zero
       // bytes. The bridge doesn't need the client's EOF anyway -- it reads
       // up to the first newline and responds by closing its own end (see
-      // bridge.uc.js), which is what actually terminates this connection.
+      // bridge.sys.mjs), which is what actually terminates this connection.
       sock.write(Buffer.from(source).toString("base64") + "\n");
     });
     sock.on("data", (chunk) => {
@@ -163,7 +163,7 @@ function evalOverBridge(source, timeoutMs) {
         done(
           reject,
           new Error(
-            `no bridge listening at ${SOCK_PATH} -- is firefox-neo running with browser-exec's bridge.uc.js loaded?`
+            `no bridge listening at ${SOCK_PATH} -- is firefox-neo running with browser-exec's bridge.sys.mjs loaded?`
           )
         );
         return;
@@ -253,12 +253,18 @@ async function pruneTemp() {
 // world script -- `world: "page"` snippets are just `return pageEval(\`...\`)`
 // under the hood, but that indirection would be tedious to write by hand for
 // every request, so the tool does it based on the header/arg instead.
-function wrapForWorld(body, world) {
+//
+// The bridge's own content-probe timeout is passed explicitly and set below
+// this tool's socket timeout. Otherwise the bridge's 8s default silently caps
+// every page-world snippet: ask for `timeout: 60`, wait 8s, get "content
+// probe timed out" and go looking for the bug in the page.
+export function wrapForWorld(body, world, timeoutMs) {
   if (world === "page") {
     // Backtick-embed: escape backtick/backslash/${ so the body can't break
     // out of the template literal it's wrapped in.
     const escaped = body.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
-    return `return await pageEval(\`${escaped}\`);`;
+    const budget = Math.max(1000, Math.floor((timeoutMs || 15000) * 0.9));
+    return `return await pageEval(\`${escaped}\`, null, ${budget});`;
   }
   return body;
 }
@@ -269,6 +275,15 @@ export default async (_ctx) => {
   tool: {
     browser_exec: {
       description:
+        "ALWAYS START WITH `list`. Call with `list: true` (or " +
+        "`list: \"substring\"`) before writing any new `script`. It does not " +
+        "evaluate anything, it is one cheap read of the snippet library, and " +
+        "it is the only way to find out that the thing you are about to " +
+        "write already exists. Re-running a saved snippet by `name` is " +
+        "cheaper and more reliable than rewriting it from memory, and an " +
+        "existing snippet has already had its bugs found. Skip the list step " +
+        "only when re-running a `name` you have already seen in this " +
+        "session. " +
         "What: evaluate JavaScript against a running Firefox (firefox-neo), " +
         "either chrome-privileged (`world: 'chrome'`, default -- full browser " +
         "UI/XPCOM access, sandbox helpers: tabs(), openTab(url), $/$$, cs(), R(), " +
@@ -277,23 +292,25 @@ export default async (_ctx) => {
         "content window). " +
         "When: extracting structure/text from a page, driving the browser UI, " +
         "or iterating on a userscript before saving it. Requires firefox-neo " +
-        "running with browser-exec's bridge.uc.js loaded (unix socket, no " +
+        "running with browser-exec's bridge.sys.mjs loaded (unix socket, no " +
         "auth beyond filesystem permissions -- see pkgs/browser-exec). " +
-        "Before writing a new snippet, call with `list` to check for an " +
-        "existing one. " +
-        "Shapes: `script` alone evals once, nothing saved; `script`+`name`" +
-        "(+`description`) saves to the snippet library and evals it, git-" +
-        "committed; `name` alone re-evals a saved snippet; `list` (true, or " +
-        "a substring) returns saved snippets without evaluating anything; " +
-        "`reload: true` asks the bridge to re-scan the userscript library " +
-        "(~/.local/share/browser-exec/userscripts/*.user.js) after you've " +
-        "written or edited one with the normal file tools.",
+        "Shapes: `list` (true, or a substring) returns saved snippets without " +
+        "evaluating anything -- do this first; `script` alone evals once, " +
+        "nothing saved; `script`+`name`(+`description`) saves to the snippet " +
+        "library and evals it, git-committed; `name` alone re-evals a saved " +
+        "snippet; `reload: true` asks the bridge to re-scan the userscript " +
+        "library (~/.local/share/browser-exec/userscripts/*.user.js) after " +
+        "you've written or edited one with the normal file tools.",
       args: {
         script: z
           .string()
           .optional()
           .describe(
-            "JS body; bare `await`/`return` work. Omit to re-run a saved " +
+            "JS *body*, not an expression: it must `return` the value you " +
+              "want back, and bare `await` works. A body with no `return` " +
+              "yields null. In `world: 'page'` the body runs against the " +
+              "tab's own window, so ordinary page JS (document, location, " +
+              "setTimeout, fetch) works as written. Omit to re-run a saved " +
               "snippet by name, reload, or list."
           ),
         world: z
@@ -312,7 +329,14 @@ export default async (_ctx) => {
           .optional()
           .describe("One-line summary. Required the first time a `name` is saved."),
         message: z.string().optional().describe("Git commit message for this save."),
-        timeout: z.number().optional().describe("Eval timeout in seconds (default 15)."),
+        timeout: z
+          .number()
+          .optional()
+          .describe(
+            "Eval timeout in seconds (default 15). For `world: 'page'` the " +
+              "bridge's content probe is budgeted just under this, so a " +
+              "slow page-world snippet gets the time you asked for."
+          ),
         list: z
           .union([z.boolean(), z.string()])
           .optional()
@@ -404,7 +428,7 @@ export default async (_ctx) => {
 
           const timeoutMs = Math.min(Number(args.timeout) || 15, 120) * 1000;
           try {
-            const out = await evalOverBridge(wrapForWorld(body, world), timeoutMs);
+            const out = await evalOverBridge(wrapForWorld(body, world, timeoutMs), timeoutMs);
             return `${savedMsg}$ browser_exec [${world}] ${label}\n${clip(out.trim() || "(no output)")}`;
           } catch (e) {
             return `${savedMsg}$ browser_exec [${world}] ${label}\nError: ${e.message}`;
