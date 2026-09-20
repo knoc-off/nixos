@@ -99,7 +99,37 @@
 #root.root {
   --nav-btn-width: 37px;
   --nav-btn-height: 37px;
-  --tabs-height: 28px;
+  /* Not the real tab height -- see the .Tab override below. Sidebery's drag
+   * insert-marker math (calcTabsBounds in sidebar.fg.ts) reads this var back
+   * via getComputedStyle and sums it with --tabs-margin to get the per-row
+   * pixel pitch it steps the marker by. But Sidebery's OWN stylesheet renders
+   * each .Tab at height:calc(var(--tabs-height) + var(--tabs-margin)) PLUS a
+   * padding-bottom:var(--tabs-margin) on top of that (content-box) -- so the
+   * real rendered row is var(--tabs-height) + 2x var(--tabs-margin) tall, one
+   * margin more than what the JS pitch math assumes. That one-margin
+   * shortfall compounds every row, so the insert-point line drifts further
+   * from the real tab boundaries the further down the list you drag (verified
+   * live: real offsetTop step 32px/row, marker step only 30px/row -- exactly
+   * --tabs-margin off).
+   *
+   * Can't fix it in Sidebery itself: it's a signed XPI, and nixpkgs firefox
+   * hardcodes MOZ_REQUIRE_SIGNING=true at compile time, so a locally patched/
+   * resigned XPI will not load (see project notes; the only escape is a full
+   * from-source Firefox rebuild with requireSigning=false, not worth it here).
+   *
+   * So instead: this var is inflated by one --tabs-margin (28px -> 30px) so
+   * the JS's own sum lands on the true 32px pitch, and the .Tab rule below
+   * pins the ACTUAL rendered content-height back down to 30px -- the value it
+   * already computed to before this override -- cancelling the growth that
+   * bumping this var alone would otherwise cause. Net visual size: unchanged.
+   *
+   * Fragile against density changes: --tabs-margin tracks --general-margin,
+   * which is 1/2/3px across compact/default/loose (styles/vars.styl). This
+   * assumes the 2px default tier, same as the --nav-btn-width/height literals
+   * above already do -- not a new fragility, just following existing
+   * precedent in this file. Re-measure and adjust both numbers if density
+   * settings ever change. */
+  --tabs-height: 30px;
   --bookmarks-folder-height: 32px;
   --bookmarks-bookmark-height: 30px;
 
@@ -200,6 +230,13 @@
 
 .Tab {
   transition: none !important;
+  /* Cancels the growth from inflating --tabs-height above (see the comment
+   * there). Sidebery's own rule is height:calc(var(--tabs-height) +
+   * var(--tabs-margin)); with --tabs-height now 30px that would render at
+   * 32px instead of the original 30px. Pin it back to the literal so the
+   * visible tab size is unchanged -- only the JS's internal pitch math sees
+   * the bigger number. */
+  height: 30px !important;
 }
 
 .ctx {
