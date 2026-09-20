@@ -236,6 +236,16 @@ let
         --panel-background-color: ${ld l.base01 d.base01};
         --toolbar-background-color: ${ld l.base01 d.base01};
 
+        /* New tab card surfaces. activity-stream.css hardcodes these as
+           literal hex under :root[lwt-newtab-brighttext] rather than deriving
+           them from a design token, so the overrides above never reach them --
+           they have to be named directly. Drives the search bar background
+           (via --content-search-handoff-ui-background-color), the weather
+           widget, and the top-site tiles. */
+        --newtab-background-color-secondary: ${ld l.base01 d.base01};
+        --newtab-background-card: ${ld l.base01 d.base01};
+        --newtab-weather-background-color: ${ld l.base01 d.base01};
+
         /* Text */
         --text-color: ${ld l.base05 d.base05};
         --text-color-deemphasized: ${ld l.base04 d.base04};
@@ -386,7 +396,18 @@ in
   # userContent.css -- in-content pages (about:config, about:addons,
   # about:preferences, about:profiles, the error pages). The design tokens are
   # the only thing that colors these; --lwt-* does not apply here.
-  userContent = contentTokens;
+  #
+  # Wrapped in @-moz-document url-prefix("about:") so this only touches
+  # Firefox's own about: pages, not arbitrary web content -- userContent.css
+  # is otherwise a blanket sheet applied to every document, real websites
+  # included. Requires layout.css.moz-document.content.enabled (set in
+  # default.nix's settings block); that pref is off by default, and without
+  # it this whole block is silently dropped.
+  userContent = ''
+    @-moz-document url-prefix("about:") {
+      ${contentTokens}
+    }
+  '';
 
   # Sidebery's in-panel stylesheet, with the palette prepended so the CSS can
   # reference --neo-base00..0F instead of hardcoding hex.

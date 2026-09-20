@@ -57,6 +57,9 @@ in
               sidebery
               ublock-origin
               bitwarden
+              dearrow
+              sponsorblock
+              violentmonkey
               # Applies neoTheme.colorTheme through the official theme API.
               firefox-color
             ];
@@ -116,6 +119,11 @@ in
           settings = neoTheme.settings // {
             # Required for userChrome.css to be read at all.
             "toolkit.legacyUserProfileCustomizations.stylesheets" = true;
+
+            # Required for the @-moz-document url-prefix("about:") wrapper in
+            # userContent.css (theme.nix) to be honored, scoping those rules to
+            # Firefox's own about: pages instead of every document loaded.
+            "layout.css.moz-document.content.enabled" = true;
 
             # Suppresses fx-autoconfig's own first-run infobar ("Firefox is
             # being modified with custom autoconfig scripting"). boot.sys.mjs
