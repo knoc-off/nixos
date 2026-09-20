@@ -111,6 +111,8 @@ in
           # "nova" accent regardless of what the chrome is themed to.
           userContent = neoTheme.userContent;
 
+          search = import ./searchEngines.nix { inherit pkgs lib; };
+
           settings = neoTheme.settings // {
             # Required for userChrome.css to be read at all.
             "toolkit.legacyUserProfileCustomizations.stylesheets" = true;
@@ -259,12 +261,9 @@ in
         # browser-exec: unix-socket chrome/page eval bridge (supersedes the
         # old TCP debug-bridge.uc.js) and the fx-autoconfig userscript loader
         # it exposes reloadUserscripts() for. See pkgs/browser-exec.
-        "${profileDir}/chrome/JS/bridge.uc.js".source =
-          "${browserExecChrome}/JS/bridge.uc.js";
-        "${profileDir}/chrome/JS/loader.sys.mjs".source =
-          "${browserExecChrome}/JS/loader.sys.mjs";
-        "${profileDir}/chrome/JS/match.mjs".source =
-          "${browserExecChrome}/JS/match.mjs";
+        "${profileDir}/chrome/JS/bridge.uc.js".source = "${browserExecChrome}/JS/bridge.uc.js";
+        "${profileDir}/chrome/JS/loader.sys.mjs".source = "${browserExecChrome}/JS/loader.sys.mjs";
+        "${profileDir}/chrome/JS/match.mjs".source = "${browserExecChrome}/JS/match.mjs";
         "${profileDir}/chrome/JS/actor" = {
           source = "${browserExecChrome}/JS/actor";
           recursive = true;
@@ -273,8 +272,7 @@ in
         # Builds the dedicated Sidebery sidebar, so the extension is not
         # competing with Bitwarden/AI chat/etc for the single native slot.
         # Styled by the #neo-sidebar-box rules in sidebery-collapse.css.
-        "${profileDir}/chrome/JS/neo-sidebar.uc.js".source =
-          "${chromeSrc}/JS/neo-sidebar.uc.js";
+        "${profileDir}/chrome/JS/neo-sidebar.uc.js".source = "${chromeSrc}/JS/neo-sidebar.uc.js";
 
         # Agent sheet, hiding the "Sidebery [x]" header Firefox draws above
         # extension sidebars. Must live in chrome/CSS (the "userstyles"
@@ -290,17 +288,15 @@ in
         # Reachable as chrome://userstyles/skin/sidebery.css. Sidebery's own
         # in-panel styling; pure Sidebery DOM classes, so it carried over from
         # the Zen setup unchanged.
-        "${profileDir}/chrome/CSS/sidebery.css".source =
-          "${chromeSrc}/CSS/sidebery.css";
+        "${profileDir}/chrome/CSS/sidebery.css".source = "${chromeSrc}/CSS/sidebery.css";
       };
 
       # Store files always carry a 1970 mtime, so Firefox's startup cache will
       # not invalidate itself when a script changes. Dropping it every switch
       # costs one slightly slower start and avoids debugging stale scripts.
-      home.activation.firefoxNeoClearStartupCache =
-        lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-          run rm -rf ${lib.escapeShellArg "${config.home.homeDirectory}/${profileDir}/startupCache"}
-          run rm -rf ${lib.escapeShellArg "${config.xdg.cacheHome}/mozilla/firefox/${profileName}/startupCache"}
-        '';
+      home.activation.firefoxNeoClearStartupCache = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        run rm -rf ${lib.escapeShellArg "${config.home.homeDirectory}/${profileDir}/startupCache"}
+        run rm -rf ${lib.escapeShellArg "${config.xdg.cacheHome}/mozilla/firefox/${profileName}/startupCache"}
+      '';
     };
 }

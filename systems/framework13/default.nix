@@ -81,6 +81,10 @@ in
             owner = "knoff";
             sopsFile = ../../modules/shared-secrets.yaml;
           };
+          "firefox/kagi-token" = {
+            owner = "knoff";
+            sopsFile = ../../modules/shared-secrets.yaml;
+          };
         };
       };
     }
