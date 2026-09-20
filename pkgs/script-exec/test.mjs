@@ -1,6 +1,6 @@
 // node:test coverage for the pure header functions in opencode-plugin.js.
 // Run directly with `node --test test.mjs`, or via `nix flake check`
-// (see flake.nix's `checks.script-exec`). No framework, no fixtures --
+// (see this package's `passthru.tests.plugin`). No framework, no fixtures --
 // node:test and assert are stdlib.
 import test from "node:test";
 import assert from "node:assert/strict";

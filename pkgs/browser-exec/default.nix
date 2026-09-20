@@ -1,6 +1,8 @@
 {
   lib,
   stdenv,
+  runCommand,
+  nodejs,
 }:
 
 # browser-exec: a Firefox bridge (unix-socket chrome/page eval, fx-autoconfig
@@ -47,4 +49,19 @@ stdenv.mkDerivation {
     license = lib.licenses.mit;
     platforms = lib.platforms.linux;
   };
+
+  # node:test over match.mjs (userscript header parsing, glob matching) and
+  # the header helpers in the opencode plugin. See ./test.mjs. Collected into
+  # `nix flake check` by flake.nix.
+  passthru.tests.plugin =
+    runCommand "browser-exec-check"
+      {
+        nativeBuildInputs = [ nodejs ];
+        src = ./.;
+      }
+      ''
+        cp $src/opencode-plugin.js $src/match.mjs $src/test.mjs .
+        node --test test.mjs
+        touch $out
+      '';
 }

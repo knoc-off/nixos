@@ -1,6 +1,8 @@
 {
   lib,
   stdenv,
+  runCommand,
+  nodejs,
 }:
 
 # script-exec: an opencode plugin (no daemon, no binary). The tool runs
@@ -27,4 +29,20 @@ stdenv.mkDerivation {
     license = lib.licenses.mit;
     platforms = lib.platforms.linux;
   };
+
+  # node:test over the pure header functions (makeHeader/parseHeader/
+  # stripHeader/withHeader) -- round-trip metadata, legacy files with no
+  # description, malformed lines, whitespace-tolerant marker matching.
+  # See ./test.mjs. Collected into `nix flake check` by flake.nix.
+  passthru.tests.plugin =
+    runCommand "script-exec-check"
+      {
+        nativeBuildInputs = [ nodejs ];
+        src = ./.;
+      }
+      ''
+        cp $src/opencode-plugin.js $src/test.mjs .
+        node --test test.mjs
+        touch $out
+      '';
 }

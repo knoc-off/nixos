@@ -1,7 +1,7 @@
 // node:test coverage for the pure functions in match.mjs (glob matching,
 // Tampermonkey-header parsing) and the header helpers in opencode-plugin.js
 // (save/list metadata round-trip). Run with `node --test test.mjs`, or via
-// `nix flake check` (see flake.nix's `checks.browser-exec`).
+// `nix flake check` (see this package's `passthru.tests.plugin`).
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseUserscript, globToRegExp, matchesAny } from "./match.mjs";
