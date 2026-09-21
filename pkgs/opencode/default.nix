@@ -166,6 +166,15 @@ upkgs.opencode.overrideAttrs (old: {
                 ""
           fi
 
+          # gpt-astra.txt arrived in 1.18.31; guarded for the same reason as
+          # meta.txt above (the pinned upkgs revision may predate it).
+          if [ -f packages/opencode/src/session/prompt/gpt-astra.txt ]; then
+            substituteInPlace packages/opencode/src/session/prompt/gpt-astra.txt \
+              --replace-fail \
+                "You are an AI agent powered by OpenCode, a coding agent harness." \
+                "You are Claude Code, Anthropic's official CLI for Claude."
+          fi
+
           substituteInPlace packages/opencode/src/tool/lsp.txt \
             --replace-fail \
               "For workspaceSymbol, filePath is not sent in the LSP workspace/symbol request. It is used by opencode to select and start the matching LSP server." \
