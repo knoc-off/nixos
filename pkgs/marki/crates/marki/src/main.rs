@@ -121,7 +121,7 @@ enum Cmd {
 }
 
 fn main() -> Result<()> {
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
 
     // Verbosity: an explicit RUST_LOG/env filter always wins; otherwise
     // `-v` bumps the default level. Logs go to stderr so stdout stays
@@ -154,10 +154,13 @@ fn main() -> Result<()> {
     let cfg = load_config(&cli)?;
 
     // No subcommand → run a single push (one-shot first).
-    let cmd = cli.cmd.unwrap_or(Cmd::Push { prune: false, simulate: false });
+    let cmd = cli.cmd.take().unwrap_or(Cmd::Push { prune: false, simulate: false });
 
     if let Cmd::Mcp { listen } = cmd {
-        return marki::mcp::serve(cfg, &listen);
+        // The server outlives config edits; it reloads through this.
+        let path = Config::discover(&std::env::current_dir()?, cli.config.as_deref()).config_path;
+        let reload = move || load_config(&cli);
+        return marki::mcp::serve(cfg, path, Box::new(reload), &listen);
     }
     if let Cmd::Fmt = cmd {
         return cmd_fmt(&cfg);

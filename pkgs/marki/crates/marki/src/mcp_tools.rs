@@ -22,6 +22,9 @@ const QUERY_ROW_LIMIT: usize = 200;
 
 pub struct Handler {
     pub project: Project,
+    /// Set when `.marki/config.toml` changed and no longer loads; every tool
+    /// fails with it until the file is fixed.
+    pub config_error: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -69,7 +72,7 @@ pub struct ChangeLine {
 
 impl Handler {
     pub fn new(project: Project) -> Self {
-        Self { project }
+        Self { project, config_error: None }
     }
 
     fn root(&self) -> &Path {

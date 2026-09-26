@@ -208,6 +208,10 @@ Global flags: `--config`, `--cards-dir`, `--collection`, `--media-dir` and
 Every note marki manages carries the `marki` tag, plus a `marki::hash:...` tag
 it uses to detect changes. Leave both alone.
 
+The files win for tags as they do for fields: a push sets a note's Anki tags
+to exactly its file's tags, so tags added in Anki (including `leech`) are
+dropped. A tag-only edit in a file is a normal update.
+
 ## MCP server
 
 `marki mcp --listen 127.0.0.1:3047` serves the repo to LLM agents at `/mcp`
@@ -234,6 +238,9 @@ The guard rails:
   user hasn't seen. After a push the cards repo is committed (if it's a git
   repo).
 - `marki_query` runs one read-only statement on a snapshot.
+
+The server rereads `.marki/config.toml` when it changes. If the file stops
+parsing, every tool fails with the parse error until it's fixed.
 
 On NixOS, `modules/marki-mcp.nix` runs it as a service.
 

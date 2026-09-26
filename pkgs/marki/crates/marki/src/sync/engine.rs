@@ -23,7 +23,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::anki::model::{MARKER_TAG, ORPHAN_TAG, full_tag_set, hash_from_tags};
+use crate::anki::model::{MARKER_TAG, ORPHAN_TAG, full_tag_set, hash_from_tags, strip_marker};
 use crate::note::Note;
 use crate::render::Registry;
 use crate::scan::{ScannedNote, deck_for_note};
@@ -231,13 +231,20 @@ pub fn reconcile(
             Some(r) => {
                 let model_changed = l.model_name() != r.model_name;
                 let remote_hash = hash_from_tags(&r.tags).unwrap_or_default();
-                let content_changed = l.hash != remote_hash;
+                // Tags aren't in the hash (it covers fields only), so a
+                // tag-only edit is caught here. Disk wins: tags added in
+                // Anki are dropped on the next push.
+                let tags = tag_diff(&l.anki_tags, &strip_marker(&r.tags));
+                let content_changed = l.hash != remote_hash || !tags.is_empty();
                 let deck_changed = l.deck != r.deck;
-                let deck_note = if deck_changed {
-                    format!("deck {} -> {}", r.deck, l.deck)
-                } else {
-                    String::new()
-                };
+                let deck_note = [
+                    if deck_changed { format!("deck {} -> {}", r.deck, l.deck) } else { String::new() },
+                    tags,
+                ]
+                .into_iter()
+                .filter(|s| !s.is_empty())
+                .collect::<Vec<_>>()
+                .join("; ");
 
                 if model_changed {
                     plan.push(Plan::ModelChange(r, l));
@@ -714,6 +721,19 @@ fn is_orphan(guid: &str, seen_source_ids: &HashSet<String>) -> bool {
 }
 
 /// Hash over all field values, in order.
+/// `tags +new -gone` between disk and Anki, empty when they match. Anki
+/// treats tags case-insensitively, so this does too.
+fn tag_diff(local: &[String], remote: &[String]) -> String {
+    let set = |t: &[String]| t.iter().map(|x| x.to_lowercase()).collect::<std::collections::BTreeSet<_>>();
+    let (l, r) = (set(local), set(remote));
+    let diff: Vec<String> = l
+        .difference(&r)
+        .map(|t| format!("+{t}"))
+        .chain(r.difference(&l).map(|t| format!("-{t}")))
+        .collect();
+    if diff.is_empty() { String::new() } else { format!("tags {}", diff.join(" ")) }
+}
+
 fn compute_hash(fields: &[String]) -> String {
     let mut hasher = blake3::Hasher::new();
     for value in fields {
@@ -727,6 +747,13 @@ fn compute_hash(fields: &[String]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tag_diff_ignores_order_and_case() {
+        let v = |x: &[&str]| x.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(tag_diff(&v(&["a", "B"]), &v(&["b", "a"])), "");
+        assert_eq!(tag_diff(&v(&["test", "resync"]), &v(&["deck", "test"])), "tags +resync -deck");
+    }
 
     #[test]
     fn hash_changes_on_field_value() {

@@ -156,6 +156,26 @@ st = tool("marki_status")
 assert st["ok"] and not st["changes"] and "uncommitted" not in st, st
 assert col.execute("select count() from notes").fetchone()[0] == 3
 
+# A tag-only edit is a change (the content hash covers fields only).
+caps = open(f"{w}/p/geo/caps.md").read()
+open(f"{w}/p/geo/caps.md", "w").write(caps.replace("#id(", "#retag #id("))
+sim = tool("marki_push")
+assert [(c["kind"], c["detail"]) for c in sim["changes"]] == [("update", "tags +retag")], sim
+done = tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"]})
+assert done["ok"] and not done["full_sync_required"], done
+tags = col.execute("select tags from notes where guid=?", (cid,)).fetchone()[0].split()
+assert "retag" in tags, tags
+assert not tool("marki_push")["changes"], "tag push is not idempotent"
+
+# Config edits apply without a restart; a broken one fails tools loudly.
+cfg = open(f"{w}/p/.marki/config.toml").read()
+open(f"{w}/p/.marki/config.toml", "w").write(cfg + "\n[server]\nstop = [\"nonexistent-stop\"]\n")
+assert "command not found: nonexistent-stop" in str(tool("marki_push")["problems"])
+open(f"{w}/p/.marki/config.toml", "w").write(cfg + "\n[broken\n")
+assert "no longer loads" in tool("marki_status", ok=False)
+open(f"{w}/p/.marki/config.toml", "w").write(cfg)
+assert tool("marki_status")["kind"] == "status"
+
 # Flag a card as the user would in Anki, then find it.
 col.execute("update cards set flags=1 where nid=(select id from notes where guid=?)", (cid,))
 col.commit(); col.close()

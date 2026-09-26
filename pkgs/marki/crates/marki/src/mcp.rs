@@ -5,6 +5,7 @@
 //! collection access, which SQLite wants anyway.
 
 use anyhow::Result;
+use std::path::PathBuf;
 use base64::Engine as _;
 use rmcp::handler::server::router::prompt::PromptRouter;
 use rmcp::handler::server::router::tool::ToolRouter;
@@ -64,6 +65,7 @@ usually meaning 'fix this card'. marki_query runs read-only SQL on a snapshot \
 of the collection (tables notes, cards, revlog, decks, notetypes).";
 
 type Job = Box<dyn FnOnce(&mut Handler) + Send>;
+pub type Reload = Box<dyn Fn() -> Result<Config> + Send>;
 
 #[derive(Clone)]
 pub struct Marki {
@@ -73,12 +75,32 @@ pub struct Marki {
 }
 
 impl Marki {
-    /// Start the worker thread that owns the project.
-    pub fn spawn(cfg: Config) -> Self {
+    /// Start the worker thread that owns the project. Before each job it
+    /// reloads the project if `config_path` changed on disk, so edits to
+    /// `.marki/config.toml` apply without a restart. A config that no longer
+    /// parses keeps the old project and fails that job with the error.
+    pub fn spawn(cfg: Config, config_path: Option<PathBuf>, reload: Reload) -> Self {
         let (tx, rx) = mpsc::channel::<Job>();
         std::thread::spawn(move || {
+            let mtime = || config_path.as_ref().and_then(|p| std::fs::metadata(p).and_then(|m| m.modified()).ok());
+            let mut seen = mtime();
             let mut h = Handler::new(Project::new(cfg));
             for job in rx {
+                let now = mtime();
+                if now != seen {
+                    match reload() {
+                        Ok(cfg) => {
+                            tracing::info!("config changed; reloaded");
+                            h = Handler::new(Project::new(cfg));
+                            seen = now;
+                        }
+                        Err(e) => {
+                            let e = format!("{e:#}");
+                            tracing::warn!("config reload failed: {e}");
+                            h.config_error = Some(e);
+                        }
+                    }
+                }
                 job(&mut h);
             }
         });
@@ -92,6 +114,10 @@ impl Marki {
         let (tx, rx) = oneshot::channel();
         self.jobs
             .send(Box::new(move |h| {
+                if let Some(e) = &h.config_error {
+                    let _ = tx.send(Err(format!(".marki/config.toml no longer loads, fix it first: {e}")));
+                    return;
+                }
                 // A panicking tool must not take the worker down with it.
                 let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(h)));
                 let _ = tx.send(match r {
@@ -393,10 +419,10 @@ impl ServerHandler for Marki {
 /// Serve on `listen` (e.g. `127.0.0.1:3047`) at `/mcp`. rmcp only accepts
 /// loopback `Host` headers, which is what an auth proxy on the same host
 /// sends (it rewrites Host to its backend URL).
-pub fn serve(cfg: Config, listen: &str) -> Result<()> {
+pub fn serve(cfg: Config, config_path: Option<PathBuf>, reload: Reload, listen: &str) -> Result<()> {
     let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
     rt.block_on(async move {
-        let marki = Marki::spawn(cfg);
+        let marki = Marki::spawn(cfg, config_path, reload);
         let config = StreamableHttpServerConfig::default();
         let service: StreamableHttpService<Marki, LocalSessionManager> =
             StreamableHttpService::new(move || Ok(marki.clone()), Default::default(), config);
