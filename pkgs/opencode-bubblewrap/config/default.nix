@@ -521,10 +521,11 @@ let
         type = "remote";
         url = "https://mcp.grep.app";
       };
-      # Anki card authoring (modules/marki-mcp.nix), tailnet-only, no auth.
+      # Anki card authoring (modules/marki-mcp.nix). OAuth via mcp-auth-proxy:
+      # one-time `opencode mcp auth marki` per jail identity, like datadog.
       marki = {
         type = "remote";
-        url = "https://marki.optiplex.tail.niko.ink/mcp";
+        url = "https://marki-mcp.niko.ink/mcp";
       };
       nixos = {
         type = "local";

@@ -379,15 +379,14 @@ impl ServerHandler for Marki {
     }
 }
 
-/// Serve on `listen` (e.g. `127.0.0.1:3045`) at `/mcp`. `hosts` are the
-/// public names a reverse proxy forwards as `Host` (rmcp only accepts
-/// loopback by default).
-pub fn serve(cfg: Config, listen: &str, hosts: Vec<String>) -> Result<()> {
+/// Serve on `listen` (e.g. `127.0.0.1:3047`) at `/mcp`. rmcp only accepts
+/// loopback `Host` headers, which is what an auth proxy on the same host
+/// sends (it rewrites Host to its backend URL).
+pub fn serve(cfg: Config, listen: &str) -> Result<()> {
     let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
     rt.block_on(async move {
         let marki = Marki::spawn(cfg);
-        let mut config = StreamableHttpServerConfig::default();
-        config.allowed_hosts.extend(hosts);
+        let config = StreamableHttpServerConfig::default();
         let service: StreamableHttpService<Marki, LocalSessionManager> =
             StreamableHttpService::new(move || Ok(marki.clone()), Default::default(), config);
         let app = axum::Router::new().nest_service("/mcp", service);

@@ -85,14 +85,12 @@ enum Cmd {
     /// block errors), and check the collection's structure.
     Check,
     /// Serve the card-authoring tools over MCP (streamable HTTP at `/mcp`).
-    /// No authentication: keep it on loopback behind a trusted proxy.
+    /// No authentication: keep it on loopback behind an auth proxy. Only
+    /// loopback `Host` headers are accepted.
     Mcp {
         /// Address to listen on.
-        #[arg(long, default_value = "127.0.0.1:3045")]
+        #[arg(long, default_value = "127.0.0.1:3047")]
         listen: String,
-        /// Extra `Host` names to accept (the reverse proxy's public name).
-        #[arg(long = "allow-host")]
-        allow_hosts: Vec<String>,
     },
     /// Long-running daemon: watch the cards directory and push on change.
     Watch,
@@ -158,8 +156,8 @@ fn main() -> Result<()> {
     // No subcommand → run a single push (one-shot first).
     let cmd = cli.cmd.unwrap_or(Cmd::Push { prune: false, simulate: false });
 
-    if let Cmd::Mcp { listen, allow_hosts } = cmd {
-        return marki::mcp::serve(cfg, &listen, allow_hosts);
+    if let Cmd::Mcp { listen } = cmd {
+        return marki::mcp::serve(cfg, &listen);
     }
     if let Cmd::Fmt = cmd {
         return cmd_fmt(&cfg);

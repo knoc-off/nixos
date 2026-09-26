@@ -132,6 +132,18 @@ in
     '';
   };
 
+  # marki MCP server on optiplex (modules/marki-mcp.nix). Its mcp-auth-proxy
+  # runs there and is the gate; this just terminates TLS and crosses the
+  # tailnet. No `auth-public`: MCP clients cannot follow its redirect.
+  services.caddy.virtualHosts."marki-mcp.niko.ink" = {
+    useACMEHost = "niko.ink";
+    extraConfig = ''
+      import security-headers
+      # services.marki-mcp.proxy.port on optiplex.
+      reverse_proxy ${self.lib.tailnet.optiplex}:3048
+    '';
+  };
+
   # Cap journal size so it doesn't eat disk over time
   services.journald.extraConfig = "SystemMaxUse=500M";
 

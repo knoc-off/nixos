@@ -202,8 +202,9 @@ it uses to detect changes. Leave both alone.
 ## MCP server
 
 `marki mcp --listen 127.0.0.1:3047` serves the repo to LLM agents at `/mcp`
-(streamable HTTP). It has no authentication: keep it on loopback or a private
-network. Behind a reverse proxy, pass `--allow-host <public name>`.
+(streamable HTTP). It has no authentication and only accepts loopback `Host`
+headers, so put an auth proxy on the same host in front of it (the NixOS
+module uses mcp-auth-proxy).
 
 Tools: `marki_context`, `marki_search_cards`, `marki_read_card`,
 `marki_preview`, `marki_write_card`, `marki_add_media`, `marki_find`,
