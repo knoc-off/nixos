@@ -43,6 +43,21 @@
             order = config.security.pam.services.${name}.rules.auth.unix.order - 10;
             control = "sufficient";
             modulePath = pam_fprintd_grosshackSo;
+
+            # Negative values map to UINT_MAX in pam_fprintd.c -- i.e. "never
+            # give up". Without these the reader stops after 30s (or 3 failed
+            # swipes) with "Verification timed out" and auth degrades to
+            # password-only. The password prompt thread still cuts the wait
+            # short: typing a password sets PAM_AUTHTOK and raises SIGUSR1,
+            # which breaks the verify loop, so an infinite timeout doesn't
+            # block the fallback.
+            #
+            # The timeout= parser only accepts <=2 chars of value
+            # (pam_fprintd.c:900), so "-1" is the only way to spell infinity.
+            settings = {
+              timeout = -1;
+              max-tries = -1;
+            };
           };
         };
       };
