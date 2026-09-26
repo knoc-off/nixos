@@ -149,6 +149,7 @@ assert col.execute("select count() from notes").fetchone()[0] == 0, "simulate wr
 assert "plan changed" in tool("marki_push", {"confirm": True, "plan_hash": "nope"}, ok=False)
 done = tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"]})
 assert done["ok"] and done["kind"] == "push", done
+assert done["full_sync_required"], done  # new note types moved col.scm
 assert {s["name"]: s["status"] for s in done["steps"]} == \
     {"media": "ok", "collection": "ok", "server": "skipped", "git": "ok"}, done
 st = tool("marki_status")

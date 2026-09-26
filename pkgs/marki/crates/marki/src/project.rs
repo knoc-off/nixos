@@ -81,6 +81,9 @@ pub struct Pushed {
     pub outcome: Outcome,
     pub plan_hash: String,
     pub steps: Vec<Step>,
+    /// `col.scm` moved during the write: every client must full-sync.
+    /// Measured, not predicted from the plan.
+    pub schema_changed: bool,
 }
 
 impl Pushed {
@@ -264,6 +267,7 @@ impl Project {
             );
         }
 
+        let scm_before = col.scm()?;
         let mut steps = Vec::new();
         let media_ok = match media::push_all(&plan.assets, &s.media_dir, &s.media_db) {
             Ok(n) => {
@@ -293,13 +297,14 @@ impl Project {
             steps.push(Step::skipped("collection", "media failed; notes would reference missing files"));
             plan
         };
+        let schema_changed = col.scm()? != scm_before;
         drop(col);
         steps.push(match pause.resume() {
             Ok(Some(())) => Step::ok("server", "restarted"),
             Ok(None) => Step::skipped("server", "no [server] configured"),
             Err(e) => Step::error("server", &e),
         });
-        Ok(Pushed { outcome, plan_hash: hash, steps })
+        Ok(Pushed { outcome, plan_hash: hash, steps, schema_changed })
     }
 
     /// Run `f` on the live collection with the server paused.

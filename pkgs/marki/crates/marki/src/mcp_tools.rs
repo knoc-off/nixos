@@ -421,6 +421,7 @@ impl Handler {
             crate::project::Step::skipped("git", "collection not written")
         });
         let mut r = self.report("push", &pushed.outcome, vec![], pushed.plan_hash.clone(), steps, false);
+        r.full_sync_required = pushed.schema_changed;
         r.ok = pushed.ok() && r.steps.iter().all(|s| s.status != "error");
         Ok(r)
     }
