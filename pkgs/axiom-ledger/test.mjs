@@ -565,3 +565,25 @@ test("guard: a V1 object default with no id fails to load as a directory-scanned
   const brokenMod = { default: { server: async () => ({}) } };
   assert.throws(() => assertOpencodeCanLoad(brokenMod), /must export id/);
 });
+
+test("nudgeFor: fires at NUDGE_EVERY investigative calls, not again until another NUDGE_EVERY, resets on post", async () => {
+  const { nudgeFor, NUDGE_EVERY } = pluginModule;
+  const tool = (t) => ({ type: "tool", tool: t });
+  const msgs = (parts) => [{ info: { sessionID: "s1", role: "assistant" }, parts }];
+  const state = new Map();
+  const reads = (n) => Array.from({ length: n }, () => tool("read"));
+
+  assert.equal(nudgeFor(msgs(reads(NUDGE_EVERY - 1)), state), null);
+  assert.equal(nudgeFor(msgs([...reads(NUDGE_EVERY - 1), tool("edit")]), state), null, "edit is not investigative");
+  assert.match(nudgeFor(msgs(reads(NUDGE_EVERY)), state), /axiom_post/);
+  assert.equal(nudgeFor(msgs(reads(NUDGE_EVERY + 1)), state), null, "no repeat right after");
+  assert.match(nudgeFor(msgs(reads(2 * NUDGE_EVERY)), state), /axiom_post/);
+
+  // A post resets the count; the nudge doesn't fire again until NUDGE_EVERY more.
+  const posted = [...reads(2 * NUDGE_EVERY), tool("axiom_post")];
+  assert.equal(nudgeFor(msgs([...posted, ...reads(NUDGE_EVERY - 1)]), state), null);
+  assert.match(nudgeFor(msgs([...posted, ...reads(NUDGE_EVERY)]), state), /axiom_post/);
+
+  // Sessions are independent.
+  assert.match(nudgeFor([{ info: { sessionID: "s2" }, parts: reads(NUDGE_EVERY) }], state), /axiom_post/);
+});

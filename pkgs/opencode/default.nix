@@ -191,9 +191,15 @@ upkgs.opencode.overrideAttrs (old: {
           # and the TUI never see the alias -- they keep comparing against
           # "bash" etc. same as before, since only this file's wire
           # representation changes. Tools with no faithful Claude Code
-          # counterpart (opencode's own apply_patch/lsp/skill, and the
-          # always-on "invalid" placeholder) are dropped from the outgoing
-          # list entirely rather than leaking an opencode-only name.
+          # counterpart (opencode's own apply_patch/lsp, and the always-on
+          # "invalid" placeholder) are dropped from the outgoing list entirely
+          # rather than leaking an opencode-only name. `skill` maps to Claude
+          # Code's `Skill` instead: opencode injects <available_skills> every
+          # turn regardless, so dropping the tool left a list the model could
+          # read but never act on. The MCP resource tools are dropped too:
+          # opencode registers them whenever any server advertises the
+          # resources capability (session/tools.ts), with no config switch,
+          # and none of our servers serve anything worth reading.
           substituteInPlace packages/llm/src/protocols/anthropic-messages.ts \
             --replace-fail \
               'const lowerTool = (breakpoints: Cache.Breakpoints, tool: ToolDefinition, inputSchema: JsonSchema): AnthropicTool => ({

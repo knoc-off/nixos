@@ -66,8 +66,6 @@
               self.homeModules.environment
 
               self.homeModules.lspmux
-              self.homeModules.claude-mem
-              { services.claude-mem.enable = true; }
 
               self.homeModules.hyprland
               self.homeModules.noctalia

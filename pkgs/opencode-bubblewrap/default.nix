@@ -36,7 +36,6 @@ let
   # Code identity spoofing isn't undermined from inside the jail either.
   patchedOpencode = selfPkgs.opencode;
 
-  claudeMem = selfPkgs.claude-mem;
   hostQuery = selfPkgs.host-query;
   scriptExec = selfPkgs.script-exec;
   browserExec = selfPkgs.browser-exec;
@@ -47,7 +46,6 @@ let
   # config dir, and why it is mounted as an overlay lower layer.
   opencodeConfig = pkgs.callPackage ./config {
     inherit
-      claudeMem
       hostQuery
       scriptExec
       browserExec
@@ -252,7 +250,7 @@ let
     # Nix — self-provisioning inside the jail.
     nix
 
-    # Python tooling (uvx needed by claude-mem for chroma vector search)
+    # Python tooling
     uv
     python3
 
@@ -442,7 +440,6 @@ jail "jailed-opencode" upkgs.fish (
       PORT_HASH=$(echo "$PORT_SEED" | ${pkgs.coreutils}/bin/sha256sum | ${pkgs.coreutils}/bin/head -c7)
       PORT_OFFSET=$((16#''${PORT_HASH:0:4} % 200))
       JAIL_PROXY_PORT=$(pick_port $((18800 + PORT_OFFSET)))
-      JAIL_MEM_PORT=$(pick_port $((19200 + PORT_OFFSET)))
       HOST_QUERY_PORT=$(pick_port $((19600 + PORT_OFFSET)))
 
       # ── Host-query service (runs on host, outside jail) ──────
@@ -513,11 +510,10 @@ jail "jailed-opencode" upkgs.fish (
       # per jail identity -- once for _shared, once per named jail.
       JAIL_DIR="$JAIL_PERSIST_DIR"
       JAIL_CLAUDE_DIR="$JAIL_DIR/claude"
-      JAIL_MEM_DIR="$JAIL_DIR/claude-mem"
       JAIL_FISH_DIR="$JAIL_DIR/fish"
       # JAIL_STATE_DIR was computed above, for the host-query log.
 
-      ${pkgs.coreutils}/bin/mkdir -p "$JAIL_CLAUDE_DIR" "$JAIL_MEM_DIR" "$JAIL_FISH_DIR"
+      ${pkgs.coreutils}/bin/mkdir -p "$JAIL_CLAUDE_DIR" "$JAIL_FISH_DIR"
 
       # .claude.json carries `oauthAccount.accountUuid`, which compat-proxy
       # reads for the `metadata.user_id` field real Claude Code sends. It is
@@ -562,7 +558,6 @@ jail "jailed-opencode" upkgs.fish (
       RUNTIME_ARGS+=(--bind "$JAIL_CLAUDE_DIR" "$HOME/.claude")
       RUNTIME_ARGS+=(--bind "$JAIL_DIR" "$HOME/.local/share/opencode")
       RUNTIME_ARGS+=(--bind "$JAIL_STATE_DIR" "$HOME/.local/state/opencode")
-      RUNTIME_ARGS+=(--bind "$JAIL_MEM_DIR" "$HOME/.claude-mem")
       RUNTIME_ARGS+=(--bind "$JAIL_FISH_DIR" "$HOME/.local/share/fish")
 
       if [[ -r "$HOME/.ssh/id_ed25519_signing" ]]; then
@@ -575,7 +570,6 @@ jail "jailed-opencode" upkgs.fish (
 
       # ── Pass computed values into the jail ───────────────────
       RUNTIME_ARGS+=(--setenv JAIL_PROXY_PORT "$JAIL_PROXY_PORT")
-      RUNTIME_ARGS+=(--setenv JAIL_MEM_PORT "$JAIL_MEM_PORT")
       RUNTIME_ARGS+=(--setenv HOST_QUERY_PORT "$HOST_QUERY_PORT")
       RUNTIME_ARGS+=(--setenv JAIL_START_DIR "$JAIL_START_DIR")
       RUNTIME_ARGS+=(--setenv JAIL_NAME "''${JAIL_NAME:-}")
@@ -621,21 +615,6 @@ jail "jailed-opencode" upkgs.fish (
       # postPatch) actually runs on. home.sessionVariables doesn't cross
       # the bwrap boundary, so this has to be set here too.
       export OPENCODE_EXPERIMENTAL_NATIVE_LLM=1
-
-      CLAUDE_MEM_WORKER_PORT=$JAIL_MEM_PORT \
-      CLAUDE_MEM_WORKER_HOST=127.0.0.1 \
-      CLAUDE_MEM_DATA_DIR="$HOME/.claude-mem" \
-        ${lib.getExe claudeMem} > "$LOG_DIR/claude-mem.log" 2>&1 &
-      CLAUDE_MEM_PID=$!
-      trap 'kill $PROXY_PID $CLAUDE_MEM_PID 2>/dev/null || true' EXIT
-
-      # Non-fatal: memory search degrades, the session still works.
-      if ! wait_for_health "http://127.0.0.1:$JAIL_MEM_PORT/api/health"; then
-        echo "jailed-opencode: warning: claude-mem failed to start on port $JAIL_MEM_PORT" >&2
-        echo "  memory search will be unavailable; see $LOG_DIR/claude-mem.log" >&2
-      fi
-
-      export CLAUDE_MEM_WORKER_PORT=$JAIL_MEM_PORT
 
       cd "$JAIL_START_DIR"
       ${entry}
@@ -767,7 +746,6 @@ jail "jailed-opencode" upkgs.fish (
       agentToolbelt
       ++ [
         compatProxy
-        claudeMem
       ]
     ))
   ]

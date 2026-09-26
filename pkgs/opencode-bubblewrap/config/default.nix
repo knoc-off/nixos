@@ -5,7 +5,6 @@
   lib,
   upkgs,
   jailContext,
-  claudeMem,
   hostQuery,
   scriptExec,
   browserExec,
@@ -319,10 +318,8 @@ let
     websearch = "allow";
     external_directory = "allow";
     # Skills are read-only instructions; a blanket deny would leave the
-    # subagent unable to load one. Currently moot -- pkgs/opencode strips
-    # `skill` from the outgoing tools array (CC_DROPPED_TOOLS) -- but the rule
-    # should be right for when that changes.
-    skill = "allow";
+    # subagent unable to load one.
+    skill = skillPermission;
 
     # axiom-ledger: read/write access to the shared findings ledger. This is
     # the whole point of a ledger a sub-agent can post to -- see
@@ -332,11 +329,6 @@ let
     axiom_post = "allow";
     axiom_get = "allow";
 
-    # Recall from claude-mem's distilled observation store -- read-only,
-    # cheap, complements the ledger's cited/attributed claims with looser
-    # "what happened" context.
-    claude_mem_search = "allow";
-
     # MCP: denied tool schemas are stripped from the outgoing request
     # entirely (not just blocked at call time), so granting these is a real
     # per-request token cost, not a formality -- kept to the three read-only
@@ -345,6 +337,19 @@ let
     "mcp__nixos__*" = "allow";
     "mcp__context7__*" = "allow";
     "mcp__grep__*" = "allow";
+  };
+
+  # Per-skill grants. A denied skill is filtered out of the <available_skills>
+  # list opencode injects every turn (SkillV2.available, core/src/skill.ts),
+  # not just blocked at call time -- so this is how to keep a skill out of
+  # the prompt. The ponytail ones denied here are one-shot report/help
+  # commands the user runs as /slash commands, never something the model
+  # needs to decide to load.
+  skillPermission = {
+    "*" = "allow";
+    ponytail-gain = "deny";
+    ponytail-help = "deny";
+    ponytail-debt = "deny";
   };
 
   # One exploration sub-agent per model tier. Ordered by capability, cheapest
@@ -471,7 +476,7 @@ let
       task = "allow";
       question = "allow";
       repo_clone = "allow";
-      skill = "allow";
+      skill = skillPermission;
       external_directory = "allow";
 
       # Bash — sandbox + trash-backed rm constrain damage
@@ -503,11 +508,6 @@ let
     # mutated per session. The plugin locates its own hooks/ and skills/
     # relative to its file, which is why an in-tree path works (upstream
     # documents this as the "share one checkout" mode).
-    #
-    # Caveat: pkgs/opencode drops the `skill` tool from the outgoing tools
-    # array (CC_DROPPED_TOOLS), so ponytail's six skills are advertised in the
-    # system prompt but cannot actually be invoked. The always-on ruleset
-    # injection and the slash commands -- the substance of it -- work.
     plugin = [ "${inputs.ponytail}/.opencode/plugins/ponytail.mjs" ];
 
     mcp = {
@@ -652,7 +652,7 @@ pkgs.runCommand "opencode-jail-config" { } ''
   cp ${pkgs.writeText "customtheme.json" (builtins.toJSON customtheme)} $out/themes/customtheme.json
 
   cp ${./ghostty-progress.js} $out/plugins/ghostty-progress.js
-  cp ${claudeMem}/lib/claude-mem/dist/opencode-plugin/index.js $out/plugins/claude-mem.js
+  cp -r ${./skills} $out/skills
   cp ${hostQuery}/lib/host-query/plugin/index.js $out/plugins/host-query.js
   cp ${scriptExec}/lib/script-exec/plugin/index.js $out/plugins/script-exec.js
   cp ${browserExec}/lib/browser-exec/plugin/index.js $out/plugins/browser-exec.js
