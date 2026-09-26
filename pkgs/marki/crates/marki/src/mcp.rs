@@ -32,7 +32,16 @@ const INSTRUCTIONS: &str = "\
 marki keeps Anki flashcards as markdown files in a git repo and pushes them \
 into the user's Anki collection.
 
-Workflow: call marki_context first (models, decks, media dirs). Draft a card, \
+Docs first: marki has built-in features for what cards usually need (cloze, \
+maps that highlight countries/regions, images and audio, typeset math and \
+diagrams, custom card types). Before writing cards read marki_docs(\"cards\"); \
+before using a ```map, ```media or ```typst block read marki_docs(<that \
+block>). Use these features instead of hand-written HTML, external images of \
+maps, {{c1::}} syntax or other workarounds; if something seems unsupported, \
+check the docs before inventing a solution, and ask the user if it still is.
+
+Workflow: call marki_context first (models, decks, media dirs, available \
+blocks and doc topics). Draft a card, \
 check it with marki_preview (pass `source` to preview without saving), then \
 marki_write_card. When done, marki_push without confirm simulates and returns \
 a plan_hash; show the user the planned changes, and only after they agree \
@@ -56,9 +65,11 @@ Good cards test one fact, have a short unambiguous front, and put context on \
 the back. Prefer several small cards over one big one.
 
 Media: marki_add_media saves a file, then reference it in a ```media block \
-(`src = \"dir/name\"`). Math: $inline$ and $$display$$.
+(marki_docs(\"media\")). Maps: a ```map block renders the map itself \
+(marki_docs(\"map\")); never download a map image. Math: $inline$ and \
+$$display$$.
 
-Models: read the resource marki://docs/models before writing one; \
+Models: read marki_docs(\"models\") before writing one; \
 marki_read_model(\"basic\"|\"cloze\") shows the built-ins as Lua examples. \
 M.card_names lists card types; generate(note, ctx) returns keys \
 <Card>Front / <Card>Back only (other keys are an error); render output with \
@@ -251,6 +262,12 @@ pub struct QueryArgs {
 }
 
 #[derive(Deserialize, JsonSchema)]
+pub struct DocsArgs {
+    /// cards | map | media | typst | models
+    pub topic: String,
+}
+
+#[derive(Deserialize, JsonSchema)]
 pub struct MakeCardsArgs {
     /// What to make cards about.
     pub topic: String,
@@ -258,9 +275,17 @@ pub struct MakeCardsArgs {
 
 #[tool_router]
 impl Marki {
-    #[tool(description = "Overview: models (with card types and descriptions), decks with card counts, media dirs. Call first.")]
+    #[tool(description = "Overview: models (with card types and descriptions), decks with card counts, media dirs, the special blocks this server renders and the doc topics. Call first.")]
     async fn marki_context(&self, _: Parameters<Empty>) -> Result<CallToolResult, McpError> {
         self.tool(|h| h.context()).await
+    }
+
+    #[tool(description = "Authoring reference. Topics: cards (file format, tags, cloze, decks, code blocks, math), map (```map blocks: highlight countries/regions/OSM features), media (```media images/audio), typst (```typst diagrams/formulas), models (Lua card types). Read `cards` before writing cards and the block's topic before using a block; prefer these built-in features over inventing HTML or workarounds.")]
+    async fn marki_docs(&self, Parameters(a): Parameters<DocsArgs>) -> Result<CallToolResult, McpError> {
+        Ok(match crate::docs::doc(&a.topic) {
+            Ok(t) => CallToolResult::success(vec![ContentBlock::text(t)]),
+            Err(e) => CallToolResult::error(vec![ContentBlock::text(e.to_string())]),
+        })
     }
 
     #[tool(description = "Search card files by path or content.")]
@@ -352,9 +377,11 @@ impl Marki {
             Role::User,
             format!(
                 "Make Anki flashcards about: {}\n\n\
-                 1. Call marki_context and marki_search_cards to see existing decks, models and \
-                 overlapping cards.\n\
-                 2. Propose a short list of cards (one fact each, deck = directory) and wait for my OK.\n\
+                 1. Call marki_context and marki_search_cards to see existing decks, models, \
+                 blocks and overlapping cards, and read marki_docs(\"cards\").\n\
+                 2. Propose a short list of cards (one fact each, deck = directory) and wait for my OK. \
+                 If a card would benefit from a map, image, audio or diagram, read that block's \
+                 marki_docs topic and use the block.\n\
                  3. For each: marki_preview with the draft source, fix any errors, then marki_write_card.\n\
                  4. marki_push (simulate), show me the plan, and push with confirm only after I agree.",
                 a.topic
@@ -388,9 +415,12 @@ impl ServerHandler for Marki {
             .await
             .map_err(|e| McpError::internal_error(e, None))?;
         let (cards, ctx) = listed;
-        let mut resources = vec![
-            Resource::new("marki://docs/models", "model API reference").with_mime_type("text/markdown"),
-        ];
+        let mut resources: Vec<_> = crate::docs::TOPICS
+            .iter()
+            .map(|(t, what)| {
+                Resource::new(format!("marki://docs/{t}"), format!("docs: {what}")).with_mime_type("text/markdown")
+            })
+            .collect();
         resources.extend(cards
             .into_iter()
             .map(|c| {
@@ -417,8 +447,8 @@ impl ServerHandler for Marki {
         let uri = req.uri.clone();
         let text = self
             .run(move |h| {
-                if uri == "marki://docs/models" {
-                    Ok(crate::scripting::MODEL_API.to_string())
+                if let Some(t) = uri.strip_prefix("marki://docs/") {
+                    crate::docs::doc(t)
                 } else if let Some(p) = uri.strip_prefix("marki://card/") {
                     h.read_card(p)
                 } else if let Some(n) = uri.strip_prefix("marki://model/") {

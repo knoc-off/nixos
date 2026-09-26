@@ -9,6 +9,7 @@
 {
   config,
   lib,
+  pkgs,
   self,
   ...
 }:
@@ -28,6 +29,8 @@ in
         enable = true;
         cardsDir = "/srv/flashcards";
         user = "tv";
+        # For ```typst blocks (typst_binary = "typst" in the cards config).
+        extraPackages = [ pkgs.typst ];
         proxy = {
           enable = true;
           externalUrl = "https://marki-mcp.niko.ink";

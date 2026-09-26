@@ -188,6 +188,9 @@
             GIT_AUTHOR_EMAIL = "marki@${config.networking.hostName}";
             GIT_COMMITTER_NAME = "marki";
             GIT_COMMITTER_EMAIL = "marki@${config.networking.hostName}";
+            # Offline boundary data for ```map blocks.
+            NATURAL_EARTH_DATA = "${self.packages.${pkgs.stdenv.hostPlatform.system}.natural-earth-data}";
+            GEOBOUNDARIES_DATA = "${self.packages.${pkgs.stdenv.hostPlatform.system}.geoboundaries-data}";
           };
 
           serviceConfig = hardening // {

@@ -2,6 +2,7 @@
 
 pub mod anki;
 pub mod config;
+pub mod docs;
 pub mod fmt;
 pub mod highlighter;
 pub mod id;

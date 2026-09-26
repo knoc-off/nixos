@@ -331,7 +331,9 @@ Three-letter codes from ISO 3166-1 alpha-3.
 ### `adm1|adm2|adm3/<ISO_A3>/<NAME>`
 
 `<NAME>` matches geoBoundaries' local `shapeName` (case-insensitive).
-To list the units at a given level for a country (inside
+Without a shell (e.g. over MCP), preview a card with a guessed name: the
+`unknown adm<N>` error lists every valid unit name for that country and
+level. To list the units at a given level for a country (inside
 `nix develop .#marki`, where gdal + `GEOBOUNDARIES_DATA` are
 available):
 

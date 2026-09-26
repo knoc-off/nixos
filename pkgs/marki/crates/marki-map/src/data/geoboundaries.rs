@@ -120,11 +120,22 @@ pub fn resolve_feature(name: &str) -> Result<Geometry, MapError> {
                 .split_once('/')
                 .ok_or_else(|| MapError::Resolve(format!("bad adm{lvl} ref: {name}")))?;
             let key = (lvl, iso.to_string(), unit.to_lowercase());
-            return idx
-                .admin
-                .get(&key)
-                .map(|f| f.geom.clone())
-                .ok_or_else(|| MapError::Resolve(format!("unknown adm{lvl}: {iso}/{unit}")));
+            return idx.admin.get(&key).map(|f| f.geom.clone()).ok_or_else(|| {
+                // List the valid names: authors (often agents without a
+                // shell) have no other way to discover them.
+                let mut names: Vec<&str> = idx
+                    .admin
+                    .keys()
+                    .filter(|(l, i, _)| *l == lvl && i == iso)
+                    .map(|(_, _, n)| n.as_str())
+                    .collect();
+                names.sort_unstable();
+                MapError::Resolve(if names.is_empty() {
+                    format!("unknown adm{lvl}: {iso}/{unit} ({iso} has no adm{lvl} units; try another level)")
+                } else {
+                    format!("unknown adm{lvl}: {iso}/{unit}; {iso} adm{lvl} units: {}", names.join(", "))
+                })
+            });
         }
     }
     if let Some(rest) = name.strip_prefix("neighbors/") {

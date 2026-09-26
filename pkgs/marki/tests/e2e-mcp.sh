@@ -66,7 +66,7 @@ def tool(name, args=None, ok=True):
     r = rpc("tools/call", {"name": name, "arguments": args or {}})
     text = r["content"][0]["text"]
     assert bool(r.get("isError")) != ok, f"{name}: {text}"
-    return json.loads(text) if ok else text
+    return json.loads(text) if ok and name != "marki_docs" else text
 
 init = rpc("initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
                           "clientInfo": {"name": "e2e", "version": "0"}})
@@ -76,13 +76,25 @@ names = {t["name"] for t in rpc("tools/list")["tools"]}
 want = {"marki_context", "marki_search_cards", "marki_read_card", "marki_preview",
         "marki_write_card", "marki_add_media", "marki_read_model",
         "marki_write_model", "marki_status", "marki_push", "marki_query",
-        "marki_delete_card", "marki_move_card"}
+        "marki_delete_card", "marki_move_card", "marki_docs"}
 assert want <= names, want - names
 assert not names & {"marki_find", "marki_flagged"}, names
+assert "marki_docs" in init["instructions"]
+assert "layers" in tool("marki_docs", {"topic": "map"}) and "### Cloze" in tool("marki_docs", {"topic": "cards"})
+assert "topics: cards" in tool("marki_docs", {"topic": "nope"}, ok=False)
+assert "section_html" in rpc("resources/read", {"uri": "marki://docs/models"})["contents"][0]["text"]
+
+# A wrong region name lists the valid ones, and the error points at the docs.
+bad_map = "Which state?\n\n```map\n[layers.base]\nfeatures = [\"country/DEU\"]\n[layers.answer]\nhighlights = [\"adm1/DEU/Bavaria\"]\n```\n\n---\n\nBavaria"
+err = tool("marki_write_card", {"path": "geo/by.md", "source": bad_map}, ok=False)
+assert "bayern" in err and 'marki_docs("map")' in err, err
+assert tool("marki_preview", {"path": "geo/by.md", "source": bad_map})["docs"] == 'marki_docs("map")'
 assert any(p["name"] == "make-cards" for p in rpc("prompts/list")["prompts"])
 
 ctx = tool("marki_context")
 assert ctx["cards"] == 0
+assert "```map" in [b["fence"] for b in ctx["blocks"]], ctx["blocks"]
+assert {d["topic"] for d in ctx["docs"]} >= {"cards", "map", "media", "typst", "models"}
 
 # Path confinement.
 assert "relative" in tool("marki_write_card", {"path": "../evil.md", "source": "x"}, ok=False)
