@@ -226,5 +226,11 @@
             systemd.user.startServices = "sd-switch";
           };
       };
+
+      # One password try: a wrong password in host-query's askpass dialog
+      # fails immediately instead of re-prompting (and blocking the server).
+      security.sudo.extraConfig = ''
+        Defaults:${user} passwd_tries=1
+      '';
     };
 }

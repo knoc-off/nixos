@@ -74,12 +74,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return self._json(400, {"error": "Missing 'command' field"})
 
         try:
-            result = subprocess.run(
+            proc = subprocess.Popen(
                 command,
                 shell=True,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=EXEC_TIMEOUT,
                 # Detach into a new session, severing the controlling terminal.
                 # Without this the child inherits the *opencode TUI's* tty (the
                 # launcher backgrounds this server from the same shell), and
@@ -91,14 +91,23 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 start_new_session=True,
                 env={**os.environ, **({"SUDO_ASKPASS": ASKPASS} if ASKPASS else {})},
             )
-            output = result.stdout
-            if result.stderr:
-                output += "\n--- stderr ---\n" + result.stderr
+            try:
+                stdout, stderr = proc.communicate(timeout=EXEC_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                # Kill the whole session group, not just the /bin/sh wrapper:
+                # sudo and its askpass dialog are grandchildren holding the
+                # pipes open, and would otherwise outlive the timeout.
+                os.killpg(proc.pid, signal.SIGKILL)
+                proc.communicate()
+                raise
+            output = stdout
+            if stderr:
+                output += "\n--- stderr ---\n" + stderr
             if len(output) > MAX_OUTPUT:
                 output = output[:MAX_OUTPUT] + f"\n... (truncated at {MAX_OUTPUT} bytes)"
             self._json(200, {
                 "command": command,
-                "exit_code": result.returncode,
+                "exit_code": proc.returncode,
                 "output": output,
             })
         except subprocess.TimeoutExpired:
@@ -217,6 +226,7 @@ if __name__ == "__main__":
         GRANT_ROOT = sys.argv[2]
         os.makedirs(GRANT_ROOT, exist_ok=True)
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
-    srv = http.server.HTTPServer(("127.0.0.1", port), Handler)
+    # Threaded: one command blocked on a sudo prompt must not queue the rest.
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), Handler)
     print(f"host-query: listening on 127.0.0.1:{port}", flush=True)
     srv.serve_forever()
