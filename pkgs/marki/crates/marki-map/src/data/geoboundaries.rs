@@ -324,10 +324,20 @@ fn load_geojson(path: &Path) -> Result<Vec<(String, Geometry)>, MapError> {
 }
 
 /// Convert a GeoJSON geometry object into our internal [`Geometry`].
-fn json_to_geometry(g: &serde_json::Value) -> Option<Geometry> {
+pub(crate) fn json_to_geometry(g: &serde_json::Value) -> Option<Geometry> {
     let ty = g.get("type")?.as_str()?;
     let coords = g.get("coordinates")?;
+    let line = |c: &serde_json::Value| -> Option<Vec<LonLat>> {
+        let mut pts: Vec<LonLat> = c.as_array()?.iter().map(point).collect::<Option<_>>()?;
+        normalize_antimeridian(&mut pts);
+        Some(pts)
+    };
     match ty {
+        "Point" => Some(Geometry::Point(point(coords)?)),
+        "LineString" => Some(Geometry::LineString(line(coords)?)),
+        "MultiLineString" => Some(Geometry::MultiLineString(
+            coords.as_array()?.iter().map(line).collect::<Option<_>>()?,
+        )),
         "Polygon" => {
             let rings = parse_polygon_rings(coords)?;
             Some(rings_to_geometry(rings))
@@ -353,18 +363,17 @@ fn json_to_geometry(g: &serde_json::Value) -> Option<Geometry> {
     }
 }
 
+fn point(pt: &serde_json::Value) -> Option<LonLat> {
+    let arr = pt.as_array()?;
+    Some(LonLat { lon: arr.first()?.as_f64()?, lat: arr.get(1)?.as_f64()? })
+}
+
 /// Parse a GeoJSON polygon (array of rings, each an array of [lon,lat])
 /// into rings of `LonLat`, applying antimeridian normalization per ring.
 fn parse_polygon_rings(coords: &serde_json::Value) -> Option<Vec<Vec<LonLat>>> {
     let mut rings = Vec::new();
     for ring in coords.as_array()? {
-        let mut pts: Vec<LonLat> = Vec::new();
-        for pt in ring.as_array()? {
-            let arr = pt.as_array()?;
-            let lon = arr.first()?.as_f64()?;
-            let lat = arr.get(1)?.as_f64()?;
-            pts.push(LonLat { lon, lat });
-        }
+        let mut pts: Vec<LonLat> = ring.as_array()?.iter().map(point).collect::<Option<_>>()?;
         normalize_antimeridian(&mut pts);
         rings.push(pts);
     }

@@ -22,7 +22,7 @@ use crate::cache::{self, CacheFile};
 use crate::clip;
 use crate::cluster;
 use crate::compose::{Feature, RenderDetail, compose_layer};
-use crate::data::{geoboundaries, natural_earth, overpass};
+use crate::data::{custom, geoboundaries, natural_earth, overpass};
 use crate::dsl::{MapSpec, RevealMode};
 use crate::embed::{EmbedLayer, embed_layers, resolve_reveals};
 use crate::error::MapError;
@@ -56,10 +56,17 @@ struct ResolvedLayer<'a> {
 /// `render/<key>/`.
 ///
 /// On a cache hit, the SVGs and sidecar are read directly from disk
-/// and no resolve / project / compose work happens.
-pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<Fragment, MapError> {
+/// and no resolve / project / compose work happens. `geo_dir` holds the
+/// project's `geo/<name>` features, if any.
+pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<Fragment, MapError> {
     let theme = load_theme(&spec.style)?;
-    let key = cache_key(spec, &theme.bytes)?;
+    // Custom feature files are inputs too: editing one re-renders its maps.
+    let refs = spec.layers.values().flat_map(|l| {
+        l.features.iter().chain(&l.context).chain(&l.highlights).chain(l.hull.iter().flat_map(|h| &h.features))
+    });
+    let mut key_input = theme.bytes.clone();
+    key_input.extend(custom::fingerprint(geo_dir, refs));
+    let key = cache_key(spec, &key_input)?;
 
     if cache::is_ready(cache_root, &key) {
         tracing::debug!(key, "map cache hit");
@@ -73,7 +80,7 @@ pub fn run(spec: &MapSpec, cache_root: &Path) -> Result<Fragment, MapError> {
     );
 
     // ---- Resolve.
-    let mut resolved = resolve_all_layers(spec, cache_root)?;
+    let mut resolved = resolve_all_layers(spec, cache_root, geo_dir)?;
     if tracing::enabled!(tracing::Level::TRACE) {
         for l in &resolved {
             tracing::trace!(layer = %l.name, features = l.features.len(), "resolved layer");
@@ -303,7 +310,9 @@ fn layer_media_filename(key: &str, layer_name: &str) -> String {
 fn resolve_all_layers<'a>(
     spec: &'a MapSpec,
     cache_root: &Path,
+    geo_dir: Option<&Path>,
 ) -> Result<Vec<ResolvedLayer<'a>>, MapError> {
+    let resolve_one = |r: &str, c: &Path| resolve_one(r, c, geo_dir);
     let mut out = Vec::with_capacity(spec.layers.len());
     for (name, lspec) in &spec.layers {
         let mut features: Vec<(Geometry, &'static str, bool, bool)> = Vec::new();
@@ -346,7 +355,10 @@ fn is_composite_ref(r: &str) -> bool {
 
 /// Resolve one feature reference. Centralised here so future sources
 /// can be added without touching the per-source loaders.
-fn resolve_one(r: &str, cache_root: &Path) -> Result<Geometry, MapError> {
+fn resolve_one(r: &str, cache_root: &Path, geo_dir: Option<&Path>) -> Result<Geometry, MapError> {
+    if let Some(name) = r.strip_prefix(custom::PREFIX) {
+        return custom::resolve(geo_dir, name);
+    }
     if r == "coastline" {
         return natural_earth::resolve_feature(r);
     }

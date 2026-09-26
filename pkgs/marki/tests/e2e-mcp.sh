@@ -77,7 +77,7 @@ want = {"marki_context", "marki_search_cards", "marki_read_card", "marki_preview
         "marki_write_card", "marki_add_media", "marki_read_model",
         "marki_write_model", "marki_status", "marki_push", "marki_query",
         "marki_delete_card", "marki_move_card", "marki_docs", "marki_write_cards",
-        "marki_map_units", "marki_map_find", "marki_media_list"}
+        "marki_map_units", "marki_map_find", "marki_map_define", "marki_map_list", "marki_media_list"}
 assert want <= names, want - names
 assert not names & {"marki_find", "marki_flagged"}, names
 assert "marki_docs" in init["instructions"]
@@ -101,7 +101,7 @@ assert any(p["name"] == "make-cards" for p in rpc("prompts/list")["prompts"])
 ctx = tool("marki_context")
 assert ctx["cards"] == 0
 mapb = [b for b in ctx["blocks"] if b["fence"] == "```map"]
-assert mapb and mapb[0]["tools"] == ["marki_map_units", "marki_map_find"], ctx["blocks"]
+assert mapb and mapb[0]["tools"] == ["marki_map_units", "marki_map_find", "marki_map_define", "marki_map_list"], ctx["blocks"]
 assert {d["topic"] for d in ctx["docs"]} == {"cards", "map", "media", "models"}, ctx["docs"]
 
 # Path confinement.
@@ -266,6 +266,25 @@ assert [c["name"] for c in cards] == ["Locate", "Identify"], cards
 # Cleaned up again so the final repo/collection checks stay as they were.
 import shutil; shutil.rmtree(f"{w}/p/batch")
 os.remove(f"{w}/p/.marki/models/geographic-location.lua")
+
+# Custom geometry: define from GeoJSON, then a card uses geo/<name>.
+wall = {"type": "FeatureCollection", "features": [
+    {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[100, 38], [106, 40], [112, 40.5]]}},
+    {"type": "Feature", "geometry": {"type": "LineString", "coordinates": [[112, 40.5], [117, 40.4], [119.8, 40]]}}]}
+d = tool("marki_map_define", {"name": "great-wall", "from": {"geojson": wall}})
+assert d["ref"] == "geo/great-wall" and d["kind"] == "line" and d["points"] == 6, d
+assert d["bbox"] == [100, 38, 119.8, 40.5], d
+assert "exactly one" in tool("marki_map_define", {"name": "x", "from": {"osm": [], "geojson": wall}}, ok=False)
+assert "bad geo name" in tool("marki_map_define", {"name": "../x", "from": {"geojson": wall}}, ok=False)
+assert tool("marki_map_list")["features"] == ["geo/great-wall"]
+assert tool("marki_context")["custom_geometry"] == ["geo/great-wall"]
+wall_card = ("Where is the Great Wall?\n\n```map\n[layers.base]\nfeatures = [\"country/CHN\"]\n"
+             "[layers.answer]\nhighlights = [\"geo/great-wall\"]\n```\n\n---\n\nNorthern China")
+pv = tool("marki_preview", {"path": "wall.md", "source": wall_card})
+assert not pv["errors"] and pv["assets"], pv
+err = tool("marki_preview", {"path": "wall.md", "source": wall_card.replace("great-wall", "nope")})["errors"]
+assert "marki_map_define" in str(err), err
+shutil.rmtree(f"{w}/p/.marki/geo")
 print("mcp tools ok")
 EOF
 

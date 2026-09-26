@@ -325,6 +325,8 @@ Over MCP, two lookup tools do this for you; use them instead of guessing:
 - `marki_map_find(query)` searches OpenStreetMap by name and returns
   ready `relation/N` / `way/N` refs, each with its `kind` (e.g.
   `water=lake`) to pick the right hit.
+- `marki_map_define(name, from)` saves a custom `geo/<name>` feature; see
+  [below](#geoname-custom-features).
 
 ### `country/<ISO_A3>`
 
@@ -383,6 +385,38 @@ an ID, try [overpass-turbo].
 
 [Nominatim]: https://nominatim.openstreetmap.org/ui/search.html
 [overpass-turbo]: https://overpass-turbo.eu
+
+### `geo/<name>`: custom features
+
+For something no single ref covers -- a wall mapped as hundreds of OSM
+segments, a trade route, a historic border, a region you draw yourself --
+define a feature once and reference it like any other:
+
+```map
+[layers.base]
+features = ["country/CHN"]
+
+[layers.answer]
+highlights = ["geo/great-wall"]
+```
+
+`geo/<name>` reads `.marki/geo/<name>.geojson` (names are lowercase kebab,
+`/` for folders). The file is part of the cards repo, so it's versioned and
+renders offline; editing it re-renders the maps that use it. Any GeoJSON
+Geometry, Feature or FeatureCollection works, as long as it is all areas,
+all lines, or a single point.
+
+Over MCP, `marki_map_define(name, from)` builds and saves one. `from` is one of:
+
+| `from` | For |
+| ------ | --- |
+| `{"osm": ["relation/1", "way/2"]}` | merging refs found with `marki_map_find` |
+| `{"overpass": "way[historic=citywalls][name=\"Great Wall of China\"](30,95,45,125)"}` | every piece matching tags inside a south,west,north,east box (the bbox is required; the output part is added) |
+| `{"geojson": {...}}` | coordinates from anywhere else |
+
+Large inputs are simplified to at most 20,000 points. The result reports
+the feature's kind (area/line/point), point count and bbox; check the bbox
+before using it. `marki_map_list` lists existing features.
 
 ### `coastline` and `neighbors/<ISO>`
 

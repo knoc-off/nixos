@@ -525,7 +525,7 @@ pub fn build_registry(cfg: &Config) -> Registry {
                 marki_map::MapRenderer::new()
             }
         };
-    reg.register(Box::new(map_renderer));
+    reg.register(Box::new(map_renderer.with_geo_dir(cfg.anchor_dir.join("geo"))));
 
     let mut sources: Vec<(String, PathBuf)> = Vec::new();
     let builtin = cfg.builtin_media_dir();

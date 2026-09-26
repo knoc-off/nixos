@@ -246,6 +246,83 @@ struct RelationMember {
     geometry: Vec<NodeRef>,
 }
 
+/// Run an author's Overpass selection (ways/relations only, bbox
+/// required) and merge every hit into one geometry. The statement is
+/// wrapped: `[out:json][timeout:60][maxsize:64Mi];(<stmt>);out geom;`.
+pub fn query(stmt: &str, cache_root: &Path) -> Result<Geometry, MapError> {
+    let stmt = stmt.trim().trim_end_matches(';');
+    let lower = stmt.to_lowercase();
+    if lower.contains("[out:") || lower.contains("out ") || lower.contains("out;") {
+        return Err(MapError::Resolve(
+            "overpass: give only the selection, e.g. way[name=\"X\"](s,w,n,e); the output part is added".into(),
+        ));
+    }
+    if !(lower.starts_with("way") || lower.starts_with("relation") || lower.starts_with("nwr")) {
+        return Err(MapError::Resolve("overpass: select way[...] or relation[...]".into()));
+    }
+    // A bbox `(s,w,n,e)` or an area filter keeps one query from pulling a continent.
+    let has_bbox = stmt.contains("(area") || {
+        let nums = stmt
+            .split(['(', ')'])
+            .skip(1)
+            .step_by(2)
+            .any(|inner| inner.split(',').count() == 4 && inner.split(',').all(|n| n.trim().parse::<f64>().is_ok()));
+        nums
+    };
+    if !has_bbox {
+        return Err(MapError::Resolve(
+            "overpass: add a bounding box (south,west,north,east), e.g. way[name=\"X\"](30,95,45,125)".into(),
+        ));
+    }
+    let ql = format!("[out:json][timeout:60][maxsize:67108864];({stmt};);out geom;");
+    let cache_dir = cache_root.join("net").join("overpass");
+    std::fs::create_dir_all(&cache_dir)?;
+    let cache_file = cache_dir.join(format!("{}.json", query_key(&ql)));
+    let raw = if cache_file.exists() {
+        std::fs::read(&cache_file)?
+    } else {
+        let bytes = http_post(&ql)?;
+        let tmp = cache_file.with_extension("tmp");
+        std::fs::write(&tmp, &bytes)?;
+        std::fs::rename(&tmp, &cache_file)?;
+        bytes
+    };
+    decode_all(&raw)
+}
+
+/// Every way/relation in a response, merged (areas or lines, not both).
+fn decode_all(raw: &[u8]) -> Result<Geometry, MapError> {
+    let parsed: OverpassResponse =
+        serde_json::from_slice(raw).map_err(|e| MapError::Resolve(format!("overpass json: {e}")))?;
+    let mut polys: Vec<Polygon> = Vec::new();
+    let mut lines: Vec<Vec<LonLat>> = Vec::new();
+    for el in parsed.elements {
+        let one = OverpassResponse { elements: vec![el] };
+        let g = match &one.elements[0] {
+            OverpassElement::Way { .. } => decode_way(&one, "way"),
+            OverpassElement::Relation { .. } => decode_relation(&one, "relation"),
+            OverpassElement::Node(_) => continue,
+        };
+        match g? {
+            Geometry::Polygon { outer, holes } => polys.push(Polygon { outer, holes }),
+            Geometry::MultiPolygon(ps) => polys.extend(ps),
+            Geometry::LineString(l) => lines.push(l),
+            Geometry::MultiLineString(ls) => lines.extend(ls),
+            Geometry::Point(_) => {}
+        }
+    }
+    match (polys.is_empty(), lines.is_empty()) {
+        (true, true) => Err(MapError::Resolve("overpass: the query matched nothing (check tags, names and bbox)".into())),
+        (false, true) => Ok(Geometry::MultiPolygon(polys)),
+        (true, false) => Ok(Geometry::MultiLineString(lines)),
+        // A wall's closed loops (forts) come back as areas: keep them as outlines.
+        (false, false) => {
+            lines.extend(polys.into_iter().map(|p| p.outer));
+            Ok(Geometry::MultiLineString(lines))
+        }
+    }
+}
+
 fn decode_response(raw: &[u8], reference: &str) -> Result<Geometry, MapError> {
     let parsed: OverpassResponse = serde_json::from_slice(raw)
         .map_err(|e| MapError::Resolve(format!("overpass json: {e}")))?;
@@ -463,6 +540,33 @@ mod tests {
             Geometry::LineString(pts) => assert_eq!(pts.len(), 3),
             other => panic!("expected linestring, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn query_needs_selection_and_bbox() {
+        let d = std::env::temp_dir();
+        for (q, want) in [
+            ("[out:json];way(1);out geom;", "only the selection"),
+            ("node[name=x](1,2,3,4)", "select way"),
+            ("way[name=\"Great Wall\"]", "bounding box"),
+        ] {
+            let e = query(q, &d).unwrap_err().to_string();
+            assert!(e.contains(want), "{q}: {e}");
+        }
+    }
+
+    #[test]
+    fn decode_all_merges_ways_and_keeps_loops_as_lines() {
+        let raw = br#"{"elements":[
+          {"type":"way","geometry":[{"lat":40,"lon":100},{"lat":40.5,"lon":101}]},
+          {"type":"way","geometry":[{"lat":41,"lon":102},{"lat":41,"lon":103},{"lat":41.5,"lon":103},{"lat":41,"lon":102}]},
+          {"type":"node","lat":1,"lon":2}
+        ]}"#;
+        match decode_all(raw).unwrap() {
+            Geometry::MultiLineString(ls) => assert_eq!(ls.len(), 2),
+            g => panic!("{g:?}"),
+        }
+        assert!(decode_all(br#"{"elements":[]}"#).unwrap_err().to_string().contains("matched nothing"));
     }
 
     #[test]

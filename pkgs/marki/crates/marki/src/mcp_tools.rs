@@ -144,6 +144,8 @@ impl Handler {
             "models": models,
             "media_dirs": media,
             "media_sources": self.project.cfg.media_sources.keys().collect::<Vec<_>>(),
+            // Custom map features (marki_map_define): reuse before redefining.
+            "custom_geometry": marki_map::data::custom::list(&self.project.cfg.anchor_dir.join("geo")),
             // Special fenced blocks this server renders, with their lookup
             // tools; anything else is shown as highlighted code.
             "blocks": crate::docs::block_langs(reg)

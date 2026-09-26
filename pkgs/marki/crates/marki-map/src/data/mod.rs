@@ -5,7 +5,9 @@
 //!   * Natural Earth — offline `coastline` only, via the
 //!     `natural-earth-data` derivation + `NATURAL_EARTH_DATA` env.
 //!   * Overpass — online, with content-addressable cache.
+//!   * Custom — the project's own `geo/<name>` GeoJSON files.
 
+pub mod custom;
 pub mod geo_common;
 pub mod geoboundaries;
 pub mod natural_earth;

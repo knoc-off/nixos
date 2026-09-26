@@ -42,7 +42,10 @@ maps, {{c1::}} syntax or other workarounds; if something seems unsupported, \
 check the docs before inventing a solution, and ask the user if it still is. \
 Blocks bring lookup tools (marki_map_units, marki_map_find, \
 marki_media_list...; marki_context lists them per block): look up valid \
-region names, OSM refs and media files with them instead of guessing.
+region names, OSM refs and media files with them instead of guessing. For a \
+map feature no single ref covers (a wall made of many OSM segments, a route, \
+a historic border), build it once with marki_map_define and use its geo/<name> \
+ref; marki_context lists existing ones under custom_geometry.
 
 Workflow: call marki_context first (models, decks, media dirs, available \
 blocks and doc topics). Draft a card, \

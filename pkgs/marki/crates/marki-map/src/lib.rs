@@ -45,6 +45,8 @@ pub struct MapRenderer {
     /// Project-level DSL defaults + path rules, merged underneath each
     /// card's own block. Empty for a bare [`MapRenderer::new`].
     defaults: defaults::CompiledDefaults,
+    /// Where `geo/<name>` features live (`.marki/geo/`); None disables them.
+    geo_dir: Option<std::path::PathBuf>,
 }
 
 impl Default for MapRenderer {
@@ -57,6 +59,7 @@ impl MapRenderer {
     pub fn new() -> Self {
         Self {
             defaults: defaults::CompiledDefaults::empty(),
+            geo_dir: None,
         }
     }
 
@@ -69,7 +72,20 @@ impl MapRenderer {
     ) -> Result<Self, String> {
         Ok(Self {
             defaults: defaults::CompiledDefaults::compile(defs, cards_dir)?,
+            geo_dir: None,
         })
+    }
+
+    /// Enable `geo/<name>` refs, read from (and defined into) `dir`.
+    pub fn with_geo_dir(mut self, dir: std::path::PathBuf) -> Self {
+        self.geo_dir = Some(dir);
+        self
+    }
+
+    fn geo_dir(&self) -> Result<&std::path::Path, RenderError> {
+        self.geo_dir
+            .as_deref()
+            .ok_or_else(|| RenderError::Resolve("custom geometry needs a project (.marki/geo/)".into()))
     }
 }
 
@@ -91,7 +107,7 @@ impl Renderer for MapRenderer {
                 .try_into()
                 .map_err(|e: toml::de::Error| RenderError::Parse(e.to_string()))?
         };
-        Ok(pipeline::run(&spec, ctx.cache_dir)?)
+        Ok(pipeline::run(&spec, ctx.cache_dir, self.geo_dir.as_deref())?)
     }
 
     fn docs(&self) -> &'static str {
@@ -121,6 +137,30 @@ impl Renderer for MapRenderer {
                     "required": ["query"]
                 }),
             },
+            Tool {
+                name: "define",
+                description: "Create a custom map feature `geo/<name>` (saved as .marki/geo/<name>.geojson in the cards repo) for things no single ref covers: a wall made of many OSM segments, a trade route, a historic border, a region you draw. `from` is exactly one of: {\"osm\": [\"relation/N\", \"way/N\", ...]} to merge refs from marki_map_find; {\"overpass\": \"way[historic=citywalls][name=\\\"Great Wall of China\\\"](30,95,45,125)\"} (a way/relation selection with a south,west,north,east bbox; the output part is added) to collect every matching piece; or {\"geojson\": <Geometry|Feature|FeatureCollection>} for coordinates you have (e.g. from another tool). Large inputs are simplified. Returns the ref, kind (area/line/point), points and bbox: check the bbox is where you expect, then use the ref in a map layer (a base layer for context, the ref in the answer layer) and marki_preview the card. Overwrites an existing feature of that name.",
+                schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "lowercase-kebab, / for folders, e.g. \"great-wall\" or \"china/great-wall\"."},
+                        "from": {
+                            "type": "object",
+                            "properties": {
+                                "osm": {"type": "array", "items": {"type": "string"}},
+                                "overpass": {"type": "string"},
+                                "geojson": {"type": "object"}
+                            }
+                        }
+                    },
+                    "required": ["name", "from"]
+                }),
+            },
+            Tool {
+                name: "list",
+                description: "List the project's custom map features (`geo/<name>` refs made with marki_map_define). Reuse one before defining it again.",
+                schema: serde_json::json!({"type": "object", "properties": {}}),
+            },
         ]
     }
 
@@ -147,6 +187,30 @@ impl Renderer for MapRenderer {
                 }))
             }
             "find" => Ok(serde_json::json!({ "hits": data::overpass::search(s("query")?, ctx.cache_dir)? })),
+            "define" => {
+                use data::custom::{Source, define};
+                let from = args.get("from").and_then(|v| v.as_object()).ok_or_else(|| {
+                    RenderError::Parse("`from` must be an object with one of osm, overpass, geojson".into())
+                })?;
+                if from.len() != 1 {
+                    return Err(RenderError::Parse("`from` takes exactly one of osm, overpass, geojson".into()));
+                }
+                let source = match from.iter().next() {
+                    Some((k, v)) if k == "osm" => Source::Osm(
+                        v.as_array()
+                            .map(|a| a.iter().filter_map(|r| r.as_str().map(String::from)).collect())
+                            .unwrap_or_default(),
+                    ),
+                    Some((k, v)) if k == "overpass" => {
+                        Source::Overpass(v.as_str().ok_or_else(|| RenderError::Parse("overpass must be a string".into()))?)
+                    }
+                    Some((k, v)) if k == "geojson" => Source::GeoJson(v),
+                    Some((k, _)) => return Err(RenderError::Parse(format!("unknown source `{k}`; use osm, overpass or geojson"))),
+                    None => unreachable!(),
+                };
+                Ok(define(self.geo_dir()?, s("name")?, source, ctx.cache_dir)?)
+            }
+            "list" => Ok(serde_json::json!({ "features": data::custom::list(self.geo_dir()?) })),
             _ => Err(RenderError::Internal(format!("no tool `{name}`"))),
         }
     }
