@@ -74,10 +74,11 @@ assert "marki_context" in init["instructions"]
 rpc("notifications/initialized", notify=True)
 names = {t["name"] for t in rpc("tools/list")["tools"]}
 want = {"marki_context", "marki_search_cards", "marki_read_card", "marki_preview",
-        "marki_write_card", "marki_add_media", "marki_find", "marki_read_model",
-        "marki_write_model", "marki_status", "marki_push", "marki_flagged", "marki_query",
-        "marki_delete_card"}
+        "marki_write_card", "marki_add_media", "marki_read_model",
+        "marki_write_model", "marki_status", "marki_push", "marki_query",
+        "marki_delete_card", "marki_move_card"}
 assert want <= names, want - names
+assert not names & {"marki_find", "marki_flagged"}, names
 assert any(p["name"] == "make-cards" for p in rpc("prompts/list")["prompts"])
 
 ctx = tool("marki_context")
@@ -105,7 +106,7 @@ tool("marki_write_card", {"path": "geo/caps.md", "expected_id": cid,
 assert "load model" in tool("marki_write_card", {"path": "bad.md", "source": "x\n\n#model(nope)"}, ok=False)
 
 assert [c["path"] for c in tool("marki_search_cards", {"query": "madrid"})] == ["geo/caps.md"]
-assert tool("marki_find", {"needle": cid}) == ["geo/caps.md"]
+assert [c["path"] for c in tool("marki_search_cards", {"query": cid})] == ["geo/caps.md"]
 assert "Madrid" in tool("marki_read_card", {"path": "geo/caps.md"})
 
 # Media.
@@ -191,11 +192,29 @@ assert "no longer loads" in tool("marki_status", ok=False)
 open(f"{w}/p/.marki/config.toml", "w").write(cfg)
 assert tool("marki_status")["kind"] == "status"
 
-# Flag a card as the user would in Anki, then find it.
+# Move: the file changes directory, the push moves the same note.
+mid = open(f"{w}/p/geo/m.md").read().split("#id(")[1].split(")")[0]
+nid = col.execute("select id from notes where guid=?", (mid,)).fetchone()[0]
+assert "already exists" in tool("marki_move_card", {"path": "geo/m.md", "new_path": "geo/caps.md", "expected_id": mid}, ok=False)
+mv = tool("marki_move_card", {"path": "geo/m.md", "new_path": "nature/peaks/m.md", "expected_id": mid})
+assert mv["moved"] == "nature/peaks/m.md" and not mv["render_errors"], mv
+sim = tool("marki_push")
+assert [(c["kind"], c["detail"]) for c in sim["changes"]] == [("move", "deck geo -> nature::peaks")], sim
+assert tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"]})["ok"]
+assert col.execute("select id from notes where guid=?", (mid,)).fetchone()[0] == nid
+
+# A flag set in Anki is cleared by the push that changes the note.
 col.execute("update cards set flags=1 where nid=(select id from notes where guid=?)", (cid,))
-col.commit(); col.close()
-fl = tool("marki_flagged", {"flag": 1})
-assert fl and fl[0]["path"] == "geo/caps.md", fl
+col.commit()
+fl = tool("marki_query", {"sql": "select distinct n.guid from cards c join notes n on n.id=c.nid where c.flags & 7 = 1"})
+assert [r["path"] for r in fl["rows"]] == ["geo/caps.md"], fl
+caps = open(f"{w}/p/geo/caps.md").read()
+open(f"{w}/p/geo/caps.md", "w").write(caps.replace("Madrid", "Madrid (Spain)"))
+sim = tool("marki_push")
+assert [(c["kind"], c["detail"]) for c in sim["changes"]] == [("update", "unflag")], sim
+assert tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"]})["ok"]
+assert col.execute("select count() from cards where flags & 7 != 0").fetchone()[0] == 0
+col.close()
 
 q = tool("marki_query", {"sql": "select guid, sfld from notes order by sfld"})
 assert len(q["rows"]) == 2 and all(r["path"] for r in q["rows"]), q

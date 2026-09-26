@@ -43,7 +43,8 @@ shows anything still pending.
 Deleting: marki_delete_card removes the file; the next push lists the note \
 as an orphan and suspends its cards. Only with the user's explicit consent \
 pass delete_orphans=true (to both the simulation and the confirm) to delete \
-the note and its review history instead.
+the note and its review history instead. To change a card's deck, \
+marki_move_card it; the push moves the note and keeps its reviews.
 
 Cards: one .md file = one note; the directory is the deck (a/b/x.md -> a::b), \
 or #deck(a::b). `---` splits front from back. Tags are #words anywhere; \
@@ -65,9 +66,12 @@ ctx:section_html(note, n), not block:html(), or media blocks show as text. \
 Renaming or dropping a card type loses review history unless M.renames maps \
 old->new; dropping needs M.allow_card_removal and the user's consent.
 
-marki_flagged finds cards the user flagged in Anki (1 red .. 7 purple), \
-usually meaning 'fix this card'. marki_query runs read-only SQL on a snapshot \
-of the collection (tables notes, cards, revlog, decks, notetypes).";
+marki_query runs read-only SQL on a snapshot of the collection (tables \
+notes, cards, revlog, decks, notetypes); select n.guid to get each card's \
+file path. Flags (cards.flags & 7: 1 red .. 7 purple) usually mean 'fix this \
+card': select distinct n.guid from cards c join notes n on n.id=c.nid where \
+c.flags & 7 = 1. A push that changes a flagged note clears its flags \
+(`unflag` in the change detail).";
 
 type Job = Box<dyn FnOnce(&mut Handler) + Send>;
 pub type Reload = Box<dyn Fn() -> Result<Config> + Send>;
@@ -201,12 +205,6 @@ pub struct MediaArgs {
 }
 
 #[derive(Deserialize, JsonSchema)]
-pub struct FindArgs {
-    /// A card id, media name, tag or any literal text.
-    pub needle: String,
-}
-
-#[derive(Deserialize, JsonSchema)]
 pub struct ModelArgs {
     pub name: String,
 }
@@ -238,9 +236,12 @@ pub struct DeleteCardArgs {
 }
 
 #[derive(Deserialize, JsonSchema)]
-pub struct FlagArgs {
-    /// 1 red, 2 orange, 3 green, 4 blue, 5 pink, 6 turquoise, 7 purple.
-    pub flag: u8,
+pub struct MoveCardArgs {
+    pub path: String,
+    /// New path; its directory becomes the deck (created if missing).
+    pub new_path: String,
+    /// The card's current #id.
+    pub expected_id: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -307,11 +308,6 @@ impl Marki {
         .await
     }
 
-    #[tool(description = "Card files containing a literal (card id, media name, tag...).")]
-    async fn marki_find(&self, Parameters(a): Parameters<FindArgs>) -> Result<CallToolResult, McpError> {
-        self.tool(move |h| h.find(&a.needle)).await
-    }
-
     #[tool(description = "Read a custom model's Lua and CSS, with per-card-type card and review counts from the collection.")]
     async fn marki_read_model(&self, Parameters(a): Parameters<ModelArgs>) -> Result<CallToolResult, McpError> {
         self.tool(move |h| h.read_model(&a.name)).await
@@ -337,9 +333,9 @@ impl Marki {
         self.tool(move |h| h.delete_card(&a.path, &a.expected_id)).await
     }
 
-    #[tool(description = "Card files whose Anki cards carry a flag (1 red .. 7 purple).")]
-    async fn marki_flagged(&self, Parameters(a): Parameters<FlagArgs>) -> Result<CallToolResult, McpError> {
-        self.tool(move |h| h.flagged(a.flag)).await
+    #[tool(description = "Move/rename a card file (needs its current #id). The directory is the deck, so this changes deck; the next marki_push moves the note and keeps its review history. Returns render_errors if relative media broke.")]
+    async fn marki_move_card(&self, Parameters(a): Parameters<MoveCardArgs>) -> Result<CallToolResult, McpError> {
+        self.tool(move |h| h.move_card(&a.path, &a.new_path, &a.expected_id)).await
     }
 
     #[tool(description = "Read-only SQL on a snapshot of the Anki collection. A `guid` column gets a `path` column with the card file.")]

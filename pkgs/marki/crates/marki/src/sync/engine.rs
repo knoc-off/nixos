@@ -240,6 +240,9 @@ pub fn reconcile(
                 let deck_note = [
                     if deck_changed { format!("deck {} -> {}", r.deck, l.deck) } else { String::new() },
                     tags,
+                    // Changing a note the user flagged is taken as handling
+                    // the flag; the push clears it.
+                    if r.flagged { "unflag".into() } else { String::new() },
                 ]
                 .into_iter()
                 .filter(|s| !s.is_empty())
@@ -251,7 +254,12 @@ pub fn reconcile(
                     outcome.updated += 1;
                     changes.push(change(
                         ChangeKind::ModelChange,
-                        format!("model {} -> {} (full sync required)", r.model_name, l.model_name()),
+                        format!(
+                            "model {} -> {} (full sync required){}",
+                            r.model_name,
+                            l.model_name(),
+                            if r.flagged { "; unflag" } else { "" }
+                        ),
                     ));
                 } else if content_changed {
                     plan.push(Plan::Update(r, l, deck_changed));
@@ -380,6 +388,11 @@ fn apply(
             };
             if is_blocked(l) {
                 continue;
+            }
+            if let Plan::ModelChange(r, _) | Plan::Update(r, _, _) | Plan::Move(r, _) = p {
+                if r.flagged {
+                    w.clear_note_flags(r.note_id)?;
+                }
             }
             match p {
                 Plan::Add(l) => {

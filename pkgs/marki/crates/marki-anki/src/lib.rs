@@ -385,20 +385,21 @@ impl Collection {
             .collect::<rusqlite::Result<Vec<_>>>()?;
 
         let mut card_stmt = self.db.prepare(
-            "SELECT c.id, d.name FROM cards c JOIN decks d ON d.id = c.did \
+            "SELECT c.id, d.name, c.flags & 7 FROM cards c JOIN decks d ON d.id = c.did \
              WHERE c.nid = ?1 ORDER BY c.ord",
         )?;
 
         let mut out = Vec::with_capacity(rows.len());
         for (note_id, guid, mid, model_name, tags, flds) in rows {
-            let cards: Vec<(i64, String)> = card_stmt
-                .query_map([note_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+            let cards: Vec<(i64, String, i64)> = card_stmt
+                .query_map([note_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
                 .collect::<rusqlite::Result<Vec<_>>>()?;
             let deck = cards
                 .first()
-                .map(|(_, native)| deck::native_to_human(native))
+                .map(|(_, native, _)| deck::native_to_human(native))
                 .unwrap_or_default();
-            let card_ids = cards.into_iter().map(|(id, _)| id).collect();
+            let flagged = cards.iter().any(|(_, _, f)| *f != 0);
+            let card_ids = cards.into_iter().map(|(id, _, _)| id).collect();
             out.push(RawManagedNote {
                 note_id,
                 guid,
@@ -408,6 +409,7 @@ impl Collection {
                 fields: notes::split_fields(&flds),
                 deck,
                 card_ids,
+                flagged,
             });
         }
         Ok(out)
@@ -529,6 +531,8 @@ pub struct RawManagedNote {
     /// Human `::`-separated deck of the note's first card, empty if cardless.
     pub deck: String,
     pub card_ids: Vec<i64>,
+    /// Any of the note's cards carries a user flag (`cards.flags & 7`).
+    pub flagged: bool,
 }
 
 /// Mutation handle scoped to one `transact` batch. Holds the current server
@@ -932,6 +936,22 @@ impl NoteWriter<'_> {
                 params![self.usn, now_secs(), note_id],
             )
             .with_context(|| format!("suspend cards of note {note_id}"))?;
+        if n > 0 {
+            self.mutated = true;
+        }
+        Ok(n)
+    }
+
+    /// Clear the user flag (`flags & 7`) on every card of a note: a push that
+    /// changed a flagged note treats the flag as handled.
+    pub fn clear_note_flags(&mut self, note_id: i64) -> Result<usize> {
+        let n = self
+            .tx
+            .execute(
+                "UPDATE cards SET flags = flags & ~7, usn=?1, mod=?2 WHERE nid=?3 AND flags & 7 != 0",
+                params![self.usn, now_secs(), note_id],
+            )
+            .with_context(|| format!("clear flags of note {note_id}"))?;
         if n > 0 {
             self.mutated = true;
         }

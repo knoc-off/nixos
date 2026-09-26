@@ -271,8 +271,8 @@ impl Handler {
         Ok(formatted)
     }
 
-    /// Remove a card file. Anki is only touched by the next push.
-    pub fn delete_card(&mut self, rel: &str, expected_id: &str) -> Result<serde_json::Value> {
+    /// Resolve an existing card file whose `#id` must be `expected_id`.
+    fn existing_card(&self, rel: &str, expected_id: &str) -> Result<PathBuf> {
         let path = self.card_path(rel)?;
         ensure!(path.exists(), "{rel} does not exist");
         let current = parse_note(&std::fs::read_to_string(&path)?, path.clone()).id;
@@ -281,11 +281,33 @@ impl Handler {
             "{rel} has id {}, not {expected_id}; read it first",
             current.as_deref().unwrap_or("none")
         );
+        Ok(path)
+    }
+
+    /// Remove a card file. Anki is only touched by the next push.
+    pub fn delete_card(&mut self, rel: &str, expected_id: &str) -> Result<serde_json::Value> {
+        let path = self.existing_card(rel, expected_id)?;
         std::fs::remove_file(&path).with_context(|| format!("delete {rel}"))?;
         Ok(serde_json::json!({
             "deleted": rel,
             "next": "marki_push: the note shows as an orphan; delete_orphans=true deletes it and its reviews, otherwise its cards are suspended"
         }))
+    }
+
+    /// Rename a card file. Its directory is its deck, so this is how a card
+    /// changes deck; the push sees the same #id and moves the note, keeping
+    /// its reviews.
+    pub fn move_card(&mut self, rel: &str, new_rel: &str, expected_id: &str) -> Result<serde_json::Value> {
+        let path = self.existing_card(rel, expected_id)?;
+        let dest = self.card_path(new_rel)?;
+        ensure!(!dest.exists(), "{new_rel} already exists");
+        if let Some(d) = dest.parent() {
+            std::fs::create_dir_all(d)?;
+        }
+        std::fs::rename(&path, &dest).with_context(|| format!("move {rel} -> {new_rel}"))?;
+        // Relative media paths resolve from the card's directory.
+        let render_errors = self.project.preview(&dest, &std::fs::read_to_string(&dest)?)?.note.errors;
+        Ok(serde_json::json!({ "moved": new_rel, "render_errors": render_errors }))
     }
 
     /// Save a media file into `.marki/media/<dir>/<name>`. Referenced from
@@ -306,18 +328,6 @@ impl Handler {
         std::fs::write(&dest, bytes)?;
         let stem = rel.with_extension("");
         Ok(format!("src = \"{}\"", stem.display()))
-    }
-
-    /// Cards whose source mentions `needle` (an id, a media name, a tag).
-    pub fn find(&self, needle: &str) -> Result<Vec<String>> {
-        ensure!(!needle.trim().is_empty(), "empty search");
-        let mut out: Vec<String> = scan_dir_v2(self.root())?
-            .into_iter()
-            .filter(|sn| sn.source.contains(needle) || sn.note.id.as_deref() == Some(needle))
-            .map(|sn| self.rel(&sn.path))
-            .collect();
-        out.sort();
-        Ok(out)
     }
 
     pub fn read_model(&mut self, name: &str) -> Result<serde_json::Value> {
@@ -479,27 +489,6 @@ impl Handler {
             problems,
             steps,
         }
-    }
-
-    /// Card files whose Anki cards carry `flag` (1 red, 2 orange, 3 green,
-    /// 4 blue, 5 pink, 6 turquoise, 7 purple).
-    pub fn flagged(&self, flag: u8) -> Result<Vec<serde_json::Value>> {
-        ensure!((1..=7).contains(&flag), "flag must be 1..7");
-        let view = self.project.read_view()?;
-        let mut stmt = view.col.conn().prepare(
-            "SELECT n.guid, count(*) FROM cards c JOIN notes n ON n.id=c.nid \
-             WHERE (c.flags & 7) = ?1 GROUP BY n.guid",
-        )?;
-        let rows: Vec<(String, i64)> = stmt
-            .query_map([flag], |r| Ok((r.get(0)?, r.get(1)?)))?
-            .collect::<rusqlite::Result<_>>()?;
-        let paths = self.paths_by_id()?;
-        Ok(rows
-            .into_iter()
-            .map(|(guid, n)| {
-                serde_json::json!({"path": paths.get(&guid), "id": guid, "flagged_cards": n})
-            })
-            .collect())
     }
 
     fn paths_by_id(&self) -> Result<std::collections::HashMap<String, String>> {

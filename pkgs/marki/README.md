@@ -220,9 +220,9 @@ headers, so put an auth proxy on the same host in front of it (the NixOS
 module uses mcp-auth-proxy).
 
 Tools: `marki_context`, `marki_search_cards`, `marki_read_card`,
-`marki_preview`, `marki_write_card`, `marki_add_media`, `marki_find`,
-`marki_read_model`, `marki_write_model`, `marki_status`, `marki_push`,
-`marki_delete_card`, `marki_flagged`, `marki_query`. Plus cards and models as resources and a
+`marki_preview`, `marki_write_card`, `marki_move_card`, `marki_delete_card`,
+`marki_add_media`, `marki_read_model`, `marki_write_model`, `marki_status`,
+`marki_push`, `marki_query`. Plus cards and models as resources and a
 `make-cards` prompt.
 
 The guard rails:
@@ -241,6 +241,10 @@ The guard rails:
 - `marki_delete_card` only removes the file (given its `#id`). The next push
   suspends the note's cards; deleting the note and its reviews needs
   `delete_orphans=true` on both the simulation and the confirm.
+- `marki_move_card` renames a file (given its `#id`), which is how a card
+  changes deck; the push moves the note and keeps its reviews.
+- A push that changes a note clears the flags on its cards (shown as `unflag`
+  in the plan): fixing a flagged card is what the flag asked for.
 
 The server rereads `.marki/config.toml` when it changes. If the file stops
 parsing, every tool fails with the parse error until it's fixed.
