@@ -29,7 +29,6 @@ use crate::render::Registry;
 use crate::scan::{ScannedNote, deck_for_note};
 use crate::scripting::context::RenderContext;
 use crate::scripting::engine::ScriptEngine;
-use crate::sync::media;
 
 /// The single card name a basic note's `marki:basic` notetype uses. Its two
 /// fields are `CardFront`/`CardBack`.
@@ -63,15 +62,25 @@ pub struct Outcome {
     pub skipped_prune: usize,
     pub unformatted: usize,
     pub errors: Vec<String>,
-    /// Per-note plan, in path order (orphans last, by id). Filled for dry
-    /// runs too, so `status` and simulations can say *which* notes change.
+    /// The plan: models first, then notes in path order, orphans last (by
+    /// id). Filled for dry runs too, so `status` and simulations can say
+    /// *what* changes. Media entries are appended by the caller, which owns
+    /// the media store (see `sync::media::plan`).
     pub changes: Vec<Change>,
+    /// Every renderer-emitted asset of the rendered notes, deduplicated by
+    /// filename. Reconcile never writes them; the caller pushes them to the
+    /// media store before the collection.
+    pub assets: Vec<Asset>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, strum::IntoStaticStr)]
 #[serde(rename_all = "snake_case")]
 #[strum(serialize_all = "snake_case")]
 pub enum ChangeKind {
+    /// A notetype is created or changed (id = notetype name).
+    Model,
+    /// A media file is written or registered (id = filename).
+    Media,
     Add,
     Update,
     Move,
@@ -90,6 +99,9 @@ pub struct Change {
     /// Hash of the rendered fields being written (empty for orphans), so a
     /// plan fingerprint changes when content does.
     pub content_hash: String,
+    /// Applying this bumps the collection schema, so every client must do a
+    /// one-way full sync afterwards.
+    pub full_sync: bool,
 }
 
 /// A fully resolved local note ready for diffing against the collection.
@@ -134,8 +146,6 @@ pub fn reconcile(
     registry: &Arc<Registry>,
     cache_dir: &Path,
     models_dir: &Path,
-    // `(media dir, media.db)`; `None` skips writing assets (simulation).
-    media: Option<(&Path, &Path)>,
     dry_run: bool,
     prune: bool,
 ) -> Result<Outcome> {
@@ -209,7 +219,8 @@ pub fn reconcile(
     let mut plan: Vec<Plan> = Vec::new();
     let mut changes: Vec<Change> = Vec::new();
     for (guid, l) in &local {
-        let change = |kind, detail: String| Change {
+        let change = |kind: ChangeKind, detail: String| Change {
+            full_sync: kind == ChangeKind::ModelChange,
             kind,
             id: guid.clone(),
             path: Some(l.path.clone()),
@@ -270,26 +281,11 @@ pub fn reconcile(
             path: None,
             detail: format!("{} in {}", r.model_name, r.deck),
             content_hash: String::new(),
+            full_sync: false,
         })
         .collect();
     orphan_changes.sort_by(|a, b| a.id.cmp(&b.id));
     changes.extend(orphan_changes);
-    outcome.changes = changes;
-
-    // ---- Phase 4: Report or apply.
-    if dry_run {
-        account_orphans(&orphans, prune, &mut outcome);
-        return Ok(outcome);
-    }
-
-    // Push media before touching the collection so a media failure trips the
-    // orphan safety valve below (never prune during a cycle with errors).
-    if let Some((media_dir, media_db_path)) = media {
-        let assets = collect_assets(&local);
-        if let Err(e) = media::push_all(&assets, media_dir, media_db_path) {
-            outcome.errors.push(format!("media push: {e:#}"));
-        }
-    }
 
     // One representative note per model, in a stable order.
     let mut models_in_use: Vec<&Local> = Vec::new();
@@ -300,6 +296,21 @@ pub fn reconcile(
         if seen_models.insert(l.model_name()) {
             models_in_use.push(l);
         }
+    }
+    let mut model_changes = Vec::new();
+    for l in &models_in_use {
+        if let Some(c) = model_change(col, &l.spec)? {
+            model_changes.push(c);
+        }
+    }
+    model_changes.extend(changes);
+    outcome.changes = model_changes;
+    outcome.assets = collect_assets(&local);
+
+    // ---- Phase 4: Report or apply.
+    if dry_run {
+        account_orphans(&orphans, prune, &mut outcome);
+        return Ok(outcome);
     }
 
     apply(col, &models_in_use, &plan, &orphans, prune, &mut outcome)?;
@@ -451,6 +462,35 @@ fn apply(
 }
 
 /// Count orphan handling for a dry run, applying the same safety valve.
+/// What writing `spec` does to the collection's notetype, `None` when it is
+/// already up to date. Mirrors `ensure_model_with`'s decision: a new
+/// notetype or changed card list bumps the schema (full sync); a css-only
+/// change does not.
+fn model_change(col: &Collection, spec: &ModelSpec) -> Result<Option<Change>> {
+    let name = spec.notetype_name();
+    let want = spec.template_names();
+    let (detail, full_sync) = match col.notetype_state(&name)? {
+        None => (format!("new note type, cards {}", want.join(", ")), true),
+        Some((have, _)) if have != want => {
+            (format!("cards {} -> {}", have.join(", "), want.join(", ")), true)
+        }
+        Some((_, css)) if css != spec.css => ("css".to_string(), false),
+        Some(_) => return Ok(None),
+    };
+    let mut h = blake3::Hasher::new();
+    h.update(want.join("\0").as_bytes());
+    h.update(b"\0");
+    h.update(spec.css.as_bytes());
+    Ok(Some(Change {
+        kind: ChangeKind::Model,
+        id: name,
+        path: None,
+        detail,
+        content_hash: h.finalize().to_hex()[..16].to_string(),
+        full_sync,
+    }))
+}
+
 fn account_orphans(orphans: &[&RawManagedNote], prune: bool, outcome: &mut Outcome) {
     if orphans.is_empty() {
         return;

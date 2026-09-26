@@ -66,17 +66,37 @@ fn register_unicase(db: &Connection) -> Result<()> {
 
 /// Turn SQLITE_BUSY/LOCKED into an actionable message; pass anything else
 /// through unchanged.
-fn locked_hint(e: rusqlite::Error, path: &Path) -> anyhow::Error {
+pub(crate) fn locked_hint(e: rusqlite::Error, path: &Path) -> anyhow::Error {
     use rusqlite::ErrorCode::{DatabaseBusy, DatabaseLocked};
     match e.sqlite_error_code() {
         Some(DatabaseBusy | DatabaseLocked) => anyhow::anyhow!(
-            "collection {} is locked by another process (Anki desktop, or \
-             anki-sync-server mid-sync). Close Anki / wait for the sync to \
-             finish and retry.",
+            "{} is locked by another process. Anki desktop and \
+             anki-sync-server both hold their databases exclusively for as \
+             long as they run; close Anki, or configure `[server]` stop/start \
+             commands so marki can pause the sync server.",
             path.display()
         ),
         _ => e.into(),
     }
+}
+
+/// Whether another process holds `path` locked right now. Probes with a zero
+/// busy timeout, so it answers immediately. A missing file is not locked.
+pub fn is_locked(path: &Path) -> bool {
+    use rusqlite::ErrorCode::{DatabaseBusy, DatabaseLocked};
+    if !path.exists() {
+        return false;
+    }
+    let Ok(db) = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) else {
+        return false;
+    };
+    let _ = db.busy_timeout(std::time::Duration::ZERO);
+    matches!(
+        db.query_row("SELECT count(*) FROM sqlite_master", [], |r| r.get::<_, i64>(0))
+            .err()
+            .and_then(|e| e.sqlite_error_code()),
+        Some(DatabaseBusy | DatabaseLocked)
+    )
 }
 
 /// An open Anki collection, guarded to v18 with the `unicase` collation
@@ -102,9 +122,10 @@ impl Collection {
         }
         let db = Connection::open(path)
             .with_context(|| format!("open collection {}", path.display()))?;
-        // anki-sync-server only holds the lock while a client is syncing;
-        // wait that out instead of failing on the first SQLITE_BUSY.
-        db.busy_timeout(std::time::Duration::from_secs(10))
+        // Only rides out brief contention. Anki desktop and anki-sync-server
+        // hold an exclusive lock for as long as they have the collection
+        // open, so waiting longer never helps; callers pause the server.
+        db.busy_timeout(std::time::Duration::from_secs(2))
             .context("set busy_timeout")?;
         register_unicase(&db)?;
 
@@ -239,6 +260,29 @@ impl Collection {
             .query_map([name], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
             .collect::<rusqlite::Result<_>>()?;
         Ok(rows)
+    }
+
+    /// `(template names in ord order, css)` of a notetype, `None` when it
+    /// doesn't exist yet. Lets a plan say what writing a model will do.
+    pub fn notetype_state(&self, name: &str) -> Result<Option<(Vec<String>, String)>> {
+        use prost::Message;
+        let Some((ntid, blob)) = self
+            .db
+            .query_row("SELECT id, config FROM notetypes WHERE name = ?1", [name], |r| {
+                Ok((r.get::<_, i64>(0)?, r.get::<_, Vec<u8>>(1)?))
+            })
+            .optional()?
+        else {
+            return Ok(None);
+        };
+        let mut stmt = self.db.prepare("SELECT name FROM templates WHERE ntid = ?1 ORDER BY ord")?;
+        let names = stmt
+            .query_map([ntid], |r| r.get::<_, String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        let css = proto::notetypes::notetype::Config::decode(blob.as_slice())
+            .map(|c| c.css)
+            .unwrap_or_default();
+        Ok(Some((names, css)))
     }
 
     /// Raw connection for read-only callers (ad-hoc queries over a snapshot).
@@ -399,8 +443,16 @@ impl Collection {
 
         if mutated {
             // increment_usn(): a single bump per sync batch, never per row.
-            tx.execute("UPDATE col SET usn = usn + 1", [])
-                .context("increment col.usn")?;
+            // col.mod is what clients compare first: equal mod on both
+            // sides means "no changes" regardless of usn (rslib
+            // sync/collection/meta.rs compared_to_remote), so a write that
+            // leaves it alone is never pulled by a client that already
+            // synced. Strictly increasing, like rslib's finalize_sync.
+            tx.execute(
+                "UPDATE col SET usn = usn + 1, mod = max(mod + 1, ?1)",
+                [now_millis()],
+            )
+            .context("increment col.usn/mod")?;
         }
         if schema_changed {
             // scm is only bumped when a notetype's shape changes; doing so

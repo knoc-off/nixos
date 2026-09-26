@@ -84,6 +84,11 @@ pub struct Config {
     #[serde(default)]
     pub map: marki_map::MapDefaults,
 
+    /// How to pause the process that owns the collection (anki-sync-server)
+    /// around writes. See [`ServerConfig`].
+    #[serde(default)]
+    pub server: ServerConfig,
+
     /// The `.marki/` directory this config is anchored to (where
     /// `models/`, `lib/`, and `media/` live). Set during discovery; never
     /// read from the TOML file.
@@ -95,6 +100,28 @@ pub struct Config {
     /// relative config paths. Set during discovery; never from TOML.
     #[serde(skip)]
     pub project_root: PathBuf,
+}
+
+/// Commands that stop and restart the process owning the collection.
+///
+/// anki-sync-server opens the collection and `media.db` with an exclusive
+/// SQLite lock and keeps them open while it runs, so nothing else can read or
+/// write them. With both commands set, a push runs `stop`, writes, and always
+/// runs `start` afterwards. Reads never pause: they work on a file-level
+/// snapshot. Each command is an argv list (no shell).
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ServerConfig {
+    #[serde(default)]
+    pub stop: Vec<String>,
+    #[serde(default)]
+    pub start: Vec<String>,
+}
+
+impl ServerConfig {
+    pub fn configured(&self) -> bool {
+        !self.stop.is_empty() && !self.start.is_empty()
+    }
 }
 
 fn default_sync_interval() -> Duration {
@@ -152,6 +179,7 @@ impl Default for Config {
             media_sources: Default::default(),
             typst_binary: None,
             map: Default::default(),
+            server: Default::default(),
             anchor_dir: PathBuf::new(),
             project_root: PathBuf::new(),
         }
@@ -478,6 +506,13 @@ const STARTER_CONFIG: &str = r#"# marki project config — lives in `.marki/`, c
 # Path to the `typst` CLI for ```typst``` blocks. Pair with `nix shell`
 # and env interpolation so the volatile /nix/store path isn't committed:
 # typst_binary = "${TYPST_BIN:-typst}"
+
+# anki-sync-server keeps the collection locked while it runs. Give marki
+# commands to pause it around a push (argv lists, no shell). Without these,
+# marki can only write a collection nothing else has open.
+# [server]
+# stop  = ["systemctl", "stop", "anki-sync-server"]
+# start = ["systemctl", "start", "anki-sync-server"]
 
 # Named media sources for ```media``` blocks. The built-in
 # `.marki/media/` directory is always searched FIRST; these add more.

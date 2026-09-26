@@ -126,16 +126,23 @@ assert tool("marki_read_model", {"name": "qa"})["lua"].startswith("local M")
 tool("marki_write_card", {"path": "geo/m.md", "source": "Tallest mountain?\n\n---\n\nEverest\n\n#model(qa)"})
 
 st = tool("marki_status")
-assert sorted(c["kind"] for c in st["changes"]) == ["add", "add", "add"], st
+assert st["kind"] == "status" and not st["ok"], st
+assert sorted(c["kind"] for c in st["changes"] if c["kind"] == "add") == ["add", "add", "add"], st
+assert st["uncommitted"], st
 
 # Simulate, then confirm; a wrong hash is refused.
 sim = tool("marki_push")
-assert sim["ok"] and sim["simulated"] and not sim["problems"], sim
+assert sim["ok"] and sim["kind"] == "simulation" and "problems" not in sim, sim
+assert [c["kind"] for c in sim["changes"]][:1] == ["model"], sim  # new note types listed first
 col = sqlite3.connect(f"{w}/col.anki2")
 assert col.execute("select count() from notes").fetchone()[0] == 0, "simulate wrote"
 assert "plan changed" in tool("marki_push", {"confirm": True, "plan_hash": "nope"}, ok=False)
 done = tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"]})
-assert not done["simulated"] and done["committed"], done
+assert done["ok"] and done["kind"] == "push", done
+assert {s["name"]: s["status"] for s in done["steps"]} == \
+    {"media": "ok", "collection": "ok", "server": "skipped", "git": "ok"}, done
+st = tool("marki_status")
+assert st["ok"] and not st["changes"] and "uncommitted" not in st, st
 assert col.execute("select count() from notes").fetchone()[0] == 3
 
 # Flag a card as the user would in Anki, then find it.

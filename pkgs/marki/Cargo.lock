@@ -1358,6 +1358,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "sha1",
  "strum",
  "syntect",
  "thiserror 2.0.18",

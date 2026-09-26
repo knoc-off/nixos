@@ -35,7 +35,9 @@ Workflow: call marki_context first (models, decks, media dirs). Draft a card, \
 check it with marki_preview (pass `source` to preview without saving), then \
 marki_write_card. When done, marki_push without confirm simulates and returns \
 a plan_hash; show the user the planned changes, and only after they agree \
-call marki_push with confirm=true and that plan_hash.
+call marki_push with confirm=true and that plan_hash. Check `ok` and `steps` \
+of the result; never report success when a step says error. marki_status \
+shows anything still pending.
 
 Cards: one .md file = one note; the directory is the deck (a/b/x.md -> a::b), \
 or #deck(a::b). `---` splits front from back. Tags are #words anywhere; \
@@ -273,12 +275,12 @@ impl Marki {
         self.tool(move |h| h.write_model(&a.name, &a.lua, a.css.as_deref())).await
     }
 
-    #[tool(description = "What a push would change right now (no simulation, fast).")]
+    #[tool(description = "Everything that is out of sync, read-only and fast: pending model/note/media changes, cards that fail to render (errors), and card files not yet committed (uncommitted). ok=true only when all agree. Does not pause the sync server.")]
     async fn marki_status(&self, _: Parameters<Empty>) -> Result<CallToolResult, McpError> {
         self.tool(|h| h.status()).await
     }
 
-    #[tool(description = "Without confirm: simulate the push on a copy of the collection and return changes, problems and plan_hash. With confirm=true and that plan_hash (after the user agreed): apply it and commit the repo.")]
+    #[tool(description = "Without confirm: simulate the push on copies of the collection and media db, check what the real push needs (server pause, media dir, git), and return changes, problems and plan_hash. With confirm=true and that plan_hash (after the user agreed): pause the sync server, write media then the collection (stopping at the first failure), restart the server and commit the repo; `steps` reports each part. After a failed step, fix it and push again: pushes are idempotent.")]
     async fn marki_push(&self, Parameters(a): Parameters<PushArgs>) -> Result<CallToolResult, McpError> {
         self.tool(move |h| h.push(a.confirm, a.plan_hash.as_deref())).await
     }

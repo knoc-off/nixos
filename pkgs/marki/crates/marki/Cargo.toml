@@ -25,6 +25,7 @@ dirs.workspace = true
 blake3.workspace = true
 thiserror.workspace = true
 getrandom = "0.3"
+sha1 = "0.10"
 pulldown-cmark.workspace = true
 regex.workspace = true
 strum.workspace = true

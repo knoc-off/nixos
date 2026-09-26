@@ -71,17 +71,25 @@ impl MediaDatabase {
     pub fn open_or_create(path: &Path) -> Result<Self> {
         let db = Connection::open(path)
             .with_context(|| format!("open media db {}", path.display()))?;
-        // Match rslib's `open_or_create_db` pragmas.
-        db.pragma_update(None, "locking_mode", "exclusive")
-            .context("set media locking_mode")?;
-        db.pragma_update(None, "journal_mode", "wal")
-            .context("set media journal_mode")?;
+        // No locking_mode/journal_mode pragmas on an existing file: it may
+        // belong to a running anki-sync-server, which holds it with an
+        // exclusive lock for its whole lifetime (busy_timeout 0, rslib
+        // sync/media/database/server/mod.rs). Changing the journal mode of a
+        // database another process owns is never ours to do; WAL is
+        // persistent in the file header anyway. Callers must pause the
+        // server before writing (see marki's `[server]` config).
+        db.busy_timeout(std::time::Duration::from_secs(2))
+            .context("set media busy_timeout")?;
 
         let ver: u32 = db
             .query_row("SELECT user_version FROM pragma_user_version", [], |r| r.get(0))
+            .map_err(|e| crate::locked_hint(e, path))
             .context("read media user_version")?;
         if ver == 0 {
-            // Brand-new file: run the exact rslib migration chain.
+            // Brand-new file nobody else has open: match rslib's journal
+            // mode, then run its exact migration chain.
+            db.pragma_update(None, "journal_mode", "wal")
+                .context("set media journal_mode")?;
             db.execute_batch(include_str!("../media/schema_v3.sql"))
                 .context("apply media schema_v3")?;
             db.execute_batch(include_str!("../media/schema_v4.sql"))
@@ -90,6 +98,27 @@ impl MediaDatabase {
             bail!("unsupported media db version {ver}; expected {MEDIA_VER}");
         }
         Ok(Self { db })
+    }
+
+    /// `(csum, size)` of a media row, `None` when absent. A `size` of 0 is a
+    /// tombstone (deleted file).
+    pub fn entry(&self, fname: &str) -> Result<Option<(Vec<u8>, i64)>> {
+        Ok(self
+            .db
+            .query_row("SELECT csum, size FROM media WHERE fname = ?1", [fname], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .optional()?)
+    }
+
+    /// Standalone copy of the database at `dest` (`VACUUM INTO`), for
+    /// simulating writes. `dest` must not exist.
+    pub fn backup(&self, dest: &Path) -> Result<()> {
+        let d = dest
+            .to_str()
+            .with_context(|| format!("backup path is not valid UTF-8: {}", dest.display()))?;
+        self.db.execute("VACUUM INTO ?1", [d]).with_context(|| format!("VACUUM INTO {d}"))?;
+        Ok(())
     }
 
     fn read_meta(&self) -> Result<Meta> {

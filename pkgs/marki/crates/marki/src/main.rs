@@ -166,10 +166,9 @@ fn main() -> Result<()> {
         return cmd_prune(&Project::new(cfg), dry_run);
     }
     let mut project = Project::new(cfg);
-    let mut col = project.open_collection()?;
     match cmd {
         Cmd::Push { prune, simulate: true } => {
-            let sim = project.simulate(&col, prune)?;
+            let sim = project.simulate(prune)?;
             print_changes(&project, &sim.outcome);
             for e in sim.outcome.errors.iter().chain(&sim.problems) {
                 eprintln!("problem: {e}");
@@ -178,16 +177,22 @@ fn main() -> Result<()> {
             println!("simulation clean (plan {})", sim.plan_hash);
             Ok(())
         }
-        Cmd::Push { prune, simulate: false } => cmd_push(&mut project, &mut col, prune),
+        Cmd::Push { prune, simulate: false } => cmd_push(&mut project, prune),
         Cmd::Status => {
-            let outcome = run_cycle(&mut project, &mut col, true, false)?;
+            let (outcome, snapshot) = project.plan(false)?;
+            if snapshot {
+                eprintln!("(read from a snapshot: the collection is held by another process)");
+            }
             print_changes(&project, &outcome);
+            for e in &outcome.errors {
+                eprintln!("error: {e}");
+            }
             Ok(())
         }
-        Cmd::Watch => cmd_watch(&mut project, &mut col),
+        Cmd::Watch => cmd_watch(&mut project),
         Cmd::Check => {
-            let outcome = project.cycle(&mut col, true, false)?;
-            let problems = col.check()?;
+            let (outcome, _) = project.plan(false)?;
+            let problems = project.read_view()?.col.check()?;
             for e in outcome.errors.iter().chain(&problems) {
                 println!("{e}");
             }
@@ -239,28 +244,47 @@ fn apply_cli_overrides(cfg: &mut Config, cli: &Cli) -> Result<()> {
     Ok(())
 }
 
-fn run_cycle(
-    project: &mut Project,
-    col: &mut marki_anki::Collection,
-    dry_run: bool,
-    prune: bool,
-) -> Result<marki::sync::Outcome> {
-    let outcome = project.cycle(col, dry_run, prune)?;
+/// Push, log each step, and fail when any step or card did. Only pauses
+/// the server when there is something to write.
+fn run_push(project: &mut Project, prune: bool) -> Result<()> {
+    let (plan, _) = project.plan(prune)?;
+    if plan.changes.is_empty() && plan.errors.is_empty() {
+        tracing::info!("up to date");
+        return Ok(());
+    }
+    let pushed = project.push(None, prune)?;
+    let o = &pushed.outcome;
     tracing::info!(
-        "cycle: +{} ~{} ->{} -{} (quarantined {}, skipped-prune {}, unformatted {}, {} errors)",
-        outcome.added,
-        outcome.updated,
-        outcome.moved,
-        outcome.deleted,
-        outcome.quarantined,
-        outcome.skipped_prune,
-        outcome.unformatted,
-        outcome.errors.len(),
+        "push: +{} ~{} ->{} -{} (quarantined {}, skipped-prune {}, unformatted {}, {} errors)",
+        o.added,
+        o.updated,
+        o.moved,
+        o.deleted,
+        o.quarantined,
+        o.skipped_prune,
+        o.unformatted,
+        o.errors.len(),
     );
-    for e in &outcome.errors {
+    for e in &o.errors {
         tracing::warn!("{e}");
     }
-    Ok(outcome)
+    for s in &pushed.steps {
+        match s.status {
+            "error" => tracing::error!("{}: {}", s.name, s.detail),
+            _ => tracing::info!("{} {}: {}", s.name, s.status, s.detail),
+        }
+    }
+    if let Some(s) = pushed.steps.iter().find(|s| s.status == "error") {
+        anyhow::bail!("{} step failed: {}", s.name, s.detail);
+    }
+    // Surface failures with a non-zero exit so cron/systemd notices, instead
+    // of silently "succeeding" while notes failed to render.
+    anyhow::ensure!(
+        o.errors.is_empty(),
+        "push completed with {} card error(s); no orphans were pruned",
+        o.errors.len()
+    );
+    Ok(())
 }
 
 /// One line per planned note change, paths relative to the cards dir.
@@ -303,17 +327,8 @@ fn cmd_fmt(cfg: &Config) -> Result<()> {
     Ok(())
 }
 
-fn cmd_push(project: &mut Project, col: &mut marki_anki::Collection, prune: bool) -> Result<()> {
-    let outcome = run_cycle(project, col, false, prune)?;
-    // Surface failures with a non-zero exit so cron/systemd notices, instead
-    // of silently "succeeding" while notes failed to render.
-    if !outcome.errors.is_empty() {
-        anyhow::bail!(
-            "cycle completed with {} error(s); no orphans were pruned",
-            outcome.errors.len()
-        );
-    }
-    Ok(())
+fn cmd_push(project: &mut Project, prune: bool) -> Result<()> {
+    run_push(project, prune)
 }
 
 /// Permanently delete every note quarantined by a prior soft-delete
@@ -322,8 +337,7 @@ fn cmd_push(project: &mut Project, col: &mut marki_anki::Collection, prune: bool
 fn cmd_prune(project: &Project, dry_run: bool) -> Result<()> {
     use marki::anki::model::{MARKER_TAG, ORPHAN_TAG};
 
-    let mut col = project.open_collection()?;
-    let managed = col.managed_notes(MARKER_TAG).context("read managed notes")?;
+    let managed = project.read_view()?.col.managed_notes(MARKER_TAG).context("read managed notes")?;
     let note_ids: Vec<i64> = managed
         .iter()
         .filter(|n| n.tags.iter().any(|t| t == ORPHAN_TAG))
@@ -338,13 +352,16 @@ fn cmd_prune(project: &Project, dry_run: bool) -> Result<()> {
         println!("prune (dry-run): would delete {} quarantined note(s)", note_ids.len());
         return Ok(());
     }
-    col.transact(|w| {
-        for id in &note_ids {
-            w.remove_note(*id)?;
-        }
-        Ok(())
-    })
-    .context("delete quarantined notes")?;
+    project
+        .with_paused(|col| {
+            col.transact(|w| {
+                for id in &note_ids {
+                    w.remove_note(*id)?;
+                }
+                Ok(())
+            })
+        })
+        .context("delete quarantined notes")?;
     println!("prune: deleted {} quarantined note(s)", note_ids.len());
     Ok(())
 }
@@ -395,7 +412,7 @@ fn cmd_render(project: &mut Project, file: &Path, out: &Path, to_stdout: bool) -
     Ok(())
 }
 
-fn cmd_watch(project: &mut Project, col: &mut marki_anki::Collection) -> Result<()> {
+fn cmd_watch(project: &mut Project) -> Result<()> {
     let cfg = project.cfg.clone();
     let debounce = Duration::from_millis(cfg.debounce_ms);
     let heartbeat = cfg.sync_interval;
@@ -412,7 +429,7 @@ fn cmd_watch(project: &mut Project, col: &mut marki_anki::Collection) -> Result<
             Tick::Filesystem => tracing::info!("cycle: triggered by filesystem change"),
             Tick::Heartbeat => tracing::info!("cycle: triggered by heartbeat"),
         }
-        if let Err(e) = run_cycle(project, col, false, false) {
+        if let Err(e) = run_push(project, false) {
             tracing::error!("cycle failed: {e:#}");
         }
         Ok(true)

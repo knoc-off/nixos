@@ -36,14 +36,28 @@ pub struct CardSummary {
 
 #[derive(Serialize)]
 pub struct PushReport {
-    pub simulated: bool,
+    /// `status` (read-only plan), `simulation` (dry run on copies) or
+    /// `push` (written).
+    pub kind: &'static str,
     pub ok: bool,
+    /// For `simulation`: pass to a confirmed push.
+    #[serde(skip_serializing_if = "String::is_empty")]
     pub plan_hash: String,
     pub changes: Vec<ChangeLine>,
+    /// Cards that failed to render (they are left untouched in Anki).
     pub errors: Vec<String>,
+    /// For `simulation`: what would go wrong beyond render errors.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub problems: Vec<String>,
+    /// For `push`: media, collection, server, git -- each ok/error/skipped.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub steps: Vec<crate::project::Step>,
+    /// Card files changed on disk but not committed to git.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub uncommitted: Vec<String>,
+    /// Read from a snapshot because the sync server holds the files.
+    pub snapshot: bool,
     pub full_sync_required: bool,
-    pub committed: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -297,10 +311,11 @@ impl Handler {
     }
 
     fn usage(&self, name: &str) -> Result<Vec<serde_json::Value>> {
-        let Ok(col) = self.project.open_collection() else {
+        let Ok(view) = self.project.read_view() else {
             return Ok(vec![]);
         };
-        Ok(col
+        Ok(view
+            .col
             .template_usage(&format!("marki:{name}"))?
             .into_iter()
             .map(|(t, cards, reviews)| serde_json::json!({"card": t, "cards": cards, "reviews": reviews}))
@@ -350,54 +365,80 @@ impl Handler {
         }))
     }
 
+    /// Everything that differs between the cards and Anki: pending
+    /// models/notes/media plus uncommitted card files. Clean means all three
+    /// agree.
     pub fn status(&mut self) -> Result<PushReport> {
-        let mut col = self.project.open_collection()?;
-        let o = self.project.cycle(&mut col, true, false)?;
-        Ok(self.report(true, &o, vec![], String::new(), None))
+        let (o, snapshot) = self.project.plan(false)?;
+        let uncommitted = git_dirty(self.root())?;
+        let mut r = self.report("status", &o, vec![], String::new(), vec![], snapshot);
+        r.ok = r.ok && r.changes.is_empty() && uncommitted.is_empty();
+        r.uncommitted = uncommitted;
+        Ok(r)
     }
 
     /// Without `confirm`: simulate and return a plan hash. With it: push if
     /// the plan still matches, then commit the cards repo.
     pub fn push(&mut self, confirm: bool, plan_hash: Option<&str>) -> Result<PushReport> {
-        let mut col = self.project.open_collection()?;
         if !confirm {
-            let sim = self.project.simulate(&col, false)?;
-            return Ok(self.report(true, &sim.outcome, sim.problems, sim.plan_hash, None));
+            let sim = self.project.simulate(false)?;
+            let mut problems = sim.problems;
+            if let Err(e) = git_usable(self.root()) {
+                problems.push(format!("git: {e:#}"));
+            }
+            return Ok(self.report("simulation", &sim.outcome, problems, sim.plan_hash, vec![], false));
         }
         let hash = plan_hash.context("confirm requires the plan_hash from a simulation")?;
-        let o = self.project.push_confirmed(&mut col, hash, false)?;
-        let committed = git_commit(self.root(), &o)?;
-        Ok(self.report(false, &o, vec![], hash.to_string(), committed))
+        let pushed = self.project.push(Some(hash), false)?;
+        let mut steps = pushed.steps.clone();
+        // Commit whenever the collection took the cards, even if a later step
+        // (server restart) failed: the repo should record what Anki now has.
+        steps.push(if pushed.collection_written() {
+            match git_commit(self.root(), &pushed.outcome) {
+                Ok(Some(msg)) => crate::project::Step::ok("git", msg),
+                Ok(None) => crate::project::Step::skipped("git", "nothing to commit"),
+                Err(e) => crate::project::Step::error("git", &e),
+            }
+        } else {
+            crate::project::Step::skipped("git", "collection not written")
+        });
+        let mut r = self.report("push", &pushed.outcome, vec![], pushed.plan_hash.clone(), steps, false);
+        r.ok = pushed.ok() && r.steps.iter().all(|s| s.status != "error");
+        Ok(r)
     }
 
     fn report(
         &self,
-        simulated: bool,
+        kind: &'static str,
         o: &Outcome,
         problems: Vec<String>,
         plan_hash: String,
-        committed: Option<String>,
+        steps: Vec<crate::project::Step>,
+        snapshot: bool,
     ) -> PushReport {
         PushReport {
-            simulated,
+            kind,
             ok: o.errors.is_empty() && problems.is_empty(),
             plan_hash,
-            full_sync_required: o
-                .changes
-                .iter()
-                .any(|c| c.kind == crate::sync::ChangeKind::ModelChange),
+            snapshot,
+            uncommitted: vec![],
+            full_sync_required: o.changes.iter().any(|c| c.full_sync),
             changes: o
                 .changes
                 .iter()
                 .map(|c| ChangeLine {
                     kind: (&c.kind).into(),
-                    path: c.path.as_deref().map(|p| self.rel(p)).unwrap_or_else(|| format!("#id({})", c.id)),
+                    path: match (&c.path, &c.kind) {
+                        (Some(p), _) => self.rel(p),
+                        (None, crate::sync::ChangeKind::Orphan) => format!("#id({})", c.id),
+                        (None, _) => c.id.clone(),
+                    },
                     detail: c.detail.clone(),
                 })
                 .collect(),
             errors: o.errors.clone(),
             problems,
-            committed,
+            steps,
         }
     }
 
@@ -405,8 +446,8 @@ impl Handler {
     /// 4 blue, 5 pink, 6 turquoise, 7 purple).
     pub fn flagged(&self, flag: u8) -> Result<Vec<serde_json::Value>> {
         ensure!((1..=7).contains(&flag), "flag must be 1..7");
-        let col = self.project.open_collection()?;
-        let mut stmt = col.conn().prepare(
+        let view = self.project.read_view()?;
+        let mut stmt = view.col.conn().prepare(
             "SELECT n.guid, count(*) FROM cards c JOIN notes n ON n.id=c.nid \
              WHERE (c.flags & 7) = ?1 GROUP BY n.guid",
         )?;
@@ -432,14 +473,12 @@ impl Handler {
     /// Read-only SQL over a snapshot of the collection. A `guid` column gets
     /// a sibling `path` column mapping it back to the card file.
     pub fn query(&self, sql: &str) -> Result<serde_json::Value> {
-        let col = self.project.open_collection()?;
-        let dir = std::env::temp_dir().join(format!("marki-query-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
-        std::fs::create_dir_all(&dir)?;
-        let snap = dir.join("snapshot.anki2");
-        let result = (|| {
-            col.backup(&snap)?;
-            drop(col);
+        let view = self.project.read_view()?;
+        let dir = crate::project::TempDir::new("query")?;
+        let snap = dir.path().join("snapshot.anki2");
+        {
+            view.col.backup(&snap)?;
+            drop(view);
             let conn = rusqlite::Connection::open_with_flags(
                 &snap,
                 rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
@@ -478,9 +517,7 @@ impl Handler {
                 out.push(serde_json::Value::Object(obj));
             }
             Ok(serde_json::json!({"rows": out, "truncated": truncated}))
-        })();
-        let _ = std::fs::remove_dir_all(&dir);
-        result
+        }
     }
 }
 
@@ -502,15 +539,54 @@ fn safe_rel(rel: &str) -> Result<PathBuf> {
     Ok(p)
 }
 
-/// Commit the cards repo after a confirmed push. Skipped (None) when the
-/// cards dir isn't a git repo or nothing changed.
-fn git_commit(root: &Path, o: &Outcome) -> Result<Option<String>> {
-    use std::process::Command;
-    let git = |args: &[&str]| Command::new("git").arg("-C").arg(root).args(args).output();
-    match git(&["rev-parse", "--is-inside-work-tree"]) {
-        Ok(out) if out.status.success() => {}
-        _ => return Ok(None),
+fn git(root: &Path, args: &[&str]) -> Result<std::process::Output> {
+    std::process::Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .context("run git")
+}
+
+/// Whether the cards dir is a repo git will operate on. `Ok(false)` only
+/// for a plain directory; anything else git refuses (ownership, missing
+/// binary, broken repo) is an error, never a silent skip.
+fn git_repo(root: &Path) -> Result<bool> {
+    if !root.join(".git").exists() {
+        return Ok(false);
     }
+    let out = git(root, &["rev-parse", "--is-inside-work-tree"])?;
+    ensure!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr).trim());
+    Ok(true)
+}
+
+/// A push will be able to commit: the repo is usable and has an identity.
+fn git_usable(root: &Path) -> Result<()> {
+    if !git_repo(root)? {
+        return Ok(());
+    }
+    let out = git(root, &["var", "GIT_COMMITTER_IDENT"])?;
+    ensure!(out.status.success(), "no committer identity: {}", String::from_utf8_lossy(&out.stderr).trim());
+    Ok(())
+}
+
+/// Uncommitted changes under the cards dir (`git status --porcelain`).
+fn git_dirty(root: &Path) -> Result<Vec<String>> {
+    if !git_repo(root)? {
+        return Ok(vec![]);
+    }
+    let out = git(root, &["status", "--porcelain", "--untracked-files=all", "."])?;
+    ensure!(out.status.success(), "git status: {}", String::from_utf8_lossy(&out.stderr).trim());
+    Ok(String::from_utf8_lossy(&out.stdout).lines().map(|l| l.trim().to_string()).collect())
+}
+
+/// Commit the cards repo after a push. `None` when the cards dir isn't a git
+/// repo or nothing changed.
+fn git_commit(root: &Path, o: &Outcome) -> Result<Option<String>> {
+    if !git_repo(root)? {
+        return Ok(None);
+    }
+    let git = |args: &[&str]| git(root, args);
     let add = git(&["add", "-A", "."])?;
     ensure!(add.status.success(), "git add: {}", String::from_utf8_lossy(&add.stderr));
     if git(&["diff", "--cached", "--quiet"])?.status.success() {
