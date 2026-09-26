@@ -8,6 +8,13 @@
 
 local M = {}
 
+function M.describe()
+  return "Heading 1 is the place name. A ```map block (base layer for context, "
+    .. "answer layer highlighting the place) gives Locate and Identify cards; a "
+    .. "```media block with its flag gives FlagToCountry and CountryToFlag. "
+    .. "Section 2 (after ---) holds facts shown on the backs."
+end
+
 function M.card_names()
   return { "Locate", "Identify", "FlagToCountry", "CountryToFlag" }
 end

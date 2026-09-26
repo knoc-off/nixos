@@ -34,9 +34,9 @@ trap 'kill $server 2>/dev/null; rm -rf "$w"' EXIT
 for _ in $(seq 50); do curl -s "127.0.0.1:$port/mcp" >/dev/null && break; sleep 0.1; done
 
 # The client half lives in python (json handling); it asserts as it goes.
-py "$port" "$w" <<'EOF'
+py "$port" "$w" "$here" <<'EOF'
 import sys, json, urllib.request, sqlite3
-port, w = sys.argv[1], sys.argv[2]
+port, w, here = sys.argv[1], sys.argv[2], sys.argv[3]
 url = f"http://127.0.0.1:{port}/mcp"
 sid = None
 n = 0
@@ -235,11 +235,33 @@ assert "read-only" in tool("marki_query", {"sql": "delete from notes"}, ok=False
 res = rpc("resources/list")["resources"]
 assert any(r["uri"] == "marki://card/geo/caps.md" for r in res)
 assert "Madrid" in rpc("resources/read", {"uri": "marki://card/geo/caps.md"})["contents"][0]["text"]
+
+# Batch write: one broken card means nothing is written.
+import os
+geo_lua = open(f"{here}/models/geographic-location.lua").read()
+tool("marki_write_model", {"name": "geographic-location", "lua": geo_lua})
+country = lambda name, iso: (f"# {name}\n\n```map\n[layers.base]\nfeatures = [\"country/{iso}\"]\n"
+                             f"context = [\"neighbors/{iso}\"]\n[layers.answer]\nhighlights = [\"country/{iso}\"]\n```\n\n"
+                             f"#model(geographic-location)")
+batch = [{"path": "batch/fr.md", "source": country("France", "FRA")},
+         {"path": "batch/xx.md", "source": country("Nowhere", "XXX")}]
+err = tool("marki_write_cards", {"cards": batch}, ok=False)
+assert "1 of 2" in err and "batch/xx.md" in err and "batch/fr.md" not in err, err
+assert not os.path.exists(f"{w}/p/batch"), "partial batch written"
+batch[1] = {"path": "batch/es.md", "source": country("Spain", "ESP")}
+assert "twice" in tool("marki_write_cards", {"cards": batch + batch[:1]}, ok=False)
+out = tool("marki_write_cards", {"cards": batch})
+assert [c["path"] for c in out["written"]] == ["batch/fr.md", "batch/es.md"], out
+cards = tool("marki_preview", {"path": "batch/fr.md"})["cards"]
+assert [c["name"] for c in cards] == ["Locate", "Identify"], cards
+# Cleaned up again so the final repo/collection checks stay as they were.
+import shutil; shutil.rmtree(f"{w}/p/batch")
+os.remove(f"{w}/p/.marki/models/geographic-location.lua")
 print("mcp tools ok")
 EOF
 
 test -z "$(git status --porcelain)" || { echo "FAIL: push left the repo dirty"; git status; exit 1; }
-git log --oneline | grep -q 'marki push' || { echo "FAIL: no push commit"; exit 1; }
+git log --oneline | grep 'marki push' >/dev/null || { echo "FAIL: no push commit"; exit 1; }
 
 py "$w/col.anki2" <<'EOF'
 import sys

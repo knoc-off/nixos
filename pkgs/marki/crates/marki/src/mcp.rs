@@ -43,7 +43,8 @@ check the docs before inventing a solution, and ask the user if it still is.
 Workflow: call marki_context first (models, decks, media dirs, available \
 blocks and doc topics). Draft a card, \
 check it with marki_preview (pass `source` to preview without saving), then \
-marki_write_card. When done, marki_push without confirm simulates and returns \
+marki_write_card (marki_write_cards for more than a few). When done, \
+marki_push without confirm simulates and returns \
 a plan_hash; show the user the planned changes, and only after they agree \
 call marki_push with confirm=true and that plan_hash. Check `ok` and `steps` \
 of the result; never report success when a step says error. marki_status \
@@ -204,6 +205,12 @@ pub struct WriteCardArgs {
 }
 
 #[derive(Deserialize, JsonSchema)]
+pub struct WriteCardsArgs {
+    /// Up to 500 cards; each like marki_write_card's arguments.
+    pub cards: Vec<WriteCardArgs>,
+}
+
+#[derive(Deserialize, JsonSchema)]
 pub struct MediaArgs {
     /// Directory under .marki/media/, e.g. `flags` or `diagrams/cell`.
     pub dir: String,
@@ -309,6 +316,12 @@ impl Marki {
     #[tool(description = "Format, validate and save a card file. New cards get an #id; overwriting needs expected_id. Does not push.")]
     async fn marki_write_card(&self, Parameters(a): Parameters<WriteCardArgs>) -> Result<CallToolResult, McpError> {
         self.tool(move |h| h.write_card(&a.path, &a.source, a.expected_id.as_deref())).await
+    }
+
+    #[tool(description = "Write many cards at once (e.g. a whole deck from one model): every card is formatted and checked like marki_write_card, then all are written, or none if any fails (the error lists each failing card). Does not push.")]
+    async fn marki_write_cards(&self, Parameters(a): Parameters<WriteCardsArgs>) -> Result<CallToolResult, McpError> {
+        let cards: Vec<_> = a.cards.into_iter().map(|c| (c.path, c.source, c.expected_id)).collect();
+        self.tool(move |h| h.write_cards(&cards)).await
     }
 
     #[tool(description = "Save a media file (from a URL or base64) under .marki/media/<dir>/. Returns the `src` line for a ```media block.")]

@@ -7,6 +7,7 @@
 
 use anyhow::{Context, Result, bail, ensure};
 use serde::Serialize;
+use std::collections::{HashMap, HashSet};
 use std::path::{Component, Path, PathBuf};
 
 use crate::config::MARKI_DIR;
@@ -248,6 +249,73 @@ impl Handler {
     /// current `#id` (so an agent can't clobber a card it didn't read).
     /// Returns the written source.
     pub fn write_card(&mut self, rel: &str, source: &str, expected_id: Option<&str>) -> Result<String> {
+        let (path, formatted) = self.check_card(rel, source, expected_id, &self.ids_on_disk()?, &HashSet::new())?;
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)?;
+        }
+        std::fs::write(&path, &formatted).with_context(|| format!("write {rel}"))?;
+        Ok(formatted)
+    }
+
+    /// Write many cards: all are checked first, then all are written, or
+    /// none if any fails.
+    pub fn write_cards(&mut self, cards: &[(String, String, Option<String>)]) -> Result<serde_json::Value> {
+        ensure!(!cards.is_empty(), "no cards");
+        ensure!(cards.len() <= 500, "at most 500 cards per call (got {})", cards.len());
+        // Files in the batch may take ids that the batch itself frees up
+        // (an overwrite keeps its id), but not ids of other files.
+        let batch_paths: HashSet<PathBuf> =
+            cards.iter().filter_map(|(p, _, _)| self.card_path(p).ok()).collect();
+        let taken = self.ids_on_disk()?;
+        let mut seen_paths = HashSet::new();
+        let mut seen_ids: HashMap<String, String> = HashMap::new();
+        let mut ok = Vec::new();
+        let mut failures = Vec::new();
+        for (rel, source, expected) in cards {
+            if !seen_paths.insert(rel.clone()) {
+                failures.push(format!("{rel}: path appears twice in the batch"));
+                continue;
+            }
+            match self.check_card(rel, source, expected.as_deref(), &taken, &batch_paths) {
+                Ok((path, formatted)) => {
+                    let id = parse_note(&formatted, path.clone()).id.unwrap_or_default();
+                    if let Some(other) = seen_ids.insert(id.clone(), rel.clone()) {
+                        failures.push(format!("{rel}: #id({id}) also used by {other} in this batch"));
+                        continue;
+                    }
+                    ok.push((rel.clone(), path, formatted, id));
+                }
+                Err(e) => failures.push(format!("{rel}: {e:#}")),
+            }
+        }
+        ensure!(
+            failures.is_empty(),
+            "nothing written; {} of {} cards failed:\n{}",
+            failures.len(),
+            cards.len(),
+            failures.join("\n")
+        );
+        for (rel, path, formatted, _) in &ok {
+            if let Some(dir) = path.parent() {
+                std::fs::create_dir_all(dir)?;
+            }
+            std::fs::write(path, formatted).with_context(|| format!("write {rel}"))?;
+        }
+        Ok(serde_json::json!({
+            "written": ok.iter().map(|(rel, _, _, id)| serde_json::json!({"path": rel, "id": id})).collect::<Vec<_>>(),
+        }))
+    }
+
+    /// Everything write_card checks, without writing. `batch` holds paths
+    /// being written in the same call, whose current ids don't count as taken.
+    fn check_card(
+        &mut self,
+        rel: &str,
+        source: &str,
+        expected_id: Option<&str>,
+        taken: &HashMap<String, PathBuf>,
+        batch: &HashSet<PathBuf>,
+    ) -> Result<(PathBuf, String)> {
         let path = self.card_path(rel)?;
         if path.exists() {
             let current = parse_note(&std::fs::read_to_string(&path)?, path.clone()).id;
@@ -267,9 +335,9 @@ impl Handler {
         }
         // Duplicate id elsewhere in the tree would make two files claim one note.
         let id = note.id.clone().unwrap_or_default();
-        for sn in scan_dir_v2(self.root())? {
-            if sn.path != path && sn.note.id.as_deref() == Some(id.as_str()) {
-                bail!("#id({id}) already used by {}", self.rel(&sn.path));
+        if let Some(other) = taken.get(&id) {
+            if *other != path && !batch.contains(other) {
+                bail!("#id({id}) already used by {}", self.rel(other));
             }
         }
         let preview = self.project.preview(&path, &formatted)?;
@@ -280,11 +348,15 @@ impl Handler {
             block_docs(&formatted).map(|d| format!(". Syntax: {d}")).unwrap_or_default()
         );
         ensure!(!preview.cards.is_empty(), "card generates no cards (empty front?)");
-        if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir)?;
-        }
-        std::fs::write(&path, &formatted).with_context(|| format!("write {rel}"))?;
-        Ok(formatted)
+        Ok((path, formatted))
+    }
+
+    /// `#id` -> file, for the duplicate-id check.
+    fn ids_on_disk(&self) -> Result<HashMap<String, PathBuf>> {
+        Ok(scan_dir_v2(self.root())?
+            .into_iter()
+            .filter_map(|sn| Some((sn.note.id?, sn.path)))
+            .collect())
     }
 
     /// Resolve an existing card file whose `#id` must be `expected_id`.
