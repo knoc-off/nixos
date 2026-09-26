@@ -286,7 +286,14 @@ pub fn reconcile(
             kind: ChangeKind::Orphan,
             id: r.guid.clone(),
             path: None,
-            detail: format!("{} in {}", r.model_name, r.deck),
+            // The action is in the detail so the plan hash tells a
+            // simulated suspend from a delete.
+            detail: format!(
+                "{} {} in {}",
+                if prune { "delete" } else { "suspend" },
+                r.model_name,
+                r.deck
+            ),
             content_hash: String::new(),
             full_sync: false,
         })

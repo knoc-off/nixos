@@ -222,7 +222,7 @@ module uses mcp-auth-proxy).
 Tools: `marki_context`, `marki_search_cards`, `marki_read_card`,
 `marki_preview`, `marki_write_card`, `marki_add_media`, `marki_find`,
 `marki_read_model`, `marki_write_model`, `marki_status`, `marki_push`,
-`marki_flagged`, `marki_query`. Plus cards and models as resources and a
+`marki_delete_card`, `marki_flagged`, `marki_query`. Plus cards and models as resources and a
 `make-cards` prompt.
 
 The guard rails:
@@ -238,6 +238,9 @@ The guard rails:
   user hasn't seen. After a push the cards repo is committed (if it's a git
   repo).
 - `marki_query` runs one read-only statement on a snapshot.
+- `marki_delete_card` only removes the file (given its `#id`). The next push
+  suspends the note's cards; deleting the note and its reviews needs
+  `delete_orphans=true` on both the simulation and the confirm.
 
 The server rereads `.marki/config.toml` when it changes. If the file stops
 parsing, every tool fails with the parse error until it's fixed.

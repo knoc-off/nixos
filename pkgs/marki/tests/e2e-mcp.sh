@@ -75,7 +75,8 @@ rpc("notifications/initialized", notify=True)
 names = {t["name"] for t in rpc("tools/list")["tools"]}
 want = {"marki_context", "marki_search_cards", "marki_read_card", "marki_preview",
         "marki_write_card", "marki_add_media", "marki_find", "marki_read_model",
-        "marki_write_model", "marki_status", "marki_push", "marki_flagged", "marki_query"}
+        "marki_write_model", "marki_status", "marki_push", "marki_flagged", "marki_query",
+        "marki_delete_card"}
 assert want <= names, want - names
 assert any(p["name"] == "make-cards" for p in rpc("prompts/list")["prompts"])
 
@@ -167,6 +168,20 @@ tags = col.execute("select tags from notes where guid=?", (cid,)).fetchone()[0].
 assert "retag" in tags, tags
 assert not tool("marki_push")["changes"], "tag push is not idempotent"
 
+# Delete: file first (guarded by id), then the push suspends or deletes.
+qid = open(f"{w}/p/geo/q.md").read().split("#id(")[1].split(")")[0]
+assert "not nope" in tool("marki_delete_card", {"path": "geo/q.md", "expected_id": "nope"}, ok=False)
+tool("marki_delete_card", {"path": "geo/q.md", "expected_id": qid})
+soft = tool("marki_push")
+assert [c["detail"].split()[0] for c in soft["changes"] if c["kind"] == "orphan"] == ["suspend"], soft
+hard = tool("marki_push", {"delete_orphans": True})
+assert [c["detail"].split()[0] for c in hard["changes"] if c["kind"] == "orphan"] == ["delete"], hard
+assert soft["plan_hash"] != hard["plan_hash"]
+assert "plan changed" in tool("marki_push", {"confirm": True, "plan_hash": soft["plan_hash"], "delete_orphans": True}, ok=False)
+done = tool("marki_push", {"confirm": True, "plan_hash": hard["plan_hash"], "delete_orphans": True})
+assert done["ok"], done
+assert col.execute("select count() from notes where guid=?", (qid,)).fetchone()[0] == 0
+
 # Config edits apply without a restart; a broken one fails tools loudly.
 cfg = open(f"{w}/p/.marki/config.toml").read()
 open(f"{w}/p/.marki/config.toml", "w").write(cfg + "\n[server]\nstop = [\"nonexistent-stop\"]\n")
@@ -183,7 +198,7 @@ fl = tool("marki_flagged", {"flag": 1})
 assert fl and fl[0]["path"] == "geo/caps.md", fl
 
 q = tool("marki_query", {"sql": "select guid, sfld from notes order by sfld"})
-assert len(q["rows"]) == 3 and all(r["path"] for r in q["rows"]), q
+assert len(q["rows"]) == 2 and all(r["path"] for r in q["rows"]), q
 assert "read-only" in tool("marki_query", {"sql": "delete from notes"}, ok=False)
 
 res = rpc("resources/list")["resources"]
@@ -201,6 +216,6 @@ from anki.collection import Collection
 col = Collection(sys.argv[1])
 msg, ok = col.fix_integrity()
 assert ok and msg.strip() == "Database rebuilt and optimized.", msg
-assert col.card_count() == 4, col.card_count()  # cloze c1+c2, basic, qa
+assert col.card_count() == 3, col.card_count()  # cloze c1+c2, qa (basic deleted)
 EOF
 echo "all mcp e2e checks passed"

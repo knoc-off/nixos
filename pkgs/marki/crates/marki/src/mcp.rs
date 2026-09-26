@@ -40,6 +40,11 @@ call marki_push with confirm=true and that plan_hash. Check `ok` and `steps` \
 of the result; never report success when a step says error. marki_status \
 shows anything still pending.
 
+Deleting: marki_delete_card removes the file; the next push lists the note \
+as an orphan and suspends its cards. Only with the user's explicit consent \
+pass delete_orphans=true (to both the simulation and the confirm) to delete \
+the note and its review history instead.
+
 Cards: one .md file = one note; the directory is the deck (a/b/x.md -> a::b), \
 or #deck(a::b). `---` splits front from back. Tags are #words anywhere; \
 #cloze with **bold**/*italic* answers makes cloze cards (never write {{c1::}}); \
@@ -219,6 +224,17 @@ pub struct PushArgs {
     #[serde(default)]
     pub confirm: bool,
     pub plan_hash: Option<String>,
+    /// Delete notes whose card file is gone (with their review history)
+    /// instead of suspending them. Must match between simulate and confirm.
+    #[serde(default)]
+    pub delete_orphans: bool,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct DeleteCardArgs {
+    pub path: String,
+    /// The card's current #id, as a guard against deleting the wrong file.
+    pub expected_id: String,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -313,7 +329,12 @@ impl Marki {
 
     #[tool(description = "Without confirm: simulate the push on copies of the collection and media db, check what the real push needs (server pause, media dir, git), and return changes, problems and plan_hash. With confirm=true and that plan_hash (after the user agreed): pause the sync server, write media then the collection (stopping at the first failure), restart the server and commit the repo; `steps` reports each part. After a failed step, fix it and push again: pushes are idempotent.")]
     async fn marki_push(&self, Parameters(a): Parameters<PushArgs>) -> Result<CallToolResult, McpError> {
-        self.tool(move |h| h.push(a.confirm, a.plan_hash.as_deref())).await
+        self.tool(move |h| h.push(a.confirm, a.plan_hash.as_deref(), a.delete_orphans)).await
+    }
+
+    #[tool(description = "Delete a card file (needs its current #id). Does not push: the next marki_push suspends the note's cards in Anki (tagged marki::orphan), or deletes the note and its review history with delete_orphans=true -- ask the user which.")]
+    async fn marki_delete_card(&self, Parameters(a): Parameters<DeleteCardArgs>) -> Result<CallToolResult, McpError> {
+        self.tool(move |h| h.delete_card(&a.path, &a.expected_id)).await
     }
 
     #[tool(description = "Card files whose Anki cards carry a flag (1 red .. 7 purple).")]

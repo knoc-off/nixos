@@ -271,6 +271,23 @@ impl Handler {
         Ok(formatted)
     }
 
+    /// Remove a card file. Anki is only touched by the next push.
+    pub fn delete_card(&mut self, rel: &str, expected_id: &str) -> Result<serde_json::Value> {
+        let path = self.card_path(rel)?;
+        ensure!(path.exists(), "{rel} does not exist");
+        let current = parse_note(&std::fs::read_to_string(&path)?, path.clone()).id;
+        ensure!(
+            current.as_deref() == Some(expected_id),
+            "{rel} has id {}, not {expected_id}; read it first",
+            current.as_deref().unwrap_or("none")
+        );
+        std::fs::remove_file(&path).with_context(|| format!("delete {rel}"))?;
+        Ok(serde_json::json!({
+            "deleted": rel,
+            "next": "marki_push: the note shows as an orphan; delete_orphans=true deletes it and its reviews, otherwise its cards are suspended"
+        }))
+    }
+
     /// Save a media file into `.marki/media/<dir>/<name>`. Referenced from
     /// cards as ```media src = "<dir>/<stem>"```.
     pub fn add_media(&self, dir: &str, name: &str, bytes: &[u8]) -> Result<String> {
@@ -400,9 +417,9 @@ impl Handler {
 
     /// Without `confirm`: simulate and return a plan hash. With it: push if
     /// the plan still matches, then commit the cards repo.
-    pub fn push(&mut self, confirm: bool, plan_hash: Option<&str>) -> Result<PushReport> {
+    pub fn push(&mut self, confirm: bool, plan_hash: Option<&str>, prune: bool) -> Result<PushReport> {
         if !confirm {
-            let sim = self.project.simulate(false)?;
+            let sim = self.project.simulate(prune)?;
             let mut problems = sim.problems;
             if let Err(e) = git_usable(self.root()) {
                 problems.push(format!("git: {e:#}"));
@@ -410,7 +427,7 @@ impl Handler {
             return Ok(self.report("simulation", &sim.outcome, problems, sim.plan_hash, vec![], false));
         }
         let hash = plan_hash.context("confirm requires the plan_hash from a simulation")?;
-        let pushed = self.project.push(Some(hash), false)?;
+        let pushed = self.project.push(Some(hash), prune)?;
         let mut steps = pushed.steps.clone();
         // Commit whenever the collection took the cards, even if a later step
         // (server restart) failed: the repo should record what Anki now has.
