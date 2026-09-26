@@ -170,8 +170,14 @@
             "anki-sync-server.service"
           ];
           wants = [ "network-online.target" ];
-          # git for the post-push commit.
-          path = [ pkgs.gitMinimal ] ++ cfg.extraPackages;
+          # git for the post-push commit; systemctl for the config's
+          # `[server] stop/start`, which pause anki-sync-server around a push
+          # (the host must let cfg.user do that, e.g. via polkit).
+          path = [
+            pkgs.gitMinimal
+            config.systemd.package
+          ]
+          ++ cfg.extraPackages;
           environment = {
             # Renderer cache (map/typst output) goes to the cache dir.
             XDG_CACHE_HOME = "%C/marki-mcp";

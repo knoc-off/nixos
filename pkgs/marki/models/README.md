@@ -16,15 +16,17 @@ This directory holds an example. Copy what you need into your project's
 
 ## Contract
 
-A model is a Lua 5.4 module that returns a table with two functions:
+A model is a Lua 5.4 module that returns a table with `card_names`,
+`generate` and `describe`:
 
 ```lua
 local M = {}
 
--- One Anki card template per name.
-function M.card_names()
-  return { "Recall" }
-end
+-- One Anki card template per name. A list, or a function returning one.
+M.card_names = { "Recall" }
+
+-- One short paragraph for authors (required by marki_write_model).
+function M.describe() return "Heading 1 asks, section 2 answers." end
 
 -- Field name -> HTML. Fields are named <CardName>Front and <CardName>Back.
 function M.generate(note, ctx)
@@ -38,10 +40,15 @@ end
 return M
 ```
 
-- `card_names()` must return a non-empty list.
-- `generate()` must return a table mapping strings to strings.
-- If a field is missing or empty, Anki doesn't generate that card. Use this to
-  skip cards that don't apply, like a flag card for a note without a flag.
+- `card_names` must be a non-empty list of unique names (letters, digits,
+  `_`, `-`, space).
+- `generate()` must return a table mapping strings to strings. Keys other than
+  `<Card>Front` / `<Card>Back` are an error naming the valid ones.
+- If a Front is missing or empty, Anki doesn't generate that card. Use this to
+  skip cards that don't apply, like a flag card for a note without a flag. A
+  note that produces no card at all is an error.
+- The answer side shows only `<Card>Back`. To keep the question visible
+  there, include it in the Back.
 - An optional `<name>.css` next to the script becomes the note type's styling.
   Without one, marki uses a small built-in stylesheet.
 - Shared helpers go in `lib_dir` (default `.marki/lib/`) and are loaded with
@@ -112,9 +119,13 @@ list methods.
 | Method           | Returns                                   |
 | ---------------- | ----------------------------------------- |
 | `block:text()`   | Plain text                                |
-| `block:html()`   | Rendered HTML                             |
+| `block:html()`   | Inline HTML of prose; **raw source for code blocks** |
 | `block:lang()`   | Fence language, for code blocks           |
 | `block:source()` | Raw fence body, for code blocks           |
+
+`block:html()` does not run block renderers, so a ` ```media ` block built
+with it shows as text and its file is never pushed. Use block methods to
+decide, and `ctx:section_html` / `ctx:body_html` to output.
 
 ### TagValue
 

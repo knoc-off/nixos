@@ -5,8 +5,10 @@ There's no AnkiConnect and no add-on: marki writes `collection.anki2` directly
 through SQLite.
 
 Anki desktop locks its collection while it's open, so close it before
-`marki push`. anki-sync-server only locks during a sync; marki waits up to 10s
-for that to finish.
+`marki push`. anki-sync-server holds its collection and `media.db` locked for
+as long as it runs. `status` and `check` read a copy then, but `push` needs
+`[server]` in the config so marki can stop the server, write, and start it
+again.
 
 ## Quick start
 
@@ -122,6 +124,8 @@ If a block fails to render, the error appears in a red box on the card and the
 rest of the note still syncs.
 
 Other markdown works as usual, including tables and ~~strikethrough~~.
+`$x$` is inline math and `$$x$$` display math (write `\$` for a literal
+dollar).
 
 ## Formatting rules
 
@@ -159,6 +163,7 @@ the directory that contains `.marki/`.
 | `map`           | none                 | `[map.defaults]` and `[[map.rules]]` for map blocks, merged under each card's own block |
 | `sync_interval` | `300`                | `watch` heartbeat in seconds, or `"5m"`, `"1h"`, `"1d"`     |
 | `debounce_ms`   | `250`                | How long `watch` waits after a file change                  |
+| `server`        | none                 | `stop` / `start` argv run around a push to release the sync server's locks |
 
 ```toml
 collection = "${ANKI_COLLECTION:-~/.local/share/Anki2/User 1/collection.anki2}"
@@ -166,6 +171,10 @@ typst_binary = "${TYPST_BIN:-typst}"
 
 [media_sources]
 flags = "${HAYLEOX_FLAGS}/share/hayleox-flags"
+
+[server]
+stop = ["systemctl", "stop", "anki-sync-server"]
+start = ["systemctl", "start", "anki-sync-server"]
 
 [[map.rules]]
 match = "geography/**"
@@ -183,7 +192,7 @@ respecting `.gitignore`, and skipping hidden files.
 | `marki init`                  | Create `.marki/`. Safe to re-run; it never overwrites anything      |
 | `marki fmt`                   | Mint ids and normalize files on disk                                |
 | `marki status`                | Read-only diff: every note that would be added, updated, moved or orphaned |
-| `marki push` (or `marki`)     | One sync. Notes whose file is gone are suspended and tagged `marki::orphan` |
+| `marki push` (or `marki`)     | One sync: pauses the server, writes media then the collection, restarts it. Stops at the first failed step. Notes whose file is gone are suspended and tagged `marki::orphan` |
 | `marki push --prune`          | Same, but deletes orphans outright                                  |
 | `marki push --simulate`       | Push into a throwaway copy, check it, and list what would change; writes nothing |
 | `marki mcp`                   | Serve the card-authoring tools over MCP; see [MCP server](#mcp-server) |
@@ -219,7 +228,7 @@ The guard rails:
 - `marki_write_card` formats and renders a card before saving, and only
   overwrites a card when given its current `#id`.
 - `marki_write_model` needs `M.describe()` and must render every note that
-  uses the model.
+  uses the model. The model reference is the `marki://docs/models` resource.
 - `marki_push` without `confirm` only simulates. Pushing needs `confirm` plus
   the `plan_hash` from that simulation, so an agent can't push anything the
   user hasn't seen. After a push the cards repo is committed (if it's a git
@@ -258,4 +267,6 @@ For development, direnv (`.envrc`) loads the dev shell, which sets
 cards into a collection created by Anki's own library, and checks Check
 Database and review history after each risky change (cloze edits, type
 changes, card renames, reorders and removals). `tests/e2e-mcp.sh` starts
-`marki mcp` and drives every tool over HTTP. Both need `cargo build` first.
+`marki mcp` and drives every tool over HTTP. `tests/e2e-server.sh` runs a real
+anki-sync-server, pushes through its locks, and syncs a client to check the
+notes and media arrive. All need `cargo build` first.

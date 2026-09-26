@@ -83,6 +83,21 @@ in
     ];
   };
 
+  # anki-sync-server holds its collection and media.db exclusively locked
+  # while it runs, so marki's push stops it, writes, and starts it again
+  # (`[server]` in /srv/flashcards/.marki/config.toml). Lets tv -- the CLI and
+  # the marki-mcp service -- do exactly that and nothing else.
+  security.polkit.extraConfig = ''
+    polkit.addRule(function(action, subject) {
+      if (action.id == "org.freedesktop.systemd1.manage-units" &&
+          action.lookup("unit") == "anki-sync-server.service" &&
+          ["start", "stop", "restart"].indexOf(action.lookup("verb")) >= 0 &&
+          subject.user == "tv") {
+        return polkit.Result.YES;
+      }
+    });
+  '';
+
   services.caddy.virtualHosts."anki.optiplex.tail.niko.ink" = {
     useACMEHost = "anki.optiplex.tail.niko.ink";
     extraConfig = ''
