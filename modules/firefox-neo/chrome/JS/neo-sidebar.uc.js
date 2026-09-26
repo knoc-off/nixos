@@ -279,6 +279,9 @@
   }
 
   function init(win) {
+    // Popup windows (extension pop-outs like Bitwarden, window.open popups)
+    // get no tab strip, so a Sidebery rail there is just an empty column.
+    if (!win.toolbar.visible) return;
     watchToolsPref(win);
     unregisterNativeTool(win);
     if (build(win)) {

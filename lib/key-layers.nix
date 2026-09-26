@@ -6,8 +6,12 @@
 #
 # "base" is the wildcard fallback for windows not matching any other class.
 #
-# Layers match windows by class only:
+# Layers match windows by class, optionally narrowed by title:
 #   classes  = ["firefox" "chromium-browser"];
+#   titles   = [" — calendar%.google%.com$"];  # Lua patterns (string.find);
+#                                               # match any one. Title rules
+#                                               # win over class-only rules and
+#                                               # re-evaluate on title change.
 #
 # capsbinds: keys remapped when caps is held
 #   Bulk shorthand:  ctrl = ["a" "b" "c"];   alt = ["1" "2" "3"];
@@ -69,7 +73,7 @@
 #     };
 #   };
 #
-#   result.windowRules    -- list of { class; layer; } window match rules,
+#   result.windowRules    -- list of { class; title?; layer; } window match rules,
 #                            consumed by modules/keylayers to generate Lua
 #   result.kanataConfig   -- function: extraAliases string -> kanata config string
 { lib }:
@@ -435,19 +439,34 @@ let
       # Flat class -> layer match list for non-"base" layers, deduped
       # per-class (multiple app modules can independently declare the same
       # class, e.g. firefox and zen-browser both claiming "firefox").
+      # Layers with `titles` emit one rule per class x title, ordered before
+      # every class-only rule so a site layer beats its browser's layer.
       windowRules =
         let
           nonBase = lib.filterAttrs (n: _: n != "base") layers;
-        in
-        lib.concatLists (
-          lib.mapAttrsToList (
+          rulesFor =
             name: layer:
-            map (class: {
-              inherit class;
-              layer = name;
-            }) (lib.unique (layer.classes or [ ]))
-          ) nonBase
-        );
+            let
+              classes = lib.unique (layer.classes or [ ]);
+              titles = lib.unique (layer.titles or [ ]);
+            in
+            if titles == [ ] then
+              map (class: {
+                inherit class;
+                layer = name;
+              }) classes
+            else
+              lib.concatMap (
+                class:
+                map (title: {
+                  inherit class title;
+                  layer = name;
+                }) titles
+              ) classes;
+          all = lib.concatLists (lib.mapAttrsToList rulesFor nonBase);
+          titled = lib.partition (r: r ? title) all;
+        in
+        titled.right ++ titled.wrong;
 
       kanataConfig =
         extraAliases:

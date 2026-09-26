@@ -308,6 +308,7 @@ in
         # competing with Bitwarden/AI chat/etc for the single native slot.
         # Styled by the #neo-sidebar-box rules in sidebery-collapse.css.
         "${profileDir}/chrome/JS/neo-sidebar.uc.js".source = "${chromeSrc}/JS/neo-sidebar.uc.js";
+        "${profileDir}/chrome/JS/url-in-title.uc.js".source = "${chromeSrc}/JS/url-in-title.uc.js";
 
         # Agent sheet, hiding the "Sidebery [x]" header Firefox draws above
         # extension sidebars. Must live in chrome/CSS (the "userstyles"

@@ -8,8 +8,9 @@
 # forces modules/kanata's own checkPhase (`kanata --check`, using the real
 # upstream parser) to run during this derivation's build; key-layers-check.lua
 # loads the generated Lua fragment (catching syntax errors) and asserts its
-# runtime behavior (class -> layer matching, dedup, base fallback,
-# malformed-event safety) against an in-memory `hl` stub.
+# runtime behavior (class -> layer matching, title rules + window.title
+# re-evaluation, dedup, base fallback, malformed-event safety) against an
+# in-memory `hl` stub.
 let
   # A fixture home-manager config exercising every keyLayers feature
   # (bulk capsbinds, per-key actions, raw/cmd escape hatches, a fork,
@@ -70,6 +71,11 @@ let
               "foot"
             ];
             capsbinds.alt = [ "e" ];
+          };
+          calendar = {
+            classes = [ "firefox" ];
+            titles = [ " — calendar%.google%.com$" ];
+            capsbinds.keys.t.key = "t";
           };
         };
       }

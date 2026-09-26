@@ -114,17 +114,19 @@
       keyLayers.layers.terminal = lib.mkIf config.keyLayers.enable {
         classes = [
           "com.mitchellh.ghostty"
+          "com.mitchellh.ghostty-hdrop" # SUPER+grave dropdown (hyprland.lua)
           "foot"
         ];
         capsbinds = {
           alt = [ "e" ];
           shift = [ ";" ];
           keys = presets.navKeys // {
+            # unmod, not release-key: the latter can strand rmet (lib/key-layers.nix).
             d = {
-              raw = "(multi (release-key rmet) (mwheel-down 50 1 ))";
+              raw = "(multi (unmod (rmet) nop0) (mwheel-down 50 1))";
             };
             u = {
-              raw = "(multi (release-key rmet) (mwheel-up 50 1 ))";
+              raw = "(multi (unmod (rmet) nop0) (mwheel-up 50 1))";
             };
           };
         };
@@ -214,18 +216,19 @@
               "super+t=new_tab"
               "super+shift+t=new_window"
             ]
+            # Hyprland owns super+w/h/j/k/l/1-9 (close window, focus/move, workspaces)
+            # and eats them before ghostty sees them, so split/tab nav lives on
+            # super+alt instead (Hyprland only binds super+alt+s/d/m).
             ++ [
-              "super+w=close_surface"
-
-              "super+one=goto_tab:1"
-              "super+two=goto_tab:2"
-              "super+three=goto_tab:3"
-              "super+four=goto_tab:4"
-              "super+five=goto_tab:5"
-              "super+six=goto_tab:6"
-              "super+seven=goto_tab:7"
-              "super+eight=goto_tab:8"
-              "super+nine=goto_tab:9"
+              "super+alt+one=goto_tab:1"
+              "super+alt+two=goto_tab:2"
+              "super+alt+three=goto_tab:3"
+              "super+alt+four=goto_tab:4"
+              "super+alt+five=goto_tab:5"
+              "super+alt+six=goto_tab:6"
+              "super+alt+seven=goto_tab:7"
+              "super+alt+eight=goto_tab:8"
+              "super+alt+nine=goto_tab:9"
 
               "super+equal=increase_font_size:1"
               "super+minus=decrease_font_size:1"
@@ -234,10 +237,10 @@
               "super+shift+enter=new_split:right"
               "super+shift+w=close_surface"
 
-              "super+h=goto_split:left"
-              "super+j=goto_split:bottom"
-              "super+k=goto_split:top"
-              "super+l=goto_split:right"
+              "super+alt+h=goto_split:left"
+              "super+alt+j=goto_split:bottom"
+              "super+alt+k=goto_split:top"
+              "super+alt+l=goto_split:right"
 
               "super+ctrl+h=resize_split:left,10"
               "super+ctrl+j=resize_split:down,10"

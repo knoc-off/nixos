@@ -3,9 +3,9 @@
 -- template). Run via `nix flake check` (checks.<system>.key-layers).
 --
 -- Stubs Hyprland's `hl` global (the fragment's only external dependency:
--- `hl.on` for the focus callback, `hl.exec_cmd` for the fire-and-forget
--- nc invocation towards kanata), then asserts on the sequence of layer
--- switches produced by a scripted series of focus events.
+-- `hl.on` for the focus/title callbacks, `hl.exec_cmd` for the
+-- fire-and-forget nc invocation towards kanata), then asserts on the
+-- sequence of layer switches produced by a scripted series of events.
 --
 -- Usage: lua key-layers-check.lua <generated-fragment.lua>
 local fragmentPath = arg[1]
@@ -28,19 +28,36 @@ local fragment = assert(io.open(fragmentPath, "r")):read("a")
 assert(load(fragment))()
 
 assert(registered["window.active"], "fragment never registered a window.active handler")
+assert(registered["window.title"], "fragment never registered a window.title handler")
 
-local fire = registered["window.active"]
-fire({ class = "firefox" }) -- expect: switch to browser
-fire({ class = "firefox" }) -- dedup: same layer, expect no write
-fire({ class = "com.mitchellh.ghostty" }) -- expect: switch to terminal
-fire({ class = "unknown-app-xyz" }) -- unmatched class, expect: fall back to base
-fire({ class = nil }) -- malformed event, expect: ignored
-fire(nil) -- malformed event, expect: ignored
+local focus = registered["window.active"]
+local retitle = registered["window.title"]
+local CAL = "Week of 27 September 2026 — calendar.google.com"
+
+focus({ class = "firefox" }) -- expect: switch to browser
+focus({ class = "firefox" }) -- dedup: same layer, expect no write
+focus({ class = "com.mitchellh.ghostty" }) -- expect: switch to terminal
+focus({ class = "unknown-app-xyz" }) -- unmatched class, expect: fall back to base
+focus({ class = nil }) -- malformed event, expect: ignored
+focus(nil) -- malformed event, expect: ignored
+
+focus({ class = "firefox", title = "GitHub — github.com", active = true }) -- expect: browser
+retitle({ class = "firefox", title = CAL, active = true }) -- title rule beats class rule: calendar
+retitle({ class = "firefox", title = CAL .. " x", active = true }) -- anchored pattern misses: browser
+retitle({ class = "firefox", title = CAL, active = false }) -- background window: ignored
+focus({ class = "firefox", title = CAL }) -- focusing a calendar window: calendar
+retitle({ class = "com.mitchellh.ghostty", title = CAL, active = true }) -- title rule is class-scoped: terminal
+retitle(nil) -- malformed event, expect: ignored
 
 local expected = {
   "browser",
   "terminal",
   "base",
+  "browser",
+  "calendar",
+  "browser",
+  "calendar",
+  "terminal",
 }
 
 assert(
