@@ -318,6 +318,14 @@ See **Finding feature IDs** below for how to look these up in practice.
 When you author a `map` block you'll mostly be filling in three kinds
 of references. Here's how to find each.
 
+Over MCP, two lookup tools do this for you; use them instead of guessing:
+
+- `marki_map_units(iso, level)` lists every valid `adm<level>/<ISO>/<name>`
+  unit name for a country.
+- `marki_map_find(query)` searches OpenStreetMap by name and returns
+  ready `relation/N` / `way/N` refs, each with its `kind` (e.g.
+  `water=lake`) to pick the right hit.
+
 ### `country/<ISO_A3>`
 
 Three-letter codes from ISO 3166-1 alpha-3.
@@ -331,11 +339,9 @@ Three-letter codes from ISO 3166-1 alpha-3.
 ### `adm1|adm2|adm3/<ISO_A3>/<NAME>`
 
 `<NAME>` matches geoBoundaries' local `shapeName` (case-insensitive).
-Without a shell (e.g. over MCP), preview a card with a guessed name: the
-`unknown adm<N>` error lists every valid unit name for that country and
-level. To list the units at a given level for a country (inside
-`nix develop .#marki`, where gdal + `GEOBOUNDARIES_DATA` are
-available):
+`marki_map_units` lists them, and an `unknown adm<N>` error does too.
+In a shell (inside `nix develop .#marki`, where gdal +
+`GEOBOUNDARIES_DATA` are available):
 
 ```sh
 # Units at ADM1 for Germany:

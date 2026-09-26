@@ -48,6 +48,35 @@ impl Registry {
         self.renderers.contains_key(lang)
     }
 
+    /// The authoring doc of `lang`'s renderer, if it has one.
+    pub fn docs(&self, lang: &str) -> Option<&'static str> {
+        self.renderers.get(lang).map(|r| r.docs()).filter(|d| !d.is_empty())
+    }
+
+    /// Every renderer's lookup tools, as `(lang, tool)`, in registration order.
+    pub fn tools(&self) -> Vec<(&'static str, marki_render::Tool)> {
+        self.langs
+            .iter()
+            .flat_map(|l| self.renderers[l].tools().into_iter().map(move |t| (*l, t)))
+            .collect()
+    }
+
+    /// Run `lang`'s tool `name`. Paths as in [`Renderer::call_tool`].
+    pub fn call_tool(
+        &self,
+        lang: &str,
+        name: &str,
+        args: serde_json::Value,
+        project_dir: &Path,
+        cache_dir: &Path,
+    ) -> Result<serde_json::Value, RenderError> {
+        let r = self
+            .renderers
+            .get(lang)
+            .ok_or_else(|| RenderError::Resolve(format!("```{lang} blocks are not enabled on this server")))?;
+        r.call_tool(name, args, &RenderCtx { source_path: project_dir, cache_dir })
+    }
+
     /// Render one block by looking up `lang` in the registry. Returns
     /// `Err(RenderError::Resolve)` if nothing is registered for it --
     /// shouldn't happen if the parser was given the matching

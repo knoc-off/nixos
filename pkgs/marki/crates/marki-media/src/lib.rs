@@ -27,7 +27,7 @@ pub mod error;
 
 use std::path::{Path, PathBuf};
 
-use marki_render::{Asset, AssetMime, Fragment, Input, RenderCtx, RenderError, Renderer};
+use marki_render::{Asset, AssetMime, Fragment, Input, RenderCtx, RenderError, Renderer, Tool};
 use marki_render::escape_html as escape_attr;
 
 pub use error::MediaError;
@@ -72,6 +72,75 @@ impl Renderer for MediaRenderer {
         let spec: dsl::MediaSpec = input.deserialize()?;
         Ok(render_media(&self.sources, &spec)?)
     }
+
+    fn docs(&self) -> &'static str {
+        include_str!("../README.md")
+    }
+
+    fn tools(&self) -> Vec<Tool> {
+        vec![Tool {
+            name: "list",
+            description: "List media files usable in ```media blocks, as ready-to-use `src` values, from .marki/media and the configured media sources. Filter by substring (e.g. a country code for flags) instead of guessing paths.",
+            schema: serde_json::json!({
+                "type": "object",
+                "properties": {
+                    "filter": {"type": "string", "description": "Case-insensitive substring of the src, e.g. \"fr\" or \"flags/\"."},
+                    "source": {"type": "string", "description": "Only this source (e.g. \"flags\")."}
+                }
+            }),
+        }]
+    }
+
+    fn call_tool(&self, name: &str, args: serde_json::Value, _: &RenderCtx<'_>) -> Result<serde_json::Value, RenderError> {
+        if name != "list" {
+            return Err(RenderError::Internal(format!("no tool `{name}`")));
+        }
+        let arg = |k: &str| args.get(k).and_then(|v| v.as_str()).map(str::to_lowercase);
+        let (filter, only) = (arg("filter").unwrap_or_default(), arg("source"));
+        Ok(list_media(&self.sources, &filter, only.as_deref(), 200))
+    }
+}
+
+/// Built-in `.marki/media/` source, whose files are referenced without a
+/// source prefix (see `marki::project::build_registry`).
+const BUILTIN_SOURCE: &str = "media";
+
+/// `src` values of every media file, filtered; `truncated` when capped.
+fn list_media(sources: &[(String, PathBuf)], filter: &str, only: Option<&str>, cap: usize) -> serde_json::Value {
+    let mut out = Vec::new();
+    let mut total = 0usize;
+    for (name, dir) in sources {
+        if only.is_some_and(|o| o != name.to_lowercase()) {
+            continue;
+        }
+        let mut stack = vec![dir.clone()];
+        while let Some(d) = stack.pop() {
+            let Ok(rd) = std::fs::read_dir(&d) else { continue };
+            for e in rd.flatten() {
+                let p = e.path();
+                if p.is_dir() {
+                    stack.push(p);
+                    continue;
+                }
+                let Some(ext) = p.extension().and_then(|x| x.to_str()) else { continue };
+                if classify(&ext.to_lowercase()).is_none() {
+                    continue;
+                }
+                let rel = p.strip_prefix(dir).unwrap_or(&p).with_extension("");
+                let rel = rel.to_string_lossy().replace('\\', "/");
+                let src = if name == BUILTIN_SOURCE { rel } else { format!("{name}/{rel}") };
+                if !src.to_lowercase().contains(filter) {
+                    continue;
+                }
+                total += 1;
+                if out.len() < cap {
+                    out.push(src);
+                }
+            }
+        }
+    }
+    out.sort();
+    serde_json::json!({ "src": out, "total": total, "truncated": total > out.len() })
 }
 
 fn render_media(
@@ -685,6 +754,27 @@ mod tests {
         };
         let err = r.render(Input::Raw("not = [valid"), &mut ctx).unwrap_err();
         assert!(matches!(err, RenderError::Parse(_)));
+    }
+
+    #[test]
+    fn list_gives_ready_src_values() {
+        let tmp = tempdir();
+        let (builtin, flags) = (tmp.path().join("builtin"), tmp.path().join("flags"));
+        write_file(&builtin, "icons/dot.svg", b"x");
+        write_file(&flags, "fr.svg", b"x");
+        write_file(&flags, "de/by.png", b"x");
+        write_file(&flags, "notes.txt", b"x");
+        let sources = vec![("media".into(), builtin), ("flags".into(), flags)];
+        let all = list_media(&sources, "", None, 200);
+        assert_eq!(all["src"], serde_json::json!(["flags/de/by", "flags/fr", "icons/dot"]));
+        // Every listed src resolves.
+        for s in all["src"].as_array().unwrap() {
+            assert!(resolve(s.as_str().unwrap(), &sources).is_ok(), "{s}");
+        }
+        assert_eq!(list_media(&sources, "fr", None, 200)["src"], serde_json::json!(["flags/fr"]));
+        assert_eq!(list_media(&sources, "", Some("media"), 200)["src"], serde_json::json!(["icons/dot"]));
+        let capped = list_media(&sources, "", None, 1);
+        assert_eq!((capped["total"].as_u64(), capped["truncated"].as_bool()), (Some(3), Some(true)));
     }
 
     // -- test helpers --

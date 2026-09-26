@@ -189,6 +189,41 @@ pub trait Renderer: Send + Sync {
 
     /// Render one block.
     fn render(&self, input: Input<'_>, ctx: &mut RenderCtx<'_>) -> Result<Fragment, RenderError>;
+
+    /// Authoring reference for this block, in markdown. Served to agents
+    /// as `marki_docs("<lang>")`.
+    fn docs(&self) -> &'static str {
+        ""
+    }
+
+    /// Lookup tools this block offers authors (valid ids, available
+    /// files...), exposed as `marki_<lang>_<name>`. Run them with
+    /// [`Self::call_tool`].
+    fn tools(&self) -> Vec<Tool> {
+        Vec::new()
+    }
+
+    /// Run one of [`Self::tools`] with JSON arguments. `ctx.source_path` is
+    /// the cards root (for tools that save files there), `ctx.cache_dir`
+    /// the render cache.
+    fn call_tool(
+        &self,
+        name: &str,
+        _args: serde_json::Value,
+        _ctx: &RenderCtx<'_>,
+    ) -> Result<serde_json::Value, RenderError> {
+        Err(RenderError::Internal(format!("no tool `{name}`")))
+    }
+}
+
+/// A lookup tool a renderer offers, described for an MCP client.
+#[derive(Debug, Clone)]
+pub struct Tool {
+    /// Short name; exposed as `marki_<lang>_<name>`.
+    pub name: &'static str,
+    pub description: &'static str,
+    /// JSON schema (an object schema) of the arguments.
+    pub schema: serde_json::Value,
 }
 
 #[cfg(test)]

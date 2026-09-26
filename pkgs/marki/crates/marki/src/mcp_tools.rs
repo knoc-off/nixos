@@ -136,6 +136,7 @@ impl Handler {
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
+        let reg = &*self.project.registry;
         Ok(serde_json::json!({
             "cards": notes.len(),
             "decks": decks,
@@ -143,21 +144,31 @@ impl Handler {
             "models": models,
             "media_dirs": media,
             "media_sources": self.project.cfg.media_sources.keys().collect::<Vec<_>>(),
-            // Special fenced blocks this server renders; anything else is
-            // shown as highlighted code. Read the doc before using one.
-            "blocks": crate::docs::BLOCK_TOPICS
-                .iter()
-                .filter(|b| self.project.registry.handles(b))
-                .map(|b| serde_json::json!({"fence": format!("```{b}"), "doc": format!("marki_docs(\"{b}\")")}))
+            // Special fenced blocks this server renders, with their lookup
+            // tools; anything else is shown as highlighted code.
+            "blocks": crate::docs::block_langs(reg)
+                .map(|b| serde_json::json!({
+                    "fence": format!("```{b}"),
+                    "doc": format!("marki_docs(\"{b}\")"),
+                    "tools": reg.tools().into_iter().filter(|(l, _)| *l == b)
+                        .map(|(l, t)| format!("marki_{l}_{}", t.name)).collect::<Vec<_>>(),
+                }))
                 .chain(std::iter::once(serde_json::json!({"fence": "```math", "doc": "marki_docs(\"cards\")"})))
                 .collect::<Vec<_>>(),
-            "docs": crate::docs::TOPICS
-                .iter()
+            "docs": crate::docs::topics(reg)
+                .into_iter()
                 .map(|(t, what)| serde_json::json!({"topic": t, "covers": what}))
                 .collect::<Vec<_>>(),
-            "read_first": "marki_docs(\"cards\") before writing cards; marki_docs(<block>) before using a block. \
+            "read_first": "marki_docs(\"cards\") before writing cards; marki_docs(<block>) before using a block, \
+                           and its tools to look up valid values instead of guessing. \
                            These features exist so cards don't need hand-made HTML, images or workarounds.",
         }))
+    }
+
+    /// Run a block module's lookup tool (`marki_<lang>_<name>`).
+    pub fn block_tool(&self, lang: &str, name: &str, args: serde_json::Value) -> Result<serde_json::Value> {
+        let cache = crate::project::render_cache_dir();
+        Ok(self.project.registry.call_tool(lang, name, args, self.root(), &cache)?)
     }
 
     fn model_names(&self) -> Result<Vec<String>> {
@@ -240,7 +251,7 @@ impl Handler {
             "errors": p.note.errors,
             "assets": p.note.assets.iter().map(|a| &a.filename).collect::<Vec<_>>(),
             "css": p.note.spec.css,
-            "docs": block_docs(&source),
+            "docs": block_docs(&self.project.registry, &source),
         }))
     }
 
@@ -345,7 +356,7 @@ impl Handler {
             preview.note.errors.is_empty(),
             "card does not render: {}{}",
             preview.note.errors.join("; "),
-            block_docs(&formatted).map(|d| format!(". Syntax: {d}")).unwrap_or_default()
+            block_docs(&self.project.registry, &formatted).map(|d| format!(". Syntax: {d}")).unwrap_or_default()
         );
         ensure!(!preview.cards.is_empty(), "card generates no cards (empty front?)");
         Ok((path, formatted))
@@ -682,11 +693,21 @@ fn safe_rel(rel: &str) -> Result<PathBuf> {
     Ok(p)
 }
 
-/// "marki_docs(\"map\")" etc. for the blocks a source uses, so render
-/// errors lead to the syntax reference instead of guesswork.
-fn block_docs(source: &str) -> Option<String> {
-    let t = crate::docs::block_topics(source);
-    (!t.is_empty()).then(|| t.iter().map(|b| format!("marki_docs(\"{b}\")")).collect::<Vec<_>>().join(", "))
+/// "marki_docs(\"map\")" etc. for the blocks a source uses, plus their
+/// lookup tools, so render errors lead to the reference instead of guesswork.
+fn block_docs(reg: &crate::render::Registry, source: &str) -> Option<String> {
+    let t = crate::docs::block_topics(reg, source);
+    let tools = reg.tools();
+    (!t.is_empty()).then(|| {
+        t.iter()
+            .flat_map(|b| {
+                std::iter::once(format!("marki_docs(\"{b}\")")).chain(
+                    tools.iter().filter(move |(l, _)| l == b).map(|(l, tool)| format!("marki_{l}_{}", tool.name)),
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    })
 }
 
 fn git(root: &Path, args: &[&str]) -> Result<std::process::Output> {

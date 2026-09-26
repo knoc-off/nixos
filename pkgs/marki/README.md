@@ -219,11 +219,17 @@ dropped. A tag-only edit in a file is a normal update.
 headers, so put an auth proxy on the same host in front of it (the NixOS
 module uses mcp-auth-proxy).
 
-Tools: `marki_context`, `marki_search_cards`, `marki_read_card`,
-`marki_preview`, `marki_write_card`, `marki_move_card`, `marki_delete_card`,
-`marki_add_media`, `marki_read_model`, `marki_write_model`, `marki_status`,
-`marki_push`, `marki_query`. Plus cards and models as resources and a
-`make-cards` prompt.
+Tools: `marki_context`, `marki_docs`, `marki_search_cards`, `marki_read_card`,
+`marki_preview`, `marki_write_card`, `marki_write_cards`, `marki_move_card`,
+`marki_delete_card`, `marki_add_media`, `marki_read_model`,
+`marki_write_model`, `marki_status`, `marki_push`, `marki_query`. Plus docs,
+cards and models as resources and a `make-cards` prompt.
+
+Block renderers add their own: each ships its README as `marki_docs("<block>")`
+and may offer lookup tools named `marki_<block>_<name>` (`marki_map_units`,
+`marki_map_find`, `marki_media_list`), through `docs()` and `tools()` on the
+`Renderer` trait. They are registered when the server starts, so enabling a
+block (e.g. setting `typst_binary`) needs a restart.
 
 The guard rails:
 

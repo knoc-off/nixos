@@ -152,6 +152,62 @@ fn rate_limit() {
     *guard = Some(Instant::now());
 }
 
+const NOMINATIM: &str = "https://nominatim.openstreetmap.org/search";
+
+/// Search OSM by name via Nominatim. Each hit carries a ready map ref
+/// (`relation/N`, `way/N`; nodes are points and not map features).
+/// Cached like Overpass responses; shares the 1 req/s limit, which is
+/// also Nominatim's usage policy.
+pub fn search(query: &str, cache_root: &Path) -> Result<Vec<serde_json::Value>, MapError> {
+    let cache_dir = cache_root.join("net").join("nominatim");
+    std::fs::create_dir_all(&cache_dir)?;
+    let cache_file = cache_dir.join(format!("{}.json", query_key(query)));
+    let raw = if cache_file.exists() {
+        std::fs::read(&cache_file)?
+    } else {
+        rate_limit();
+        let url = reqwest::Url::parse_with_params(
+            NOMINATIM,
+            &[("q", query), ("format", "jsonv2"), ("limit", "10"), ("accept-language", "en")],
+        )
+        .map_err(|e| MapError::Network(format!("nominatim url: {e}")))?;
+        let resp = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(10))
+            .user_agent(USER_AGENT)
+            .build()
+            .map_err(|e| MapError::Network(format!("client: {e}")))?
+            .get(url)
+            .send()
+            .and_then(|r| r.error_for_status())
+            .map_err(|e| MapError::Network(format!("nominatim: {e}")))?;
+        let bytes = resp.bytes().map_err(|e| MapError::Network(format!("nominatim: {e}")))?.to_vec();
+        let tmp = cache_file.with_extension("tmp");
+        std::fs::write(&tmp, &bytes)?;
+        std::fs::rename(&tmp, &cache_file)?;
+        bytes
+    };
+    decode_search(&raw)
+}
+
+fn decode_search(raw: &[u8]) -> Result<Vec<serde_json::Value>, MapError> {
+    let hits: Vec<serde_json::Value> =
+        serde_json::from_slice(raw).map_err(|e| MapError::Resolve(format!("nominatim json: {e}")))?;
+    Ok(hits
+        .iter()
+        .filter_map(|h| {
+            let kind = h["osm_type"].as_str()?;
+            if kind == "node" {
+                return None;
+            }
+            Some(serde_json::json!({
+                "ref": format!("{kind}/{}", h["osm_id"].as_i64()?),
+                "name": h["display_name"],
+                "kind": format!("{}={}", h["category"].as_str().unwrap_or("?"), h["type"].as_str().unwrap_or("?")),
+            }))
+        })
+        .collect())
+}
+
 // ---------- response decoding ----------
 
 #[derive(Deserialize)]
@@ -407,6 +463,19 @@ mod tests {
             Geometry::LineString(pts) => assert_eq!(pts.len(), 3),
             other => panic!("expected linestring, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn search_hits_become_map_refs() {
+        let raw = br#"[
+          {"osm_type":"way","osm_id":188317625,"category":"historic","type":"citywalls","display_name":"Great Wall"},
+          {"osm_type":"node","osm_id":1,"category":"place","type":"city","display_name":"a point"},
+          {"osm_type":"relation","osm_id":2145268,"category":"boundary","type":"administrative","display_name":"Bavaria"}
+        ]"#;
+        let hits = decode_search(raw).unwrap();
+        let refs: Vec<_> = hits.iter().map(|h| h["ref"].as_str().unwrap()).collect();
+        assert_eq!(refs, ["way/188317625", "relation/2145268"]);
+        assert_eq!(hits[0]["kind"], "historic=citywalls");
     }
 
     #[test]

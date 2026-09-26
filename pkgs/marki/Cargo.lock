@@ -1410,6 +1410,7 @@ dependencies = [
  "blake3",
  "marki-render",
  "serde",
+ "serde_json",
  "thiserror 2.0.18",
  "toml",
 ]
@@ -1419,6 +1420,7 @@ name = "marki-render"
 version = "0.3.0"
 dependencies = [
  "serde",
+ "serde_json",
  "thiserror 2.0.18",
  "toml",
 ]

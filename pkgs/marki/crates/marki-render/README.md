@@ -12,6 +12,14 @@ pub trait Renderer: Send + Sync {
     /// Fence language, e.g. "map". Also used as the name for script-side constructors.
     fn lang(&self) -> &'static str;
     fn render(&self, input: Input<'_>, ctx: &mut RenderCtx<'_>) -> Result<Fragment, RenderError>;
+
+    // Optional, for agents using marki over MCP:
+    /// Authoring reference (markdown), served as marki_docs("<lang>").
+    fn docs(&self) -> &'static str { "" }
+    /// Lookup tools, exposed as marki_<lang>_<name>.
+    fn tools(&self) -> Vec<Tool> { vec![] }
+    fn call_tool(&self, name: &str, args: serde_json::Value, ctx: &RenderCtx<'_>)
+        -> Result<serde_json::Value, RenderError>;
 }
 ```
 
@@ -26,6 +34,11 @@ pub trait Renderer: Send + Sync {
   - `assets` are files uploaded to Anki's media collection. Give them
     content-addressed filenames so identical files are only stored once.
 - `escape_html` is provided for building HTML safely.
+- `docs()` usually returns the crate README (`include_str!("../README.md")`),
+  so authors and agents read the same text. `tools()` suits lookups an
+  author can't do otherwise: valid ids, available files, external searches.
+  Each `Tool` has a name, a description and a JSON schema of its arguments;
+  `call_tool` gets the cards root as `ctx.source_path`.
 
 ## Adding a block type
 
@@ -33,7 +46,7 @@ pub trait Renderer: Send + Sync {
    (plus its own dependencies), and implement `Renderer`.
 2. Add it to the workspace `members` and `[workspace.dependencies]` in the root
    `Cargo.toml`.
-3. Register it in `build_registry` in `crates/marki/src/main.rs`:
+3. Register it in `build_registry` in `crates/marki/src/project.rs`:
 
    ```rust
    reg.register(Box::new(MyRenderer::new()));

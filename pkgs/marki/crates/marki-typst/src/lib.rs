@@ -56,6 +56,10 @@ impl Renderer for TypstRenderer {
     fn render(&self, input: Input<'_>, ctx: &mut RenderCtx<'_>) -> Result<Fragment, RenderError> {
         Ok(render::run(&self.binary, input.as_source()?, ctx)?)
     }
+
+    fn docs(&self) -> &'static str {
+        include_str!("../README.md")
+    }
 }
 
 #[cfg(test)]

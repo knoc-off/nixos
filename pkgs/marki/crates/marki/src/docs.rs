@@ -1,16 +1,16 @@
 //! Authoring docs served to agents (`marki_docs` tool, `marki://docs/*`
-//! resources). They are the repo's own READMEs, embedded at build time, so
-//! there is no second copy to drift.
+//! resources). `cards` and `models` live here; each block renderer ships
+//! its own doc (`Renderer::docs`, its crate README), so a new block brings
+//! its docs along. All are the repo's own markdown, embedded at build time.
 
 use anyhow::{Result, bail};
 
-const README: &str = include_str!("../../../README.md");
-const MAP: &str = include_str!("../../marki-map/README.md");
-const MEDIA: &str = include_str!("../../marki-media/README.md");
-const TYPST: &str = include_str!("../../marki-typst/README.md");
+use crate::render::Registry;
 
-/// Topic names with a one-line summary, in reading order.
-pub const TOPICS: &[(&str, &str)] = &[
+const README: &str = include_str!("../../../README.md");
+
+/// One-line summaries for topic lists; a block without one gets a generic line.
+const SUMMARIES: &[(&str, &str)] = &[
     ("cards", "card file format: sections, tags, cloze, decks, code blocks, math"),
     ("map", "```map blocks: highlight countries/regions/OSM features on an SVG map"),
     ("media", "```media blocks: images and audio from .marki/media or media sources"),
@@ -18,37 +18,56 @@ pub const TOPICS: &[(&str, &str)] = &[
     ("models", "Lua card models (custom card types)"),
 ];
 
-/// Fence languages that have a doc topic of the same name.
-pub const BLOCK_TOPICS: &[&str] = &["map", "media", "typst"];
+/// `(topic, summary)` for every doc this server has: cards, the active
+/// blocks, models.
+pub fn topics(reg: &Registry) -> Vec<(String, String)> {
+    let summary = |t: &str| {
+        SUMMARIES
+            .iter()
+            .find(|(n, _)| *n == t)
+            .map_or_else(|| format!("```{t} blocks"), |(_, s)| s.to_string())
+    };
+    std::iter::once("cards")
+        .chain(block_langs(reg))
+        .chain(std::iter::once("models"))
+        .map(|t| (t.to_string(), summary(t)))
+        .collect()
+}
 
-pub fn doc(topic: &str) -> Result<String> {
+/// Active block languages that ship a doc.
+pub fn block_langs(reg: &Registry) -> impl Iterator<Item = &'static str> + '_ {
+    reg.external_langs().iter().copied().filter(|l| reg.docs(l).is_some())
+}
+
+pub fn doc(reg: &Registry, topic: &str) -> Result<String> {
     Ok(match topic {
-        "cards" => format!(
-            "{}\nBlock syntax: marki_docs(\"map\"), marki_docs(\"media\"), marki_docs(\"typst\"). \
-             Custom card types: marki_docs(\"models\").\n",
+        "cards" => {
+            let blocks: Vec<String> = block_langs(reg).map(|l| format!("marki_docs(\"{l}\")")).collect();
             // Repo-relative links mean nothing over MCP; point at the topics.
-            section(README, "## Writing cards", "## Formatting rules")
-                .replace("[models/](models/README.md)", "marki_docs(\"models\")")
-                .replace("[marki-map](crates/marki-map/README.md)", "marki_docs(\"map\")")
-                .replace("[marki-media](crates/marki-media/README.md)", "marki_docs(\"media\")")
-                .replace("[marki-typst](crates/marki-typst/README.md)", "marki_docs(\"typst\")")
-        ),
-        "map" => MAP.into(),
-        "media" => MEDIA.into(),
-        "typst" => TYPST.into(),
+            let mut body = section(README, "## Writing cards", "## Formatting rules")
+                .replace("[models/](models/README.md)", "marki_docs(\"models\")");
+            for l in ["map", "media", "typst"] {
+                body = body.replace(&format!("[marki-{l}](crates/marki-{l}/README.md)"), &format!("marki_docs(\"{l}\")"));
+            }
+            format!(
+                "{body}\nBlock syntax on this server: {}. Custom card types: marki_docs(\"models\").\n",
+                if blocks.is_empty() { "none enabled".into() } else { blocks.join(", ") }
+            )
+        }
         "models" => crate::scripting::MODEL_API.into(),
-        _ => bail!(
-            "unknown topic {topic:?}; topics: {}",
-            TOPICS.iter().map(|(t, _)| *t).collect::<Vec<_>>().join(", ")
-        ),
+        t => match reg.docs(t) {
+            Some(d) => d.into(),
+            None => bail!(
+                "unknown topic {t:?}; topics: {}",
+                topics(reg).into_iter().map(|(t, _)| t).collect::<Vec<_>>().join(", ")
+            ),
+        },
     })
 }
 
 /// Doc topics for the renderer blocks a card source uses (```map etc.).
-pub fn block_topics(source: &str) -> Vec<&'static str> {
-    BLOCK_TOPICS
-        .iter()
-        .copied()
+pub fn block_topics(reg: &Registry, source: &str) -> Vec<&'static str> {
+    block_langs(reg)
         .filter(|t| {
             source
                 .lines()
@@ -66,21 +85,32 @@ fn section<'a>(text: &'a str, start: &str, end: &str) -> &'a str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::Config;
+
+    fn registry() -> Registry {
+        let mut cfg = Config::default();
+        cfg.typst_binary = Some("typst".into());
+        crate::project::build_registry(&cfg)
+    }
 
     #[test]
     fn every_topic_has_text() {
-        for (t, _) in TOPICS {
-            assert!(doc(t).unwrap().len() > 500, "{t} doc is empty");
+        let reg = registry();
+        let names: Vec<_> = topics(&reg).into_iter().map(|(t, _)| t).collect();
+        assert_eq!(names, ["cards", "map", "typst", "models"], "media needs a source dir");
+        for t in &names {
+            assert!(doc(&reg, t).unwrap().len() > 500, "{t} doc is empty");
         }
-        let cards = doc("cards").unwrap();
+        let cards = doc(&reg, "cards").unwrap();
         assert!(cards.contains("### Cloze") && !cards.contains("## Config"), "cards cut moved");
         assert!(!cards.contains("README.md"), "unrewritten repo link in cards doc");
-        assert!(doc("nope").unwrap_err().to_string().contains("map"));
+        assert!(doc(&reg, "nope").unwrap_err().to_string().contains("map"));
     }
 
     #[test]
     fn finds_block_topics() {
-        assert_eq!(block_topics("Q\n\n```map\nx\n```\n\n```media\n```"), ["map", "media"]);
-        assert!(block_topics("```_map\n```").is_empty());
+        let reg = registry();
+        assert_eq!(block_topics(&reg, "Q\n\n```map\nx\n```\n\n```typst\n```"), ["map", "typst"]);
+        assert!(block_topics(&reg, "```_map\n```").is_empty());
     }
 }

@@ -8,7 +8,8 @@ use anyhow::Result;
 use std::path::PathBuf;
 use base64::Engine as _;
 use rmcp::handler::server::router::prompt::PromptRouter;
-use rmcp::handler::server::router::tool::ToolRouter;
+use rmcp::handler::server::router::tool::{ToolRoute, ToolRouter};
+use rmcp::handler::server::tool::ToolCallContext;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{
     CallToolResult, ContentBlock, GetPromptResult, ListResourcesResult, PaginatedRequestParams,
@@ -38,7 +39,10 @@ diagrams, custom card types). Before writing cards read marki_docs(\"cards\"); \
 before using a ```map, ```media or ```typst block read marki_docs(<that \
 block>). Use these features instead of hand-written HTML, external images of \
 maps, {{c1::}} syntax or other workarounds; if something seems unsupported, \
-check the docs before inventing a solution, and ask the user if it still is.
+check the docs before inventing a solution, and ask the user if it still is. \
+Blocks bring lookup tools (marki_map_units, marki_map_find, \
+marki_media_list...; marki_context lists them per block): look up valid \
+region names, OSM refs and media files with them instead of guessing.
 
 Workflow: call marki_context first (models, decks, media dirs, available \
 blocks and doc topics). Draft a card, \
@@ -101,6 +105,9 @@ impl Marki {
     /// `.marki/config.toml` apply without a restart. A config that no longer
     /// parses keeps the old project and fails that job with the error.
     pub fn spawn(cfg: Config, config_path: Option<PathBuf>, reload: Reload) -> Self {
+        // Block modules' lookup tools, fixed at startup: a client caches the
+        // tool list, so enabling a module (e.g. typst_binary) needs a restart.
+        let block_tools = crate::project::build_registry(&cfg).tools();
         let (tx, rx) = mpsc::channel::<Job>();
         std::thread::spawn(move || {
             let mtime = || config_path.as_ref().and_then(|p| std::fs::metadata(p).and_then(|m| m.modified()).ok());
@@ -125,7 +132,22 @@ impl Marki {
                 job(&mut h);
             }
         });
-        Self { jobs: tx, tool_router: Self::tool_router(), prompt_router: Self::prompt_router() }
+        let mut tool_router = Self::tool_router();
+        for (lang, t) in block_tools {
+            let schema = match t.schema {
+                serde_json::Value::Object(o) => o,
+                _ => Default::default(),
+            };
+            let attr = rmcp::model::Tool::new(format!("marki_{lang}_{}", t.name), t.description, schema);
+            tool_router.add_route(ToolRoute::new_dyn(attr, move |c: ToolCallContext<'_, Self>| {
+                let args = serde_json::Value::Object(c.arguments.clone().unwrap_or_default());
+                let service = c.service.clone();
+                Box::pin(async move {
+                    service.tool(move |h| h.block_tool(lang, t.name, args)).await.map(Into::into)
+                })
+            }));
+        }
+        Self { jobs: tx, tool_router, prompt_router: Self::prompt_router() }
     }
 
     async fn run<R: Send + 'static>(
@@ -289,9 +311,10 @@ impl Marki {
 
     #[tool(description = "Authoring reference. Topics: cards (file format, tags, cloze, decks, code blocks, math), map (```map blocks: highlight countries/regions/OSM features), media (```media images/audio), typst (```typst diagrams/formulas), models (Lua card types). Read `cards` before writing cards and the block's topic before using a block; prefer these built-in features over inventing HTML or workarounds.")]
     async fn marki_docs(&self, Parameters(a): Parameters<DocsArgs>) -> Result<CallToolResult, McpError> {
-        Ok(match crate::docs::doc(&a.topic) {
+        // Plain markdown, not JSON.
+        Ok(match self.run(move |h| crate::docs::doc(&h.project.registry, &a.topic)).await {
             Ok(t) => CallToolResult::success(vec![ContentBlock::text(t)]),
-            Err(e) => CallToolResult::error(vec![ContentBlock::text(e.to_string())]),
+            Err(e) => CallToolResult::error(vec![ContentBlock::text(e)]),
         })
     }
 
@@ -404,8 +427,10 @@ impl Marki {
     }
 }
 
-#[tool_handler]
-#[prompt_handler]
+// The routers are fields, not rebuilt per request (the macro default), so
+// the block modules' tools added in `spawn` are listed and callable.
+#[tool_handler(router = self.tool_router)]
+#[prompt_handler(router = self.prompt_router)]
 impl ServerHandler for Marki {
     fn get_info(&self) -> ServerConfig {
         ServerConfig::new(
@@ -423,13 +448,13 @@ impl ServerHandler for Marki {
             .run(|h| {
                 let cards = h.search_cards("", usize::MAX)?;
                 let ctx = h.context()?;
-                Ok((cards, ctx))
+                Ok((cards, ctx, crate::docs::topics(&h.project.registry)))
             })
             .await
             .map_err(|e| McpError::internal_error(e, None))?;
-        let (cards, ctx) = listed;
-        let mut resources: Vec<_> = crate::docs::TOPICS
-            .iter()
+        let (cards, ctx, topics) = listed;
+        let mut resources: Vec<_> = topics
+            .into_iter()
             .map(|(t, what)| {
                 Resource::new(format!("marki://docs/{t}"), format!("docs: {what}")).with_mime_type("text/markdown")
             })
@@ -461,7 +486,7 @@ impl ServerHandler for Marki {
         let text = self
             .run(move |h| {
                 if let Some(t) = uri.strip_prefix("marki://docs/") {
-                    crate::docs::doc(t)
+                    crate::docs::doc(&h.project.registry, t)
                 } else if let Some(p) = uri.strip_prefix("marki://card/") {
                     h.read_card(p)
                 } else if let Some(n) = uri.strip_prefix("marki://model/") {

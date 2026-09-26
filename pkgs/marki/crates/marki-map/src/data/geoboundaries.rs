@@ -99,6 +99,26 @@ fn index() -> Result<&'static GbIndex, MapError> {
 /// Resolve one feature reference like `country/DEU` or `adm1/DEU/Bayern`
 /// to a [`Geometry`]. `neighbors`, `continent` and `subregion` return
 /// composites.
+/// Unit names (lowercase, as matched) at admin `level` for `iso`, sorted.
+pub fn admin_units(iso: &str, level: u8) -> Result<Vec<String>, MapError> {
+    let idx = index()?;
+    let mut names: Vec<String> = idx
+        .admin
+        .keys()
+        .filter(|(l, i, _)| *l == level && i == iso)
+        .map(|(_, _, n)| n.clone())
+        .collect();
+    names.sort_unstable();
+    Ok(names)
+}
+
+/// ISO3 codes of every country in the index, sorted.
+pub fn country_codes() -> Result<Vec<String>, MapError> {
+    let mut v: Vec<String> = index()?.countries.keys().cloned().collect();
+    v.sort_unstable();
+    Ok(v)
+}
+
 pub fn resolve_feature(name: &str) -> Result<Geometry, MapError> {
     let idx = index()?;
     if let Some(rest) = name.strip_prefix("country/") {
@@ -123,13 +143,7 @@ pub fn resolve_feature(name: &str) -> Result<Geometry, MapError> {
             return idx.admin.get(&key).map(|f| f.geom.clone()).ok_or_else(|| {
                 // List the valid names: authors (often agents without a
                 // shell) have no other way to discover them.
-                let mut names: Vec<&str> = idx
-                    .admin
-                    .keys()
-                    .filter(|(l, i, _)| *l == lvl && i == iso)
-                    .map(|(_, _, n)| n.as_str())
-                    .collect();
-                names.sort_unstable();
+                let names = admin_units(iso, lvl).unwrap_or_default();
                 MapError::Resolve(if names.is_empty() {
                     format!("unknown adm{lvl}: {iso}/{unit} ({iso} has no adm{lvl} units; try another level)")
                 } else {
