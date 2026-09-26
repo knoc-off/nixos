@@ -75,6 +75,12 @@ in
     Group = "anki";
     UMask = "0007";
     StateDirectoryMode = "0770";
+    # Apply the ownership rule below before every start (as root, `+`).
+    # tmpfiles only runs at boot, so after the DynamicUser -> static switch
+    # the relocated dir stayed nobody:nogroup and the server hit EACCES.
+    ExecStartPre = [
+      "+${config.systemd.package}/bin/systemd-tmpfiles --create --prefix=/var/lib/anki-sync-server"
+    ];
   };
 
   services.caddy.virtualHosts."anki.optiplex.tail.niko.ink" = {
