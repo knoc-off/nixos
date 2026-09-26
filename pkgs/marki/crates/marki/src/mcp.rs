@@ -49,10 +49,15 @@ Good cards test one fact, have a short unambiguous front, and put context on \
 the back. Prefer several small cards over one big one.
 
 Media: marki_add_media saves a file, then reference it in a ```media block \
-(`src = \"dir/name\"`). Models: marki_read_model / marki_write_model \
-(Lua; must define card_names, generate, describe). Renaming or dropping a \
-card type loses review history unless M.renames maps old->new; dropping needs \
-M.allow_card_removal and the user's consent.
+(`src = \"dir/name\"`). Math: $inline$ and $$display$$.
+
+Models: read the resource marki://docs/models before writing one; \
+marki_read_model(\"basic\"|\"cloze\") shows the built-ins as Lua examples. \
+M.card_names lists card types; generate(note, ctx) returns keys \
+<Card>Front / <Card>Back only (other keys are an error); render output with \
+ctx:section_html(note, n), not block:html(), or media blocks show as text. \
+Renaming or dropping a card type loses review history unless M.renames maps \
+old->new; dropping needs M.allow_card_removal and the user's consent.
 
 marki_flagged finds cards the user flagged in Anki (1 red .. 7 purple), \
 usually meaning 'fix this card'. marki_query runs read-only SQL on a snapshot \
@@ -340,13 +345,15 @@ impl ServerHandler for Marki {
             .await
             .map_err(|e| McpError::internal_error(e, None))?;
         let (cards, ctx) = listed;
-        let mut resources: Vec<Resource> = cards
+        let mut resources = vec![
+            Resource::new("marki://docs/models", "model API reference").with_mime_type("text/markdown"),
+        ];
+        resources.extend(cards
             .into_iter()
             .map(|c| {
                 Resource::new(format!("marki://card/{}", c.path), c.path)
                     .with_mime_type("text/markdown")
-            })
-            .collect();
+            }));
         for m in ctx["models"].as_array().into_iter().flatten() {
             if m.get("builtin").is_none() {
                 let name = m["name"].as_str().unwrap_or_default();
@@ -367,7 +374,9 @@ impl ServerHandler for Marki {
         let uri = req.uri.clone();
         let text = self
             .run(move |h| {
-                if let Some(p) = uri.strip_prefix("marki://card/") {
+                if uri == "marki://docs/models" {
+                    Ok(crate::scripting::MODEL_API.to_string())
+                } else if let Some(p) = uri.strip_prefix("marki://card/") {
                     h.read_card(p)
                 } else if let Some(n) = uri.strip_prefix("marki://model/") {
                     Ok(h.read_model(n)?["lua"].as_str().unwrap_or_default().to_string())

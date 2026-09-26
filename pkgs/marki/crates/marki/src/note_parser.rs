@@ -41,7 +41,7 @@ pub fn parse_note(source: &str, source_path: PathBuf) -> Note {
     // Resolve Auto algorithm: need to know if both bold+italic exist.
     let resolved_cloze_algo = match cloze_pre {
         Some(ClozeAlgorithm::Auto) => {
-            let opts = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH;
+            let opts = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_MATH;
             let mut has_strong = false;
             let mut has_em = false;
             for event in Parser::new_ext(source, opts) {
@@ -67,7 +67,7 @@ pub fn parse_note(source: &str, source_path: PathBuf) -> Note {
     // Holds (src, title, accumulated_alt_text).
     let mut in_image: Option<(String, String, String)> = None;
 
-    let opts = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH;
+    let opts = Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_MATH;
     let parser = Parser::new_ext(source, opts);
 
     for event in parser {
@@ -289,6 +289,18 @@ pub fn parse_note(source: &str, source_path: PathBuf) -> Note {
                     &mut state,
                     &format!("<code>{}</code>", escape_html(&cleaned)),
                 );
+            }
+
+            // ---- Math: `$x$` / `$$x$$` -> MathJax delimiters Anki renders.
+            // Escaped like text: MathJax reads the decoded DOM text, so
+            // `a<b` survives as `a&lt;b` in the field.
+            Event::InlineMath(m) => {
+                push_text(&mut state, &m);
+                push_html(&mut state, &format!("\\({}\\)", escape_html(&m)));
+            }
+            Event::DisplayMath(m) => {
+                push_text(&mut state, &m);
+                push_html(&mut state, &format!("\\[{}\\]", escape_html(&m)));
             }
 
             // ---- Text content
@@ -815,5 +827,14 @@ mod tests {
         let note = parse_note("x\n\n#cloze(duo)\n", PathBuf::new());
         assert_eq!(note.model, "cloze");
         assert_eq!(note.cloze_algorithm, ClozeAlgorithm::Duo);
+    }
+
+    #[test]
+    fn dollar_math_becomes_mathjax() {
+        let n = parse_note("Area $\\pi r^2$, and $a<b$:\n\n$$e^{i\\pi}+1=0$$\n\nCosts \\$5.", PathBuf::from("/x.md"));
+        let html: Vec<&str> = n.blocks.iter().map(|b| b.html()).collect();
+        assert_eq!(html[0], "Area \\(\\pi r^2\\), and \\(a&lt;b\\):", "{html:?}");
+        assert_eq!(html[1], "\\[e^{i\\pi}+1=0\\]", "{html:?}");
+        assert_eq!(html[2], "Costs $5.", "escaped dollar stays literal: {html:?}");
     }
 }

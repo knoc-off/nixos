@@ -146,7 +146,7 @@ expect "marki:cloze Cloze ord=0 revlog=1" \
   "marki:duo Question ord=1 revlog=1" "marki:duo Reverse ord=0 revlog=1" "detached 1"
 
 step="removal refused without permission, other notes still pushed"
-sed -i 's/{ "Reverse", "Question" }/{ "Question" }/' .marki/models/duo.lua
+sed -i 's/{ "Reverse", "Question" }/{ "Question" }/; s/, ReverseFront = "a", ReverseBack = h//' .marki/models/duo.lua
 sed -i 's/Jupiter/Mars/' planets.md
 out=$("$marki" push 2>&1 || true)
 grep -q 'would be removed' <<<"$out" || { echo "FAIL: $step (no refusal)"; echo "$out"; exit 1; }

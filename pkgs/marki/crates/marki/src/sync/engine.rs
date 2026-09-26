@@ -622,9 +622,31 @@ impl RenderedNote {
 }
 
 /// Render one note. Basic/cloze go through the stock pipeline; anything else
-/// runs its model script. A hard failure (missing model, script error) is
-/// `Err`; block-level render problems land in `errors`.
+/// runs its model script. A hard failure (missing model, script error, no
+/// cards at all) is `Err`; block-level render problems land in `errors`.
 pub fn render_note(
+    sn: &ScannedNote,
+    script_engine: &mut ScriptEngine,
+    registry: &Arc<Registry>,
+    cache_dir: &Path,
+    models_dir: &Path,
+) -> Result<RenderedNote> {
+    let r = render_note_inner(sn, script_engine, registry, cache_dir, models_dir)?;
+    // Anki would store the note with zero cards: invisible and unreviewable.
+    if crate::preview::cards(&r).is_empty() {
+        anyhow::bail!(if r.spec.cloze {
+            "note makes no cards: no cloze deletions (mark answers **bold** or *italic*)".to_string()
+        } else {
+            format!(
+                "note makes no cards: every front is empty ({})",
+                r.spec.card_names.iter().map(|c| format!("{c}Front")).collect::<Vec<_>>().join(", ")
+            )
+        });
+    }
+    Ok(r)
+}
+
+fn render_note_inner(
     sn: &ScannedNote,
     script_engine: &mut ScriptEngine,
     registry: &Arc<Registry>,

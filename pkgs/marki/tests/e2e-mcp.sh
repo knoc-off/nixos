@@ -123,7 +123,17 @@ return M'''
 assert "describe" in tool("marki_write_model", {"name": "qa", "lua": lua % ""}, ok=False)
 tool("marki_write_model", {"name": "qa", "lua": lua % 'function M.describe() return "Q/A" end'})
 assert tool("marki_read_model", {"name": "qa"})["lua"].startswith("local M")
+assert tool("marki_read_model", {"name": "basic"})["builtin"]
+assert "models are basic, cloze, qa" in tool("marki_read_model", {"name": "nope"}, ok=False)
+# A card that makes no cards is refused.
+assert "no cards" in tool("marki_write_card", {"path": "empty.md", "source": "\n---\n\nonly a back"}, ok=False)
+doc = rpc("resources/read", {"uri": "marki://docs/models"})["contents"][0]["text"]
+assert "section_html" in doc and "<Card>Front" in doc
 tool("marki_write_card", {"path": "geo/m.md", "source": "Tallest mountain?\n\n---\n\nEverest\n\n#model(qa)"})
+# Wrong generate keys: named error, not a silently missing card.
+bad = lua.replace("AskFront", "Ask").replace("AskBack", "Back") % 'function M.describe() return "x" end'
+err = tool("marki_write_model", {"name": "qa", "lua": bad}, ok=False)
+assert "unknown key" in err and "AskFront" in err, err
 
 st = tool("marki_status")
 assert st["kind"] == "status" and not st["ok"], st

@@ -11,3 +11,6 @@
 pub mod context;
 pub mod engine;
 pub mod types;
+
+/// Author reference for Lua models (served as `marki://docs/models`).
+pub const MODEL_API: &str = include_str!("MODEL_API.md");

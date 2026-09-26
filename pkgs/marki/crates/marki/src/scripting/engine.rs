@@ -1,14 +1,20 @@
 //! Lua engine setup and model-script execution.
 //!
-//! A model script is a Lua module that returns a table with two
-//! functions:
+//! A model script is a Lua module; the full author-facing reference is
+//! `MODEL_API` (served to agents as `marki://docs/models`). In short:
 //!
 //! ```lua
 //! local M = {}
-//! function M.card_names() return { "Front", "Back" } end
-//! function M.generate(note, ctx) return { Front = "...", Back = "..." } end
+//! M.card_names = { "Forward", "Reverse" }  -- or a function returning it
+//! function M.describe() return "..." end
+//! function M.generate(note, ctx)
+//!   return { ForwardFront = "...", ForwardBack = "...",
+//!            ReverseFront = "...", ReverseBack = "..." }
+//! end
 //! return M
 //! ```
+//!
+//! `generate` keys are `<Card>Front`/`<Card>Back`; any other key is an error.
 //!
 //! Stock models (basic, cloze) never reach this engine -- they render
 //! through `sync::engine::render_stock`.
@@ -51,6 +57,16 @@ pub struct CompiledModel {
     /// detect on-disk edits so the cache reloads only what changed,
     /// instead of being cleared wholesale every sync cycle.
     mtime: Option<SystemTime>,
+}
+
+impl CompiledModel {
+    /// The keys `generate` may return, in ord order.
+    pub fn field_names(&self) -> Vec<String> {
+        self.card_names
+            .iter()
+            .flat_map(|c| [format!("{c}Front"), format!("{c}Back")])
+            .collect()
+    }
 }
 
 /// The scripting runtime: one Lua state plus a cache of loaded models.
@@ -235,22 +251,49 @@ impl ScriptEngine {
             })?;
             output.insert(key, html);
         }
+        // A misspelled key used to become an empty field, i.e. a silently
+        // missing card. Reject it and name the valid keys.
+        let valid = model.field_names();
+        let mut unknown: Vec<&String> = output.keys().filter(|k| !valid.contains(k)).collect();
+        if !unknown.is_empty() {
+            unknown.sort();
+            bail!(
+                "model '{}' generate() returned unknown key(s) {}; valid keys are {} \
+                 (<Card>Front / <Card>Back for each name in card_names)",
+                model.name,
+                unknown.iter().map(|k| format!("{k:?}")).collect::<Vec<_>>().join(", "),
+                valid.join(", ")
+            );
+        }
         Ok(output)
     }
 
-    /// Call `card_names()` on a loaded module to get its template list.
+    /// `M.card_names`: a list of names, or a function returning one.
     fn extract_card_names(&self, name: &str, module: &Table) -> Result<Vec<String>> {
-        let f: Function = module
-            .get("card_names")
-            .map_err(|_| anyhow::anyhow!("model '{name}' must define card_names()"))?;
-
-        self.reset_budget();
-        let names: Vec<String> = f
-            .call(())
-            .map_err(|e| anyhow::anyhow!("model '{name}' card_names(): {e}"))?;
-
+        let names: Vec<String> = match module.get::<Value>("card_names") {
+            Ok(Value::Function(f)) => {
+                self.reset_budget();
+                f.call(()).map_err(|e| anyhow::anyhow!("model '{name}' card_names(): {e}"))?
+            }
+            Ok(v @ Value::Table(_)) => self
+                .lua
+                .unpack(v)
+                .map_err(|e| anyhow::anyhow!("model '{name}' card_names must list strings: {e}"))?,
+            _ => bail!(
+                "model '{name}' must define M.card_names, e.g. M.card_names = {{ \"Card\" }}"
+            ),
+        };
         if names.is_empty() {
-            bail!("model '{name}' card_names() returned an empty list");
+            bail!("model '{name}' card_names is empty");
+        }
+        let mut seen = std::collections::HashSet::new();
+        for n in &names {
+            if n.is_empty() || !n.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-' || c == ' ') {
+                bail!("model '{name}' card name {n:?}: use letters, digits, space, _ or -");
+            }
+            if !seen.insert(n) {
+                bail!("model '{name}' card name {n:?} appears twice");
+            }
         }
         Ok(names)
     }
@@ -372,12 +415,12 @@ mod tests {
             dir.join("demo.lua"),
             r#"
 local M = {}
-function M.card_names() return { "Front", "Back" } end
+M.card_names = { "Card" }
 function M.generate(note, ctx)
   local h = note:heading(1)
   return {
-    Front = "Q: " .. (h and h:text() or ""),
-    Back = ctx:section_html(note, 2),
+    CardFront = "Q: " .. (h and h:text() or ""),
+    CardBack = ctx:section_html(note, 2),
   }
 end
 return M
@@ -387,7 +430,7 @@ return M
 
         let mut se = ScriptEngine::new(dir.clone(), None);
         let compiled = se.load_model("demo").unwrap();
-        assert_eq!(compiled.card_names, vec!["Front".to_string(), "Back".to_string()]);
+        assert_eq!(compiled.card_names, vec!["Card".to_string()]);
 
         // A second load of an unchanged file is served from cache.
         let again = se.load_model("demo").unwrap();
@@ -403,10 +446,43 @@ return M
             PathBuf::from("/tmp"),
         );
         let out = se.execute(&compiled, note, ctx).unwrap();
-        assert_eq!(out.get("Front").unwrap(), "Q: Berlin");
-        assert!(out.get("Back").unwrap().contains("Capital of Germany"));
+        assert_eq!(out.get("CardFront").unwrap(), "Q: Berlin");
+        assert!(out.get("CardBack").unwrap().contains("Capital of Germany"));
 
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn generate_keys_and_card_names_are_validated() {
+        use crate::note_parser::parse_note;
+        use crate::render::Registry;
+        use crate::scripting::context::RenderContext;
+
+        let se = ScriptEngine::new(std::env::temp_dir(), None);
+        let run = |src: &str| -> Result<ModelOutput> {
+            let m = se.compile("t", src, None)?;
+            let note = parse_note("x\n", PathBuf::from("/tmp/x.md"));
+            let ctx = RenderContext::new(Arc::new(Registry::new()), PathBuf::from("/tmp/x.md"), PathBuf::from("/tmp"));
+            se.execute(&m, note, ctx)
+        };
+        // The pre-fix trap: keys named after the card, not <Card>Front/Back.
+        let err = run(r#"return { card_names = {"A","B"},
+            generate = function() return { A = "x", B = "y" } end }"#)
+            .unwrap_err()
+            .to_string();
+        assert!(err.contains(r#"unknown key(s) "A", "B""#) && err.contains("AFront, ABack, BFront, BBack"), "{err}");
+        // card_names as a function still works.
+        assert!(run(r#"return { card_names = function() return {"A"} end,
+            generate = function() return { AFront = "x" } end }"#).is_ok());
+        for (src, want) in [
+            (r#"return { generate = function() end }"#, "must define M.card_names"),
+            (r#"return { card_names = {}, generate = function() end }"#, "is empty"),
+            (r#"return { card_names = {"A","A"}, generate = function() end }"#, "appears twice"),
+            (r#"return { card_names = {"a{b"}, generate = function() end }"#, "use letters"),
+        ] {
+            let err = se.compile("t", src, None).err().map(|e| e.to_string()).unwrap_or_default();
+            assert!(err.contains(want), "{src}: {err}");
+        }
     }
 
     #[test]

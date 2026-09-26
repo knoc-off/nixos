@@ -302,9 +302,27 @@ impl Handler {
 
     pub fn read_model(&mut self, name: &str) -> Result<serde_json::Value> {
         check_model_name(name)?;
+        if let Some(lua) = builtin_model_lua(name) {
+            return Ok(serde_json::json!({
+                "name": name,
+                "builtin": true,
+                "note": "built in, not editable: this Lua is an equivalent example to copy from",
+                "lua": lua,
+                "card_usage": self.usage(name)?,
+            }));
+        }
         let dir = self.models_dir();
-        let lua = std::fs::read_to_string(dir.join(format!("{name}.lua")))
-            .with_context(|| format!("no model {name}"))?;
+        let lua = std::fs::read_to_string(dir.join(format!("{name}.lua"))).map_err(|_| {
+            anyhow::anyhow!(
+                "no model {name}; models are {}",
+                ["basic", "cloze"]
+                    .into_iter()
+                    .map(String::from)
+                    .chain(self.model_names().unwrap_or_default())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        })?;
         let css = std::fs::read_to_string(dir.join(format!("{name}.css"))).ok();
         let usage = self.usage(name)?;
         Ok(serde_json::json!({"name": name, "lua": lua, "css": css, "card_usage": usage}))
@@ -518,6 +536,33 @@ impl Handler {
             }
             Ok(serde_json::json!({"rows": out, "truncated": truncated}))
         }
+    }
+}
+
+/// Lua equivalents of the built-in models, as examples for authors.
+fn builtin_model_lua(name: &str) -> Option<&'static str> {
+    match name {
+        "basic" => Some(
+            r#"local M = {}
+M.card_names = { "Card" }
+function M.describe() return "Section 1 is the front, section 2 the back." end
+-- The answer side shows only CardBack (no {{FrontSide}}), so the
+-- built-in's back is section 2 alone.
+function M.generate(note, ctx)
+  return { CardFront = ctx:section_html(note, 1), CardBack = ctx:section_html(note, 2) }
+end
+return M"#,
+        ),
+        // Cloze can't be written in Lua (it needs Anki's cloze note type);
+        // this shows how the built-in reads a note.
+        "cloze" => Some(
+            r#"-- Not expressible as a Lua model: cloze needs Anki's cloze note
+-- type (one card per {{cN::}} number). The built-in turns each **bold** /
+-- *italic* span of a #cloze note into {{c1::}}, {{c2::}}, ... in the Text
+-- field, and section 2 (after ---) becomes Back Extra. Write cloze cards
+-- as markdown with #cloze; never write {{c1::}} by hand."#,
+        ),
+        _ => None,
     }
 }
 
