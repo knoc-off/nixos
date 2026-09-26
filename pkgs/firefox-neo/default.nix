@@ -37,6 +37,12 @@
   cfg ? { },
   extraPolicies ? { },
   pkcs11Modules ? [ ],
+  # Same reason as the three above: home-manager passes appDataDir through
+  # package.override when configPath is non-default, and probes for it with
+  # `lib.functionArgs` first. Undeclared here, the probe fails and it silently
+  # drops the argument -- the profile gets written to the XDG path while the
+  # binary keeps reading ~/.mozilla/firefox.
+  appDataDir ? null,
 }:
 let
   fxAutoconfig = inputs.fx-autoconfig;
@@ -56,5 +62,6 @@ firefox.override {
     cfg
     extraPolicies
     pkcs11Modules
+    appDataDir
     ;
 }

@@ -166,6 +166,11 @@ in
             # Sidebery replaces the tab strip; the horizontal one is redundant.
             "browser.tabs.inTitlebar" = 0;
 
+            # Ctrl+Tab walks most-recently-used order instead of tab-strip
+            # order (the "Ctrl+Tab cycles through tabs in recently used order"
+            # checkbox in Settings).
+            "browser.ctrlTab.sortByRecentlyUsed" = true;
+
             # Vertical tabs, which is what actually removes the horizontal tab
             # strip from the titlebar (inTitlebar=0 alone only unmerges it from
             # the window decorations). Firefox's own vertical strip is then

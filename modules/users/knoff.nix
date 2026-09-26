@@ -13,7 +13,7 @@
     let
       user = "knoff";
       upkgs = import inputs.nixpkgs-unstable {
-        inherit (pkgs) system;
+        inherit (pkgs.stdenv.hostPlatform) system;
         config = {
           allowUnfree = true;
         };
