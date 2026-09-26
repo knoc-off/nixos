@@ -1,13 +1,15 @@
-"""FastMCP server: transport/auth at the edge, curated tools inside.
+"""FastMCP server: curated tools over one KitchenOwl household.
 
 Reads return compact projections; KitchenOwl's own `obj_to_full_dict` carries a
 lot of noise that would be paid for on every call. Writes go through the
 validator in `validator.py`, which reports every violation at once.
+
+This server does no authentication of its own: mcp-auth-proxy sits in front of
+it and is the only gate. See the binding note in `config.py`.
 """
 
 from __future__ import annotations
 
-import hmac
 from importlib import resources
 from pathlib import Path
 from typing import Annotated, Any
@@ -15,11 +17,7 @@ from typing import Annotated, Any
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from pydantic import BaseModel, Field
-from starlette.middleware import Middleware
-from starlette.responses import JSONResponse
-from starlette.types import ASGIApp, Receive, Scope, Send
 
-from .auth import build_auth_provider
 from .client import KitchenOwlClient, KitchenOwlError
 from .config import Config
 from .validator import (
@@ -28,40 +26,6 @@ from .validator import (
     ValidationResult,
     validate_recipe,
 )
-
-
-class BearerAuthMiddleware:
-    """Constant-time shared-secret check, applied before anything else.
-
-    Kept out here so no tool ever has to think about who is calling. FastMCP's
-    built-in verifiers target JWT and OAuth; for one fixed token this is less
-    indirection.
-    """
-
-    def __init__(self, app: ASGIApp, token: str) -> None:
-        self.app = app
-        self._token = token.encode()
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http":
-            await self.app(scope, receive, send)
-            return
-
-        header = ""
-        for key, value in scope.get("headers", []):
-            if key == b"authorization":
-                header = value.decode("latin-1")
-                break
-
-        scheme, _, presented = header.partition(" ")
-        if scheme.lower() != "bearer" or not hmac.compare_digest(
-            presented.strip().encode(), self._token
-        ):
-            response = JSONResponse({"error": "unauthorized"}, status_code=401)
-            await response(scope, receive, send)
-            return
-
-        await self.app(scope, receive, send)
 
 
 class RecipeItemInput(BaseModel):
@@ -147,10 +111,9 @@ def _preview(draft: RecipeDraft, result: ValidationResult, source: str) -> dict[
     }
 
 
-def build_server(config: Config, client: KitchenOwlClient, auth: Any = None) -> FastMCP:
+def build_server(config: Config, client: KitchenOwlClient) -> FastMCP:
     mcp: FastMCP = FastMCP(
         name="kitchenowl",
-        auth=auth,
         instructions=(
             "Recipe management for a single KitchenOwl household. Call "
             "get_style_guide before writing a recipe, and list_items before "
@@ -363,21 +326,7 @@ def main() -> None:
 
     config = Config.from_env()
     client = KitchenOwlClient(config)
-    auth = build_auth_provider(config)
-    mcp = build_server(config, client, auth=auth)
+    mcp = build_server(config, client)
 
-    # With OAuth the provider is the gate, and it must not sit behind the
-    # bearer middleware: the OAuth endpoints themselves (discovery, consent,
-    # callback) are reached without a token by definition.
-    middleware = (
-        []
-        if auth is not None
-        else [Middleware(BearerAuthMiddleware, token=config.mcp_token)]
-    )
-
-    app = mcp.http_app(
-        path="/mcp",
-        stateless_http=True,
-        middleware=middleware,
-    )
+    app = mcp.http_app(path="/mcp", stateless_http=True)
     uvicorn.run(app, host=config.host, port=config.port, access_log=False)

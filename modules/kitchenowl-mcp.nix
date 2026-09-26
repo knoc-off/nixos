@@ -5,17 +5,11 @@
 # writes that are validated against KitchenOwl's own markdown/item rules before
 # anything is persisted.
 #
-# Auth comes in two mutually exclusive shapes, because MCP clients differ:
-#
-#   - `mcpTokenFile`: a shared bearer token, checked in constant time ahead of
-#     the MCP app. Fine for CLI clients that can set a header.
-#   - `oauth`: a GitHub-backed OAuth flow, for clients (Claude's web connector)
-#     that only speak OAuth and have nowhere to paste a token.
-#
-# Either way the vhost deliberately skips the `auth-public` snippet -- MCP
-# clients cannot follow an interactive redirect to auth.niko.ink. In OAuth mode
-# the server runs its own authorization endpoints instead, and `allowedGitHubUsers`
-# is what keeps the rest of GitHub out.
+# The MCP server itself authenticates nobody. `proxy` puts mcp-auth-proxy in
+# front of it -- a drop-in OAuth 2.1 gateway -- because MCP clients cannot
+# follow an interactive redirect to auth.niko.ink, which is why the vhost also
+# skips the `auth-public` snippet. The server stays on loopback; the proxy is
+# the only thing reachable from Caddy.
 { self, ... }:
 {
   nixos =
@@ -28,7 +22,6 @@
     with lib;
     let
       cfg = config.services.kitchenowl-mcp;
-      oauthBaseUrl = if cfg.oauth.baseUrl != null then cfg.oauth.baseUrl else "https://${cfg.domain}";
     in
     {
       options.services.kitchenowl-mcp = {
@@ -59,7 +52,10 @@
         host = mkOption {
           type = types.str;
           default = "127.0.0.1";
-          description = "Address to bind. Keep on loopback and reverse-proxy to it.";
+          description = ''
+            Address to bind. Keep on loopback: the server does no authentication
+            of its own, and relies on `proxy` being the only public entry point.
+          '';
         };
 
         port = mkOption {
@@ -73,10 +69,9 @@
           default = null;
           example = "kitchenowl-mcp.niko.ink";
           description = ''
-            If set, a Caddy virtual host is created for this domain. The vhost does
-            not import `auth-public`: authentication is handled by the server
-            itself, either as a bearer token or via the OAuth endpoints it serves
-            on this same domain.
+            If set, a Caddy virtual host is created for this domain, pointing at
+            the auth proxy. The vhost does not import `auth-public`: MCP clients
+            cannot follow the interactive redirect it issues.
           '';
         };
 
@@ -104,92 +99,43 @@
           '';
         };
 
-        mcpTokenFile = mkOption {
-          type = types.nullOr types.path;
-          default = null;
-          description = ''
-            Path (sops secret) to a file whose contents are the bearer token MCP
-            clients must present. Must be distinct from `apiTokenFile`: this one is
-            handed to clients, and a leak of it should not imply KitchenOwl account
-            access. Mutually exclusive with `oauth.enable`.
-          '';
-        };
-
-        oauth = {
+        proxy = {
           enable = mkEnableOption "" // {
             description = ''
-              Authenticate MCP clients via GitHub OAuth instead of a bearer
-              token, for clients that cannot send an Authorization header.
+              Run mcp-auth-proxy in front of the MCP server. It terminates the
+              OAuth 2.1 flow MCP clients expect, issues its own tokens, and
+              proxies authenticated requests through to `/mcp` unchanged.
 
-              The server exposes its own OAuth endpoints (discovery, dynamic
-              client registration, consent, callback) on `domain` and proxies
-              them upstream to a GitHub OAuth app.
+              Without this the server is unauthenticated, so only enable
+              `domain` alongside it.
             '';
           };
 
-          clientId = mkOption {
-            type = types.str;
-            default = "";
-            example = "Ov23liAbcDefGhiJkLmN";
-            description = ''
-              Client ID of a GitHub OAuth app whose callback URL is
-              `https://<domain>/auth/callback`. This must be an app of its own:
-              GitHub allows a single callback per app, and the oauth2-proxy app is
-              already using its own.
-
-              Not a secret (it appears in the browser during the OAuth redirect);
-              use `clientIdFile` instead to keep it out of the world-readable Nix
-              store anyway.
-            '';
+          package = mkOption {
+            type = types.package;
+            default = self.packages.${pkgs.stdenv.hostPlatform.system}.mcp-auth-proxy;
+            defaultText = literalExpression "self.packages.\${system}.mcp-auth-proxy";
+            description = "The mcp-auth-proxy package to run.";
           };
 
-          clientIdFile = mkOption {
+          port = mkOption {
+            type = types.port;
+            default = 3045;
+            description = "Port the proxy listens on. Caddy reverse-proxies to this.";
+          };
+
+          passwordHashFile = mkOption {
             type = types.nullOr types.path;
             default = null;
-            description = "Path (sops secret) holding the client ID, as an alternative to `clientId`.";
-          };
-
-          clientSecretFile = mkOption {
-            type = types.nullOr types.path;
-            default = null;
-            description = "Path (sops secret) to the GitHub OAuth app client secret.";
-          };
-
-          allowedGitHubUsers = mkOption {
-            type = types.listOf types.str;
-            default = [ ];
-            example = [ "octocat" ];
             description = ''
-              GitHub logins permitted to use this server. Checked on every request,
-              so revoking someone takes effect immediately rather than when their
-              token expires.
+              Path (sops secret) to a bcrypt hash of the login password. A hash
+              rather than a plaintext password so it never appears in the
+              process table; generate one with
 
-              A successful GitHub login only proves the caller has *a* GitHub
-              account, so this list -- not the OAuth flow -- is what actually
-              restricts access. It must be non-empty.
-            '';
-          };
+                nix run nixpkgs#apacheHttpd -- htpasswd -nbBC 12 "" yourpassword | cut -d: -f2
 
-          allowedRedirectUris = mkOption {
-            type = types.nullOr (types.listOf types.str);
-            default = null;
-            example = [ "https://claude.ai/api/mcp/auth_callback" ];
-            description = ''
-              Redirect URI patterns accepted from registering MCP clients. Null
-              keeps the built-in default (Anthropic's connector callbacks).
-
-              Do not widen this casually: the upstream library's own default is to
-              accept any redirect URI, which would let a malicious client have
-              authorization codes delivered to itself.
-            '';
-          };
-
-          baseUrl = mkOption {
-            type = types.nullOr types.str;
-            default = null;
-            description = ''
-              Public https URL the OAuth endpoints are reachable at. Defaults to
-              `https://<domain>`, and must match the GitHub app's callback host.
+              Required: with no hash configured every login attempt fails, which
+              locks the server rather than opening it, but silently.
             '';
           };
         };
@@ -198,35 +144,27 @@
       config = mkIf cfg.enable {
         assertions = [
           {
-            assertion = cfg.oauth.enable != (cfg.mcpTokenFile != null);
+            assertion = cfg.proxy.enable -> cfg.proxy.passwordHashFile != null;
             message = ''
-              services.kitchenowl-mcp needs exactly one of `oauth.enable` or
-              `mcpTokenFile`. Setting both would leave the static token as a way
-              around the GitHub allowlist; setting neither leaves the server
-              unauthenticated.
+              services.kitchenowl-mcp.proxy needs passwordHashFile. Without it
+              mcp-auth-proxy has no password to compare against and every login
+              fails, leaving the server unreachable rather than unprotected.
             '';
           }
           {
-            assertion = !cfg.oauth.enable || cfg.oauth.allowedGitHubUsers != [ ];
+            assertion = cfg.proxy.enable -> cfg.domain != null;
             message = ''
-              services.kitchenowl-mcp.oauth.allowedGitHubUsers is empty. GitHub
-              authenticates every account on the site, so this would expose the
-              household to anyone with a GitHub login.
+              services.kitchenowl-mcp.proxy needs `domain`: the public https URL
+              is the issuer and audience of the tokens it signs, not just a
+              vhost name.
             '';
           }
           {
-            assertion = !cfg.oauth.enable || ((cfg.oauth.clientId != "") != (cfg.oauth.clientIdFile != null));
-            message = "services.kitchenowl-mcp.oauth needs exactly one of clientId or clientIdFile.";
-          }
-          {
-            assertion = !cfg.oauth.enable || cfg.oauth.clientSecretFile != null;
-            message = "services.kitchenowl-mcp.oauth needs clientSecretFile.";
-          }
-          {
-            assertion = !cfg.oauth.enable || cfg.domain != null || cfg.oauth.baseUrl != null;
+            assertion = cfg.domain != null -> cfg.proxy.enable;
             message = ''
-              services.kitchenowl-mcp.oauth needs a public URL: set `domain`, or
-              `oauth.baseUrl` if the server is reached through some other host.
+              services.kitchenowl-mcp has a `domain` but no `proxy`. The MCP
+              server does not authenticate anyone, so this would publish the
+              household to the internet.
             '';
           }
         ];
@@ -250,26 +188,6 @@
             # lands in the unit file or the store.
             KITCHENOWL_API_TOKEN_FILE = "%d/api-token";
           }
-          // optionalAttrs (cfg.mcpTokenFile != null) {
-            KITCHENOWL_MCP_TOKEN_FILE = "%d/mcp-token";
-          }
-          // optionalAttrs cfg.oauth.enable {
-            KITCHENOWL_MCP_OAUTH_BASE_URL = oauthBaseUrl;
-            KITCHENOWL_MCP_OAUTH_CLIENT_SECRET_FILE = "%d/oauth-client-secret";
-            KITCHENOWL_MCP_OAUTH_ALLOWED_USERS = concatStringsSep "," cfg.oauth.allowedGitHubUsers;
-            # Issued-token and client-registration state. Persisted so a restart
-            # does not force every client through the consent flow again.
-            FASTMCP_HOME = "%S/kitchenowl-mcp/fastmcp";
-          }
-          // optionalAttrs (cfg.oauth.enable && cfg.oauth.clientIdFile != null) {
-            KITCHENOWL_MCP_OAUTH_CLIENT_ID_FILE = "%d/oauth-client-id";
-          }
-          // optionalAttrs (cfg.oauth.enable && cfg.oauth.clientId != "") {
-            KITCHENOWL_MCP_OAUTH_CLIENT_ID = cfg.oauth.clientId;
-          }
-          // optionalAttrs (cfg.oauth.enable && cfg.oauth.allowedRedirectUris != null) {
-            KITCHENOWL_MCP_OAUTH_REDIRECT_URIS = concatStringsSep "," cfg.oauth.allowedRedirectUris;
-          }
           // optionalAttrs (cfg.styleGuideFile != null) {
             KITCHENOWL_MCP_STYLE_GUIDE = toString cfg.styleGuideFile;
           };
@@ -280,18 +198,82 @@
             RestartSec = 5;
 
             DynamicUser = true;
-            StateDirectory = "kitchenowl-mcp";
-            StateDirectoryMode = "0700";
-            LoadCredential = [
-              "api-token:${toString cfg.apiTokenFile}"
-            ]
-            ++ optional (cfg.mcpTokenFile != null) "mcp-token:${toString cfg.mcpTokenFile}"
-            ++ optionals cfg.oauth.enable (
-              [ "oauth-client-secret:${toString cfg.oauth.clientSecretFile}" ]
-              ++ optional (cfg.oauth.clientIdFile != null) "oauth-client-id:${toString cfg.oauth.clientIdFile}"
-            );
+            LoadCredential = [ "api-token:${toString cfg.apiTokenFile}" ];
 
             # Hardening.
+            NoNewPrivileges = true;
+            ProtectSystem = "strict";
+            ProtectHome = true;
+            PrivateTmp = true;
+            PrivateDevices = true;
+            ProtectKernelTunables = true;
+            ProtectKernelModules = true;
+            ProtectControlGroups = true;
+            RestrictSUIDSGID = true;
+            RestrictNamespaces = true;
+            RestrictRealtime = true;
+            LockPersonality = true;
+            MemoryDenyWriteExecute = true;
+            SystemCallArchitectures = "native";
+            SystemCallFilter = [
+              "@system-service"
+              "~@privileged"
+              "~@resources"
+            ];
+            RestrictAddressFamilies = [
+              "AF_INET"
+              "AF_INET6"
+              "AF_UNIX"
+            ];
+          };
+        };
+
+        # Password hash reaches the proxy as an environment variable rather than
+        # a flag, which would put it in the process table for every local user.
+        systemd.services.kitchenowl-mcp-proxy = mkIf cfg.proxy.enable {
+          description = "OAuth 2.1 gateway for the KitchenOwl MCP server";
+          wantedBy = [ "multi-user.target" ];
+          after = [ "kitchenowl-mcp.service" ];
+          bindsTo = [ "kitchenowl-mcp.service" ];
+
+          environment = {
+            # Caddy terminates TLS, so no ACME here -- but the external URL is
+            # still the issuer and audience of every token the proxy signs.
+            EXTERNAL_URL = "https://${cfg.domain}";
+            LISTEN = "127.0.0.1:${toString cfg.proxy.port}";
+            NO_AUTO_TLS = "true";
+            DATA_PATH = "%S/kitchenowl-mcp-proxy";
+            # Caddy is the only thing in front, so its X-Forwarded-* headers are
+            # the ones to believe; from anywhere else they are ignored.
+            TRUSTED_PROXIES = "127.0.0.1/32";
+          };
+
+          serviceConfig = {
+            # The hash is exported from the credential rather than passed as
+            # --password-hash, which would expose it in the process table.
+            # Plain assignment, not `export X=$(...)`: that returns export's
+            # status, so a failed read would start the proxy with an empty hash
+            # and silently reject every login instead of failing here. Going
+            # through a shell also keeps the `$` in a bcrypt hash away from
+            # systemd's EnvironmentFile parsing.
+            ExecStart = pkgs.writeShellScript "kitchenowl-mcp-proxy-start" ''
+              set -euo pipefail
+              PASSWORD_HASH=$(cat "$CREDENTIALS_DIRECTORY/password-hash")
+              export PASSWORD_HASH
+              exec ${getExe cfg.proxy.package} http://${cfg.host}:${toString cfg.port}
+            '';
+            Restart = "on-failure";
+            RestartSec = 5;
+
+            DynamicUser = true;
+            # Holds the RSA token-signing key, the session HMAC secret, and the
+            # registered-client store. Wiping it invalidates every issued token
+            # and forces each client to register again.
+            StateDirectory = "kitchenowl-mcp-proxy";
+            StateDirectoryMode = "0700";
+            LoadCredential = [ "password-hash:${toString cfg.proxy.passwordHashFile}" ];
+
+            # Hardening, matching the MCP server above.
             NoNewPrivileges = true;
             ProtectSystem = "strict";
             ProtectHome = true;
@@ -327,7 +309,7 @@
             useACMEHost = "niko.ink";
             extraConfig = ''
               import security-headers
-              reverse_proxy ${cfg.host}:${toString cfg.port}
+              reverse_proxy 127.0.0.1:${toString cfg.proxy.port}
             '';
           };
         };

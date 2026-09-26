@@ -7,7 +7,7 @@ name = "kitchenowl-mcp"
 version = "0.1.0"
 description = "MCP server for a single KitchenOwl household, with recipe validation"
 requires-python = ">=3.11"
-dependencies = ["fastmcp", "httpx", "mcp", "uvicorn"]
+dependencies = ["fastmcp", "httpx", "uvicorn"]
 
 [project.scripts]
 kitchenowl-mcp = "kitchenowl_mcp:main"

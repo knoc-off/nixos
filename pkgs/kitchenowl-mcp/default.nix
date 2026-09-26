@@ -18,23 +18,15 @@ python3Packages.buildPythonApplication {
   dependencies = with python3Packages; [
     fastmcp
     httpx
-    # Imported directly for the DCR registration error type; fastmcp re-exports
-    # the provider machinery but not this.
-    mcp
     uvicorn
   ];
 
-  nativeCheckInputs = [
-    python3Packages.pytestCheckHook
-    # In-memory OAuth client store, so the auth tests need no writable HOME.
-    python3Packages.py-key-value-aio
-  ];
+  nativeCheckInputs = [ python3Packages.pytestCheckHook ];
 
   passthru.devShell = python3Packages.python.withPackages (
     ps: with ps; [
       fastmcp
       httpx
-      mcp
       uvicorn
       pytest
     ]

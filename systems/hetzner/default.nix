@@ -26,6 +26,7 @@ in
         secrets = {
           "services/kitchenowl/jwt-secret" = { };
           "services/kitchenowl/api-token" = { };
+          "services/kitchenowl/mcp-password-hash" = { };
           "services/ntfy/admin-hash" = { };
           "services/ntfy/normal-hash" = { };
           "services/ntfy/publisher-hash" = { };
@@ -42,7 +43,7 @@ in
     ./services/kitchenowl.nix
     self.nixosModules.kitchenowl-notify
     self.nixosModules.kitchenowl-meal-plan
-    # self.nixosModules.kitchenowl-mcp
+    self.nixosModules.kitchenowl-mcp
     ./services/trilium.nix
     ./services/ntfy.nix
     ./services/minecraft-gate.nix
@@ -74,23 +75,19 @@ in
     ntfyTokenFile = config.sops.secrets."services/ntfy/publish-token".path;
   };
 
-  # Curated MCP tool surface over the KitchenOwl household.
-  # services.kitchenowl-mcp = {
-  #   enable = true;
-  #   householdId = 1; # TODO: set to your KitchenOwl household ("home") id
-  #   domain = "kitchenowl-mcp.niko.ink";
-  #   apiTokenFile = config.sops.secrets."services/kitchenowl/api-token".path;
+  # Curated MCP tool surface over the KitchenOwl household. The server itself
+  # authenticates nobody; mcp-auth-proxy in front of it is the gate.
+  services.kitchenowl-mcp = {
+    enable = true;
+    householdId = 1;
+    domain = "kitchenowl-mcp.niko.ink";
+    apiTokenFile = config.sops.secrets."services/kitchenowl/api-token".path;
 
-  #   # Claude's web connector only speaks OAuth, so there is no bearer token
-  #   # here. GitHub does the authenticating; allowedGitHubUsers does the
-  #   # authorizing, and is the only thing keeping the rest of GitHub out.
-  #   oauth = {
-  #     enable = true;
-  #     clientIdFile = config.sops.secrets."services/kitchenowl/oauth-client-id".path;
-  #     clientSecretFile = config.sops.secrets."services/kitchenowl/oauth-client-secret".path;
-  #     allowedGitHubUsers = [ "knoc-off" ];
-  #   };
-  # };
+    proxy = {
+      enable = true;
+      passwordHashFile = config.sops.secrets."services/kitchenowl/mcp-password-hash".path;
+    };
+  };
 
   nix.optimise.automatic = true;
   nix.gc = {
