@@ -17,7 +17,7 @@
 
 use anyhow::{Context, Result};
 use marki_anki::notetype::ModelSpec;
-use marki_anki::{Collection, NoteWriter, RawManagedNote};
+use marki_anki::{Collection, ModelChangeOpts, NoteWriter, RawManagedNote};
 use marki_render::Asset;
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -26,7 +26,7 @@ use std::sync::Arc;
 use crate::anki::model::{MARKER_TAG, ORPHAN_TAG, full_tag_set, hash_from_tags};
 use crate::note::Note;
 use crate::render::Registry;
-use crate::scan::{ScannedNote, deck_for};
+use crate::scan::{ScannedNote, deck_for_note};
 use crate::scripting::context::RenderContext;
 use crate::scripting::engine::ScriptEngine;
 use crate::sync::media;
@@ -63,6 +63,33 @@ pub struct Outcome {
     pub skipped_prune: usize,
     pub unformatted: usize,
     pub errors: Vec<String>,
+    /// Per-note plan, in path order (orphans last, by id). Filled for dry
+    /// runs too, so `status` and simulations can say *which* notes change.
+    pub changes: Vec<Change>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, strum::IntoStaticStr)]
+#[serde(rename_all = "snake_case")]
+#[strum(serialize_all = "snake_case")]
+pub enum ChangeKind {
+    Add,
+    Update,
+    Move,
+    ModelChange,
+    Orphan,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Change {
+    pub kind: ChangeKind,
+    pub id: String,
+    /// Source file; `None` for orphans (their file is gone).
+    pub path: Option<std::path::PathBuf>,
+    /// Human detail: `deck A -> B`, `model X -> Y`, ...
+    pub detail: String,
+    /// Hash of the rendered fields being written (empty for orphans), so a
+    /// plan fingerprint changes when content does.
+    pub content_hash: String,
 }
 
 /// A fully resolved local note ready for diffing against the collection.
@@ -70,6 +97,8 @@ struct Local {
     path: std::path::PathBuf,
     guid: String,
     spec: ModelSpec,
+    /// Rename/removal permissions declared by the model script.
+    change_opts: ModelChangeOpts,
     /// Field values in ord order (`CardFront`, `CardBack`, ...).
     fields: Vec<String>,
     anki_tags: Vec<String>,
@@ -105,8 +134,8 @@ pub fn reconcile(
     registry: &Arc<Registry>,
     cache_dir: &Path,
     models_dir: &Path,
-    media_dir: &Path,
-    media_db_path: &Path,
+    // `(media dir, media.db)`; `None` skips writing assets (simulation).
+    media: Option<(&Path, &Path)>,
     dry_run: bool,
     prune: bool,
 ) -> Result<Outcome> {
@@ -135,28 +164,28 @@ pub fn reconcile(
         // Record the id as present on disk regardless of what happens next.
         seen_source_ids.insert(guid.clone());
 
-        // Cloze notes expand to N variants per note and cannot be templated
-        // through the fixed Front/Back pair yet -- skip them without error so
-        // they are neither written nor treated as orphaned.
-        if note.model == "cloze" {
-            tracing::warn!(
-                path = %sn.path.display(),
-                "cloze notes are not yet supported by the direct writer; skipping"
-            );
-            continue;
-        }
-
-        let result = if note.model == "basic" {
-            build_stock_local(sn, &guid, root, registry, cache_dir, models_dir, &mut outcome)
-        } else {
-            build_custom_local(
-                sn, &guid, root, script_engine, registry, cache_dir, models_dir, &mut outcome,
-            )
-        };
-
-        let entry = match result {
-            Some(e) => e,
-            None => continue, // error already pushed to outcome
+        let entry = match render_note(sn, script_engine, registry, cache_dir, models_dir) {
+            Ok(r) => {
+                for e in &r.errors {
+                    outcome.errors.push(format!("{}: {e}", sn.path.display()));
+                }
+                let hash = compute_hash(&r.fields);
+                Local {
+                    path: sn.path.clone(),
+                    guid: guid.clone(),
+                    spec: r.spec,
+                    change_opts: r.change_opts,
+                    fields: r.fields,
+                    anki_tags: note.anki_tags.clone(),
+                    deck: deck_for_note(root, note),
+                    assets: r.assets,
+                    hash,
+                }
+            }
+            Err(e) => {
+                outcome.errors.push(format!("{}: {e:#}", sn.path.display()));
+                continue;
+            }
         };
 
         if let Some(prev) = local.insert(guid.clone(), entry) {
@@ -178,31 +207,52 @@ pub fn reconcile(
 
     // ---- Phase 3: Compute the plan (pure) and the orphan set.
     let mut plan: Vec<Plan> = Vec::new();
+    let mut changes: Vec<Change> = Vec::new();
     for (guid, l) in &local {
+        let change = |kind, detail: String| Change {
+            kind,
+            id: guid.clone(),
+            path: Some(l.path.clone()),
+            detail,
+            content_hash: l.hash.clone(),
+        };
         match remote.get(guid) {
             Some(r) => {
                 let model_changed = l.model_name() != r.model_name;
                 let remote_hash = hash_from_tags(&r.tags).unwrap_or_default();
                 let content_changed = l.hash != remote_hash;
                 let deck_changed = l.deck != r.deck;
+                let deck_note = if deck_changed {
+                    format!("deck {} -> {}", r.deck, l.deck)
+                } else {
+                    String::new()
+                };
 
                 if model_changed {
                     plan.push(Plan::ModelChange(r, l));
                     outcome.updated += 1;
+                    changes.push(change(
+                        ChangeKind::ModelChange,
+                        format!("model {} -> {} (full sync required)", r.model_name, l.model_name()),
+                    ));
                 } else if content_changed {
                     plan.push(Plan::Update(r, l, deck_changed));
                     outcome.updated += 1;
+                    changes.push(change(ChangeKind::Update, deck_note));
                 } else if deck_changed {
                     plan.push(Plan::Move(r, l));
                     outcome.moved += 1;
+                    changes.push(change(ChangeKind::Move, deck_note));
                 }
             }
             None => {
                 plan.push(Plan::Add(l));
                 outcome.added += 1;
+                changes.push(change(ChangeKind::Add, format!("deck {}", l.deck)));
             }
         }
     }
+    changes.sort_by(|a, b| a.path.cmp(&b.path));
 
     // An orphan is a managed note whose id is absent from disk. We filter by
     // `seen_source_ids`, NOT merely "unmatched": a note whose source file
@@ -212,6 +262,19 @@ pub fn reconcile(
         .values()
         .filter(|r| is_orphan(&r.guid, &seen_source_ids))
         .collect();
+    let mut orphan_changes: Vec<Change> = orphans
+        .iter()
+        .map(|r| Change {
+            kind: ChangeKind::Orphan,
+            id: r.guid.clone(),
+            path: None,
+            detail: format!("{} in {}", r.model_name, r.deck),
+            content_hash: String::new(),
+        })
+        .collect();
+    orphan_changes.sort_by(|a, b| a.id.cmp(&b.id));
+    changes.extend(orphan_changes);
+    outcome.changes = changes;
 
     // ---- Phase 4: Report or apply.
     if dry_run {
@@ -221,12 +284,25 @@ pub fn reconcile(
 
     // Push media before touching the collection so a media failure trips the
     // orphan safety valve below (never prune during a cycle with errors).
-    let assets = collect_assets(&local);
-    if let Err(e) = media::push_all(&assets, media_dir, media_db_path) {
-        outcome.errors.push(format!("media push: {e:#}"));
+    if let Some((media_dir, media_db_path)) = media {
+        let assets = collect_assets(&local);
+        if let Err(e) = media::push_all(&assets, media_dir, media_db_path) {
+            outcome.errors.push(format!("media push: {e:#}"));
+        }
     }
 
-    apply(col, &plan, &orphans, prune, &mut outcome)?;
+    // One representative note per model, in a stable order.
+    let mut models_in_use: Vec<&Local> = Vec::new();
+    let mut seen_models: HashSet<String> = HashSet::new();
+    let mut by_path: Vec<&Local> = local.values().collect();
+    by_path.sort_by(|a, b| a.path.cmp(&b.path));
+    for l in by_path {
+        if seen_models.insert(l.model_name()) {
+            models_in_use.push(l);
+        }
+    }
+
+    apply(col, &models_in_use, &plan, &orphans, prune, &mut outcome)?;
     Ok(outcome)
 }
 
@@ -234,13 +310,13 @@ pub fn reconcile(
 fn ensure_model_cached(
     w: &mut NoteWriter,
     cache: &mut HashMap<String, i64>,
-    spec: &ModelSpec,
+    l: &Local,
 ) -> Result<i64> {
-    let name = spec.notetype_name();
+    let name = l.spec.notetype_name();
     if let Some(&mid) = cache.get(&name) {
         return Ok(mid);
     }
-    let mid = w.ensure_model(spec)?;
+    let mid = w.ensure_model_with(&l.spec, &l.change_opts)?;
     cache.insert(name, mid);
     Ok(mid)
 }
@@ -248,6 +324,7 @@ fn ensure_model_cached(
 /// Apply the plan and orphan handling inside a single exclusive transaction.
 fn apply(
     col: &mut Collection,
+    models_in_use: &[&Local],
     plan: &[Plan],
     orphans: &[&RawManagedNote],
     prune: bool,
@@ -256,37 +333,69 @@ fn apply(
     // Read outside the closure -- the safety valve depends on render errors.
     let had_errors = !outcome.errors.is_empty();
 
-    let (deleted, quarantined, skipped_prune) = col.transact(|w| {
+    let (deleted, quarantined, skipped_prune, blocked) = col.transact(|w| {
         let mut ensured: HashMap<String, i64> = HashMap::new();
 
+        // Bring every model in use up to date first, even when none of its
+        // notes changed: a script that only renames or appends card types
+        // leaves note hashes untouched, so the plan alone would miss it.
+        // A model that can't be brought up to date (e.g. a refused template
+        // removal) only blocks its own notes, not the whole push.
+        let mut blocked: HashMap<String, String> = HashMap::new();
+        for l in models_in_use {
+            if let Err(e) = ensure_model_cached(w, &mut ensured, l) {
+                blocked.insert(l.model_name(), format!("{e:#}"));
+            }
+        }
+        let is_blocked = |l: &Local| blocked.contains_key(&l.model_name());
+
         for p in plan {
+            let l = match p {
+                Plan::Add(l) | Plan::ModelChange(_, l) | Plan::Update(_, l, _) | Plan::Move(_, l) => *l,
+            };
+            if is_blocked(l) {
+                continue;
+            }
             match p {
                 Plan::Add(l) => {
-                    let mid = ensure_model_cached(w, &mut ensured, &l.spec)?;
+                    let mid = ensure_model_cached(w, &mut ensured, l)?;
                     let did = w.deck_id_for(&l.deck)?;
                     let tags = full_tag_set(&l.anki_tags, &l.hash);
                     w.add_note(mid, &l.guid, l.fields.clone(), 0, &tags, did)?;
                     tracing::debug!(path = %l.path.display(), id = %l.guid, "add");
                 }
                 Plan::ModelChange(r, l) => {
-                    w.remove_note(r.note_id)?;
-                    let mid = ensure_model_cached(w, &mut ensured, &l.spec)?;
+                    let mid = ensure_model_cached(w, &mut ensured, l)?;
                     let did = w.deck_id_for(&l.deck)?;
                     let tags = full_tag_set(&l.anki_tags, &l.hash);
-                    w.add_note(mid, &l.guid, l.fields.clone(), 0, &tags, did)?;
+                    let remap = w.change_note_model(
+                        r.note_id,
+                        mid,
+                        l.fields.clone(),
+                        0,
+                        &tags,
+                        did,
+                        &l.change_opts.renames,
+                    )?;
                     tracing::info!(
                         path = %l.path.display(),
                         from = %r.model_name,
                         to = %l.model_name(),
-                        "note type changed -- removed and re-added"
+                        kept = remap.kept,
+                        removed = remap.removed,
+                        added = remap.added,
+                        "note type changed in place (full sync required)"
                     );
                 }
                 Plan::Update(r, l, deck_changed) => {
                     // Ensure the model in case the script appended a card
                     // (new fields/templates) since the note was last written.
-                    ensure_model_cached(w, &mut ensured, &l.spec)?;
+                    ensure_model_cached(w, &mut ensured, l)?;
                     let tags = full_tag_set(&l.anki_tags, &l.hash);
                     w.update_note(r.note_id, l.fields.clone(), 0, &tags)?;
+                    if l.spec.cloze {
+                        w.sync_cloze_cards(r.note_id)?;
+                    }
                     if *deck_changed {
                         let did = w.deck_id_for(&l.deck)?;
                         w.set_note_deck(r.note_id, did)?;
@@ -303,9 +412,9 @@ fn apply(
 
         // Orphans: notes with no matching source file this cycle.
         if orphans.is_empty() {
-            return Ok((0usize, 0usize, 0usize));
+            return Ok((0usize, 0usize, 0usize, blocked));
         }
-        if had_errors {
+        if had_errors || !blocked.is_empty() {
             // Safety valve: a cycle that hit errors may have failed to render
             // live notes; never prune in that state. Re-run once clean.
             tracing::warn!(
@@ -314,24 +423,27 @@ fn apply(
                  re-run after fixing them",
                 orphans.len()
             );
-            return Ok((0, 0, orphans.len()));
+            return Ok((0, 0, orphans.len(), blocked));
         }
         if prune {
             for r in orphans {
                 w.remove_note(r.note_id)?;
             }
             tracing::debug!(count = orphans.len(), "deleted orphaned notes");
-            Ok((orphans.len(), 0, 0))
+            Ok((orphans.len(), 0, 0, blocked))
         } else {
             for r in orphans {
                 w.suspend_note_cards(r.note_id)?;
                 w.add_tag_to_note(r.note_id, ORPHAN_TAG)?;
             }
             tracing::debug!(count = orphans.len(), "quarantined orphaned notes");
-            Ok((0, orphans.len(), 0))
+            Ok((0, orphans.len(), 0, blocked))
         }
     })?;
 
+    for (model, e) in blocked {
+        outcome.errors.push(format!("model {model}: not updated, its notes were skipped: {e}"));
+    }
     outcome.deleted = deleted;
     outcome.quarantined = quarantined;
     outcome.skipped_prune = skipped_prune;
@@ -372,13 +484,30 @@ fn collect_assets(local: &HashMap<String, Local>) -> Vec<Asset> {
 /// minimal default when absent.
 fn load_model_css(models_dir: &Path, name: &str) -> String {
     let path = models_dir.join(format!("{name}.css"));
-    std::fs::read_to_string(&path).unwrap_or_else(|_| DEFAULT_CSS.to_string())
+    std::fs::read_to_string(&path).unwrap_or_else(|_| {
+        if name == "cloze" {
+            format!("{DEFAULT_CSS}{CLOZE_CSS}")
+        } else {
+            DEFAULT_CSS.to_string()
+        }
+    })
 }
+
+/// Anki styles the active cloze span with `.cloze`; without a rule it is
+/// indistinguishable from surrounding text.
+const CLOZE_CSS: &str = r#".cloze {
+    font-weight: bold;
+    color: #1565c0;
+}
+.nightMode .cloze {
+    color: #90caf9;
+}
+"#;
 
 // ---- Stock pipeline (basic) ----
 
 /// Fields and assets for a stock ("Basic"/"Cloze") note. Kept as named
-/// `(field, value)` pairs because `render-map` and the offline preview read
+/// `(field, value)` pairs because the offline preview reads
 /// them by name; the reconcile engine takes only the values.
 pub struct StockRenderResult {
     /// `("Front", html)`/`("Back", html)` for Basic;
@@ -429,111 +558,88 @@ pub fn render_stock(
     StockRenderResult { fields, assets, errors }
 }
 
-/// Build a [`Local`] for a basic note. Its `marki:basic` notetype has a single
-/// `Card` template, so the front/back HTML map straight to `CardFront`/`CardBack`.
-#[allow(clippy::too_many_arguments)]
-fn build_stock_local(
-    sn: &ScannedNote,
-    guid: &str,
-    root: &Path,
-    registry: &Arc<Registry>,
-    cache_dir: &Path,
-    models_dir: &Path,
-    outcome: &mut Outcome,
-) -> Option<Local> {
-    let result = render_stock(&sn.note, registry.as_ref(), &sn.path, cache_dir);
-
-    for e in &result.errors {
-        outcome.errors.push(format!("{}: {e}", sn.path.display()));
-    }
-
-    let fields: Vec<String> = result.fields.into_iter().map(|(_, v)| v).collect();
-    let hash = compute_hash(&fields);
-    let deck = deck_for(root, &sn.path);
-
-    let spec = ModelSpec {
-        name: "basic".into(),
-        css: load_model_css(models_dir, "basic"),
-        card_names: vec![BASIC_CARD_NAME.to_string()],
-    };
-
-    Some(Local {
-        path: sn.path.clone(),
-        guid: guid.to_string(),
-        spec,
-        fields,
-        anki_tags: sn.note.anki_tags.clone(),
-        deck,
-        assets: result.assets,
-        hash,
-    })
+/// A note rendered into its notetype: the spec it needs, field values in
+/// ord order, emitted assets and non-fatal render errors. Shared by sync and
+/// preview so both see exactly the same HTML.
+pub struct RenderedNote {
+    pub spec: ModelSpec,
+    pub change_opts: ModelChangeOpts,
+    pub fields: Vec<String>,
+    pub assets: Vec<Asset>,
+    pub errors: Vec<String>,
 }
 
-// ---- Custom model pipeline ----
+impl RenderedNote {
+    /// Field value by notetype field name (`CardFront`, `Text`, ...).
+    pub fn field(&self, name: &str) -> &str {
+        self.spec
+            .field_names()
+            .iter()
+            .position(|n| n == name)
+            .and_then(|i| self.fields.get(i))
+            .map_or("", String::as_str)
+    }
+}
 
-/// Build a [`Local`] for a custom-model note using the Lua pipeline. The model
-/// script names its cards; append-only ordering is enforced later by
-/// `NoteWriter::ensure_model` against the committed templates.
-#[allow(clippy::too_many_arguments)]
-fn build_custom_local(
+/// Render one note. Basic/cloze go through the stock pipeline; anything else
+/// runs its model script. A hard failure (missing model, script error) is
+/// `Err`; block-level render problems land in `errors`.
+pub fn render_note(
     sn: &ScannedNote,
-    guid: &str,
-    root: &Path,
     script_engine: &mut ScriptEngine,
     registry: &Arc<Registry>,
     cache_dir: &Path,
     models_dir: &Path,
-    outcome: &mut Outcome,
-) -> Option<Local> {
+) -> Result<RenderedNote> {
     let note = &sn.note;
+    let css = load_model_css(models_dir, &note.model);
 
-    let model = match script_engine.load_model(&note.model) {
-        Ok(m) => m,
-        Err(e) => {
-            outcome.errors.push(format!(
-                "{}: load model '{}': {e}",
-                sn.path.display(),
-                note.model
-            ));
-            return None;
-        }
-    };
+    if note.model == "basic" || note.model == "cloze" {
+        let r = render_stock(note, registry.as_ref(), &sn.path, cache_dir);
+        let cloze = note.model == "cloze";
+        return Ok(RenderedNote {
+            spec: ModelSpec {
+                name: note.model.clone(),
+                css,
+                card_names: if cloze { vec![] } else { vec![BASIC_CARD_NAME.to_string()] },
+                cloze,
+            },
+            change_opts: ModelChangeOpts::default(),
+            fields: r.fields.into_iter().map(|(_, v)| v).collect(),
+            assets: r.assets,
+            errors: r.errors,
+        });
+    }
 
+    let model = script_engine
+        .load_model(&note.model)
+        .with_context(|| format!("load model '{}'", note.model))?;
     let spec = ModelSpec {
         name: note.model.clone(),
-        css: load_model_css(models_dir, &note.model),
+        css,
         card_names: model.card_names.clone(),
+        cloze: false,
     };
-
     let ctx = RenderContext::new(Arc::clone(registry), sn.path.clone(), cache_dir.to_path_buf());
-    let model_output = match script_engine.execute(&model, note.clone(), ctx.clone()) {
-        Ok(o) => o,
-        Err(e) => {
-            outcome.errors.push(format!("{}: script error: {e}", sn.path.display()));
-            return None;
-        }
-    };
-
-    let assets = ctx.take_assets();
+    let output = script_engine
+        .execute(&model, note.clone(), ctx.clone())
+        .context("script error")?;
     // Field values in ord order; a field the script did not emit is empty,
     // which suppresses that card in Anki.
-    let fields: Vec<String> = spec
+    let fields = spec
         .field_names()
         .iter()
-        .map(|name| model_output.get(name).cloned().unwrap_or_default())
+        .map(|name| output.get(name).cloned().unwrap_or_default())
         .collect();
-    let hash = compute_hash(&fields);
-    let deck = deck_for(root, &sn.path);
-
-    Some(Local {
-        path: sn.path.clone(),
-        guid: guid.to_string(),
+    Ok(RenderedNote {
         spec,
+        change_opts: ModelChangeOpts {
+            renames: model.renames.clone(),
+            allow_removal: model.allow_card_removal,
+        },
         fields,
-        anki_tags: note.anki_tags.clone(),
-        deck,
-        assets,
-        hash,
+        assets: ctx.take_assets(),
+        errors: Vec::new(),
     })
 }
 

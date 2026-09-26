@@ -58,6 +58,15 @@ fn walk_md_files(root: &Path) -> Vec<PathBuf> {
     paths
 }
 
+/// Deck for a parsed note: an explicit `#deck(a::b)` tag wins, otherwise the
+/// directory-derived [`deck_for`].
+pub fn deck_for_note(root: &Path, note: &crate::note::Note) -> String {
+    match note.tag("deck") {
+        Some(crate::note::TagValue::Param(d)) if !d.trim().is_empty() => d.trim().to_string(),
+        _ => deck_for(root, &note.source_path),
+    }
+}
+
 /// Derive Anki deck path from a card file's location relative to the scan
 /// root. `math/algebra/foo.md` rooted at `./cards/` → `"math::algebra"`. A
 /// file at the root returns `"Default"`.
@@ -119,5 +128,16 @@ mod tests {
         let root = PathBuf::from("/cards");
         let file = PathBuf::from("/elsewhere/foo.md");
         assert_eq!(deck_for(&root, &file), "Default");
+    }
+
+    #[test]
+    fn deck_tag_overrides_directory() {
+        use crate::note_parser::parse_note;
+        let root = PathBuf::from("/cards");
+        let path = PathBuf::from("/cards/math/foo.md");
+        let tagged = parse_note("Q\n\n---\n\nA\n\n#deck(geo::europe)\n", path.clone());
+        assert_eq!(deck_for_note(&root, &tagged), "geo::europe");
+        let plain = parse_note("Q\n\n---\n\nA\n", path);
+        assert_eq!(deck_for_note(&root, &plain), "math");
     }
 }

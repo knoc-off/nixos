@@ -4,8 +4,9 @@ Syncs a directory of markdown flashcards straight into an Anki collection file.
 There's no AnkiConnect and no add-on: marki writes `collection.anki2` directly
 through SQLite.
 
-Close Anki before you run `marki push`. marki holds an exclusive lock on the
-collection while it writes.
+Anki desktop locks its collection while it's open, so close it before
+`marki push`. anki-sync-server only locks during a sync; marki waits up to 10s
+for that to finish.
 
 ## Quick start
 
@@ -55,6 +56,7 @@ code is left alone.
 | `#basic`                            | Front/back card. This is the default                                    |
 | `#cloze` / `#cloze(mode)`           | Cloze card; see [Cloze](#cloze)                                         |
 | `#model(name)`                      | Custom card type from `.marki/models/name.lua`; see [models/](models/README.md) |
+| `#deck(a::b)`                       | Put the note in deck `a::b` instead of the one from its directory. Not an Anki tag |
 | `#name(value)`                      | Parametric tag. Becomes an Anki tag, and models can read it with `note:tag("name")` |
 | `#name`                             | Plain Anki tag. `::` makes a hierarchy: `#geo::europe`                  |
 
@@ -84,7 +86,8 @@ gives `{{c1::Russia}}`, `{{c2::Canada}}` and `{{c3::China}}`.
 
 ### Decks
 
-The deck comes from the file's directory, relative to `cards_dir`:
+The deck comes from the file's directory, relative to `cards_dir`, unless the
+note has a `#deck(...)` tag:
 
 ```
 geography/europe/france.md  ->  geography::europe
@@ -93,6 +96,16 @@ france.md                   ->  Default
 
 Moving a file moves the note to the new deck and keeps its review history,
 because the note is identified by its `#id`.
+
+### Changing a note's type
+
+Switching a note between `basic`, `cloze` and custom models (e.g. adding
+`#cloze`) changes it in place, like Anki's "Change Note Type": cards whose
+card type exists in both keep their review history, the rest are replaced.
+Between basic and cloze, the first card carries over as `c1`.
+
+This is a schema change: the next sync on every device asks for a full sync.
+Choose **download** there, or the device overwrites what marki just pushed.
 
 ### Code blocks
 
@@ -169,12 +182,14 @@ respecting `.gitignore`, and skipping hidden files.
 | ----------------------------- | ------------------------------------------------------------------- |
 | `marki init`                  | Create `.marki/`. Safe to re-run; it never overwrites anything      |
 | `marki fmt`                   | Mint ids and normalize files on disk                                |
-| `marki status`                | Read-only diff: added, updated, moved, deleted, unformatted         |
+| `marki status`                | Read-only diff: every note that would be added, updated, moved or orphaned |
 | `marki push` (or `marki`)     | One sync. Notes whose file is gone are suspended and tagged `marki::orphan` |
 | `marki push --prune`          | Same, but deletes orphans outright                                  |
+| `marki push --simulate`       | Push into a throwaway copy, check it, and list what would change; writes nothing |
+| `marki check`                 | Render every card and check the collection's structure, without writing |
 | `marki prune [--dry-run]`     | Delete notes previously tagged `marki::orphan`                      |
 | `marki watch`                 | Push on every file change and on the heartbeat interval             |
-| `marki render-map <file>`     | Render one card's blocks to `./out` (or `--stdout`) without touching Anki |
+| `marki render <file>`         | Write `./out/preview.html` (every card, front and back, with model CSS) and assets, without touching Anki; `--stdout` dumps raw assets |
 
 Global flags: `--config`, `--cards-dir`, `--collection`, `--media-dir` and
 `--typst-binary`, with env equivalents `MARKI_CONFIG`, `MARKI_COLLECTION`,
@@ -204,10 +219,12 @@ For development, direnv (`.envrc`) loads the dev shell, which sets
 
 ## Known gaps
 
-- `#deck(...)` does nothing special. It becomes a plain Anki tag, and the deck
-  still comes from the directory.
-- `render-map` renders every kind of block, not just maps. It should be renamed
-  `render` (REDESIGN phase 7).
-- There's no `check` or `doctor` command yet (phase 7).
 - There's no `examples/` directory. The map fixtures in
   `crates/marki-map/tests/fixtures/` have no golden-test harness (phase 10).
+
+## Testing
+
+`cargo test --workspace` runs the unit tests. `tests/e2e-anki.sh` pushes real
+cards into a collection created by Anki's own library, and checks Check
+Database and review history after each risky change (cloze edits, type
+changes, card renames, reorders and removals).

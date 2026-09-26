@@ -14,7 +14,7 @@
 //! through `sync::engine::render_stock`.
 
 use anyhow::{bail, Context, Result};
-use mlua::{Function, HookTriggers, Lua, Table};
+use mlua::{chunk::ChunkMode, Function, HookTriggers, Lua, LuaOptions, StdLib, Table, Value};
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -38,6 +38,12 @@ pub struct CompiledModel {
     pub name: String,
     pub generate: Function,
     pub card_names: Vec<String>,
+    /// `M.renames` (old card name -> new): cards of a renamed template keep
+    /// their review history.
+    pub renames: HashMap<String, String>,
+    /// `M.allow_card_removal = true`: permit dropping card types that still
+    /// have cards (their reviews are lost).
+    pub allow_card_removal: bool,
     /// Modified time of the `.lua` file when it was loaded. Used to
     /// detect on-disk edits so the cache reloads only what changed,
     /// instead of being cleared wholesale every sync cycle.
@@ -48,8 +54,10 @@ pub struct CompiledModel {
 pub struct ScriptEngine {
     lua: Lua,
     models_dir: PathBuf,
-    lib_dir: Option<PathBuf>,
     compiled: HashMap<String, Arc<CompiledModel>>,
+    /// Unsaved model sources (previewing a draft over MCP) that shadow
+    /// `models/<name>.lua` until [`ScriptEngine::clear_drafts`].
+    drafts: HashMap<String, Arc<CompiledModel>>,
     /// Remaining instruction budget for the currently running script,
     /// charged down by the execution hook. Reset before each invocation.
     budget: Rc<Cell<i64>>,
@@ -60,7 +68,21 @@ impl ScriptEngine {
     /// scripts; `lib_dir` (if set) is prepended to `package.path` so
     /// scripts can `require` shared libraries.
     pub fn new(models_dir: PathBuf, lib_dir: Option<PathBuf>) -> Self {
-        let lua = Lua::new();
+        // Model scripts may be written by an LLM over MCP, so they get pure
+        // computation only: no io/os/package/debug, and no load/dofile that
+        // could read files or run bytecode. Shared libs come in through the
+        // restricted `require` installed below.
+        let lua = Lua::new_with(
+            StdLib::TABLE | StdLib::STRING | StdLib::MATH | StdLib::UTF8 | StdLib::COROUTINE,
+            LuaOptions::default(),
+        )
+        .expect("create sandboxed Lua state");
+        {
+            let g = lua.globals();
+            for name in ["dofile", "loadfile", "load", "collectgarbage"] {
+                g.raw_remove(name).expect("strip unsafe global");
+            }
+        }
         let budget = Rc::new(Cell::new(INSTRUCTION_BUDGET));
 
         // Charge the budget down every HOOK_INTERVAL instructions and
@@ -80,11 +102,13 @@ impl ScriptEngine {
         )
         .expect("install budget hook");
 
+        install_require(&lua, lib_dir).expect("install require");
+
         Self {
             lua,
             models_dir,
-            lib_dir,
             compiled: HashMap::new(),
+            drafts: HashMap::new(),
             budget,
         }
     }
@@ -93,24 +117,15 @@ impl ScriptEngine {
         self.budget.set(INSTRUCTION_BUDGET);
     }
 
-    /// Prepend `<lib>/?.lua` to Lua's `package.path` (idempotent) so
-    /// model scripts can `require` shared libraries.
-    fn prepend_lib_path(&self, lib: &std::path::Path) -> mlua::Result<()> {
-        let pat = format!("{}/?.lua", lib.display());
-        let package: Table = self.lua.globals().get("package")?;
-        let existing: String = package.get("path").unwrap_or_default();
-        if !existing.split(';').any(|p| p == pat) {
-            package.set("path", format!("{pat};{existing}"))?;
-        }
-        Ok(())
-    }
-
     /// Load (or return from cache) a custom model by name. Only reads
     /// `models/<name>.lua`; basic and cloze bypass this engine.
     ///
     /// The cache is keyed on the file's modified time: an unchanged file
     /// is served from cache, an edited one is transparently reloaded.
     pub fn load_model(&mut self, name: &str) -> Result<Arc<CompiledModel>> {
+        if let Some(d) = self.drafts.get(name) {
+            return Ok(Arc::clone(d));
+        }
         let path = self.models_dir.join(format!("{name}.lua"));
         let mtime = std::fs::metadata(&path).and_then(|m| m.modified()).ok();
 
@@ -120,20 +135,32 @@ impl ScriptEngine {
             }
         }
 
-        // Make shared libraries requireable on first load.
-        if let Some(lib) = self.lib_dir.clone() {
-            self.prepend_lib_path(&lib)
-                .map_err(|e| anyhow::anyhow!("configure package.path: {e}"))?;
-        }
-
         let source = std::fs::read_to_string(&path)
             .with_context(|| format!("load model script: {}", path.display()))?;
+        let compiled = Arc::new(self.compile(name, &source, mtime)?);
+        self.compiled.insert(name.to_string(), Arc::clone(&compiled));
+        Ok(compiled)
+    }
 
+    /// Compile `source` as model `name` and let it shadow the file on disk
+    /// for every later [`ScriptEngine::load_model`], until cleared.
+    pub fn set_draft(&mut self, name: &str, source: &str) -> Result<Arc<CompiledModel>> {
+        let compiled = Arc::new(self.compile(name, source, None)?);
+        self.drafts.insert(name.to_string(), Arc::clone(&compiled));
+        Ok(compiled)
+    }
+
+    pub fn clear_drafts(&mut self) {
+        self.drafts.clear();
+    }
+
+    fn compile(&self, name: &str, source: &str, mtime: Option<SystemTime>) -> Result<CompiledModel> {
         self.reset_budget();
         let module: Table = self
             .lua
-            .load(&source)
+            .load(source)
             .set_name(name)
+            .set_mode(ChunkMode::Text)
             .eval()
             .map_err(|e| anyhow::anyhow!("load model '{name}': {e}"))?;
 
@@ -141,17 +168,24 @@ impl ScriptEngine {
             .get("generate")
             .map_err(|_| anyhow::anyhow!("model '{name}' must define generate()"))?;
         let card_names = self.extract_card_names(name, &module)?;
+        let renames: HashMap<String, String> = module
+            .get::<Option<HashMap<String, String>>>("renames")
+            .map_err(|e| anyhow::anyhow!("model '{name}': M.renames must map strings to strings: {e}"))?
+            .unwrap_or_default();
+        let allow_card_removal = module
+            .get::<Option<bool>>("allow_card_removal")
+            .map_err(|e| anyhow::anyhow!("model '{name}': M.allow_card_removal must be a boolean: {e}"))?
+            .unwrap_or(false);
 
         debug!(model = name, cards = ?card_names, "loaded model");
-
-        let compiled = Arc::new(CompiledModel {
+        Ok(CompiledModel {
             name: name.to_string(),
             generate,
             card_names,
+            renames,
+            allow_card_removal,
             mtime,
-        });
-        self.compiled.insert(name.to_string(), Arc::clone(&compiled));
-        Ok(compiled)
+        })
     }
 
     /// Execute a model's `generate(note, ctx)`.
@@ -220,6 +254,44 @@ impl ScriptEngine {
     }
 }
 
+/// A `require` that only loads `<lib_dir>/<name>.lua` as source text.
+/// Names are restricted to `[A-Za-z0-9_-]` (with `.` as a dir separator,
+/// like stock Lua) so a script cannot escape `lib_dir` or load C modules.
+/// Results are cached per name, matching stock `require` semantics.
+fn install_require(lua: &Lua, lib_dir: Option<PathBuf>) -> mlua::Result<()> {
+    let loaded = lua.create_table()?;
+    let require = lua.create_function(move |lua, name: String| {
+        if let Ok(v) = loaded.raw_get::<Value>(name.as_str()) {
+            if !v.is_nil() {
+                return Ok(v);
+            }
+        }
+        let valid = !name.is_empty()
+            && name
+                .split('.')
+                .all(|seg| !seg.is_empty() && seg.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-'));
+        if !valid {
+            return Err(mlua::Error::runtime(format!("require({name:?}): invalid module name")));
+        }
+        let Some(lib) = &lib_dir else {
+            return Err(mlua::Error::runtime(format!("require({name:?}): no lib_dir configured")));
+        };
+        let path = lib.join(format!("{}.lua", name.replace('.', "/")));
+        let src = std::fs::read_to_string(&path).map_err(|e| {
+            mlua::Error::runtime(format!("require({name:?}): {}: {e}", path.display()))
+        })?;
+        let v: Value = lua
+            .load(&src)
+            .set_name(format!("@{}", path.display()))
+            .set_mode(ChunkMode::Text)
+            .eval()?;
+        let v = if v.is_nil() { Value::Boolean(true) } else { v };
+        loaded.raw_set(name.as_str(), v.clone())?;
+        Ok(v)
+    })?;
+    lua.globals().set("require", require)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,6 +308,41 @@ mod tests {
         // basic and cloze bypass the script engine, so there is no file.
         assert!(se.load_model("basic").is_err());
         assert!(se.load_model("cloze").is_err());
+    }
+
+    #[test]
+    fn sandbox_blocks_io_os_and_escaping_require() {
+        let dir = std::env::temp_dir().join(format!("marki-lua-sandbox-{}", std::process::id()));
+        let lib = dir.join("lib");
+        std::fs::create_dir_all(&lib).unwrap();
+        std::fs::write(lib.join("helper.lua"), "return { x = 42 }").unwrap();
+
+        let se = ScriptEngine::new(dir.clone(), Some(lib));
+        let eval = |src: &str| se.lua.load(src).eval::<Value>();
+
+        for probe in [
+            "return os.execute('true')",
+            "return io.open('/etc/passwd')",
+            "return package.loadlib",
+            "return debug.getinfo(1)",
+            "return dofile('/etc/passwd')",
+            "return loadfile('/etc/passwd')",
+            "return load('return 1')()",
+            "return require('../../etc/passwd')",
+            "return require('/etc/passwd')",
+        ] {
+            let r = eval(probe);
+            assert!(
+                r.is_err() || matches!(r, Ok(Value::Nil)),
+                "sandbox leak: {probe} -> {r:?}"
+            );
+        }
+
+        // Safe libs and lib_dir require still work.
+        let n: i64 = se.lua.load("return require('helper').x + #string.rep('a', 3) + math.floor(1.5)").eval().unwrap();
+        assert_eq!(n, 46);
+
+        std::fs::remove_dir_all(&dir).ok();
     }
 
     #[test]

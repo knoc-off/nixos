@@ -7,6 +7,8 @@ pub mod highlighter;
 pub mod id;
 pub mod note;
 pub mod note_parser;
+pub mod preview;
+pub mod project;
 pub mod render;
 pub mod scan;
 pub mod scripting;

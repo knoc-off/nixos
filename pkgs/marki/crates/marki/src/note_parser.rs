@@ -501,6 +501,10 @@ fn strip_tags(
                     let name = &inner[..paren_start];
                     let val = inner[paren_start + 1..].trim_end_matches(')');
                     tags.insert(name.to_string(), TagValue::Param(val.to_string()));
+                    // `#deck(...)` is a placement directive, not a label.
+                    if name == "deck" {
+                        continue;
+                    }
                 } else {
                     tags.insert(kw.clone(), TagValue::Bool);
                 }
@@ -677,8 +681,8 @@ mod tests {
             note.tag("deck"),
             Some(&TagValue::Param("geography::hard".into()))
         );
-        // "deck" shouldn't appear in anki_tags with the param
-        assert!(note.anki_tags.contains(&"deck".to_string()));
+        // `#deck(...)` is a placement directive, so it is not an Anki tag.
+        assert!(!note.anki_tags.iter().any(|t| t == "deck"));
     }
 
     #[test]

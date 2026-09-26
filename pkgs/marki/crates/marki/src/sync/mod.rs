@@ -3,4 +3,4 @@
 pub mod engine;
 pub mod media;
 
-pub use engine::{Outcome, reconcile, render_stock};
+pub use engine::{Change, ChangeKind, Outcome, RenderedNote, reconcile, render_note, render_stock};

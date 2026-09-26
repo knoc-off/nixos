@@ -7,7 +7,8 @@
 use anyhow::{Context, Result, bail};
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use std::cmp::Ordering;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub mod deck;
@@ -63,6 +64,21 @@ fn register_unicase(db: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Turn SQLITE_BUSY/LOCKED into an actionable message; pass anything else
+/// through unchanged.
+fn locked_hint(e: rusqlite::Error, path: &Path) -> anyhow::Error {
+    use rusqlite::ErrorCode::{DatabaseBusy, DatabaseLocked};
+    match e.sqlite_error_code() {
+        Some(DatabaseBusy | DatabaseLocked) => anyhow::anyhow!(
+            "collection {} is locked by another process (Anki desktop, or \
+             anki-sync-server mid-sync). Close Anki / wait for the sync to \
+             finish and retry.",
+            path.display()
+        ),
+        _ => e.into(),
+    }
+}
+
 /// An open Anki collection, guarded to v18 with the `unicase` collation
 /// registered.
 pub struct Collection {
@@ -86,10 +102,15 @@ impl Collection {
         }
         let db = Connection::open(path)
             .with_context(|| format!("open collection {}", path.display()))?;
+        // anki-sync-server only holds the lock while a client is syncing;
+        // wait that out instead of failing on the first SQLITE_BUSY.
+        db.busy_timeout(std::time::Duration::from_secs(10))
+            .context("set busy_timeout")?;
         register_unicase(&db)?;
 
         let ver: i64 = db
             .query_row("SELECT ver FROM col", [], |r| r.get(0))
+            .map_err(|e| locked_hint(e, path))
             .context("read col.ver")?;
         if ver != COL_VER {
             bail!("unsupported collection version {ver}; expected {COL_VER}");
@@ -132,6 +153,83 @@ impl Collection {
             .execute("VACUUM INTO ?1", [dest])
             .with_context(|| format!("VACUUM INTO {dest}"))?;
         Ok(())
+    }
+
+    /// Structural checks for the invariants Anki's Check Database would
+    /// otherwise repair in what marki writes. Returns one line per problem;
+    /// empty means clean. Not a full reimplementation of Check Database --
+    /// the e2e test keeps real Anki as the oracle.
+    pub fn check(&self) -> Result<Vec<String>> {
+        let mut problems = Vec::new();
+        let ok: String = self.db.query_row("PRAGMA integrity_check", [], |r| r.get(0))?;
+        if ok != "ok" {
+            problems.push(format!("sqlite integrity_check: {ok}"));
+        }
+        for (what, sql) in [
+            ("cards without a note", "SELECT count(*) FROM cards WHERE nid NOT IN (SELECT id FROM notes)"),
+            ("notes without cards", "SELECT count(*) FROM notes WHERE id NOT IN (SELECT nid FROM cards)"),
+            ("notes with a missing notetype", "SELECT count(*) FROM notes WHERE mid NOT IN (SELECT id FROM notetypes)"),
+            ("cards in a missing deck", "SELECT count(*) FROM cards WHERE did NOT IN (SELECT id FROM decks)"),
+            ("rows with usn -1", "SELECT (SELECT count(*) FROM notes WHERE usn=-1)+(SELECT count(*) FROM cards WHERE usn=-1)+(SELECT count(*) FROM notetypes WHERE usn=-1)+(SELECT count(*) FROM decks WHERE usn=-1)"),
+            ("duplicate guids", "SELECT count(*) FROM (SELECT guid FROM notes GROUP BY guid HAVING count(*)>1)"),
+        ] {
+            let n: i64 = self.db.query_row(sql, [], |r| r.get(0))?;
+            if n > 0 {
+                problems.push(format!("{n} {what}"));
+            }
+        }
+
+        // Per notetype: field count matches notes, card ords are in range,
+        // and csum/sfld match what Anki would derive.
+        let sort_idx = self.sort_field_indices()?;
+        let mut nt = self.db.prepare(
+            "SELECT id, name, (SELECT count(*) FROM fields f WHERE f.ntid=nt.id), \
+             (SELECT count(*) FROM templates t WHERE t.ntid=nt.id) FROM notetypes nt",
+        )?;
+        let nts: Vec<(i64, String, usize, i64)> = nt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        for (mid, name, nfields, ntemplates) in nts {
+            let cloze = self.notetype_is_cloze_ro(mid)?;
+            if !cloze {
+                let bad: i64 = self.db.query_row(
+                    "SELECT count(*) FROM cards c JOIN notes n ON n.id=c.nid WHERE n.mid=?1 AND c.ord>=?2",
+                    [mid, ntemplates],
+                    |r| r.get(0),
+                )?;
+                if bad > 0 {
+                    problems.push(format!("{name}: {bad} card(s) with ord past the last template"));
+                }
+            }
+            let mut notes = self.db.prepare(
+                "SELECT guid, flds, csum, CAST(sfld AS text) FROM notes WHERE mid=?1",
+            )?;
+            let rows = notes.query_map([mid], |r| {
+                Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?, r.get::<_, i64>(2)?, r.get::<_, String>(3)?))
+            })?;
+            let idx = sort_idx.get(&mid).copied().unwrap_or(0);
+            for row in rows {
+                let (guid, flds, csum, sfld) = row?;
+                let fields = notes::split_fields(&flds);
+                if fields.len() != nfields {
+                    problems.push(format!("{name} note {guid}: {} fields, notetype has {nfields}", fields.len()));
+                    continue;
+                }
+                let (_, want_csum, want_sfld) = notes::prepare_fields(fields, idx, true);
+                if want_csum as i64 != csum || want_sfld != sfld {
+                    problems.push(format!("{name} note {guid}: stale csum/sfld"));
+                }
+            }
+        }
+        Ok(problems)
+    }
+
+    fn notetype_is_cloze_ro(&self, mid: i64) -> Result<bool> {
+        use crate::proto::notetypes::notetype::Config;
+        use prost::Message;
+        let blob: Vec<u8> =
+            self.db.query_row("SELECT config FROM notetypes WHERE id=?1", [mid], |r| r.get(0))?;
+        Ok(Config::decode(blob.as_slice())?.kind == 1)
     }
 
     /// Count rows in a table (collation-sensitive tables included).
@@ -259,9 +357,11 @@ impl Collection {
         f: impl FnOnce(&mut NoteWriter) -> Result<T>,
     ) -> Result<T> {
         let usn = self.usn()?;
+        let path = PathBuf::from(self.db.path().unwrap_or("collection"));
         let tx = self
             .db
             .transaction_with_behavior(TransactionBehavior::Exclusive)
+            .map_err(|e| locked_hint(e, &path))
             .context("begin exclusive transaction")?;
 
         let (out, mutated, schema_changed) = {
@@ -291,10 +391,53 @@ impl Collection {
     }
 }
 
+/// Whether a card requirement is met: ANY needs one non-empty referenced
+/// field, ALL needs all of them; NONE (and unknown kinds) never generate.
+fn req_satisfied(kind: i32, field_ords: &[u32], nonempty: impl Fn(u32) -> bool) -> bool {
+    match kind {
+        1 => field_ords.iter().any(|&o| nonempty(o)),
+        2 => !field_ords.is_empty() && field_ords.iter().all(|&o| nonempty(o)),
+        _ => false,
+    }
+}
+
+/// Permissions for notetype changes that can cost review history.
+#[derive(Debug, Default, Clone)]
+pub struct ModelChangeOpts {
+    /// Template renames, old name -> new name. A renamed template keeps its
+    /// cards (and their history).
+    pub renames: HashMap<String, String>,
+    /// Allow dropping templates that still have cards.
+    pub allow_removal: bool,
+}
+
+/// What [`NoteWriter::change_note_model`] did to a note's cards.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct CardRemap {
+    /// Cards carried over with their review history.
+    pub kept: usize,
+    /// Cards deleted because their template has no counterpart.
+    pub removed: usize,
+    /// Fresh cards generated for the new notetype.
+    pub added: usize,
+}
+
 /// `graves.type` discriminants (`rslib` `GraveKind`): peers read these to
 /// learn what kind of object was deleted.
 const GRAVE_CARD: i64 = 0;
 const GRAVE_NOTE: i64 = 1;
+
+/// Apply a card rename to a marki field name: `OldFront` -> `NewFront`.
+fn rename_field(field: &str, renames: &HashMap<String, String>) -> String {
+    for suffix in ["Front", "Back"] {
+        if let Some(card) = field.strip_suffix(suffix) {
+            if let Some(new) = renames.get(card) {
+                return format!("{new}{suffix}");
+            }
+        }
+    }
+    field.to_string()
+}
 
 /// A note marki manages, read back from the collection for diffing. Identity
 /// is the `guid`; tag interpretation (marker/hash/orphan) is the caller's
@@ -523,26 +666,29 @@ impl NoteWriter<'_> {
 
         // Generate cards. A requirement is satisfied when the referenced
         // fields are non-empty (ANY: at least one; ALL: all); NONE never
-        // generates. Empty is whitespace-only, matching Anki.
-        let reqs = self.notetype_reqs(mid)?;
+        // generates. Empty is whitespace-only, matching Anki. Cloze notetypes
+        // instead get one card per `{{cN::}}` number in the Text field.
         let pos = self.next_position()?;
-        let nonempty = |ord: u32| {
-            norm.get(ord as usize)
-                .map(|f| !f.trim().is_empty())
-                .unwrap_or(false)
-        };
         let mut generated = 0;
-        for (card_ord, kind, field_ords) in reqs {
-            let satisfied = match kind {
-                1 => field_ords.iter().any(|&o| nonempty(o)), // ANY
-                2 => !field_ords.is_empty() && field_ords.iter().all(|&o| nonempty(o)), // ALL
-                _ => false,                                   // NONE / unknown
-            };
-            if !satisfied {
-                continue;
+        if self.notetype_is_cloze(mid)? {
+            for ord in notetype::cloze_ords(norm.first().map(String::as_str).unwrap_or("")) {
+                self.insert_card(nid, deck_id, ord, pos)?;
+                generated += 1;
             }
-            self.insert_card(nid, deck_id, card_ord, pos)?;
-            generated += 1;
+        } else {
+            let reqs = self.notetype_reqs(mid)?;
+            let nonempty = |ord: u32| {
+                norm.get(ord as usize)
+                    .map(|f| !f.trim().is_empty())
+                    .unwrap_or(false)
+            };
+            for (card_ord, kind, field_ords) in reqs {
+                if !req_satisfied(kind, &field_ords, nonempty) {
+                    continue;
+                }
+                self.insert_card(nid, deck_id, card_ord, pos)?;
+                generated += 1;
+            }
         }
         if generated > 0 {
             self.set_next_position(pos + 1)?;
@@ -550,6 +696,67 @@ impl NoteWriter<'_> {
 
         self.mutated = true;
         Ok(nid)
+    }
+
+    /// Whether a notetype is a cloze notetype (`Config.kind == Cloze`).
+    fn notetype_is_cloze(&self, mid: i64) -> Result<bool> {
+        use crate::proto::notetypes::notetype::Config;
+        use prost::Message;
+        let blob: Vec<u8> = self
+            .tx
+            .query_row("SELECT config FROM notetypes WHERE id = ?1", [mid], |r| r.get(0))
+            .with_context(|| format!("load notetype {mid} config"))?;
+        Ok(Config::decode(blob.as_slice()).context("decode notetype config")?.kind == 1)
+    }
+
+    /// Bring a cloze note's cards in line with the `{{cN::}}` numbers in its
+    /// Text field: generate cards for new numbers and delete (with graves)
+    /// cards whose number is gone. marki's files are declarative, so a
+    /// removed cloze is removed -- unlike Anki, which leaves an empty card.
+    /// No-op for non-cloze notes. Returns `(added, removed)`.
+    pub fn sync_cloze_cards(&mut self, note_id: i64) -> Result<(usize, usize)> {
+        let (mid, flds): (i64, String) = self
+            .tx
+            .query_row("SELECT mid, flds FROM notes WHERE id = ?1", [note_id], |r| {
+                Ok((r.get(0)?, r.get(1)?))
+            })
+            .with_context(|| format!("load note {note_id}"))?;
+        if !self.notetype_is_cloze(mid)? {
+            return Ok((0, 0));
+        }
+        let fields = notes::split_fields(&flds);
+        let want = notetype::cloze_ords(fields.first().map(String::as_str).unwrap_or(""));
+        let have: Vec<(i64, u32, i64)> = {
+            let mut stmt = self.tx.prepare("SELECT id, ord, did FROM cards WHERE nid = ?1")?;
+            stmt.query_map([note_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        let did = have.first().map(|c| c.2).unwrap_or(1);
+
+        let mut removed = 0;
+        for (cid, ord, _) in &have {
+            if !want.contains(ord) {
+                self.add_grave(*cid, GRAVE_CARD)?;
+                self.tx
+                    .execute("DELETE FROM cards WHERE id = ?1", [cid])
+                    .with_context(|| format!("delete card {cid}"))?;
+                removed += 1;
+            }
+        }
+        let mut added = 0;
+        for ord in want {
+            if have.iter().any(|c| c.1 == ord) {
+                continue;
+            }
+            let pos = self.next_position()?;
+            self.insert_card(note_id, did, ord, pos)?;
+            self.set_next_position(pos + 1)?;
+            added += 1;
+        }
+        if added + removed > 0 {
+            self.mutated = true;
+        }
+        Ok((added, removed))
     }
 
     /// Insert a fresh, unseen card at new-card position `pos` with zeroed
@@ -713,8 +920,42 @@ impl NoteWriter<'_> {
     ///   -> add the new field/template rows, rewrite the config (new reqs/css),
     ///   bump `col.scm`, and generate the new cards for existing notes.
     /// - Only the css changed -> rewrite the config, no `scm` bump.
-    /// - Reordered or removed templates -> refuse (would corrupt reviews).
+    /// - Renamed/reordered/removed templates -> [`reshape_model`](Self::reshape_model).
     pub fn ensure_model(&mut self, spec: &notetype::ModelSpec) -> Result<i64> {
+        self.ensure_model_with(spec, &ModelChangeOpts::default())
+    }
+
+    /// [`ensure_model`](Self::ensure_model) with explicit permission for
+    /// shape changes that are not pure appends.
+    pub fn ensure_model_with(
+        &mut self,
+        spec: &notetype::ModelSpec,
+        opts: &ModelChangeOpts,
+    ) -> Result<i64> {
+        // A savepoint makes a refused/failed reshape leave no partial writes
+        // behind, so the caller can skip this model and keep going.
+        self.tx.execute_batch("SAVEPOINT ensure_model")?;
+        let (mutated, schema_changed) = (self.mutated, self.schema_changed);
+        match self.ensure_model_inner(spec, opts) {
+            Ok(id) => {
+                self.tx.execute_batch("RELEASE ensure_model")?;
+                Ok(id)
+            }
+            Err(e) => {
+                self.tx
+                    .execute_batch("ROLLBACK TO ensure_model; RELEASE ensure_model")?;
+                self.mutated = mutated;
+                self.schema_changed = schema_changed;
+                Err(e)
+            }
+        }
+    }
+
+    fn ensure_model_inner(
+        &mut self,
+        spec: &notetype::ModelSpec,
+        opts: &ModelChangeOpts,
+    ) -> Result<i64> {
         use prost::Message;
 
         let name = spec.notetype_name();
@@ -723,13 +964,10 @@ impl NoteWriter<'_> {
         };
 
         let existing = self.template_names(ntid)?;
-        let want = &spec.card_names;
+        let want = &spec.template_names();
         let is_append = want.len() >= existing.len() && want[..existing.len()] == existing[..];
         if !is_append {
-            bail!(
-                "model {name:?}: templates reordered or removed (have {existing:?}, want {want:?}); \
-                 refusing to rewrite -- this would corrupt existing reviews"
-            );
+            return self.reshape_model(ntid, spec, opts);
         }
 
         let built = notetype::build(spec, ntid);
@@ -749,7 +987,11 @@ impl NoteWriter<'_> {
 
         let mtime = now_secs();
         // Insert the newly-appended fields (2 per new card) and templates.
-        let old_field_count = existing.len() * 2;
+        let old_field_count = if spec.cloze {
+            notetype::CLOZE_FIELDS.len()
+        } else {
+            existing.len() * 2
+        };
         for (ord, fname, fcfg) in built.fields.iter().skip(old_field_count) {
             self.tx
                 .execute(
@@ -782,6 +1024,100 @@ impl NoteWriter<'_> {
             self.generate_missing_cards(ntid)?;
         }
         Ok(ntid)
+    }
+
+    /// Rebuild a notetype whose templates were renamed, reordered or removed,
+    /// keeping review history wherever a card's template survives (by name,
+    /// or via `opts.renames`). The new shape is created under a fresh id,
+    /// every note is moved across with [`change_note_model`], then the old
+    /// notetype is deleted. Removing templates that still have cards is
+    /// refused unless `opts.allow_removal`, since those reviews are lost.
+    ///
+    /// [`change_note_model`]: Self::change_note_model
+    fn reshape_model(
+        &mut self,
+        old_ntid: i64,
+        spec: &notetype::ModelSpec,
+        opts: &ModelChangeOpts,
+    ) -> Result<i64> {
+        let name = spec.notetype_name();
+        let old_names = self.template_names(old_ntid)?;
+        let want = spec.template_names();
+        let lost: Vec<&String> = old_names
+            .iter()
+            .filter(|n| !want.contains(opts.renames.get(*n).unwrap_or(n)))
+            .collect();
+        if !lost.is_empty() && !opts.allow_removal {
+            let used: i64 = self.tx.query_row(
+                "SELECT count(*) FROM cards c JOIN notes n ON c.nid = n.id WHERE n.mid = ?1",
+                [old_ntid],
+                |r| r.get(0),
+            )?;
+            if used > 0 {
+                bail!(
+                    "model {name:?}: templates {lost:?} would be removed, deleting their cards \
+                     and review history ({used} cards on this notetype). Rename them instead \
+                     (have {old_names:?}, want {want:?}), or allow removal explicitly."
+                );
+            }
+        }
+
+        // Park the old notetype under a temporary name so the new one can
+        // take the real name (notetypes.name is unique).
+        self.tx.execute(
+            "UPDATE notetypes SET name = name || ' (reshaping)' WHERE id = ?1",
+            [old_ntid],
+        )?;
+        let new_ntid = self.add_model(spec)?;
+        let new_fields = spec.field_names();
+        let old_fields = self.field_names(old_ntid)?;
+
+        let notes: Vec<(i64, String, String)> = {
+            let mut stmt = self.tx.prepare("SELECT id, flds, tags FROM notes WHERE mid = ?1")?;
+            stmt.query_map([old_ntid], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        for (nid, flds, tags) in notes {
+            let old_vals = notes::split_fields(&flds);
+            // Carry field values across by name; `XFront`/`XBack` follow a
+            // rename of card `X`.
+            let values: Vec<String> = new_fields
+                .iter()
+                .map(|nf| {
+                    old_fields
+                        .iter()
+                        .position(|of| &rename_field(of, &opts.renames) == nf)
+                        .and_then(|i| old_vals.get(i).cloned())
+                        .unwrap_or_default()
+                })
+                .collect();
+            let did: i64 = self
+                .tx
+                .query_row("SELECT did FROM cards WHERE nid = ?1 LIMIT 1", [nid], |r| r.get(0))
+                .optional()?
+                .unwrap_or(1);
+            let tag_list: Vec<String> = tags.split_whitespace().map(String::from).collect();
+            self.change_note_model(nid, new_ntid, values, 0, &tag_list, did, &opts.renames)?;
+        }
+
+        self.tx.execute("DELETE FROM templates WHERE ntid = ?1", [old_ntid])?;
+        self.tx.execute("DELETE FROM fields WHERE ntid = ?1", [old_ntid])?;
+        // No grave: rslib only graves cards/notes/decks; peers pick up the
+        // notetype removal through the full sync the scm bump forces.
+        self.tx.execute("DELETE FROM notetypes WHERE id = ?1", [old_ntid])?;
+        self.mutated = true;
+        self.schema_changed = true;
+        Ok(new_ntid)
+    }
+
+    fn field_names(&self, ntid: i64) -> Result<Vec<String>> {
+        let mut stmt = self
+            .tx
+            .prepare("SELECT name FROM fields WHERE ntid = ?1 ORDER BY ord")?;
+        let rows = stmt
+            .query_map([ntid], |r| r.get::<_, String>(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
     }
 
     /// Pad every note of a notetype whose `flds` has fewer than `count` fields
@@ -817,6 +1153,24 @@ impl NoteWriter<'_> {
     /// notes gain the new card(s). Idempotent: only missing `(nid, ord)` pairs
     /// are inserted, and only where the requirement is satisfied.
     fn generate_missing_cards(&mut self, mid: i64) -> Result<usize> {
+        self.generate_missing_cards_for(mid, None)
+    }
+
+    /// [`generate_missing_cards`](Self::generate_missing_cards), optionally
+    /// limited to one note.
+    fn generate_missing_cards_for(&mut self, mid: i64, only: Option<i64>) -> Result<usize> {
+        if self.notetype_is_cloze(mid)? {
+            let ids: Vec<i64> = {
+                let mut stmt = self.tx.prepare("SELECT id FROM notes WHERE mid = ?1")?;
+                stmt.query_map([mid], |r| r.get(0))?
+                    .collect::<rusqlite::Result<Vec<_>>>()?
+            };
+            let mut added = 0;
+            for nid in ids.into_iter().filter(|n| only.is_none_or(|o| o == *n)) {
+                added += self.sync_cloze_cards(nid)?.0;
+            }
+            return Ok(added);
+        }
         let reqs = self.notetype_reqs(mid)?;
         let notes: Vec<(i64, String)> = {
             let mut stmt = self
@@ -824,6 +1178,9 @@ impl NoteWriter<'_> {
                 .prepare("SELECT id, flds FROM notes WHERE mid = ?1")?;
             stmt.query_map([mid], |r| Ok((r.get(0)?, r.get(1)?)))?
                 .collect::<rusqlite::Result<Vec<_>>>()?
+                .into_iter()
+                .filter(|(n, _)| only.is_none_or(|o| o == *n))
+                .collect()
         };
 
         let mut generated = 0;
@@ -859,12 +1216,7 @@ impl NoteWriter<'_> {
                 if exists {
                     continue;
                 }
-                let satisfied = match kind {
-                    1 => field_ords.iter().any(|&o| nonempty(o)),
-                    2 => !field_ords.is_empty() && field_ords.iter().all(|&o| nonempty(o)),
-                    _ => false,
-                };
-                if !satisfied {
+                if !req_satisfied(*kind, field_ords, nonempty) {
                     continue;
                 }
                 let pos = self.next_position()?;
@@ -891,6 +1243,121 @@ impl NoteWriter<'_> {
             )
             .with_context(|| format!("insert grave oid={oid} type={kind}"))?;
         Ok(())
+    }
+
+    /// Delete a single card, recording a grave. Review history in `revlog`
+    /// is left in place (as rslib does), it just no longer joins to a card.
+    fn remove_card(&mut self, cid: i64) -> Result<()> {
+        self.add_grave(cid, GRAVE_CARD)?;
+        self.tx
+            .execute("DELETE FROM cards WHERE id = ?1", [cid])
+            .with_context(|| format!("delete card {cid}"))?;
+        self.mutated = true;
+        Ok(())
+    }
+
+    /// Move a note to another notetype in place, like Anki's "Change Note
+    /// Type": the note id and guid stay, cards whose template name exists in
+    /// both notetypes keep their id (and so their review history) with `ord`
+    /// remapped, cards of templates that don't carry over are deleted, and
+    /// cards the new notetype requires are generated. `fields` must already
+    /// be in the new notetype's ord order.
+    ///
+    /// Changing between normal and cloze keeps the first card as ord 0;
+    /// further cloze cards follow the `{{cN::}}` numbers.
+    ///
+    /// This is a schema change (bumps `col.scm`, forcing a full sync), as
+    /// in rslib. Returns what happened to the cards.
+    #[allow(clippy::too_many_arguments)]
+    pub fn change_note_model(
+        &mut self,
+        note_id: i64,
+        new_mid: i64,
+        fields: Vec<String>,
+        sort_field_idx: u32,
+        tags: &[String],
+        deck_id: i64,
+        renames: &HashMap<String, String>,
+    ) -> Result<CardRemap> {
+        let old_mid: i64 = self
+            .tx
+            .query_row("SELECT mid FROM notes WHERE id = ?1", [note_id], |r| r.get(0))
+            .with_context(|| format!("load note {note_id}"))?;
+        let old_names = self.template_names(old_mid)?;
+        let new_names = self.template_names(new_mid)?;
+
+        // old ord -> new ord, matching by (possibly renamed) template name.
+        // Between a normal and a cloze notetype names never line up, so,
+        // like Anki's default Change Note Type mapping, the first card
+        // carries over as ord 0 (cloze c1 / the first template).
+        let crosses_kind = self.notetype_is_cloze(old_mid)? != self.notetype_is_cloze(new_mid)?;
+        let map_ord = |old_ord: u32| -> Option<u32> {
+            if crosses_kind {
+                return (old_ord == 0).then_some(0);
+            }
+            let name = old_names.get(old_ord as usize)?;
+            let target = renames.get(name).unwrap_or(name);
+            new_names.iter().position(|n| n == target).map(|i| i as u32)
+        };
+
+        let cards: Vec<(i64, u32)> = {
+            let mut stmt = self.tx.prepare("SELECT id, ord FROM cards WHERE nid = ?1")?;
+            stmt.query_map([note_id], |r| Ok((r.get(0)?, r.get(1)?)))?
+                .collect::<rusqlite::Result<Vec<_>>>()?
+        };
+
+        let mut remap = CardRemap::default();
+        // Two passes so a swap (A<->B) never collides on the (nid, ord) index:
+        // park kept cards at negative ords first, then settle them.
+        let mut kept: Vec<(i64, u32)> = Vec::new();
+        for (cid, ord) in cards {
+            match map_ord(ord) {
+                Some(new_ord) => kept.push((cid, new_ord)),
+                None => {
+                    self.remove_card(cid)?;
+                    remap.removed += 1;
+                }
+            }
+        }
+        for (cid, _) in &kept {
+            self.tx.execute("UPDATE cards SET ord = -1 - ord WHERE id = ?1", [cid])?;
+        }
+        for (cid, new_ord) in &kept {
+            self.tx
+                .execute(
+                    "UPDATE cards SET ord=?1, did=?2, usn=?3, mod=?4 WHERE id=?5",
+                    params![new_ord, deck_id, self.usn, now_secs(), cid],
+                )
+                .with_context(|| format!("remap card {cid}"))?;
+        }
+        remap.kept = kept.len();
+
+        self.tx
+            .execute(
+                "UPDATE notes SET mid=?1, usn=?2, mod=?3 WHERE id=?4",
+                params![new_mid, self.usn, now_secs(), note_id],
+            )
+            .with_context(|| format!("move note {note_id} to notetype {new_mid}"))?;
+        self.update_note(note_id, fields, sort_field_idx, tags)?;
+
+        let before = self.count_cards(note_id)?;
+        if self.notetype_is_cloze(new_mid)? {
+            self.sync_cloze_cards(note_id)?;
+        } else {
+            self.generate_missing_cards_for(new_mid, Some(note_id))?;
+        }
+        remap.added = self.count_cards(note_id)?.saturating_sub(before);
+
+        self.mutated = true;
+        self.schema_changed = true;
+        Ok(remap)
+    }
+
+    fn count_cards(&self, note_id: i64) -> Result<usize> {
+        let n: i64 = self
+            .tx
+            .query_row("SELECT count(*) FROM cards WHERE nid = ?1", [note_id], |r| r.get(0))?;
+        Ok(n as usize)
     }
 
     /// Delete a note and all its cards, recording a grave for each so the
@@ -1112,6 +1579,7 @@ mod tests {
             name: "capital-city".into(),
             css: ".card { text-align: center; }".into(),
             card_names: vec!["Locate".into(), "Identify".into()],
+            cloze: false,
         };
 
         let (ntid, scm_before, scm_after);
@@ -1221,6 +1689,7 @@ mod tests {
             name: "capital-city".into(),
             css: ".card { text-align: center; }".into(),
             card_names: vec!["Locate".into(), "Identify".into(), "Flag".into()],
+            cloze: false,
         };
 
         let (nid, full_cards, partial_cards);
@@ -1337,6 +1806,7 @@ mod tests {
                         name: "phase6".into(),
                         css: ".card{}".into(),
                         card_names: vec!["Card".into()],
+                        cloze: false,
                     };
                     let mid = w.ensure_model(&spec1)?;
                     // Re-running with identical spec is a no-op reuse.
@@ -1377,6 +1847,7 @@ mod tests {
                         name: "phase6".into(),
                         css: ".card{}".into(),
                         card_names: vec!["Card".into(), "Reverse".into()],
+                        cloze: false,
                     };
                     assert_eq!(w.ensure_model(&spec2)?, mid);
                     // Fill the reverse fields, then regen: the new card appears.
@@ -1451,11 +1922,13 @@ mod tests {
                 name: "reord".into(),
                 css: String::new(),
                 card_names: vec!["A".into(), "B".into()],
+                cloze: false,
             })?;
             w.ensure_model(&notetype::ModelSpec {
                 name: "reord".into(),
                 css: String::new(),
                 card_names: vec!["B".into(), "A".into()],
+                cloze: false,
             })?;
             Ok(())
         });

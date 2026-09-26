@@ -26,19 +26,41 @@ const DEFAULT_FIELD_SIZE: u32 = 20;
 
 /// A marki model to materialize as a notetype. `name` is the bare model name
 /// (`geographic-location`); the notetype is stored as `marki:<name>`.
+///
+/// `cloze` switches to Anki's cloze layout: fields `Text`/`Back Extra`, one
+/// `Cloze` template, and one card per `{{cN::}}` number rather than per
+/// template. `card_names` is ignored for cloze specs.
 pub struct ModelSpec {
     pub name: String,
     pub css: String,
     pub card_names: Vec<String>,
+    pub cloze: bool,
 }
+
+/// Field and template names of a cloze notetype, matching Anki's stock Cloze.
+pub const CLOZE_FIELDS: [&str; 2] = ["Text", "Back Extra"];
+pub const CLOZE_TEMPLATE: &str = "Cloze";
 
 impl ModelSpec {
     pub fn notetype_name(&self) -> String {
         format!("marki:{}", self.name)
     }
 
-    /// Field names in ord order: `[A]Front, [A]Back, [B]Front, ...`.
+    /// Template names in ord order.
+    pub fn template_names(&self) -> Vec<String> {
+        if self.cloze {
+            vec![CLOZE_TEMPLATE.to_string()]
+        } else {
+            self.card_names.clone()
+        }
+    }
+
+    /// Field names in ord order: `[A]Front, [A]Back, [B]Front, ...`, or
+    /// `Text, Back Extra` for cloze.
     pub fn field_names(&self) -> Vec<String> {
+        if self.cloze {
+            return CLOZE_FIELDS.iter().map(|s| s.to_string()).collect();
+        }
         let mut out = Vec::with_capacity(self.card_names.len() * 2);
         for card in &self.card_names {
             out.push(format!("{card}Front"));
@@ -68,17 +90,27 @@ fn stable_id(ntid: i64, kind: u8, ord: u32) -> i64 {
 }
 
 /// The `Notetype.Config` blob for `notetypes.config`. `reqs[i]` points card
-/// `i` at its front field ord `2*i` (see module docs).
-pub fn notetype_config(css: &str, card_count: usize) -> Config {
-    let reqs = (0..card_count as u32)
-        .map(|i| CardRequirement {
-            card_ord: i,
+/// `i` at its front field ord `2*i` (see module docs). Cloze notetypes carry
+/// a single `ANY [0]` req like Anki's stock Cloze; their cards come from the
+/// `{{cN::}}` numbers instead (see [`cloze_ords`]).
+pub fn notetype_config(css: &str, card_count: usize, cloze: bool) -> Config {
+    let reqs = if cloze {
+        vec![CardRequirement {
+            card_ord: 0,
             kind: ReqKind::Any as i32,
-            field_ords: vec![2 * i],
-        })
-        .collect();
+            field_ords: vec![0],
+        }]
+    } else {
+        (0..card_count as u32)
+            .map(|i| CardRequirement {
+                card_ord: i,
+                kind: ReqKind::Any as i32,
+                field_ords: vec![2 * i],
+            })
+            .collect()
+    };
     Config {
-        kind: 0, // Normal
+        kind: if cloze { 1 } else { 0 }, // Cloze / Normal
         sort_field_idx: 0,
         css: css.to_string(),
         target_deck_id_unused: 0,
@@ -86,11 +118,35 @@ pub fn notetype_config(css: &str, card_count: usize) -> Config {
         latex_post: LATEX_POST.to_string(),
         latex_svg: false,
         reqs,
-        original_stock_kind: OriginalStockKind::Basic as i32,
+        original_stock_kind: if cloze {
+            OriginalStockKind::Cloze as i32
+        } else {
+            OriginalStockKind::Basic as i32
+        },
         original_id: None,
         other: Vec::new(),
     }
 }
+
+/// Card ords a cloze note generates: `N-1` for every distinct `{{cN::` in
+/// `text`, sorted. A note without markers still gets ord 0, as in Anki.
+pub fn cloze_ords(text: &str) -> Vec<u32> {
+    let mut ords: Vec<u32> = CLOZE_RE
+        .captures_iter(text)
+        .filter_map(|c| c[1].parse::<u32>().ok())
+        .filter(|n| *n >= 1)
+        .map(|n| n - 1)
+        .collect();
+    ords.sort_unstable();
+    ords.dedup();
+    if ords.is_empty() {
+        ords.push(0);
+    }
+    ords
+}
+
+static CLOZE_RE: std::sync::LazyLock<regex::Regex> =
+    std::sync::LazyLock::new(|| regex::Regex::new(r"\{\{c(\d+)::").unwrap());
 
 /// A `fields.config` blob (stock Basic field defaults).
 pub fn field_config(id: i64) -> field::Config {
@@ -110,11 +166,23 @@ pub fn field_config(id: i64) -> field::Config {
     }
 }
 
-/// A `templates.config` blob rendering `{{<card>Front}}` / `{{<card>Back}}`.
-pub fn template_config(card_name: &str, id: i64) -> template::Config {
+/// A `templates.config` blob rendering `{{<card>Front}}` / `{{<card>Back}}`,
+/// or Anki's stock cloze formats for `cloze`.
+pub fn template_config(card_name: &str, id: i64, cloze: bool) -> template::Config {
+    let (q_format, a_format) = if cloze {
+        (
+            "{{cloze:Text}}".to_string(),
+            "{{cloze:Text}}<br>\n{{Back Extra}}".to_string(),
+        )
+    } else {
+        (
+            format!("{{{{{card_name}Front}}}}"),
+            format!("{{{{{card_name}Back}}}}"),
+        )
+    };
     template::Config {
-        q_format: format!("{{{{{card_name}Front}}}}"),
-        a_format: format!("{{{{{card_name}Back}}}}"),
+        q_format,
+        a_format,
         q_format_browser: String::new(),
         a_format_browser: String::new(),
         target_deck_id: 0,
@@ -150,18 +218,19 @@ pub fn build(spec: &ModelSpec, ntid: i64) -> BuiltNotetype {
         })
         .collect();
     let templates = spec
-        .card_names
-        .iter()
+        .template_names()
+        .into_iter()
         .enumerate()
         .map(|(i, card)| {
             let ord = i as u32;
-            (ord, card.clone(), template_config(card, stable_id(ntid, b'T', ord)))
+            let cfg = template_config(&card, stable_id(ntid, b'T', ord), spec.cloze);
+            (ord, card, cfg)
         })
         .collect();
     BuiltNotetype {
         id: ntid,
         name: spec.notetype_name(),
-        config: notetype_config(&spec.css, spec.card_names.len()),
+        config: notetype_config(&spec.css, spec.card_names.len(), spec.cloze),
         fields,
         templates,
     }
@@ -213,6 +282,7 @@ mod tests {
                 "FlagToCountry".into(),
                 "CountryToFlag".into(),
             ],
+            cloze: false,
         }
     }
 
@@ -237,7 +307,7 @@ mod tests {
 
     #[test]
     fn reqs_use_2i_stride() {
-        let cfg = notetype_config(".card{}", 4);
+        let cfg = notetype_config(".card{}", 4, false);
         let ords: Vec<(u32, Vec<u32>)> = cfg
             .reqs
             .iter()
@@ -251,8 +321,15 @@ mod tests {
     }
 
     #[test]
+    fn cloze_ords_follow_numbers() {
+        assert_eq!(cloze_ords("{{c1::a}} {{c3::b}} {{c1::c}}"), vec![0, 2]);
+        assert_eq!(cloze_ords("no markers"), vec![0]);
+        assert_eq!(cloze_ords("{{c0::bad}}"), vec![0]);
+    }
+
+    #[test]
     fn template_formats_reference_matching_fields() {
-        let t = template_config("Locate", 1);
+        let t = template_config("Locate", 1, false);
         assert_eq!(t.q_format, "{{LocateFront}}");
         assert_eq!(t.a_format, "{{LocateBack}}");
     }

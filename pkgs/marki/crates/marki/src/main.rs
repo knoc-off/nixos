@@ -2,16 +2,11 @@
 
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
-use marki_anki::Collection;
 use marki::config::Config;
 use marki::fmt as fmt_mod;
-use marki::render::Registry;
-use marki::scan::scan_dir_v2;
-use marki::scripting::engine::ScriptEngine;
-use marki::sync::reconcile;
+use marki::project::Project;
 use marki::watch::{Tick, run as run_watch};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::time::Duration;
 use tracing_subscriber::EnvFilter;
 
@@ -81,7 +76,14 @@ enum Cmd {
         /// flag, nothing is pruned during a cycle that had render errors.
         #[arg(long)]
         prune: bool,
+        /// Push into a throwaway copy of the collection, check the result,
+        /// and report; the real collection and media are not touched.
+        #[arg(long)]
+        simulate: bool,
     },
+    /// Validate without writing: render every card (reporting model and
+    /// block errors), and check the collection's structure.
+    Check,
     /// Long-running daemon: watch the cards directory and push on change.
     Watch,
     /// Read-only diff view (added / updated / moved / deleted / unformatted).
@@ -94,19 +96,16 @@ enum Cmd {
         #[arg(long)]
         dry_run: bool,
     },
-    /// Render every external block in a single .md file to disk and
-    /// print the resulting HTML on stdout. No Anki round-trip — useful
-    /// for theme iteration.
-    RenderMap {
+    /// Render one card offline (no collection) to `<out>/preview.html`
+    /// with every card front and back and the model CSS, plus its assets.
+    Render {
         /// The card .md to render.
         file: PathBuf,
-        /// Directory to write asset files into. Created if missing.
+        /// Directory to write the preview and asset files into.
         #[arg(long, default_value = "out")]
         out: PathBuf,
         /// Dump rendered assets (SVGs etc.) to stdout instead of writing
-        /// files. Logs still go to stderr, so `marki -v render-map
-        /// card.md --stdout > map.svg` gives a clean SVG plus debug
-        /// trace. With multiple assets each is prefixed by an
+        /// files. With multiple assets each is prefixed by an
         /// `<!-- asset: NAME -->` comment.
         #[arg(long)]
         stdout: bool,
@@ -133,13 +132,10 @@ fn main() -> Result<()> {
         .with_writer(std::io::stderr)
         .init();
 
-    // RenderMap doesn't need a working AnkiConnect — but it does want
-    // the same renderer registry the daemon uses, which in turn wants
-    // config (for media sources). Load the config the same way as below.
-    if let Some(Cmd::RenderMap { file, out, stdout }) = &cli.cmd {
-        let cfg = load_config_for_render(&cli)?;
-        let registry = build_registry(&cfg);
-        return cmd_render_map(file, out, *stdout, &registry);
+    // Render needs the project (models, media) but no collection.
+    if let Some(Cmd::Render { file, out, stdout }) = &cli.cmd {
+        let mut project = Project::new(load_config(&cli)?);
+        return cmd_render(&mut project, file, out, *stdout);
     }
 
     // `init` only scaffolds the current directory; no config load needed.
@@ -150,100 +146,49 @@ fn main() -> Result<()> {
     let cfg = load_config(&cli)?;
 
     // No subcommand → run a single push (one-shot first).
-    let cmd = cli.cmd.unwrap_or(Cmd::Push { prune: false });
+    let cmd = cli.cmd.unwrap_or(Cmd::Push { prune: false, simulate: false });
 
+    if let Cmd::Fmt = cmd {
+        return cmd_fmt(&cfg);
+    }
+    if let Cmd::Prune { dry_run } = cmd {
+        return cmd_prune(&Project::new(cfg), dry_run);
+    }
+    let mut project = Project::new(cfg);
+    let mut col = project.open_collection()?;
     match cmd {
-        Cmd::Init => unreachable!("handled above"),
-        Cmd::Fmt => cmd_fmt(&cfg),
-        Cmd::Push { prune } => {
-            let mut col = open_collection(&cfg)?;
-            let registry = Arc::new(build_registry(&cfg));
-            let mut script_engine = build_script_engine(&cfg);
-            cmd_push(&mut col, &cfg, &registry, &mut script_engine, prune)
-        }
-        Cmd::Status => {
-            let mut col = open_collection(&cfg)?;
-            let registry = Arc::new(build_registry(&cfg));
-            let mut script_engine = build_script_engine(&cfg);
-            run_cycle(&mut col, &cfg, &registry, &mut script_engine, true, false)?;
+        Cmd::Push { prune, simulate: true } => {
+            let sim = project.simulate(&col, prune)?;
+            print_changes(&project, &sim.outcome);
+            for e in sim.outcome.errors.iter().chain(&sim.problems) {
+                eprintln!("problem: {e}");
+            }
+            anyhow::ensure!(sim.ok(), "simulation found problems; nothing was written");
+            println!("simulation clean (plan {})", sim.plan_hash);
             Ok(())
         }
-        Cmd::Prune { dry_run } => cmd_prune(&cfg, dry_run),
-        Cmd::Watch => {
-            let mut col = open_collection(&cfg)?;
-            let registry = Arc::new(build_registry(&cfg));
-            let mut script_engine = build_script_engine(&cfg);
-            cmd_watch(&mut col, &cfg, &registry, &mut script_engine)
+        Cmd::Push { prune, simulate: false } => cmd_push(&mut project, &mut col, prune),
+        Cmd::Status => {
+            let outcome = run_cycle(&mut project, &mut col, true, false)?;
+            print_changes(&project, &outcome);
+            Ok(())
         }
-        Cmd::RenderMap { .. } => unreachable!("handled above"),
-    }
-}
-
-/// Build the external block-renderer registry. The media renderer is
-/// registered when at least one media source exists — the built-in
-/// git-tracked `.marki/media/` directory (searched first) plus any
-/// `[media_sources]` from config. Otherwise ```media``` blocks fall
-/// through to plain code rendering. Likewise, the typst renderer is only
-/// registered when a typst binary is configured.
-fn build_registry(cfg: &Config) -> Registry {
-    let mut reg = Registry::new();
-    let map_renderer =
-        match marki_map::MapRenderer::with_defaults(cfg.map.clone(), cfg.resolved_cards_dir()) {
-            Ok(r) => r,
-            Err(e) => {
-                tracing::warn!("invalid [map] rule in config ({e}); ignoring map defaults");
-                marki_map::MapRenderer::new()
+        Cmd::Watch => cmd_watch(&mut project, &mut col),
+        Cmd::Check => {
+            let outcome = project.cycle(&mut col, true, false)?;
+            let problems = col.check()?;
+            for e in outcome.errors.iter().chain(&problems) {
+                println!("{e}");
             }
-        };
-    reg.register(Box::new(map_renderer));
-
-    let mut sources: Vec<(String, std::path::PathBuf)> = Vec::new();
-    // Built-in primary media dir, searched first when it exists.
-    let builtin = cfg.builtin_media_dir();
-    if builtin.is_dir() {
-        sources.push(("media".to_string(), builtin));
-    }
-    sources.extend(
-        cfg.media_sources
-            .iter()
-            .map(|(name, dir)| (name.clone(), dir.clone())),
-    );
-
-    if !sources.is_empty() {
-        reg.register(Box::new(marki_media::MediaRenderer::new(sources)));
-    }
-
-    if let Some(bin) = &cfg.typst_binary {
-        reg.register(Box::new(marki_typst::TypstRenderer::new(bin.clone())));
-    }
-
-    reg
-}
-
-/// Build the Lua script engine with models_dir and lib_dir from config.
-fn build_script_engine(cfg: &Config) -> ScriptEngine {
-    let models_dir = cfg.resolved_models_dir();
-    let lib_dir = cfg.resolved_lib_dir();
-    let lib = if lib_dir.exists() { Some(lib_dir) } else { None };
-    ScriptEngine::new(models_dir, lib)
-}
-
-/// Open the configured Anki collection file, or fail with guidance when the
-/// `collection` key is unset.
-fn open_collection(cfg: &Config) -> Result<Collection> {
-    let path = cfg.resolved_collection().context(
-        "no collection configured; set `collection` in .marki/config.toml or pass --collection",
-    )?;
-    Collection::open(&path).with_context(|| format!("open collection {}", path.display()))
-}
-
-/// Cache directory used by external block renderers. We default to
-/// `$XDG_CACHE_HOME/marki/` and fall back to `$HOME/.cache/marki/`.
-fn render_cache_dir() -> PathBuf {
-    if let Some(d) = dirs::cache_dir() {
-        d.join("marki")
-    } else {
-        PathBuf::from("/tmp/marki-cache")
+            anyhow::ensure!(
+                outcome.errors.is_empty() && problems.is_empty(),
+                "{} problem(s)",
+                outcome.errors.len() + problems.len()
+            );
+            println!("ok");
+            Ok(())
+        }
+        Cmd::Init | Cmd::Fmt | Cmd::Prune { .. } | Cmd::Render { .. } => unreachable!(),
     }
 }
 
@@ -255,20 +200,6 @@ fn load_config(cli: &Cli) -> Result<Config> {
     } else {
         tracing::debug!(anchor = %disc.anchor_dir.display(), "no config file; using defaults");
     }
-    let mut cfg = Config::load(&disc)?;
-
-    apply_cli_overrides(&mut cfg, cli)?;
-    // Resolve cards_dir to an absolute path (project root by default).
-    cfg.cards_dir = cfg.resolved_cards_dir();
-    Ok(cfg)
-}
-
-/// Like [`load_config`] but tolerates a missing project — used by the
-/// offline `render-map` subcommand which only needs the renderer
-/// registry config (media sources, typst).
-fn load_config_for_render(cli: &Cli) -> Result<Config> {
-    let cwd = std::env::current_dir().context("get current directory")?;
-    let disc = Config::discover(&cwd, cli.config.as_deref());
     let mut cfg = Config::load(&disc)?;
     apply_cli_overrides(&mut cfg, cli)?;
     Ok(cfg)
@@ -296,41 +227,12 @@ fn apply_cli_overrides(cfg: &mut Config, cli: &Cli) -> Result<()> {
 }
 
 fn run_cycle(
-    col: &mut Collection,
-    cfg: &Config,
-    registry: &Arc<Registry>,
-    script_engine: &mut ScriptEngine,
+    project: &mut Project,
+    col: &mut marki_anki::Collection,
     dry_run: bool,
     prune: bool,
 ) -> Result<marki::sync::Outcome> {
-    // Model scripts are cached and reloaded on mtime change (see
-    // ScriptEngine::load_model), so no blanket invalidation per cycle.
-    let notes = scan_dir_v2(&cfg.cards_dir)?;
-    let cache_dir = render_cache_dir();
-    let models_dir = cfg.resolved_models_dir();
-    let media_dir = cfg.media_dir().context("derive media dir from collection")?;
-    let media_db = cfg.media_db_path().context("derive media db path from collection")?;
-    tracing::debug!(
-        notes = notes.len(),
-        cards_dir = %cfg.cards_dir.display(),
-        cache_dir = %cache_dir.display(),
-        dry_run,
-        prune,
-        "starting reconcile cycle"
-    );
-    let outcome = reconcile(
-        col,
-        &cfg.cards_dir,
-        &notes,
-        script_engine,
-        registry,
-        &cache_dir,
-        &models_dir,
-        &media_dir,
-        &media_db,
-        dry_run,
-        prune,
-    )?;
+    let outcome = project.cycle(col, dry_run, prune)?;
     tracing::info!(
         "cycle: +{} ~{} ->{} -{} (quarantined {}, skipped-prune {}, unformatted {}, {} errors)",
         outcome.added,
@@ -348,6 +250,22 @@ fn run_cycle(
     Ok(outcome)
 }
 
+/// One line per planned note change, paths relative to the cards dir.
+fn print_changes(project: &Project, outcome: &marki::sync::Outcome) {
+    for c in &outcome.changes {
+        let what = match &c.path {
+            Some(p) => p.strip_prefix(&project.cfg.cards_dir).unwrap_or(p).display().to_string(),
+            None => format!("#id({})", c.id),
+        };
+        let kind: &str = (&c.kind).into();
+        if c.detail.is_empty() {
+            println!("{kind:<12} {what}");
+        } else {
+            println!("{kind:<12} {what}  ({})", c.detail);
+        }
+    }
+}
+
 /// Scaffold a `.marki/` project in the current directory.
 fn cmd_init() -> Result<()> {
     let cwd = std::env::current_dir().context("get current directory")?;
@@ -361,7 +279,7 @@ fn cmd_init() -> Result<()> {
 }
 
 fn cmd_fmt(cfg: &Config) -> Result<()> {
-    let outcome = fmt_mod::run(&cfg.cards_dir)?;
+    let outcome = fmt_mod::run(&cfg.resolved_cards_dir())?;
     println!(
         "fmt: formatted {} (minted {}), unchanged {}, warnings {}",
         outcome.formatted, outcome.minted, outcome.unchanged, outcome.errored,
@@ -372,14 +290,8 @@ fn cmd_fmt(cfg: &Config) -> Result<()> {
     Ok(())
 }
 
-fn cmd_push(
-    col: &mut Collection,
-    cfg: &Config,
-    registry: &Arc<Registry>,
-    script_engine: &mut ScriptEngine,
-    prune: bool,
-) -> Result<()> {
-    let outcome = run_cycle(col, cfg, registry, script_engine, false, prune)?;
+fn cmd_push(project: &mut Project, col: &mut marki_anki::Collection, prune: bool) -> Result<()> {
+    let outcome = run_cycle(project, col, false, prune)?;
     // Surface failures with a non-zero exit so cron/systemd notices, instead
     // of silently "succeeding" while notes failed to render.
     if !outcome.errors.is_empty() {
@@ -394,10 +306,10 @@ fn cmd_push(
 /// Permanently delete every note quarantined by a prior soft-delete
 /// (`tag:marki::orphan`). Separate, explicit, opt-in step. Reads the
 /// collection directly and removes the notes in one transaction.
-fn cmd_prune(cfg: &Config, dry_run: bool) -> Result<()> {
+fn cmd_prune(project: &Project, dry_run: bool) -> Result<()> {
     use marki::anki::model::{MARKER_TAG, ORPHAN_TAG};
 
-    let mut col = open_collection(cfg)?;
+    let mut col = project.open_collection()?;
     let managed = col.managed_notes(MARKER_TAG).context("read managed notes")?;
     let note_ids: Vec<i64> = managed
         .iter()
@@ -424,29 +336,24 @@ fn cmd_prune(cfg: &Config, dry_run: bool) -> Result<()> {
     Ok(())
 }
 
-fn cmd_render_map(file: &Path, out: &Path, to_stdout: bool, registry: &Registry) -> Result<()> {
+fn cmd_render(project: &mut Project, file: &Path, out: &Path, to_stdout: bool) -> Result<()> {
     use std::io::Write;
 
-    let source = std::fs::read_to_string(file)
-        .with_context(|| format!("read {}", file.display()))?;
-    let note = marki::note_parser::parse_note(&source, file.to_path_buf());
-
-    let cache = render_cache_dir();
-    let result = marki::sync::render_stock(&note, registry, file, &cache);
-
-    for e in &result.errors {
+    let source =
+        std::fs::read_to_string(file).with_context(|| format!("read {}", file.display()))?;
+    let abs = std::path::absolute(file).unwrap_or_else(|_| file.to_path_buf());
+    let preview = project.preview(&abs, &source)?;
+    for e in &preview.note.errors {
         eprintln!("warning: {e}");
     }
+    let assets = &preview.note.assets;
 
-    // --stdout: dump each rendered asset to stdout (SVG XML etc.) and
-    // skip file writing entirely. Logs and warnings already went to
-    // stderr, so the stream stays clean.
+    // --stdout: raw assets only, so `marki render card.md --stdout > map.svg`
+    // gives a clean SVG (logs go to stderr).
     if to_stdout {
-        let stdout = std::io::stdout();
-        let mut w = stdout.lock();
-        let multi = result.assets.len() > 1;
-        for a in &result.assets {
-            if multi {
+        let mut w = std::io::stdout().lock();
+        for a in assets {
+            if assets.len() > 1 {
                 writeln!(w, "<!-- asset: {} -->", a.filename)?;
             }
             w.write_all(&a.bytes)?;
@@ -454,63 +361,29 @@ fn cmd_render_map(file: &Path, out: &Path, to_stdout: bool, registry: &Registry)
                 writeln!(w)?;
             }
         }
-        tracing::info!(
-            assets = result.assets.len(),
-            "rendered {} to stdout",
-            file.display()
-        );
         return Ok(());
     }
 
-    // Extract front/back from fields.
-    let front = result.fields.iter()
-        .find(|(k, _)| k == "Front" || k == "Text")
-        .map(|(_, v)| v.as_str())
-        .unwrap_or("");
-    let back = result.fields.iter()
-        .find(|(k, _)| k == "Back" || k == "Back Extra")
-        .map(|(_, v)| v.as_str())
-        .unwrap_or("");
-
-    std::fs::create_dir_all(out)
-        .with_context(|| format!("create {}", out.display()))?;
-
-    // Write assets to output directory.
-    let mut total_assets = 0usize;
-    for a in &result.assets {
-        let asset_path = out.join(&a.filename);
-        std::fs::write(&asset_path, &a.bytes).with_context(|| {
-            format!("write asset {}", asset_path.display())
-        })?;
-        total_assets += 1;
+    std::fs::create_dir_all(out).with_context(|| format!("create {}", out.display()))?;
+    for a in assets {
+        let p = out.join(&a.filename);
+        std::fs::write(&p, &a.bytes).with_context(|| format!("write asset {}", p.display()))?;
     }
-
     let html_path = out.join("preview.html");
-    let document = format!(
-        "<!doctype html><meta charset=\"utf-8\"><title>{name}</title>\
-         <style>body{{font-family:system-ui,sans-serif;margin:2rem;max-width:800px;}}</style>\
-         <h2>front</h2>{front}<hr><h2>back</h2>{back}",
-        name = file.display(),
-        front = front,
-        back = back,
-    );
-    std::fs::write(&html_path, document.as_bytes())
+    std::fs::write(&html_path, preview.html_page(&file.display().to_string()))
         .with_context(|| format!("write {}", html_path.display()))?;
     println!(
-        "wrote {} (preview) plus {} asset(s) to {}",
+        "wrote {} ({} card(s)) plus {} asset(s) to {}",
         html_path.display(),
-        total_assets,
+        preview.cards.len(),
+        assets.len(),
         out.display()
     );
     Ok(())
 }
 
-fn cmd_watch(
-    col: &mut Collection,
-    cfg: &Config,
-    registry: &Arc<Registry>,
-    script_engine: &mut ScriptEngine,
-) -> Result<()> {
+fn cmd_watch(project: &mut Project, col: &mut marki_anki::Collection) -> Result<()> {
+    let cfg = project.cfg.clone();
     let debounce = Duration::from_millis(cfg.debounce_ms);
     let heartbeat = cfg.sync_interval;
 
@@ -526,7 +399,7 @@ fn cmd_watch(
             Tick::Filesystem => tracing::info!("cycle: triggered by filesystem change"),
             Tick::Heartbeat => tracing::info!("cycle: triggered by heartbeat"),
         }
-        if let Err(e) = run_cycle(col, cfg, registry, script_engine, false, false) {
+        if let Err(e) = run_cycle(project, col, false, false) {
             tracing::error!("cycle failed: {e:#}");
         }
         Ok(true)

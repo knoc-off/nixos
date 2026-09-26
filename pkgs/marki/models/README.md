@@ -50,8 +50,38 @@ return M
   infinite loop fails instead of hanging.
 - Scripts reload automatically when the file changes, including in `watch`.
 
-Changing a note's `#model` makes marki delete it and add it again, which
-resets its review history.
+Scripts run in a sandbox: only `string`, `table`, `math`, `utf8` and
+`coroutine` are available. There is no `io`, `os`, `load` or `dofile`, and
+`require` only loads `.lua` files from `lib_dir`.
+
+## Changing a model that's in use
+
+Anki cards belong to a card type, and review history belongs to cards. marki
+keeps history wherever a card type survives a change:
+
+| Change in `card_names()`       | What happens                                               |
+| ------------------------------ | ---------------------------------------------------------- |
+| Append a name                  | New cards are generated for existing notes                 |
+| Reorder names                  | Cards follow their name; history kept                      |
+| Rename (declare it, below)     | Cards follow the new name; history kept                    |
+| Remove a name                  | Refused while cards use it, unless allowed (below)         |
+
+```lua
+local M = {
+  renames = { Ask = "Question" },  -- old card name -> new
+  allow_card_removal = true,       -- drop removed card types and their history
+}
+```
+
+Once a push has applied a rename, the `renames` entry can be deleted.
+
+A model that can't be updated (for example a refused removal) is reported as
+an error and only its own notes are skipped; the rest of the push goes ahead.
+Anything other than an append or a CSS change is a schema change, so devices
+need a full sync afterwards (choose **download**).
+
+Changing a single note's `#model` works the same way: cards whose card type
+exists in both models keep their history.
 
 ## API
 
