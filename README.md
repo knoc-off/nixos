@@ -4,13 +4,13 @@ My personal NixOS flake for my laptops, a home server, a VPS, and a Raspberry Pi
 
 ## Hosts
 
-| Host            | Hardware              | Role                                          |
-| --------------- | --------------------- | --------------------------------------------- |
-| `framework13`   | Framework 13 (AMD)    | Main laptop                                   |
-| `thinkpad-work` | Lenovo ThinkPad       | Work laptop                                   |
-| `optiplex`      | Dell OptiPlex 7080    | Home server: Minecraft, nix cache, services   |
-| `hetzner`       | Hetzner VPS           | Public web services, Gate ingress             |
-| `rpi-4b-plus`   | Raspberry Pi 4        | Home Assistant, MQTT                          |
+| Host            | Hardware           | Role                                        |
+| --------------- | ------------------ | ------------------------------------------- |
+| `framework13`   | Framework 13 (AMD) | Main laptop                                 |
+| `thinkpad-work` | Lenovo ThinkPad    | Work laptop                                 |
+| `optiplex`      | Dell OptiPlex 7080 | Home server: Minecraft, nix cache, services |
+| `hetzner`       | Hetzner VPS        | Public web services, Gate ingress           |
+| `rpi-4b-plus`   | Raspberry Pi 4     | Home Assistant, MQTT                        |
 
 ## Highlights
 
