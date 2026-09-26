@@ -521,6 +521,11 @@ let
         type = "remote";
         url = "https://mcp.grep.app";
       };
+      # Anki card authoring (modules/marki-mcp.nix), tailnet-only, no auth.
+      marki = {
+        type = "remote";
+        url = "https://marki.optiplex.tail.niko.ink/mcp";
+      };
       nixos = {
         type = "local";
         command = [ "${upkgs.mcp-nixos}/bin/mcp-nixos" ];

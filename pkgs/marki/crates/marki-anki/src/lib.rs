@@ -224,6 +224,28 @@ impl Collection {
         Ok(problems)
     }
 
+    /// Per card type of notetype `name`: `(template, cards, reviews)`, in ord
+    /// order. Empty when the notetype doesn't exist yet. Lets a model edit be
+    /// judged by what dropping a card type would cost.
+    pub fn template_usage(&self, name: &str) -> Result<Vec<(String, i64, i64)>> {
+        let mut stmt = self.db.prepare(
+            "SELECT t.name, \
+               (SELECT count(*) FROM cards c JOIN notes n ON n.id=c.nid WHERE n.mid=nt.id AND c.ord=t.ord), \
+               (SELECT count(*) FROM revlog r JOIN cards c ON c.id=r.cid JOIN notes n ON n.id=c.nid \
+                WHERE n.mid=nt.id AND c.ord=t.ord) \
+             FROM notetypes nt JOIN templates t ON t.ntid=nt.id WHERE nt.name=?1 ORDER BY t.ord",
+        )?;
+        let rows = stmt
+            .query_map([name], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?
+            .collect::<rusqlite::Result<_>>()?;
+        Ok(rows)
+    }
+
+    /// Raw connection for read-only callers (ad-hoc queries over a snapshot).
+    pub fn conn(&self) -> &Connection {
+        &self.db
+    }
+
     fn notetype_is_cloze_ro(&self, mid: i64) -> Result<bool> {
         use crate::proto::notetypes::notetype::Config;
         use prost::Message;

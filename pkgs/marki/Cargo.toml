@@ -40,6 +40,10 @@ base64 = "0.22"
 dirs = "6"
 rusqlite = { version = "0.37", features = ["bundled", "collation"] }
 prost = "0.13"
+rmcp = { version = "3.4.1", features = ["server", "macros", "transport-streamable-http-server"] }
+schemars = "1"
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "signal"] }
 
 # map renderer deps
 shapefile = "0.6"

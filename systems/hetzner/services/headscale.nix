@@ -84,6 +84,12 @@ in
             type = "A";
             value = tailnet.optiplex;
           }
+          # marki MCP server on optiplex (card authoring for agents).
+          {
+            name = "marki.optiplex.tail.niko.ink";
+            type = "A";
+            value = tailnet.optiplex;
+          }
           # No mc.niko.ink record on purpose: Gate on the hub is the only
           # player-facing entrypoint, and optiplex's firewall only accepts the
           # game port from Gate's address. A split-horizon record here would

@@ -44,6 +44,9 @@ pub struct CompiledModel {
     /// `M.allow_card_removal = true`: permit dropping card types that still
     /// have cards (their reviews are lost).
     pub allow_card_removal: bool,
+    /// `M.describe()`: one-paragraph summary for authors (and the MCP
+    /// context), e.g. which sections/tags the model reads. Optional.
+    pub describe: Option<String>,
     /// Modified time of the `.lua` file when it was loaded. Used to
     /// detect on-disk edits so the cache reloads only what changed,
     /// instead of being cleared wholesale every sync cycle.
@@ -177,8 +180,20 @@ impl ScriptEngine {
             .map_err(|e| anyhow::anyhow!("model '{name}': M.allow_card_removal must be a boolean: {e}"))?
             .unwrap_or(false);
 
+        let describe = match module.get::<Option<Function>>("describe") {
+            Ok(Some(f)) => {
+                self.reset_budget();
+                Some(
+                    f.call::<String>(())
+                        .map_err(|e| anyhow::anyhow!("model '{name}' describe(): {e}"))?,
+                )
+            }
+            _ => None,
+        };
+
         debug!(model = name, cards = ?card_names, "loaded model");
         Ok(CompiledModel {
+            describe,
             name: name.to_string(),
             generate,
             card_names,

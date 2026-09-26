@@ -186,6 +186,7 @@ respecting `.gitignore`, and skipping hidden files.
 | `marki push` (or `marki`)     | One sync. Notes whose file is gone are suspended and tagged `marki::orphan` |
 | `marki push --prune`          | Same, but deletes orphans outright                                  |
 | `marki push --simulate`       | Push into a throwaway copy, check it, and list what would change; writes nothing |
+| `marki mcp`                   | Serve the card-authoring tools over MCP; see [MCP server](#mcp-server) |
 | `marki check`                 | Render every card and check the collection's structure, without writing |
 | `marki prune [--dry-run]`     | Delete notes previously tagged `marki::orphan`                      |
 | `marki watch`                 | Push on every file change and on the heartbeat interval             |
@@ -197,6 +198,34 @@ Global flags: `--config`, `--cards-dir`, `--collection`, `--media-dir` and
 
 Every note marki manages carries the `marki` tag, plus a `marki::hash:...` tag
 it uses to detect changes. Leave both alone.
+
+## MCP server
+
+`marki mcp --listen 127.0.0.1:3047` serves the repo to LLM agents at `/mcp`
+(streamable HTTP). It has no authentication: keep it on loopback or a private
+network. Behind a reverse proxy, pass `--allow-host <public name>`.
+
+Tools: `marki_context`, `marki_search_cards`, `marki_read_card`,
+`marki_preview`, `marki_write_card`, `marki_add_media`, `marki_find`,
+`marki_read_model`, `marki_write_model`, `marki_status`, `marki_push`,
+`marki_flagged`, `marki_query`. Plus cards and models as resources and a
+`make-cards` prompt.
+
+The guard rails:
+
+- Paths are confined to the cards dir; files under `.marki/` are only
+  reachable through the model and media tools.
+- `marki_write_card` formats and renders a card before saving, and only
+  overwrites a card when given its current `#id`.
+- `marki_write_model` needs `M.describe()` and must render every note that
+  uses the model.
+- `marki_push` without `confirm` only simulates. Pushing needs `confirm` plus
+  the `plan_hash` from that simulation, so an agent can't push anything the
+  user hasn't seen. After a push the cards repo is committed (if it's a git
+  repo).
+- `marki_query` runs one read-only statement on a snapshot.
+
+On NixOS, `modules/marki-mcp.nix` runs it as a service.
 
 ## Layout
 
@@ -227,4 +256,5 @@ For development, direnv (`.envrc`) loads the dev shell, which sets
 `cargo test --workspace` runs the unit tests. `tests/e2e-anki.sh` pushes real
 cards into a collection created by Anki's own library, and checks Check
 Database and review history after each risky change (cloze edits, type
-changes, card renames, reorders and removals).
+changes, card renames, reorders and removals). `tests/e2e-mcp.sh` starts
+`marki mcp` and drives every tool over HTTP. Both need `cargo build` first.

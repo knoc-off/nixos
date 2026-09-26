@@ -5,6 +5,8 @@ pub mod config;
 pub mod fmt;
 pub mod highlighter;
 pub mod id;
+pub mod mcp;
+pub mod mcp_tools;
 pub mod note;
 pub mod note_parser;
 pub mod preview;
