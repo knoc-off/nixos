@@ -27,6 +27,11 @@ stdenv.mkDerivation rec {
     hash = "sha256-obczZbf/oH4xGaVvp3y3ZyDdYhZnxlCWvL0irgEYIi0=";
   };
 
+  # Fork dropped upstream's ULONG_MAX guard, so the documented timeout=-1
+  # ("no limit") overflowed int64 negative and failed instantly with
+  # "An unknown error occurred". See patch header.
+  patches = [ ./infinite-timeout.patch ];
+
   nativeBuildInputs = [
     meson
     ninja

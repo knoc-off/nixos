@@ -10,7 +10,15 @@
   # overlay exposes `upkgs` on `pkgs`), so every caller -- the
   # home-manager service and the bubblewrap jail alike -- impersonates
   # the real installed CLI without needing to pass this explicitly.
-  ccVersion ? upkgs.claude-code.version,
+  #
+  # Temporarily pinned ahead of the packaged CLI. Once nixpkgs ships
+  # >= 2.1.280 this throws instead of silently going stale -- delete the
+  # pin and go back to `upkgs.claude-code.version`.
+  ccVersion ?
+    if lib.versionAtLeast upkgs.claude-code.version "2.1.280" then
+      throw "compat-proxy: claude-code is now ${upkgs.claude-code.version}; drop the ccVersion pin in pkgs/compat-proxy/default.nix"
+    else
+      "2.1.280",
 }:
 let
   toolchain = fenix.combine [

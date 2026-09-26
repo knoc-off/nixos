@@ -9,6 +9,7 @@
   hostQuery,
   scriptExec,
   browserExec,
+  axiomLedger,
   lspmuxSession,
   datadog,
 }:
@@ -322,6 +323,28 @@ let
     # `skill` from the outgoing tools array (CC_DROPPED_TOOLS) -- but the rule
     # should be right for when that changes.
     skill = "allow";
+
+    # axiom-ledger: read/write access to the shared findings ledger. This is
+    # the whole point of a ledger a sub-agent can post to -- see
+    # pkgs/axiom-ledger. Posts from these tiers are auto-stamped
+    # "unverified" (context.agent isn't build/plan), so a wrong finding
+    # can't masquerade as confirmed.
+    axiom_post = "allow";
+    axiom_get = "allow";
+
+    # Recall from claude-mem's distilled observation store -- read-only,
+    # cheap, complements the ledger's cited/attributed claims with looser
+    # "what happened" context.
+    claude_mem_search = "allow";
+
+    # MCP: denied tool schemas are stripped from the outgoing request
+    # entirely (not just blocked at call time), so granting these is a real
+    # per-request token cost, not a formality -- kept to the three read-only
+    # doc/search servers actually useful for exploration. mcp__datadog__* is
+    # NOT granted here: large schema, irrelevant to codebase investigation.
+    "mcp__nixos__*" = "allow";
+    "mcp__context7__*" = "allow";
+    "mcp__grep__*" = "allow";
   };
 
   # One exploration sub-agent per model tier. Ordered by capability, cheapest
@@ -633,4 +656,5 @@ pkgs.runCommand "opencode-jail-config" { } ''
   cp ${hostQuery}/lib/host-query/plugin/index.js $out/plugins/host-query.js
   cp ${scriptExec}/lib/script-exec/plugin/index.js $out/plugins/script-exec.js
   cp ${browserExec}/lib/browser-exec/plugin/index.js $out/plugins/browser-exec.js
+  cp ${axiomLedger}/lib/axiom-ledger/plugin/index.js $out/plugins/axiom-ledger.js
 ''

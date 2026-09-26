@@ -44,16 +44,17 @@
             control = "sufficient";
             modulePath = pam_fprintd_grosshackSo;
 
-            # Negative values map to UINT_MAX in pam_fprintd.c -- i.e. "never
-            # give up". Without these the reader stops after 30s (or 3 failed
-            # swipes) with "Verification timed out" and auth degrades to
-            # password-only. The password prompt thread still cuts the wait
-            # short: typing a password sets PAM_AUTHTOK and raises SIGUSR1,
-            # which breaks the verify loop, so an infinite timeout doesn't
-            # block the fallback.
+            # Both negative values map to UINT_MAX -- no time limit, no retry
+            # limit -- so the reader stays armed instead of giving up after
+            # 30s / 3 tries and degrading to password-only.
             #
-            # The timeout= parser only accepts <=2 chars of value
-            # (pam_fprintd.c:900), so "-1" is the only way to spell infinity.
+            # timeout=-1 only works because pkgs/grosshack carries
+            # infinite-timeout.patch; unpatched, the fork overflows on the
+            # ULONG_MAX sentinel and dies with "An unknown error occurred".
+            #
+            # Password fallback is unaffected: typing a password sets
+            # PAM_AUTHTOK and raises SIGUSR1, and the loop breaks on
+            # stop_got_pw regardless of the timeout (pam_fprintd.c:503,742).
             settings = {
               timeout = -1;
               max-tries = -1;

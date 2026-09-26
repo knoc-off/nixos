@@ -40,6 +40,7 @@ let
   hostQuery = selfPkgs.host-query;
   scriptExec = selfPkgs.script-exec;
   browserExec = selfPkgs.browser-exec;
+  axiomLedger = selfPkgs.axiom-ledger;
 
   # The jail's entire ~/.config/opencode, generated in the store. See
   # config/default.nix for why this is a store path rather than the host's
@@ -50,6 +51,7 @@ let
       hostQuery
       scriptExec
       browserExec
+      axiomLedger
       lspmuxSession
       datadog
       ;

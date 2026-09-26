@@ -1,0 +1,40 @@
+Restore upstream's ULONG_MAX guard so timeout=-1 actually means "no limit".
+
+pam_fprintd(8) documents a negative timeout as "no limit at all", implemented
+by setting verification_end = ULONG_MAX (pam_fprintd.c:464) and skipping the
+deadline arithmetic. This fork, branched from fprintd ~1.94.2 and unmaintained
+since 2022, dropped the guard and unconditionally computes
+
+    wait_time = verification_end - now ();
+
+into an int64_t. With the ULONG_MAX sentinel that subtraction overflows to a
+negative value, so `wait_time <= 0` breaks the poll loop on the first
+iteration. The subsequent `now () >= verification_end` test is then false --
+nothing exceeds ULONG_MAX -- so timed_out is never set and data->result is
+still NULL, dropping control to the final else branch, which reports
+"An unknown error occurred" instead of ever reading the sensor.
+
+The hunk below is upstream's fix (fprintd pam/pam_fprintd.c:519-525),
+minus the __linux__ ifdefs and keeping this fork's stop_got_pw term so the
+grosshack password-prompt thread can still cut the wait short.
+
+On the infinite path wait_time stays INT64_MAX and poll()'s int timeout
+argument truncates to a negative value, which means "block indefinitely" --
+the same behaviour upstream relies on.
+
+--- a/pam/pam_fprintd.c
++++ b/pam/pam_fprintd.c
+@@ -497,9 +497,11 @@
+       for (;;)
+         {
+           struct signalfd_siginfo siginfo;
+-          int64_t wait_time;
++          int64_t wait_time = INT64_MAX;
++
++          if (verification_end != ULONG_MAX)
++            wait_time = verification_end - now ();
+ 
+-          wait_time = verification_end - now ();
+           if (wait_time <= 0 || data->stop_got_pw)
+             break;
+ 
