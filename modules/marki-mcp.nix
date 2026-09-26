@@ -182,6 +182,12 @@
             # Renderer cache (map/typst output) goes to the cache dir.
             XDG_CACHE_HOME = "%C/marki-mcp";
             HOME = "%C/marki-mcp";
+            # HOME is the cache dir, so cfg.user's git identity isn't seen;
+            # the post-push commits are marki's anyway.
+            GIT_AUTHOR_NAME = "marki";
+            GIT_AUTHOR_EMAIL = "marki@${config.networking.hostName}";
+            GIT_COMMITTER_NAME = "marki";
+            GIT_COMMITTER_EMAIL = "marki@${config.networking.hostName}";
           };
 
           serviceConfig = hardening // {
