@@ -221,23 +221,27 @@ fn write_hull(out: &mut String, p: &dyn Projector, g: &Geometry, radius_px: f64)
     write_rounded_hull(out, &hull, radius_px);
 }
 
-/// Project every outer-ring vertex of a geometry's polygon components.
-/// Returns an empty vec for geometries with no polygon area (points,
-/// lines) — hull halos only make sense for areal features.
+/// Project the vertices that bound a geometry: outer rings of areas,
+/// every vertex of lines, the point itself. A point (or a feature that
+/// projects to one pixel) then gets a circle, a short line a capsule.
 fn gather_projected_vertices(p: &dyn Projector, g: &Geometry) -> Vec<(f64, f64)> {
     let mut pts = Vec::new();
-    let mut add_ring = |ring: &[LonLat]| {
+    let mut add = |ring: &[LonLat]| {
         pts.extend(ring.iter().map(|pt| p.project(*pt)));
     };
     match g {
-        Geometry::Polygon { outer, .. } => add_ring(outer),
-        Geometry::MultiPolygon(polys) => {
-            for poly in polys {
-                add_ring(&poly.outer);
-            }
-        }
-        _ => {}
+        Geometry::Point(pt) => add(std::slice::from_ref(pt)),
+        Geometry::LineString(l) => add(l),
+        Geometry::MultiLineString(ls) => ls.iter().for_each(|l| add(l)),
+        Geometry::Polygon { outer, .. } => add(outer),
+        Geometry::MultiPolygon(polys) => polys.iter().for_each(|poly| add(&poly.outer)),
     }
+    // Round to the SVG's 0.01 px so a speck whose vertices all land on
+    // one output pixel dedups to a single point -> clean circle.
+    pts.iter_mut().for_each(|(x, y)| {
+        *x = (*x * 100.0).round() / 100.0;
+        *y = (*y * 100.0).round() / 100.0;
+    });
     pts
 }
 
@@ -337,6 +341,7 @@ fn write_rounded_polygon(out: &mut String, hull: &[(f64, f64)], pad: f64) {
     // (a -> b) is the edge direction rotated +90°: (dy, -dx) normalized.
     let n = poly.len();
     let mut d = String::new();
+    let mut start = (0.0, 0.0);
     for i in 0..n {
         let a = poly[i];
         let b = poly[(i + 1) % n];
@@ -349,6 +354,7 @@ fn write_rounded_polygon(out: &mut String, hull: &[(f64, f64)], pad: f64) {
         let a_off = (a.0 + nx * pad, a.1 + ny * pad);
         let b_off = (b.0 + nx * pad, b.1 + ny * pad);
         if d.is_empty() {
+            start = a_off;
             let _ = write!(d, "M{:.2} {:.2}", a_off.0, a_off.1);
         } else {
             // Arc around vertex `a` from the previous edge's offset end
@@ -361,16 +367,10 @@ fn write_rounded_polygon(out: &mut String, hull: &[(f64, f64)], pad: f64) {
         }
         let _ = write!(d, " L{:.2} {:.2}", b_off.0, b_off.1);
     }
-    // Closing arc around the first vertex.
-    let first = poly[0];
-    let last_edge = poly[n - 1];
-    let (dx, dy) = (first.0 - last_edge.0, first.1 - last_edge.1);
-    let len = (dx * dx + dy * dy).sqrt();
-    if len >= 1e-9 {
-        let (nx, ny) = (dy / len, -dx / len);
-        let start = (first.0 + nx * pad, first.1 + ny * pad);
-        let _ = write!(d, " A{pad:.2} {pad:.2} 0 0 1 {:.2} {:.2}", start.0, start.1);
-    }
+    // Closing arc around the first vertex, back to where the path began.
+    // (Aiming it at the last edge's own offset point made it zero-length,
+    // so `Z` cut that corner straight -- the clipped top-left corner.)
+    let _ = write!(d, " A{pad:.2} {pad:.2} 0 0 1 {:.2} {:.2}", start.0, start.1);
     d.push_str(" Z");
     let _ = write!(out, "<path d=\"{d}\"/>");
 }
@@ -789,7 +789,7 @@ mod tests {
     }
 
     #[test]
-    fn hull_skips_line_geometry() {
+    fn hull_wraps_lines_and_points_too() {
         let bb = BBox {
             min_lon: 0.0,
             min_lat: 0.0,
@@ -797,25 +797,42 @@ mod tests {
             max_lat: 10.0,
         };
         let p = Equirectangular::fit(bb, (100.0, 100.0));
-        let g = Geometry::LineString(vec![
+        let hull = |g: &Geometry| {
+            compose_layer(100, 100, &LayerStyle::default(), &p,
+                &[Feature { geom: g, role: "hull", faithful: false }], 12.0, RenderDetail::default())
+        };
+        let line = Geometry::LineString(vec![
             LonLat { lon: 0.0, lat: 0.0 },
             LonLat { lon: 10.0, lat: 10.0 },
         ]);
-        let svg = compose_layer(
-            100,
-            100,
-            &LayerStyle::default(),
-            &p,
-            &[Feature { geom: &g, role: "hull", faithful: false }],
-            12.0,
-            RenderDetail::default(),
-        );
-        assert!(!svg.contains("<circle"), "no area → no halo: {svg}");
-        // The hull <g> wrapper is the only path-free path-less group.
-        assert!(
-            !svg.contains("A12.00"),
-            "no hull arcs for a bare line: {svg}"
-        );
+        assert_eq!(hull(&line).matches("A12.00").count(), 2, "line -> capsule");
+        let pt = Geometry::Point(LonLat { lon: 5.0, lat: 5.0 });
+        assert!(hull(&pt).contains("r=\"12.00\""), "point -> circle");
+        // A speck whose vertices fall within one output pixel -> circle.
+        let speck = Geometry::Polygon {
+            outer: vec![
+                LonLat { lon: 5.0, lat: 5.0 },
+                LonLat { lon: 5.0001, lat: 5.0 },
+                LonLat { lon: 5.0, lat: 5.0001 },
+            ],
+            holes: vec![],
+        };
+        assert!(hull(&speck).contains("<circle"), "{}", hull(&speck));
+    }
+
+    #[test]
+    fn rounded_hull_closes_with_a_real_arc() {
+        // Regression: the closing arc ended where it started, so `Z`
+        // cut the first (top-left) corner straight.
+        let mut out = String::new();
+        write_rounded_hull(&mut out, &convex_hull(&[(0.0, 0.0), (10.0, 0.0), (10.0, 10.0), (0.0, 10.0)]), 5.0);
+        let d = out.split("d=\"").nth(1).unwrap().trim_end_matches("\"/>");
+        assert_eq!(d.matches(" A").count(), 4, "{d}");
+        let start = d[1..].split(" L").next().unwrap();
+        assert!(d.ends_with(&format!("{start} Z")), "last arc returns to the start: {d}");
+        // And that arc is not zero-length: the line end before it differs.
+        let before = d.rsplit(" A").nth(1).unwrap().rsplit(" L").next().unwrap();
+        assert_ne!(before, start, "{d}");
     }
 
     #[test]

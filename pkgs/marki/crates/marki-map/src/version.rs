@@ -97,5 +97,7 @@
 //!   islands) and never touches a shared land border — is back on,
 //!   removing the noisy speckle that `27` reintroduced (e.g. Chile's
 //!   southern archipelago).
+//! - `29` — Hull closing arc fixed (the first, top-left corner was cut
+//!   straight); hulls wrap lines and points, specks become circles.
 
-pub const RENDER_VERSION_MAP: u32 = 28;
+pub const RENDER_VERSION_MAP: u32 = 29;

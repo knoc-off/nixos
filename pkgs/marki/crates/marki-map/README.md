@@ -123,11 +123,9 @@ highlights = ["country/FJI"]   # the real island draws over its hull
 The padding (and corner radius) is computed at render time as
 `clamp(radius × diagonal, min_px, max_frac × diagonal)`, so the hull
 keeps a roughly constant, always-spottable margin around the feature
-with `min_px` as a hard floor. A single-vertex feature degenerates to a
-circle. Antimeridian-spanning features (Fiji, Kiribati) are handled by
-the same frame-rotation the rest of the pipeline uses. Hull references
-must be polygon features; lines/points (e.g. `coastline`) have no area
-and are skipped.
+with `min_px` as a hard floor. A point, or a feature smaller than a
+pixel, gets a circle; a line gets its rounded hull too. Antimeridian-spanning features (Fiji, Kiribati) are handled by
+the same frame-rotation the rest of the pipeline uses.
 
 The hull `style` override and the `hull` theme role both control the
 hull fill/stroke; the bundled `atlas` theme ships a translucent default.

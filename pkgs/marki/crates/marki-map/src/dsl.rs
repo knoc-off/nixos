@@ -226,9 +226,8 @@ pub struct LayerSpec {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct HullSpec {
-    /// Feature references to wrap in a hull. Polygon features only;
-    /// line/point references (e.g. `coastline`) have no area and are
-    /// skipped.
+    /// Feature references to wrap in a hull. Areas use their outer
+    /// rings; lines and points work too (a point gets a circle).
     #[serde(default)]
     pub features: Vec<String>,
 
