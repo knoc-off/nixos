@@ -284,6 +284,17 @@ pub struct PushArgs {
     /// instead of suspending them. Must match between simulate and confirm.
     #[serde(default)]
     pub delete_orphans: bool,
+    /// List every change line, including one per media file. Default: counts
+    /// (`summary`, `by_dir`) and at most 50 non-media lines.
+    #[serde(default)]
+    pub detail: bool,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct StatusArgs {
+    /// As for marki_push.
+    #[serde(default)]
+    pub detail: bool,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -421,13 +432,13 @@ impl Marki {
     }
 
     #[tool(description = "Everything that is out of sync, read-only and fast: pending model/note/media changes, cards that fail to render (errors), and card files not yet committed (uncommitted). ok=true only when all agree. Does not pause the sync server.")]
-    async fn marki_status(&self, _: Parameters<Empty>) -> Result<CallToolResult, McpError> {
-        self.tool(|h| h.status()).await
+    async fn marki_status(&self, Parameters(a): Parameters<StatusArgs>) -> Result<CallToolResult, McpError> {
+        self.tool(move |h| Ok(h.status()?.compact(a.detail))).await
     }
 
-    #[tool(description = "Without confirm: simulate the push on copies of the collection and media db, check what the real push needs (server pause, media dir, git), and return changes, problems and plan_hash. With confirm=true and that plan_hash (after the user agreed): pause the sync server, write media then the collection (stopping at the first failure), restart the server and commit the repo; `steps` reports each part. After a failed step, fix it and push again: pushes are idempotent.")]
+    #[tool(description = "Without confirm: simulate the push on copies of the collection and media db, check what the real push needs (server pause, media dir, git), and return a summary (counts per kind and per deck dir), changes, problems and plan_hash. With confirm=true and that plan_hash (after the user agreed): pause the sync server, write media then the collection (stopping at the first failure), restart the server and commit the repo; `steps` reports each part. After a failed step, fix it and push again: pushes are idempotent. detail=true lists every change incl. media files.")]
     async fn marki_push(&self, Parameters(a): Parameters<PushArgs>) -> Result<CallToolResult, McpError> {
-        self.tool(move |h| h.push(a.confirm, a.plan_hash.as_deref(), a.delete_orphans)).await
+        self.tool(move |h| Ok(h.push(a.confirm, a.plan_hash.as_deref(), a.delete_orphans)?.compact(a.detail))).await
     }
 
     #[tool(description = "Delete a card file (needs its current #id). Does not push: the next marki_push suspends the note's cards in Anki (tagged marki::orphan), or deletes the note and its review history with delete_orphans=true -- ask the user which.")]

@@ -47,7 +47,15 @@ pub struct PushReport {
     /// For `simulation`: pass to a confirmed push.
     #[serde(skip_serializing_if = "String::is_empty")]
     pub plan_hash: String,
+    /// Count per change kind (`add`, `update`, `media`, ...).
+    pub summary: std::collections::BTreeMap<&'static str, usize>,
+    /// Count per card directory (deck) and kind; media is not per deck.
+    pub by_dir: std::collections::BTreeMap<String, std::collections::BTreeMap<&'static str, usize>>,
+    /// One line per change. Without `detail`: no media lines and at most
+    /// [`CHANGE_LINES`] others (see `changes_omitted`).
     pub changes: Vec<ChangeLine>,
+    #[serde(skip_serializing_if = "is_zero")]
+    pub changes_omitted: usize,
     /// Cards that failed to render (they are left untouched in Anki).
     pub errors: Vec<String>,
     /// For `simulation`: what would go wrong beyond render errors.
@@ -69,6 +77,14 @@ pub struct ChangeLine {
     pub kind: &'static str,
     pub path: String,
     pub detail: String,
+}
+
+/// Change lines shown without `detail`: enough for a small push, and a big
+/// one is judged from `summary`/`by_dir`.
+const CHANGE_LINES: usize = 50;
+
+fn is_zero(n: &usize) -> bool {
+    *n == 0
 }
 
 impl Handler {
@@ -609,6 +625,25 @@ impl Handler {
         steps: Vec<crate::project::Step>,
         snapshot: bool,
     ) -> PushReport {
+        use crate::sync::ChangeKind;
+        let mut summary = std::collections::BTreeMap::new();
+        let mut by_dir: std::collections::BTreeMap<String, std::collections::BTreeMap<&'static str, usize>> =
+            Default::default();
+        let mut changes = Vec::new();
+        for c in &o.changes {
+            let k: &'static str = (&c.kind).into();
+            *summary.entry(k).or_default() += 1;
+            let path = match (&c.path, &c.kind) {
+                (Some(p), _) => self.rel(p),
+                (None, ChangeKind::Orphan) => format!("#id({})", c.id),
+                (None, _) => c.id.clone(),
+            };
+            if c.path.is_some() || matches!(c.kind, ChangeKind::Orphan) {
+                let dir = path.rsplit_once('/').map_or("", |(d, _)| d).to_string();
+                *by_dir.entry(dir).or_default().entry(k).or_default() += 1;
+            }
+            changes.push(ChangeLine { kind: k, path, detail: c.detail.clone() });
+        }
         PushReport {
             kind,
             ok: o.errors.is_empty() && problems.is_empty(),
@@ -616,24 +651,31 @@ impl Handler {
             snapshot,
             uncommitted: vec![],
             full_sync_required: o.changes.iter().any(|c| c.full_sync),
-            changes: o
-                .changes
-                .iter()
-                .map(|c| ChangeLine {
-                    kind: (&c.kind).into(),
-                    path: match (&c.path, &c.kind) {
-                        (Some(p), _) => self.rel(p),
-                        (None, crate::sync::ChangeKind::Orphan) => format!("#id({})", c.id),
-                        (None, _) => c.id.clone(),
-                    },
-                    detail: c.detail.clone(),
-                })
-                .collect(),
+            summary,
+            by_dir,
+            changes,
+            changes_omitted: 0,
             errors: o.errors.clone(),
             problems,
             steps,
         }
     }
+}
+
+impl PushReport {
+    /// Drop media lines and cap the rest, unless the caller wants every line.
+    pub fn compact(mut self, detail: bool) -> Self {
+        if !detail {
+            let before = self.changes.len();
+            self.changes.retain(|c| c.kind != "media");
+            self.changes.truncate(CHANGE_LINES);
+            self.changes_omitted = before - self.changes.len();
+        }
+        self
+    }
+}
+
+impl Handler {
 
     fn paths_by_id(&self) -> Result<std::collections::HashMap<String, String>> {
         Ok(scan_dir_v2(self.root())?

@@ -168,6 +168,11 @@ assert st["uncommitted"], st
 sim = tool("marki_push")
 assert sim["ok"] and sim["kind"] == "simulation" and "problems" not in sim, sim
 assert [c["kind"] for c in sim["changes"]][:1] == ["model"], sim  # new note types listed first
+# Compact by default: counts per kind and deck dir; detail gives every line, same plan.
+full = tool("marki_push", {"detail": True})
+assert sim["summary"] == {"add": 3, "model": 3} and full["plan_hash"] == sim["plan_hash"], sim["summary"]
+assert sum(d.get("add", 0) for d in sim["by_dir"].values()) == 3, sim["by_dir"]
+assert "model" not in str(sim["by_dir"]) and "changes_omitted" not in full
 col = sqlite3.connect(f"{w}/col.anki2")
 assert col.execute("select count() from notes").fetchone()[0] == 0, "simulate wrote"
 assert "plan changed" in tool("marki_push", {"confirm": True, "plan_hash": "nope"}, ok=False)
@@ -291,6 +296,15 @@ assert pv["images"] == ["Card front #1"] and len(imgs) == 1, (pv["images"], pv["
 assert base64.b64decode(imgs[0]["data"]).startswith(b"\x89PNG")
 r = rpc("tools/call", {"name": "marki_preview", "arguments": {"path": "wall.md", "source": wall_card, "images": False}})
 assert not [c for c in r["content"] if c["type"] == "image"]
+# Media changes are counted, not listed, unless detail=true.
+tool("marki_write_card", {"path": "wall.md", "source": wall_card})
+sim = tool("marki_push")
+full = tool("marki_push", {"detail": True})
+media = [c for c in full["changes"] if c["kind"] == "media"]
+assert media and sim["summary"]["media"] == len(media), (sim["summary"], full["changes"])
+assert not [c for c in sim["changes"] if c["kind"] == "media"] and sim["changes_omitted"] == len(media), sim
+assert sim["by_dir"] == {"": {"add": 1}}, sim["by_dir"]
+os.remove(f"{w}/p/wall.md")
 # A block alone, with a fixed frame and a dashed answer.
 blk = ("[viewport]\nbbox = [110, 38, 120, 42]\n[layers.base]\nfeatures = [\"country/CHN\"]\n"
        "[layers.answer]\nhighlights = [\"geo/great-wall\"]\n[layers.answer.style]\ndash = \"6 4\"\n")
