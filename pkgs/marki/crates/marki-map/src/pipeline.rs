@@ -517,6 +517,45 @@ fn resolve_one(r: &str, cache_root: &Path, geo_dir: Option<&Path>) -> Result<Geo
     Err(MapError::Resolve(format!("unsupported feature ref: {r}")))
 }
 
+/// Resolve and summarise any feature ref for `ctx:geo` / `marki_map_get`:
+/// kind, point count, bbox, centre and, on request, GeoJSON geometry.
+/// `bytes` is the on-disk size for `geo/<name>` refs, 0 for everything
+/// else (fetched refs have no single file of their own). A bare name
+/// with no recognised prefix is assumed to be a `geo/<name>`, so
+/// `marki_map_get` keeps accepting `"great-wall"` as well as
+/// `"geo/great-wall"`.
+pub fn describe_ref(
+    r: &str,
+    cache_root: &Path,
+    geo_dir: Option<&Path>,
+    geometry: bool,
+    tolerance: Option<f64>,
+) -> Result<serde_json::Value, MapError> {
+    let r = &if is_known_ref_prefix(r) { r.to_string() } else { format!("{}{r}", custom::PREFIX) };
+    let g = resolve_one(r, cache_root, geo_dir)?;
+    let bytes = r
+        .strip_prefix(custom::PREFIX)
+        .and_then(|name| custom::path(geo_dir?, name).ok())
+        .and_then(|p| std::fs::metadata(p).ok())
+        .map(|m| m.len())
+        .unwrap_or(0);
+    custom::describe(r, g, bytes, geometry, tolerance)
+}
+
+fn is_known_ref_prefix(r: &str) -> bool {
+    r.starts_with(custom::PREFIX)
+        || r == "coastline"
+        || r.starts_with("country/")
+        || r.starts_with("adm1/")
+        || r.starts_with("adm2/")
+        || r.starts_with("adm3/")
+        || r.starts_with("neighbors/")
+        || r.starts_with("continent/")
+        || r.starts_with("subregion/")
+        || r.starts_with("relation/")
+        || r.starts_with("way/")
+}
+
 /// Pick a stylistic role for a feature reference based on what kind of
 /// reference it is and which layer it lives on. Authors typically don't
 /// need to think about roles directly.
@@ -1005,6 +1044,30 @@ mod tests {
         assert!(((ya - yb).abs() - 2.5).abs() < 0.1, "{ya} vs {yb}\n{base:?}\n{net:?}");
         // Layer pieces were joined: one continuous path for geo/a.
         assert_eq!(base[0].matches('M').count(), 1, "{}", base[0]);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn describe_ref_covers_geo_and_bare_names() {
+        let d = std::env::temp_dir().join(format!("marki-describe-{}-{:?}", std::process::id(), std::thread::current().id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("stop.geojson"), r#"{"type":"Point","coordinates":[13.5,52.5]}"#).unwrap();
+
+        let g = describe_ref("geo/stop", &d.join("cache"), Some(&d), false, None).unwrap();
+        assert_eq!(g["kind"], "point");
+        assert_eq!(g["bbox"], serde_json::json!([13.5, 52.5, 13.5, 52.5]));
+        assert_eq!(g["center"], serde_json::json!([13.5, 52.5]));
+        assert!(g["bytes"].as_u64().unwrap() > 0, "{g}");
+
+        // A bare name with no recognised prefix is assumed to be geo/<name>
+        // (marki_map_get has always accepted "great-wall" as well as "geo/great-wall").
+        let bare = describe_ref("stop", &d.join("cache"), Some(&d), false, None).unwrap();
+        assert_eq!(bare, g);
+
+        // A recognised prefix that doesn't resolve is a real error, not
+        // silently reinterpreted as geo/<name>.
+        assert!(describe_ref("geo/does-not-exist", &d.join("cache"), Some(&d), false, None).is_err());
         let _ = std::fs::remove_dir_all(&d);
     }
 

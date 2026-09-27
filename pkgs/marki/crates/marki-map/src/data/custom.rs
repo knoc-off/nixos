@@ -137,7 +137,7 @@ pub fn to_geojson(g: &Geometry) -> serde_json::Value {
     }
 }
 
-fn round(x: f64) -> f64 {
+pub(crate) fn round(x: f64) -> f64 {
     (x * 1e5).round() / 1e5
 }
 
@@ -164,7 +164,7 @@ pub fn simplify_to_budget(g: &mut Geometry) -> f64 {
     eps
 }
 
-fn simplify_geometry(g: &mut Geometry, eps: f64) {
+pub(crate) fn simplify_geometry(g: &mut Geometry, eps: f64) {
     let s = |l: &mut Vec<LonLat>, min: usize| {
         let pts: Vec<(f64, f64)> = l.iter().map(|p| (p.lon, p.lat)).collect();
         let out = crate::simplify::simplify(&pts, eps);
@@ -239,7 +239,7 @@ pub fn define(dir: &Path, name: &str, source: Source<'_>, cache_root: &Path) -> 
     }))
 }
 
-fn kind(g: &Geometry) -> &'static str {
+pub(crate) fn kind(g: &Geometry) -> &'static str {
     match g {
         Geometry::Point(_) => "point",
         Geometry::LineString(_) | Geometry::MultiLineString(_) => "line",
@@ -248,21 +248,28 @@ fn kind(g: &Geometry) -> &'static str {
 }
 
 /// Largest geometry `get` returns inline; pass a tolerance for more.
-const MAX_GET_BYTES: usize = 200_000;
+pub(crate) const MAX_GET_BYTES: usize = 200_000;
 
-/// Summary of `geo/<name>` (kind, points, bbox, bytes) and, with
-/// `geometry`, its GeoJSON geometry, first simplified by `tolerance`
-/// degrees if given.
-pub fn get(dir: &Path, name: &str, geometry: bool, tolerance: Option<f64>) -> Result<serde_json::Value, MapError> {
-    let name = name.strip_prefix(PREFIX).unwrap_or(name);
-    let mut g = resolve(Some(dir), name)?;
+/// Summary of a resolved geometry (kind, points, bbox) for any ref, and,
+/// with `geometry`, its GeoJSON geometry, first simplified by `tolerance`
+/// degrees if given. Shared by `geo/<name>` (`get`, below) and the
+/// generic-ref inspector (`pipeline::describe_ref`).
+pub(crate) fn describe(
+    r: &str,
+    mut g: Geometry,
+    bytes: u64,
+    geometry: bool,
+    tolerance: Option<f64>,
+) -> Result<serde_json::Value, MapError> {
     let bbox = g.bbox();
+    let center = [round((bbox.min_lon + bbox.max_lon) / 2.0), round((bbox.min_lat + bbox.max_lat) / 2.0)];
     let mut out = serde_json::json!({
-        "ref": format!("{PREFIX}{name}"),
+        "ref": r,
         "kind": kind(&g),
         "points": point_count(&g),
         "bbox": [round(bbox.min_lon), round(bbox.min_lat), round(bbox.max_lon), round(bbox.max_lat)],
-        "bytes": std::fs::metadata(path(dir, name)?).map(|m| m.len()).unwrap_or(0),
+        "center": center,
+        "bytes": bytes,
     });
     if geometry {
         if let Some(eps) = tolerance.filter(|t| *t > 0.0) {
@@ -273,13 +280,23 @@ pub fn get(dir: &Path, name: &str, geometry: bool, tolerance: Option<f64>) -> Re
         let size = geo.to_string().len();
         if size > MAX_GET_BYTES {
             return Err(MapError::Resolve(format!(
-                "geo/{name} geometry is {size} bytes (limit {MAX_GET_BYTES}); pass a tolerance in degrees \
+                "{r} geometry is {size} bytes (limit {MAX_GET_BYTES}); pass a tolerance in degrees \
                  (e.g. 0.001 ~ 100 m) to simplify it, or use the summary"
             )));
         }
         out["geometry"] = geo;
     }
     Ok(out)
+}
+
+/// Summary of `geo/<name>` (kind, points, bbox, centre, bytes) and, with
+/// `geometry`, its GeoJSON geometry, first simplified by `tolerance`
+/// degrees if given.
+pub fn get(dir: &Path, name: &str, geometry: bool, tolerance: Option<f64>) -> Result<serde_json::Value, MapError> {
+    let name = name.strip_prefix(PREFIX).unwrap_or(name);
+    let g = resolve(Some(dir), name)?;
+    let bytes = std::fs::metadata(path(dir, name)?).map(|m| m.len()).unwrap_or(0);
+    describe(&format!("{PREFIX}{name}"), g, bytes, geometry, tolerance)
 }
 
 /// Every `geo/<name>` under `dir`, sorted.

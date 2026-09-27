@@ -9,12 +9,17 @@
 //!     of the note's blocks through the shared [`Registry::render_blocks`]
 //!     path, so external blocks are dispatched rather than dumped as raw
 //!     source.
+//!   * `ctx:geo(ref)` looks up any map feature ref (`geo/<name>`,
+//!     `relation/N`, `country/DEU`, ...) and returns its
+//!     `{ ref, kind, points, bbox = {w,s,e,n}, center = {lon,lat}, bytes }`,
+//!     so a model can compute a viewport or a pin position instead of an
+//!     author pasting them in by hand.
 //!
 //! Assets emitted while a script runs are accumulated here and drained by
 //! the sync engine after `generate()` returns.
 
 use marki_render::{Asset, Input};
-use mlua::{AnyUserData, UserData, UserDataMethods};
+use mlua::{AnyUserData, LuaSerdeExt, UserData, UserDataMethods};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -94,6 +99,15 @@ impl UserData for RenderContext {
         m.add_method("body_html", |_, this, note: AnyUserData| {
             let note = note.borrow::<Note>()?;
             Ok(this.render_slice(&note.blocks))
+        });
+
+        // ctx:geo(ref) -> { ref, kind, points, bbox, center, bytes }
+        m.add_method("geo", |lua, this, r: String| {
+            let v = this
+                .registry
+                .call_tool("map", "get", serde_json::json!({"name": r}), &this.source_path, &this.cache_dir)
+                .map_err(|e| mlua::Error::runtime(format!("geo({r}): {e}")))?;
+            lua.to_value(&v)
         });
     }
 }

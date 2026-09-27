@@ -164,11 +164,11 @@ impl Renderer for MapRenderer {
             },
             Tool {
                 name: "get",
-                description: "Inspect a custom map feature: kind (area/line/point), point count, bbox [w,s,e,n] (usable as [viewport] bbox) and file size. geometry=true also returns its GeoJSON geometry (up to ~200 KB; pass tolerance in degrees, e.g. 0.001 ~ 100 m, to simplify a big one).",
+                description: "Inspect any map feature ref (`geo/<name>`, `relation/N`, `way/N`, `country/ISO3`, adm units, ...): kind (area/line/point), point count, bbox [w,s,e,n] (usable as [viewport] bbox), centre [lon,lat] and, for geo/ refs, file size. geometry=true also returns its GeoJSON geometry (up to ~200 KB; pass tolerance in degrees, e.g. 0.001 ~ 100 m, to simplify a big one).",
                 schema: serde_json::json!({
                     "type": "object",
                     "properties": {
-                        "name": {"type": "string", "description": "`<name>` or `geo/<name>`"},
+                        "name": {"type": "string", "description": "any feature ref, e.g. `geo/<name>`, `relation/N`, `country/DEU`"},
                         "geometry": {"type": "boolean"},
                         "tolerance": {"type": "number"}
                     },
@@ -225,9 +225,10 @@ impl Renderer for MapRenderer {
                 Ok(define(self.geo_dir()?, s("name")?, source, ctx.cache_dir)?)
             }
             "list" => Ok(serde_json::json!({ "features": data::custom::list(self.geo_dir()?) })),
-            "get" => Ok(data::custom::get(
-                self.geo_dir()?,
+            "get" => Ok(crate::pipeline::describe_ref(
                 s("name")?,
+                ctx.cache_dir,
+                self.geo_dir.as_deref(),
                 args.get("geometry").and_then(|v| v.as_bool()).unwrap_or(false),
                 args.get("tolerance").and_then(|v| v.as_f64()),
             )?),

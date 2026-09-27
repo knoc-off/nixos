@@ -286,6 +286,9 @@ assert tool("marki_map_list")["features"] == ["geo/great-wall"]
 g = tool("marki_map_get", {"name": "geo/great-wall", "geometry": True})
 assert g["bbox"] == d["bbox"] and g["points"] == 6 and g["geometry"]["type"] == "MultiLineString", g
 assert "geometry" not in tool("marki_map_get", {"name": "great-wall"})
+# marki_map_get isn't geo/-only: any ref works, and reports a centre too.
+c = tool("marki_map_get", {"name": "country/DEU"})
+assert c["kind"] == "area" and len(c["center"]) == 2, c
 assert tool("marki_context")["custom_geometry"] == ["geo/great-wall"]
 wall_card = ("Where is the Great Wall?\n\n```map\n[layers.base]\nfeatures = [\"country/CHN\"]\n"
              "[layers.answer]\nhighlights = [\"geo/great-wall\"]\n```\n\n---\n\nNorthern China")

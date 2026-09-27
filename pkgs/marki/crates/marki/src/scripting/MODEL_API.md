@@ -47,6 +47,11 @@ language), and ctx for *output*.
 - `ctx:render(lang, source)` -> `{ front_html, back_html, assets }`. Renders
   one block given as source text. `back_html` is extra content for the
   answer side (for example map labels).
+- `ctx:geo(ref)` -> `{ ref, kind, points, bbox = {w,s,e,n}, center = {lon, lat}, bytes }`.
+  Looks up any map feature ref (`geo/<name>`, `relation/N`, `way/N`,
+  `country/DEU`, an adm unit, ...) without rendering a map. Use it to
+  compute a viewport, a pin position, or a zoom factor from a feature
+  instead of an author pasting `bbox`/`center` tags in by hand.
 
 ## note
 

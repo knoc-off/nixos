@@ -453,6 +453,47 @@ return M
     }
 
     #[test]
+    fn ctx_geo_looks_up_any_map_ref() {
+        use crate::note_parser::parse_note;
+        use crate::render::Registry;
+        use crate::scripting::context::RenderContext;
+
+        let dir = std::env::temp_dir().join(format!("marki-lua-geo-{}", std::process::id()));
+        let geo_dir = dir.join(".marki/geo");
+        std::fs::create_dir_all(&geo_dir).unwrap();
+        std::fs::write(
+            geo_dir.join("zoo.geojson"),
+            r#"{"type":"Point","coordinates":[13.3325,52.5075]}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            dir.join("demo.lua"),
+            r#"
+local M = {}
+M.card_names = { "Card" }
+function M.generate(note, ctx)
+  local g = ctx:geo("geo/zoo")
+  return { CardFront = g.kind .. " " .. g.center[1] .. "," .. g.center[2], CardBack = "x" }
+end
+return M
+"#,
+        )
+        .unwrap();
+
+        let mut registry = Registry::new();
+        registry.register(Box::new(marki_map::MapRenderer::new().with_geo_dir(geo_dir)));
+
+        let mut se = ScriptEngine::new(dir.clone(), None);
+        let compiled = se.load_model("demo").unwrap();
+        let note = parse_note("x\n", PathBuf::from("/tmp/x.md"));
+        let ctx = RenderContext::new(Arc::new(registry), PathBuf::from("/tmp/x.md"), dir.join("cache"));
+        let out = se.execute(&compiled, note, ctx).unwrap();
+        assert_eq!(out.get("CardFront").unwrap(), "point 13.3325,52.5075");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
     fn generate_keys_and_card_names_are_validated() {
         use crate::note_parser::parse_note;
         use crate::render::Registry;
