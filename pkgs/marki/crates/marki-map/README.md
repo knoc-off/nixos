@@ -130,6 +130,40 @@ the same frame-rotation the rest of the pipeline uses.
 The hull `style` override and the `hull` theme role both control the
 hull fill/stroke; the bundled `atlas` theme ships a translucent default.
 
+### Bundled lines (shared track)
+
+Lines that run along the same track (S-Bahn lines on a shared trunk)
+otherwise draw on top of each other. Put their layers in one bundle
+and they are drawn side by side, transit-map style:
+
+```toml
+[bundle.transit]      # optional tuning; defaults shown
+spacing_px = 2.5      # centre-to-centre distance between strands
+snap_px    = 3.0      # parallel lines closer than this share track
+min_run_px = 20       # ignore shared stretches shorter than this
+ease_px    = 12       # length over which a strand eases into its slot
+# order = ["S3", "S5"]  # slot order by bundle_key; default: layer order
+
+[layers.net_s5]
+highlights = ["geo/berlin/lines/s5"]
+bundle = "transit"
+bundle_key = "S5"     # optional; defaults to the layer name
+
+[layers.s5]           # the answer: same key, so exactly on top of net_s5
+highlights = ["geo/berlin/lines/s5"]
+bundle = "transit"
+bundle_key = "S5"
+```
+
+- Each `bundle_key` is one strand, however many refs its layer has.
+- Layers sharing a key must reference the same features (checked); they
+  get identical geometry, so a highlight or casing covers its network
+  line exactly.
+- Lines that only cross are not shifted. Framing (`bbox`, `fit`,
+  auto-focus) uses the true, unshifted positions.
+- Separately, line pieces that meet end to end are joined into one
+  path everywhere, so dash patterns run on across OSM way boundaries.
+
 ## Project defaults & path rules
 
 A marki project can set DSL defaults for every `map` block in its

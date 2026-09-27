@@ -10,6 +10,7 @@
 //! emits the bytes as `marki_render::Asset`s for the daemon to
 //! upload to Anki.
 
+pub mod bundle;
 pub mod cache;
 pub mod clip;
 pub mod cluster;

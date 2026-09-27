@@ -61,9 +61,7 @@ struct ResolvedLayer<'a> {
 pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<Fragment, MapError> {
     let theme = load_theme(&spec.style)?;
     // Custom feature files are inputs too: editing one re-renders its maps.
-    let refs = spec.layers.values().flat_map(|l| {
-        l.features.iter().chain(&l.context).chain(&l.highlights).chain(l.hull.iter().flat_map(|h| &h.features))
-    }).chain(&spec.viewport.fit);
+    let refs = spec.layers.values().flat_map(layer_refs).chain(&spec.viewport.fit);
     let mut key_input = theme.bytes.clone();
     key_input.extend(custom::fingerprint(geo_dir, refs));
     let key = cache_key(spec, &key_input)?;
@@ -163,8 +161,10 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
 
     let aspect = Mercator::projected_aspect(padded);
     let (render_w, render_h) = fit_canvas(spec.size, aspect);
-    let projector: Box<dyn Projector> =
-        Box::new(Mercator::fit(padded, (render_w as f64, render_h as f64)));
+    let mercator = Mercator::fit(padded, (render_w as f64, render_h as f64));
+    // Bundling runs after framing, so framing sees true positions.
+    bundle_lines(spec, &mut resolved, &mercator);
+    let projector: Box<dyn Projector> = Box::new(mercator);
     let projection_name = "mercator";
     tracing::debug!(
         bbox_lon = format!("{:.2}..{:.2}", padded.min_lon, padded.max_lon),
@@ -359,6 +359,89 @@ fn fixed_frame(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Res
 
 /// Compute the Anki-media filename for one layer. The content-addressed
 /// cache key prevents collisions between cards.
+/// Feature refs of a layer in the order [`resolve_all_layers`] resolves them.
+fn layer_refs(l: &crate::dsl::LayerSpec) -> impl Iterator<Item = &String> {
+    l.features.iter().chain(&l.context).chain(&l.highlights).chain(l.hull.iter().flat_map(|h| &h.features))
+}
+
+/// Replace the line features of bundled layers with their parallel
+/// strands. Each `bundle_key` is computed once, from its first layer,
+/// and copied to every layer with that key (the DSL guarantees they
+/// share refs), so a highlight sits exactly on its network copy.
+fn bundle_lines(spec: &MapSpec, resolved: &mut [ResolvedLayer<'_>], m: &Mercator) {
+    let lines_of = |g: &Geometry| -> Vec<Vec<(f64, f64)>> {
+        let proj = |l: &Vec<crate::geometry::LonLat>| l.iter().map(|p| m.project(*p)).collect();
+        match g {
+            Geometry::LineString(l) => vec![proj(l)],
+            Geometry::MultiLineString(ls) => ls.iter().map(proj).collect(),
+            _ => Vec::new(),
+        }
+    };
+    let mut groups: Vec<&String> = spec.layers.values().filter_map(|l| l.bundle.as_ref()).collect();
+    groups.sort();
+    groups.dedup();
+    for group in groups {
+        let params = spec.bundle.get(group).cloned().unwrap_or_default();
+        let members: Vec<(usize, &str, &crate::dsl::LayerSpec)> = spec
+            .layers
+            .iter()
+            .enumerate()
+            .filter(|(_, (_, l))| l.bundle.as_ref() == Some(group))
+            .map(|(i, (n, l))| (i, l.strand_key(n), l))
+            .collect();
+        // Slot order: `order` first, then layer order.
+        let mut keys: Vec<&str> = params.order.iter().map(String::as_str).collect();
+        for &(_, k, _) in &members {
+            if !keys.contains(&k) {
+                keys.push(k);
+            }
+        }
+        // Per key, from its first layer: (ref, line count) per line feature, and all lines.
+        let mut parts: Vec<Vec<(&str, usize)>> = Vec::new();
+        let mut strands: Vec<Vec<Vec<(f64, f64)>>> = Vec::new();
+        for key in &keys {
+            let &(li, _, lspec) = members.iter().find(|m| m.1 == *key).expect("keys come from members");
+            let (mut p, mut s) = (Vec::new(), Vec::new());
+            for ((g, role, _, _), r) in resolved[li].features.iter().zip(layer_refs(lspec)) {
+                let ls = lines_of(g);
+                if *role != "hull" && !ls.is_empty() && !p.iter().any(|(q, _)| *q == r.as_str()) {
+                    p.push((r.as_str(), ls.len()));
+                    s.extend(ls);
+                }
+            }
+            parts.push(p);
+            strands.push(s);
+        }
+        let out = crate::bundle::bundle(&strands, &params);
+        for ((key, p), lines) in keys.iter().zip(&parts).zip(out) {
+            let mut lines = lines.into_iter();
+            let shifted: Vec<(&str, Geometry)> = p
+                .iter()
+                .map(|&(r, n)| {
+                    let mut ls: Vec<Vec<_>> =
+                        lines.by_ref().take(n).map(|l| l.into_iter().map(|xy| m.unproject(xy)).collect()).collect();
+                    let g = if ls.len() == 1 {
+                        Geometry::LineString(ls.pop().unwrap_or_default())
+                    } else {
+                        Geometry::MultiLineString(ls)
+                    };
+                    (r, g)
+                })
+                .collect();
+            // Every layer with this key gets the same strand, matched by ref.
+            for &(li, _, lspec) in members.iter().filter(|m| m.1 == *key) {
+                for ((g, role, _, _), r) in resolved[li].features.iter_mut().zip(layer_refs(lspec)) {
+                    if let Some((_, new)) = shifted.iter().find(|(q, _)| *q == r.as_str()) {
+                        if *role != "hull" {
+                            *g = new.clone();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn layer_media_filename(key: &str, layer_name: &str) -> String {
     format!("marki-map-{key}-{layer_name}.svg")
 }
@@ -890,6 +973,39 @@ mod tests {
 
         let fit = format!("[viewport]\nfit = [\"geo/city\"]\n{base}");
         assert_eq!(render_size(&fit, &files).unwrap(), (w, h), "fit = padded feature bbox");
+    }
+
+    #[test]
+    fn bundled_layers_split_and_shared_keys_match() {
+        let d = std::env::temp_dir().join(format!("marki-bundle-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        // Two lines on one track, drawn in opposite directions, in pieces.
+        std::fs::write(d.join("a.geojson"), r#"{"type":"MultiLineString","coordinates":[[[13,52.5],[13.5,52.5]],[[13.5,52.5],[14,52.5]]]}"#).unwrap();
+        std::fs::write(d.join("b.geojson"), r#"{"type":"LineString","coordinates":[[14,52.5],[13,52.5]]}"#).unwrap();
+        let toml = "[viewport]\nbbox = [12.9, 52.3, 14.1, 52.7]\n\
+            [layers.base]\nfeatures = [\"geo/a\", \"geo/b\"]\nbundle = \"t\"\nbundle_key = \"A\"\n\
+            [layers.net_b]\nhighlights = [\"geo/b\"]\nbundle = \"t\"\n\
+            [layers.answer]\nhighlights = [\"geo/a\", \"geo/b\"]\nbundle = \"t\"\nbundle_key = \"A\"\n";
+        // Layer `base` carries both lines but is one strand: only net_b is its neighbour.
+        let spec = crate::dsl::parse_map_spec(toml).unwrap();
+        let frag = run(&spec, &d.join("cache"), Some(&d)).unwrap();
+        let svg = |i: usize| String::from_utf8(frag.assets[i].bytes.clone()).unwrap();
+        let paths = |s: String| -> Vec<String> {
+            s.split("<path d=\"").skip(1).map(|p| p.split('"').next().unwrap().to_string()).collect()
+        };
+        let (base, net, answer) = (paths(svg(0)), paths(svg(1)), paths(svg(2)));
+        assert_eq!(base, answer, "same bundle_key -> identical strands");
+        // y of the first point of each path, mid-canvas the strands sit apart.
+        let y_mid = |p: &str| -> f64 {
+            let pts: Vec<f64> = p.split(|c: char| c == 'M' || c == 'L' || c == ' ').filter_map(|t| t.parse().ok()).collect();
+            pts[pts.len() / 2 | 1]
+        };
+        let (ya, yb) = (y_mid(&base[0]), y_mid(&net[0]));
+        assert!(((ya - yb).abs() - 2.5).abs() < 0.1, "{ya} vs {yb}\n{base:?}\n{net:?}");
+        // Layer pieces were joined: one continuous path for geo/a.
+        assert_eq!(base[0].matches('M').count(), 1, "{}", base[0]);
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]

@@ -163,6 +163,18 @@ impl Projector for Mercator {
     }
 }
 
+impl Mercator {
+    /// Inverse of [`Projector::project`]: SVG pixels -> lon/lat.
+    pub fn unproject(&self, (x, y): (f64, f64)) -> LonLat {
+        let mx = (x - self.offset_x) / self.scale + self.proj_bbox.min_x;
+        let my = self.proj_bbox.max_y - (y - self.offset_y) / self.scale;
+        LonLat {
+            lon: mx.to_degrees(),
+            lat: (2.0 * my.exp().atan() - std::f64::consts::FRAC_PI_2).to_degrees(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

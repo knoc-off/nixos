@@ -100,5 +100,6 @@
 //! - `29` — Hull closing arc fixed (the first, top-left corner was cut
 //!   straight); hulls wrap lines and points, specks become circles.
 //!   Line pieces meeting end to end are joined into one path.
+//!   `bundle` layers draw shared-track lines as parallel strands.
 
 pub const RENDER_VERSION_MAP: u32 = 29;

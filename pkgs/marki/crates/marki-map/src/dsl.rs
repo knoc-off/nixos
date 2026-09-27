@@ -54,7 +54,52 @@ pub struct MapSpec {
     /// which controls DOM stacking: earlier layers render underneath
     /// later ones. Authors should write `base` first.
     pub layers: IndexMap<String, LayerSpec>,
+
+    /// Tuning for line bundles, keyed by the name layers use in
+    /// `bundle = "<name>"`. A bundle needs no entry here to work.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub bundle: IndexMap<String, BundleSpec>,
 }
+
+/// Parallel-strand drawing for lines sharing track (transit maps).
+/// All distances are in output pixels.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct BundleSpec {
+    /// Centre-to-centre distance between strands.
+    #[serde(default = "default_spacing_px")]
+    pub spacing_px: f64,
+    /// Lines closer than this (and running parallel) share track.
+    #[serde(default = "default_snap_px")]
+    pub snap_px: f64,
+    /// Shared stretches shorter than this are ignored.
+    #[serde(default = "default_min_run_px")]
+    pub min_run_px: f64,
+    /// Distance over which a strand eases in and out of its slot.
+    #[serde(default = "default_ease_px")]
+    pub ease_px: f64,
+    /// Slot order by `bundle_key` (layer name if unset); unlisted
+    /// strands follow in layer order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub order: Vec<String>,
+}
+
+impl Default for BundleSpec {
+    fn default() -> Self {
+        Self {
+            spacing_px: default_spacing_px(),
+            snap_px: default_snap_px(),
+            min_run_px: default_min_run_px(),
+            ease_px: default_ease_px(),
+            order: Vec::new(),
+        }
+    }
+}
+
+fn default_spacing_px() -> f64 { 2.5 }
+fn default_snap_px() -> f64 { 3.0 }
+fn default_min_run_px() -> f64 { 20.0 }
+fn default_ease_px() -> f64 { 12.0 }
 
 fn default_style() -> String {
     "atlas".to_string()
@@ -216,6 +261,33 @@ pub struct LayerSpec {
     /// hull layer wherever you want it in TOML source order.
     #[serde(default)]
     pub hull: Option<HullSpec>,
+
+    /// Bundle this layer's lines with the other layers naming the same
+    /// bundle: lines sharing track are drawn side by side.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bundle: Option<String>,
+
+    /// Layers with the same key share one strand (and must reference
+    /// the same features), e.g. a highlighted line and its network copy.
+    /// Defaults to the layer name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bundle_key: Option<String>,
+}
+
+impl LayerSpec {
+    /// Every feature ref on the layer except hull refs, sorted, deduped.
+    pub fn line_refs(&self) -> Vec<&str> {
+        let mut v: Vec<&str> =
+            self.features.iter().chain(&self.context).chain(&self.highlights).map(String::as_str).collect();
+        v.sort_unstable();
+        v.dedup();
+        v
+    }
+
+    /// The strand this layer draws in its bundle.
+    pub fn strand_key<'a>(&'a self, name: &'a str) -> &'a str {
+        self.bundle_key.as_deref().unwrap_or(name)
+    }
 }
 
 /// Configuration for a hull layer. The outward padding (and corner
@@ -318,6 +390,8 @@ pub enum DslError {
     HullMinPx(f64),
     #[error("hull radius ({radius}) must not exceed max_frac ({max_frac})")]
     HullRadiusOverMax { radius: f64, max_frac: f64 },
+    #[error("bundle: {0}")]
+    Bundle(String),
 }
 
 /// Parse a `map` block body as TOML and validate it.
@@ -370,12 +444,76 @@ pub fn parse_map_spec(src: &str) -> Result<MapSpec, DslError> {
             }
         }
     }
+    check_bundles(&spec)?;
     Ok(spec)
+}
+
+fn check_bundles(spec: &MapSpec) -> Result<(), DslError> {
+    let err = |m: String| Err(DslError::Bundle(m));
+    for (name, l) in &spec.layers {
+        if l.bundle_key.is_some() && l.bundle.is_none() {
+            return err(format!("layer `{name}` sets bundle_key but no bundle"));
+        }
+        let Some(group) = &l.bundle else { continue };
+        // Same key = same strand, computed once: the refs must match.
+        let key = l.strand_key(name);
+        if let Some(other) = spec.layers.iter().find_map(|(n, o)| {
+            (o.bundle.as_ref() == Some(group) && o.strand_key(n) == key && o.line_refs() != l.line_refs()).then_some(n)
+        }) {
+            return err(format!(
+                "layers `{other}` and `{name}` share bundle_key `{key}` but reference different features; \
+                 a shared key means one strand, so give them the same refs"
+            ));
+        }
+    }
+    for (group, b) in &spec.bundle {
+        for (field, v, min) in [("spacing_px", b.spacing_px, 0.0), ("snap_px", b.snap_px, 0.0)] {
+            if !(v > min && v <= 100.0) {
+                return err(format!("{group}.{field} must be > 0 and <= 100 (got {v})"));
+            }
+        }
+        for (field, v) in [("min_run_px", b.min_run_px), ("ease_px", b.ease_px)] {
+            if !(0.0..=1000.0).contains(&v) {
+                return err(format!("{group}.{field} must be 0..=1000 (got {v})"));
+            }
+        }
+        let keys: Vec<&str> = spec
+            .layers
+            .iter()
+            .filter(|(_, l)| l.bundle.as_ref() == Some(group))
+            .map(|(n, l)| l.strand_key(n))
+            .collect();
+        if keys.is_empty() {
+            return err(format!("[bundle.{group}] is not used by any layer (set bundle = \"{group}\" on the line layers)"));
+        }
+        if let Some(k) = b.order.iter().find(|k| !keys.contains(&k.as_str())) {
+            return err(format!("{group}.order names `{k}`, which is not a bundle_key or layer name in the bundle ({})", keys.join(", ")));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bundle_options_are_checked() {
+        let e = |s: &str| parse_map_spec(s).unwrap_err().to_string();
+        assert!(e("[layers.a]\nhighlights = [\"x\"]\nbundle_key = \"k\"\n").contains("no bundle"));
+        let shared = "[layers.a]\nhighlights = [\"x\"]\nbundle = \"t\"\nbundle_key = \"k\"\n\
+                      [layers.b]\nhighlights = [\"y\"]\nbundle = \"t\"\nbundle_key = \"k\"\n";
+        assert!(e(shared).contains("different features"));
+        let one = "[layers.a]\nhighlights = [\"x\"]\nbundle = \"t\"\n";
+        assert!(e(&format!("[bundle.t]\nspacing_px = 0\n{one}")).contains("spacing_px"));
+        assert!(e(&format!("[bundle.t]\norder = [\"zz\"]\n{one}")).contains("`zz`"));
+        assert!(e(&format!("[bundle.u]\n{one}")).contains("not used"));
+        let ok = parse_map_spec(&format!("[bundle.t]\norder = [\"a\"]\n{one}")).unwrap();
+        assert_eq!(ok.bundle["t"].spacing_px, 2.5);
+        // Unbundled specs serialise exactly as before (stable cache keys).
+        let plain = parse_map_spec("[layers.a]\nhighlights = [\"x\"]\n").unwrap();
+        assert!(!toml::to_string(&plain).unwrap().contains("bundle"));
+    }
 
     #[test]
     fn minimal_spec_parses() {
