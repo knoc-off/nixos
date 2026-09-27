@@ -74,7 +74,9 @@ the back. Prefer several small cards over one big one.
 
 Media: marki_add_media saves a file, then reference it in a ```media block \
 (marki_docs(\"media\")). Maps: a ```map block renders the map itself \
-(marki_docs(\"map\")); never download a map image. Math: $inline$ and \
+(marki_docs(\"map\")); never download a map image. marki_preview returns a \
+PNG of each map, and marki_map_render renders a bare map block: look at them \
+to check the frame, gaps and overlaps. Math: $inline$ and \
 $$display$$.
 
 Models: read marki_docs(\"models\") before writing one; \
@@ -218,6 +220,19 @@ pub struct PreviewArgs {
     pub model_lua: Option<String>,
     /// Draft CSS for the card's model.
     pub model_css: Option<String>,
+    /// Attach PNG snapshots of maps/typst figures (default true).
+    pub images: Option<bool>,
+}
+
+/// JSON text first, then one label + image pair per PNG.
+fn with_pngs(json: &serde_json::Value, pngs: Vec<(String, Vec<u8>)>) -> Vec<ContentBlock> {
+    let b64 = base64::engine::general_purpose::STANDARD;
+    let mut out = vec![ContentBlock::text(serde_json::to_string_pretty(json).unwrap_or_default())];
+    for (label, png) in pngs {
+        out.push(ContentBlock::text(label));
+        out.push(ContentBlock::image(b64.encode(png), "image/png"));
+    }
+    out
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -300,6 +315,14 @@ pub struct DocsArgs {
 }
 
 #[derive(Deserialize, JsonSchema)]
+pub struct MapRenderArgs {
+    /// The map block's TOML, without the ```map fences.
+    pub source: String,
+    /// Optional card path whose [map.rules] defaults should apply.
+    pub path: Option<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
 pub struct MakeCardsArgs {
     /// What to make cards about.
     pub topic: String,
@@ -321,6 +344,15 @@ impl Marki {
         })
     }
 
+    #[tool(description = "Render a ```map block's TOML (without the fences, no card needed) to PNGs of its front (reveal layers hidden) and back (all layers), max 512 px. Use it to iterate on a map's frame, styling and geometry. `path` (a card path) only selects which [map.rules] defaults apply.")]
+    async fn marki_map_render(&self, Parameters(a): Parameters<MapRenderArgs>) -> Result<CallToolResult, McpError> {
+        let r = self.run(move |h| h.map_render(&a.source, a.path.as_deref())).await;
+        Ok(match r {
+            Ok(pngs) => CallToolResult::success(with_pngs(&serde_json::json!({"images": pngs.iter().map(|(l, _)| l).collect::<Vec<_>>()}), pngs)),
+            Err(e) => CallToolResult::error(vec![ContentBlock::text(e)]),
+        })
+    }
+
     #[tool(description = "Search card files by path or content.")]
     async fn marki_search_cards(&self, Parameters(a): Parameters<SearchArgs>) -> Result<CallToolResult, McpError> {
         self.tool(move |h| h.search_cards(&a.query, a.limit.unwrap_or(50))).await
@@ -331,12 +363,18 @@ impl Marki {
         self.tool(move |h| h.read_card(&a.path)).await
     }
 
-    #[tool(description = "Render a card (saved or draft source, optionally with a draft model) to the HTML of every card front/back it generates, plus render errors. Writes nothing.")]
+    #[tool(description = "Render a card (saved or draft source, optionally with a draft model) to the HTML of every card front/back it generates, plus render errors, plus a PNG (max 512 px) of each map/typst figure per card side so you can check what it looks like (`images` lists their labels; images=false skips them). Writes nothing.")]
     async fn marki_preview(&self, Parameters(a): Parameters<PreviewArgs>) -> Result<CallToolResult, McpError> {
-        self.tool(move |h| {
-            h.preview(&a.path, a.source.as_deref(), a.model_lua.as_deref(), a.model_css.as_deref())
+        let images = a.images.unwrap_or(true);
+        let r = self
+            .run(move |h| {
+                h.preview(&a.path, a.source.as_deref(), a.model_lua.as_deref(), a.model_css.as_deref(), images)
+            })
+            .await;
+        Ok(match r {
+            Ok((json, pngs)) => CallToolResult::success(with_pngs(&json, pngs)),
+            Err(e) => CallToolResult::error(vec![ContentBlock::text(e)]),
         })
-        .await
     }
 
     #[tool(description = "Format, validate and save a card file. New cards get an #id; overwriting needs expected_id. Does not push.")]

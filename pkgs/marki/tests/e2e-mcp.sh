@@ -35,7 +35,7 @@ for _ in $(seq 50); do curl -s "127.0.0.1:$port/mcp" >/dev/null && break; sleep 
 
 # The client half lives in python (json handling); it asserts as it goes.
 py "$port" "$w" "$here" <<'EOF'
-import sys, json, urllib.request, sqlite3
+import sys, json, urllib.request, sqlite3, base64
 port, w, here = sys.argv[1], sys.argv[2], sys.argv[3]
 url = f"http://127.0.0.1:{port}/mcp"
 sid = None
@@ -77,7 +77,8 @@ want = {"marki_context", "marki_search_cards", "marki_read_card", "marki_preview
         "marki_write_card", "marki_add_media", "marki_read_model",
         "marki_write_model", "marki_status", "marki_push", "marki_query",
         "marki_delete_card", "marki_move_card", "marki_docs", "marki_write_cards",
-        "marki_map_units", "marki_map_find", "marki_map_define", "marki_map_list", "marki_media_list"}
+        "marki_map_units", "marki_map_find", "marki_map_define", "marki_map_list", "marki_media_list",
+        "marki_map_render"}
 assert want <= names, want - names
 assert not names & {"marki_find", "marki_flagged"}, names
 assert "marki_docs" in init["instructions"]
@@ -282,6 +283,22 @@ wall_card = ("Where is the Great Wall?\n\n```map\n[layers.base]\nfeatures = [\"c
              "[layers.answer]\nhighlights = [\"geo/great-wall\"]\n```\n\n---\n\nNorthern China")
 pv = tool("marki_preview", {"path": "wall.md", "source": wall_card})
 assert not pv["errors"] and pv["assets"], pv
+# The card's map comes back as a PNG (Basic: the map is on the front only;
+# marki_map_render below shows both sides).
+r = rpc("tools/call", {"name": "marki_preview", "arguments": {"path": "wall.md", "source": wall_card}})
+imgs = [c for c in r["content"] if c["type"] == "image"]
+assert pv["images"] == ["Card front #1"] and len(imgs) == 1, (pv["images"], pv["image_errors"])
+assert base64.b64decode(imgs[0]["data"]).startswith(b"\x89PNG")
+r = rpc("tools/call", {"name": "marki_preview", "arguments": {"path": "wall.md", "source": wall_card, "images": False}})
+assert not [c for c in r["content"] if c["type"] == "image"]
+# A block alone, with a fixed frame and a dashed answer.
+blk = ("[viewport]\nbbox = [110, 38, 120, 42]\n[layers.base]\nfeatures = [\"country/CHN\"]\n"
+       "[layers.answer]\nhighlights = [\"geo/great-wall\"]\n[layers.answer.style]\ndash = \"6 4\"\n")
+r = rpc("tools/call", {"name": "marki_map_render", "arguments": {"source": blk}})
+assert not r.get("isError") and [c["text"] for c in r["content"] if c["type"] == "text"][1:] == ["front", "back"], r["content"][0]
+front, back = [base64.b64decode(c["data"]) for c in r["content"] if c["type"] == "image"]
+assert front != back, "the back shows the answer layer"
+assert "parse" in tool("marki_map_render", {"source": "[viewport]\nbbox = 1\n"}, ok=False)
 err = tool("marki_preview", {"path": "wall.md", "source": wall_card.replace("great-wall", "nope")})["errors"]
 assert "marki_map_define" in str(err), err
 shutil.rmtree(f"{w}/p/.marki/geo")

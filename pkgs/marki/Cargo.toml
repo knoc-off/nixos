@@ -16,6 +16,8 @@ license = "MIT"
 authors = ["knoff"]
 
 [workspace.dependencies]
+# No text/fonts: marki's SVGs (maps, typst) draw glyphs as paths.
+resvg = { version = "0.48", default-features = false }
 anyhow = "1"
 blake3 = "1"
 globset = "0.4"

@@ -222,8 +222,13 @@ module uses mcp-auth-proxy).
 Tools: `marki_context`, `marki_docs`, `marki_search_cards`, `marki_read_card`,
 `marki_preview`, `marki_write_card`, `marki_write_cards`, `marki_move_card`,
 `marki_delete_card`, `marki_add_media`, `marki_read_model`,
-`marki_write_model`, `marki_status`, `marki_push`, `marki_query`. Plus docs,
-cards and models as resources and a `make-cards` prompt.
+`marki_write_model`, `marki_status`, `marki_push`, `marki_query`,
+`marki_map_render`. Plus docs, cards and models as resources and a
+`make-cards` prompt.
+
+`marki_preview` also returns a PNG (max 512 px) of every SVG figure (maps,
+typst) on each card side, and `marki_map_render` renders a bare map block's
+front and back, so an agent can see what it drew.
 
 Block renderers add their own: each ships its README as `marki_docs("<block>")`
 and may offer tools named `marki_<block>_<name>` (`marki_map_units`,

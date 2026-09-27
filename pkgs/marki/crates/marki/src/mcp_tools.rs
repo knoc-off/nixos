@@ -173,6 +173,29 @@ impl Handler {
         Ok(self.project.registry.call_tool(lang, name, args, self.root(), &cache)?)
     }
 
+    /// Render one ```map block (its TOML, no card needed) to a PNG of the
+    /// front (reveal layers hidden) and the back (all layers). `path` sets
+    /// which `[map.rules]` apply, as for a card at that path.
+    pub fn map_render(&self, source: &str, path: Option<&str>) -> Result<Vec<(String, Vec<u8>)>> {
+        let at = match path {
+            Some(p) => self.card_path(p)?,
+            None => self.root().join("_map.md"),
+        };
+        let cache = crate::project::render_cache_dir();
+        let frag = self
+            .project
+            .registry
+            .dispatch("map", marki_render::Input::Raw(source), &at, &cache)
+            .map_err(|e| anyhow::anyhow!("map block: {e}"))?;
+        let mut out = Vec::new();
+        for (side, back) in [("front", false), ("back", true)] {
+            for fig in crate::raster::figures(&frag.html, &frag.assets, back, 512) {
+                out.push((side.to_string(), fig.map_err(anyhow::Error::msg)?.png));
+            }
+        }
+        Ok(out)
+    }
+
     fn model_names(&self) -> Result<Vec<String>> {
         let mut out: Vec<String> = std::fs::read_dir(self.models_dir())
             .map(|rd| {
@@ -230,7 +253,8 @@ impl Handler {
         source: Option<&str>,
         model_lua: Option<&str>,
         model_css: Option<&str>,
-    ) -> Result<serde_json::Value> {
+        images: bool,
+    ) -> Result<(serde_json::Value, Vec<(String, Vec<u8>)>)> {
         let path = self.card_path(rel)?;
         let source = match source {
             Some(s) => s.to_string(),
@@ -246,7 +270,23 @@ impl Handler {
         if let Some(css) = model_css {
             p.note.spec.css = css.to_string();
         }
-        Ok(serde_json::json!({
+        // One PNG per figure per card side; failures are reported, not fatal.
+        let mut pngs = Vec::new();
+        let mut image_errors = Vec::new();
+        if images {
+            for c in &p.cards {
+                for (side, html, back) in [("front", &c.front, false), ("back", &c.back, true)] {
+                    for (i, fig) in crate::raster::figures(html, &p.note.assets, back, 512).into_iter().enumerate() {
+                        let label = format!("{} {side} #{}", c.name, i + 1);
+                        match fig {
+                            Ok(f) => pngs.push((label, f.png)),
+                            Err(e) => image_errors.push(format!("{label}: {e}")),
+                        }
+                    }
+                }
+            }
+        }
+        let json = serde_json::json!({
             "model": model,
             "deck": deck_for_note(self.root(), &parse_note(&source, path.clone())),
             "cards": p.cards,
@@ -254,7 +294,10 @@ impl Handler {
             "assets": p.note.assets.iter().map(|a| &a.filename).collect::<Vec<_>>(),
             "css": p.note.spec.css,
             "docs": block_docs(&self.project.registry, &source),
-        }))
+            "images": pngs.iter().map(|(l, _)| l).collect::<Vec<_>>(),
+            "image_errors": image_errors,
+        });
+        Ok((json, pngs))
     }
 
     /// Format, validate and write a card. A new file gets a fresh id; an
