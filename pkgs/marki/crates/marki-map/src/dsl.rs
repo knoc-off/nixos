@@ -298,6 +298,15 @@ pub struct LayerSpec {
     /// Defaults to the layer name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bundle_key: Option<String>,
+
+    /// An Overpass selector (ways/relations, e.g.
+    /// `way[highway~"^(primary|secondary)$"]`), fetched and cached for
+    /// the map's own frame instead of a fixed area. Needs a fixed frame
+    /// ([viewport] `bbox`, `fit` or `center`) since the frame isn't
+    /// known until after auto-focus would otherwise run. Give only the
+    /// selector, no bbox of your own -- the frame supplies it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub osm: Option<String>,
 }
 
 impl LayerSpec {

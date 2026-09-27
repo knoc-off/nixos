@@ -79,7 +79,7 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
 
     // ---- Resolve.
     let frame = fixed_frame(spec, cache_root, geo_dir)?;
-    let mut resolved = resolve_all_layers(spec, cache_root, geo_dir)?;
+    let mut resolved = resolve_all_layers(spec, cache_root, geo_dir, frame)?;
     if tracing::enabled!(tracing::Level::TRACE) {
         for l in &resolved {
             tracing::trace!(layer = %l.name, features = l.features.len(), "resolved layer");
@@ -493,6 +493,7 @@ fn resolve_all_layers<'a>(
     spec: &'a MapSpec,
     cache_root: &Path,
     geo_dir: Option<&Path>,
+    frame: Option<BBox>,
 ) -> Result<Vec<ResolvedLayer<'a>>, MapError> {
     let resolve_one = |r: &str, c: &Path| resolve_one(r, c, geo_dir);
     let mut out = Vec::with_capacity(spec.layers.len());
@@ -517,6 +518,27 @@ fn resolve_all_layers<'a>(
                 let g = resolve_one(r, cache_root)?;
                 features.push((g, "hull", false, is_composite_ref(r)));
             }
+        }
+        if let Some(selector) = &lspec.osm {
+            let bbox = frame.ok_or_else(|| {
+                MapError::Resolve(format!(
+                    "[layers.{name}] osm needs a fixed [viewport] frame (bbox, fit or center); \
+                     auto-focus isn't known until after fetching, so it can't supply one"
+                ))
+            })?;
+            let g = overpass::query_in_bbox(
+                selector,
+                (bbox.min_lat, bbox.min_lon, bbox.max_lat, bbox.max_lon),
+                cache_root,
+            )
+            .map_err(|e| match e {
+                MapError::Resolve(msg) => MapError::Resolve(format!("[layers.{name}] {msg}")),
+                other => other,
+            })?;
+            // "highlight" role, like any other feature: the layer's own
+            // `style` override (stroke/dash/opacity) is how an osm
+            // layer gets styled, since there's no dedicated role for it.
+            features.push((g, "highlight", false, false));
         }
         out.push(ResolvedLayer { name, features });
     }
@@ -1191,5 +1213,32 @@ mod tests {
             min_lon: bbox2[0], min_lat: bbox2[1], max_lon: bbox2[2], max_lat: bbox2[3],
         });
         assert!((aspect2 - 3.0).abs() < 1e-6, "{aspect2}");
+    }
+
+    #[test]
+    fn osm_layer_needs_a_fixed_frame_and_fetches_it_when_present() {
+        // No fixed frame: auto-focus's bbox isn't known yet, so `osm`
+        // must reject rather than silently fetch the whole planet.
+        let no_frame = "[layers.base]\nfeatures = [\"geo/city\"]\n[layers.roads]\nosm = \"way[highway]\"\n";
+        let err = render_size(no_frame, &[("city", CITY)]).unwrap_err().to_string();
+        assert!(err.contains("osm needs a fixed") && err.contains("layers.roads"), "{err}");
+
+        // With a fixed frame, the layer's bbox is the frame's own bbox,
+        // injected server-side (the selector carries none of its own).
+        let d = std::env::temp_dir().join(format!("marki-osm-layer-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("city.geojson"), CITY).unwrap();
+        let _guard = crate::data::overpass::tests::ENV_LOCK.lock().unwrap();
+        let body = r#"{"elements":[{"type":"way","geometry":[{"lat":52.4,"lon":13.3},{"lat":52.6,"lon":13.5}]}]}"#;
+        let url = crate::data::overpass::tests::fake_server(vec![("HTTP/1.1 200 OK", body)]);
+        unsafe { std::env::set_var("MARKI_OVERPASS_URL", &url) };
+        let toml = "[viewport]\nbbox = [13, 52, 14, 53]\n[layers.base]\nfeatures = [\"geo/city\"]\n\
+                    [layers.roads]\nosm = \"way[highway]\"\n";
+        let spec = crate::dsl::parse_map_spec(toml).unwrap();
+        let frag = run(&spec, &d.join("cache"), Some(&d));
+        unsafe { std::env::remove_var("MARKI_OVERPASS_URL") };
+        assert!(frag.is_ok(), "{frag:?}");
+        let _ = std::fs::remove_dir_all(&d);
     }
 }

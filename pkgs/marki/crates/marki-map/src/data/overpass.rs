@@ -310,6 +310,40 @@ struct RelationMember {
 /// required) and merge every hit into one geometry. The statement is
 /// wrapped: `[out:json][timeout:60][maxsize:64Mi];(<stmt>);out geom;`.
 pub fn query(stmt: &str, cache_root: &Path) -> Result<Geometry, MapError> {
+    let stmt = check_selector(stmt)?;
+    if !has_own_bbox(stmt) {
+        return Err(MapError::Resolve(
+            "overpass: add a bounding box (south,west,north,east), e.g. way[name=\"X\"](30,95,45,125)".into(),
+        ));
+    }
+    decode_all(&run_ql(&format!("[out:json][timeout:60][maxsize:67108864];({stmt};);out geom;"), cache_root)?)
+}
+
+/// Run an author's Overpass selection with no bbox of its own inside a
+/// caller-supplied frame (`[viewport]`'s fixed frame, for a per-layer
+/// `osm = "<selector>"` fetched for the map's own area). Rejects a
+/// selector that already carries a bbox, since the two would combine
+/// unpredictably (Overpass ANDs sequential filters).
+pub fn query_in_bbox(stmt: &str, bbox: (f64, f64, f64, f64), cache_root: &Path) -> Result<Geometry, MapError> {
+    let stmt = check_selector(stmt)?;
+    if has_own_bbox(stmt) {
+        return Err(MapError::Resolve(
+            "osm: give only the selector, e.g. way[highway~\"^(primary|secondary)$\"]; \
+             the map's frame supplies the bounding box"
+                .into(),
+        ));
+    }
+    let (s, w, n, e) = bbox;
+    let ql = format!("[out:json][timeout:60][maxsize:67108864];({stmt}({s},{w},{n},{e}););out geom;");
+    decode_all(&run_ql(&ql, cache_root)?)
+}
+
+/// Shared validation for an author-supplied Overpass selector (used by
+/// both `query` and `query_in_bbox`): trims the trailing `;`, rejects an
+/// embedded output statement (`out ...`/`out;`) since that part is
+/// always added for the caller, and requires a `way`/`relation`/`nwr`
+/// selection.
+fn check_selector(stmt: &str) -> Result<&str, MapError> {
     let stmt = stmt.trim().trim_end_matches(';');
     let lower = stmt.to_lowercase();
     if lower.contains("[out:") || lower.contains("out ") || lower.contains("out;") {
@@ -320,34 +354,33 @@ pub fn query(stmt: &str, cache_root: &Path) -> Result<Geometry, MapError> {
     if !(lower.starts_with("way") || lower.starts_with("relation") || lower.starts_with("nwr")) {
         return Err(MapError::Resolve("overpass: select way[...] or relation[...]".into()));
     }
-    // A bbox `(s,w,n,e)` or an area filter keeps one query from pulling a continent.
-    let has_bbox = stmt.contains("(area") || {
-        let nums = stmt
+    Ok(stmt)
+}
+
+/// Whether `stmt` already has a `(area...)` or a `(s,w,n,e)` bbox filter.
+fn has_own_bbox(stmt: &str) -> bool {
+    stmt.contains("(area")
+        || stmt
             .split(['(', ')'])
             .skip(1)
             .step_by(2)
-            .any(|inner| inner.split(',').count() == 4 && inner.split(',').all(|n| n.trim().parse::<f64>().is_ok()));
-        nums
-    };
-    if !has_bbox {
-        return Err(MapError::Resolve(
-            "overpass: add a bounding box (south,west,north,east), e.g. way[name=\"X\"](30,95,45,125)".into(),
-        ));
-    }
-    let ql = format!("[out:json][timeout:60][maxsize:67108864];({stmt};);out geom;");
+            .any(|inner| inner.split(',').count() == 4 && inner.split(',').all(|n| n.trim().parse::<f64>().is_ok()))
+}
+
+/// Run a fully-built Overpass QL query through the content-addressed
+/// cache, fetching over the network only on a miss.
+fn run_ql(ql: &str, cache_root: &Path) -> Result<Vec<u8>, MapError> {
     let cache_dir = cache_root.join("net").join("overpass");
     std::fs::create_dir_all(&cache_dir)?;
-    let cache_file = cache_dir.join(format!("{}.json", query_key(&ql)));
-    let raw = if cache_file.exists() {
-        std::fs::read(&cache_file)?
-    } else {
-        let bytes = http_post(&ql)?;
-        let tmp = cache_file.with_extension("tmp");
-        std::fs::write(&tmp, &bytes)?;
-        std::fs::rename(&tmp, &cache_file)?;
-        bytes
-    };
-    decode_all(&raw)
+    let cache_file = cache_dir.join(format!("{}.json", query_key(ql)));
+    if cache_file.exists() {
+        return Ok(std::fs::read(&cache_file)?);
+    }
+    let bytes = http_post(ql)?;
+    let tmp = cache_file.with_extension("tmp");
+    std::fs::write(&tmp, &bytes)?;
+    std::fs::rename(&tmp, &cache_file)?;
+    Ok(bytes)
 }
 
 /// Every way/relation in a response, merged (areas or lines, not both).
@@ -562,8 +595,13 @@ fn pt_eq(a: LonLat, b: LonLat) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+
+    /// `MARKI_OVERPASS_URL` is process-global; any test (in this module
+    /// or `pipeline`'s) that points it at a fake server must hold this
+    /// for the duration, or a parallel test's real value/removal races it.
+    pub(crate) static ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn build_query_relation() {
@@ -685,7 +723,7 @@ mod tests {
     }
 
     /// Serve one raw HTTP response per connection: `(status line + headers, body)`.
-    fn fake_server(responses: Vec<(&'static str, &'static str)>) -> String {
+    pub(crate) fn fake_server(responses: Vec<(&'static str, &'static str)>) -> String {
         let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}/api/interpreter", l.local_addr().unwrap());
         std::thread::spawn(move || {
@@ -703,17 +741,29 @@ mod tests {
 
     #[test]
     fn rate_limit_is_retried_and_a_bad_query_explains_itself() {
-        // One test so the MARKI_OVERPASS_URL env var isn't raced by another.
+        let _guard = ENV_LOCK.lock().unwrap();
         let url = fake_server(vec![
             ("HTTP/1.1 429 Too Many Requests\r\nRetry-After: 1", ""),
             ("HTTP/1.1 200 OK", "{\"elements\":[]}"),
             ("HTTP/1.1 400 Bad Request", "<p><strong>Error</strong>: line 1: parse error: ';' expected </p>\n"),
         ]);
-        // SAFETY: only this test touches the variable.
+        // SAFETY: only this test touches the variable while holding ENV_LOCK.
         unsafe { std::env::set_var("MARKI_OVERPASS_URL", &url) };
         assert_eq!(http_post("q").unwrap(), b"{\"elements\":[]}");
         let e = http_post("q").unwrap_err().to_string();
         assert!(e.contains("HTTP 400") && e.contains("parse error: ';' expected") && e.contains(&url), "{e}");
         unsafe { std::env::remove_var("MARKI_OVERPASS_URL") };
     }
+
+    #[test]
+    fn query_in_bbox_rejects_a_selectors_own_bbox_and_query_requires_one() {
+        // A selector with its own bbox is for `query` (a saved feature),
+        // not `query_in_bbox` (a per-layer osm fetch inside the map's
+        // own frame) -- the two would otherwise combine unpredictably.
+        let d = std::env::temp_dir().join(format!("marki-osm-{}-{:?}", std::process::id(), std::thread::current().id()));
+        let own_bbox = "way[highway](30,95,45,125)";
+        assert!(query_in_bbox(own_bbox, (30.0, 95.0, 45.0, 125.0), &d).unwrap_err().to_string().contains("map's frame supplies"));
+        assert!(query("way[highway]", &d).unwrap_err().to_string().contains("bounding box"));
+        assert!(query("select foo", &d).unwrap_err().to_string().contains("select way"));
+        assert!(query("way[highway](30,95,45,125); out geom;", &d).unwrap_err().to_string().contains("output part"));    }
 }

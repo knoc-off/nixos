@@ -251,6 +251,29 @@ The renderer understands these reference shapes:
   `MARKI_OVERPASS_URL` on the server to use another (e.g. self-hosted)
   Overpass interpreter.
 
+### `osm`: OSM features for the map's own area
+
+A layer's `osm` field is a different kind of reference: instead of one
+fixed feature, it's an Overpass selector fetched and cached for
+whatever the map's frame turns out to be, so one spec works at any
+zoom instead of a hand-picked, pre-simplified roads feature per card:
+
+```toml
+[viewport]
+center = "geo/berlin/stations/zoo"
+span_km = 3.5
+
+[layers.roads]
+osm = 'way[highway~"^(primary|secondary)$"]'
+style = { stroke = "#999", stroke_width = 0.8 }
+```
+
+Give only the selector, with no bbox of your own — the frame supplies
+one server-side. `osm` needs a **fixed** frame (`[viewport] bbox`,
+`fit` or `center`): auto-focus's bbox depends on the drawn features and
+isn't known until after fetching would already need it. It shares the
+same cache and retry behaviour as `relation/`/`way/` refs.
+
 ## Auto-focus
 
 Most countries with overseas territories (USA + Alaska + Hawaii,
