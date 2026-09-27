@@ -319,6 +319,16 @@ assert not r.get("isError") and [c["text"] for c in r["content"] if c["type"] ==
 front, back = [base64.b64decode(c["data"]) for c in r["content"] if c["type"] == "image"]
 assert front != back, "the back shows the answer layer"
 assert "parse" in tool("marki_map_render", {"source": "[viewport]\nbbox = 1\n"}, ok=False)
+# center + span_km frames on a point ref; aspect widens the short axis.
+c = tool("marki_map_get", {"name": "geo/great-wall"})
+mid_lon = (c["bbox"][0] + c["bbox"][2]) / 2
+mid_lat = (c["bbox"][1] + c["bbox"][3]) / 2
+tool("marki_map_define", {"name": "wall-mid", "from": {"geojson": {"type": "Point", "coordinates": [mid_lon, mid_lat]}}})
+zoom = ("size = [400, 400]\n[viewport]\ncenter = \"geo/wall-mid\"\nspan_km = 50\naspect = 2.0\n"
+        "[layers.base]\nfeatures = [\"geo/great-wall\"]\n")
+zr = rpc("tools/call", {"name": "marki_map_render", "arguments": {"source": zoom}})
+assert not zr.get("isError"), zr
+assert "only one" in tool("marki_map_render", {"source": "[viewport]\nbbox = [1,2,3,4]\ncenter = \"geo/wall-mid\"\nspan_km = 1\n[layers.base]\nfeatures = [\"geo/wall-mid\"]\n"}, ok=False)
 err = tool("marki_preview", {"path": "wall.md", "source": wall_card.replace("great-wall", "nope")})["errors"]
 assert "marki_map_define" in str(err), err
 shutil.rmtree(f"{w}/p/.marki/geo")

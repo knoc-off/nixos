@@ -296,6 +296,35 @@ fit = ["geo/berlin/ring"]          # frame on these refs (+5% margin); they need
 `cluster_factor`, `min_density` and `min_aspect` are ignored. A `bbox`
 with `east < west` crosses the antimeridian.
 
+### Fixed frame around a point: `center` and `span_km`
+
+`fit`'s bbox-of-refs doesn't help for "zoom in on this one station at
+this scale" -- a point has no extent to pad. `center` does that
+directly:
+
+```toml
+[viewport]
+center = "geo/berlin/stations/zoo"   # any feature ref; its bbox centre is used
+span_km = 3.5                        # the frame's width, exact (no extra margin)
+```
+
+`center` needs `span_km`, and is mutually exclusive with `bbox` and
+`fit`. Its height comes from `size`'s own aspect ratio, unless you set
+`aspect` explicitly (below).
+
+### Fixed aspect ratio: `aspect`
+
+```toml
+[viewport]
+aspect = 1.5   # width / height; applies to bbox, fit, center or auto-focus alike
+```
+
+Whatever frame results, `aspect` widens the shorter axis (never crops)
+until the ratio matches. Two maps rendered with the same `aspect` and
+`size` always come out the same canvas size -- useful for a CSS
+cross-fade between a city map and a zoomed-in `center` map of a station
+on it, which needs both to line up pixel-for-pixel.
+
 ## Detail reduction
 
 Archipelago and subregion features (e.g. `subregion/Melanesia`, which

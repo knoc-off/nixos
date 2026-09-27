@@ -188,9 +188,32 @@ pub struct ViewportSpec {
 
     /// Frame the map on these feature refs (their combined bbox plus a
     /// 5% margin) instead of on the drawn features. The refs need not be
-    /// drawn. Mutually exclusive with `bbox`.
+    /// drawn. Mutually exclusive with `bbox` and `center`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fit: Vec<String>,
+
+    /// Frame the map on this one feature ref's centre, `span_km` wide.
+    /// The common "zoom in on this station/city at this scale" case,
+    /// which `fit` can't express for a point. Needs `span_km`. Mutually
+    /// exclusive with `bbox` and `fit`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub center: Option<String>,
+
+    /// Width of the `center` frame on the ground, in kilometres. Only
+    /// meaningful with `center`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub span_km: Option<f64>,
+
+    /// Fixed width/height ratio for the canvas. Applies to every framing
+    /// mode (`bbox`, `fit`, `center`, or automatic): the frame is widened
+    /// (never cropped) on whichever axis is short until it matches.
+    /// Two maps with the same `aspect` and `size` always come out the
+    /// same canvas size, which a CSS cross-fade between them needs.
+    /// Defaults to `size`'s own ratio when `center` is set (so a
+    /// `span_km` zoom doesn't need it spelled out); otherwise unset,
+    /// and the canvas follows the data's own projected aspect.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aspect: Option<f64>,
 }
 
 impl Default for ViewportSpec {
@@ -198,6 +221,9 @@ impl Default for ViewportSpec {
         Self {
             bbox: None,
             fit: Vec::new(),
+            center: None,
+            span_km: None,
+            aspect: None,
             min_density: default_min_density(),
             min_aspect: default_min_aspect(),
             cluster_factor: default_cluster_factor(),

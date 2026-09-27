@@ -188,6 +188,44 @@ pub fn xy_percent(bbox: BBox, center_lon: f64, width: f64, height: f64, lon: f64
     (100.0 * x / width, 100.0 * y / height)
 }
 
+/// Widen `bb` (never crop) until its Mercator-projected aspect
+/// (`dx_proj / dy_proj`) equals `target`, growing symmetrically on
+/// whichever axis is short. `[viewport] aspect`'s implementation: a
+/// fixed aspect and a fixed `size` always give two maps the same
+/// canvas, which a CSS cross-fade between them needs.
+///
+/// Longitude widening is exact (Mercator x is linear in longitude).
+/// Latitude widening is exact too, despite Mercator y being nonlinear
+/// in latitude: it targets a `dy_proj` directly (in already-projected
+/// space, symmetric about the current projected centre) and inverts
+/// with the same closed-form formula [`Mercator::unproject`] uses, so
+/// no search/iteration is needed.
+pub fn widen_to_aspect(bb: BBox, target: f64) -> BBox {
+    if !(target.is_finite() && target > 0.0) {
+        return bb;
+    }
+    let (min_x, max_x) = (bb.min_lon.to_radians(), bb.max_lon.to_radians());
+    let (min_y, max_y) = (mercator_y(bb.min_lat), mercator_y(bb.max_lat));
+    let (dx, dy) = (max_x - min_x, max_y - min_y);
+    let current = dx / dy;
+    if (current - target).abs() < 1e-9 {
+        return bb;
+    }
+    if current < target {
+        // Too tall for the target ratio: widen longitude (dx), keep dy.
+        let new_dx = target * dy;
+        let cx = (min_x + max_x) / 2.0;
+        BBox { min_lon: (cx - new_dx / 2.0).to_degrees(), max_lon: (cx + new_dx / 2.0).to_degrees(), ..bb }
+    } else {
+        // Too wide: widen latitude (dy), keep dx. Symmetric in
+        // projected space, matching how Mercator::fit centres a bbox.
+        let new_dy = dx / target;
+        let cy = (min_y + max_y) / 2.0;
+        let inv_y = |y: f64| (2.0 * y.exp().atan() - std::f64::consts::FRAC_PI_2).to_degrees();
+        BBox { min_lat: inv_y(cy - new_dy / 2.0), max_lat: inv_y(cy + new_dy / 2.0), ..bb }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -266,6 +304,26 @@ mod tests {
         let (cx, _) = xy_percent(bb, 0.0, 600.0, 400.0, 15.0, 50.0);
         let (rx, _) = xy_percent(bb, 0.0, 600.0, 400.0, 15.0 - 360.0, 50.0);
         assert!((cx - rx).abs() < 1e-6, "rotation should normalise a wrapped lon back on frame");
+    }
+
+    #[test]
+    fn widen_to_aspect_grows_the_short_axis_only() {
+        let bb = BBox { min_lon: -1.0, min_lat: -1.0, max_lon: 1.0, max_lat: 1.0 };
+        // Wider target: longitude grows, latitude untouched.
+        let wide = widen_to_aspect(bb, 4.0);
+        assert_eq!((wide.min_lat, wide.max_lat), (bb.min_lat, bb.max_lat));
+        assert!(wide.min_lon < bb.min_lon && wide.max_lon > bb.max_lon);
+        assert!((Mercator::projected_aspect(wide) - 4.0).abs() < 1e-6, "{}", Mercator::projected_aspect(wide));
+
+        // Taller target: latitude grows, longitude untouched.
+        let tall = widen_to_aspect(bb, 0.25);
+        assert_eq!((tall.min_lon, tall.max_lon), (bb.min_lon, bb.max_lon));
+        assert!(tall.min_lat < bb.min_lat && tall.max_lat > bb.max_lat);
+        assert!((Mercator::projected_aspect(tall) - 0.25).abs() < 1e-6, "{}", Mercator::projected_aspect(tall));
+
+        // Already matching: untouched.
+        let matched = widen_to_aspect(bb, Mercator::projected_aspect(bb));
+        assert_eq!((matched.min_lon, matched.max_lon, matched.min_lat, matched.max_lat), (bb.min_lon, bb.max_lon, bb.min_lat, bb.max_lat));
     }
 
     #[test]

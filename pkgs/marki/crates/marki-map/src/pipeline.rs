@@ -140,7 +140,11 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
                 spec.viewport.min_density,
                 spec.viewport.min_aspect,
             );
-            trimmed.padded(0.05)
+            let padded = trimmed.padded(0.05);
+            match spec.viewport.aspect {
+                Some(a) => crate::project::widen_to_aspect(padded, a),
+                None => padded,
+            }
         }
     };
 
@@ -327,11 +331,12 @@ fn fit_canvas(budget: [u32; 2], aspect: f64) -> (u32, u32) {
 // crosses the antimeridian frames the whole globe; use `bbox` there.
 fn fixed_frame(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<Option<BBox>, MapError> {
     let v = &spec.viewport;
-    let bb = match (v.bbox, v.fit.is_empty()) {
-        (Some(_), false) => {
-            return Err(MapError::Parse("[viewport]: set either bbox or fit, not both".into()));
-        }
-        (Some([w, s, e, n]), true) => {
+    let modes = [v.bbox.is_some(), !v.fit.is_empty(), v.center.is_some()];
+    if modes.iter().filter(|set| **set).count() > 1 {
+        return Err(MapError::Parse("[viewport]: set only one of bbox, fit or center".into()));
+    }
+    let bb = match (v.bbox, v.fit.is_empty(), &v.center) {
+        (Some([w, s, e, n]), true, None) => {
             let ok = [w, e].iter().all(|x| (-180.0..=180.0).contains(x))
                 && [s, n].iter().all(|y| (-85.0..=85.0).contains(y))
                 && s < n
@@ -344,7 +349,7 @@ fn fixed_frame(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Res
             }
             BBox { min_lon: w, min_lat: s, max_lon: if e < w { e + 360.0 } else { e }, max_lat: n }
         }
-        (None, false) => {
+        (None, false, None) => {
             let mut bb = BBox::empty();
             for r in &v.fit {
                 bb.extend(resolve_one(r, cache_root, geo_dir)?.bbox());
@@ -354,10 +359,46 @@ fn fixed_frame(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Res
             }
             bb.padded(0.05)
         }
-        (None, true) => return Ok(None),
+        (None, true, Some(center)) => {
+            let span_km = v.span_km.ok_or_else(|| {
+                MapError::Parse("[viewport] center needs span_km (the frame's width, in km)".into())
+            })?;
+            if !(span_km.is_finite() && span_km > 0.0) {
+                return Err(MapError::Parse(format!("[viewport] span_km must be positive, got {span_km}")));
+            }
+            let c = resolve_one(center, cache_root, geo_dir)?.bbox();
+            let (clon, clat) = ((c.min_lon + c.max_lon) / 2.0, (c.min_lat + c.max_lat) / 2.0);
+            // Width is exact ground distance; degrees-per-km at this
+            // latitude shrinks longitude spacing by cos(lat) (a degree
+            // of longitude is shorter away from the equator).
+            let dlat = span_km / KM_PER_DEGREE;
+            let dlon = span_km / (KM_PER_DEGREE * clat.to_radians().cos().max(1e-6));
+            BBox {
+                min_lon: clon - dlon / 2.0,
+                min_lat: (clat - dlat / 2.0).max(-85.0),
+                max_lon: clon + dlon / 2.0,
+                max_lat: (clat + dlat / 2.0).min(85.0),
+            }
+        }
+        (None, true, None) => return Ok(None),
+        _ => unreachable!("mutual exclusion checked above"),
+    };
+    // A fixed aspect widens the short axis so it never crops; `center`
+    // defaults to the canvas's own budget ratio (so a plain span_km
+    // zoom doesn't need it spelled out), the other modes are left as
+    // the data's own aspect unless the author asks for one.
+    let aspect = v.aspect.or_else(|| v.center.as_ref().map(|_| spec.size[0] as f64 / spec.size[1] as f64));
+    let bb = match aspect {
+        Some(a) => crate::project::widen_to_aspect(bb, a),
+        None => bb,
     };
     Ok(Some(bb))
 }
+
+/// Mean km per degree of latitude (WGS84 authalic radius). Good enough
+/// for a `span_km` viewport, which is already an approximation (Web
+/// Mercator itself isn't equidistant).
+const KM_PER_DEGREE: f64 = 111.32;
 
 /// Compute the Anki-media filename for one layer. The content-addressed
 /// cache key prevents collisions between cards.
@@ -999,6 +1040,12 @@ mod tests {
     /// Render `toml` with `geo/` features from `files`; returns the base
     /// SVG's canvas size.
     fn render_size(toml: &str, files: &[(&str, &str)]) -> Result<(u32, u32), MapError> {
+        Ok(render_frag(toml, files)?.0)
+    }
+
+    /// Like `render_size`, but also returns the frame reported in
+    /// `frag.meta.map.bbox` (west, south, east, north).
+    fn render_frag(toml: &str, files: &[(&str, &str)]) -> Result<((u32, u32), [f64; 4]), MapError> {
         let d = std::env::temp_dir().join(format!("marki-frame-{}-{:?}", std::process::id(), std::thread::current().id()));
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
@@ -1012,7 +1059,8 @@ mod tests {
             let i = svg.find(&format!(" {attr}=\"")).unwrap() + attr.len() + 3;
             svg[i..].split('"').next().unwrap().parse().unwrap()
         };
-        Ok((num("width"), num("height")))
+        let bbox: [f64; 4] = serde_json::from_value(frag.meta["map"]["bbox"].clone()).unwrap();
+        Ok(((num("width"), num("height")), bbox))
     }
 
     const CITY: &str = r#"{"type":"Polygon","coordinates":[[[13,52],[14,52],[14,53],[13,53],[13,52]]]}"#;
@@ -1095,8 +1143,53 @@ mod tests {
     fn frame_options_are_checked() {
         let base = "[layers.base]\nfeatures = [\"geo/city\"]\n";
         let both = format!("[viewport]\nbbox = [13, 52, 14, 53]\nfit = [\"geo/city\"]\n{base}");
-        assert!(render_size(&both, &[("city", CITY)]).unwrap_err().to_string().contains("not both"));
+        assert!(render_size(&both, &[("city", CITY)]).unwrap_err().to_string().contains("only one"));
         let bad = format!("[viewport]\nbbox = [13, 53, 14, 52]\n{base}");
         assert!(render_size(&bad, &[("city", CITY)]).unwrap_err().to_string().contains("south < north"));
+        let center_no_span = format!("[viewport]\ncenter = \"geo/city\"\n{base}");
+        assert!(render_size(&center_no_span, &[("city", CITY)]).unwrap_err().to_string().contains("span_km"));
+        let all_three = format!("[viewport]\nbbox = [13, 52, 14, 53]\ncenter = \"geo/city\"\nspan_km = 3\n{base}");
+        assert!(render_size(&all_three, &[("city", CITY)]).unwrap_err().to_string().contains("only one"));
+    }
+
+    #[test]
+    fn center_frames_a_point_span_km_wide() {
+        let point = r#"{"type":"Point","coordinates":[13.4,52.5]}"#;
+        // Pin `aspect` to the frame's own natural ratio so the (separately
+        // tested) aspect-widening step is a no-op here, isolating span_km.
+        let dlat = 4.0 / KM_PER_DEGREE;
+        let dlon = 4.0 / (KM_PER_DEGREE * 52.5f64.to_radians().cos());
+        let raw = BBox { min_lon: 13.4 - dlon / 2.0, min_lat: 52.5 - dlat / 2.0, max_lon: 13.4 + dlon / 2.0, max_lat: 52.5 + dlat / 2.0 };
+        let aspect = crate::project::Mercator::projected_aspect(raw);
+        let toml = format!("[viewport]\ncenter = \"geo/stop\"\nspan_km = 4\naspect = {aspect}\n[layers.base]\nfeatures = [\"geo/stop\"]\n");
+        let (_, bbox) = render_frag(&toml, &[("stop", point)]).unwrap();
+        let [w, s, e, n] = bbox;
+        // Width (east-west, at this latitude) should be ~4km; a straight
+        // degree-width check needs the same cos(lat) correction the
+        // implementation uses.
+        let width_km = (e - w) * KM_PER_DEGREE * 52.5f64.to_radians().cos();
+        let height_km = (n - s) * KM_PER_DEGREE;
+        assert!((width_km - 4.0).abs() < 0.05, "{width_km}");
+        assert!((height_km - 4.0).abs() < 0.05, "{height_km}");
+        // Centred on the point.
+        assert!(((w + e) / 2.0 - 13.4).abs() < 1e-6);
+        assert!(((s + n) / 2.0 - 52.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn aspect_widens_the_short_axis_for_every_frame_mode() {
+        let point = r#"{"type":"Point","coordinates":[13.4,52.5]}"#;
+        // center: defaults aspect to size's own ratio (2:1 canvas here).
+        let toml = "size = [800, 400]\n[viewport]\ncenter = \"geo/stop\"\nspan_km = 4\n[layers.base]\nfeatures = [\"geo/stop\"]\n";
+        let ((w, h), _) = render_frag(toml, &[("stop", point)]).unwrap();
+        assert_eq!((w, h), (800, 400), "center defaults aspect to size's own ratio");
+
+        // bbox: an explicit aspect widens a square-ish bbox to match.
+        let toml2 = "[viewport]\nbbox = [13, 52, 14, 53]\naspect = 3.0\n[layers.base]\nfeatures = [\"geo/city\"]\n";
+        let (_, bbox2) = render_frag(toml2, &[("city", CITY)]).unwrap();
+        let aspect2 = crate::project::Mercator::projected_aspect(BBox {
+            min_lon: bbox2[0], min_lat: bbox2[1], max_lon: bbox2[2], max_lat: bbox2[3],
+        });
+        assert!((aspect2 - 3.0).abs() < 1e-6, "{aspect2}");
     }
 }
