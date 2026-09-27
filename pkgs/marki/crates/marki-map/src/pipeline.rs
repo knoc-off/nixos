@@ -157,7 +157,7 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
     for layer in &mut resolved {
         for (g, _, _, _) in &mut layer.features {
             let old = std::mem::take(g);
-            *g = clip::clip_geometry(old, clip_bb);
+            *g = clip::clip_geometry(old, clip_bb).join_lines();
         }
     }
 

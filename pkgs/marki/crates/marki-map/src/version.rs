@@ -99,5 +99,6 @@
 //!   southern archipelago).
 //! - `29` — Hull closing arc fixed (the first, top-left corner was cut
 //!   straight); hulls wrap lines and points, specks become circles.
+//!   Line pieces meeting end to end are joined into one path.
 
 pub const RENDER_VERSION_MAP: u32 = 29;

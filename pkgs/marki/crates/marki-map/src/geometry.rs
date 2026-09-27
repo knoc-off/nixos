@@ -152,6 +152,20 @@ pub fn best_outer_for(inner: &[LonLat], polys: &[Polygon]) -> Option<usize> {
 }
 
 impl Geometry {
+    /// Join line pieces that meet end to end into longer polylines, so
+    /// a dash pattern runs on instead of restarting at every OSM way.
+    /// Other kinds pass through; a line that joins into one piece
+    /// becomes a `LineString`.
+    pub fn join_lines(self) -> Geometry {
+        match self {
+            Geometry::MultiLineString(ls) => {
+                let mut ls = join_pieces(ls);
+                if ls.len() == 1 { Geometry::LineString(ls.pop().unwrap_or_default()) } else { Geometry::MultiLineString(ls) }
+            }
+            g => g,
+        }
+    }
+
     pub fn bbox(&self) -> BBox {
         let mut bb = BBox::empty();
         match self {
@@ -183,6 +197,55 @@ impl Geometry {
         }
         bb
     }
+}
+
+/// Merge pieces wherever exactly two piece ends share a point. Junctions
+/// (three or more ends) are left alone: which branch continues the line
+/// is a guess, and a wrong one would reroute the drawn path.
+pub fn join_pieces(pieces: Vec<Vec<LonLat>>) -> Vec<Vec<LonLat>> {
+    use std::collections::HashMap;
+    // ~1 cm; custom features are stored rounded to 1e-5, so shared ends are equal.
+    let key = |p: &LonLat| ((p.lon * 1e7).round() as i64, (p.lat * 1e7).round() as i64);
+    let mut ends: HashMap<(i64, i64), Vec<usize>> = HashMap::new();
+    for (i, l) in pieces.iter().enumerate() {
+        if let (Some(a), Some(b)) = (l.first(), l.last()) {
+            ends.entry(key(a)).or_default().push(i);
+            ends.entry(key(b)).or_default().push(i);
+        }
+    }
+    let mut used = vec![false; pieces.len()];
+    let mut out = Vec::new();
+    for i in 0..pieces.len() {
+        if used[i] {
+            continue;
+        }
+        used[i] = true;
+        let mut line = pieces[i].clone();
+        // Grow from the tail, then flip and grow from the other end.
+        for _ in 0..2 {
+            let mut tail = i;
+            while let Some(k) = line.last().map(key) {
+                let next = match ends.get(&k).map(Vec::as_slice) {
+                    Some(&[a, b]) if a != b && (a == tail || b == tail) => if a == tail { b } else { a },
+                    _ => break,
+                };
+                if used[next] {
+                    break;
+                }
+                used[next] = true;
+                let p = &pieces[next];
+                if p.first().map(key) == Some(k) {
+                    line.extend_from_slice(&p[1..]);
+                } else {
+                    line.extend(p.iter().rev().skip(1));
+                }
+                tail = next;
+            }
+            line.reverse();
+        }
+        out.push(line);
+    }
+    out
 }
 
 #[cfg(test)]
@@ -241,5 +304,22 @@ mod tests {
         };
         assert!(a.intersects(&b));
         assert!(!a.intersects(&c));
+    }
+
+    #[test]
+    fn join_pieces_chains_ends_but_not_junctions() {
+        let p = |x: f64| LonLat { lon: x, lat: 0.0 };
+        let q = |y: f64| LonLat { lon: 2.0, lat: y };
+        // 1-2 reversed, 0-1, 2-3 -> one line 0..3 (either direction).
+        let out = join_pieces(vec![vec![p(2.0), p(1.0)], vec![p(0.0), p(1.0)], vec![p(2.0), p(3.0)]]);
+        assert_eq!(out.len(), 1, "{out:?}");
+        let xs: Vec<f64> = out[0].iter().map(|l| l.lon).collect();
+        assert!(xs == [0.0, 1.0, 2.0, 3.0] || xs == [3.0, 2.0, 1.0, 0.0], "{xs:?}");
+        // A branch at x=2 makes a junction: nothing joins across it.
+        let out = join_pieces(vec![vec![p(0.0), p(2.0)], vec![p(2.0), p(3.0)], vec![q(0.0), q(1.0)], vec![q(1.0), p(2.0)]]);
+        assert_eq!(out.len(), 3, "{out:?}");
+        // Closed loop pieces and a two-piece ring terminate.
+        assert_eq!(join_pieces(vec![vec![p(0.0), p(1.0), q(1.0), p(0.0)]]).len(), 1);
+        assert_eq!(join_pieces(vec![vec![p(0.0), p(1.0)], vec![p(1.0), q(1.0), p(0.0)]]).len(), 1);
     }
 }
