@@ -232,7 +232,7 @@ front and back, so an agent can see what it drew.
 
 Block renderers add their own: each ships its README as `marki_docs("<block>")`
 and may offer tools named `marki_<block>_<name>` (`marki_map_units`,
-`marki_map_find`, `marki_map_define`, `marki_map_list`, `marki_media_list`),
+`marki_map_find`, `marki_map_define`, `marki_map_list`, `marki_map_get`, `marki_media_list`),
 through `docs()` and `tools()` on the
 `Renderer` trait. They are registered when the server starts, so enabling a
 block (e.g. setting `typst_binary`) needs a restart.

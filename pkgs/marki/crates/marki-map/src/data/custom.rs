@@ -247,6 +247,41 @@ fn kind(g: &Geometry) -> &'static str {
     }
 }
 
+/// Largest geometry `get` returns inline; pass a tolerance for more.
+const MAX_GET_BYTES: usize = 200_000;
+
+/// Summary of `geo/<name>` (kind, points, bbox, bytes) and, with
+/// `geometry`, its GeoJSON geometry, first simplified by `tolerance`
+/// degrees if given.
+pub fn get(dir: &Path, name: &str, geometry: bool, tolerance: Option<f64>) -> Result<serde_json::Value, MapError> {
+    let name = name.strip_prefix(PREFIX).unwrap_or(name);
+    let mut g = resolve(Some(dir), name)?;
+    let bbox = g.bbox();
+    let mut out = serde_json::json!({
+        "ref": format!("{PREFIX}{name}"),
+        "kind": kind(&g),
+        "points": point_count(&g),
+        "bbox": [round(bbox.min_lon), round(bbox.min_lat), round(bbox.max_lon), round(bbox.max_lat)],
+        "bytes": std::fs::metadata(path(dir, name)?).map(|m| m.len()).unwrap_or(0),
+    });
+    if geometry {
+        if let Some(eps) = tolerance.filter(|t| *t > 0.0) {
+            simplify_geometry(&mut g, eps);
+            out["points_returned"] = point_count(&g).into();
+        }
+        let geo = to_geojson(&g);
+        let size = geo.to_string().len();
+        if size > MAX_GET_BYTES {
+            return Err(MapError::Resolve(format!(
+                "geo/{name} geometry is {size} bytes (limit {MAX_GET_BYTES}); pass a tolerance in degrees \
+                 (e.g. 0.001 ~ 100 m) to simplify it, or use the summary"
+            )));
+        }
+        out["geometry"] = geo;
+    }
+    Ok(out)
+}
+
 /// Every `geo/<name>` under `dir`, sorted.
 pub fn list(dir: &Path) -> Vec<String> {
     let mut out = Vec::new();
@@ -322,6 +357,13 @@ mod tests {
         let back = resolve(Some(&d), "wall").unwrap();
         assert_eq!(point_count(&back), out["points"].as_u64().unwrap() as usize);
         assert_eq!(list(&d), ["geo/wall"]);
+        // get: summary matches define; big geometry needs a tolerance.
+        let s = get(&d, "geo/wall", false, None).unwrap();
+        assert_eq!((&s["points"], &s["bbox"], s.get("geometry")), (&out["points"], &out["bbox"], None));
+        assert!(get(&d, "wall", true, None).unwrap()["geometry"]["coordinates"].is_array());
+        let small = get(&d, "wall", true, Some(0.01)).unwrap();
+        assert!(small["points_returned"].as_u64().unwrap() < out["points"].as_u64().unwrap() / 10, "{}", small["points_returned"]);
+        assert_eq!(small["geometry"]["type"], "LineString");
         assert!(resolve(Some(&d), "nope").unwrap_err().to_string().contains("marki_map_define"));
         // The fingerprint follows file contents.
         let refs = vec!["geo/wall".to_string()];

@@ -438,7 +438,9 @@ Over MCP, `marki_map_define(name, from)` builds and saves one. `from` is one of:
 
 Large inputs are simplified to at most 20,000 points. The result reports
 the feature's kind (area/line/point), point count and bbox; check the bbox
-before using it. `marki_map_list` lists existing features.
+before using it. `marki_map_list` lists existing features, and
+`marki_map_get` returns one's kind, point count and bbox (use it as a
+`[viewport] bbox`), plus its GeoJSON with `geometry=true`.
 
 ### `coastline` and `neighbors/<ISO>`
 

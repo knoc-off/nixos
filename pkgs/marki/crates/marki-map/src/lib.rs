@@ -161,6 +161,19 @@ impl Renderer for MapRenderer {
                 description: "List the project's custom map features (`geo/<name>` refs made with marki_map_define). Reuse one before defining it again.",
                 schema: serde_json::json!({"type": "object", "properties": {}}),
             },
+            Tool {
+                name: "get",
+                description: "Inspect a custom map feature: kind (area/line/point), point count, bbox [w,s,e,n] (usable as [viewport] bbox) and file size. geometry=true also returns its GeoJSON geometry (up to ~200 KB; pass tolerance in degrees, e.g. 0.001 ~ 100 m, to simplify a big one).",
+                schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "name": {"type": "string", "description": "`<name>` or `geo/<name>`"},
+                        "geometry": {"type": "boolean"},
+                        "tolerance": {"type": "number"}
+                    },
+                    "required": ["name"]
+                }),
+            },
         ]
     }
 
@@ -211,6 +224,12 @@ impl Renderer for MapRenderer {
                 Ok(define(self.geo_dir()?, s("name")?, source, ctx.cache_dir)?)
             }
             "list" => Ok(serde_json::json!({ "features": data::custom::list(self.geo_dir()?) })),
+            "get" => Ok(data::custom::get(
+                self.geo_dir()?,
+                s("name")?,
+                args.get("geometry").and_then(|v| v.as_bool()).unwrap_or(false),
+                args.get("tolerance").and_then(|v| v.as_f64()),
+            )?),
             _ => Err(RenderError::Internal(format!("no tool `{name}`"))),
         }
     }

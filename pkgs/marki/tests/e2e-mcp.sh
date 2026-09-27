@@ -78,7 +78,7 @@ want = {"marki_context", "marki_search_cards", "marki_read_card", "marki_preview
         "marki_write_model", "marki_status", "marki_push", "marki_query",
         "marki_delete_card", "marki_move_card", "marki_docs", "marki_write_cards",
         "marki_map_units", "marki_map_find", "marki_map_define", "marki_map_list", "marki_media_list",
-        "marki_map_render"}
+        "marki_map_render", "marki_map_get"}
 assert want <= names, want - names
 assert not names & {"marki_find", "marki_flagged"}, names
 assert "marki_docs" in init["instructions"]
@@ -102,7 +102,7 @@ assert any(p["name"] == "make-cards" for p in rpc("prompts/list")["prompts"])
 ctx = tool("marki_context")
 assert ctx["cards"] == 0
 mapb = [b for b in ctx["blocks"] if b["fence"] == "```map"]
-assert mapb and mapb[0]["tools"] == ["marki_map_units", "marki_map_find", "marki_map_define", "marki_map_list"], ctx["blocks"]
+assert mapb and mapb[0]["tools"] == ["marki_map_units", "marki_map_find", "marki_map_define", "marki_map_list", "marki_map_get"], ctx["blocks"]
 assert {d["topic"] for d in ctx["docs"]} == {"cards", "map", "media", "models"}, ctx["docs"]
 
 # Path confinement.
@@ -283,6 +283,9 @@ assert d["bbox"] == [100, 38, 119.8, 40.5], d
 assert "exactly one" in tool("marki_map_define", {"name": "x", "from": {"osm": [], "geojson": wall}}, ok=False)
 assert "bad geo name" in tool("marki_map_define", {"name": "../x", "from": {"geojson": wall}}, ok=False)
 assert tool("marki_map_list")["features"] == ["geo/great-wall"]
+g = tool("marki_map_get", {"name": "geo/great-wall", "geometry": True})
+assert g["bbox"] == d["bbox"] and g["points"] == 6 and g["geometry"]["type"] == "MultiLineString", g
+assert "geometry" not in tool("marki_map_get", {"name": "great-wall"})
 assert tool("marki_context")["custom_geometry"] == ["geo/great-wall"]
 wall_card = ("Where is the Great Wall?\n\n```map\n[layers.base]\nfeatures = [\"country/CHN\"]\n"
              "[layers.answer]\nhighlights = [\"geo/great-wall\"]\n```\n\n---\n\nNorthern China")
