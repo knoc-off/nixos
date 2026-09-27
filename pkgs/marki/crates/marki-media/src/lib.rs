@@ -174,6 +174,7 @@ fn render_media(
             bytes,
             mime,
         }],
+        ..Default::default()
     })
 }
 

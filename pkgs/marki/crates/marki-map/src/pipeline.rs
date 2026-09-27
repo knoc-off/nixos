@@ -264,6 +264,8 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
         height: render_h,
         requested_size: spec.size,
         projection: projection_name.into(),
+        bbox: [padded.min_lon, padded.min_lat, padded.max_lon, padded.max_lat],
+        center_lon: central,
         layers: svg_files
             .iter()
             .map(|(name, _cache_name, _bytes)| SidecarLayer {
@@ -291,7 +293,7 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
     cache::write_atomic(cache_root, &key, &files)?;
 
     // ---- Build embed + assets.
-    Ok(build_block(&key, render_w, render_h, &reveals, &svg_files))
+    Ok(build_block(&key, render_w, render_h, padded, central, &reveals, &svg_files))
 }
 
 /// Pick the largest `(w, h)` within `budget` whose aspect equals
@@ -753,6 +755,8 @@ fn build_block(
     key: &str,
     render_w: u32,
     render_h: u32,
+    bbox: BBox,
+    center_lon: f64,
     reveals: &BTreeMap<String, RevealMode>,
     svg_files: &[(String, String, Vec<u8>)],
 ) -> Fragment {
@@ -761,7 +765,7 @@ fn build_block(
         .map(|(name, _cache_name, _)| (name.clone(), layer_media_filename(key, name)))
         .collect();
 
-    let mut layers: Vec<EmbedLayer<'_>> = media_files
+    let layers: Vec<EmbedLayer<'_>> = media_files
         .iter()
         .map(|(name, fname)| EmbedLayer {
             name: name.as_str(),
@@ -771,7 +775,7 @@ fn build_block(
         .collect();
     let embed = embed_layers(render_w, render_h, &layers);
 
-    let mut assets: Vec<Asset> = svg_files
+    let assets: Vec<Asset> = svg_files
         .iter()
         .map(|(name, _cache_name, bytes)| Asset {
             filename: layer_media_filename(key, name),
@@ -784,6 +788,14 @@ fn build_block(
         html: embed.front_html,
         reveal: embed.back_html_extras,
         assets,
+        meta: serde_json::json!({
+            "map": {
+                "width": render_w,
+                "height": render_h,
+                "bbox": [bbox.min_lon, bbox.min_lat, bbox.max_lon, bbox.max_lat],
+                "center_lon": center_lon,
+            }
+        }),
     }
 }
 
@@ -808,10 +820,18 @@ fn load_from_cache(
     }
 
     let reveals = resolve_reveals(&spec.layers);
+    let bbox = BBox {
+        min_lon: parsed.bbox[0],
+        min_lat: parsed.bbox[1],
+        max_lon: parsed.bbox[2],
+        max_lat: parsed.bbox[3],
+    };
     Ok(build_block(
         key,
         parsed.width,
         parsed.height,
+        bbox,
+        parsed.center_lon,
         &reveals,
         &svg_files,
     ))

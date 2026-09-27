@@ -101,5 +101,10 @@
 //!   straight); hulls wrap lines and points, specks become circles.
 //!   Line pieces meeting end to end are joined into one path.
 //!   `bundle` layers draw shared-track lines as parallel strands.
+//! - `30` — The sidecar now carries the final frame (`bbox`,
+//!   `center_lon`), so `ctx:render("map", ...)` can report `map.bbox`
+//!   correctly on a cache hit too. No pixels changed; the bump exists
+//!   only so pre-`30` cache entries (missing those fields) re-render
+//!   instead of reporting a zeroed-out bbox.
 
-pub const RENDER_VERSION_MAP: u32 = 29;
+pub const RENDER_VERSION_MAP: u32 = 30;

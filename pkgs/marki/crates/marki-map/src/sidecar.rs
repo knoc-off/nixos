@@ -22,6 +22,17 @@ pub struct Sidecar {
     /// aspect of the data.
     pub requested_size: [u32; 2],
     pub projection: String,
+    /// Final frame `[west, south, east, north]`, after rotation around
+    /// `center_lon` -- the same numbers `ctx:render`'s `map.bbox` reports.
+    /// Defaulted for sidecars written before this field existed (a
+    /// version bump lands alongside it, so that path is dead in
+    /// practice, but a missing field shouldn't be a hard error).
+    #[serde(default)]
+    pub bbox: [f64; 4],
+    /// Central meridian the frame (and every feature) was rotated
+    /// around, degrees. 0 unless the map crosses the antimeridian.
+    #[serde(default)]
+    pub center_lon: f64,
     pub layers: Vec<SidecarLayer>,
 }
 
@@ -46,6 +57,8 @@ mod tests {
             height: 280,
             requested_size: [600, 400],
             projection: "mercator".into(),
+            bbox: [10.0, 45.0, 20.0, 55.0],
+            center_lon: 0.0,
             layers: vec![SidecarLayer {
                 name: "base".into(),
                 filename: "base.svg".into(),

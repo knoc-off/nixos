@@ -44,9 +44,17 @@ language), and ctx for *output*.
 - `ctx:section_html(note, n)` -> string. Section `n` (1-based) rendered.
   Sections are split by `---` lines.
 - `ctx:body_html(note)` -> string. The whole note rendered.
-- `ctx:render(lang, source)` -> `{ front_html, back_html, assets }`. Renders
-  one block given as source text. `back_html` is extra content for the
-  answer side (for example map labels).
+- `ctx:render(lang, source)` -> `{ front_html, back_html, assets, meta }`.
+  Renders one block given as source text. `back_html` is extra content for
+  the answer side (for example map labels). `meta` is renderer-specific;
+  for `lang = "map"` the table also gets:
+  - `map = { width, height, bbox = {w,s,e,n} }` -- the canvas size and the
+    final frame actually drawn (after auto-focus, margins and rotation).
+  - `xy(lon, lat) -> x_pct, y_pct` -- where a coordinate lands on that
+    canvas, as a percentage (0..100, y down). Use it to place a pin
+    (absolutely-positioned HTML) over the rendered map without
+    reimplementing the projection; it stays correct if the map's
+    internals change, since it's built from `map` alone.
 - `ctx:geo(ref)` -> `{ ref, kind, points, bbox = {w,s,e,n}, center = {lon, lat}, bytes }`.
   Looks up any map feature ref (`geo/<name>`, `relation/N`, `way/N`,
   `country/DEU`, an adm unit, ...) without rendering a map. Use it to

@@ -4,7 +4,11 @@
 //!
 //!   * `ctx:render(lang, source)` dispatches one fenced block through the
 //!     matching `Renderer` and returns a table `{ front_html, back_html,
-//!     assets }`.
+//!     assets, meta }`. For `lang = "map"`, the table also gets `map =
+//!     { width, height, bbox } ` and `xy(lon, lat) -> x_pct, y_pct`, the
+//!     final frame and a coordinate-to-canvas-percentage helper, so a
+//!     script can place a pin on the map it just rendered without
+//!     reimplementing Marki's projection.
 //!   * `ctx:section_html(note, n)` / `ctx:body_html(note)` render a run
 //!     of the note's blocks through the shared [`Registry::render_blocks`]
 //!     path, so external blocks are dispatched rather than dumped as raw
@@ -70,7 +74,7 @@ impl RenderContext {
 
 impl UserData for RenderContext {
     fn add_methods<M: UserDataMethods<Self>>(m: &mut M) {
-        // ctx:render(lang, source) -> { front_html, back_html, assets }
+        // ctx:render(lang, source) -> { front_html, back_html, assets, meta[, map, xy] }
         m.add_method("render", |lua, this, (lang, source): (String, String)| {
             let frag = this
                 .registry
@@ -79,12 +83,36 @@ impl UserData for RenderContext {
 
             let asset_names: Vec<String> =
                 frag.assets.iter().map(|a| a.filename.clone()).collect();
+            let meta = frag.meta.clone();
             this.push_assets(frag.assets);
 
             let t = lua.create_table()?;
             t.set("front_html", frag.html)?;
             t.set("back_html", frag.reveal)?;
             t.set("assets", asset_names)?;
+            t.set("meta", lua.to_value(&meta)?)?;
+
+            // `map`-specific ergonomics: the final frame, plus xy(lon, lat)
+            // -> x_pct, y_pct, so a script can place a pin without
+            // reimplementing the projection. Both come from `meta.map`
+            // alone (bbox + canvas size), not from marki-map internals.
+            if let Some(map) = meta.get("map") {
+                t.set("map", lua.to_value(map)?)?;
+                let bbox: [f64; 4] = serde_json::from_value(map["bbox"].clone())
+                    .map_err(|e| mlua::Error::runtime(format!("render({lang}): bad map.bbox: {e}")))?;
+                let center_lon = map["center_lon"].as_f64().unwrap_or(0.0);
+                let (w, h) = (map["width"].as_f64().unwrap_or(0.0), map["height"].as_f64().unwrap_or(0.0));
+                let bbox = marki_map::geometry::BBox {
+                    min_lon: bbox[0],
+                    min_lat: bbox[1],
+                    max_lon: bbox[2],
+                    max_lat: bbox[3],
+                };
+                let xy = lua.create_function(move |_, (lon, lat): (f64, f64)| {
+                    Ok(marki_map::project::xy_percent(bbox, center_lon, w, h, lon, lat))
+                })?;
+                t.set("xy", xy)?;
+            }
             Ok(t)
         });
 

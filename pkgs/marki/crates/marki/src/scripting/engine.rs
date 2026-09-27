@@ -494,6 +494,53 @@ return M
     }
 
     #[test]
+    fn ctx_render_map_reports_frame_and_xy() {
+        use crate::note_parser::parse_note;
+        use crate::render::Registry;
+        use crate::scripting::context::RenderContext;
+
+        let dir = std::env::temp_dir().join(format!("marki-lua-mapxy-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("demo.lua"),
+            r#"
+local M = {}
+M.card_names = { "Card" }
+function M.generate(note, ctx)
+  local r = ctx:render("map", "[viewport]\nbbox = [10.0, 45.0, 20.0, 55.0]\n[layers.base]\n")
+  local x, y = r.xy(15.0, 50.0)
+  return {
+    CardFront = string.format("%d %d %.1f %.1f", r.map.width, r.map.height, x, y),
+    CardBack = "x",
+  }
+end
+return M
+"#,
+        )
+        .unwrap();
+
+        let mut registry = Registry::new();
+        registry.register(Box::new(marki_map::MapRenderer::new()));
+
+        let mut se = ScriptEngine::new(dir.clone(), None);
+        let compiled = se.load_model("demo").unwrap();
+        let note = parse_note("x\n", PathBuf::from("/tmp/x.md"));
+        let ctx = RenderContext::new(Arc::new(registry), PathBuf::from("/tmp/x.md"), dir.join("cache"));
+        let out = se.execute(&compiled, note, ctx).unwrap();
+        let front = out.get("CardFront").unwrap();
+        let parts: Vec<&str> = front.split(' ').collect();
+        let (w, h): (f64, f64) = (parts[0].parse().unwrap(), parts[1].parse().unwrap());
+        let (x, y): (f64, f64) = (parts[2].parse().unwrap(), parts[3].parse().unwrap());
+        assert!(w > 0.0 && h > 0.0, "{front}");
+        // (15, 50) is the bbox's midpoint -> roughly (but not exactly,
+        // Mercator stretches y) at 50% x, near 50% y.
+        assert!((x - 50.0).abs() < 1.0, "{front}");
+        assert!((45.0..55.0).contains(&y), "{front}");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
     fn generate_keys_and_card_names_are_validated() {
         use crate::note_parser::parse_note;
         use crate::render::Registry;

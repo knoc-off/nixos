@@ -193,6 +193,7 @@ fn build_block(svg: Vec<u8>) -> Fragment {
             bytes: svg,
             mime: AssetMime::SvgXml,
         }],
+        ..Default::default()
     }
 }
 

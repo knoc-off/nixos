@@ -98,6 +98,12 @@ pub struct Fragment {
     pub reveal: String,
     /// Files the renderer produced, for the media collection.
     pub assets: Vec<Asset>,
+    /// Renderer-specific facts about what it just built, surfaced to Lua
+    /// model scripts via `ctx:render`'s return table (e.g. the map
+    /// renderer reports its final frame and canvas size so a script can
+    /// compute a pin position instead of an author pasting one in by
+    /// hand). `Value::Null` (the default) means "nothing to report".
+    pub meta: serde_json::Value,
 }
 
 /// One file emitted by a renderer, stored in the media collection verbatim

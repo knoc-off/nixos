@@ -175,6 +175,19 @@ impl Mercator {
     }
 }
 
+/// Where `(lon, lat)` lands on a rendered map, as a percentage of the
+/// canvas (`0..100`, y down): the same Mercator fit + antimeridian
+/// rotation `pipeline::run` used to draw it, rebuilt from the frame it
+/// reported (`bbox`, `center_lon`, `width`, `height` -- `ctx:render`'s
+/// `map` table). Deterministic in `bbox`/`size` alone, so a caller
+/// doesn't need the original `Projector` to place a pin on the map it
+/// already got back.
+pub fn xy_percent(bbox: BBox, center_lon: f64, width: f64, height: f64, lon: f64, lat: f64) -> (f64, f64) {
+    let m = Mercator::fit(bbox, (width, height));
+    let (x, y) = m.project(LonLat { lon: crate::unwrap::rotate_lon(lon, center_lon), lat });
+    (100.0 * x / width, 100.0 * y / height)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -236,6 +249,23 @@ mod tests {
         // Top-left should map roughly to top-left.
         assert!(tl.1 < br.1);
         assert!(tl.0 < br.0);
+    }
+
+    #[test]
+    fn xy_percent_matches_project_and_handles_rotation() {
+        let bb = BBox { min_lon: 10.0, min_lat: 45.0, max_lon: 20.0, max_lat: 55.0 };
+        let m = Mercator::fit(bb, (600.0, 400.0));
+        let (px, py) = m.project(LonLat { lon: 15.0, lat: 50.0 });
+        let (x, y) = xy_percent(bb, 0.0, 600.0, 400.0, 15.0, 50.0);
+        assert!((x - 100.0 * px / 600.0).abs() < 1e-9);
+        assert!((y - 100.0 * py / 400.0).abs() < 1e-9);
+
+        // A point outside a rotated frame's raw lon range still lands
+        // correctly once rotated the same way the pipeline rotated the
+        // frame it's being placed on.
+        let (cx, _) = xy_percent(bb, 0.0, 600.0, 400.0, 15.0, 50.0);
+        let (rx, _) = xy_percent(bb, 0.0, 600.0, 400.0, 15.0 - 360.0, 50.0);
+        assert!((cx - rx).abs() < 1e-6, "rotation should normalise a wrapped lon back on frame");
     }
 
     #[test]
