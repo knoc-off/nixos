@@ -28,6 +28,10 @@ struct RoleEntry {
     stroke: Option<String>,
     #[serde(default = "default_sw")]
     stroke_width: f64,
+    #[serde(default)]
+    dash: Option<String>,
+    #[serde(default)]
+    opacity: Option<f64>,
 }
 
 fn default_sw() -> f64 {
@@ -64,6 +68,8 @@ pub fn load(name: &str) -> Result<LoadedTheme, MapError> {
                 fill: r.fill.unwrap_or_else(|| "none".into()),
                 stroke: r.stroke.unwrap_or_else(|| "#000".into()),
                 stroke_width: r.stroke_width,
+                dash: r.dash,
+                opacity: r.opacity,
             })
             .collect(),
     };

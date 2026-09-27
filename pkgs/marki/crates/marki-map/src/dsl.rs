@@ -133,11 +133,26 @@ pub struct ViewportSpec {
     /// simplification and keep full vertex detail.
     #[serde(default = "default_simplify_px")]
     pub simplify_px: f64,
+
+    /// Fixed frame `[west, south, east, north]` in degrees. Replaces the
+    /// automatic framing: everything is clipped to it, so highlights far
+    /// away no longer zoom the map out. `east < west` crosses the
+    /// antimeridian.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bbox: Option<[f64; 4]>,
+
+    /// Frame the map on these feature refs (their combined bbox plus a
+    /// 5% margin) instead of on the drawn features. The refs need not be
+    /// drawn. Mutually exclusive with `bbox`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fit: Vec<String>,
 }
 
 impl Default for ViewportSpec {
     fn default() -> Self {
         Self {
+            bbox: None,
+            fit: Vec::new(),
             min_density: default_min_density(),
             min_aspect: default_min_aspect(),
             cluster_factor: default_cluster_factor(),
@@ -257,6 +272,10 @@ pub struct HighlightStyle {
     pub fill: Option<String>,
     pub stroke: Option<String>,
     pub stroke_width: Option<f64>,
+    /// SVG dash pattern for the stroke, e.g. `"6 4"` (6 px dash, 4 px gap).
+    pub dash: Option<String>,
+    /// Opacity of the whole role group, 0..1.
+    pub opacity: Option<f64>,
 }
 
 /// How a layer transitions between front and back of a card.

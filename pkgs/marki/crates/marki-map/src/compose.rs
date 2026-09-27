@@ -33,12 +33,16 @@ pub struct LayerStyle {
     pub roles: Vec<RoleStyle>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct RoleStyle {
     pub role: String,
     pub fill: String,
     pub stroke: String,
     pub stroke_width: f64,
+    /// SVG `stroke-dasharray`, e.g. `"6 4"`.
+    pub dash: Option<String>,
+    /// Group opacity, 0..1.
+    pub opacity: Option<f64>,
 }
 
 impl LayerStyle {
@@ -148,14 +152,23 @@ pub fn compose_layer(
             .role(role)
             .cloned()
             .unwrap_or_else(|| default_role_style(role));
+        // Butt caps on dashed lines, or round caps visually close the gaps.
+        let cap = if role_style.dash.is_some() { "butt" } else { "round" };
         let _ = write!(
             out,
             "<g fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"{sw}\" \
-             stroke-linejoin=\"round\" stroke-linecap=\"round\">",
+             stroke-linejoin=\"round\" stroke-linecap=\"{cap}\"",
             fill = escape_attr(&role_style.fill),
             stroke = escape_attr(&role_style.stroke),
             sw = role_style.stroke_width,
         );
+        if let Some(d) = &role_style.dash {
+            let _ = write!(out, " stroke-dasharray=\"{}\"", escape_attr(d));
+        }
+        if let Some(o) = role_style.opacity {
+            let _ = write!(out, " opacity=\"{}\"", o.clamp(0.0, 1.0));
+        }
+        out.push('>');
         for f in feats {
             if role == "hull" {
                 write_hull(&mut out, projector, f.geom, hull_radius_px);
@@ -191,6 +204,7 @@ fn default_role_style(role: &str) -> RoleStyle {
         fill: fill.to_string(),
         stroke: stroke.to_string(),
         stroke_width: 1.0,
+        ..Default::default()
     }
 }
 
@@ -640,10 +654,33 @@ mod tests {
                 fill: "#abc".into(),
                 stroke: "#000".into(),
                 stroke_width: 2.0,
+                ..Default::default()
             }],
         };
         assert!(s.role("highlight").is_some());
         assert!(s.role("missing").is_none());
+    }
+
+    #[test]
+    fn dash_and_opacity_reach_the_svg() {
+        let p = Equirectangular::fit(BBox { min_lon: 0.0, min_lat: 0.0, max_lon: 10.0, max_lat: 10.0 }, (100.0, 100.0));
+        let g = Geometry::LineString(vec![LonLat { lon: 0.0, lat: 0.0 }, LonLat { lon: 10.0, lat: 10.0 }]);
+        let style = LayerStyle {
+            background: None,
+            roles: vec![RoleStyle {
+                role: "highlight".into(),
+                fill: "none".into(),
+                stroke: "#c00".into(),
+                stroke_width: 2.0,
+                dash: Some("6 4".into()),
+                opacity: Some(0.5),
+            }],
+        };
+        let f = [Feature { geom: &g, role: "highlight", faithful: false }];
+        let svg = compose_layer(100, 100, &style, &p, &f, 0.0, RenderDetail::default());
+        assert!(svg.contains("stroke-dasharray=\"6 4\""), "{svg}");
+        assert!(svg.contains("stroke-linecap=\"butt\""), "{svg}");
+        assert!(svg.contains("opacity=\"0.5\""), "{svg}");
     }
 
     #[test]

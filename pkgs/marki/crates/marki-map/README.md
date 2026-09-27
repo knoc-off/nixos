@@ -85,6 +85,8 @@ highlights = ["adm1/DEU/Bayern"]
 fill = "#3388ff"
 stroke = "#1a5599"
 stroke_width = 2.0
+# dash = "6 4"      # dashed stroke: 6 px dash, 4 px gap (SVG stroke-dasharray)
+# opacity = 0.6     # whole-group opacity, 0..1 (instead of alpha in the colour)
 ```
 
 ### Hull layers (hard-to-spot landmasses)
@@ -239,8 +241,24 @@ gets clipped.
 
 Geometry is **never thrown away** by auto-focus. Outlying islands
 always render; they just fall outside the SVG viewBox in the unfocused
-case. (Sub-pixel specks *are* dropped at draw time — see
+case. (Sub-pixel specks *are* dropped at draw time -- see
 [Detail reduction](#detail-reduction).)
+
+### Fixed frame: `bbox` and `fit`
+
+To stop highlights from zooming the map out (a train line that runs
+past the city, a region inset), set the frame yourself. Everything is
+then clipped to it, so there is no need to pre-clip features:
+
+```toml
+[viewport]
+fit = ["geo/berlin/ring"]          # frame on these refs (+5% margin); they need not be drawn
+# bbox = [13.08, 52.33, 13.77, 52.68]  # or: [west, south, east, north] in degrees
+```
+
+`bbox` and `fit` are mutually exclusive. With either set, auto-focus,
+`cluster_factor`, `min_density` and `min_aspect` are ignored. A `bbox`
+with `east < west` crosses the antimeridian.
 
 ## Detail reduction
 

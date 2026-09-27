@@ -63,7 +63,7 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
     // Custom feature files are inputs too: editing one re-renders its maps.
     let refs = spec.layers.values().flat_map(|l| {
         l.features.iter().chain(&l.context).chain(&l.highlights).chain(l.hull.iter().flat_map(|h| &h.features))
-    });
+    }).chain(&spec.viewport.fit);
     let mut key_input = theme.bytes.clone();
     key_input.extend(custom::fingerprint(geo_dir, refs));
     let key = cache_key(spec, &key_input)?;
@@ -80,6 +80,7 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
     );
 
     // ---- Resolve.
+    let frame = fixed_frame(spec, cache_root, geo_dir)?;
     let mut resolved = resolve_all_layers(spec, cache_root, geo_dir)?;
     if tracing::enabled!(tracing::Level::TRACE) {
         for l in &resolved {
@@ -97,7 +98,11 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
     // spanning Melanesia (≈140°E) and Polynesia (≈−150°W) would pick a
     // central meridian in the Atlantic and smear the Pacific across
     // ~340° of canvas. See [`choose_central_meridian`].
-    let central = choose_central_meridian(&resolved).unwrap_or(0.0);
+    // A fixed frame is centred on itself instead.
+    let central = match frame {
+        Some(f) => (f.min_lon + f.max_lon) / 2.0,
+        None => choose_central_meridian(&resolved).unwrap_or(0.0),
+    };
     tracing::debug!(central, "chose central meridian");
 
     // ---- Rotate every geometry into the chosen frame, then split
@@ -126,15 +131,20 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
     //      edges (e.g. northern tip of Norway on a Europe map) so the
     //      canvas stays well-proportioned. Both behaviours are tunable
     //      via the `[viewport]` DSL section.
-    let raw_bb = viewport_bbox(&resolved, spec.viewport.cluster_factor)?;
-    let focus_geoms = collect_focus_geoms(&resolved);
-    let trimmed = trim::trim_sparse_edges(
-        raw_bb,
-        &focus_geoms,
-        spec.viewport.min_density,
-        spec.viewport.min_aspect,
-    );
-    let padded = trimmed.padded(0.05);
+    let padded = match frame {
+        Some(f) => f,
+        None => {
+            let raw_bb = viewport_bbox(&resolved, spec.viewport.cluster_factor)?;
+            let focus_geoms = collect_focus_geoms(&resolved);
+            let trimmed = trim::trim_sparse_edges(
+                raw_bb,
+                &focus_geoms,
+                spec.viewport.min_density,
+                spec.viewport.min_aspect,
+            );
+            trimmed.padded(0.05)
+        }
+    };
 
     // ---- Clip every geometry to a 10% margin around the viewport.
     //      Components fully outside are dropped; straddling rings are
@@ -205,6 +215,12 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
                 }
                 if let Some(sw) = ov.stroke_width {
                     role.stroke_width = sw;
+                }
+                if ov.dash.is_some() {
+                    role.dash = ov.dash.clone();
+                }
+                if ov.opacity.is_some() {
+                    role.opacity = ov.opacity;
                 }
             }
         }
@@ -299,6 +315,46 @@ fn fit_canvas(budget: [u32; 2], aspect: f64) -> (u32, u32) {
         (max_w, max_w / aspect)
     };
     (w.round().max(1.0) as u32, h.round().max(1.0) as u32)
+}
+
+/// The author-fixed frame from `[viewport] bbox` or `fit`, if any. Its
+/// longitudes are contiguous (`east < west` becomes `east + 360`), so
+/// centring on its midpoint puts it in the same rotated frame as the
+/// geometry.
+// ponytail: `fit` uses the refs' raw bbox, so a fit feature that itself
+// crosses the antimeridian frames the whole globe; use `bbox` there.
+fn fixed_frame(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<Option<BBox>, MapError> {
+    let v = &spec.viewport;
+    let bb = match (v.bbox, v.fit.is_empty()) {
+        (Some(_), false) => {
+            return Err(MapError::Parse("[viewport]: set either bbox or fit, not both".into()));
+        }
+        (Some([w, s, e, n]), true) => {
+            let ok = [w, e].iter().all(|x| (-180.0..=180.0).contains(x))
+                && [s, n].iter().all(|y| (-85.0..=85.0).contains(y))
+                && s < n
+                && w != e;
+            if !ok {
+                return Err(MapError::Parse(format!(
+                    "[viewport] bbox must be [west, south, east, north] with lon in -180..180, \
+                     lat in -85..85 and south < north; got [{w}, {s}, {e}, {n}]"
+                )));
+            }
+            BBox { min_lon: w, min_lat: s, max_lon: if e < w { e + 360.0 } else { e }, max_lat: n }
+        }
+        (None, false) => {
+            let mut bb = BBox::empty();
+            for r in &v.fit {
+                bb.extend(resolve_one(r, cache_root, geo_dir)?.bbox());
+            }
+            if bb.is_empty() {
+                return Err(MapError::Resolve(format!("[viewport] fit {:?} has no extent", v.fit)));
+            }
+            bb.padded(0.05)
+        }
+        (None, true) => return Ok(None),
+    };
+    Ok(Some(bb))
 }
 
 /// Compute the Anki-media filename for one layer. The content-addressed
@@ -796,5 +852,52 @@ mod tests {
         // Pathological: aspect so extreme that one dim rounds to 0.
         let (w, h) = fit_canvas([1, 1000], 0.0001);
         assert!(w >= 1 && h >= 1);
+    }
+
+    /// Render `toml` with `geo/` features from `files`; returns the base
+    /// SVG's canvas size.
+    fn render_size(toml: &str, files: &[(&str, &str)]) -> Result<(u32, u32), MapError> {
+        let d = std::env::temp_dir().join(format!("marki-frame-{}-{:?}", std::process::id(), std::thread::current().id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        for (name, json) in files {
+            std::fs::write(d.join(format!("{name}.geojson")), json).unwrap();
+        }
+        let spec = crate::dsl::parse_map_spec(toml).map_err(|e| MapError::Parse(e.to_string()))?;
+        let frag = run(&spec, &d.join("cache"), Some(&d))?;
+        let svg = String::from_utf8(frag.assets[0].bytes.clone()).unwrap();
+        let num = |attr: &str| -> u32 {
+            let i = svg.find(&format!(" {attr}=\"")).unwrap() + attr.len() + 3;
+            svg[i..].split('"').next().unwrap().parse().unwrap()
+        };
+        Ok((num("width"), num("height")))
+    }
+
+    const CITY: &str = r#"{"type":"Polygon","coordinates":[[[13,52],[14,52],[14,53],[13,53],[13,52]]]}"#;
+    // A long line far east of the city: auto-framing makes the map wide.
+    const LINE: &str = r#"{"type":"LineString","coordinates":[[13.5,52.5],[30,52.5]]}"#;
+
+    #[test]
+    fn highlight_widens_auto_frame_but_not_a_fixed_one() {
+        let files = [("city", CITY), ("line", LINE)];
+        let base = "[layers.base]\nfeatures = [\"geo/city\"]\n[layers.answer]\nhighlights = [\"geo/line\"]\n";
+        let (w, h) = render_size(base, &files).unwrap();
+        assert!(w as f64 / h as f64 > 3.0, "auto frame should include the line: {w}x{h}");
+
+        let fixed = format!("[viewport]\nbbox = [13, 52, 14, 53]\n{base}");
+        let (w, h) = render_size(&fixed, &files).unwrap();
+        assert!((w as f64 / h as f64) < 1.0, "bbox frame ignores the line: {w}x{h}");
+
+        let fit = format!("[viewport]\nfit = [\"geo/city\"]\n{base}");
+        assert_eq!(render_size(&fit, &files).unwrap(), (w, h), "fit = padded feature bbox");
+    }
+
+    #[test]
+    fn frame_options_are_checked() {
+        let base = "[layers.base]\nfeatures = [\"geo/city\"]\n";
+        let both = format!("[viewport]\nbbox = [13, 52, 14, 53]\nfit = [\"geo/city\"]\n{base}");
+        assert!(render_size(&both, &[("city", CITY)]).unwrap_err().to_string().contains("not both"));
+        let bad = format!("[viewport]\nbbox = [13, 53, 14, 52]\n{base}");
+        assert!(render_size(&bad, &[("city", CITY)]).unwrap_err().to_string().contains("south < north"));
     }
 }
