@@ -214,6 +214,10 @@ The renderer understands these reference shapes:
   [Overpass](https://overpass-api.de/) and cached
   content-addressably. Use this when geoBoundaries' admin
   boundaries don't match the political boundary you want.
+  Rate limits (HTTP 429) and gateway errors are retried with backoff;
+  the final error names the server, status and any `Retry-After`. Set
+  `MARKI_OVERPASS_URL` on the server to use another (e.g. self-hosted)
+  Overpass interpreter.
 
 ## Auto-focus
 

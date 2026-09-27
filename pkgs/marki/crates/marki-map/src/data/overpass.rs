@@ -10,7 +10,11 @@
 //!   * 30s timeout
 //!   * `User-Agent: marki/<version>`
 //!   * 1 req/sec rate limit (process-global)
-//!   * Exponential backoff on 429/504/timeouts (up to ~30s)
+//!   * Backoff on 429/502/503/504 and transport errors (honours
+//!     `Retry-After`, up to 5 attempts)
+//!
+//! `MARKI_OVERPASS_URL` overrides the interpreter URL (e.g. a
+//! self-hosted instance).
 //!
 //! Failures are converted to [`MapError::Network`] / `Resolve`. The
 //! daemon turns each into a card-level failure and continues.
@@ -28,9 +32,35 @@ const USER_AGENT: &str = concat!(
     " (+https://github.com/knoc-off/nixos)"
 );
 
-const ENDPOINT: &str = "https://overpass-api.de/api/interpreter";
+const DEFAULT_ENDPOINT: &str = "https://overpass-api.de/api/interpreter";
 const HTTP_TIMEOUT: Duration = Duration::from_secs(30);
 const MIN_INTERVAL: Duration = Duration::from_millis(1100);
+
+/// Overpass interpreter URL: `MARKI_OVERPASS_URL` (e.g. a self-hosted
+/// instance) or the public overpass-api.de.
+fn endpoint() -> String {
+    std::env::var("MARKI_OVERPASS_URL").ok().filter(|s| !s.is_empty()).unwrap_or_else(|| DEFAULT_ENDPOINT.into())
+}
+
+/// An error with its whole source chain: reqwest's own Display is just
+/// "error sending request", which hides the actual cause.
+fn chain(e: &dyn std::error::Error) -> String {
+    let mut s = e.to_string();
+    let mut src = e.source();
+    while let Some(c) = src {
+        s.push_str(": ");
+        s.push_str(&c.to_string());
+        src = c.source();
+    }
+    s
+}
+
+/// Seconds from a `Retry-After` header (delta-seconds form only), capped
+/// so one bad header can't stall a render for minutes.
+fn retry_after(resp: &reqwest::blocking::Response) -> Option<Duration> {
+    let secs: u64 = resp.headers().get(reqwest::header::RETRY_AFTER)?.to_str().ok()?.trim().parse().ok()?;
+    Some(Duration::from_secs(secs.min(60)))
+}
 
 /// Process-global last-request timestamp, for rate limiting.
 static LAST_REQUEST: Mutex<Option<Instant>> = Mutex::new(None);
@@ -87,56 +117,82 @@ fn build_query(reference: &str) -> Result<String, MapError> {
     )))
 }
 
-/// POST a query to Overpass with backoff on 429/504. Returns the raw
-/// JSON bytes on success.
+/// POST a query to Overpass, retrying 429/502/503/504 and transport errors
+/// with backoff (honouring `Retry-After`). The final error names the
+/// endpoint, the last status or cause, and how long it tried.
 fn http_post(ql: &str) -> Result<Vec<u8>, MapError> {
+    let url = endpoint();
     let client = reqwest::blocking::Client::builder()
         .timeout(HTTP_TIMEOUT)
         .user_agent(USER_AGENT)
         .build()
-        .map_err(|e| MapError::Network(format!("client: {e}")))?;
+        .map_err(|e| MapError::Network(format!("client: {}", chain(&e))))?;
 
-    let mut backoff = Duration::from_millis(500);
+    let mut backoff = Duration::from_secs(2);
     let max_backoff = Duration::from_secs(30);
     let max_attempts = 5;
+    let started = Instant::now();
+    let mut last = String::new();
 
-    for attempt in 0..max_attempts {
+    for attempt in 1..=max_attempts {
         rate_limit();
-        match client.post(ENDPOINT).body(ql.to_string()).send() {
+        let wait = match client.post(&url).body(ql.to_string()).send() {
             Ok(resp) => {
                 let status = resp.status();
                 if status.is_success() {
                     return resp
                         .bytes()
                         .map(|b| b.to_vec())
-                        .map_err(|e| MapError::Network(format!("read: {e}")));
+                        .map_err(|e| MapError::Network(format!("overpass read ({url}): {}", chain(&e))));
                 }
-                // 429 Too Many Requests, 504 Gateway Timeout — back off.
-                if status.as_u16() == 429 || status.as_u16() == 504 {
-                    tracing::warn!(
-                        "overpass {} attempt {}/{} — backing off {:?}",
-                        status, attempt + 1, max_attempts, backoff
-                    );
-                    std::thread::sleep(backoff);
-                    backoff = (backoff * 2).min(max_backoff);
-                    continue;
+                let hint = retry_after(&resp);
+                last = match hint {
+                    Some(d) => format!("HTTP {status} (retry after {}s)", d.as_secs()),
+                    None => format!("HTTP {status}"),
+                };
+                if !matches!(status.as_u16(), 429 | 502 | 503 | 504) {
+                    // A 400 page carries Overpass's complaint about the query.
+                    let body = strip_tags(&resp.text().unwrap_or_default());
+                    let msg = body.find("Error").map_or(&body[..], |i| &body[i..]);
+                    return Err(MapError::Network(format!(
+                        "overpass ({url}): {last}: {}",
+                        msg.chars().take(300).collect::<String>()
+                    )));
                 }
-                return Err(MapError::Network(format!(
-                    "overpass HTTP {status}"
-                )));
+                hint.unwrap_or(backoff)
             }
-            Err(e) if attempt + 1 < max_attempts => {
-                tracing::warn!(
-                    "overpass error attempt {}/{}: {e}; backing off {:?}",
-                    attempt + 1, max_attempts, backoff
-                );
-                std::thread::sleep(backoff);
-                backoff = (backoff * 2).min(max_backoff);
+            Err(e) => {
+                last = chain(&e);
+                backoff
             }
-            Err(e) => return Err(MapError::Network(format!("send: {e}"))),
+        };
+        if attempt == max_attempts {
+            break;
+        }
+        tracing::warn!("overpass {last}; attempt {attempt}/{max_attempts}, retrying in {wait:?}");
+        std::thread::sleep(wait);
+        backoff = (backoff * 2).min(max_backoff);
+    }
+    Err(MapError::Network(format!(
+        "overpass ({url}): {last}; gave up after {max_attempts} attempts over {}s. \
+         The public server rate-limits heavy use: wait a minute and retry (responses are cached), \
+         or point MARKI_OVERPASS_URL at another instance",
+        started.elapsed().as_secs()
+    )))
+}
+
+fn strip_tags(s: &str) -> String {
+    let mut out = String::new();
+    let mut in_tag = false;
+    for c in s.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            c if !in_tag => out.push(c),
+            _ => {}
         }
     }
-    Err(MapError::Network("overpass: gave up after retries".into()))
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 /// Block until at least `MIN_INTERVAL` has elapsed since the last
@@ -175,12 +231,16 @@ pub fn search(query: &str, cache_root: &Path) -> Result<Vec<serde_json::Value>, 
             .timeout(Duration::from_secs(10))
             .user_agent(USER_AGENT)
             .build()
-            .map_err(|e| MapError::Network(format!("client: {e}")))?
+            .map_err(|e| MapError::Network(format!("client: {}", chain(&e))))?
             .get(url)
             .send()
-            .and_then(|r| r.error_for_status())
-            .map_err(|e| MapError::Network(format!("nominatim: {e}")))?;
-        let bytes = resp.bytes().map_err(|e| MapError::Network(format!("nominatim: {e}")))?.to_vec();
+            .map_err(|e| MapError::Network(format!("nominatim: {}", chain(&e))))?;
+        let status = resp.status();
+        if !status.is_success() {
+            let hint = retry_after(&resp).map(|d| format!(" (retry after {}s)", d.as_secs())).unwrap_or_default();
+            return Err(MapError::Network(format!("nominatim: HTTP {status}{hint}")));
+        }
+        let bytes = resp.bytes().map_err(|e| MapError::Network(format!("nominatim: {}", chain(&e))))?.to_vec();
         let tmp = cache_file.with_extension("tmp");
         std::fs::write(&tmp, &bytes)?;
         std::fs::rename(&tmp, &cache_file)?;
@@ -622,5 +682,38 @@ mod tests {
         let b = query_key("[out:json];relation(1);out geom;");
         assert_eq!(a, b);
         assert_eq!(a.len(), 16);
+    }
+
+    /// Serve one raw HTTP response per connection: `(status line + headers, body)`.
+    fn fake_server(responses: Vec<(&'static str, &'static str)>) -> String {
+        let l = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/api/interpreter", l.local_addr().unwrap());
+        std::thread::spawn(move || {
+            use std::io::{Read, Write};
+            for (head, body) in responses {
+                let (mut s, _) = l.accept().unwrap();
+                let mut buf = [0u8; 4096];
+                let _ = s.read(&mut buf);
+                let r = format!("{head}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+                let _ = s.write_all(r.as_bytes());
+            }
+        });
+        url
+    }
+
+    #[test]
+    fn rate_limit_is_retried_and_a_bad_query_explains_itself() {
+        // One test so the MARKI_OVERPASS_URL env var isn't raced by another.
+        let url = fake_server(vec![
+            ("HTTP/1.1 429 Too Many Requests\r\nRetry-After: 1", ""),
+            ("HTTP/1.1 200 OK", "{\"elements\":[]}"),
+            ("HTTP/1.1 400 Bad Request", "<p><strong>Error</strong>: line 1: parse error: ';' expected </p>\n"),
+        ]);
+        // SAFETY: only this test touches the variable.
+        unsafe { std::env::set_var("MARKI_OVERPASS_URL", &url) };
+        assert_eq!(http_post("q").unwrap(), b"{\"elements\":[]}");
+        let e = http_post("q").unwrap_err().to_string();
+        assert!(e.contains("HTTP 400") && e.contains("parse error: ';' expected") && e.contains(&url), "{e}");
+        unsafe { std::env::remove_var("MARKI_OVERPASS_URL") };
     }
 }
