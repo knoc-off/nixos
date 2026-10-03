@@ -26,6 +26,27 @@ pub struct Feature<'a> {
     pub faithful: bool,
 }
 
+/// One text label: a resolved lon/lat and its string.
+pub struct Label<'a> {
+    pub at: LonLat,
+    pub text: &'a str,
+}
+
+/// Resolved label styling (theme default + layer override already merged).
+#[derive(Clone)]
+pub struct LabelStyle {
+    pub font_size: f64,
+    pub fill: String,
+    /// Halo (text-outline) colour; empty disables the halo.
+    pub halo: String,
+}
+
+impl Default for LabelStyle {
+    fn default() -> Self {
+        Self { font_size: 11.0, fill: "#222".into(), halo: "#fff".into() }
+    }
+}
+
 /// Per-layer styling resolved from the theme.
 #[derive(Clone, Default)]
 pub struct LayerStyle {
@@ -115,6 +136,8 @@ pub fn compose_layer(
     features: &[Feature<'_>],
     hull_radius_px: f64,
     detail: RenderDetail,
+    labels: &[Label<'_>],
+    label_style: &LabelStyle,
 ) -> String {
     let mut out = String::with_capacity(4096);
     let _ = write!(
@@ -184,8 +207,37 @@ pub fn compose_layer(
         out.push_str("</g>");
     }
 
+    write_labels(&mut out, projector, labels, label_style);
+
     out.push_str("</svg>");
     out
+}
+
+/// Emit labels as SVG `<text>`, each with an optional halo (a stroke
+/// drawn under the fill via `paint-order`, so the label reads over busy
+/// geometry). Anki's own renderer draws these directly -- no font
+/// bundling needed there. The PNG preview path (resvg) needs its own
+/// font loaded to show them; see `marki::raster`.
+fn write_labels(out: &mut String, p: &dyn Projector, labels: &[Label<'_>], style: &LabelStyle) {
+    let font_size = style.font_size;
+    for l in labels {
+        let (x, y) = p.project(l.at);
+        let _ = write!(
+            out,
+            "<text x=\"{x:.1}\" y=\"{y:.1}\" font-size=\"{font_size}\" \
+             font-family=\"sans-serif\" text-anchor=\"middle\" fill=\"{fill}\"",
+            fill = escape_attr(&style.fill),
+        );
+        if !style.halo.is_empty() {
+            let _ = write!(
+                out,
+                " stroke=\"{halo}\" stroke-width=\"{sw}\" paint-order=\"stroke\"",
+                halo = escape_attr(&style.halo),
+                sw = font_size * 0.3,
+            );
+        }
+        let _ = write!(out, ">{}</text>", escape_attr(l.text));
+    }
 }
 
 fn default_role_style(role: &str) -> RoleStyle {
@@ -603,9 +655,26 @@ mod tests {
         };
         let p = Equirectangular::fit(bb, (100.0, 100.0));
         let style = LayerStyle::default();
-        let svg = compose_layer(100, 100, &style, &p, &[], 0.0, RenderDetail::default());
+        let svg = compose_layer(100, 100, &style, &p, &[], 0.0, RenderDetail::default(), &[], &LabelStyle::default());
         assert!(svg.contains("<svg"));
         assert!(svg.contains("</svg>"));
+    }
+
+    #[test]
+    fn labels_render_escaped_with_optional_halo() {
+        let bb = BBox { min_lon: 0.0, min_lat: 0.0, max_lon: 10.0, max_lat: 10.0 };
+        let p = Equirectangular::fit(bb, (100.0, 100.0));
+        let labels = [Label { at: LonLat { lon: 5.0, lat: 5.0 }, text: "A & <B>" }];
+        let draw = |s: &LabelStyle| {
+            compose_layer(100, 100, &LayerStyle::default(), &p, &[], 0.0, RenderDetail::default(), &labels, s)
+        };
+        let svg = draw(&LabelStyle::default());
+        assert!(svg.contains(r#"x="50.0" y="50.0""#), "{svg}");
+        assert!(svg.contains("A &amp; &lt;B&gt;</text>"), "{svg}");
+        assert!(svg.contains(r##"stroke="#fff""##) && svg.contains(r#"paint-order="stroke""#), "{svg}");
+        let plain = draw(&LabelStyle { font_size: 20.0, fill: "red".into(), halo: String::new() });
+        assert!(!plain.contains("stroke="), "empty halo = no outline: {plain}");
+        assert!(plain.contains(r#"font-size="20""#) && plain.contains(r#"fill="red""#), "{plain}");
     }
 
     #[test]
@@ -639,6 +708,8 @@ mod tests {
             }],
             0.0,
             RenderDetail::default(),
+            &[],
+            &LabelStyle::default(),
         );
         assert!(svg.contains("<path"), "{svg}");
         assert!(svg.contains("M"), "{svg}");
@@ -677,7 +748,7 @@ mod tests {
             }],
         };
         let f = [Feature { geom: &g, role: "highlight", faithful: false }];
-        let svg = compose_layer(100, 100, &style, &p, &f, 0.0, RenderDetail::default());
+        let svg = compose_layer(100, 100, &style, &p, &f, 0.0, RenderDetail::default(), &[], &LabelStyle::default());
         assert!(svg.contains("stroke-dasharray=\"6 4\""), "{svg}");
         assert!(svg.contains("stroke-linecap=\"butt\""), "{svg}");
         assert!(svg.contains("opacity=\"0.5\""), "{svg}");
@@ -713,6 +784,8 @@ mod tests {
             &[Feature { geom: &g, role: "hull", faithful: false }],
             12.0,
             RenderDetail::default(),
+            &[],
+            &LabelStyle::default(),
         );
         assert!(svg.contains("<path"), "hull must draw a path: {svg}");
         assert!(!svg.contains("<circle"), "extended hull is not a circle: {svg}");
@@ -751,6 +824,8 @@ mod tests {
             &[Feature { geom: &g, role: "hull", faithful: false }],
             4.0,
             RenderDetail::default(),
+            &[],
+            &LabelStyle::default(),
         );
         // A single closed path spanning both corners of the canvas.
         assert_eq!(svg.matches("<path").count(), 1, "one combined hull: {svg}");
@@ -783,6 +858,8 @@ mod tests {
             &[Feature { geom: &g, role: "hull", faithful: false }],
             12.0,
             RenderDetail::default(),
+            &[],
+            &LabelStyle::default(),
         );
         assert!(svg.contains("<circle"), "single point → circle: {svg}");
         assert!(svg.contains("r=\"12.00\""), "{svg}");
@@ -799,7 +876,7 @@ mod tests {
         let p = Equirectangular::fit(bb, (100.0, 100.0));
         let hull = |g: &Geometry| {
             compose_layer(100, 100, &LayerStyle::default(), &p,
-                &[Feature { geom: g, role: "hull", faithful: false }], 12.0, RenderDetail::default())
+                &[Feature { geom: g, role: "hull", faithful: false }], 12.0, RenderDetail::default(), &[], &LabelStyle::default())
         };
         let line = Geometry::LineString(vec![
             LonLat { lon: 0.0, lat: 0.0 },

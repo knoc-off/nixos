@@ -47,6 +47,10 @@ struct ResolvedLayer<'a> {
     /// which would otherwise re-split the coincident borders shared by
     /// adjacent member units into double lines.
     features: Vec<(Geometry, &'static str, bool, bool)>,
+    /// Resolved label positions (lon/lat, text), same rotation as
+    /// `features` but never clipped or fed into the viewport bbox --
+    /// a label marks a spot on the map, it doesn't define the frame.
+    labels: Vec<(LonLat, String)>,
 }
 
 /// Run the full pipeline for one [`MapSpec`].
@@ -111,6 +115,9 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
         for layer in &mut resolved {
         for (g, _, _, _) in &mut layer.features {
                 unwrap::rotate_geometry(g, central);
+            }
+            for (p, _) in &mut layer.labels {
+                p.lon = unwrap::rotate_lon(p.lon, central);
             }
         }
     }
@@ -242,6 +249,21 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
             }
             None => 0.0,
         };
+        // Label style: theme default, then the layer's own override.
+        let mut label_style = crate::compose::LabelStyle::default();
+        if let Some(ov) = &spec.layers[layer.name].label_style {
+            if let Some(fs) = ov.font_size {
+                label_style.font_size = fs;
+            }
+            if let Some(f) = &ov.fill {
+                label_style.fill = f.clone();
+            }
+            if let Some(h) = &ov.halo {
+                label_style.halo = h.clone();
+            }
+        }
+        let labels: Vec<crate::compose::Label<'_>> =
+            layer.labels.iter().map(|(at, text)| crate::compose::Label { at: *at, text: text.as_str() }).collect();
         let svg = compose_layer(
             render_w,
             render_h,
@@ -250,6 +272,8 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
             &features,
             hull_radius_px,
             detail,
+            &labels,
+            &label_style,
         );
         tracing::trace!(
             layer = %layer.name,
@@ -540,7 +564,18 @@ fn resolve_all_layers<'a>(
             // layer gets styled, since there's no dedicated role for it.
             features.push((g, "highlight", false, false));
         }
-        out.push(ResolvedLayer { name, features });
+        let mut labels = Vec::with_capacity(lspec.labels.len());
+        for l in &lspec.labels {
+            let p = match &l.at {
+                crate::dsl::LabelAt::LonLat([lon, lat]) => LonLat { lon: *lon, lat: *lat },
+                crate::dsl::LabelAt::Ref(r) => {
+                    let bbox = resolve_one(r, cache_root)?.bbox();
+                    LonLat { lon: (bbox.min_lon + bbox.max_lon) / 2.0, lat: (bbox.min_lat + bbox.max_lat) / 2.0 }
+                }
+            };
+            labels.push((p, l.text.clone()));
+        }
+        out.push(ResolvedLayer { name, features, labels });
     }
     Ok(out)
 }
@@ -917,6 +952,7 @@ mod tests {
         vec![ResolvedLayer {
             name: "base",
             features: feats,
+            labels: Vec::new(),
         }]
     }
 
@@ -1172,6 +1208,33 @@ mod tests {
         assert!(render_size(&center_no_span, &[("city", CITY)]).unwrap_err().to_string().contains("span_km"));
         let all_three = format!("[viewport]\nbbox = [13, 52, 14, 53]\ncenter = \"geo/city\"\nspan_km = 3\n{base}");
         assert!(render_size(&all_three, &[("city", CITY)]).unwrap_err().to_string().contains("only one"));
+    }
+
+    #[test]
+    fn labels_sit_at_ref_centres_and_never_widen_the_frame() {
+        let d = std::env::temp_dir().join(format!("marki-labels-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("city.geojson"), CITY).unwrap();
+        let toml = "[layers.base]\nfeatures = [\"geo/city\"]\n\
+                    [layers.names]\nlabels = [{ at = \"geo/city\", text = \"Berlin\" }, { at = [40, 10], text = \"Far\" }]\n\
+                    label_style = { font_size = 14, halo = \"\" }\n";
+        let spec = crate::dsl::parse_map_spec(toml).unwrap();
+        let frag = run(&spec, &d.join("cache"), Some(&d)).unwrap();
+        let names = frag.assets.iter().find(|a| a.filename.ends_with("-names.svg")).unwrap();
+        let svg = String::from_utf8(names.bytes.clone()).unwrap();
+        assert!(svg.contains(">Berlin</text>") && svg.contains(r#"font-size="14""#), "{svg}");
+        assert!(!svg.contains("stroke="), "halo disabled: {svg}");
+        let bbox: [f64; 4] = serde_json::from_value(frag.meta["map"]["bbox"].clone()).unwrap();
+        assert!(bbox[2] < 20.0, "a label must not pull the frame east: {bbox:?}");
+        // The ref label sits at the canvas point of the city's centre.
+        let (w, h) = (frag.meta["map"]["width"].as_f64().unwrap(), frag.meta["map"]["height"].as_f64().unwrap());
+        let bb = BBox { min_lon: bbox[0], min_lat: bbox[1], max_lon: bbox[2], max_lat: bbox[3] };
+        let center_lon = frag.meta["map"]["center_lon"].as_f64().unwrap();
+        let (xp, yp) = crate::project::xy_percent(bb, center_lon, w, h, 13.5, 52.5);
+        let at = format!(r#"x="{:.1}" y="{:.1}""#, xp * w / 100.0, yp * h / 100.0);
+        assert!(svg.contains(&at), "expected {at}: {svg}");
+        assert!(crate::dsl::parse_map_spec("[layers.a]\nlabel_style = { font_size = 0 }\n").is_err());
     }
 
     #[test]

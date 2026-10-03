@@ -106,5 +106,6 @@
 //!   correctly on a cache hit too. No pixels changed; the bump exists
 //!   only so pre-`30` cache entries (missing those fields) re-render
 //!   instead of reporting a zeroed-out bbox.
+//! - `31` — Layers can carry text `labels` (SVG `<text>` with a halo).
 
-pub const RENDER_VERSION_MAP: u32 = 30;
+pub const RENDER_VERSION_MAP: u32 = 31;

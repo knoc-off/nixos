@@ -329,6 +329,12 @@ zoom = ("size = [400, 400]\n[viewport]\ncenter = \"geo/wall-mid\"\nspan_km = 50\
 zr = rpc("tools/call", {"name": "marki_map_render", "arguments": {"source": zoom}})
 assert not zr.get("isError"), zr
 assert "only one" in tool("marki_map_render", {"source": "[viewport]\nbbox = [1,2,3,4]\ncenter = \"geo/wall-mid\"\nspan_km = 1\n[layers.base]\nfeatures = [\"geo/wall-mid\"]\n"}, ok=False)
+# A label layer renders, and its preview differs from the unlabelled map.
+labelled = zoom + "[layers.names]\nreveal = \"none\"\nlabels = [{ at = \"geo/wall-mid\", text = \"WALL WALL\" }]\nlabel_style = { font_size = 40 }\n"
+lr = rpc("tools/call", {"name": "marki_map_render", "arguments": {"source": labelled}})
+assert not lr.get("isError"), lr
+img = lambda r: [c["data"] for c in r["content"] if c["type"] == "image"]
+assert img(lr) and img(lr) != img(zr), "label must show up in the preview"
 err = tool("marki_preview", {"path": "wall.md", "source": wall_card.replace("great-wall", "nope")})["errors"]
 assert "marki_map_define" in str(err), err
 shutil.rmtree(f"{w}/p/.marki/geo")

@@ -307,6 +307,17 @@ pub struct LayerSpec {
     /// selector, no bbox of your own -- the frame supplies it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub osm: Option<String>,
+
+    /// Text labels on this layer: a feature ref or a bare `[lon, lat]`,
+    /// plus the string to draw there. Put labels on their own layer so
+    /// they can be revealed or faded independently of the geometry.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub labels: Vec<LabelSpec>,
+
+    /// Style for this layer's `labels`. Unset fields fall back to the
+    /// built-in default (11px, dark fill, white halo).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label_style: Option<LabelStyle>,
 }
 
 impl LayerSpec {
@@ -384,6 +395,35 @@ pub struct HighlightStyle {
     pub opacity: Option<f64>,
 }
 
+/// One text label: `at` (a feature ref's centre, or a bare `[lon, lat]`)
+/// plus the string to draw there.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct LabelSpec {
+    pub at: LabelAt,
+    pub text: String,
+}
+
+/// Where a label sits: a feature ref (its bbox centre) or an explicit
+/// `[lon, lat]` pair.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum LabelAt {
+    Ref(String),
+    LonLat([f64; 2]),
+}
+
+/// Style for a layer's `labels`. Unset fields fall back to a legible
+/// default: dark text with a white halo, readable over most geometry.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct LabelStyle {
+    pub font_size: Option<f64>,
+    pub fill: Option<String>,
+    /// Halo (text-outline) colour; `""` disables the halo.
+    pub halo: Option<String>,
+}
+
 /// How a layer transitions between front and back of a card.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -427,6 +467,8 @@ pub enum DslError {
     HullRadiusOverMax { radius: f64, max_frac: f64 },
     #[error("bundle: {0}")]
     Bundle(String),
+    #[error("label_style font_size must be > 0 and <= 200 (got {0})")]
+    LabelFontSize(f64),
 }
 
 /// Parse a `map` block body as TOML and validate it.
@@ -461,6 +503,11 @@ pub fn parse_map_spec(src: &str) -> Result<MapSpec, DslError> {
         return Err(DslError::OutOfRange { field: "simplify_px", value: vp.simplify_px });
     }
     for lspec in spec.layers.values() {
+        if let Some(fs) = lspec.label_style.as_ref().and_then(|s| s.font_size) {
+            if !(fs > 0.0 && fs <= 200.0) {
+                return Err(DslError::LabelFontSize(fs));
+            }
+        }
         if let Some(hull) = &lspec.hull {
             if !(0.0..=1.0).contains(&hull.radius) {
                 return Err(DslError::OutOfRange { field: "hull radius", value: hull.radius });

@@ -164,6 +164,33 @@ bundle_key = "S5"
 - Separately, line pieces that meet end to end are joined into one
   path everywhere, so dash patterns run on across OSM way boundaries.
 
+### Labels
+
+Any layer can carry text labels. `at` is a feature ref (placed at its
+bbox centre) or a bare `[lon, lat]`:
+
+```toml
+[layers.names]
+reveal = "fade"                     # e.g. names only on the back
+labels = [
+  { at = "geo/berlin/stations/alex", text = "Alexanderplatz" },
+  { at = [13.37, 52.52], text = "Hbf" },
+]
+label_style = { font_size = 11, fill = "#222", halo = "#fff" }  # defaults; halo = "" turns it off
+```
+
+- Labels never affect framing and are never clipped: a label at a point
+  outside the frame simply isn't visible.
+- A bbox centre can fall outside a curved or ring-shaped area; pass an
+  explicit `[lon, lat]` there.
+- No collision handling: overlapping labels overlap.
+- For layout the DSL can't express (HTML/CSS labels, leader lines,
+  dropping labels that collide), overlay HTML in the model instead:
+  `ctx:render("map", src)` returns `map.width/height/bbox` and
+  `xy(lon, lat)` giving canvas percentages, so
+  `<span style="left:{x}%;top:{y}%">` over the map's container lines up
+  at any display size.
+
 ## Project defaults & path rules
 
 A marki project can set DSL defaults for every `map` block in its

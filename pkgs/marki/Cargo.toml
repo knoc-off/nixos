@@ -16,8 +16,9 @@ license = "MIT"
 authors = ["knoff"]
 
 [workspace.dependencies]
-# No text/fonts: marki's SVGs (maps, typst) draw glyphs as paths.
-resvg = { version = "0.48", default-features = false }
+# Text only, no system fonts: map labels are real <text>, so the PNG
+# preview loads one embedded font (MARKI_FONT, see raster.rs).
+resvg = { version = "0.48", default-features = false, features = ["text"] }
 anyhow = "1"
 blake3 = "1"
 globset = "0.4"

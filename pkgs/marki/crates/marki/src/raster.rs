@@ -57,12 +57,29 @@ pub fn figures(html: &str, assets: &[Asset], back: bool, max_px: u32) -> Vec<Res
         .collect()
 }
 
+/// Parse options with one embedded font standing in for every family, so
+/// map labels (`<text font-family="sans-serif">`) show up in previews.
+/// Anki renders the real SVG with the browser's own fonts.
+static OPTS: LazyLock<usvg::Options<'static>> = LazyLock::new(|| {
+    let mut opts = usvg::Options::default();
+    let db = opts.fontdb_mut();
+    db.load_font_data(include_bytes!(env!("MARKI_FONT")).to_vec());
+    let family = db.faces().next().and_then(|f| f.families.first()).map(|(n, _)| n.clone());
+    if let Some(family) = family {
+        db.set_sans_serif_family(&family);
+        db.set_serif_family(&family);
+        db.set_monospace_family(&family);
+        opts.font_family = family;
+    }
+    opts
+});
+
 /// Draw `svgs` on top of each other (sized by the first) into one PNG.
 pub fn stack_png(svgs: &[&[u8]], max_px: u32) -> Result<Vec<u8>, String> {
-    let opts = usvg::Options::default();
+    let opts = &*OPTS;
     let trees = svgs
         .iter()
-        .map(|b| usvg::Tree::from_data(b, &opts).map_err(|e| format!("svg: {e}")))
+        .map(|b| usvg::Tree::from_data(b, opts).map_err(|e| format!("svg: {e}")))
         .collect::<Result<Vec<_>, _>>()?;
     let size = trees.first().ok_or("no svg")?.size();
     let scale = (max_px as f32 / size.width().max(size.height())).min(1.0);
@@ -122,5 +139,14 @@ mod tests {
         let figs = figures(r#"<img src="x.svg"><img src="photo.png">"#, &[], true, 512);
         assert_eq!(figs.len(), 1);
         assert!(figs[0].as_ref().err().unwrap().contains("x.svg"));
+    }
+
+    #[test]
+    fn text_is_drawn_with_the_embedded_font() {
+        let a = svg("t.svg", r##"<text x="10" y="60" font-size="60" font-family="sans-serif" fill="#000">MMMM</text>"##);
+        let png = stack_png(&[&a.bytes], 200).unwrap();
+        let p = tiny_skia::Pixmap::decode_png(&png).unwrap();
+        let dark = p.pixels().iter().filter(|c| c.red() < 100).count();
+        assert!(dark > 500, "label glyphs should rasterize, got {dark} dark pixels");
     }
 }
