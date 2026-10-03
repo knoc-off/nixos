@@ -1,5 +1,6 @@
-# Anki sync for AnkiDroid over the tailnet; marki pushes markdown cards
-# from /srv/flashcards directly into the served collection file. Caddy
+# Anki sync for AnkiDroid over the tailnet. marki (CLI and MCP service)
+# pushes markdown cards from /srv/flashcards as another sync client of this
+# server, with its own collection copy. Caddy
 # terminates TLS (DNS-01 via caddy-common, no public reachability
 # needed); the sync server itself only listens on loopback.
 #
@@ -8,7 +9,6 @@
 # be Anki's home just because Anki got here first.
 {
   config,
-  lib,
   pkgs,
   self,
   ...
@@ -29,6 +29,10 @@ in
         enable = true;
         cardsDir = "/srv/flashcards";
         user = "tv";
+        # The same account AnkiDroid uses: marki is one more device of tv's.
+        # /srv/flashcards/.marki/config.toml reads it via
+        # MARKI_SYNC_PASSWORD_FILE (see the module).
+        syncPasswordFile = config.sops.secrets."services/anki-sync-server/password".path;
         # For ```typst blocks (typst_binary = "typst" in the cards config).
         extraPackages = [ pkgs.typst ];
         proxy = {
@@ -61,46 +65,6 @@ in
     ];
   };
 
-  # marki (as tv, and the marki MCP service) writes the collection file
-  # directly, so the upstream DynamicUser isolation is replaced by a static
-  # user whose group tv is in. With DynamicUser off, systemd moves the state
-  # out of /var/lib/private (0700 root) back to /var/lib/anki-sync-server.
-  # Group-writable because SQLite creates its -wal/-journal next to the file.
-  users.groups.anki = { };
-  users.users.anki-sync-server = {
-    isSystemUser = true;
-    group = "anki";
-  };
-  users.users.tv.extraGroups = [ "anki" ];
-  systemd.services.anki-sync-server.serviceConfig = {
-    DynamicUser = lib.mkForce false;
-    User = "anki-sync-server";
-    Group = "anki";
-    UMask = "0007";
-    StateDirectoryMode = "0770";
-    # Apply the ownership rule below before every start (as root, `+`).
-    # tmpfiles only runs at boot, so after the DynamicUser -> static switch
-    # the relocated dir stayed nobody:nogroup and the server hit EACCES.
-    ExecStartPre = [
-      "+${config.systemd.package}/bin/systemd-tmpfiles --create --prefix=/var/lib/anki-sync-server"
-    ];
-  };
-
-  # anki-sync-server holds its collection and media.db exclusively locked
-  # while it runs, so marki's push stops it, writes, and starts it again
-  # (`[server]` in /srv/flashcards/.marki/config.toml). Lets tv -- the CLI and
-  # the marki-mcp service -- do exactly that and nothing else.
-  security.polkit.extraConfig = ''
-    polkit.addRule(function(action, subject) {
-      if (action.id == "org.freedesktop.systemd1.manage-units" &&
-          action.lookup("unit") == "anki-sync-server.service" &&
-          ["start", "stop", "restart"].indexOf(action.lookup("verb")) >= 0 &&
-          subject.user == "tv") {
-        return polkit.Result.YES;
-      }
-    });
-  '';
-
   services.caddy.virtualHosts."anki.optiplex.tail.niko.ink" = {
     useACMEHost = "anki.optiplex.tail.niko.ink";
     extraConfig = ''
@@ -108,10 +72,5 @@ in
     '';
   };
 
-  systemd.tmpfiles.rules = [
-    "d /srv/flashcards 0755 tv users -"
-    # One-time fixup of files the DynamicUser era left owned by nobody;
-    # idempotent afterwards.
-    "Z /var/lib/anki-sync-server 0770 anki-sync-server anki -"
-  ];
+  systemd.tmpfiles.rules = [ "d /srv/flashcards 0755 tv users -" ];
 }

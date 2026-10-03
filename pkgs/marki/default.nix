@@ -14,6 +14,15 @@ let
   # map labels; the binary needs no fonts at runtime.
   labelFont = "${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf";
 
+  # Anki's own Python library, which marki runs (crates/marki/src/sync/sync.py)
+  # to sync its collection. From the same nixpkgs as anki-sync-server, so the
+  # client and server speak the same protocol version. The lib output's
+  # site-packages bundles its Python dependencies.
+  ankiPython = pkgs.writeShellScript "marki-anki-python" ''
+    PYTHONNOUSERSITE=true PYTHONPATH=${pkgs.anki.lib}/${pkgs.python3.sitePackages} \
+      exec ${lib.getExe pkgs.python3} "$@"
+  '';
+
   marki = pkgs.rustPlatform.buildRustPackage {
     pname = "marki";
     inherit version;
@@ -32,12 +41,19 @@ let
     cargoTestFlags = [ "--workspace" ];
 
     # reqwest with rustls-tls needs no system OpenSSL; keep nativeBuildInputs minimal.
-    nativeBuildInputs = [ pkgs.pkg-config ];
+    nativeBuildInputs = [
+      pkgs.pkg-config
+      pkgs.makeWrapper
+    ];
 
     MARKI_FONT = labelFont;
 
+    postInstall = ''
+      wrapProgram $out/bin/marki --set-default MARKI_PYTHON ${ankiPython}
+    '';
+
     meta = {
-      description = "One-shot CLI (with optional watch daemon) that syncs a repo of markdown cards directly into an Anki collection file";
+      description = "Syncs a repo of markdown cards into Anki, as an Anki sync client";
       license = lib.licenses.mit;
       mainProgram = "marki";
     };
@@ -52,6 +68,7 @@ let
       NATURAL_EARTH_DATA = "${naturalEarthData}";
       GEOBOUNDARIES_DATA = "${geoBoundariesData}";
       MARKI_FONT = labelFont;
+      MARKI_PYTHON = "${ankiPython}";
       shellHook = ''
         echo "marki dev shell"
         echo "  NATURAL_EARTH_DATA=$NATURAL_EARTH_DATA"

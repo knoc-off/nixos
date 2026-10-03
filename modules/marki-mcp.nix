@@ -1,8 +1,9 @@
 # MCP server for authoring Anki cards with marki (`marki mcp`).
 #
 # Runs as the owner of the cards repo so its file writes and git commits land
-# as that user, and in the collection's group so it can write the collection
-# file that anki-sync-server serves.
+# as that user. marki keeps its own Anki collection in the state directory and
+# syncs it with the Anki sync server named in the repo's `.marki/config.toml`
+# (`[sync]`), like any other Anki device.
 #
 # The server authenticates nobody and only ever listens on loopback. `proxy`
 # puts mcp-auth-proxy in front of it -- the OAuth 2.1 gateway MCP clients
@@ -68,7 +69,7 @@
         cardsDir = mkOption {
           type = types.path;
           example = "/srv/flashcards";
-          description = "The marki repo (contains `.marki/config.toml`, which names the collection).";
+          description = "The marki repo (contains `.marki/config.toml`, whose `[sync]` names the sync server).";
         };
 
         user = mkOption {
@@ -76,10 +77,16 @@
           description = "Owner of `cardsDir`; tools write cards and commit as this user.";
         };
 
-        group = mkOption {
-          type = types.str;
-          default = "anki";
-          description = "Group with write access to the Anki collection directory.";
+        syncPasswordFile = mkOption {
+          type = types.nullOr types.path;
+          default = null;
+          example = literalExpression ''config.sops.secrets."services/anki-sync-server/password".path'';
+          description = ''
+            The sync server password (e.g. a sops secret). Loaded as a systemd
+            credential; its path is exported as `MARKI_SYNC_PASSWORD_FILE`,
+            so the cards config can say
+            `password_file = "''${MARKI_SYNC_PASSWORD_FILE:-~/.config/marki/anki-password}"`.
+          '';
         };
 
         port = mkOption {
@@ -165,22 +172,16 @@
         systemd.services.marki-mcp = {
           description = "marki MCP server";
           wantedBy = [ "multi-user.target" ];
-          after = [
-            "network-online.target"
-            "anki-sync-server.service"
-          ];
+          after = [ "network-online.target" ];
           wants = [ "network-online.target" ];
-          # git for the post-push commit; systemctl for the config's
-          # `[server] stop/start`, which pause anki-sync-server around a push
-          # (the host must let cfg.user do that, e.g. via polkit).
-          path = [
-            pkgs.gitMinimal
-            config.systemd.package
-          ]
-          ++ cfg.extraPackages;
+          # git for the post-push commit.
+          path = [ pkgs.gitMinimal ] ++ cfg.extraPackages;
           environment = {
-            # Renderer cache (map/typst output) goes to the cache dir.
+            # Renderer cache (map/typst output) goes to the cache dir; marki's
+            # collection copy to the state dir (it is re-downloadable, but a
+            # first sync fetches every media file).
             XDG_CACHE_HOME = "%C/marki-mcp";
+            XDG_STATE_HOME = "%S/marki-mcp";
             HOME = "%C/marki-mcp";
             # HOME is the cache dir, so cfg.user's git identity isn't seen;
             # the post-push commits are marki's anyway.
@@ -191,6 +192,9 @@
             # Offline boundary data for ```map blocks.
             NATURAL_EARTH_DATA = "${self.packages.${pkgs.stdenv.hostPlatform.system}.natural-earth-data}";
             GEOBOUNDARIES_DATA = "${self.packages.${pkgs.stdenv.hostPlatform.system}.geoboundaries-data}";
+          }
+          // lib.optionalAttrs (cfg.syncPasswordFile != null) {
+            MARKI_SYNC_PASSWORD_FILE = "%d/sync-password";
           };
 
           serviceConfig = hardening // {
@@ -199,18 +203,17 @@
             ExecStart = "${getExe cfg.package} mcp --listen 127.0.0.1:${toString cfg.port}";
             WorkingDirectory = cfg.cardsDir;
             User = cfg.user;
-            Group = cfg.group;
-            # The collection's -wal/-journal must stay group-writable.
-            UMask = "0007";
             CacheDirectory = "marki-mcp";
+            StateDirectory = "marki-mcp";
+            StateDirectoryMode = "0700";
+            LoadCredential = lib.optional (
+              cfg.syncPasswordFile != null
+            ) "sync-password:${toString cfg.syncPasswordFile}";
             Restart = "on-failure";
             RestartSec = 5;
-            # Writes only the cards repo, the collection dir, the cache and
-            # /tmp (simulation snapshots).
-            ReadWritePaths = [
-              cfg.cardsDir
-              "/var/lib/anki-sync-server"
-            ];
+            # Writes only the cards repo, its state and cache dirs, and /tmp
+            # (simulation copies).
+            ReadWritePaths = [ cfg.cardsDir ];
           };
         };
 
