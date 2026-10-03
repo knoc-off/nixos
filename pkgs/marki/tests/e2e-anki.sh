@@ -111,6 +111,17 @@ echo "ok: $step"
 
 step="initial push"
 push
+# Written like an Anki client: everything marki added waits for upload.
+py "$w/col.anki2" <<'EOF' || { echo "FAIL: $step (pending usn)"; exit 1; }
+import sys
+from anki.collection import Collection
+col = Collection(sys.argv[1])
+for t in ["notes", "cards"]:
+    assert col.db.scalar(f"select count() from {t} where usn != -1") == 0, t
+assert col.db.scalar("select count() from notetypes where name like 'marki:%' and usn != -1") == 0
+assert col.db.scalar("select usn from col") == 0, "col.usn is the server's, not ours"
+col.close()
+EOF
 review_all
 expect "marki:basic Card ord=0 revlog=1" \
   "marki:cloze Cloze ord=0 revlog=1" "marki:cloze Cloze ord=1 revlog=1" "marki:cloze Cloze ord=2 revlog=1" \

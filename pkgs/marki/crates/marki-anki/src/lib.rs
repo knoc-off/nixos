@@ -1,7 +1,8 @@
 //! Direct-SQLite writer for Anki collections (v18).
 //!
-//! This crate writes into anki-sync-server's collection in *server mode*.
-//! The full write contract lives in `docs/ANKI-SCHEMA.md`; nothing here is
+//! This crate writes a local collection the way an Anki client does:
+//! changed rows are stamped `usn = -1` and reach the server on the next
+//! sync (see [`Collection::transact`]). The full write contract lives in `docs/ANKI-SCHEMA.md`; nothing here is
 //! inferred -- every rule traces back to rslib.
 
 use anyhow::{Context, Result, bail};
@@ -51,6 +52,9 @@ pub mod proto {
 /// The only collection schema version we operate on. We refuse anything
 /// else rather than attempt an upgrade.
 pub const COL_VER: i64 = 18;
+
+/// The usn an Anki client stamps on rows it changed locally: pending upload.
+pub const PENDING_USN: i64 = -1;
 
 /// Register Anki's custom `unicase` collation. Without this even
 /// `SELECT count(*) FROM decks` fails, and any other case-insensitive
@@ -140,7 +144,7 @@ impl Collection {
         Ok(Self { db })
     }
 
-    /// The collection's current USN (server mode reads this from `col`).
+    /// The last server usn this copy synced to (`col.usn`).
     pub fn usn(&self) -> Result<i64> {
         let usn = self
             .db
@@ -191,7 +195,6 @@ impl Collection {
             ("notes without cards", "SELECT count(*) FROM notes WHERE id NOT IN (SELECT nid FROM cards)"),
             ("notes with a missing notetype", "SELECT count(*) FROM notes WHERE mid NOT IN (SELECT id FROM notetypes)"),
             ("cards in a missing deck", "SELECT count(*) FROM cards WHERE did NOT IN (SELECT id FROM decks)"),
-            ("rows with usn -1", "SELECT (SELECT count(*) FROM notes WHERE usn=-1)+(SELECT count(*) FROM cards WHERE usn=-1)+(SELECT count(*) FROM notetypes WHERE usn=-1)+(SELECT count(*) FROM decks WHERE usn=-1)"),
             ("duplicate guids", "SELECT count(*) FROM (SELECT guid FROM notes GROUP BY guid HAVING count(*)>1)"),
         ] {
             let n: i64 = self.db.query_row(sql, [], |r| r.get(0))?;
@@ -424,16 +427,16 @@ impl Collection {
         Ok(out)
     }
 
-    /// Run a batch of mutations inside a single `BEGIN EXCLUSIVE` transaction
-    /// in server-USN mode. Every row written by the closure is stamped with
-    /// the collection's current `usn`; `col.usn` is incremented exactly once
-    /// after the batch, and only if something was actually written. On any
-    /// error the transaction is rolled back and the file is untouched.
+    /// Run a batch of mutations inside a single `BEGIN EXCLUSIVE` transaction,
+    /// the way an Anki client writes: every row written by the closure is
+    /// stamped `usn = -1` ("not uploaded yet"), and the next sync sends
+    /// exactly those. `col.usn` (the last server usn this copy saw) is left
+    /// alone; `col.mod` advances when something was written. On any error the
+    /// transaction is rolled back and the file is untouched.
     pub fn transact<T>(
         &mut self,
         f: impl FnOnce(&mut NoteWriter) -> Result<T>,
     ) -> Result<T> {
-        let usn = self.usn()?;
         let path = PathBuf::from(self.db.path().unwrap_or("collection"));
         let tx = self
             .db
@@ -444,7 +447,7 @@ impl Collection {
         let (out, mutated, schema_changed) = {
             let mut w = NoteWriter {
                 tx: &tx,
-                usn,
+                usn: PENDING_USN,
                 mutated: false,
                 schema_changed: false,
             };
@@ -453,17 +456,10 @@ impl Collection {
         };
 
         if mutated {
-            // increment_usn(): a single bump per sync batch, never per row.
-            // col.mod is what clients compare first: equal mod on both
-            // sides means "no changes" regardless of usn (rslib
-            // sync/collection/meta.rs compared_to_remote), so a write that
-            // leaves it alone is never pulled by a client that already
-            // synced. Strictly increasing, like rslib's finalize_sync.
-            tx.execute(
-                "UPDATE col SET usn = usn + 1, mod = max(mod + 1, ?1)",
-                [now_millis()],
-            )
-            .context("increment col.usn/mod")?;
+            // Sync compares col.mod first: equal on both sides means "no
+            // changes" (rslib sync/collection/meta.rs), so it must move.
+            tx.execute("UPDATE col SET mod = max(mod + 1, ?1)", [now_millis()])
+                .context("advance col.mod")?;
         }
         if schema_changed {
             // scm is only bumped when a notetype's shape changes; doing so
@@ -544,8 +540,8 @@ pub struct RawManagedNote {
     pub flagged: bool,
 }
 
-/// Mutation handle scoped to one `transact` batch. Holds the current server
-/// USN so every write is stamped consistently.
+/// Mutation handle scoped to one `transact` batch. Holds the usn every
+/// write is stamped with ([`PENDING_USN`]).
 pub struct NoteWriter<'a> {
     tx: &'a rusqlite::Transaction<'a>,
     usn: i64,
@@ -575,8 +571,7 @@ impl NoteWriter<'_> {
 
     /// Materialize a marki model as a notetype: insert the `notetypes` row
     /// plus one `fields` row per field and one `templates` row per card.
-    /// Bumps `col.scm` (a shape change) and stamps every row with the current
-    /// server USN. Returns the assigned notetype id.
+    /// Bumps `col.scm` (a shape change) and marks every row pending upload. Returns the assigned notetype id.
     pub fn add_model(&mut self, spec: &notetype::ModelSpec) -> Result<i64> {
         use prost::Message;
 
@@ -1643,13 +1638,12 @@ mod tests {
             .unwrap();
         }
 
-        // Server-mode USN: incremented exactly once for the whole batch.
+        // Client mode: col.usn untouched, every note pending upload.
         let col = Collection::open(&out).unwrap();
-        assert_eq!(col.usn().unwrap(), before_usn + 1);
-        // Every note row now carries the pre-batch USN we stamped.
+        assert_eq!(col.usn().unwrap(), before_usn);
         let stamped: i64 = col
             .db
-            .query_row("SELECT count(*) FROM notes WHERE usn = ?1", [before_usn], |r| {
+            .query_row("SELECT count(*) FROM notes WHERE usn = ?1", [PENDING_USN], |r| {
                 r.get(0)
             })
             .unwrap();
@@ -1754,9 +1748,9 @@ mod tests {
         }
 
         let col = Collection::open(&out).unwrap();
-        // Deck creation is normal data: usn advances, scm does NOT.
+        // Deck creation is normal data: pending upload, scm does NOT move.
         assert_eq!(scm_after, scm_before, "deck creation must not bump scm");
-        assert_eq!(col.usn().unwrap(), usn_before + 1);
+        assert_eq!(col.usn().unwrap(), usn_before);
 
         // Every ancestor exists as its own native-named row.
         for native in [
@@ -2123,12 +2117,12 @@ mod tests {
             0
         );
         // One note grave (type 1) plus one card grave (type 0) per card, all
-        // stamped with the pre-batch USN.
+        // pending upload.
         let note_graves: i64 = col
             .db
             .query_row(
                 "SELECT count(*) FROM graves WHERE oid=?1 AND type=1 AND usn=?2",
-                params![nid, usn_before],
+                params![nid, PENDING_USN],
                 |r| r.get(0),
             )
             .unwrap();
@@ -2137,13 +2131,12 @@ mod tests {
             .db
             .query_row(
                 "SELECT count(*) FROM graves WHERE type=0 AND usn=?1",
-                [usn_before],
+                [PENDING_USN],
                 |r| r.get(0),
             )
             .unwrap();
         assert_eq!(card_graves, card_count);
-        // Server-mode USN: one bump for the whole batch.
-        assert_eq!(col.usn().unwrap(), usn_before + 1);
+        assert_eq!(col.usn().unwrap(), usn_before);
         // Left at `out` for the Check Database gate.
     }
 }
