@@ -98,8 +98,8 @@ impl Collection {
     pub fn open(path: &Path) -> Result<Self> {
         if !path.exists() {
             bail!(
-                "no collection at {}; configure [sync] so the first push downloads it, \
-                 or point `collection` at one Anki created",
+                "no collection at {} yet; `marki push` downloads it from the [sync] \
+                 server, or point `collection` at one Anki created",
                 path.display()
             );
         }
