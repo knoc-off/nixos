@@ -153,23 +153,56 @@ pub fn point_count(g: &Geometry) -> usize {
 
 /// Douglas-Peucker in degrees, doubling the tolerance until the feature
 /// fits [`MAX_POINTS`]. Returns the tolerance used (0 = untouched).
-pub fn simplify_to_budget(g: &mut Geometry) -> f64 {
+///
+/// Every part keeps a minimum (4 per ring, 2 per line), so a feature with
+/// thousands of parts can't fit however coarse the tolerance: once a
+/// tolerance wider than the whole feature leaves it over budget, give up
+/// instead of doubling forever.
+pub fn simplify_to_budget(g: &mut Geometry) -> Result<f64, MapError> {
     let mut eps = 0.0;
     let original = g.clone();
+    let b = original.bbox();
+    let span = (b.max_lon - b.min_lon).max(b.max_lat - b.min_lat);
     while point_count(g) > MAX_POINTS {
+        if eps > span {
+            return Err(MapError::Resolve(format!(
+                "{} points in {} parts can't be simplified under {MAX_POINTS}: narrow the query \
+                 (smaller bbox, stricter tags) or split it into several features",
+                point_count(&original),
+                part_count(&original)
+            )));
+        }
         eps = if eps == 0.0 { 1e-4 } else { eps * 2.0 };
         *g = original.clone();
         simplify_geometry(g, eps);
     }
-    eps
+    Ok(eps)
+}
+
+fn part_count(g: &Geometry) -> usize {
+    match g {
+        Geometry::Point(_) | Geometry::LineString(_) => 1,
+        Geometry::MultiLineString(ls) => ls.len(),
+        Geometry::Polygon { holes, .. } => 1 + holes.len(),
+        Geometry::MultiPolygon(ps) => ps.iter().map(|p| 1 + p.holes.len()).sum(),
+    }
 }
 
 pub(crate) fn simplify_geometry(g: &mut Geometry, eps: f64) {
     let s = |l: &mut Vec<LonLat>, min: usize| {
+        if l.len() <= min {
+            return;
+        }
         let pts: Vec<(f64, f64)> = l.iter().map(|p| (p.lon, p.lat)).collect();
         let out = crate::simplify::simplify(&pts, eps);
         if out.len() >= min {
             *l = out.into_iter().map(|(lon, lat)| LonLat { lon, lat }).collect();
+        } else {
+            // Collapsed below a valid shape: keep `min` evenly spaced points
+            // (first and last included, so a ring stays closed) rather than
+            // the original, or coarser tolerances could keep more points.
+            let n = l.len() - 1;
+            *l = (0..min).map(|i| l[i * n / (min - 1)]).collect();
         }
     };
     match g {
@@ -221,7 +254,7 @@ pub fn define(dir: &Path, name: &str, source: Source<'_>, cache_root: &Path) -> 
         Source::GeoJson(v) => from_geojson(v).map_err(|e| MapError::Resolve(format!("geojson: {e}")))?,
     };
     let before = point_count(&g);
-    let eps = simplify_to_budget(&mut g);
+    let eps = simplify_to_budget(&mut g)?;
     let bbox = g.bbox();
     let body = serde_json::json!({"type": "Feature", "properties": {"name": name}, "geometry": to_geojson(&g)});
     if let Some(d) = dest.parent() {
@@ -329,6 +362,20 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
         std::fs::create_dir_all(&d).unwrap();
         d
+    }
+
+    #[test]
+    fn many_parts_terminate() {
+        // A wiggly 40-point line per part: fits once parts collapse to 2 points.
+        let line = |k: usize| -> Vec<LonLat> {
+            (0..40).map(|i| LonLat { lon: 13.0 + k as f64 * 1e-3 + i as f64 * 1e-5, lat: 52.0 + (i % 2) as f64 * 1e-3 }).collect()
+        };
+        let mut g = Geometry::MultiLineString((0..5_000).map(line).collect());
+        assert!(simplify_to_budget(&mut g).is_ok());
+        assert!(point_count(&g) <= MAX_POINTS);
+        // 12k parts need 24k points at minimum: must error, not spin.
+        let mut g = Geometry::MultiLineString((0..12_000).map(line).collect());
+        assert!(simplify_to_budget(&mut g).unwrap_err().to_string().contains("narrow the query"));
     }
 
     #[test]
