@@ -15,12 +15,14 @@ use tracing_subscriber::EnvFilter;
     name = "marki",
     version,
     about = "Sync a markdown card repo with an Anki collection -- a one-shot CLI (optional watch daemon).",
-    long_about = "marki keeps a directory of markdown flashcards in sync with an Anki \
-collection file (`.anki2`), which it writes directly.\n\nIt is repo-centric: run it from \
+    long_about = "marki keeps a directory of markdown flashcards in sync with Anki. It keeps \
+its own collection (`.anki2`), writes the cards into it, and syncs it with the Anki sync \
+server in `[sync]` like any other Anki device.\n\nIt is repo-centric: run it from \
 inside a flashcard repo and it discovers a hidden `.marki/` directory (git-style, walking up \
 from the current directory) holding the config, models, libraries and media that define your \
 cards. `marki init` scaffolds one.\n\n\
-With no subcommand, marki runs a single `push` (scan -> reconcile -> write) and exits."
+With no subcommand, marki runs a single `push` (pull -> scan -> reconcile -> write -> sync) \
+and exits."
 )]
 struct Cli {
     /// Path to a config file. By default marki discovers the nearest
@@ -33,7 +35,7 @@ struct Cli {
     #[arg(long, global = true)]
     cards_dir: Option<PathBuf>,
 
-    /// Override the Anki collection file (`.anki2`) to write into.
+    /// Override marki's local Anki collection file (`.anki2`).
     #[arg(long, env = "MARKI_COLLECTION", global = true)]
     collection: Option<PathBuf>,
 
@@ -76,8 +78,8 @@ enum Cmd {
         /// flag, nothing is pruned during a cycle that had render errors.
         #[arg(long)]
         prune: bool,
-        /// Push into a throwaway copy of the collection, check the result,
-        /// and report; the real collection and media are not touched.
+        /// Pull, push into a throwaway copy of the collection, check the
+        /// result, and report; nothing is written locally or uploaded.
         #[arg(long)]
         simulate: bool,
     },

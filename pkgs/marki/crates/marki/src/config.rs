@@ -5,9 +5,9 @@
 //! directory that contains it as the *project root*. Cards are the `.md`
 //! files in the project root; everything that defines and renders them —
 //! `config.toml`, `models/`, `lib/`, and `media/` — lives inside `.marki/`,
-//! so a flashcard repo is fully self-contained. The collection it writes to
-//! is a `.anki2` file (with a sibling `media/` dir and `media.db`) named by
-//! the `collection` key.
+//! so a flashcard repo is fully self-contained. marki's own collection is
+//! a `.anki2` file with a sibling `<name>.media/` folder (`collection`
+//! key, default in the state dir), synced with the `[sync]` server.
 //!
 //! Config precedence: `--config` / `$MARKI_CONFIG` win; otherwise the
 //! nearest `.marki/config.toml`; otherwise the legacy global

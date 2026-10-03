@@ -1,14 +1,16 @@
 # marki
 
-Syncs a directory of markdown flashcards straight into an Anki collection file.
-There's no AnkiConnect and no add-on: marki writes `collection.anki2` directly
-through SQLite.
+Syncs a directory of markdown flashcards into Anki. There's no AnkiConnect and
+no add-on: marki is one more Anki device. It keeps its own collection, writes
+cards into it through SQLite the way Anki does, and syncs it with an Anki sync
+server (anki-sync-server, or anything Anki itself syncs with) using Anki's own
+library. Your phone and desktop get the cards on their next sync, and reviews
+made there are never touched.
 
-Anki desktop locks its collection while it's open, so close it before
-`marki push`. anki-sync-server holds its collection and `media.db` locked for
-as long as it runs. `status` and `check` read a copy then, but `push` needs
-`[server]` in the config so marki can stop the server, write, and start it
-again.
+A push pulls the server's changes first, then writes, then syncs back up.
+`status`, `check` and `marki_query` work offline against the copy as of its
+last sync. Without `[sync]`, marki only writes the local collection, which is
+how to write straight into Anki desktop's profile (with Anki closed).
 
 ## Quick start
 
@@ -17,10 +19,11 @@ marki init                  # create .marki/ (config.toml, models/, lib/, media/
 $EDITOR geography/france.md
 marki fmt                   # mint ids, normalize formatting
 marki status                # preview what would change
-marki push                  # write to the collection
+marki push                  # pull, write, sync
 ```
 
-Set `collection` in `.marki/config.toml` first (see [Config](#config)).
+Set `[sync]` in `.marki/config.toml` first (see [Config](#config)). The first
+push downloads the server's collection; later ones only exchange changes.
 
 ## Writing cards
 
@@ -154,7 +157,8 @@ the directory that contains `.marki/`.
 
 | Key             | Default              | Purpose                                                     |
 | --------------- | -------------------- | ----------------------------------------------------------- |
-| `collection`    | none                 | Path to `collection.anki2`. Needed by `push`, `status`, `watch` and `prune` |
+| `sync`          | none                 | `endpoint`, `username` and `password_file` of the Anki sync server. Without it, pushes only write the local collection |
+| `collection`    | state dir            | marki's own collection; media go in the sibling `<name>.media/`. Default `$XDG_STATE_HOME/marki/<repo>-<hash>/collection.anki2` |
 | `cards_dir`     | project root         | Where to look for cards                                     |
 | `models_dir`    | `.marki/models`      | Lua card types                                              |
 | `lib_dir`       | `.marki/lib`         | Shared Lua modules for `require`                            |
@@ -163,18 +167,17 @@ the directory that contains `.marki/`.
 | `map`           | none                 | `[map.defaults]` and `[[map.rules]]` for map blocks, merged under each card's own block |
 | `sync_interval` | `300`                | `watch` heartbeat in seconds, or `"5m"`, `"1h"`, `"1d"`     |
 | `debounce_ms`   | `250`                | How long `watch` waits after a file change                  |
-| `server`        | none                 | `stop` / `start` argv run around a push to release the sync server's locks |
 
 ```toml
-collection = "${ANKI_COLLECTION:-~/.local/share/Anki2/User 1/collection.anki2}"
 typst_binary = "${TYPST_BIN:-typst}"
+
+[sync]
+endpoint = "http://127.0.0.1:27701/"
+username = "me"
+password_file = "${MARKI_SYNC_PASSWORD_FILE:-~/.config/marki/anki-password}"
 
 [media_sources]
 flags = "${HAYLEOX_FLAGS}/share/hayleox-flags"
-
-[server]
-stop = ["systemctl", "stop", "anki-sync-server"]
-start = ["systemctl", "start", "anki-sync-server"]
 
 [[map.rules]]
 match = "geography/**"
@@ -191,13 +194,13 @@ respecting `.gitignore`, and skipping hidden files.
 | ----------------------------- | ------------------------------------------------------------------- |
 | `marki init`                  | Create `.marki/`. Safe to re-run; it never overwrites anything      |
 | `marki fmt`                   | Mint ids and normalize files on disk                                |
-| `marki status`                | Read-only diff: every note that would be added, updated, moved or orphaned |
-| `marki push` (or `marki`)     | One sync: pauses the server, writes media then the collection, restarts it. Stops at the first failed step. Notes whose file is gone are suspended and tagged `marki::orphan` |
+| `marki status`                | Offline diff against the last-synced copy: every note that would be added, updated, moved or orphaned |
+| `marki push` (or `marki`)     | Pull, write media then the collection, sync up. Stops at the first failed step; a failed sync keeps the writes pending for the next push. Notes whose file is gone are suspended and tagged `marki::orphan` |
 | `marki push --prune`          | Same, but deletes orphans outright                                  |
-| `marki push --simulate`       | Push into a throwaway copy, check it, and list what would change; writes nothing |
+| `marki push --simulate`       | Pull, push into a throwaway copy, check it, and list what would change; uploads nothing |
 | `marki mcp`                   | Serve the card-authoring tools over MCP; see [MCP server](#mcp-server) |
 | `marki check`                 | Render every card and check the collection's structure, without writing |
-| `marki prune [--dry-run]`     | Delete notes previously tagged `marki::orphan`                      |
+| `marki prune [--dry-run]`     | Delete notes previously tagged `marki::orphan` (pulls and syncs like a push) |
 | `marki watch`                 | Push on every file change and on the heartbeat interval             |
 | `marki render <file>`         | Write `./out/preview.html` (every card, front and back, with model CSS) and assets, without touching Anki; `--stdout` dumps raw assets |
 
@@ -211,6 +214,11 @@ it uses to detect changes. Leave both alone.
 The files win for tags as they do for fields: a push sets a note's Anki tags
 to exactly its file's tags, so tags added in Anki (including `leech`) are
 dropped. A tag-only edit in a file is a normal update.
+
+Changing a model's card types changes the collection's schema. The push then
+replaces the server's copy with marki's (a full upload, right after pulling,
+so nothing is lost), and other devices download it on their next sync. The
+push report says so (`full_sync_required`).
 
 ## MCP server
 
@@ -249,7 +257,8 @@ The guard rails:
   the `plan_hash` from that simulation, so an agent can't push anything the
   user hasn't seen. After a push the cards repo is committed (if it's a git
   repo).
-- `marki_query` runs one read-only statement on a snapshot.
+- `marki_query` runs one read-only statement on marki's copy of the
+  collection as of its last sync.
 - `marki_delete_card` only removes the file (given its `#id`). The next push
   suspends the note's cards; deleting the note and its reviews needs
   `delete_orphans=true` on both the simulation and the confirm.
@@ -261,7 +270,9 @@ The guard rails:
 The server rereads `.marki/config.toml` when it changes. If the file stops
 parsing, every tool fails with the parse error until it's fixed.
 
-On NixOS, `modules/marki-mcp.nix` runs it as a service.
+On NixOS, `modules/marki-mcp.nix` runs it as a service, with the collection
+in its state directory and the sync password as a credential
+(`MARKI_SYNC_PASSWORD_FILE`).
 
 ## Layout
 
@@ -272,7 +283,7 @@ On NixOS, `modules/marki-mcp.nix` runs it as a service.
 | [`crates/marki-map`](crates/marki-map/README.md) | ` ```map ` blocks                                           |
 | [`crates/marki-media`](crates/marki-media/README.md) | ` ```media ` blocks                                     |
 | [`crates/marki-typst`](crates/marki-typst/README.md) | ` ```typst ` blocks                                     |
-| [`crates/marki-anki`](crates/marki-anki/README.md) | Direct SQLite access to the Anki collection               |
+| [`crates/marki-anki`](crates/marki-anki/README.md) | SQLite access to the Anki collection, writing like an Anki client |
 
 - `models/`: an example Lua card type (`geographic-location`). Copy it into
   your project's `.marki/models/`.
@@ -294,5 +305,10 @@ cards into a collection created by Anki's own library, and checks Check
 Database and review history after each risky change (cloze edits, type
 changes, card renames, reorders and removals). `tests/e2e-mcp.sh` starts
 `marki mcp` and drives every tool over HTTP. `tests/e2e-server.sh` runs a real
-anki-sync-server, pushes through its locks, and syncs a client to check the
-notes and media arrive. All need `cargo build` first.
+anki-sync-server with a second client (a phone) and checks that notes, media
+and deletions reach it and that its reviews survive a card type change. All
+need `cargo build` first.
+
+`marki` runs `crates/marki/src/sync/sync.py` with `$MARKI_PYTHON`, a Python
+that can import Anki's `anki` library. The Nix package and the dev shell set
+it to Anki's library from the same nixpkgs as anki-sync-server.
