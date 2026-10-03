@@ -13,7 +13,6 @@ use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub mod deck;
-pub mod media;
 pub mod notes;
 pub mod notetype;
 

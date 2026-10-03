@@ -335,20 +335,6 @@ impl Config {
         self.collection.clone().map(|p| self.anchor_relative(p))
     }
 
-    /// The `media/` directory beside the collection file, where renderer
-    /// assets are written. `None` when the collection is unconfigured.
-    pub fn media_dir(&self) -> Option<PathBuf> {
-        self.resolved_collection()
-            .and_then(|c| c.parent().map(|p| p.join("media")))
-    }
-
-    /// The server media database (`media.db`) beside the collection file.
-    /// `None` when the collection is unconfigured.
-    pub fn media_db_path(&self) -> Option<PathBuf> {
-        self.resolved_collection()
-            .and_then(|c| c.parent().map(|p| p.join("media.db")))
-    }
-
     /// Resolve a possibly-relative config path against the project root.
     fn anchor_relative(&self, p: PathBuf) -> PathBuf {
         if p.is_absolute() {

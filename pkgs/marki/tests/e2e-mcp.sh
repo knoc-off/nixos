@@ -360,7 +360,7 @@ assert len(gone) == 1 and gone[0] in before and gone[0].endswith("-answer.svg"),
 assert "media_orphans" not in sim and sim["summary"] == {"media_delete": 1}, sim
 done = tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"], "delete_orphans": True})
 assert done["ok"] and "1 unused" in str(done["steps"]), done
-assert not os.path.exists(f"{w}/media/{gone[0]}")
+assert not os.path.exists(f"{w}/col.media/{gone[0]}")
 assert "media_orphans" not in tool("marki_status")
 os.remove(f"{w}/p/wall.md")
 # Suspended (kept) orphans still use their files; deleting the note frees them.

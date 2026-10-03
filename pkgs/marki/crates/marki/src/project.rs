@@ -14,7 +14,6 @@
 
 use anyhow::{Context, Result, bail, ensure};
 use marki_anki::Collection;
-use marki_anki::media::MediaDatabase;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -34,18 +33,16 @@ pub struct Project {
     pub engine: ScriptEngine,
 }
 
-/// Where the collection and its media store live.
+/// Where the collection and its media folder live.
 pub struct Store {
     pub collection: PathBuf,
     pub media_dir: PathBuf,
-    pub media_db: PathBuf,
 }
 
-/// A readable collection plus the media database path to read alongside it.
-/// Either the live files or a snapshot of them (see [`Project::read_view`]).
+/// A readable collection: the live file or a snapshot of it (see
+/// [`Project::read_view`]).
 pub struct View {
     pub col: Collection,
-    pub media_db: PathBuf,
     /// Read from a copy because the live files were locked. May lag the
     /// server's latest write by whatever it had not flushed to disk.
     pub snapshot: bool,
@@ -122,8 +119,7 @@ impl Project {
         let collection = self.cfg.resolved_collection().context(
             "no collection configured; set `collection` in .marki/config.toml or pass --collection",
         )?;
-        let dir = collection.parent().context("collection path has no parent")?;
-        Ok(Store { media_dir: dir.join("media"), media_db: dir.join("media.db"), collection })
+        Ok(Store { media_dir: media_dir_for(&collection), collection })
     }
 
     /// Open the live collection for writing. Fails fast when another process
@@ -135,25 +131,23 @@ impl Project {
     }
 
     /// The collection for reading, without disturbing a running server: the
-    /// live files when nobody holds them, otherwise a copy of the collection
-    /// and `media.db` (with their WAL files, which SQLite replays on open).
+    /// live file when nobody holds it, otherwise a copy (with its WAL,
+    /// which SQLite replays on open).
     pub fn read_view(&self) -> Result<View> {
         let s = self.store()?;
-        if !marki_anki::is_locked(&s.collection) && !marki_anki::is_locked(&s.media_db) {
+        if !marki_anki::is_locked(&s.collection) {
             let col = Collection::open(&s.collection)
                 .with_context(|| format!("open collection {}", s.collection.display()))?;
-            return Ok(View { col, media_db: s.media_db, snapshot: false, _tmp: None });
+            return Ok(View { col, snapshot: false, _tmp: None });
         }
         // ponytail: a plain file copy can tear if the server checkpoints
         // mid-copy; SQLite then either replays a consistent WAL prefix or
         // fails to open, and the next call retries. Fine for reads.
         let tmp = TempDir::new("view")?;
         let col_copy = tmp.path().join("collection.anki2");
-        let media_copy = tmp.path().join("media.db");
         copy_db(&s.collection, &col_copy)?;
-        copy_db(&s.media_db, &media_copy)?;
         let col = Collection::open(&col_copy).context("open collection snapshot")?;
-        Ok(View { col, media_db: media_copy, snapshot: true, _tmp: Some(tmp) })
+        Ok(View { col, snapshot: true, _tmp: Some(tmp) })
     }
 
     /// One scan -> reconcile -> (optionally) write cycle against `col`.
@@ -175,17 +169,17 @@ impl Project {
         )
     }
 
-    /// The full plan against `col` and the media store: models, notes,
-    /// orphans, then media files that are missing or unregistered, then
+    /// The full plan against `col` and the media folder: models, notes,
+    /// orphans, then media files that are missing or different, then
     /// (with `prune`) unused renderer files to delete. Without `prune`
     /// those are only counted in `media_orphans`. A cycle with render
     /// errors never plans deletions: a failed card's files look unused.
-    fn plan_on(&mut self, col: &mut Collection, media_db: &Path, prune: bool) -> Result<Outcome> {
+    fn plan_on(&mut self, col: &mut Collection, prune: bool) -> Result<Outcome> {
         let mut o = self.cycle(col, true, prune)?;
         let media_dir = self.store()?.media_dir;
-        o.changes.extend(media::plan(&o.assets, &media_dir, media_db)?);
+        o.changes.extend(media::plan(&o.assets, &media_dir));
         if o.errors.is_empty() {
-            let unused = media::unused(&o.media_refs, media_db)?;
+            let unused = media::unused(&o.media_refs, &media_dir)?;
             if prune {
                 o.changes.extend(media::delete_changes(&unused));
             } else {
@@ -198,39 +192,28 @@ impl Project {
     /// What a push would change right now (read-only, no simulation).
     pub fn plan(&mut self, prune: bool) -> Result<(Outcome, bool)> {
         let mut v = self.read_view()?;
-        let o = self.plan_on(&mut v.col, &v.media_db, prune)?;
+        let o = self.plan_on(&mut v.col, prune)?;
         Ok((o, v.snapshot))
     }
 
-    /// Run a real push against throwaway copies of the collection and
-    /// `media.db`, then check the copies. Nothing live changes. Also checks
-    /// what the real push needs beyond the data: that the server can be
-    /// paused and the media directory is writable. `plan_hash` fingerprints
+    /// Run a real push against a throwaway copy of the collection, then
+    /// check the copy. Nothing live changes; media files are not written
+    /// (the plan already compared them). Also checks what the real push
+    /// needs beyond the data: that the server can be paused and the media
+    /// folder is writable. `plan_hash` fingerprints
     /// the plan so a later confirmed push can refuse if anything moved on.
     pub fn simulate(&mut self, prune: bool) -> Result<Simulation> {
         let s = self.store()?;
         let mut view = self.read_view()?;
-        let plan = self.plan_on(&mut view.col, &view.media_db, prune)?;
+        let plan = self.plan_on(&mut view.col, prune)?;
         let tmp = TempDir::new("sim")?;
         let col_copy = tmp.path().join("collection.anki2");
-        let media_copy = tmp.path().join("media.db");
         view.col.backup(&col_copy).context("snapshot collection")?;
-        if view.media_db.exists() {
-            MediaDatabase::open_or_create(&view.media_db)?
-                .backup(&media_copy)
-                .context("snapshot media db")?;
-        }
         drop(view);
 
         let mut problems = self.preflight(&s, &plan);
         let mut sim = Collection::open(&col_copy)?;
-        if let Err(e) = media::register(&plan.assets, &media_copy) {
-            problems.push(format!("media db: {e:#}"));
-        }
         let applied = self.cycle(&mut sim, false, prune)?;
-        if let Err(e) = media::delete(&plan.media_deletes(), None, &media_copy) {
-            problems.push(format!("media db: {e:#}"));
-        }
         problems.extend(applied.errors.iter().filter(|e| !plan.errors.contains(e)).cloned());
         problems.extend(sim.check().context("check simulated collection")?);
         Ok(Simulation { plan_hash: plan_hash(&plan), outcome: plan, problems })
@@ -239,8 +222,7 @@ impl Project {
     /// Conditions the real push depends on that a data simulation can't see.
     fn preflight(&self, s: &Store, plan: &Outcome) -> Vec<String> {
         let mut out = Vec::new();
-        let locked = marki_anki::is_locked(&s.collection) || marki_anki::is_locked(&s.media_db);
-        if locked && !self.cfg.server.configured() {
+        if marki_anki::is_locked(&s.collection) && !self.cfg.server.configured() {
             out.push(
                 "the collection is locked by another process (anki-sync-server or Anki \
                  desktop) and no [server] stop/start commands are configured"
@@ -254,7 +236,7 @@ impl Project {
                 out.push(format!("[server] command not found: {bin}"));
             }
         }
-        if !plan.assets.is_empty()
+        if !(plan.assets.is_empty() && plan.media_deletes().is_empty())
             && let Err(e) = writable_dir(&s.media_dir)
         {
             out.push(format!("media dir: {e:#}"));
@@ -272,7 +254,7 @@ impl Project {
         let mut pause = Pause::begin(&self.cfg.server, &s)?;
         let mut col = Collection::open(&s.collection)
             .with_context(|| format!("open collection {}", s.collection.display()))?;
-        let plan = self.plan_on(&mut col, &s.media_db, prune)?;
+        let plan = self.plan_on(&mut col, prune)?;
         let hash = plan_hash(&plan);
         if let Some(expected) = expected {
             ensure!(
@@ -284,7 +266,7 @@ impl Project {
 
         let scm_before = col.scm()?;
         let mut steps = Vec::new();
-        let media_ok = match media::push_all(&plan.assets, &s.media_dir, &s.media_db) {
+        let media_ok = match media::write_files(&plan.assets, &s.media_dir) {
             Ok(n) => {
                 steps.push(Step::ok("media", format!("{} asset(s), {n} file(s) written", plan.assets.len())));
                 true
@@ -304,7 +286,7 @@ impl Project {
                     // Only after the notes stopped naming them.
                     let deletes = plan.media_deletes();
                     if !deletes.is_empty() {
-                        steps.push(match media::delete(&deletes, Some(&s.media_dir), &s.media_db) {
+                        steps.push(match media::delete(&deletes, &s.media_dir) {
                             Ok(n) => Step::ok("media cleanup", format!("{n} unused file(s) deleted")),
                             Err(e) => Step::error("media cleanup", &e),
                         });
@@ -353,7 +335,7 @@ struct Pause {
 
 impl Pause {
     fn begin(server: &ServerConfig, s: &Store) -> Result<Self> {
-        let locked = || marki_anki::is_locked(&s.collection) || marki_anki::is_locked(&s.media_db);
+        let locked = || marki_anki::is_locked(&s.collection);
         if !server.configured() {
             ensure!(
                 !locked(),
@@ -441,6 +423,11 @@ fn copy_db(src: &Path, dst: &Path) -> Result<()> {
         std::fs::copy(wal(src), wal(dst)).with_context(|| format!("copy {}-wal", src.display()))?;
     }
     Ok(())
+}
+
+/// Anki's media folder for a collection: `foo.anki2` -> `foo.media`.
+pub fn media_dir_for(collection: &Path) -> PathBuf {
+    collection.with_extension("media")
 }
 
 /// A scratch directory removed on drop.
@@ -623,8 +610,7 @@ mod tests {
         let server = ServerConfig { stop: sh("stop"), start: sh("start") };
         let store = Store {
             collection: tmp.path().join("none.anki2"),
-            media_dir: tmp.path().join("media"),
-            media_db: tmp.path().join("media.db"),
+            media_dir: tmp.path().join("none.media"),
         };
         {
             let _p = Pause::begin(&server, &store).unwrap();

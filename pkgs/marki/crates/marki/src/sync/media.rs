@@ -1,14 +1,12 @@
-//! Media push into the server-side media store.
+//! Media push into the collection's media folder.
 //!
 //! Renderer-emitted assets (SVGs, audio, etc.) are content-addressed by the
-//! renderer, so we trust the filename verbatim. Each asset is written to the
-//! collection's `media/` directory and recorded in the `media.db` (schema v4)
-//! that sits beside `collection.anki2`, exactly as anki-sync-server keeps it.
-//! A file only reaches clients once it is in *both*: the directory holds the
-//! bytes, the database row is what media sync announces.
+//! renderer, so we trust the filename verbatim. Each asset is written into
+//! `<collection>.media/`, the folder an Anki client keeps beside its
+//! collection; Anki's media sync notices added and removed files on its next
+//! scan and uploads them. No media database is written.
 
 use anyhow::{Context, Result};
-use marki_anki::media::MediaDatabase;
 use marki_render::Asset;
 use regex::Regex;
 use sha1::{Digest, Sha1};
@@ -37,16 +35,18 @@ pub fn referenced_names(html: &str) -> impl Iterator<Item = String> + '_ {
     })
 }
 
-/// Live renderer files in `media.db` that nothing references, sorted.
-pub fn unused(refs: &HashSet<String>, media_db: &Path) -> Result<Vec<String>> {
-    if !media_db.exists() {
-        return Ok(Vec::new());
-    }
-    let db = MediaDatabase::open_or_create(media_db)
-        .with_context(|| format!("open media db {}", media_db.display()))?;
+/// Renderer files in `media_dir` that nothing references, sorted.
+pub fn unused(refs: &HashSet<String>, media_dir: &Path) -> Result<Vec<String>> {
+    let entries = match std::fs::read_dir(media_dir) {
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        r => r.with_context(|| format!("list media dir {}", media_dir.display()))?,
+    };
     let mut out = Vec::new();
-    for p in RENDERER_PREFIXES {
-        out.extend(db.live_names_with_prefix(p)?.into_iter().filter(|n| !refs.contains(n)));
+    for entry in entries {
+        let name = entry?.file_name().to_string_lossy().into_owned();
+        if RENDERER_PREFIXES.iter().any(|p| name.starts_with(p)) && !refs.contains(&name) {
+            out.push(name);
+        }
     }
     out.sort();
     Ok(out)
@@ -67,75 +67,44 @@ pub fn delete_changes(names: &[String]) -> Vec<Change> {
         .collect()
 }
 
-/// Tombstone `names` in `media.db` in one transaction (media sync then
-/// deletes them on clients), then remove the files. A file that fails to
-/// go stays on disk unregistered, which Anki's Check Media reports; the
-/// database is what sync follows.
-pub fn delete(names: &[String], media_dir: Option<&Path>, media_db: &Path) -> Result<usize> {
-    if names.is_empty() {
-        return Ok(0);
-    }
-    let mut db = MediaDatabase::open_or_create(media_db)
-        .with_context(|| format!("open media db {}", media_db.display()))?;
-    db.transact(|w| {
-        for n in names {
-            w.remove_file(n).with_context(|| format!("remove media {n}"))?;
-        }
-        Ok(())
-    })?;
-    if let Some(dir) = media_dir {
-        for n in names {
-            match std::fs::remove_file(dir.join(n)) {
-                Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
-                    tracing::warn!(file = n, "remove media file: {e}");
-                }
-                _ => {}
+/// Remove `names` from the media folder; media sync then deletes them on
+/// the server and other clients. Already-missing files count as removed.
+pub fn delete(names: &[String], media_dir: &Path) -> Result<usize> {
+    for n in names {
+        match std::fs::remove_file(media_dir.join(n)) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+                return Err(e).with_context(|| format!("remove media file {n}"));
             }
+            _ => {}
         }
     }
     Ok(names.len())
 }
 
-/// Assets that are missing from, or differ in, the media store: one
-/// `Media` change each. Reads `media.db` (a snapshot when the live file is
-/// locked -- the caller decides) and the files in `media_dir`.
-pub fn plan(assets: &[Asset], media_dir: &Path, media_db: &Path) -> Result<Vec<Change>> {
-    let db = if media_db.exists() {
-        Some(MediaDatabase::open_or_create(media_db)
-            .with_context(|| format!("open media db {}", media_db.display()))?)
-    } else {
-        None
-    };
+/// Assets missing from, or different in, the media folder: one `Media`
+/// change each.
+pub fn plan(assets: &[Asset], media_dir: &Path) -> Vec<Change> {
     let mut out = Vec::new();
     for a in assets {
-        let csum = Sha1::digest(&a.bytes).to_vec();
-        let registered = match &db {
-            Some(db) => db
-                .entry(&a.filename)?
-                .is_some_and(|(c, size)| size > 0 && c == csum),
-            None => false,
-        };
-        let on_disk = std::fs::read(media_dir.join(&a.filename)).is_ok_and(|b| b == a.bytes);
-        let detail = match (on_disk, registered) {
-            (true, true) => continue,
-            (true, false) => "file present but not registered in media.db",
-            (false, true) => "registered but file missing or different",
-            (false, false) => "new",
+        let detail = match std::fs::read(media_dir.join(&a.filename)) {
+            Ok(b) if b == a.bytes => continue,
+            Ok(_) => "changed",
+            Err(_) => "new",
         };
         out.push(Change {
             kind: ChangeKind::Media,
             id: a.filename.clone(),
             path: None,
             detail: format!("{detail} ({} bytes)", a.bytes.len()),
-            content_hash: hex(&csum),
+            content_hash: hex(&Sha1::digest(&a.bytes)),
             full_sync: false,
         });
     }
     out.sort_by(|a, b| a.id.cmp(&b.id));
-    Ok(out)
+    out
 }
 
-/// Write every asset into the media directory, skipping files that already
+/// Write every asset into the media folder, skipping files that already
 /// hold the same bytes. Returns how many were written.
 pub fn write_files(assets: &[Asset], media_dir: &Path) -> Result<usize> {
     std::fs::create_dir_all(media_dir)
@@ -150,31 +119,6 @@ pub fn write_files(assets: &[Asset], media_dir: &Path) -> Result<usize> {
             .with_context(|| format!("write media file {}", dest.display()))?;
         n += 1;
     }
-    Ok(n)
-}
-
-/// Record every asset in the media database, in one transaction. Unchanged
-/// rows are skipped by the writer, so re-running does not churn usns.
-pub fn register(assets: &[Asset], media_db: &Path) -> Result<()> {
-    let mut db = MediaDatabase::open_or_create(media_db)
-        .with_context(|| format!("open media db {}", media_db.display()))?;
-    db.transact(|w| {
-        for a in assets {
-            w.upsert_file(&a.filename, &a.bytes)
-                .with_context(|| format!("record media {}", a.filename))?;
-        }
-        Ok(())
-    })
-}
-
-/// Files first, then the database: a failure in between leaves at worst
-/// unregistered files, which `plan` reports and the next push registers.
-pub fn push_all(assets: &[Asset], media_dir: &Path, media_db: &Path) -> Result<usize> {
-    if assets.is_empty() {
-        return Ok(0);
-    }
-    let n = write_files(assets, media_dir)?;
-    register(assets, media_db)?;
     Ok(n)
 }
 
@@ -195,31 +139,31 @@ mod tests {
     }
 
     #[test]
-    fn unused_skips_referenced_foreign_and_deleted_files() {
-        let dir = std::env::temp_dir().join(format!("marki-media-unused-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
-        let db_path = dir.join("media.db");
-        let _ = std::fs::remove_file(&db_path);
-        let media = dir.join("media");
-        std::fs::create_dir_all(&media).unwrap();
-        let mut db = MediaDatabase::open_or_create(&db_path).unwrap();
-        db.transact(|w| {
-            for n in ["marki-map-a-base.svg", "marki-map-b-base.svg", "marki-typst-c.svg", "user.png"] {
-                w.upsert_file(n, n.as_bytes())?;
-            }
-            Ok(())
-        })
-        .unwrap();
-        drop(db);
-        std::fs::write(media.join("marki-typst-c.svg"), b"x").unwrap();
+    fn plan_write_unused_delete_round_trip() {
+        let dir = std::env::temp_dir().join(format!("marki-media-rt-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let asset = |n: &str, b: &[u8]| Asset {
+            filename: n.into(),
+            bytes: b.to_vec(),
+            mime: marki_render::AssetMime::SvgXml,
+        };
+        let assets = [asset("marki-map-a-base.svg", b"a"), asset("marki-typst-c.svg", b"c")];
 
+        assert_eq!(plan(&assets, &dir).len(), 2, "missing folder: everything is new");
+        assert_eq!(write_files(&assets, &dir).unwrap(), 2);
+        assert!(plan(&assets, &dir).is_empty(), "written files match");
+        std::fs::write(dir.join("marki-typst-c.svg"), b"old").unwrap();
+        assert_eq!(plan(&assets, &dir)[0].detail, "changed (1 bytes)");
+        write_files(&assets, &dir).unwrap();
+
+        std::fs::write(dir.join("marki-map-b-base.svg"), b"b").unwrap();
+        std::fs::write(dir.join("user.png"), b"u").unwrap();
         let refs: HashSet<String> = ["marki-map-a-base.svg".to_string()].into();
-        let unused = unused(&refs, &db_path).unwrap();
+        let unused = unused(&refs, &dir).unwrap();
         assert_eq!(unused, ["marki-map-b-base.svg", "marki-typst-c.svg"], "user files are never candidates");
-
-        assert_eq!(delete(&unused, Some(&media), &db_path).unwrap(), 2);
-        assert!(!media.join("marki-typst-c.svg").exists());
-        assert!(super::unused(&refs, &db_path).unwrap().is_empty(), "tombstoned files are gone");
+        assert_eq!(delete(&unused, &dir).unwrap(), 2);
+        assert!(super::unused(&refs, &dir).unwrap().is_empty());
+        assert!(dir.join("user.png").exists());
         std::fs::remove_dir_all(&dir).ok();
     }
 }

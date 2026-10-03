@@ -3,9 +3,9 @@
 Reads and writes an Anki collection (`collection.anki2`, schema v18) directly
 with SQLite, instead of going through AnkiConnect or rslib. It reproduces
 Anki's own rules for note fields, checksums, deck names, card generation,
-deletions (graves) and the `media.db` media store. Every write uses the
-server-style USN (update sequence number), so the change syncs to other devices
-like any other edit.
+and deletions (graves). Every changed row is stamped `usn = -1` like an Anki
+client's own edits, so the next sync uploads it. Media are plain files in
+the collection's `.media` folder and need no code here.
 
 Close Anki while this runs. It takes an exclusive lock on the collection.
 
@@ -21,7 +21,6 @@ Close Anki while this runs. It takes an exclusive lock on the collection.
   - `suspend_note_cards`, `add_tag_to_note`
 - `notetype::ModelSpec` describes a note type: its fields, card templates and
   CSS.
-- The `media` module writes files and `media.db` entries.
 
 The only user is `crates/marki/src/sync/engine.rs`.
 
