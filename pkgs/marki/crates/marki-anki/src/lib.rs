@@ -73,33 +73,12 @@ pub(crate) fn locked_hint(e: rusqlite::Error, path: &Path) -> anyhow::Error {
     use rusqlite::ErrorCode::{DatabaseBusy, DatabaseLocked};
     match e.sqlite_error_code() {
         Some(DatabaseBusy | DatabaseLocked) => anyhow::anyhow!(
-            "{} is locked by another process. Anki desktop and \
-             anki-sync-server both hold their databases exclusively for as \
-             long as they run; close Anki, or configure `[server]` stop/start \
-             commands so marki can pause the sync server.",
+            "{} is locked by another process (Anki desktop holds its collection \
+             exclusively while running); close it and retry.",
             path.display()
         ),
         _ => e.into(),
     }
-}
-
-/// Whether another process holds `path` locked right now. Probes with a zero
-/// busy timeout, so it answers immediately. A missing file is not locked.
-pub fn is_locked(path: &Path) -> bool {
-    use rusqlite::ErrorCode::{DatabaseBusy, DatabaseLocked};
-    if !path.exists() {
-        return false;
-    }
-    let Ok(db) = Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY) else {
-        return false;
-    };
-    let _ = db.busy_timeout(std::time::Duration::ZERO);
-    matches!(
-        db.query_row("SELECT count(*) FROM sqlite_master", [], |r| r.get::<_, i64>(0))
-            .err()
-            .and_then(|e| e.sqlite_error_code()),
-        Some(DatabaseBusy | DatabaseLocked)
-    )
 }
 
 /// An open Anki collection, guarded to v18 with the `unicase` collation
@@ -114,20 +93,21 @@ impl Collection {
     ///
     /// Refuses to open a path that doesn't already exist rather than
     /// silently creating an empty (schema-less) SQLite file -- marki never
-    /// creates a collection from scratch; Anki does that on first launch.
+    /// creates a collection from scratch; Anki does that (the first sync, or
+    /// Anki desktop's first launch).
     pub fn open(path: &Path) -> Result<Self> {
         if !path.exists() {
             bail!(
-                "no collection at {}; launch Anki once to create it, or check \
-                 the `collection` path in your config",
+                "no collection at {}; configure [sync] so the first push downloads it, \
+                 or point `collection` at one Anki created",
                 path.display()
             );
         }
         let db = Connection::open(path)
             .with_context(|| format!("open collection {}", path.display()))?;
-        // Only rides out brief contention. Anki desktop and anki-sync-server
-        // hold an exclusive lock for as long as they have the collection
-        // open, so waiting longer never helps; callers pause the server.
+        // Only rides out brief contention (a sync in progress). Anki desktop
+        // holds an exclusive lock for as long as it has the collection open,
+        // so waiting longer never helps.
         db.busy_timeout(std::time::Duration::from_secs(2))
             .context("set busy_timeout")?;
         register_unicase(&db)?;
@@ -159,6 +139,11 @@ impl Collection {
             .query_row("SELECT scm FROM col", [], |r| r.get(0))
             .context("read col.scm")?;
         Ok(scm)
+    }
+
+    /// When this copy last synced (`col.ls`, ms since the epoch); 0 if never.
+    pub fn last_sync_millis(&self) -> Result<i64> {
+        self.db.query_row("SELECT ls FROM col", [], |r| r.get(0)).context("read col.ls")
     }
 
     /// Write a consistent snapshot of the collection to `dest`, intended as the

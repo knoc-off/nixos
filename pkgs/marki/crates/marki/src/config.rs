@@ -46,10 +46,10 @@ pub struct Config {
     #[serde(default)]
     pub lib_dir: Option<PathBuf>,
 
-    /// Path to the Anki collection file (`.anki2`) this repo syncs into.
-    /// Written directly (no AnkiConnect); its sibling `media/` directory and
-    /// `media.db` receive renderer-emitted assets. Relative paths resolve
-    /// against the project root. Required for `push`/`status`/`watch`/`prune`.
+    /// marki's own Anki collection (`.anki2`), a sync client of the server
+    /// in `[sync]`. Its media folder is the sibling `<name>.media/`.
+    /// Relative paths resolve against the project root. Default:
+    /// `$XDG_STATE_HOME/marki/<project dir name>/collection.anki2`.
     #[serde(default)]
     pub collection: Option<PathBuf>,
 
@@ -84,10 +84,15 @@ pub struct Config {
     #[serde(default)]
     pub map: marki_map::MapDefaults,
 
-    /// How to pause the process that owns the collection (anki-sync-server)
-    /// around writes. See [`ServerConfig`].
+    /// The Anki sync server the collection syncs with. Without it, pushes
+    /// only write the local collection. See [`SyncConfig`].
     #[serde(default)]
-    pub server: ServerConfig,
+    pub sync: Option<SyncConfig>,
+
+    /// Removed; present only to reject old configs with a pointer to
+    /// `[sync]` instead of silently ignoring them.
+    #[serde(default)]
+    server: Option<toml::Value>,
 
     /// The `.marki/` directory this config is anchored to (where
     /// `models/`, `lib/`, and `media/` live). Set during discovery; never
@@ -102,26 +107,17 @@ pub struct Config {
     pub project_root: PathBuf,
 }
 
-/// Commands that stop and restart the process owning the collection.
-///
-/// anki-sync-server opens the collection and `media.db` with an exclusive
-/// SQLite lock and keeps them open while it runs, so nothing else can read or
-/// write them. With both commands set, a push runs `stop`, writes, and always
-/// runs `start` afterwards. Reads never pause: they work on a file-level
-/// snapshot. Each command is an argv list (no shell).
-#[derive(Debug, Clone, Default, Deserialize)]
+/// An Anki sync server account. marki syncs its local collection with it
+/// through Anki's own library (see `sync::client`).
+#[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ServerConfig {
-    #[serde(default)]
-    pub stop: Vec<String>,
-    #[serde(default)]
-    pub start: Vec<String>,
-}
-
-impl ServerConfig {
-    pub fn configured(&self) -> bool {
-        !self.stop.is_empty() && !self.start.is_empty()
-    }
+pub struct SyncConfig {
+    /// e.g. `http://127.0.0.1:27701/`.
+    pub endpoint: String,
+    pub username: String,
+    /// File holding the password (trailing whitespace ignored), so the
+    /// secret stays out of the committed config.
+    pub password_file: PathBuf,
 }
 
 fn default_sync_interval() -> Duration {
@@ -179,7 +175,8 @@ impl Default for Config {
             media_sources: Default::default(),
             typst_binary: None,
             map: Default::default(),
-            server: Default::default(),
+            sync: None,
+            server: None,
             anchor_dir: PathBuf::new(),
             project_root: PathBuf::new(),
         }
@@ -268,6 +265,12 @@ impl Config {
         };
         cfg.anchor_dir = disc.anchor_dir.clone();
         cfg.project_root = disc.project_root.clone();
+        anyhow::ensure!(
+            cfg.server.is_none(),
+            "[server] was removed: marki keeps its own collection and syncs it with the \
+             server as a client. Replace it with [sync] endpoint/username/password_file \
+             and drop `collection` unless you want a specific local path"
+        );
         cfg.expand_env()?;
         Ok(cfg)
     }
@@ -291,6 +294,10 @@ impl Config {
         }
         if let Some(p) = self.collection.as_mut() {
             expand_path(p, "collection")?;
+        }
+        if let Some(s) = self.sync.as_mut() {
+            expand_path(&mut s.password_file, "sync.password_file")?;
+            s.endpoint = expand_env_str(&s.endpoint, "sync.endpoint")?;
         }
         for (name, dir) in self.media_sources.iter_mut() {
             let key = format!("media_sources.{name}");
@@ -330,9 +337,18 @@ impl Config {
     }
 
     /// Resolved collection file (`.anki2`), anchored to the project root when
-    /// the configured path is relative. `None` when unconfigured.
+    /// the configured path is relative. Unconfigured, it lives in the state
+    /// dir, keyed by the project's name and path: two repos sharing one copy
+    /// would see each other's notes as orphans.
     pub fn resolved_collection(&self) -> Option<PathBuf> {
-        self.collection.clone().map(|p| self.anchor_relative(p))
+        if let Some(p) = &self.collection {
+            return Some(self.anchor_relative(p.clone()));
+        }
+        let base = dirs::state_dir().or_else(dirs::data_local_dir)?;
+        let root = std::path::absolute(&self.project_root).unwrap_or_else(|_| self.project_root.clone());
+        let name = root.file_name().map_or("cards".into(), |n| n.to_string_lossy().into_owned());
+        let key = &blake3::hash(root.to_string_lossy().as_bytes()).to_hex()[..8];
+        Some(base.join("marki").join(format!("{name}-{key}")).join("collection.anki2"))
     }
 
     /// Resolve a possibly-relative config path against the project root.
@@ -483,22 +499,22 @@ const STARTER_CONFIG: &str = r#"# marki project config — lives in `.marki/`, c
 # Relative paths resolve against that root. Uncomment to override:
 # cards_dir = "cards"
 
-# Path to the Anki collection file (.anki2) this repo syncs into. Written
-# directly -- no AnkiConnect. Its sibling `media/` dir and `media.db` receive
-# rendered assets. Relative paths resolve against the repo root. Pair with
-# env interpolation to keep a volatile profile path out of the committed file:
-# collection = "${ANKI_COLLECTION:-~/.local/share/Anki2/User 1/collection.anki2}"
+# marki keeps its own Anki collection and syncs it with an Anki sync server
+# (anki-sync-server, or any server Anki itself can sync with), exactly like
+# another device would. The password lives in a file, not here:
+# [sync]
+# endpoint      = "http://127.0.0.1:27701/"
+# username      = "me"
+# password_file = "~/.config/marki/anki-password"
+#
+# The local collection defaults to $XDG_STATE_HOME/marki/<repo>-<hash>/.
+# Override it (relative paths resolve against the repo root), e.g. to write
+# into Anki desktop's own profile while Anki is closed and no [sync] is set:
+# collection = "~/.local/share/Anki2/User 1/collection.anki2"
 
 # Path to the `typst` CLI for ```typst``` blocks. Pair with `nix shell`
 # and env interpolation so the volatile /nix/store path isn't committed:
 # typst_binary = "${TYPST_BIN:-typst}"
-
-# anki-sync-server keeps the collection locked while it runs. Give marki
-# commands to pause it around a push (argv lists, no shell). Without these,
-# marki can only write a collection nothing else has open.
-# [server]
-# stop  = ["systemctl", "stop", "anki-sync-server"]
-# start = ["systemctl", "start", "anki-sync-server"]
 
 # Named media sources for ```media``` blocks. The built-in
 # `.marki/media/` directory is always searched FIRST; these add more.
@@ -640,6 +656,29 @@ mod tests {
     }
 
     // ---------- init scaffolder ----------
+
+    #[test]
+    fn sync_section_parses_and_server_is_rejected() {
+        let root = tmp("sync");
+        let anchor = root.join(".marki");
+        std::fs::create_dir_all(&anchor).unwrap();
+        let path = anchor.join("config.toml");
+        let disc = Discovery { config_path: Some(path.clone()), anchor_dir: anchor, project_root: root.clone() };
+
+        std::fs::write(&path, "[sync]\nendpoint = \"http://h/\"\nusername = \"u\"\npassword_file = \"~/pw\"\n").unwrap();
+        let cfg = Config::load(&disc).unwrap();
+        let sync = cfg.sync.as_ref().unwrap();
+        assert_eq!(sync.password_file, dirs::home_dir().unwrap().join("pw"));
+        // Default collection: per project, outside the repo.
+        let col = cfg.resolved_collection().unwrap();
+        assert!(!col.starts_with(&root), "{}", col.display());
+        assert!(col.parent().unwrap().file_name().unwrap().to_string_lossy().starts_with("marki-cfg-sync-"));
+
+        std::fs::write(&path, "[server]\nstop = [\"x\"]\nstart = [\"y\"]\n").unwrap();
+        let err = format!("{:#}", Config::load(&disc).unwrap_err());
+        assert!(err.contains("[sync]"), "{err}");
+        let _ = std::fs::remove_dir_all(&root);
+    }
 
     #[test]
     fn init_creates_layout_idempotently() {

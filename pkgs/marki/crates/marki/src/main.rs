@@ -182,9 +182,10 @@ fn main() -> Result<()> {
         }
         Cmd::Push { prune, simulate: false } => cmd_push(&mut project, prune),
         Cmd::Status => {
-            let (outcome, snapshot) = project.plan(false)?;
-            if snapshot {
-                eprintln!("(read from a snapshot: the collection is held by another process)");
+            let (outcome, age) = project.plan(false)?;
+            match age {
+                Some(s) => eprintln!("(against the local copy, last synced {s}s ago)"),
+                None => eprintln!("(against the local copy, never synced)"),
             }
             print_changes(&project, &outcome);
             for e in &outcome.errors {
@@ -247,13 +248,18 @@ fn apply_cli_overrides(cfg: &mut Config, cli: &Cli) -> Result<()> {
     Ok(())
 }
 
-/// Push, log each step, and fail when any step or card did. Only pauses
-/// the server when there is something to write.
+/// Push, log each step, and fail when any step or card did.
 fn run_push(project: &mut Project, prune: bool) -> Result<()> {
-    let (plan, _) = project.plan(prune)?;
-    if plan.changes.is_empty() && plan.errors.is_empty() {
-        tracing::info!("up to date");
-        return Ok(());
+    // Without a server the local file is the whole truth, so an offline
+    // check can skip the no-op push. With one, always pull: other devices
+    // may have edited marki's notes, and a failed earlier sync may still
+    // have rows pending upload.
+    if project.cfg.sync.is_none() {
+        let (plan, _) = project.plan(prune)?;
+        if plan.changes.is_empty() && plan.errors.is_empty() {
+            tracing::info!("up to date");
+            return Ok(());
+        }
     }
     let pushed = project.push(None, prune)?;
     let o = &pushed.outcome;
@@ -340,6 +346,7 @@ fn cmd_push(project: &mut Project, prune: bool) -> Result<()> {
 fn cmd_prune(project: &Project, dry_run: bool) -> Result<()> {
     use marki::anki::model::{MARKER_TAG, ORPHAN_TAG};
 
+    project.pull().context("pull")?;
     let managed = project.read_view()?.col.managed_notes(MARKER_TAG).context("read managed notes")?;
     let note_ids: Vec<i64> = managed
         .iter()
@@ -356,16 +363,18 @@ fn cmd_prune(project: &Project, dry_run: bool) -> Result<()> {
         return Ok(());
     }
     project
-        .with_paused(|col| {
-            col.transact(|w| {
-                for id in &note_ids {
-                    w.remove_note(*id)?;
-                }
-                Ok(())
-            })
+        .open_collection()?
+        .transact(|w| {
+            for id in &note_ids {
+                w.remove_note(*id)?;
+            }
+            Ok(())
         })
         .context("delete quarantined notes")?;
     println!("prune: deleted {} quarantined note(s)", note_ids.len());
+    if let Some(action) = project.sync_up(false)? {
+        println!("sync: {action}");
+    }
     Ok(())
 }
 

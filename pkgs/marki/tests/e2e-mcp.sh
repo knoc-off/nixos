@@ -14,6 +14,10 @@ site=$(echo "$anki_lib"/lib/python3*/site-packages)
 py() { PYTHONNOUSERSITE=true PYTHONPATH="$site" "$python" - "$@"; }
 
 w=$(mktemp -d)
+# marki runs Anki's library for sync (the Nix wrapper sets this).
+printf '#!/bin/sh\nPYTHONNOUSERSITE=true PYTHONPATH=%s exec %s "$@"\n' "$site" "$python" >"$w/anki-python"
+chmod +x "$w/anki-python"
+export MARKI_PYTHON="$w/anki-python"
 mkdir "$w/p"
 cd "$w/p"
 git init -q . && git config user.email t@t && git config user.name t
@@ -180,7 +184,7 @@ done = tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"]})
 assert done["ok"] and done["kind"] == "push", done
 assert done["full_sync_required"], done  # new note types moved col.scm
 assert {s["name"]: s["status"] for s in done["steps"]} == \
-    {"media": "ok", "collection": "ok", "server": "skipped", "git": "ok"}, done
+    {"pull": "skipped", "media": "ok", "collection": "ok", "sync": "skipped", "git": "ok"}, done
 st = tool("marki_status")
 assert st["ok"] and not st["changes"] and "uncommitted" not in st, st
 assert col.execute("select count() from notes").fetchone()[0] == 3
@@ -212,8 +216,11 @@ assert col.execute("select count() from notes where guid=?", (qid,)).fetchone()[
 
 # Config edits apply without a restart; a broken one fails tools loudly.
 cfg = open(f"{w}/p/.marki/config.toml").read()
-open(f"{w}/p/.marki/config.toml", "w").write(cfg + "\n[server]\nstop = [\"nonexistent-stop\"]\n")
-assert "command not found: nonexistent-stop" in str(tool("marki_push")["problems"])
+open(f"{w}/p/.marki/config.toml", "w").write(
+    cfg + f'\n[sync]\nendpoint = "http://127.0.0.1:9/"\nusername = "u"\npassword_file = "{w}/pw"\n')
+open(f"{w}/pw", "w").write("p")
+err = tool("marki_push", ok=False)
+assert "pull" in err and "127.0.0.1:9" in err, err
 open(f"{w}/p/.marki/config.toml", "w").write(cfg + "\n[broken\n")
 assert "no longer loads" in tool("marki_status", ok=False)
 open(f"{w}/p/.marki/config.toml", "w").write(cfg)

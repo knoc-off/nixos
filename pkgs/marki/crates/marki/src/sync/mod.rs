@@ -1,5 +1,6 @@
 //! Reconciliation: scan the disk, read the collection, apply the diff.
 
+pub mod client;
 pub mod engine;
 pub mod media;
 

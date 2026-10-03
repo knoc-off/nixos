@@ -55,7 +55,9 @@ marki_push without confirm simulates and returns \
 a plan_hash; show the user the planned changes, and only after they agree \
 call marki_push with confirm=true and that plan_hash. Check `ok` and `steps` \
 of the result; never report success when a step says error. marki_status \
-shows anything still pending.
+shows anything still pending, compared offline against marki's copy of the \
+collection as of its last sync (last_sync_secs_ago); push and simulate pull \
+the latest from the sync server first.
 
 Deleting: marki_delete_card removes the file; the next push lists the note \
 as an orphan and suspends its cards. Only with the user's explicit consent \
@@ -89,7 +91,8 @@ ctx:section_html(note, n), not block:html(), or media blocks show as text. \
 Renaming or dropping a card type loses review history unless M.renames maps \
 old->new; dropping needs M.allow_card_removal and the user's consent.
 
-marki_query runs read-only SQL on a snapshot of the collection (tables \
+marki_query runs read-only SQL on marki's copy of the collection as last \
+synced (tables \
 notes, cards, revlog, decks, notetypes); select n.guid to get each card's \
 file path. Flags (cards.flags & 7: 1 red .. 7 purple) usually mean 'fix this \
 card': select distinct n.guid from cards c join notes n on n.id=c.nid where \
@@ -434,12 +437,12 @@ impl Marki {
         self.tool(move |h| h.write_model(&a.name, &a.lua, a.css.as_deref())).await
     }
 
-    #[tool(description = "Everything that is out of sync, read-only and fast: pending model/note/media changes, cards that fail to render (errors), and card files not yet committed (uncommitted). ok=true only when all agree. Does not pause the sync server.")]
+    #[tool(description = "Everything that is out of sync, read-only and fast: pending model/note/media changes, cards that fail to render (errors), and card files not yet committed (uncommitted). ok=true only when all agree. Offline: compares against the local collection as of its last sync (last_sync_secs_ago).")]
     async fn marki_status(&self, Parameters(a): Parameters<StatusArgs>) -> Result<CallToolResult, McpError> {
         self.tool(move |h| Ok(h.status()?.compact(a.detail))).await
     }
 
-    #[tool(description = "Without confirm: simulate the push on copies of the collection and media db, check what the real push needs (server pause, media dir, git), and return a summary (counts per kind and per deck dir), changes, problems and plan_hash. With confirm=true and that plan_hash (after the user agreed): pause the sync server, write media then the collection (stopping at the first failure), restart the server and commit the repo; `steps` reports each part. After a failed step, fix it and push again: pushes are idempotent. detail=true lists every change incl. media files.")]
+    #[tool(description = "Without confirm: pull the latest from the sync server, simulate the push on a copy of the collection, check what the real push needs (media dir, git), and return a summary (counts per kind and per deck dir), changes, problems and plan_hash. With confirm=true and that plan_hash (after the user agreed): pull, write media then the collection (stopping at the first failure), sync up to the server and commit the repo; `steps` reports each part. full_sync_required=true: a card type changed, so the server copy was replaced and other devices must download it on their next sync. After a failed step, fix it and push again: pushes are idempotent. detail=true lists every change incl. media files.")]
     async fn marki_push(&self, Parameters(a): Parameters<PushArgs>) -> Result<CallToolResult, McpError> {
         self.tool(move |h| Ok(h.push(a.confirm, a.plan_hash.as_deref(), a.delete_orphans)?.compact(a.detail))).await
     }
@@ -454,7 +457,7 @@ impl Marki {
         self.tool(move |h| h.move_card(&a.path, &a.new_path, &a.expected_id)).await
     }
 
-    #[tool(description = "Read-only SQL on a snapshot of the Anki collection. A `guid` column gets a `path` column with the card file.")]
+    #[tool(description = "Read-only SQL on marki's copy of the Anki collection as last synced. A `guid` column gets a `path` column with the card file.")]
     async fn marki_query(&self, Parameters(a): Parameters<QueryArgs>) -> Result<CallToolResult, McpError> {
         self.tool(move |h| h.query(&a.sql)).await
     }

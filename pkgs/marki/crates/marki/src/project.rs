@@ -2,29 +2,24 @@
 //! built from it. Shared by the CLI and the MCP server so both drive the
 //! same pipeline.
 //!
-//! Collection access has two modes, because anki-sync-server (and Anki
-//! desktop) hold the collection and `media.db` with an exclusive SQLite lock
-//! for as long as they run:
-//! - reads ([`Project::read_view`]) use the live files when they are free and
-//!   a file-level snapshot when they are locked, so they never disturb the
-//!   server;
-//! - writes ([`Project::push`]) pause the server with the configured
-//!   `[server]` stop/start commands, then write media, then the collection,
-//!   stopping at the first failure, and always restart it.
+//! marki owns a local collection that is a sync client of the `[sync]`
+//! server, like any other Anki device. Reads use the local copy as last
+//! synced; [`Project::simulate`] and [`Project::push`] pull first, and push
+//! syncs its writes back up (see `sync::client`).
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result, ensure};
 use marki_anki::Collection;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 
-use crate::config::{Config, ServerConfig};
+use crate::config::Config;
 use crate::preview::{self, CardPreview};
 use crate::render::Registry;
 use crate::scan::ScannedNote;
 use crate::scan::scan_dir_v2;
 use crate::scripting::context::NoteIndex;
 use crate::scripting::engine::ScriptEngine;
+use crate::sync::client::{self, Mode};
 use crate::sync::{Outcome, RenderedNote, media, reconcile, render_note};
 
 pub struct Project {
@@ -39,15 +34,9 @@ pub struct Store {
     pub media_dir: PathBuf,
 }
 
-/// A readable collection: the live file or a snapshot of it (see
-/// [`Project::read_view`]).
+/// The local collection for reading (see [`Project::read_view`]).
 pub struct View {
     pub col: Collection,
-    /// Read from a copy because the live files were locked. May lag the
-    /// server's latest write by whatever it had not flushed to disk.
-    pub snapshot: bool,
-    // Declared last so the collection closes before its directory goes.
-    _tmp: Option<TempDir>,
 }
 
 /// Outcome of one push step.
@@ -86,7 +75,7 @@ pub struct Pushed {
 
 impl Pushed {
     /// No step failed or was skipped because of a failure, and no note
-    /// failed to render. A step skipped by configuration (no `[server]`)
+    /// failed to render. A step skipped by configuration (no `[sync]`)
     /// is fine.
     pub fn ok(&self) -> bool {
         self.steps.iter().all(|s| s.status != "error")
@@ -116,38 +105,38 @@ impl Project {
     }
 
     pub fn store(&self) -> Result<Store> {
-        let collection = self.cfg.resolved_collection().context(
-            "no collection configured; set `collection` in .marki/config.toml or pass --collection",
-        )?;
+        let collection = self
+            .cfg
+            .resolved_collection()
+            .context("no collection path: set `collection` in .marki/config.toml (no state dir found)")?;
         Ok(Store { media_dir: media_dir_for(&collection), collection })
     }
 
-    /// Open the live collection for writing. Fails fast when another process
-    /// holds it; use [`Project::push`] or [`Project::with_paused`] instead of
-    /// calling this directly when a server may be running.
+    /// Open the local collection (for writing too).
     pub fn open_collection(&self) -> Result<Collection> {
         let path = self.store()?.collection;
         Collection::open(&path).with_context(|| format!("open collection {}", path.display()))
     }
 
-    /// The collection for reading, without disturbing a running server: the
-    /// live file when nobody holds it, otherwise a copy (with its WAL,
-    /// which SQLite replays on open).
+    /// The local collection as of its last sync. Never contacts the server.
     pub fn read_view(&self) -> Result<View> {
+        Ok(View { col: self.open_collection()? })
+    }
+
+    /// Bring the local copy up to date with the server, if one is
+    /// configured. `None` without `[sync]`.
+    pub fn pull(&self) -> Result<Option<String>> {
+        let Some(sync) = &self.cfg.sync else { return Ok(None) };
         let s = self.store()?;
-        if !marki_anki::is_locked(&s.collection) {
-            let col = Collection::open(&s.collection)
-                .with_context(|| format!("open collection {}", s.collection.display()))?;
-            return Ok(View { col, snapshot: false, _tmp: None });
-        }
-        // ponytail: a plain file copy can tear if the server checkpoints
-        // mid-copy; SQLite then either replays a consistent WAL prefix or
-        // fails to open, and the next call retries. Fine for reads.
-        let tmp = TempDir::new("view")?;
-        let col_copy = tmp.path().join("collection.anki2");
-        copy_db(&s.collection, &col_copy)?;
-        let col = Collection::open(&col_copy).context("open collection snapshot")?;
-        Ok(View { col, snapshot: true, _tmp: Some(tmp) })
+        client::sync(sync, &s.collection, Mode::Pull).map(Some)
+    }
+
+    /// Send local writes to the server. `allow_upload`: this process just
+    /// changed the schema, so a full upload is expected (see `sync.py`).
+    pub fn sync_up(&self, allow_upload: bool) -> Result<Option<String>> {
+        let Some(sync) = &self.cfg.sync else { return Ok(None) };
+        let s = self.store()?;
+        client::sync(sync, &s.collection, Mode::Push { allow_upload }).map(Some)
     }
 
     /// One scan -> reconcile -> (optionally) write cycle against `col`.
@@ -189,21 +178,29 @@ impl Project {
         Ok(o)
     }
 
-    /// What a push would change right now (read-only, no simulation).
-    pub fn plan(&mut self, prune: bool) -> Result<(Outcome, bool)> {
+    /// What a push would change against the local copy as last synced
+    /// (offline, no simulation), plus seconds since that sync (`None`:
+    /// never synced).
+    pub fn plan(&mut self, prune: bool) -> Result<(Outcome, Option<i64>)> {
         let mut v = self.read_view()?;
-        let o = self.plan_on(&mut v.col, prune)?;
-        Ok((o, v.snapshot))
+        let ls = v.col.last_sync_millis()?;
+        let age = (ls > 0).then(|| {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_or(0, |d| d.as_millis() as i64);
+            (now - ls).max(0) / 1000
+        });
+        Ok((self.plan_on(&mut v.col, prune)?, age))
     }
 
-    /// Run a real push against a throwaway copy of the collection, then
-    /// check the copy. Nothing live changes; media files are not written
-    /// (the plan already compared them). Also checks what the real push
-    /// needs beyond the data: that the server can be paused and the media
-    /// folder is writable. `plan_hash` fingerprints
-    /// the plan so a later confirmed push can refuse if anything moved on.
+    /// Pull, then run a real push against a throwaway copy of the
+    /// collection and check the copy. Nothing is uploaded; media files are
+    /// not written (the plan already compared them). Also checks that the
+    /// media folder is writable. `plan_hash` fingerprints the plan so a
+    /// later confirmed push can refuse if anything moved on.
     pub fn simulate(&mut self, prune: bool) -> Result<Simulation> {
         let s = self.store()?;
+        self.pull().context("pull")?;
         let mut view = self.read_view()?;
         let plan = self.plan_on(&mut view.col, prune)?;
         let tmp = TempDir::new("sim")?;
@@ -211,7 +208,7 @@ impl Project {
         view.col.backup(&col_copy).context("snapshot collection")?;
         drop(view);
 
-        let mut problems = self.preflight(&s, &plan);
+        let mut problems = preflight(&s, &plan);
         let mut sim = Collection::open(&col_copy)?;
         let applied = self.cycle(&mut sim, false, prune)?;
         problems.extend(applied.errors.iter().filter(|e| !plan.errors.contains(e)).cloned());
@@ -219,39 +216,19 @@ impl Project {
         Ok(Simulation { plan_hash: plan_hash(&plan), outcome: plan, problems })
     }
 
-    /// Conditions the real push depends on that a data simulation can't see.
-    fn preflight(&self, s: &Store, plan: &Outcome) -> Vec<String> {
-        let mut out = Vec::new();
-        if marki_anki::is_locked(&s.collection) && !self.cfg.server.configured() {
-            out.push(
-                "the collection is locked by another process (anki-sync-server or Anki \
-                 desktop) and no [server] stop/start commands are configured"
-                    .into(),
-            );
-        }
-        for argv in [&self.cfg.server.stop, &self.cfg.server.start] {
-            if let Some(bin) = argv.first()
-                && which(bin).is_none()
-            {
-                out.push(format!("[server] command not found: {bin}"));
-            }
-        }
-        if !(plan.assets.is_empty() && plan.media_deletes().is_empty())
-            && let Err(e) = writable_dir(&s.media_dir)
-        {
-            out.push(format!("media dir: {e:#}"));
-        }
-        out
-    }
-
-    /// Push the current cards: pause the server, re-plan against the live
-    /// files, then write media, then the collection -- stopping at the first
-    /// failure -- and always restart the server. With `expected`, refuse
-    /// unless the plan still hashes to it (from [`Project::simulate`]).
-    /// Returns `Err` only when nothing was written.
+    /// Push the current cards: pull, re-plan against the fresh copy,
+    /// write media, then the collection (stopping at the first failure),
+    /// then sync the result up. With `expected`, refuse unless the plan
+    /// still hashes to it (from [`Project::simulate`]). Returns `Err` only
+    /// when nothing was written. A failed final sync leaves the writes
+    /// pending in the local copy (`usn = -1`); the next push sends them.
     pub fn push(&mut self, expected: Option<&str>, prune: bool) -> Result<Pushed> {
         let s = self.store()?;
-        let mut pause = Pause::begin(&self.cfg.server, &s)?;
+        let mut steps = Vec::new();
+        match self.pull().context("pull")? {
+            Some(action) => steps.push(Step::ok("pull", action)),
+            None => steps.push(Step::skipped("pull", "no [sync] configured")),
+        }
         let mut col = Collection::open(&s.collection)
             .with_context(|| format!("open collection {}", s.collection.display()))?;
         let plan = self.plan_on(&mut col, prune)?;
@@ -265,7 +242,6 @@ impl Project {
         }
 
         let scm_before = col.scm()?;
-        let mut steps = Vec::new();
         let media_ok = match media::write_files(&plan.assets, &s.media_dir) {
             Ok(n) => {
                 steps.push(Step::ok("media", format!("{} asset(s), {n} file(s) written", plan.assets.len())));
@@ -304,102 +280,24 @@ impl Project {
         };
         let schema_changed = col.scm()? != scm_before;
         drop(col);
-        steps.push(match pause.resume() {
-            Ok(Some(())) => Step::ok("server", "restarted"),
-            Ok(None) => Step::skipped("server", "no [server] configured"),
-            Err(e) => Step::error("server", &e),
+        steps.push(match self.sync_up(schema_changed) {
+            Ok(Some(action)) => Step::ok("sync", action),
+            Ok(None) => Step::skipped("sync", "no [sync] configured"),
+            Err(e) => Step::error("sync", &e),
         });
         Ok(Pushed { outcome, plan_hash: hash, steps, schema_changed })
     }
-
-    /// Run `f` on the live collection with the server paused.
-    pub fn with_paused<T>(&self, f: impl FnOnce(&mut Collection) -> Result<T>) -> Result<T> {
-        let s = self.store()?;
-        let mut pause = Pause::begin(&self.cfg.server, &s)?;
-        let out = {
-            let mut col = Collection::open(&s.collection)?;
-            f(&mut col)
-        };
-        pause.resume()?;
-        out
-    }
 }
 
-/// Stops the server on [`Pause::begin`] and starts it again on
-/// [`Pause::resume`] or, as a fallback, on drop -- so an early `?` return
-/// can't leave it stopped.
-struct Pause {
-    start: Vec<String>,
-    active: bool,
-}
-
-impl Pause {
-    fn begin(server: &ServerConfig, s: &Store) -> Result<Self> {
-        let locked = || marki_anki::is_locked(&s.collection);
-        if !server.configured() {
-            ensure!(
-                !locked(),
-                "{} is locked by another process; configure [server] stop/start commands so \
-                 marki can pause anki-sync-server, or close Anki",
-                s.collection.display()
-            );
-            return Ok(Self { start: vec![], active: false });
-        }
-        run(&server.stop).context("stop server")?;
-        let mut p = Self { start: server.start.clone(), active: true };
-        let deadline = Instant::now() + Duration::from_secs(10);
-        while locked() {
-            if Instant::now() > deadline {
-                let _ = p.resume();
-                bail!("server stopped but the collection is still locked after 10s");
-            }
-            std::thread::sleep(Duration::from_millis(100));
-        }
-        Ok(p)
+/// Conditions the real push depends on that a data simulation can't see.
+fn preflight(s: &Store, plan: &Outcome) -> Vec<String> {
+    let mut out = Vec::new();
+    if !(plan.assets.is_empty() && plan.media_deletes().is_empty())
+        && let Err(e) = writable_dir(&s.media_dir)
+    {
+        out.push(format!("media dir: {e:#}"));
     }
-
-    /// `Some` when a server was restarted, `None` when none is configured.
-    fn resume(&mut self) -> Result<Option<()>> {
-        if !self.active {
-            return Ok(None);
-        }
-        self.active = false;
-        run(&self.start).context("start server")?;
-        Ok(Some(()))
-    }
-}
-
-impl Drop for Pause {
-    fn drop(&mut self) {
-        if let Err(e) = self.resume() {
-            tracing::error!("{e:#}");
-        }
-    }
-}
-
-fn run(argv: &[String]) -> Result<()> {
-    let (bin, args) = argv.split_first().context("empty command")?;
-    let out = std::process::Command::new(bin)
-        .args(args)
-        .output()
-        .with_context(|| format!("run {}", argv.join(" ")))?;
-    ensure!(
-        out.status.success(),
-        "`{}` failed ({}): {}",
-        argv.join(" "),
-        out.status,
-        String::from_utf8_lossy(&out.stderr).trim()
-    );
-    Ok(())
-}
-
-fn which(bin: &str) -> Option<PathBuf> {
-    if bin.contains('/') {
-        return Path::new(bin).exists().then(|| PathBuf::from(bin));
-    }
-    std::env::split_paths(&std::env::var_os("PATH")?)
-        .map(|d| d.join(bin))
-        .find(|p| p.is_file())
+    out
 }
 
 fn writable_dir(dir: &Path) -> Result<()> {
@@ -407,21 +305,6 @@ fn writable_dir(dir: &Path) -> Result<()> {
     let probe = dir.join(format!(".marki-probe-{}", std::process::id()));
     std::fs::write(&probe, b"").with_context(|| format!("{} is not writable", dir.display()))?;
     let _ = std::fs::remove_file(&probe);
-    Ok(())
-}
-
-/// Copy a SQLite file and its WAL (the WAL holds committed pages not yet
-/// checkpointed). No `-shm`: exclusive-mode servers don't have one, and a
-/// stale one would be wrong for the copy. A missing source is not an error.
-fn copy_db(src: &Path, dst: &Path) -> Result<()> {
-    if !src.exists() {
-        return Ok(());
-    }
-    std::fs::copy(src, dst).with_context(|| format!("copy {}", src.display()))?;
-    let wal = |p: &Path| PathBuf::from(format!("{}-wal", p.display()));
-    if wal(src).exists() {
-        std::fs::copy(wal(src), wal(dst)).with_context(|| format!("copy {}-wal", src.display()))?;
-    }
     Ok(())
 }
 
@@ -600,25 +483,5 @@ mod tests {
         assert_ne!(base, plan_hash(&plan(ChangeKind::Update, "h2", &[])), "edited card must invalidate");
         assert_ne!(base, plan_hash(&plan(ChangeKind::Update, "h1", &["x"])), "new error must invalidate");
         assert_ne!(base, plan_hash(&plan(ChangeKind::Media, "h1", &[])), "media is part of the plan");
-    }
-
-    #[test]
-    fn pause_restarts_on_drop() {
-        let tmp = TempDir::new("pause-test").unwrap();
-        let log = tmp.path().join("log");
-        let sh = |word: &str| vec!["sh".into(), "-c".into(), format!("echo {word} >> {}", log.display())];
-        let server = ServerConfig { stop: sh("stop"), start: sh("start") };
-        let store = Store {
-            collection: tmp.path().join("none.anki2"),
-            media_dir: tmp.path().join("none.media"),
-        };
-        {
-            let _p = Pause::begin(&server, &store).unwrap();
-        }
-        assert_eq!(std::fs::read_to_string(&log).unwrap(), "stop\nstart\n");
-        let mut p = Pause::begin(&server, &store).unwrap();
-        assert_eq!(p.resume().unwrap(), Some(()));
-        drop(p);
-        assert_eq!(std::fs::read_to_string(&log).unwrap(), "stop\nstart\nstop\nstart\n", "no double start");
     }
 }

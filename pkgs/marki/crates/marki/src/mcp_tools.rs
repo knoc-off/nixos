@@ -65,14 +65,18 @@ pub struct PushReport {
     /// For `simulation`: what would go wrong beyond render errors.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub problems: Vec<String>,
-    /// For `push`: media, collection, server, git -- each ok/error/skipped.
+    /// For `push`: pull, media, collection, media cleanup, sync, git --
+    /// each ok/error/skipped.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub steps: Vec<crate::project::Step>,
     /// Card files changed on disk but not committed to git.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub uncommitted: Vec<String>,
-    /// Read from a snapshot because the sync server holds the files.
-    pub snapshot: bool,
+    /// For `status`: seconds since the local collection last synced with
+    /// the server (status compares against that copy, offline). Absent when
+    /// it never synced.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_sync_secs_ago: Option<i64>,
     pub full_sync_required: bool,
 }
 
@@ -581,9 +585,10 @@ impl Handler {
     /// models/notes/media plus uncommitted card files. Clean means all three
     /// agree.
     pub fn status(&mut self) -> Result<PushReport> {
-        let (o, snapshot) = self.project.plan(false)?;
+        let (o, age) = self.project.plan(false)?;
         let uncommitted = git_dirty(self.root())?;
-        let mut r = self.report("status", &o, vec![], String::new(), vec![], snapshot);
+        let mut r = self.report("status", &o, vec![], String::new(), vec![]);
+        r.last_sync_secs_ago = age;
         r.ok = r.ok && r.changes.is_empty() && uncommitted.is_empty();
         r.uncommitted = uncommitted;
         Ok(r)
@@ -598,13 +603,14 @@ impl Handler {
             if let Err(e) = git_usable(self.root()) {
                 problems.push(format!("git: {e:#}"));
             }
-            return Ok(self.report("simulation", &sim.outcome, problems, sim.plan_hash, vec![], false));
+            return Ok(self.report("simulation", &sim.outcome, problems, sim.plan_hash, vec![]));
         }
         let hash = plan_hash.context("confirm requires the plan_hash from a simulation")?;
         let pushed = self.project.push(Some(hash), prune)?;
         let mut steps = pushed.steps.clone();
-        // Commit whenever the collection took the cards, even if a later step
-        // (server restart) failed: the repo should record what Anki now has.
+        // Commit whenever the local collection took the cards, even if the
+        // sync failed: the repo records what marki wrote, and the next push
+        // re-sends the pending rows.
         steps.push(if pushed.collection_written() {
             match git_commit(self.root(), &pushed.outcome) {
                 Ok(Some(msg)) => crate::project::Step::ok("git", msg),
@@ -614,7 +620,7 @@ impl Handler {
         } else {
             crate::project::Step::skipped("git", "collection not written")
         });
-        let mut r = self.report("push", &pushed.outcome, vec![], pushed.plan_hash.clone(), steps, false);
+        let mut r = self.report("push", &pushed.outcome, vec![], pushed.plan_hash.clone(), steps);
         r.full_sync_required = pushed.schema_changed;
         r.ok = pushed.ok() && r.steps.iter().all(|s| s.status != "error");
         Ok(r)
@@ -627,7 +633,6 @@ impl Handler {
         problems: Vec<String>,
         plan_hash: String,
         steps: Vec<crate::project::Step>,
-        snapshot: bool,
     ) -> PushReport {
         use crate::sync::ChangeKind;
         let mut summary = std::collections::BTreeMap::new();
@@ -652,7 +657,7 @@ impl Handler {
             kind,
             ok: o.errors.is_empty() && problems.is_empty(),
             plan_hash,
-            snapshot,
+            last_sync_secs_ago: None,
             uncommitted: vec![],
             full_sync_required: o.changes.iter().any(|c| c.full_sync),
             summary,
@@ -689,7 +694,7 @@ impl Handler {
             .collect())
     }
 
-    /// Read-only SQL over a snapshot of the collection. A `guid` column gets
+    /// Read-only SQL over a copy of the local collection. A `guid` column gets
     /// a sibling `path` column mapping it back to the card file.
     pub fn query(&self, sql: &str) -> Result<serde_json::Value> {
         let view = self.project.read_view()?;
