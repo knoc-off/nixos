@@ -296,9 +296,9 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
         center_lon: central,
         layers: svg_files
             .iter()
-            .map(|(name, _cache_name, _bytes)| SidecarLayer {
+            .map(|(name, _cache_name, bytes)| SidecarLayer {
                 name: name.clone(),
-                filename: layer_media_filename(&key, name),
+                filename: layer_media_filename(bytes, name),
                 reveal: reveals.get(name).copied().unwrap_or(RevealMode::Fade),
             })
             .collect(),
@@ -321,7 +321,7 @@ pub fn run(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Result<
     cache::write_atomic(cache_root, &key, &files)?;
 
     // ---- Build embed + assets.
-    Ok(build_block(&key, render_w, render_h, padded, central, &reveals, &svg_files))
+    Ok(build_block(render_w, render_h, padded, central, &reveals, &svg_files))
 }
 
 /// Pick the largest `(w, h)` within `budget` whose aspect equals
@@ -424,8 +424,6 @@ fn fixed_frame(spec: &MapSpec, cache_root: &Path, geo_dir: Option<&Path>) -> Res
 /// Mercator itself isn't equidistant).
 const KM_PER_DEGREE: f64 = 111.32;
 
-/// Compute the Anki-media filename for one layer. The content-addressed
-/// cache key prevents collisions between cards.
 /// Feature refs of a layer in the order [`resolve_all_layers`] resolves them.
 fn layer_refs(l: &crate::dsl::LayerSpec) -> impl Iterator<Item = &String> {
     l.features.iter().chain(&l.context).chain(&l.highlights).chain(l.hull.iter().flat_map(|h| &h.features))
@@ -509,8 +507,14 @@ fn bundle_lines(spec: &MapSpec, resolved: &mut [ResolvedLayer<'_>], m: &Mercator
     }
 }
 
-fn layer_media_filename(key: &str, layer_name: &str) -> String {
-    format!("marki-map-{key}-{layer_name}.svg")
+/// Media name of one layer, addressed by its own SVG bytes: identical
+/// layers on different cards share one file, and a re-render only renames
+/// the layers whose drawing changed. 16 hex digits keep collisions out of
+/// reach at tens of thousands of files. The layer name is only a readable
+/// suffix.
+pub fn layer_media_filename(svg: &[u8], layer_name: &str) -> String {
+    let hex = blake3::hash(svg).to_hex();
+    format!("marki-map-{}-{layer_name}.svg", &hex.as_str()[..16])
 }
 
 fn resolve_all_layers<'a>(
@@ -850,7 +854,6 @@ fn for_each_vertex(g: &Geometry, f: &mut dyn FnMut(LonLat)) {
 }
 
 fn build_block(
-    key: &str,
     render_w: u32,
     render_h: u32,
     bbox: BBox,
@@ -858,29 +861,25 @@ fn build_block(
     reveals: &BTreeMap<String, RevealMode>,
     svg_files: &[(String, String, Vec<u8>)],
 ) -> Fragment {
-    let media_files: Vec<(String, String)> = svg_files
-        .iter()
-        .map(|(name, _cache_name, _)| (name.clone(), layer_media_filename(key, name)))
-        .collect();
-
-    let layers: Vec<EmbedLayer<'_>> = media_files
-        .iter()
-        .map(|(name, fname)| EmbedLayer {
-            name: name.as_str(),
-            media_filename: fname.as_str(),
-            reveal: reveals.get(name).copied().unwrap_or(RevealMode::Fade),
-        })
-        .collect();
-    let embed = embed_layers(render_w, render_h, &layers);
-
     let assets: Vec<Asset> = svg_files
         .iter()
         .map(|(name, _cache_name, bytes)| Asset {
-            filename: layer_media_filename(key, name),
+            filename: layer_media_filename(bytes, name),
             bytes: bytes.clone(),
             mime: AssetMime::SvgXml,
         })
         .collect();
+
+    let layers: Vec<EmbedLayer<'_>> = svg_files
+        .iter()
+        .zip(&assets)
+        .map(|((name, _, _), a)| EmbedLayer {
+            name: name.as_str(),
+            media_filename: a.filename.as_str(),
+            reveal: reveals.get(name).copied().unwrap_or(RevealMode::Fade),
+        })
+        .collect();
+    let embed = embed_layers(render_w, render_h, &layers);
 
     Fragment {
         html: embed.front_html,
@@ -925,7 +924,6 @@ fn load_from_cache(
         max_lat: parsed.bbox[3],
     };
     Ok(build_block(
-        key,
         parsed.width,
         parsed.height,
         bbox,
@@ -1124,6 +1122,35 @@ mod tests {
     const CITY: &str = r#"{"type":"Polygon","coordinates":[[[13,52],[14,52],[14,53],[13,53],[13,52]]]}"#;
     // A long line far east of the city: auto-framing makes the map wide.
     const LINE: &str = r#"{"type":"LineString","coordinates":[[13.5,52.5],[30,52.5]]}"#;
+
+    #[test]
+    fn layers_are_named_by_content_and_shared_across_maps() {
+        let d = std::env::temp_dir().join(format!("marki-cname-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        std::fs::write(d.join("city.geojson"), CITY).unwrap();
+        std::fs::write(d.join("a.geojson"), r#"{"type":"Point","coordinates":[13.2,52.2]}"#).unwrap();
+        std::fs::write(d.join("b.geojson"), r#"{"type":"Point","coordinates":[13.8,52.8]}"#).unwrap();
+        let map = |pin: &str| {
+            let toml = format!(
+                "[viewport]\nbbox = [13, 52, 14, 53]\n[layers.base]\nfeatures = [\"geo/city\"]\n\
+                 [layers.answer]\nhighlights = [\"geo/{pin}\"]\n"
+            );
+            let spec = crate::dsl::parse_map_spec(&toml).unwrap();
+            let names: Vec<String> =
+                run(&spec, &d.join("cache"), Some(&d)).unwrap().assets.into_iter().map(|a| a.filename).collect();
+            // A cache hit names the files the same way.
+            let again: Vec<String> =
+                run(&spec, &d.join("cache"), Some(&d)).unwrap().assets.into_iter().map(|a| a.filename).collect();
+            assert_eq!(names, again);
+            names
+        };
+        let (a, b) = (map("a"), map("b"));
+        assert_eq!(a[0], b[0], "identical base layers share a file");
+        assert_ne!(a[1], b[1]);
+        assert!(a[0].starts_with("marki-map-") && a[0].ends_with("-base.svg") && a[0].len() == "marki-map--base.svg".len() + 16, "{}", a[0]);
+        std::fs::remove_dir_all(&d).ok();
+    }
 
     #[test]
     fn highlight_widens_auto_frame_but_not_a_fixed_one() {

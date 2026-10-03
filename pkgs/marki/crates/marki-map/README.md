@@ -613,6 +613,10 @@ Three layers of caching keep things fast and offline-friendly:
 1. **Render cache** at `$XDG_CACHE_HOME/marki/render/<key>/`.
    Key = blake3(canonical TOML || theme bytes || `RENDER_VERSION_MAP`).
    On a hit, no resolve / project / compose work runs at all.
+   The Anki media files are named after each layer's own SVG bytes
+   (`marki-map-<16 hex>-<layer>.svg`), not after this key: a layer that
+   is identical on many cards is one media file, and a re-render only
+   adds files for the layers whose drawing actually changed.
 2. **Overpass cache** at `$XDG_CACHE_HOME/marki/net/overpass/`.
    Key = blake3(query string). Entries don't expire.
 3. **Offline boundary bundles** delivered by Nix derivations:

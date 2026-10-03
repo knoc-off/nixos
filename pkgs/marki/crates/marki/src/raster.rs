@@ -15,32 +15,36 @@ pub struct Figure {
     pub png: Vec<u8>,
 }
 
-static IMG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"<img\b[^>]*>"#).unwrap());
+// A map embed opens its container, then one layer <img> per layer; layer
+// filenames are per-layer content hashes, so the container is what groups them.
+static TAG: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"<div class="marki-map"|<img\b[^>]*>"#).unwrap());
 static SRC: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"\bsrc="([^"]+)""#).unwrap());
-static MAP_LAYER: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(marki-map-[0-9a-f]+)-").unwrap());
 
 /// The SVG figures in `html`, in document order, each at most `max_px` on
 /// its long side. `back` shows reveal layers. A figure that appears twice
 /// (the back repeating the front) is drawn once.
 pub fn figures(html: &str, assets: &[Asset], back: bool, max_px: u32) -> Vec<Result<Figure, String>> {
-    // Group consecutive layers of one map; every other SVG is its own figure.
-    let mut stacks: Vec<(Option<String>, Vec<String>)> = Vec::new();
-    for tag in IMG.find_iter(html).map(|m| m.as_str()) {
+    // Layers of one map stack into a figure; every other SVG is its own figure.
+    let mut stacks: Vec<(bool, Vec<String>)> = Vec::new();
+    for tag in TAG.find_iter(html).map(|m| m.as_str()) {
+        if tag.starts_with("<div") {
+            stacks.push((true, Vec::new()));
+            continue;
+        }
         let Some(src) = SRC.captures(tag).map(|c| c[1].to_string()) else { continue };
         if !src.ends_with(".svg") || (!back && tag.contains(r#"data-reveal="fade""#)) {
             continue;
         }
-        let map = MAP_LAYER.captures(&src).map(|c| c[1].to_string());
         match stacks.last_mut() {
-            // A repeated layer means the same map again (front copied onto the back).
-            Some((Some(m), layers)) if map.as_ref() == Some(m) && !layers.contains(&src) => layers.push(src),
-            _ => stacks.push((map, vec![src])),
+            Some((true, layers)) if tag.contains("marki-map-layer") => layers.push(src),
+            _ => stacks.push((false, vec![src])),
         }
     }
     let mut seen = std::collections::HashSet::new();
     stacks
         .into_iter()
-        .filter(|(_, layers)| seen.insert(layers.clone()))
+        .filter(|(_, layers)| !layers.is_empty() && seen.insert(layers.clone()))
         .map(|(_, layers)| {
             let svgs = layers
                 .iter()
@@ -116,11 +120,17 @@ mod tests {
     fn map_layers_stack_and_fade_only_on_the_back() {
         let assets = [
             svg("marki-map-ab12-base.svg", r##"<rect width="200" height="100" fill="#00f"/>"##),
-            svg("marki-map-ab12-answer.svg", r##"<rect width="100" height="100" fill="#f00"/>"##),
+            svg("marki-map-cd34-answer.svg", r##"<rect width="100" height="100" fill="#f00"/>"##),
+            svg("marki-map-ef56-other.svg", r##"<rect width="100" height="100" fill="#0f0"/>"##),
         ];
-        let html = r#"<div class="marki-map"><img data-reveal="none" src="marki-map-ab12-base.svg"><img data-reveal="fade" src="marki-map-ab12-answer.svg"></div>"#;
+        let map = |answer: &str| {
+            format!(
+                r#"<div class="marki-map"><img class="marki-map-layer" data-reveal="none" src="marki-map-ab12-base.svg"><img class="marki-map-layer" data-reveal="fade" src="{answer}"></div>"#
+            )
+        };
+        let html = map("marki-map-cd34-answer.svg");
 
-        let front = figures(html, &assets, false, 512);
+        let front = figures(&html, &assets, false, 512);
         let f = front[0].as_ref().unwrap();
         assert_eq!(f.layers, ["marki-map-ab12-base.svg"]);
         assert_eq!(pixel(&f.png, 10, 10), [0, 0, 255, 255]);
@@ -132,6 +142,12 @@ mod tests {
         assert_eq!(b.layers.len(), 2);
         assert_eq!(pixel(&b.png, 10, 10), [255, 0, 0, 255]);
         assert_eq!(pixel(&b.png, 90, 10), [0, 0, 255, 255], "scaled to 100x50");
+
+        // Two maps sharing a base layer file are still two figures.
+        let two = format!("{html}{}", map("marki-map-ef56-other.svg"));
+        let figs = figures(&two, &assets, true, 100);
+        assert_eq!(figs.len(), 2);
+        assert_eq!(figs[1].as_ref().unwrap().layers, ["marki-map-ab12-base.svg", "marki-map-ef56-other.svg"]);
     }
 
     #[test]
