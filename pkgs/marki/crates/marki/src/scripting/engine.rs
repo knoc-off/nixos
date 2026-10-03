@@ -453,6 +453,79 @@ return M
     }
 
     #[test]
+    fn ctx_notes_filters_sorts_excludes_self_and_is_capped() {
+        use crate::note_parser::parse_note;
+        use crate::render::Registry;
+        use crate::scan::ScannedNote;
+        use crate::scripting::context::{NoteIndex, RenderContext};
+
+        let dir = std::env::temp_dir().join(format!("marki-lua-notes-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("demo.lua"),
+            r#"
+local M = {}
+M.card_names = { "Card" }
+function M.generate(note, ctx)
+  local out = {}
+  for _, n in ipairs(ctx:notes{ tag = "history" }) do
+    out[#out + 1] = n:path() .. "|" .. n:deck() .. "|" .. n:heading(1):text() .. "|" .. tostring(n:tag("date"))
+  end
+  local geo = #ctx:notes{ deck = "Geo" }
+  local ok, err = pcall(function() return ctx:notes{} end)
+  return { CardFront = table.concat(out, ";"), CardBack = geo .. " " .. tostring(ok) .. " " .. tostring(err) }
+end
+return M
+"#,
+        )
+        .unwrap();
+        let root = dir.join("cards");
+        let scanned = |rel: &str, src: &str| {
+            let path = root.join(rel);
+            ScannedNote { note: parse_note(src, path.clone()), path, source: src.into() }
+        };
+        let notes = vec![
+            scanned("hist/b.md", "# Fire\n\n#id(b1) #history #date(1666-09-02)\n"),
+            scanned("hist/a.md", "# Plague\n\n#id(a1) #history #date(1665)\n"),
+            scanned("hist/self.md", "# Me\n\n#id(c1) #history\n"),
+            scanned("hist/draft.md", "# No id\n\n#history\n"),
+            scanned("Geo/Rivers/r.md", "# Rhine\n\n#id(d1)\n"),
+            scanned("Geography/g.md", "# Not Geo\n\n#id(e1)\n"),
+        ];
+        let index = Arc::new(NoteIndex::new(&root, &notes));
+
+        let mut se = ScriptEngine::new(dir.clone(), None);
+        let compiled = se.load_model("demo").unwrap();
+        let me = &notes[2];
+        let ctx = RenderContext::new(Arc::new(Registry::new()), me.path.clone(), dir.join("cache"))
+            .with_index(Some(index));
+        let out = se.execute(&compiled, me.note.clone(), ctx.clone()).unwrap();
+        assert_eq!(
+            out.get("CardFront").unwrap(),
+            "hist/a.md|hist|Plague|1665;hist/b.md|hist|Fire|1666-09-02",
+            "sorted by path, self and unformatted notes excluded"
+        );
+        let back = out.get("CardBack").unwrap();
+        assert!(back.starts_with("1 false "), "deck prefix on :: boundaries: {back}");
+        assert!(back.contains("at least one"), "{back}");
+        assert!(ctx.read_other_notes());
+
+        // Query limit.
+        std::fs::write(
+            dir.join("greedy.lua"),
+            "local M = {}\nM.card_names = { \"Card\" }\nfunction M.generate(note, ctx)\n  for i = 1, 17 do ctx:notes{ tag = \"history\" } end\n  return { CardFront = \"x\" }\nend\nreturn M\n",
+        )
+        .unwrap();
+        let greedy = se.load_model("greedy").unwrap();
+        let ctx = RenderContext::new(Arc::new(Registry::new()), me.path.clone(), dir.join("cache"))
+            .with_index(Some(Arc::new(NoteIndex::new(&root, &notes))));
+        let err = se.execute(&greedy, me.note.clone(), ctx).unwrap_err().to_string();
+        assert!(err.contains("more than 16"), "{err}");
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
     fn ctx_geo_looks_up_any_map_ref() {
         use crate::note_parser::parse_note;
         use crate::render::Registry;

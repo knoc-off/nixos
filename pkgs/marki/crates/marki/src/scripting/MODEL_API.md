@@ -60,6 +60,24 @@ language), and ctx for *output*.
   `country/DEU`, an adm unit, ...) without rendering a map. Use it to
   compute a viewport, a pin position, or a zoom factor from a feature
   instead of an author pasting `bbox`/`center` tags in by hand.
+- `ctx:notes{ model = "history", tag = "event", deck = "History" }` -> list
+  of other notes (any combination of the filters, at least one).
+  - `deck` matches whole deck levels: `History` matches `History` and
+    `History::Europe`, not `Historyish`.
+  - Results come sorted by path. The note being rendered and notes
+    without an `#id` are excluded.
+  - Each result is a read-only copy with the same methods as `note`
+    (`n:heading(1)`, `n:tag("date")`, `n:has_tag("circa")`, `n:id()`), plus
+    `n:path()` (relative to the cards folder) and `n:deck()`.
+  - It is a snapshot of the working tree at render time: what
+    `marki_status` sees.
+  - When another note changes so that this note's output changes, push
+    updates this note too, with detail `dependency`.
+  - Limits: 2000 results per query and 16 queries per `generate`. Query
+    broadly once and filter in Lua.
+  - Source level only: there is no rendered HTML of other notes. You can
+    pass one to `ctx:section_html`, but that renders its blocks, not its
+    model.
 
 ## note
 
@@ -77,6 +95,8 @@ Indices are 1-based. A missing element returns `nil` (for lists, `{}`).
   - `#deck(x)` gives `v:value() == "x"`; `tostring(v)` works too.
 - `note:anki_tags()` -> list of strings. These are the tags Anki will get.
 - `note:id()`, `note:model()`, `note:source()` (raw markdown).
+- `note:path()`, `note:deck()` -> set on notes from `ctx:notes`, `nil` on
+  the note being rendered.
 
 ## block
 

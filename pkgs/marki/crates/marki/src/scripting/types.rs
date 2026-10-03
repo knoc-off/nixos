@@ -67,6 +67,11 @@ impl UserData for Note {
 
         m.add_method("tag", |_, this, name: String| Ok(this.tag(&name).cloned()));
         m.add_method("has_tag", |_, this, name: String| Ok(this.has_tag(&name)));
+
+        // Set on notes returned by `ctx:notes` (path relative to the cards
+        // root, and the deck); `nil` on the note being rendered.
+        m.add_function("path", |_, ud: mlua::AnyUserData| ud.named_user_value::<Option<String>>("path"));
+        m.add_function("deck", |_, ud: mlua::AnyUserData| ud.named_user_value::<Option<String>>("deck"));
     }
 }
 

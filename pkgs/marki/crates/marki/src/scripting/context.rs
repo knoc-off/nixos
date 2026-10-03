@@ -18,17 +18,76 @@
 //!     `{ ref, kind, points, bbox = {w,s,e,n}, center = {lon,lat}, bytes }`,
 //!     so a model can compute a viewport or a pin position instead of an
 //!     author pasting them in by hand.
+//!   * `ctx:notes{ model=, tag=, deck= }` returns read-only copies of other
+//!     notes in the collection (source-level: tags, headings, sections), so
+//!     a note can place itself among others of its kind. Push records that
+//!     the note read others, so it can say an update came from a dependency.
 //!
 //! Assets emitted while a script runs are accumulated here and drained by
 //! the sync engine after `generate()` returns.
 
 use marki_render::{Asset, Input};
 use mlua::{AnyUserData, LuaSerdeExt, UserData, UserDataMethods};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use crate::note::Note;
 use crate::render::Registry;
+use crate::scan::ScannedNote;
+
+/// Most notes one `ctx:notes` query may return.
+pub const MAX_NOTES_PER_QUERY: usize = 2000;
+/// Most `ctx:notes` queries one `generate` call may make.
+pub const MAX_NOTE_QUERIES: usize = 16;
+
+/// Every formatted note in the working tree, as `ctx:notes` sees it.
+/// Built once per scan; sorted by path.
+pub struct NoteIndex {
+    notes: Vec<IndexedNote>,
+}
+
+struct IndexedNote {
+    note: Note,
+    /// Path relative to the cards root, `/`-separated.
+    rel: String,
+    deck: String,
+}
+
+impl NoteIndex {
+    pub fn new(root: &Path, scanned: &[ScannedNote]) -> Self {
+        let mut notes: Vec<IndexedNote> = scanned
+            .iter()
+            .filter(|sn| sn.note.id.is_some())
+            .map(|sn| IndexedNote {
+                note: sn.note.clone(),
+                rel: sn.path.strip_prefix(root).unwrap_or(&sn.path).to_string_lossy().replace('\\', "/"),
+                deck: crate::scan::deck_for_note(root, &sn.note),
+            })
+            .collect();
+        notes.sort_by(|a, b| a.rel.cmp(&b.rel));
+        Self { notes }
+    }
+}
+
+/// A `ctx:notes` filter. At least one field must be set.
+#[derive(Default, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NotesQuery {
+    model: Option<String>,
+    tag: Option<String>,
+    /// Deck prefix on `::` boundaries: `Geo` matches `Geo` and `Geo::Rivers`.
+    deck: Option<String>,
+}
+
+impl NotesQuery {
+    fn matches(&self, n: &IndexedNote) -> bool {
+        self.model.as_ref().is_none_or(|m| &n.note.model == m)
+            && self.tag.as_ref().is_none_or(|t| n.note.has_tag(t))
+            && self.deck.as_ref().is_none_or(|d| {
+                n.deck == *d || n.deck.strip_prefix(d.as_str()).is_some_and(|r| r.starts_with("::"))
+            })
+    }
+}
 
 /// The context object passed to model scripts as `ctx`.
 #[derive(Clone)]
@@ -40,6 +99,10 @@ pub struct RenderContext {
     /// clone (including the one handed to Lua) so the sync engine can
     /// drain them from its own handle after the script returns.
     accumulated_assets: Arc<Mutex<Vec<Asset>>>,
+    index: Option<Arc<NoteIndex>>,
+    /// `ctx:notes` calls so far (for the per-generate limit, and so push
+    /// knows this note's output depends on other notes).
+    note_queries: Arc<Mutex<usize>>,
 }
 
 impl RenderContext {
@@ -49,7 +112,20 @@ impl RenderContext {
             source_path,
             cache_dir,
             accumulated_assets: Arc::new(Mutex::new(Vec::new())),
+            index: None,
+            note_queries: Arc::new(Mutex::new(0)),
         }
+    }
+
+    /// Give `ctx:notes` a collection to query.
+    pub fn with_index(mut self, index: Option<Arc<NoteIndex>>) -> Self {
+        self.index = index;
+        self
+    }
+
+    /// Whether the script read other notes via `ctx:notes`.
+    pub fn read_other_notes(&self) -> bool {
+        *self.note_queries.lock().unwrap() > 0
     }
 
     /// Drain all accumulated assets (called after script execution).
@@ -136,6 +212,47 @@ impl UserData for RenderContext {
                 .call_tool("map", "get", serde_json::json!({"name": r}), &this.source_path, &this.cache_dir)
                 .map_err(|e| mlua::Error::runtime(format!("geo({r}): {e}")))?;
             lua.to_value(&v)
+        });
+
+        // ctx:notes{ model=, tag=, deck= } -> { note, ... } sorted by path
+        m.add_method("notes", |lua, this, filter: mlua::Value| {
+            let q: NotesQuery = lua
+                .from_value(filter)
+                .map_err(|e| mlua::Error::runtime(format!("notes: expected {{ model=, tag=, deck= }}: {e}")))?;
+            if q.model.is_none() && q.tag.is_none() && q.deck.is_none() {
+                return Err(mlua::Error::runtime("notes: give at least one of model, tag, deck"));
+            }
+            let index = this.index.as_ref().ok_or_else(|| {
+                mlua::Error::runtime("notes: no collection here (single-note preview of an unsaved path?)")
+            })?;
+            let hits: Vec<&IndexedNote> = index
+                .notes
+                .iter()
+                .filter(|n| n.note.source_path != this.source_path && q.matches(n))
+                .collect();
+            if hits.len() > MAX_NOTES_PER_QUERY {
+                return Err(mlua::Error::runtime(format!(
+                    "notes: {} matches, over the limit of {MAX_NOTES_PER_QUERY}; narrow the filter",
+                    hits.len()
+                )));
+            }
+            {
+                let mut queries = this.note_queries.lock().unwrap();
+                *queries += 1;
+                if *queries > MAX_NOTE_QUERIES {
+                    return Err(mlua::Error::runtime(format!(
+                        "notes: more than {MAX_NOTE_QUERIES} queries in one generate(); query once and filter in Lua"
+                    )));
+                }
+            }
+            let out = lua.create_table()?;
+            for (i, n) in hits.into_iter().enumerate() {
+                let ud = lua.create_userdata(n.note.clone())?;
+                ud.set_named_user_value("path", n.rel.as_str())?;
+                ud.set_named_user_value("deck", n.deck.as_str())?;
+                out.raw_set(i + 1, ud)?;
+            }
+            Ok(out)
         });
     }
 }

@@ -241,6 +241,35 @@ sim = tool("marki_push")
 assert [(c["kind"], c["detail"]) for c in sim["changes"]] == [("update", "unflag")], sim
 assert tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"]})["ok"]
 assert col.execute("select count() from cards where flags & 7 != 0").fetchone()[0] == 0
+
+# ctx:notes: a timeline note lists other events; adding one updates it as a dependency.
+tl = '''local M = {}
+M.card_names = { "Card" }
+function M.describe() return "timeline" end
+function M.generate(note, ctx)
+  local names = {}
+  for _, n in ipairs(ctx:notes{ tag = "event" }) do names[#names + 1] = n:heading(1):text() end
+  return { CardFront = ctx:section_html(note, 1), CardBack = table.concat(names, ", ") }
+end
+return M'''
+tool("marki_write_model", {"name": "timeline", "lua": tl})
+tool("marki_write_card", {"path": "tl/fire.md", "source": "# Fire\n\n#model(timeline) #event"})
+tool("marki_write_card", {"path": "tl/plague.md", "source": "# Plague\n\n#model(timeline) #event"})
+assert tool("marki_preview", {"path": "tl/fire.md"})["cards"][0]["back"].endswith("Plague"), "preview sees others"
+sim = tool("marki_push")
+assert tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"]})["ok"]
+tool("marki_write_card", {"path": "tl/war.md", "source": "# War\n\n#model(timeline) #event"})
+sim = tool("marki_push", {"detail": True})
+got = sorted((c["path"], c["kind"], c["detail"]) for c in sim["changes"] if c["kind"] != "model")
+assert got == [("tl/fire.md", "update", "dependency"), ("tl/plague.md", "update", "dependency"),
+               ("tl/war.md", "add", "deck tl")], got
+assert tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"]})["ok"]
+assert not tool("marki_push")["changes"], "dependency push is not idempotent"
+import shutil, os
+shutil.rmtree(f"{w}/p/tl")
+os.remove(f"{w}/p/.marki/models/timeline.lua")
+sim = tool("marki_push", {"delete_orphans": True})
+assert tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"], "delete_orphans": True})["ok"]
 col.close()
 
 q = tool("marki_query", {"sql": "select guid, sfld from notes order by sfld"})

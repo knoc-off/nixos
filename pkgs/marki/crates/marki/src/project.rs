@@ -24,6 +24,7 @@ use crate::preview::{self, CardPreview};
 use crate::render::Registry;
 use crate::scan::ScannedNote;
 use crate::scan::scan_dir_v2;
+use crate::scripting::context::NoteIndex;
 use crate::scripting::engine::ScriptEngine;
 use crate::sync::{Outcome, RenderedNote, media, reconcile, render_note};
 
@@ -497,12 +498,18 @@ impl Project {
             source: source.to_string(),
             note: crate::note_parser::parse_note(source, path.to_path_buf()),
         };
+        // ctx:notes sees the saved tree; the note itself (saved or draft)
+        // is excluded by path.
+        let index = scan_dir_v2(&self.cfg.cards_dir)
+            .map(|notes| Arc::new(NoteIndex::new(&self.cfg.cards_dir, &notes)))
+            .ok();
         let note = render_note(
             &sn,
             &mut self.engine,
             &self.registry,
             &render_cache_dir(),
             &self.cfg.resolved_models_dir(),
+            index.as_ref(),
         )?;
         let cards = preview::cards(&note);
         Ok(Preview { note, cards })

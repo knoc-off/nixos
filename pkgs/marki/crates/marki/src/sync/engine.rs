@@ -23,11 +23,13 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::anki::model::{MARKER_TAG, ORPHAN_TAG, full_tag_set, hash_from_tags, strip_marker};
+use crate::anki::model::{
+    MARKER_TAG, ORPHAN_TAG, full_tag_set, hash_from_tags, src_hash_from_tags, strip_marker,
+};
 use crate::note::Note;
 use crate::render::Registry;
 use crate::scan::{ScannedNote, deck_for_note};
-use crate::scripting::context::RenderContext;
+use crate::scripting::context::{NoteIndex, RenderContext};
 use crate::scripting::engine::ScriptEngine;
 
 /// The single card name a basic note's `marki:basic` notetype uses. Its two
@@ -117,6 +119,8 @@ struct Local {
     deck: String,
     assets: Vec<Asset>,
     hash: String,
+    /// See [`RenderedNote::own_hash`].
+    own_hash: Option<String>,
 }
 
 impl Local {
@@ -160,6 +164,10 @@ pub fn reconcile(
     // render failure for a deletion. This is the core data-loss guard.
     let mut seen_source_ids: HashSet<String> = HashSet::new();
 
+    // What `ctx:notes` queries: this same scan, so every note sees one
+    // consistent snapshot of the working tree.
+    let index = Arc::new(NoteIndex::new(root, notes));
+
     for sn in notes {
         let note = &sn.note;
 
@@ -174,7 +182,7 @@ pub fn reconcile(
         // Record the id as present on disk regardless of what happens next.
         seen_source_ids.insert(guid.clone());
 
-        let entry = match render_note(sn, script_engine, registry, cache_dir, models_dir) {
+        let entry = match render_note(sn, script_engine, registry, cache_dir, models_dir, Some(&index)) {
             Ok(r) => {
                 for e in &r.errors {
                     outcome.errors.push(format!("{}: {e}", sn.path.display()));
@@ -190,6 +198,7 @@ pub fn reconcile(
                     deck: deck_for_note(root, note),
                     assets: r.assets,
                     hash,
+                    own_hash: r.own_hash,
                 }
             }
             Err(e) => {
@@ -235,11 +244,19 @@ pub fn reconcile(
                 // tag-only edit is caught here. Disk wins: tags added in
                 // Anki are dropped on the next push.
                 let tags = tag_diff(&l.anki_tags, &strip_marker(&r.tags));
-                let content_changed = l.hash != remote_hash || !tags.is_empty();
+                let remote_src = src_hash_from_tags(&r.tags);
+                let fields_changed = l.hash != remote_hash;
+                // Only this note's inputs moved if its own-input hash did;
+                // otherwise a field change came from a note it reads.
+                let dependency = fields_changed
+                    && l.own_hash.is_some()
+                    && l.own_hash == remote_src;
+                let content_changed = fields_changed || !tags.is_empty() || l.own_hash != remote_src;
                 let deck_changed = l.deck != r.deck;
                 let deck_note = [
                     if deck_changed { format!("deck {} -> {}", r.deck, l.deck) } else { String::new() },
                     tags,
+                    if dependency { "dependency".into() } else { String::new() },
                     // Changing a note the user flagged is taken as handling
                     // the flag; the push clears it.
                     if r.flagged { "unflag".into() } else { String::new() },
@@ -398,14 +415,14 @@ fn apply(
                 Plan::Add(l) => {
                     let mid = ensure_model_cached(w, &mut ensured, l)?;
                     let did = w.deck_id_for(&l.deck)?;
-                    let tags = full_tag_set(&l.anki_tags, &l.hash);
+                    let tags = full_tag_set(&l.anki_tags, &l.hash, l.own_hash.as_deref());
                     w.add_note(mid, &l.guid, l.fields.clone(), 0, &tags, did)?;
                     tracing::debug!(path = %l.path.display(), id = %l.guid, "add");
                 }
                 Plan::ModelChange(r, l) => {
                     let mid = ensure_model_cached(w, &mut ensured, l)?;
                     let did = w.deck_id_for(&l.deck)?;
-                    let tags = full_tag_set(&l.anki_tags, &l.hash);
+                    let tags = full_tag_set(&l.anki_tags, &l.hash, l.own_hash.as_deref());
                     let remap = w.change_note_model(
                         r.note_id,
                         mid,
@@ -429,7 +446,7 @@ fn apply(
                     // Ensure the model in case the script appended a card
                     // (new fields/templates) since the note was last written.
                     ensure_model_cached(w, &mut ensured, l)?;
-                    let tags = full_tag_set(&l.anki_tags, &l.hash);
+                    let tags = full_tag_set(&l.anki_tags, &l.hash, l.own_hash.as_deref());
                     w.update_note(r.note_id, l.fields.clone(), 0, &tags)?;
                     if l.spec.cloze {
                         w.sync_cloze_cards(r.note_id)?;
@@ -634,6 +651,10 @@ pub struct RenderedNote {
     pub fields: Vec<String>,
     pub assets: Vec<Asset>,
     pub errors: Vec<String>,
+    /// Set when the model read other notes (`ctx:notes`): a hash of this
+    /// note's own inputs (its source and model script). If the output
+    /// changed but this didn't, the change came from another note.
+    pub own_hash: Option<String>,
 }
 
 impl RenderedNote {
@@ -657,8 +678,9 @@ pub fn render_note(
     registry: &Arc<Registry>,
     cache_dir: &Path,
     models_dir: &Path,
+    index: Option<&Arc<NoteIndex>>,
 ) -> Result<RenderedNote> {
-    let r = render_note_inner(sn, script_engine, registry, cache_dir, models_dir)?;
+    let r = render_note_inner(sn, script_engine, registry, cache_dir, models_dir, index)?;
     // Anki would store the note with zero cards: invisible and unreviewable.
     if crate::preview::cards(&r).is_empty() {
         anyhow::bail!(if r.spec.cloze {
@@ -679,6 +701,7 @@ fn render_note_inner(
     registry: &Arc<Registry>,
     cache_dir: &Path,
     models_dir: &Path,
+    index: Option<&Arc<NoteIndex>>,
 ) -> Result<RenderedNote> {
     let note = &sn.note;
     let css = load_model_css(models_dir, &note.model);
@@ -697,6 +720,7 @@ fn render_note_inner(
             fields: r.fields.into_iter().map(|(_, v)| v).collect(),
             assets: r.assets,
             errors: r.errors,
+            own_hash: None,
         });
     }
 
@@ -709,7 +733,8 @@ fn render_note_inner(
         card_names: model.card_names.clone(),
         cloze: false,
     };
-    let ctx = RenderContext::new(Arc::clone(registry), sn.path.clone(), cache_dir.to_path_buf());
+    let ctx = RenderContext::new(Arc::clone(registry), sn.path.clone(), cache_dir.to_path_buf())
+        .with_index(index.cloned());
     let output = script_engine
         .execute(&model, note.clone(), ctx.clone())
         .context("script error")?;
@@ -720,6 +745,10 @@ fn render_note_inner(
         .iter()
         .map(|name| output.get(name).cloned().unwrap_or_default())
         .collect();
+    let own_hash = ctx.read_other_notes().then(|| {
+        let script = std::fs::read(models_dir.join(format!("{}.lua", note.model))).unwrap_or_default();
+        compute_hash(&[sn.source.clone(), String::from_utf8_lossy(&script).into_owned()])
+    });
     Ok(RenderedNote {
         spec,
         change_opts: ModelChangeOpts {
@@ -729,6 +758,7 @@ fn render_note_inner(
         fields,
         assets: ctx.take_assets(),
         errors: Vec::new(),
+        own_hash,
     })
 }
 
