@@ -339,7 +339,35 @@ media = [c for c in full["changes"] if c["kind"] == "media"]
 assert media and sim["summary"]["media"] == len(media), (sim["summary"], full["changes"])
 assert not [c for c in sim["changes"] if c["kind"] == "media"] and sim["changes_omitted"] == len(media), sim
 assert sim["by_dir"] == {"": {"add": 1}}, sim["by_dir"]
+# Layers are named by content: re-colouring the answer replaces one file,
+# the base stays, and the old answer shows up as an unused media file.
+assert tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"]})["ok"]
+before = {c["path"] for c in media}
+cur = open(f"{w}/p/wall.md").read()
+wid = cur.split("#id(")[1].split(")")[0]
+tool("marki_write_card", {"path": "wall.md", "expected_id": wid,
+                          "source": cur.replace("```\n\n---", "[layers.answer.style]\nstroke = \"#f0f\"\n```\n\n---")})
+full = tool("marki_push", {"detail": True})
+new = {c["path"] for c in full["changes"] if c["kind"] == "media"}
+assert len(new) == 1 and "-answer.svg" in new.pop(), full["changes"]
+assert full["media_orphans"] == 1 and not [c for c in full["changes"] if c["kind"] == "media_delete"], full
+assert tool("marki_push", {"confirm": True, "plan_hash": full["plan_hash"]})["ok"]
+st = tool("marki_status")
+assert st["media_orphans"] == 1 and not st["changes"], st
+sim = tool("marki_push", {"delete_orphans": True, "detail": True})
+gone = [c["path"] for c in sim["changes"] if c["kind"] == "media_delete"]
+assert len(gone) == 1 and gone[0] in before and gone[0].endswith("-answer.svg"), sim["changes"]
+assert "media_orphans" not in sim and sim["summary"] == {"media_delete": 1}, sim
+done = tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"], "delete_orphans": True})
+assert done["ok"] and "1 unused" in str(done["steps"]), done
+assert not os.path.exists(f"{w}/media/{gone[0]}")
+assert "media_orphans" not in tool("marki_status")
 os.remove(f"{w}/p/wall.md")
+# Suspended (kept) orphans still use their files; deleting the note frees them.
+assert "media_orphans" not in tool("marki_status")
+sim = tool("marki_push", {"delete_orphans": True})
+assert sim["summary"].get("media_delete", 0) >= 2, sim["summary"]
+assert tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"], "delete_orphans": True})["ok"]
 # A block alone, with a fixed frame and a dashed answer.
 blk = ("[viewport]\nbbox = [110, 38, 120, 42]\n[layers.base]\nfeatures = [\"country/CHN\"]\n"
        "[layers.answer]\nhighlights = [\"geo/great-wall\"]\n[layers.answer.style]\ndash = \"6 4\"\n")
@@ -367,6 +395,9 @@ assert img(lr) and img(lr) != img(zr), "label must show up in the preview"
 err = tool("marki_preview", {"path": "wall.md", "source": wall_card.replace("great-wall", "nope")})["errors"]
 assert "marki_map_define" in str(err), err
 shutil.rmtree(f"{w}/p/.marki/geo")
+# The pushes above committed the feature files; commit their removal too.
+sim = tool("marki_push")
+assert tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"]})["ok"]
 print("mcp tools ok")
 EOF
 

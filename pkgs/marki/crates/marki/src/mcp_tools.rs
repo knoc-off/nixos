@@ -56,6 +56,10 @@ pub struct PushReport {
     pub changes: Vec<ChangeLine>,
     #[serde(skip_serializing_if = "is_zero")]
     pub changes_omitted: usize,
+    /// Rendered media files (maps, typst, media blocks) no card uses any
+    /// more. A push with delete_orphans=true deletes them.
+    #[serde(skip_serializing_if = "is_zero")]
+    pub media_orphans: usize,
     /// Cards that failed to render (they are left untouched in Anki).
     pub errors: Vec<String>,
     /// For `simulation`: what would go wrong beyond render errors.
@@ -655,6 +659,7 @@ impl Handler {
             by_dir,
             changes,
             changes_omitted: 0,
+            media_orphans: o.media_orphans,
             errors: o.errors.clone(),
             problems,
             steps,
@@ -667,7 +672,7 @@ impl PushReport {
     pub fn compact(mut self, detail: bool) -> Self {
         if !detail {
             let before = self.changes.len();
-            self.changes.retain(|c| c.kind != "media");
+            self.changes.retain(|c| c.kind != "media" && c.kind != "media_delete");
             self.changes.truncate(CHANGE_LINES);
             self.changes_omitted = before - self.changes.len();
         }

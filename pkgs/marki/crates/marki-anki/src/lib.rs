@@ -365,6 +365,15 @@ impl Collection {
         Ok(rows)
     }
 
+    /// `(guid, raw flds)` of every note, managed or not.
+    pub fn all_note_fields(&self) -> Result<Vec<(String, String)>> {
+        let mut stmt = self.db.prepare("SELECT guid, flds FROM notes")?;
+        let rows = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
     /// Every note carrying `marker_tag` -- the notes marki manages. Anki stores
     /// `notes.tags` space-delimited with a leading and trailing space, so an
     /// exact whole-tag match is ` <tag> `. For each note we resolve its

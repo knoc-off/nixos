@@ -111,6 +111,17 @@ impl MediaDatabase {
             .optional()?)
     }
 
+    /// Names of live (non-tombstoned) files starting with `prefix`.
+    pub fn live_names_with_prefix(&self, prefix: &str) -> Result<Vec<String>> {
+        let mut stmt = self
+            .db
+            .prepare("SELECT fname FROM media WHERE size > 0 AND substr(fname, 1, length(?1)) = ?1")?;
+        let rows = stmt
+            .query_map([prefix], |r| r.get(0))?
+            .collect::<rusqlite::Result<Vec<String>>>()?;
+        Ok(rows)
+    }
+
     /// Standalone copy of the database at `dest` (`VACUUM INTO`), for
     /// simulating writes. `dest` must not exist.
     pub fn backup(&self, dest: &Path) -> Result<()> {
@@ -380,6 +391,8 @@ mod tests {
         .unwrap();
         assert_eq!(db.last_usn().unwrap(), 4, "no-op removes must not bump usn");
         assert_meta_consistent(&db);
+        assert_eq!(db.live_names_with_prefix("a.").unwrap(), ["a.png"]);
+        assert!(db.live_names_with_prefix("b.").unwrap().is_empty(), "tombstones are not live");
     }
 
     #[test]

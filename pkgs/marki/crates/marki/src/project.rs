@@ -176,11 +176,22 @@ impl Project {
     }
 
     /// The full plan against `col` and the media store: models, notes,
-    /// orphans, then media files that are missing or unregistered.
+    /// orphans, then media files that are missing or unregistered, then
+    /// (with `prune`) unused renderer files to delete. Without `prune`
+    /// those are only counted in `media_orphans`. A cycle with render
+    /// errors never plans deletions: a failed card's files look unused.
     fn plan_on(&mut self, col: &mut Collection, media_db: &Path, prune: bool) -> Result<Outcome> {
         let mut o = self.cycle(col, true, prune)?;
         let media_dir = self.store()?.media_dir;
         o.changes.extend(media::plan(&o.assets, &media_dir, media_db)?);
+        if o.errors.is_empty() {
+            let unused = media::unused(&o.media_refs, media_db)?;
+            if prune {
+                o.changes.extend(media::delete_changes(&unused));
+            } else {
+                o.media_orphans = unused.len();
+            }
+        }
         Ok(o)
     }
 
@@ -217,6 +228,9 @@ impl Project {
             problems.push(format!("media db: {e:#}"));
         }
         let applied = self.cycle(&mut sim, false, prune)?;
+        if let Err(e) = media::delete(&plan.media_deletes(), None, &media_copy) {
+            problems.push(format!("media db: {e:#}"));
+        }
         problems.extend(applied.errors.iter().filter(|e| !plan.errors.contains(e)).cloned());
         problems.extend(sim.check().context("check simulated collection")?);
         Ok(Simulation { plan_hash: plan_hash(&plan), outcome: plan, problems })
@@ -287,7 +301,15 @@ impl Project {
                         "collection",
                         format!("+{} ~{} ->{} orphaned {}", o.added, o.updated, o.moved, o.quarantined + o.deleted),
                     ));
-                    Outcome { changes: plan.changes, ..o }
+                    // Only after the notes stopped naming them.
+                    let deletes = plan.media_deletes();
+                    if !deletes.is_empty() {
+                        steps.push(match media::delete(&deletes, Some(&s.media_dir), &s.media_db) {
+                            Ok(n) => Step::ok("media cleanup", format!("{n} unused file(s) deleted")),
+                            Err(e) => Step::error("media cleanup", &e),
+                        });
+                    }
+                    Outcome { changes: plan.changes, media_orphans: plan.media_orphans, ..o }
                 }
                 Err(e) => {
                     steps.push(Step::error("collection", &e));

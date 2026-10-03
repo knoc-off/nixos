@@ -73,6 +73,22 @@ pub struct Outcome {
     /// filename. Reconcile never writes them; the caller pushes them to the
     /// media store before the collection.
     pub assets: Vec<Asset>,
+    /// Every renderer media file the collection references once this cycle
+    /// is applied: `assets`, plus files named in the fields of notes the
+    /// cycle leaves as they are (render failures, kept orphans, notes marki
+    /// doesn't manage). Hard-deleted orphans don't count. What isn't in
+    /// here is unused (see `sync::media::unused`).
+    pub media_refs: HashSet<String>,
+    /// Unused renderer media files left in place (reported, not planned):
+    /// set by the caller when the push doesn't delete orphans.
+    pub media_orphans: usize,
+}
+
+impl Outcome {
+    /// Filenames of the planned `MediaDelete` changes.
+    pub fn media_deletes(&self) -> Vec<String> {
+        self.changes.iter().filter(|c| c.kind == ChangeKind::MediaDelete).map(|c| c.id.clone()).collect()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, strum::IntoStaticStr)]
@@ -83,6 +99,8 @@ pub enum ChangeKind {
     Model,
     /// A media file is written or registered (id = filename).
     Media,
+    /// An unused renderer media file is deleted (id = filename).
+    MediaDelete,
     Add,
     Update,
     Move,
@@ -345,6 +363,14 @@ pub fn reconcile(
     model_changes.extend(changes);
     outcome.changes = model_changes;
     outcome.assets = collect_assets(&local);
+    outcome.media_refs = outcome.assets.iter().map(|a| a.filename.clone()).collect();
+    let deleted: HashSet<&str> =
+        if prune { orphans.iter().map(|r| r.guid.as_str()).collect() } else { HashSet::new() };
+    for (guid, flds) in col.all_note_fields().context("read note fields")? {
+        if !local.contains_key(&guid) && !deleted.contains(guid.as_str()) {
+            outcome.media_refs.extend(crate::sync::media::referenced_names(&flds));
+        }
+    }
 
     // ---- Phase 4: Report or apply.
     if dry_run {

@@ -61,7 +61,9 @@ Deleting: marki_delete_card removes the file; the next push lists the note \
 as an orphan and suspends its cards. Only with the user's explicit consent \
 pass delete_orphans=true (to both the simulation and the confirm) to delete \
 the note and its review history instead. To change a card's deck, \
-marki_move_card it; the push moves the note and keeps its reviews.
+marki_move_card it; the push moves the note and keeps its reviews. \
+`media_orphans: N` counts rendered media files (maps, typst, media blocks) \
+no card uses any more; delete_orphans=true also deletes those.
 
 Cards: one .md file = one note; the directory is the deck (a/b/x.md -> a::b), \
 or #deck(a::b). `---` splits front from back. Tags are #words anywhere; \
@@ -281,7 +283,8 @@ pub struct PushArgs {
     pub confirm: bool,
     pub plan_hash: Option<String>,
     /// Delete notes whose card file is gone (with their review history)
-    /// instead of suspending them. Must match between simulate and confirm.
+    /// instead of suspending them, and rendered media files no card uses
+    /// (`media_orphans`). Must match between simulate and confirm.
     #[serde(default)]
     pub delete_orphans: bool,
     /// List every change line, including one per media file. Default: counts
