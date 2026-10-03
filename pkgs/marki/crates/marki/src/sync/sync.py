@@ -15,6 +15,8 @@
 # - FULL_SYNC on "push": upload only when this push changed the schema
 #   (allow_upload), which it did seconds after pulling; otherwise fail.
 import json
+import os
+import shutil
 import sys
 import time
 
@@ -26,7 +28,12 @@ req = json.loads(sys.argv[1])
 with open(req["password_file"]) as f:
     password = f.read().strip()
 
-col = Collection(req["collection"])
+path = req["collection"]
+# Opening creates an empty collection; if the very first sync then fails,
+# remove it again so nothing looks like a synced copy.
+created = not os.path.exists(path)
+col = Collection(path)
+ok = False
 try:
     auth = col.sync_login(req["username"], password, req["endpoint"])
     out = col.sync_collection(auth, False)
@@ -65,7 +72,14 @@ try:
         time.sleep(0.1)
     if out.server_message:
         print(f"server: {out.server_message}", file=sys.stderr)
+    ok = True
 finally:
     col.close()
+    if created and not ok:
+        stem = os.path.splitext(path)[0]
+        for f in [path, path + "-wal", stem + ".media.db2"]:
+            if os.path.exists(f):
+                os.remove(f)
+        shutil.rmtree(stem + ".media", ignore_errors=True)
 
 print(json.dumps({"action": action}))
