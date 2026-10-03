@@ -151,7 +151,9 @@ fn compile(binary: &Path, src: &str, source_path: &Path) -> Result<Vec<u8>, Typs
 fn write_atomic(dir: &Path, svg: &[u8]) -> Result<(), TypstError> {
     fs::create_dir_all(dir)?;
 
-    let svg_tmp = dir.join(format!(".{SVG_NAME}.tmp"));
+    // Unique per writer: notes render in parallel and may share a figure.
+    let uniq = format!("{}-{:?}", std::process::id(), std::thread::current().id());
+    let svg_tmp = dir.join(format!(".{SVG_NAME}.{uniq}.tmp"));
     {
         let mut h = fs::File::create(&svg_tmp)?;
         h.write_all(svg)?;
@@ -159,7 +161,7 @@ fn write_atomic(dir: &Path, svg: &[u8]) -> Result<(), TypstError> {
     }
     fs::rename(&svg_tmp, dir.join(SVG_NAME))?;
 
-    let marker_tmp = dir.join(format!(".{READY_MARKER}.tmp"));
+    let marker_tmp = dir.join(format!(".{READY_MARKER}.{uniq}.tmp"));
     fs::File::create(&marker_tmp)?.sync_all().ok();
     fs::rename(&marker_tmp, dir.join(READY_MARKER))?;
 

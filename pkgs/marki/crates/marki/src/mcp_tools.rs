@@ -546,24 +546,16 @@ impl Handler {
         check_model_name(name)?;
         ensure!(!["basic", "cloze"].contains(&name), "{name} is built in");
         let compiled = self.project.engine.set_draft(name, lua);
-        let check = compiled.and_then(|m| {
+        self.project.engine.clear_drafts();
+        let card_names = compiled.and_then(|m| {
             ensure!(
                 m.describe.as_deref().is_some_and(|d| !d.trim().is_empty()),
                 "model must define M.describe() returning a short description"
             );
-            let mut failures = Vec::new();
-            for sn in scan_dir_v2(self.root())?.into_iter().filter(|sn| sn.note.model == name) {
-                match self.project.preview(&sn.path, &sn.source) {
-                    Ok(p) if p.note.errors.is_empty() => {}
-                    Ok(p) => failures.push(format!("{}: {}", self.rel(&sn.path), p.note.errors.join("; "))),
-                    Err(e) => failures.push(format!("{}: {e:#}", self.rel(&sn.path))),
-                }
-            }
+            let failures = self.project.check_model_draft(name, lua)?;
             ensure!(failures.is_empty(), "notes fail to render:\n{}", failures.join("\n"));
             Ok(m.card_names.clone())
-        });
-        self.project.engine.clear_drafts();
-        let card_names = check?;
+        })?;
 
         let before = self.usage(name)?;
         let dir = self.models_dir();

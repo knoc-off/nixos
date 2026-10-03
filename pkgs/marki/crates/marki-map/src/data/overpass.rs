@@ -80,7 +80,7 @@ pub fn resolve(reference: &str, cache_root: &Path) -> Result<Geometry, MapError>
         let bytes = http_post(&ql)?;
         // Atomic write: tempfile + rename so a crash mid-write doesn't
         // leave a half-file in the cache.
-        let tmp = cache_file.with_extension("tmp");
+        let tmp = cache_file.with_extension(format!("{}.tmp", crate::cache::tmp_suffix()));
         std::fs::write(&tmp, &bytes)?;
         std::fs::rename(&tmp, &cache_file)?;
         bytes
@@ -241,7 +241,7 @@ pub fn search(query: &str, cache_root: &Path) -> Result<Vec<serde_json::Value>, 
             return Err(MapError::Network(format!("nominatim: HTTP {status}{hint}")));
         }
         let bytes = resp.bytes().map_err(|e| MapError::Network(format!("nominatim: {}", chain(&e))))?.to_vec();
-        let tmp = cache_file.with_extension("tmp");
+        let tmp = cache_file.with_extension(format!("{}.tmp", crate::cache::tmp_suffix()));
         std::fs::write(&tmp, &bytes)?;
         std::fs::rename(&tmp, &cache_file)?;
         bytes
@@ -377,7 +377,7 @@ fn run_ql(ql: &str, cache_root: &Path) -> Result<Vec<u8>, MapError> {
         return Ok(std::fs::read(&cache_file)?);
     }
     let bytes = http_post(ql)?;
-    let tmp = cache_file.with_extension("tmp");
+    let tmp = cache_file.with_extension(format!("{}.tmp", crate::cache::tmp_suffix()));
     std::fs::write(&tmp, &bytes)?;
     std::fs::rename(&tmp, &cache_file)?;
     Ok(bytes)

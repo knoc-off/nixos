@@ -406,6 +406,52 @@ impl Project {
         let cards = preview::cards(&note);
         Ok(Preview { note, cards })
     }
+
+    /// Render every saved note of model `name` with draft `lua` in its place
+    /// and return one line per failing note. Notes render on all cores, each
+    /// thread with its own Lua engine (engines aren't `Send`): a model edit
+    /// misses the render cache for every map, so this is the slow part of
+    /// saving a model.
+    pub fn check_model_draft(&self, name: &str, lua: &str) -> Result<Vec<String>> {
+        let root = &self.cfg.cards_dir;
+        let all = scan_dir_v2(root)?;
+        let index = Arc::new(NoteIndex::new(root, &all));
+        let notes: Vec<&ScannedNote> = all.iter().filter(|sn| sn.note.model == name).collect();
+        let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).min(notes.len().max(1));
+        let next = std::sync::atomic::AtomicUsize::new(0);
+        let (cache, models) = (render_cache_dir(), self.cfg.resolved_models_dir());
+        // Borrow only what threads need: `self.engine` isn't `Sync`.
+        let (cfg, registry) = (&self.cfg, &self.registry);
+        let mut failures: Vec<(usize, String)> = std::thread::scope(|s| {
+            let workers: Vec<_> = (0..threads)
+                .map(|_| {
+                    s.spawn(|| {
+                        let mut engine = build_script_engine(cfg);
+                        let mut out = Vec::new();
+                        if let Err(e) = engine.set_draft(name, lua) {
+                            out.push((0, format!("{e:#}")));
+                            return out;
+                        }
+                        loop {
+                            let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let Some(sn) = notes.get(i) else { break };
+                            let rel = sn.path.strip_prefix(root).unwrap_or(&sn.path).display();
+                            match render_note(sn, &mut engine, registry, &cache, &models, Some(&index)) {
+                                Ok(r) if r.errors.is_empty() => {}
+                                Ok(r) => out.push((i, format!("{rel}: {}", r.errors.join("; ")))),
+                                Err(e) => out.push((i, format!("{rel}: {e:#}"))),
+                            }
+                        }
+                        out
+                    })
+                })
+                .collect();
+            workers.into_iter().flat_map(|w| w.join().unwrap_or_default()).collect()
+        });
+        failures.sort();
+        failures.dedup();
+        Ok(failures.into_iter().map(|(_, f)| f).collect())
+    }
 }
 
 /// Build the external block-renderer registry. The media renderer is

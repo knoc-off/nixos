@@ -59,8 +59,9 @@ pub fn write_atomic(
         let p = dir.join(f.name);
         // Tempfile + rename so concurrent readers can't see a partial
         // file. Tempfile lives in the same dir to keep the rename
-        // atomic on every common filesystem.
-        let tmp = dir.join(format!(".{}.tmp", f.name));
+        // atomic on every common filesystem, and is unique per writer:
+        // notes render in parallel and share layers.
+        let tmp = dir.join(format!(".{}.{}.tmp", f.name, tmp_suffix()));
         {
             let mut h = fs::File::create(&tmp)?;
             h.write_all(f.bytes)?;
@@ -71,11 +72,18 @@ pub fn write_atomic(
 
     // Final marker — writing it last is the whole point.
     let marker = dir.join(READY_MARKER);
-    let tmp_marker = dir.join(format!(".{READY_MARKER}.tmp"));
+    let tmp_marker = dir.join(format!(".{READY_MARKER}.{}.tmp", tmp_suffix()));
     fs::File::create(&tmp_marker)?.sync_all().ok();
     fs::rename(&tmp_marker, &marker)?;
 
     Ok(())
+}
+
+/// `<pid>-<thread>`: distinct for every concurrent writer, in this process
+/// or another (CLI and MCP server share the cache).
+pub fn tmp_suffix() -> String {
+    let t = format!("{:?}", std::thread::current().id());
+    format!("{}-{}", std::process::id(), t.trim_start_matches("ThreadId(").trim_end_matches(')'))
 }
 
 /// Read a single file from a ready cache directory. Returns
