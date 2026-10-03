@@ -20,6 +20,13 @@ import shutil
 import sys
 import time
 
+# Anki prints debug output to stdout (e.g. "blocked main thread for 302ms"
+# plus a stack trace whenever a backend call takes over 200ms). Point fd 1
+# at stderr for the whole run, covering Python and Rust writers alike, and
+# write the one result line to a saved copy of the real stdout.
+result_fd = os.dup(1)
+os.dup2(2, 1)
+
 from anki.collection import Collection
 
 MEDIA_TIMEOUT_SECS = 30 * 60
@@ -82,4 +89,4 @@ finally:
                 os.remove(f)
         shutil.rmtree(stem + ".media", ignore_errors=True)
 
-print(json.dumps({"action": action}))
+os.write(result_fd, (json.dumps({"action": action}) + "\n").encode())
