@@ -269,8 +269,9 @@ export default async (_ctx) => {
       description:
         "What: run a Python script, dependencies resolved via Nix (nixpkgs " +
         "python3Packages + system tools), no pip/venv. " +
-        "When: any Python task beyond a one-liner -- prefer over shelling out " +
-        "to `python3 -c` or hand-rolled `nix shell`. Before writing a new " +
+        "When: only when the user asked for Python -- then prefer this over " +
+        "`python3 -c` or hand-rolled `nix shell`. NEVER use it to read, " +
+        "create, or edit files; use Read/Grep/Edit/Write. Before writing a new " +
         "script, call with `list` to check whether a saved one already does " +
         "this or is close enough to extend. " +
         "Shapes: `script` alone runs once (kept under .temp/ for later " +

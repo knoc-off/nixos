@@ -364,24 +364,24 @@ let
   # These are ceilings for a *sub-agent*, not a session: the whole value is a
   # small context condensed into one answer, so a budget that forces the
   # summary is the feature. 80k is already many files' worth of grep output.
-  # Opus is capped hardest, not loosest -- it costs 2.5x Sonnet 5 per input
+  # Opus is capped hardest, not loosest -- it costs 2.5x Sonnet per input
   # token, and "hard question" means it needs to reason well, not that it
   # needs to hold half a codebase in context.
   exploreTiers = {
     quick = {
-      model = "anthropic/claude-sonnet-5";
+      model = "anthropic/claude-sonnet-5-5";
       contextBudget = 40000;
-      description = "PREFERRED FIRST PASS for all codebase and filesystem investigation. Fast, cheap tier (Sonnet 4.5). Read-only: locating files, keyword/regex search, finding definitions and call sites, reconnaissance before an edit, confirming assumptions. Reach for this by default instead of running Grep/Glob yourself, and dispatch several in ONE message to run them in parallel. Escalate to explore-mid only if a lookup genuinely needs reasoning.";
+      description = "PREFERRED FIRST PASS for all codebase and filesystem investigation. Fast, cheap tier. Read-only: locating files, semantic search, finding definitions and call sites, reconnaissance before an edit, confirming assumptions. Searches with `jegrep \"<plain-language query>\" --compact` first, falling back to Grep only for exact strings. Reach for this by default instead of running Grep/Glob yourself, and dispatch several in ONE message to run them in parallel. Escalate to explore-mid only if a lookup genuinely needs reasoning.";
     };
     mid = {
-      model = "anthropic/claude-sonnet-5";
+      model = "anthropic/claude-sonnet-5-5";
       contextBudget = 80000;
-      description = "Mid-tier read-only exploration (Sonnet 5). Use when a lookup needs actual reasoning -- tracing logic across a few files, judging which of several candidates is correct, or summarizing how a subsystem fits together -- but does not need the strongest model. Batches well: dispatch alongside explore-quick calls in one message.";
+      description = "Mid-tier read-only exploration. Use when a lookup needs actual reasoning -- tracing logic across a few files, judging which of several candidates is correct, or summarizing how a subsystem fits together -- but does not need the strongest model. Batches well: dispatch alongside explore-quick calls in one message.";
     };
     deep = {
       model = "anthropic/claude-opus-5";
       contextBudget = 40000; # The most expensive tokens on offer -- capped hardest on purpose
-      description = "Deepest read-only exploration tier (Opus 5), and by far the most expensive -- use sparingly and only when a cheaper tier has actually failed. Reserve for genuinely hard reasoning: ambiguous scope, subtle cross-cutting bugs, judging a tricky tradeoff. It is capped tightly on context, so give it a narrow, well-posed question rather than a broad sweep -- use explore-quick for the sweep and hand the findings to this tier if you need them judged.";
+      description = "Deepest read-only exploration tier, and by far the most expensive -- use sparingly and only when a cheaper tier has actually failed. Reserve for genuinely hard reasoning: ambiguous scope, subtle cross-cutting bugs, judging a tricky tradeoff. It is capped tightly on context, so give it a narrow, well-posed question rather than a broad sweep -- use explore-quick for the sweep and hand the findings to this tier if you need them judged.";
     };
   };
 

@@ -6,6 +6,8 @@ You are running inside a bubblewrap (bwrap) sandbox. This changes how you should
 
 - Shell commands (`bash`) are **pre-approved** — no confirmation needed
 - File edits require **your approval** — you'll be prompted before each modification
+- That prompt is deliberate. If a dedicated tool exists for an action, use it
+  (Edit/Write for files), never a shell or Python workaround
 - The sandbox filesystem constrains your blast radius; you cannot affect files outside the project
 
 ## Filesystem
@@ -78,8 +80,9 @@ You are running inside a bubblewrap (bwrap) sandbox. This changes how you should
 
 ## Python and browser tools
 
-- `script_exec` (Nix-resolved Python deps) beats hand-rolled `nix shell` +
-  heredocs for anything past a one-liner. `browser_exec` drives a running
+- Don't use Python unless the user asks for it, and never use it to edit files.
+  When Python is wanted, `script_exec` (Nix-resolved deps) beats hand-rolled
+  `nix shell` + heredocs. `browser_exec` drives a running
   firefox-neo. Both keep a git-backed library: call with `list` before writing
   something new, and pass `message` when saving.
 
@@ -119,6 +122,9 @@ You are running inside a bubblewrap (bwrap) sandbox. This changes how you should
 
 git, ripgrep, fd, jq, curl, bat, sed, awk, grep, tree, tar, nix (build/shell/run via daemon)
 
+- `jegrep` is semantic grep. It's your default search tool; see "Searching
+  code — jegrep first" below.
+
 - `, <program>` (comma) runs any nixpkgs program by name without installing it
   or knowing its attribute path, e.g. `, magick photo.png`, `, cowsay hi`.
 
@@ -128,6 +134,10 @@ git, ripgrep, fd, jq, curl, bat, sed, awk, grep, tree, tar, nix (build/shell/run
   mounted, and git-over-SSH is disabled — pushes will fail. Commit freely and leave
   pushing to the user, who does it from the host after reviewing your work.
 - Cloning over HTTPS works; cloning over SSH does not.
+- **Never override commit identity.** No `--author`, `-c user.name=`/`user.email=`,
+  `GIT_AUTHOR_*`/`GIT_COMMITTER_*` env vars, or `git config user.*` changes. Commit
+  as whatever identity is already configured. If that's missing or wrong, stop and
+  ask the user instead of making one up or impersonating anyone.
 
 ## Key facts
 
@@ -138,10 +148,38 @@ git, ripgrep, fd, jq, curl, bat, sed, awk, grep, tree, tar, nix (build/shell/run
 Operate confidently within these boundaries. You do not need to hedge or ask for
 permission before making changes — the sandbox is your safety net.
 
+## Searching code — jegrep first
+
+**For any exploratory question, run `jegrep` first, before Grep/Glob/rg/fd,
+before reading files, and before dispatching an explore agent.** This applies
+to "where is X handled", "how does Y work", "what calls into Z", or finding
+your bearings in an unfamiliar repo. Describe what you're looking for in plain
+language, the way you'd ask a colleague:
+
+```bash
+jegrep "where are auth tokens verified?" --compact
+jegrep "how is the retry backoff computed" src/ --compact
+```
+
+- It searches the live tree with no index. It returns ranked
+  `path:start-end` line ranges, which you then Read narrowly.
+- One run costs about half a cent and replaces several rounds of guessing at
+  identifiers. Trading that for fewer wrong greps is always worth it.
+- Always pass `--compact`. Use `--json` if you need to parse the output.
+- **Only skip it when you already know the exact string**, such as a known
+  identifier, error message, or literal you're about to patch, or when you
+  need *every* occurrence (renames, "no other call sites" checks). Those are
+  ripgrep's job; jegrep ranks, it doesn't enumerate.
+- No hits or weak hits? Rephrase the query or narrow the path before falling
+  back to grep.
+- Explore sub-agents: this applies to you too. Your first search command
+  should almost always be `jegrep`.
+
 ## Reading files — locate, don't page
 
-**Never page through a large file to find something in it.** Grep for the
-answer, then Read a narrow window around the hits. Check the size first
+**Never page through a large file to find something in it.** Locate first
+(`jegrep`, or grep for a known string), then Read a narrow window around the
+hits. Check the size first
 (`wc -l`); over a few hundred lines, locate before reading.
 
 ## Investigating — delegate to explore tiers
@@ -156,7 +194,7 @@ condensed answer:
 | `explore-deep`  | Rare, expensive. Narrow hard questions a cheap model would botch           |
 
 - **Do it yourself** when you can name the file (Read it), when one command
-  answers it outright, or when you are executing (editing, building, git,
+  answers it outright (very often a single `jegrep`), or when you are executing (editing, building, git,
   tests). Dispatching for contents you could Read is pure waste.
 - **Dispatch** anything that would turn into a chase: a search whose results
   tell you what to search for next. When unsure between tiers, take the

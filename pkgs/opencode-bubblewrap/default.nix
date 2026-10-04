@@ -206,6 +206,7 @@ let
 
     # Search & navigation
     ripgrep
+    selfPkgs.jegrep # semantic grep; key injected at launch (see TYPESAFE_API_KEY)
     fd
     tree
     file
@@ -573,6 +574,12 @@ jail "jailed-opencode" upkgs.fish (
       RUNTIME_ARGS+=(--setenv HOST_QUERY_PORT "$HOST_QUERY_PORT")
       RUNTIME_ARGS+=(--setenv JAIL_START_DIR "$JAIL_START_DIR")
       RUNTIME_ARGS+=(--setenv JAIL_NAME "''${JAIL_NAME:-}")
+
+      # jegrep's Jev key (sops, modules/jegrep.nix). Only the value crosses
+      # into the jail, not /run/secrets.
+      if [[ -r /run/secrets/jev/api-key ]]; then
+        RUNTIME_ARGS+=(--setenv TYPESAFE_API_KEY "$(< /run/secrets/jev/api-key)")
+      fi
     '')
 
     (wrap-entry (entry: ''
