@@ -142,20 +142,9 @@ impl Project {
     /// One scan -> reconcile -> (optionally) write cycle against `col`.
     /// Collection only; media is the caller's (see [`Project::push`]).
     fn cycle(&mut self, col: &mut Collection, dry_run: bool, prune: bool) -> Result<Outcome> {
-        // Model scripts are cached and reloaded on mtime change (see
-        // ScriptEngine::load_model), so no blanket invalidation per cycle.
         let notes = scan_dir_v2(&self.cfg.cards_dir)?;
-        reconcile(
-            col,
-            &self.cfg.cards_dir,
-            &notes,
-            &mut self.engine,
-            &self.registry,
-            &render_cache_dir(),
-            &self.cfg.resolved_models_dir(),
-            dry_run,
-            prune,
-        )
+        let rendered = self.render_notes(&notes, |sn| sn.note.id.is_some(), None);
+        reconcile(col, &self.cfg.cards_dir, &notes, rendered, dry_run, prune)
     }
 
     /// The full plan against `col` and the media folder: models, notes,
@@ -408,49 +397,69 @@ impl Project {
     }
 
     /// Render every saved note of model `name` with draft `lua` in its place
-    /// and return one line per failing note. Notes render on all cores, each
-    /// thread with its own Lua engine (engines aren't `Send`): a model edit
-    /// misses the render cache for every map, so this is the slow part of
-    /// saving a model.
+    /// and return one line per failing note. A model edit misses the render
+    /// cache for every map, so this is the slow part of saving a model.
     pub fn check_model_draft(&self, name: &str, lua: &str) -> Result<Vec<String>> {
         let root = &self.cfg.cards_dir;
-        let all = scan_dir_v2(root)?;
-        let index = Arc::new(NoteIndex::new(root, &all));
-        let notes: Vec<&ScannedNote> = all.iter().filter(|sn| sn.note.model == name).collect();
-        let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).min(notes.len().max(1));
+        let notes = scan_dir_v2(root)?;
+        let rendered = self.render_notes(&notes, |sn| sn.note.model == name, Some((name, lua)));
+        let mut failures = Vec::new();
+        for (sn, r) in notes.iter().zip(rendered) {
+            let rel = sn.path.strip_prefix(root).unwrap_or(&sn.path).display();
+            match r {
+                None => {}
+                Some(Ok(r)) if r.errors.is_empty() => {}
+                Some(Ok(r)) => failures.push(format!("{rel}: {}", r.errors.join("; "))),
+                Some(Err(e)) => failures.push(format!("{rel}: {e:#}")),
+            }
+        }
+        Ok(failures)
+    }
+
+    /// Render the `notes` that pass `want`, on all cores; `out[i]` is
+    /// `notes[i]`, `None` where `want` said no. Each thread has its own Lua
+    /// engine (engines aren't `Send`), with draft `(name, lua)` in place of
+    /// the saved model if given. `ctx:notes` sees all of `notes`.
+    pub fn render_notes(
+        &self,
+        notes: &[ScannedNote],
+        want: impl Fn(&ScannedNote) -> bool + Sync,
+        draft: Option<(&str, &str)>,
+    ) -> Vec<Option<Result<RenderedNote>>> {
+        let index = Arc::new(NoteIndex::new(&self.cfg.cards_dir, notes));
+        let todo: Vec<usize> = (0..notes.len()).filter(|&i| want(&notes[i])).collect();
+        let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).min(todo.len()).max(1);
         let next = std::sync::atomic::AtomicUsize::new(0);
         let (cache, models) = (render_cache_dir(), self.cfg.resolved_models_dir());
         // Borrow only what threads need: `self.engine` isn't `Sync`.
         let (cfg, registry) = (&self.cfg, &self.registry);
-        let mut failures: Vec<(usize, String)> = std::thread::scope(|s| {
+        let done: Vec<(usize, Result<RenderedNote>)> = std::thread::scope(|s| {
             let workers: Vec<_> = (0..threads)
                 .map(|_| {
                     s.spawn(|| {
                         let mut engine = build_script_engine(cfg);
+                        let draft_err = draft.and_then(|(name, lua)| engine.set_draft(name, lua).err());
                         let mut out = Vec::new();
-                        if let Err(e) = engine.set_draft(name, lua) {
-                            out.push((0, format!("{e:#}")));
-                            return out;
-                        }
                         loop {
-                            let i = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                            let Some(sn) = notes.get(i) else { break };
-                            let rel = sn.path.strip_prefix(root).unwrap_or(&sn.path).display();
-                            match render_note(sn, &mut engine, registry, &cache, &models, Some(&index)) {
-                                Ok(r) if r.errors.is_empty() => {}
-                                Ok(r) => out.push((i, format!("{rel}: {}", r.errors.join("; ")))),
-                                Err(e) => out.push((i, format!("{rel}: {e:#}"))),
-                            }
+                            let k = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            let Some(&i) = todo.get(k) else { break };
+                            let r = match &draft_err {
+                                Some(e) => Err(anyhow::anyhow!("{e:#}")),
+                                None => render_note(&notes[i], &mut engine, registry, &cache, &models, Some(&index)),
+                            };
+                            out.push((i, r));
                         }
                         out
                     })
                 })
                 .collect();
-            workers.into_iter().flat_map(|w| w.join().unwrap_or_default()).collect()
+            workers.into_iter().flat_map(|w| w.join().expect("render thread panicked")).collect()
         });
-        failures.sort();
-        failures.dedup();
-        Ok(failures.into_iter().map(|(_, f)| f).collect())
+        let mut out: Vec<Option<Result<RenderedNote>>> = notes.iter().map(|_| None).collect();
+        for (i, r) in done {
+            out[i] = Some(r);
+        }
+        out
     }
 }
 

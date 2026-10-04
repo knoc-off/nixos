@@ -159,15 +159,14 @@ enum Plan<'a> {
     Move(&'a RawManagedNote, &'a Local),
 }
 
-#[allow(clippy::too_many_arguments)]
+/// Diff the rendered notes against `col` and (unless `dry_run`) write.
+/// `rendered[i]` is `notes[i]` rendered, `None` for a note without an id
+/// (callers render in parallel, see `Project::render_notes`).
 pub fn reconcile(
     col: &mut Collection,
     root: &Path,
     notes: &[ScannedNote],
-    script_engine: &mut ScriptEngine,
-    registry: &Arc<Registry>,
-    cache_dir: &Path,
-    models_dir: &Path,
+    rendered: Vec<Option<Result<RenderedNote>>>,
     dry_run: bool,
     prune: bool,
 ) -> Result<Outcome> {
@@ -182,25 +181,19 @@ pub fn reconcile(
     // render failure for a deletion. This is the core data-loss guard.
     let mut seen_source_ids: HashSet<String> = HashSet::new();
 
-    // What `ctx:notes` queries: this same scan, so every note sees one
-    // consistent snapshot of the working tree.
-    let index = Arc::new(NoteIndex::new(root, notes));
-
-    for sn in notes {
+    for (sn, r) in notes.iter().zip(rendered) {
         let note = &sn.note;
 
-        let guid = match &note.id {
-            Some(id) => id.clone(),
-            None => {
-                outcome.unformatted += 1;
-                continue;
-            }
+        let (Some(id), Some(r)) = (&note.id, r) else {
+            outcome.unformatted += 1;
+            continue;
         };
+        let guid = id.clone();
 
         // Record the id as present on disk regardless of what happens next.
         seen_source_ids.insert(guid.clone());
 
-        let entry = match render_note(sn, script_engine, registry, cache_dir, models_dir, Some(&index)) {
+        let entry = match r {
             Ok(r) => {
                 for e in &r.errors {
                     outcome.errors.push(format!("{}: {e}", sn.path.display()));
