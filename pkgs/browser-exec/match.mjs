@@ -22,6 +22,9 @@ export function parseUserscript(source) {
     // BrowserExecUserscriptsChild.sys.mjs) -- the field is still captured now
     // so scripts written today don't need editing when @run-at is honored.
     runAt: grab("run-at") || "document-idle",
+    // Only `jev` means anything today (see BrowserExecUserscriptsChild); the
+    // default is Tampermonkey's `@grant none`.
+    grants: grabAll("grant").filter((g) => g !== "none"),
   };
 }
 

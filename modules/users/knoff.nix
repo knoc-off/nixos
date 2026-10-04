@@ -37,7 +37,12 @@
       };
     in
     {
-      imports = [ inputs.home-manager.nixosModules.home-manager ];
+
+      imports = [
+        inputs.home-manager.nixosModules.home-manager
+
+        self.nixosModules.jegrep
+      ];
 
       home-manager = {
         backupFileExtension = "bak";

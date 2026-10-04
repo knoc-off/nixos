@@ -287,7 +287,7 @@ export default async (_ctx) => {
         "What: evaluate JavaScript against a running Firefox (firefox-neo), " +
         "either chrome-privileged (`world: 'chrome'`, default -- full browser " +
         "UI/XPCOM access, sandbox helpers: tabs(), openTab(url), $/$$, cs(), R(), " +
-        "readable(), contentEval(), pageEval(), reloadUserscripts()) or scoped " +
+        "readable(), contentEval(), pageEval(), reloadUserscripts(), jev, snippet()) or scoped " +
         "to the active tab's page (`world: 'page'` -- runs in that page's own " +
         "content window). " +
         "When: extracting structure/text from a page, driving the browser UI, " +
@@ -300,7 +300,22 @@ export default async (_ctx) => {
         "library and evals it, git-committed; `name` alone re-evals a saved " +
         "snippet; `reload: true` asks the bridge to re-scan the userscript " +
         "library (~/.local/share/browser-exec/userscripts/*.user.js) after " +
-        "you've written or edited one with the normal file tools.",
+        "you've written or edited one with the normal file tools. " +
+        "JEV (chrome world): `jev` is TypeSafe's Jev, a fast decision model " +
+        "that answers typed questions about a JSON state -- it never writes " +
+        "text or code, so you write the script and it makes the calls inside " +
+        "it. `await jev.noul(state, 'Is there a captcha?')` -> 0..1; " +
+        "`jev.choose(state, instr, ['a','b'] | {a:'desc'})` -> {choice, " +
+        "probabilities, confidence}; `jev.score(state, instr, [levels])` -> " +
+        "{score, confidence}; `jev.ask(state, {id: {type, instructions, " +
+        "criteria}})` batches many questions in one ~fast call (prefer this). " +
+        "`jev.observe()` -> page snapshot {url,title,text,actions}; " +
+        "`jev.run({goal, values:[strings it may type], ops:{NAME:{description, " +
+        "run: page => ...}}, maxSteps, minConfidence})` is a browser agent loop " +
+        "(CLICK/TYPE_TEXT/SELECT/SCROLL/WAIT/DONE/BLOCKED + your ops) on the " +
+        "active tab, returning {status, history}. `snippet(name)` runs a saved " +
+        "snippet, e.g. as an op's run. Userscripts get jev.ask/noul/choose/" +
+        "score with `// @grant jev` in their header.",
       args: {
         script: z
           .string()
@@ -359,8 +374,9 @@ export default async (_ctx) => {
             }
           }
 
-          if (args.list) {
-            const entries = await listSaved(typeof args.list === "string" ? args.list : null);
+          // Tool-call args can arrive with the boolean stringified ("true").
+          if (args.list && args.list !== "false") {
+            const entries = await listSaved(typeof args.list === "string" && args.list !== "true" ? args.list : null);
             return formatList(entries);
           }
 

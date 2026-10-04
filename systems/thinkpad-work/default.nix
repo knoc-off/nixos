@@ -108,6 +108,12 @@ in
           "shell_environment/FIGMA_CLIENTID".owner = "niko";
           "shell_environment/FIGMA_CLIENTSECRET".owner = "niko";
           "shell_environment/GOOGLE_TOTP_KEY".owner = "niko";
+          # Work Jev key instead of the shared (private) one from modules/jegrep.nix.
+          # Same /run/secrets path, so jegrep and the opencode jail pick it up.
+          "jev/api-key" = {
+            sopsFile = lib.mkForce ./secrets.yaml;
+            key = "jev-token";
+          };
         };
       };
     }

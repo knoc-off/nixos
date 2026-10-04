@@ -242,6 +242,13 @@
               "super+alt+k=goto_split:top"
               "super+alt+l=goto_split:right"
 
+              # Prompt-to-prompt scrolling (needs fish shell integration).
+              "super+alt+up=jump_to_prompt:-1"
+              "super+alt+down=jump_to_prompt:1"
+              # No "select last output" action exists; dump the scrollback to a
+              # temp file and paste its path (type `nvim ` first).
+              "super+alt+e=write_scrollback_file:paste,plain"
+
               "super+ctrl+h=resize_split:left,10"
               "super+ctrl+j=resize_split:down,10"
               "super+ctrl+k=resize_split:up,10"

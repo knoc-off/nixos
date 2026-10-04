@@ -299,6 +299,8 @@ in
         "${profileDir}/chrome/JS/bridge.sys.mjs".source = "${browserExecChrome}/JS/bridge.sys.mjs";
         "${profileDir}/chrome/JS/loader.sys.mjs".source = "${browserExecChrome}/JS/loader.sys.mjs";
         "${profileDir}/chrome/JS/match.mjs".source = "${browserExecChrome}/JS/match.mjs";
+        "${profileDir}/chrome/JS/jev.sys.mjs".source = "${browserExecChrome}/JS/jev.sys.mjs";
+        "${profileDir}/chrome/JS/jevkit.mjs".source = "${browserExecChrome}/JS/jevkit.mjs";
         "${profileDir}/chrome/JS/actor" = {
           source = "${browserExecChrome}/JS/actor";
           recursive = true;

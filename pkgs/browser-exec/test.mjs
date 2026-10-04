@@ -6,6 +6,103 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { parseUserscript, globToRegExp, matchesAny } from "./match.mjs";
 import { makeHeader, parseHeader, stripHeader, withHeader, wrapForWorld } from "./opencode-plugin.js";
+import { validateChoice, actionSpace, decisionRequest, readDecision, rateWindow, toCriteria, actJs } from "./jevkit.mjs";
+
+test("parseUserscript collects @grant, dropping none", () => {
+  const src = ["// ==UserScript==", "// @match https://a/*", "// @grant none", "// @grant jev", "// ==/UserScript=="].join("\n");
+  assert.deepEqual(parseUserscript(src).grants, ["jev"]);
+  assert.deepEqual(parseUserscript("x").grants, []);
+});
+
+const goodChoice = { choice: "a", probabilities: { a: 0.7, b: 0.3 }, confidence: 0.6 };
+
+test("validateChoice accepts a well-formed answer", () => {
+  assert.equal(validateChoice(goodChoice, ["a", "b"]).choice, "a");
+  assert.equal(validateChoice(goodChoice, { a: null, b: "x" }).choice, "a");
+});
+
+test("validateChoice rejects anything that could become a wrong action", () => {
+  const bad = [
+    { ...goodChoice, choice: "c" }, // not offered
+    { ...goodChoice, choice: "b" }, // not the argmax
+    { ...goodChoice, probabilities: { a: 0.7 } }, // missing option
+    { ...goodChoice, probabilities: { a: 0.9, b: 0.9 } }, // doesn't sum to 1
+    { ...goodChoice, confidence: NaN },
+    undefined,
+  ];
+  for (const a of bad) assert.throws(() => validateChoice(a, ["a", "b"]));
+});
+
+test("toCriteria turns an option list into a null-described map", () => {
+  assert.deepEqual(toCriteria(["x", "y"]), { x: null, y: null });
+  assert.deepEqual(toCriteria({ x: "d" }), { x: "d" });
+});
+
+const page = {
+  url: "https://e/",
+  title: "t",
+  text: "hello",
+  actions: [
+    { id: "e1", node: 1, kind: "fill", role: "textbox", label: "Search", value: "" },
+    { id: "e2", node: 1, kind: "click", role: "textbox", label: "Open Search", value: "" },
+    { id: "e3", node: 2, kind: "click", role: "button", label: "Go", value: "" },
+    { id: "e4", node: 3, kind: "select", role: "combobox", label: "Size -> L", value: "l", current_value: "M" },
+    { id: "scroll_down", kind: "scroll", label: "Scroll down", delta: 560 },
+    { id: "wait", kind: "wait", label: "Wait" },
+  ],
+};
+
+test("actionSpace groups actions per element and splits controls", () => {
+  const { elements, targets, controls } = actionSpace(page.actions);
+  assert.equal(elements.length, 3);
+  assert.deepEqual(elements[0].operations, ["TYPE_TEXT", "CLICK"]);
+  assert.deepEqual(Object.keys(targets.CLICK), ["1", "2"]);
+  assert.deepEqual(Object.keys(targets.SELECT), ["3:1"]);
+  assert.deepEqual(Object.keys(controls), ["SCROLL_DOWN", "WAIT"]);
+});
+
+test("decisionRequest offers caller ops, and TYPE_TEXT only when typing is possible", () => {
+  const req = decisionRequest(page, "g", [], { extraOps: { DISMISS: "close the banner" }, canType: false });
+  assert.ok(!("TYPE_TEXT" in req.operations));
+  assert.ok(!("type_text_target" in req.questions));
+  assert.equal(req.operations.DISMISS, "close the banner");
+  assert.ok("DONE" in req.operations && "BLOCKED" in req.operations);
+  assert.ok("click_target" in req.questions);
+});
+
+test("readDecision maps operation+target back to the observed action", () => {
+  const req = decisionRequest(page, "g", []);
+  const ops = Object.keys(req.operations);
+  const probs = (keys, pick) => Object.fromEntries(keys.map((k) => [k, k === pick ? 1 : 0]));
+  const d = readDecision(
+    {
+      answers: {
+        operation: { choice: "CLICK", probabilities: probs(ops, "CLICK"), confidence: 1 },
+        click_target: { choice: "2", probabilities: probs(["1", "2"], "2"), confidence: 1 },
+      },
+    },
+    req
+  );
+  assert.equal(d.action.id, "e3");
+  const w = readDecision({ answers: { operation: { choice: "WAIT", probabilities: probs(ops, "WAIT"), confidence: 1 } } }, req);
+  assert.equal(w.action.kind, "wait");
+});
+
+test("rateWindow caps calls per sliding minute", () => {
+  let t = 0;
+  const hit = rateWindow(2, () => t);
+  hit();
+  hit();
+  assert.throws(hit);
+  t = 60001;
+  hit();
+});
+
+test("actJs embeds model-free data only as JSON literals", () => {
+  const js = actJs({ kind: "fill", node: 1 }, "g", "a'); alert(1); ('");
+  assert.ok(js.includes(JSON.stringify("a'); alert(1); ('")));
+  new Function(`return (async () => {${js}})`); // parses
+});
 
 test("parseUserscript extracts name/description/match/run-at", () => {
   const src = [

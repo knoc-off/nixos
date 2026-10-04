@@ -7,7 +7,8 @@
 // script libraries are small (tens of files at most) and reload is a rare,
 // explicit action (author saves a file, then calls it), so re-parsing
 // everything is cheap and avoids a second, staler code path.
-import { IOUtils } from "resource://gre/modules/IOUtils.sys.mjs";
+// IOUtils is a global in system modules; there is no IOUtils.sys.mjs to
+// import (importing it threw "Failed to load", so the store never loaded).
 import { parseUserscript, matchesAny } from "chrome://userscripts/content/match.mjs";
 
 const DEFAULT_DIR_PREF = "browserexec.userscriptsDir";

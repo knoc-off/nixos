@@ -40,6 +40,7 @@ let
   scriptExec = selfPkgs.script-exec;
   browserExec = selfPkgs.browser-exec;
   axiomLedger = selfPkgs.axiom-ledger;
+  jevReview = selfPkgs.jev-review;
 
   # The jail's entire ~/.config/opencode, generated in the store. See
   # config/default.nix for why this is a store path rather than the host's
@@ -50,6 +51,7 @@ let
       scriptExec
       browserExec
       axiomLedger
+      jevReview
       lspmuxSession
       datadog
       ;
@@ -575,10 +577,14 @@ jail "jailed-opencode" upkgs.fish (
       RUNTIME_ARGS+=(--setenv JAIL_START_DIR "$JAIL_START_DIR")
       RUNTIME_ARGS+=(--setenv JAIL_NAME "''${JAIL_NAME:-}")
 
-      # jegrep's Jev key (sops, modules/jegrep.nix). Only the value crosses
-      # into the jail, not /run/secrets.
-      if [[ -r /run/secrets/jev/api-key ]]; then
-        RUNTIME_ARGS+=(--setenv TYPESAFE_API_KEY "$(< /run/secrets/jev/api-key)")
+      # jegrep's Jev key. A per-jail file overrides the host default (sops,
+      # modules/jegrep.nix). It's kept under ~/.config, outside the jail's
+      # writable persist dir, so the agent can't rewrite its own key. Only
+      # the value crosses into the jail, not the file.
+      JEV_KEY_FILE="$HOME/.config/opencode-jails/''${JAIL_NAME:-_shared}/jev-api-key"
+      [[ -r "$JEV_KEY_FILE" ]] || JEV_KEY_FILE=/run/secrets/jev/api-key
+      if [[ -r "$JEV_KEY_FILE" ]]; then
+        RUNTIME_ARGS+=(--setenv TYPESAFE_API_KEY "$(< "$JEV_KEY_FILE")")
       fi
     '')
 

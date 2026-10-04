@@ -37,6 +37,11 @@ stdenv.mkDerivation {
     cp ${./bridge.sys.mjs} $out/lib/browser-exec/chrome/JS/bridge.sys.mjs
     cp ${./loader.sys.mjs} $out/lib/browser-exec/chrome/JS/loader.sys.mjs
     cp ${./match.mjs} $out/lib/browser-exec/chrome/JS/match.mjs
+    # Jev decision engine. jev.sys.mjs also gets imported once at startup as
+    # a background module (top-level *.sys.mjs); that's harmless -- no I/O
+    # happens until a script calls it.
+    cp ${./jev.sys.mjs} $out/lib/browser-exec/chrome/JS/jev.sys.mjs
+    cp ${./jevkit.mjs} $out/lib/browser-exec/chrome/JS/jevkit.mjs
     cp ${./actor/store.sys.mjs} $out/lib/browser-exec/chrome/JS/actor/store.sys.mjs
     cp ${./actor/BrowserExecUserscriptsParent.sys.mjs} $out/lib/browser-exec/chrome/JS/actor/BrowserExecUserscriptsParent.sys.mjs
     cp ${./actor/BrowserExecUserscriptsChild.sys.mjs} $out/lib/browser-exec/chrome/JS/actor/BrowserExecUserscriptsChild.sys.mjs
@@ -60,7 +65,7 @@ stdenv.mkDerivation {
         src = ./.;
       }
       ''
-        cp $src/opencode-plugin.js $src/match.mjs $src/test.mjs .
+        cp $src/opencode-plugin.js $src/match.mjs $src/jevkit.mjs $src/test.mjs .
         node --test test.mjs
         touch $out
       '';

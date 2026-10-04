@@ -36,10 +36,34 @@ export class BrowserExecUserscriptChild extends JSWindowActorChild {
           wantXrays: false,
           sandboxName: `browser-exec:${script.name || "userscript"}`,
         });
+        if (script.grants?.includes("jev")) this.grantJev(sandbox, script.name);
         Cu.evalInSandbox(script.source, sandbox, undefined, url);
       } catch (e) {
         console.error(`browser-exec: userscript '${script.name}' failed on ${url}: ${e}`);
       }
     }
+  }
+
+  // `// @grant jev` puts a `jev` object (ask/noul/choose/score) on the
+  // script's sandbox global -- not on the page's window. Calls go to the
+  // parent process, which holds the API key and re-checks the grant.
+  // Arguments and results cross as JSON strings, so nothing privileged is
+  // ever handed to page-compartment code.
+  grantJev(sandbox, scriptName) {
+    const call = (fn, args) =>
+      new sandbox.Promise(
+        Cu.exportFunction((resolve, reject) => {
+          this.sendQuery("BrowserExecUserscript:Jev", { script: scriptName, fn, args }).then(
+            (r) => resolve(r),
+            (e) => reject(new sandbox.Error(String(e?.message || e)))
+          );
+        }, sandbox)
+      );
+    Cu.exportFunction(call, sandbox, { defineAs: "__bxJevCall" });
+    Cu.evalInSandbox(
+      `var jev = Object.freeze(Object.fromEntries(["ask", "noul", "choose", "score"].map((fn) =>
+        [fn, (...a) => __bxJevCall(fn, JSON.stringify(a)).then(JSON.parse)])));`,
+      sandbox
+    );
   }
 }

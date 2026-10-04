@@ -423,6 +423,22 @@ const mkSandbox = () => {
       return { error: String(e) };
     }
   };
+  // Jev decision engine (see jev.sys.mjs). Lazy getter so a broken jev
+  // module can't take the whole bridge down with it.
+  Object.defineProperty(s, "jev", {
+    get: () =>
+      ChromeUtils.importESModule("chrome://userscripts/content/jev.sys.mjs").makeJev(pageEval),
+  });
+  // Run a saved browser_exec snippet by name, in the world its header says.
+  // Lets a script hand a reviewed snippet to jev.run({ops}) as an operation.
+  s.snippet = async (name, target) => {
+    if (!/^[A-Za-z0-9_-]+$/.test(name)) throw new Error("bad snippet name " + JSON.stringify(name));
+    const src = await IOUtils.readUTF8(
+      Services.env.get("HOME") + "/.local/share/browser-exec/snippets/" + name + ".js"
+    );
+    if (/^\/\/\s*world\s*=\s*"page"\s*$/m.test(src)) return pageEval(src, target);
+    return Cu.evalInSandbox("(async function(){\n" + src + "\n})()", mkSandbox());
+  };
   return s;
 };
 

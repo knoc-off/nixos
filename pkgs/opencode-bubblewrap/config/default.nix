@@ -9,6 +9,7 @@
   scriptExec,
   browserExec,
   axiomLedger,
+  jevReview,
   lspmuxSession,
   datadog,
 }:
@@ -305,6 +306,8 @@ let
     "*" = "deny";
     grep = "allow";
     glob = "allow";
+    # jegrep-backed semantic search (./jegrep-tool.js).
+    search = "allow";
     # `list` is not a tool: directory listing is part of `read` (read.ts
     # dispatches to reader.list()). Kept only because native `explore` carries
     # the same inert entry; it grants nothing either way.
@@ -371,7 +374,7 @@ let
     quick = {
       model = "anthropic/claude-sonnet-5-5";
       contextBudget = 40000;
-      description = "PREFERRED FIRST PASS for all codebase and filesystem investigation. Fast, cheap tier. Read-only: locating files, semantic search, finding definitions and call sites, reconnaissance before an edit, confirming assumptions. Searches with `jegrep \"<plain-language query>\" --compact` first, falling back to Grep only for exact strings. Reach for this by default instead of running Grep/Glob yourself, and dispatch several in ONE message to run them in parallel. Escalate to explore-mid only if a lookup genuinely needs reasoning.";
+      description = "PREFERRED FIRST PASS for all codebase and filesystem investigation. Fast, cheap tier. Read-only: locating files, semantic search, finding definitions and call sites, reconnaissance before an edit, confirming assumptions. Opens every lookup with the `search` tool (semantic, ~1s) to get the lay of the land, then pins down exact strings with Grep/Glob; never searches via bash. Reach for this by default instead of running Grep/Glob yourself, and dispatch several in ONE message to run them in parallel. Escalate to explore-mid only if a lookup genuinely needs reasoning.";
     };
     mid = {
       model = "anthropic/claude-sonnet-5-5";
@@ -450,6 +453,11 @@ let
       read = "allow";
       glob = "allow";
       grep = "allow";
+      search = "allow";
+      jev_review = "allow";
+      # Saves into ~/scratch/jev-probes (its own git repo) and runs the probe
+      # in-process; same trust tier as script_exec.
+      jev_probe = "allow";
       list = "allow";
       lsp = "allow";
       repo_overview = "allow";
@@ -486,10 +494,10 @@ let
       # can do nothing bash can't already do, just with structured deps.
       script_exec = "allow";
 
-      # Browser exec — same trust tier: chrome/page eval against firefox-neo
-      # over a filesystem-permission-protected unix socket, no host access
-      # beyond what that browser process already has.
-      browser_exec = "allow";
+      # Browser exec — asks each time: chrome-privileged eval against the
+      # real firefox-neo profile (logged-in sessions), and scripts can drive
+      # Jev decision loops that click/type on their own.
+      browser_exec = "ask";
 
       # Edit — user approves each file modification
       edit = "ask";
@@ -509,6 +517,22 @@ let
     # relative to its file, which is why an in-tree path works (upstream
     # documents this as the "share one checkout" mode).
     plugin = [ "${inputs.ponytail}/.opencode/plugins/ponytail.mjs" ];
+
+    # /review: the model steers, Jev inspects (jev_review + jev_probe, pkgs/jev-review).
+    command.review = {
+      description = "Review changed Rust/TypeScript: bugs, repo conventions, duplication";
+      template = ''
+        Review my changes. Jev is good at confirming or ruling out a specific suspicion across many units cheaply, and bad at inventing suspicions -- that part is yours.
+
+        1. Pick the repo and the diff. If the session directory holds several repos, work out which one the user means and pass it as `path` (relative is fine). Run git status and git log in THAT repo: uncommitted work means from=HEAD; a feature branch means from=<merge-base with main> and to=HEAD. If the user named a repo, refs or a focus, use those: $ARGUMENTS
+        2. Form suspicions: read the commit messages and `git diff --stat` (and skim the riskiest files). Write 5-10 suspicions specific to THIS change: what could go wrong given what it does (state machines re-entered, retries, matching rules, error paths, partial failures, copies of existing code). Phrase each as a question with distinct options, not yes/no, when the answers differ in kind (silent / logged / propagated).
+        3. Pass 1: jev_review with routing on (the probe library) AND your suspicions as `questions` plus `route: true`. Check the probe list first (jev_probe list).
+        4. Narrow, at most 2 more passes: re-run the clusters that matter with `units` and sharper `questions`; use `rank_by` to sort by the one question you care about. Answers are cached. p is a ranking signal, not a verdict.
+        5. Read every unit you are going to report (and the neighbour after ≈ for deviates/duplicates). Verify by hand; drop false positives.
+        6. A suspicion that found a real issue and is likely to recur in other changes: save it as a probe (jev_probe, name + script) with a tight `langs`/`kinds` whitelist and a deterministic `gate`, so the next review routes to it automatically.
+        7. Report one entry per real finding, bugs before style, worst first: `path:line`, what is wrong and when it bites, and the fix as a short snippet. Note which suspicions were ruled out. Do not edit project files.
+      '';
+    };
 
     mcp = {
       context7 = {
@@ -650,7 +674,12 @@ in
 # glob with nodir, and this directory is an overlayfs lower layer -- copying
 # keeps both of those away from any symlink-resolution edge case for the sake
 # of a few KB.
-pkgs.runCommand "opencode-jail-config" { } ''
+pkgs.runCommand "opencode-jail-config" { nativeBuildInputs = [ pkgs.nodejs ]; } ''
+  # Bash-nudge classifier test; a regression fails the config build.
+  cp ${./jegrep-tool.js} jegrep-tool.js
+  cp ${./jegrep-tool.test.mjs} jegrep-tool.test.mjs
+  node --test jegrep-tool.test.mjs
+
   mkdir -p $out/themes $out/plugins
 
   cp ${pkgs.writeText "opencode.json" (builtins.toJSON opencodeJson)} $out/opencode.json
@@ -658,9 +687,11 @@ pkgs.runCommand "opencode-jail-config" { } ''
   cp ${pkgs.writeText "customtheme.json" (builtins.toJSON customtheme)} $out/themes/customtheme.json
 
   cp ${./ghostty-progress.js} $out/plugins/ghostty-progress.js
+  cp ${./jegrep-tool.js} $out/plugins/jegrep-tool.js
   cp -r ${./skills} $out/skills
   cp ${hostQuery}/lib/host-query/plugin/index.js $out/plugins/host-query.js
   cp ${scriptExec}/lib/script-exec/plugin/index.js $out/plugins/script-exec.js
   cp ${browserExec}/lib/browser-exec/plugin/index.js $out/plugins/browser-exec.js
   cp ${axiomLedger}/lib/axiom-ledger/plugin/index.js $out/plugins/axiom-ledger.js
+  cp ${jevReview}/lib/jev-review/plugin/index.js $out/plugins/jev-review.js
 ''

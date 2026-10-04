@@ -344,9 +344,10 @@ export default async (_ctx) => {
           ),
       },
       async execute(args, context) {
-        if (args.list) {
+        // Tool-call args can arrive with the boolean stringified ("true").
+        if (args.list && args.list !== "false") {
           const entries = await listSaved(
-            typeof args.list === "string" ? args.list : null
+            typeof args.list === "string" && args.list !== "true" ? args.list : null
           );
           return formatList(entries);
         }

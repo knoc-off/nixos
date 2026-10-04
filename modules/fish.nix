@@ -44,31 +44,8 @@
         chrome = "nix shell nixpkgs#$argv[1] -- $argv[2..-1] &>/dev/null &";
         cdToFile = ''pushd "$(fd . --exclude .git --exclude .gitignore -t f | fzf | xargs dirname)"'';
 
-        edit_command_buffer = {
-          description = "Edit the command buffer in an external editor";
-          body = ''
-            set -l f (mktemp)
-            if set -q f[1]
-                mv $f $f.fish
-                set f $f.fish
-            else
-                set f /tmp/fish.(echo %self).fish
-                touch $f
-            end
-
-            set -l p (commandline -C)
-            commandline -b > $f
-            if set -q EDITOR
-                eval $EDITOR $f
-            else
-                vim $f
-            end
-
-            commandline -r (cat $f)
-            commandline -C $p
-            command rm $f
-          '';
-        };
+        # `!!` abbr below: expands in place to the previous command.
+        last_history_item = "echo $history[1]";
 
         backg = ''
           eval "$argv &>/dev/null 2>&1 & disown"
@@ -80,16 +57,10 @@
           nix run nixpkgs#nmap -- -sP "$IPADDR/$NETMASK"
         '';
       };
-      shellInitLast = ''
-
-        # This stupid magic function annoys me, of course it works
-        # function fish_user_key_bindings
-        #   bind --preset \cw backward-kill-word
-        #   #bind \e\[1\;5C forward-word
-        #   #bind \e\[1\;5D backward-word
-        # end
-
-      '';
+      shellAbbrs."!!" = {
+        position = "anywhere";
+        function = "last_history_item";
+      };
     };
   };
 }

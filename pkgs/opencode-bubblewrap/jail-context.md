@@ -4,7 +4,12 @@ You are running inside a bubblewrap (bwrap) sandbox. This changes how you should
 
 ## Permissions
 
-- Shell commands (`bash`) are **pre-approved** — no confirmation needed
+- Shell commands (`bash`) are **pre-approved** — no confirmation needed. Bash
+  is for builds, git, nix, tests, and running programs.
+- **File work goes through the dedicated tools, not bash**: Read (files and
+  directory listings), Glob (finding files), `search` and Grep (searching),
+  Edit/Write (changing files). No `cat`/`head`/`tail`/`ls`/`find`/`fd`/`rg`/
+  `grep`/`sed`/`awk` for these — bash output that does so gets a reminder.
 - File edits require **your approval** — you'll be prompted before each modification
 - That prompt is deliberate. If a dedicated tool exists for an action, use it
   (Edit/Write for files), never a shell or Python workaround
@@ -120,10 +125,7 @@ You are running inside a bubblewrap (bwrap) sandbox. This changes how you should
 
 ## Available tools
 
-git, ripgrep, fd, jq, curl, bat, sed, awk, grep, tree, tar, nix (build/shell/run via daemon)
-
-- `jegrep` is semantic grep. It's your default search tool; see "Searching
-  code — jegrep first" below.
+In the shell: git, nix (build/shell/run via daemon), jq, curl, tar.
 
 - `, <program>` (comma) runs any nixpkgs program by name without installing it
   or knowing its attribute path, e.g. `, magick photo.png`, `, cowsay hi`.
@@ -148,39 +150,39 @@ git, ripgrep, fd, jq, curl, bat, sed, awk, grep, tree, tar, nix (build/shell/run
 Operate confidently within these boundaries. You do not need to hedge or ask for
 permission before making changes — the sandbox is your safety net.
 
-## Searching code — jegrep first
+## Searching code — `search` first
 
-**For any exploratory question, run `jegrep` first, before Grep/Glob/rg/fd,
-before reading files, and before dispatching an explore agent.** This applies
-to "where is X handled", "how does Y work", "what calls into Z", or finding
-your bearings in an unfamiliar repo. Describe what you're looking for in plain
-language, the way you'd ask a colleague:
+**`search` is your opening move. When in doubt, fire it.** Before Grep/Glob,
+before reading files, before dispatching an explore agent: one `search` call
+(~1s) gives you the lay of the land, then you continue with exact Grep and
+narrow Reads. This covers "where is X handled", "how does Y work", "what calls
+into Z", getting your bearings in an unfamiliar repo, and *also* the cases
+where you think you know the identifier but aren't sure which file it's in.
+Describe what you're looking for in plain language, the way you'd ask a
+colleague: `search(query: "where are auth tokens verified?")`, optionally with
+`path` and `keywords` you already know. Several phrasings in parallel are fine.
 
-```bash
-jegrep "where are auth tokens verified?" --compact
-jegrep "how is the retry backoff computed" src/ --compact
-```
+The usual flow is **search → Grep → Read**: search to orient, Grep to pin down
+exact strings or every occurrence, Read a narrow window.
 
 - It searches the live tree with no index. It returns ranked
-  `path:start-end` line ranges, which you then Read narrowly.
-- One run costs about half a cent and replaces several rounds of guessing at
-  identifiers. Trading that for fewer wrong greps is always worth it.
-- Always pass `--compact`. Use `--json` if you need to parse the output.
-- **Only skip it when you already know the exact string**, such as a known
-  identifier, error message, or literal you're about to patch, or when you
-  need *every* occurrence (renames, "no other call sites" checks). Those are
-  ripgrep's job; jegrep ranks, it doesn't enumerate.
-- No hits or weak hits? Rephrase the query or narrow the path before falling
-  back to grep.
-- Explore sub-agents: this applies to you too. Your first search command
-  should almost always be `jegrep`.
+  `path score start-end` lines, which you then Read narrowly.
+- One call costs about a tenth of a cent and replaces several rounds of
+  guessing at identifiers. Trading that for fewer wrong greps is always worth it.
+- **Skip straight to Grep only when you know both the exact string and that
+  you need every occurrence** (renames, "no other call sites" checks, a
+  literal you're about to patch). `search` ranks, it doesn't enumerate, so it
+  orients you; Grep then confirms.
+- No hits or weak hits? Rephrase the query, narrow `path`, or add `keywords`
+  before falling back to Grep.
+- Explore sub-agents: this applies to you too. Your first search should almost
+  always be `search`.
 
 ## Reading files — locate, don't page
 
 **Never page through a large file to find something in it.** Locate first
-(`jegrep`, or grep for a known string), then Read a narrow window around the
-hits. Check the size first
-(`wc -l`); over a few hundred lines, locate before reading.
+(`search`, or Grep for a known string), then Read a narrow window around the
+hits.
 
 ## Investigating — delegate to explore tiers
 
@@ -194,7 +196,7 @@ condensed answer:
 | `explore-deep`  | Rare, expensive. Narrow hard questions a cheap model would botch           |
 
 - **Do it yourself** when you can name the file (Read it), when one command
-  answers it outright (very often a single `jegrep`), or when you are executing (editing, building, git,
+  answers it outright (very often a single `search`), or when you are executing (editing, building, git,
   tests). Dispatching for contents you could Read is pure waste.
 - **Dispatch** anything that would turn into a chase: a search whose results
   tell you what to search for next. When unsure between tiers, take the

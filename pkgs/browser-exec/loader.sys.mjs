@@ -25,6 +25,10 @@ try {
     },
     matches: ["<all_urls>"],
     allFrames: true,
+    // Required since Fission's untrusted-web-process gating: without it
+    // getActor() throws "doesn't match remote type 'webIsolated=...'" on
+    // every web page and no userscript ever runs (observed on Firefox 156).
+    safeForUntrustedWebProcess: true,
   });
 } catch (e) {
   console.error("browser-exec: failed to register userscript actor: " + e);
