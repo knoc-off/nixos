@@ -4,7 +4,9 @@
 //! are versioned and render offline. `define` builds them from OSM ids,
 //! an Overpass query, or GeoJSON, simplified to a size budget.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, LazyLock, Mutex};
 
 use crate::data::{geoboundaries, overpass};
 use crate::error::MapError;
@@ -13,6 +15,10 @@ use crate::geometry::{Geometry, LonLat, Polygon};
 pub const PREFIX: &str = "geo/";
 /// Budget for a saved feature; bigger inputs are simplified down to it.
 const MAX_POINTS: usize = 20_000;
+
+type Parsed = (std::time::SystemTime, u64, Arc<Geometry>);
+/// See [`resolve`].
+static PARSED: LazyLock<Mutex<HashMap<PathBuf, Parsed>>> = LazyLock::new(Default::default);
 
 /// Validate a feature name: lowercase kebab, optional `/` folders.
 pub fn check_name(name: &str) -> Result<(), MapError> {
@@ -36,18 +42,34 @@ pub fn path(dir: &Path, name: &str) -> Result<PathBuf, MapError> {
 }
 
 /// Read `geo/<name>`.
+///
+/// Parsed files are kept in memory, keyed by path and checked against the
+/// file's mtime and size on every read: a note's maps use dozens of
+/// features that every other note uses too, and parsing them was half of a
+/// cold render. An edited file misses and is parsed again; `define` also
+/// drops its entry, in case a rewrite keeps both mtime and size.
 pub fn resolve(dir: Option<&Path>, name: &str) -> Result<Geometry, MapError> {
     let dir = dir.ok_or_else(|| MapError::Resolve("geo/ refs need a project (.marki/geo/)".into()))?;
     let p = path(dir, name)?;
-    let raw = std::fs::read(&p).map_err(|_| {
+    let missing = || {
         MapError::Resolve(format!(
             "unknown geo/{name}: no {}; create it with marki_map_define or list existing ones with marki_map_list",
             p.display()
         ))
-    })?;
+    };
+    let meta = std::fs::metadata(&p).map_err(|_| missing())?;
+    let stamp = (meta.modified()?, meta.len());
+    if let Some((m, l, g)) = PARSED.lock().unwrap_or_else(|e| e.into_inner()).get(&p) {
+        if (*m, *l) == stamp {
+            return Ok(Geometry::clone(g));
+        }
+    }
+    let raw = std::fs::read(&p).map_err(|_| missing())?;
     let v: serde_json::Value =
         serde_json::from_slice(&raw).map_err(|e| MapError::Resolve(format!("geo/{name}: {e}")))?;
-    from_geojson(&v).map_err(|e| MapError::Resolve(format!("geo/{name}: {e}")))
+    let g = from_geojson(&v).map_err(|e| MapError::Resolve(format!("geo/{name}: {e}")))?;
+    PARSED.lock().unwrap_or_else(|e| e.into_inner()).insert(p, (stamp.0, stamp.1, Arc::new(g.clone())));
+    Ok(g)
 }
 
 /// Bytes of every `geo/` file a set of refs uses, for the render cache
@@ -261,6 +283,7 @@ pub fn define(dir: &Path, name: &str, source: Source<'_>, cache_root: &Path) -> 
         std::fs::create_dir_all(d)?;
     }
     std::fs::write(&dest, serde_json::to_vec(&body).map_err(|e| MapError::Internal(e.to_string()))?)?;
+    PARSED.lock().unwrap_or_else(|e| e.into_inner()).remove(&dest);
     Ok(serde_json::json!({
         "ref": format!("{PREFIX}{name}"),
         "kind": kind(&g),
@@ -429,11 +452,14 @@ mod tests {
         assert!(small["points_returned"].as_u64().unwrap() < out["points"].as_u64().unwrap() / 10, "{}", small["points_returned"]);
         assert_eq!(small["geometry"]["type"], "LineString");
         assert!(resolve(Some(&d), "nope").unwrap_err().to_string().contains("marki_map_define"));
-        // The fingerprint follows file contents.
+        // The fingerprint follows file contents, and so does the parsed-file
+        // memo: a hand edit after a resolve must be seen.
+        assert!(matches!(resolve(Some(&d), "wall").unwrap(), Geometry::LineString(_)));
         let refs = vec!["geo/wall".to_string()];
         let a = fingerprint(Some(&d), refs.iter());
         std::fs::write(d.join("wall.geojson"), br#"{"type":"Point","coordinates":[1,2]}"#).unwrap();
         assert_ne!(a, fingerprint(Some(&d), refs.iter()));
+        assert!(matches!(resolve(Some(&d), "wall").unwrap(), Geometry::Point(_)));
         let _ = std::fs::remove_dir_all(&d);
     }
 }
