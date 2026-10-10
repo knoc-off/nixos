@@ -155,7 +155,7 @@ let
           type = "tile";
           entity = "sensor.${d.name}_battery";
           name = "${d.room.label} ${prettyName d}";
-        }) (builtins.filter (d: d.kind == kinds.button || d.kind == kinds.motion || d.kind == kinds.sensor) allDevices);
+        }) (builtins.filter (d: d.kind == kinds.button || d.kind == kinds.motion || d.kind == kinds.sensor || d.kind == kinds.door) allDevices);
       }
     ];
   };
