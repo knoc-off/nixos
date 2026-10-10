@@ -148,7 +148,10 @@ impl House {
                     Logic::Builtin(Box::new(logic))
                 }
                 (None, Some(source)) => {
-                    let lights = room.bulbs.keys().cloned();
+                    let lights = room
+                        .bulbs
+                        .iter()
+                        .map(|(n, b)| (n.clone(), b.device.clone()));
                     let script = Script::new(
                         &name,
                         &source,

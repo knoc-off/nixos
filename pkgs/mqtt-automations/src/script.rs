@@ -56,6 +56,11 @@ struct Shown {
     state: Target,
 }
 
+struct Bulb {
+    device: String,
+    shown: Option<Shown>,
+}
+
 struct Timer {
     at: Instant,
     every: Option<Duration>,
@@ -68,7 +73,7 @@ struct State {
     longitude: f64,
     now: Instant,
     wall: DateTime<FixedOffset>,
-    lights: BTreeMap<String, Option<Shown>>,
+    lights: BTreeMap<String, Bulb>,
     requests: Vec<(String, Input)>,
     timers: BTreeMap<u64, Timer>,
     next_timer: u64,
@@ -79,15 +84,19 @@ struct State {
 /// Real-time cutoff for the running call, checked by the instruction hook.
 struct CallDeadline(std::time::Instant);
 
+/// Helpers loaded ahead of every room script (`follow`, `occupancy`, ...).
+const PRELUDE: &str = include_str!("prelude.lua");
+
 pub struct Script {
     lua: Lua,
 }
 
 impl Script {
+    /// `lights`: the room's bulbs as (name, z2m device).
     pub fn new(
         room: &str,
         source: &str,
-        lights: impl IntoIterator<Item = String>,
+        lights: impl IntoIterator<Item = (String, String)>,
         (latitude, longitude): (f64, f64),
         now: Instant,
         wall: DateTime<FixedOffset>,
@@ -104,7 +113,16 @@ impl Script {
             longitude,
             now,
             wall,
-            lights: lights.into_iter().map(|l| (l, None)).collect(),
+            lights: lights
+                .into_iter()
+                .map(|(name, device)| {
+                    let bulb = Bulb {
+                        device,
+                        shown: None,
+                    };
+                    (name, bulb)
+                })
+                .collect(),
             requests: Vec::new(),
             timers: BTreeMap::new(),
             next_timer: 1,
@@ -124,6 +142,13 @@ impl Script {
         install(&lua).map_err(lua_err)?;
 
         let script = Self { lua };
+        script.budget();
+        script
+            .lua
+            .load(PRELUDE)
+            .set_name("@prelude.lua")
+            .exec()
+            .map_err(|e| anyhow!("prelude: {e}"))?;
         script.budget();
         script
             .lua
@@ -172,7 +197,7 @@ impl Script {
 
     pub fn bulb(&mut self, light: &str, held: bool, state: Target) -> Vec<(String, Input)> {
         if let Some(slot) = self.state().lights.get_mut(light) {
-            *slot = Some(Shown { held, state });
+            slot.shown = Some(Shown { held, state });
         }
         self.take()
     }
@@ -529,8 +554,11 @@ impl UserData for Light {
             };
             this.request(lua, input)
         });
+        methods.add_method("device", |lua, this, ()| {
+            Ok(state(lua)?.lights.get(&this.0).map(|b| b.device.clone()))
+        });
         methods.add_method("state", |lua, this, ()| {
-            let Some(shown) = state(lua)?.lights.get(&this.0).copied().flatten() else {
+            let Some(shown) = state(lua)?.lights.get(&this.0).and_then(|b| b.shown) else {
                 return Ok(None);
             };
             let t = lua.create_table()?;
@@ -564,7 +592,7 @@ mod tests {
         fn try_new(source: &str) -> Result<Self> {
             let now = Instant::now();
             let wall = DateTime::parse_from_rfc3339(NOON).unwrap();
-            let lights = ["a", "b"].map(String::from);
+            let lights = ["a", "b"].map(|n| (n.to_owned(), format!("dev_{n}")));
             Ok(Self {
                 script: Script::new("test", source, lights, (52.52, 13.405), now, wall)?,
                 now,
@@ -780,5 +808,306 @@ mod tests {
             "#,
         );
         assert_eq!(rig.send("x", json!({})).len(), 1);
+    }
+
+    fn targets(reqs: &[(String, Input)]) -> Vec<(&str, &'static str, Target)> {
+        reqs.iter()
+            .filter_map(|(n, i)| match i {
+                Input::Auto { target, .. } => Some((n.as_str(), "auto", *target)),
+                Input::User { target, .. } => Some((n.as_str(), "user", *target)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn releases(reqs: &[(String, Input)]) -> usize {
+        reqs.iter()
+            .filter(|(_, i)| matches!(i, Input::Release { .. }))
+            .count()
+    }
+
+    fn last_auto_on(reqs: &[(String, Input)], bulb: &str) -> Option<bool> {
+        targets(reqs)
+            .into_iter()
+            .rev()
+            .find(|(n, k, _)| *n == bulb && *k == "auto")
+            .map(|(_, _, t)| t.on)
+    }
+
+    const MOTION_ROOM: &str = r#"
+        follow{ when = occupancy{ sensors = { "motion" }, doors = { "door" }, hold = 60, door_hold = 30 }, fade = 20 }
+    "#;
+
+    #[test]
+    fn occupancy_turns_on_with_motion_and_off_after_hold_and_fade() {
+        let mut rig = Rig::new(MOTION_ROOM);
+        assert_eq!(
+            last_auto_on(&rig.wait(0), "a"),
+            Some(false),
+            "starts vacant"
+        );
+
+        let reqs = rig.send("motion", json!({ "occupancy": true }));
+        assert_eq!(last_auto_on(&reqs, "a"), Some(true));
+        assert_eq!(last_auto_on(&reqs, "b"), Some(true));
+        assert!(
+            matches!(reqs[0].1, Input::Auto { transition, .. } if transition == Duration::from_millis(400))
+        );
+
+        // Still there as long as the sensor says so, whatever the hold.
+        assert_ne!(last_auto_on(&rig.wait(600), "a"), Some(false));
+
+        rig.send("motion", json!({ "occupancy": false }));
+        assert_ne!(last_auto_on(&rig.wait(59), "a"), Some(false));
+        let reqs = rig.wait(1);
+        assert_eq!(last_auto_on(&reqs, "a"), Some(false));
+        assert_eq!(
+            releases(&reqs),
+            2,
+            "a manual change lasts as long as the visit"
+        );
+        assert!(matches!(
+            reqs.iter().find(|(_, i)| matches!(i, Input::Auto { .. })).unwrap().1,
+            Input::Auto { transition, .. } if transition == Duration::from_secs(20)
+        ));
+    }
+
+    #[test]
+    fn presence_field_counts_like_occupancy_and_noise_is_ignored() {
+        let mut rig = Rig::new(MOTION_ROOM);
+        rig.wait(0);
+        for p in [
+            json!({ "battery": 90 }),
+            json!("x"),
+            json!({ "occupancy": "yes" }),
+        ] {
+            assert_eq!(last_auto_on(&rig.send("motion", p), "a"), None);
+        }
+        assert_eq!(
+            last_auto_on(&rig.send("motion", json!({ "presence": true })), "a"),
+            Some(true)
+        );
+    }
+
+    #[test]
+    fn door_opening_lights_the_room_until_a_sensor_takes_over() {
+        let mut rig = Rig::new(MOTION_ROOM);
+        rig.wait(0);
+        assert_eq!(
+            last_auto_on(&rig.send("door", json!({ "contact": true })), "a"),
+            None,
+            "closing says nothing"
+        );
+        assert_eq!(
+            last_auto_on(&rig.send("door", json!({ "contact": false })), "a"),
+            Some(true)
+        );
+        rig.wait(10);
+        rig.send("motion", json!({ "occupancy": true }));
+        // The door's window ends, but the sensor still sees someone.
+        assert_ne!(last_auto_on(&rig.wait(60), "a"), Some(false));
+        rig.send("motion", json!({ "occupancy": false }));
+        assert_eq!(last_auto_on(&rig.wait(60), "a"), Some(false));
+    }
+
+    #[test]
+    fn door_alone_times_out() {
+        let mut rig = Rig::new(MOTION_ROOM);
+        rig.wait(0);
+        rig.send("door", json!({ "contact": false }));
+        assert_eq!(last_auto_on(&rig.wait(30), "a"), Some(false));
+    }
+
+    #[test]
+    fn follow_without_occupancy_keeps_bulbs_as_they_are() {
+        let mut rig = Rig::new("follow{}");
+        let reqs = rig.wait(0);
+        assert_eq!(
+            last_auto_on(&reqs, "a"),
+            Some(false),
+            "unknown bulbs: off is the safe guess"
+        );
+        let on = Target {
+            on: true,
+            brightness: 200,
+            color_temp: Some(300),
+        };
+        rig.script.bulb("a", false, on);
+        let reqs = rig.wait(30);
+        assert_eq!(
+            last_auto_on(&reqs, "a"),
+            Some(true),
+            "on stays on, at the curve"
+        );
+        let (_, _, t) = targets(&reqs)
+            .into_iter()
+            .find(|(n, _, _)| *n == "a")
+            .unwrap();
+        assert!(t.color_temp.is_some() && t.brightness > 100, "{t:?}");
+    }
+
+    #[test]
+    fn manual_off_in_a_follow_room_is_not_shown_as_held() {
+        let mut rig = Rig::new("follow{}");
+        rig.wait(0);
+        let off = Target {
+            on: false,
+            brightness: 1,
+            color_temp: None,
+        };
+        rig.script.bulb("a", true, off);
+        assert_eq!(releases(&rig.wait(30)), 1);
+    }
+
+    #[test]
+    fn ha_sliders_shape_the_curve() {
+        let mut rig = Rig::new("follow{}");
+        rig.wait(0);
+        rig.script.bulb(
+            "a",
+            false,
+            Target {
+                on: true,
+                brightness: 200,
+                color_temp: None,
+            },
+        );
+        let bri = |reqs: &[(String, Input)]| {
+            targets(reqs)
+                .into_iter()
+                .find(|(n, _, _)| *n == "a")
+                .unwrap()
+                .2
+                .brightness
+        };
+        let full = bri(&rig.wait(30));
+        let topic = "mqtt-auto/sun-follow/dev_a/max-brightness";
+        rig.script.message(topic, &json!(50), rig.now, rig.wall);
+        assert!(bri(&rig.wait(30)) < full / 2 + 5);
+        // HA sends numbers as strings too; garbage keeps the last value.
+        rig.script.message(topic, &json!("20"), rig.now, rig.wall);
+        let low = bri(&rig.wait(30));
+        rig.script.message(topic, &json!("lots"), rig.now, rig.wall);
+        assert_eq!(bri(&rig.wait(30)), low);
+        assert!(low <= 51);
+
+        rig.script.message(
+            "mqtt-auto/color-temp-cycle/enabled",
+            &json!("false"),
+            rig.now,
+            rig.wall,
+        );
+        let reqs = rig.wait(30);
+        assert_eq!(targets(&reqs)[0].2.color_temp, None);
+    }
+
+    #[test]
+    fn wake_ramp_switches_on_dim_and_releases_a_night_off() {
+        let mut rig = Rig::new("follow{ wake = wake_ramp() }");
+        rig.wall = DateTime::parse_from_rfc3339("2026-06-21T06:29:00+02:00").unwrap();
+        assert_eq!(last_auto_on(&rig.wait(0), "a"), Some(false));
+        rig.script.bulb(
+            "a",
+            true,
+            Target {
+                on: false,
+                brightness: 1,
+                color_temp: None,
+            },
+        );
+        let reqs = rig.wait(30);
+        assert_eq!(
+            releases(&reqs),
+            1,
+            "follow without occupancy releases an off hold"
+        );
+
+        rig.script.bulb(
+            "a",
+            true,
+            Target {
+                on: false,
+                brightness: 1,
+                color_temp: None,
+            },
+        );
+        let reqs = rig.wait(30 + 10 * 60);
+        assert_eq!(last_auto_on(&reqs, "a"), Some(true));
+        assert!(releases(&reqs) >= 2, "ramp start releases every bulb");
+        let early = targets(&reqs)[0].2.brightness;
+        let later = targets(&rig.wait(20 * 60))
+            .into_iter()
+            .find(|(n, _, _)| *n == "a")
+            .unwrap()
+            .2
+            .brightness;
+        assert!(
+            early < later && later <= 77,
+            "{early} -> {later}, capped at 30%"
+        );
+    }
+
+    #[test]
+    fn sun_switch_flips_once_per_crossing_and_releases() {
+        let mut rig = Rig::new(r#"sun_switch{ lights = { "a" } }"#);
+        assert_eq!(last_auto_on(&rig.wait(0), "a"), Some(true), "noon: bright");
+        rig.script.message(
+            "mqtt-auto/sun-follow/dev_a/invert",
+            &json!("true"),
+            rig.now,
+            rig.wall,
+        );
+        let reqs = rig.wait(30);
+        assert_eq!(last_auto_on(&reqs, "a"), Some(false));
+        assert_eq!(releases(&reqs), 1);
+        assert_eq!(releases(&rig.wait(30)), 0);
+    }
+
+    #[test]
+    fn buttons_toggle_at_the_curve() {
+        let mut rig = Rig::new(
+            r#"
+            follow{}
+            button("btn", { single = toggle(), double = toggle{ "b" } })
+            "#,
+        );
+        rig.wait(0);
+        let reqs = rig.script.message(
+            "zigbee2mqtt/btn/action",
+            &json!("single"),
+            rig.now,
+            rig.wall,
+        );
+        let t = targets(&reqs);
+        assert_eq!(t.len(), 2);
+        assert!(t
+            .iter()
+            .all(|(_, k, t)| *k == "user" && t.on && t.color_temp.is_some()));
+
+        rig.script.bulb(
+            "b",
+            false,
+            Target {
+                on: true,
+                brightness: 200,
+                color_temp: None,
+            },
+        );
+        let reqs = rig.script.message(
+            "zigbee2mqtt/btn/action",
+            &json!({ "action": "double" }),
+            rig.now,
+            rig.wall,
+        );
+        assert!(matches!(&targets(&reqs)[..], [("b", "user", t)] if !t.on));
+        assert!(rig
+            .script
+            .message(
+                "zigbee2mqtt/btn/action",
+                &json!({ "action": "triple" }),
+                rig.now,
+                rig.wall
+            )
+            .is_empty());
     }
 }
