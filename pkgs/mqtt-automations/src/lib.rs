@@ -153,7 +153,7 @@ impl Runtime {
     }
 
     /// Publish a JSON-serializable payload to a topic with the retain flag set.
-    async fn publish_retained(&self, topic: &str, payload: impl Serialize) -> Result<()> {
+    pub async fn publish_retained(&self, topic: &str, payload: impl Serialize) -> Result<()> {
         let json = serde_json::to_vec(&payload)?;
         self.client
             .publish(topic, QoS::AtMostOnce, true, json)
@@ -164,12 +164,25 @@ impl Runtime {
 
     /// Subscribe to a topic and receive messages on a channel.
     pub async fn subscribe(&self, topic: &str) -> Result<mpsc::UnboundedReceiver<Message>> {
+        self.subscribe_many([topic]).await
+    }
+
+    /// Subscribe to several topics, all delivered in arrival order on one
+    /// channel -- for state machines that need a single ordered event stream.
+    /// Topics are exact; the dispatcher does not match MQTT wildcards.
+    pub async fn subscribe_many(
+        &self,
+        topics: impl IntoIterator<Item = impl Into<String>>,
+    ) -> Result<mpsc::UnboundedReceiver<Message>> {
         let (tx, rx) = mpsc::unbounded_channel();
-        self.client
-            .subscribe(topic, QoS::AtMostOnce)
-            .await
-            .context("mqtt subscribe")?;
-        self.subs.lock().await.insert(topic.to_string(), tx);
+        for topic in topics {
+            let topic = topic.into();
+            self.client
+                .subscribe(&topic, QoS::AtMostOnce)
+                .await
+                .with_context(|| format!("mqtt subscribe {topic}"))?;
+            self.subs.lock().await.insert(topic, tx.clone());
+        }
         Ok(rx)
     }
 

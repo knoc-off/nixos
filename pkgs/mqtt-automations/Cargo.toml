@@ -31,6 +31,10 @@ path = "src/bin/button_dispatcher.rs"
 name = "sun-follow"
 path = "src/bin/sun_follow.rs"
 
+[[bin]]
+name = "light-arbiter"
+path = "src/bin/light_arbiter.rs"
+
 [dependencies]
 rumqttc = { version = "0.24", default-features = false }
 tokio = { version = "1", features = ["rt", "macros", "signal", "time", "sync"] }

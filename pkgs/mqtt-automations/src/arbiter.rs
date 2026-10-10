@@ -24,13 +24,28 @@
 use std::ops::Add;
 use std::time::{Duration, Instant};
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+use serde::{Deserialize, Serialize};
+
+/// Also the wire format rooms use for per-bulb targets.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub struct Target {
     pub on: bool,
-    /// Z2M scale, 1-254. Meaningless while `on` is false.
+    /// Z2M scale, 1-254. Meaningless while `on` is false; optional on the
+    /// wire because plugs have none.
+    #[serde(default = "Target::full")]
     pub brightness: u8,
     /// Mireds. `None` for bulbs/plugs without colour temperature.
+    #[serde(default)]
     pub color_temp: Option<u16>,
+}
+
+impl Target {
+    /// Top of z2m's brightness scale.
+    pub const FULL: u8 = 254;
+
+    fn full() -> u8 {
+        Self::FULL
+    }
 }
 
 impl Target {
@@ -285,6 +300,12 @@ impl Bulb {
         self.switch_off_at
     }
 
+    /// What the bulb should be showing now (our last command, or the state
+    /// we accepted from a report), once anything is known.
+    pub fn showing(&self) -> Option<Target> {
+        self.expected.map(|m| m.to)
+    }
+
     /// Feed one input; returns the command to publish, if any.
     pub fn step(&mut self, input: Input, now: Instant) -> Option<Command> {
         match input {
@@ -414,7 +435,7 @@ impl Bulb {
             t
         } else {
             Target {
-                brightness: u8::MAX,
+                brightness: Target::FULL,
                 color_temp: None,
                 ..t
             }

@@ -29,10 +29,7 @@ pub fn solar_noon<Tz: TimeZone>(lon: f64, date: NaiveDate, tz: Tz) -> DateTime<T
     let (eqtime, _) = solar_params(gamma);
     let noon_minutes_utc = 720.0 - 4.0 * lon - eqtime;
 
-    let base = date
-        .and_hms_opt(0, 0, 0)
-        .expect("valid midnight")
-        .and_utc();
+    let base = date.and_hms_opt(0, 0, 0).expect("valid midnight").and_utc();
     let utc = base + Duration::seconds((noon_minutes_utc * 60.0) as i64);
     utc.with_timezone(&tz)
 }
@@ -117,8 +114,8 @@ fn solar_event<Tz: TimeZone>(
     let (eqtime, decl) = solar_params(gamma);
     let lat_rad = lat.to_radians();
 
-    let cos_ha = (90.833f64.to_radians().cos()) / (lat_rad.cos() * decl.cos())
-        - lat_rad.tan() * decl.tan();
+    let cos_ha =
+        (90.833f64.to_radians().cos()) / (lat_rad.cos() * decl.cos()) - lat_rad.tan() * decl.tan();
     let ha = cos_ha.clamp(-1.0, 1.0).acos().to_degrees();
 
     let solar_noon = 720.0 - 4.0 * lon - eqtime;
@@ -129,10 +126,7 @@ fn solar_event<Tz: TimeZone>(
         solar_noon + ha * 4.0
     };
 
-    let base = date
-        .and_hms_opt(0, 0, 0)
-        .expect("valid midnight")
-        .and_utc();
+    let base = date.and_hms_opt(0, 0, 0).expect("valid midnight").and_utc();
     let utc = base + Duration::seconds((minutes_utc * 60.0) as i64);
     utc.with_timezone(&tz)
 }
@@ -183,7 +177,10 @@ mod tests {
             .unwrap()
             .and_utc();
         let elev = elevation(BERLIN_LAT, BERLIN_LON, dt);
-        assert!(elev < -5.0, "should be well below horizon at midnight, got {elev:.2}");
+        assert!(
+            elev < -5.0,
+            "should be well below horizon at midnight, got {elev:.2}"
+        );
     }
 
     #[test]
@@ -223,7 +220,10 @@ mod tests {
             .and_utc();
         let e1 = elevation(BERLIN_LAT, BERLIN_LON, early);
         let e2 = elevation(BERLIN_LAT, BERLIN_LON, later);
-        assert!(e2 > e1, "elevation should increase during morning: {e1:.2} -> {e2:.2}");
+        assert!(
+            e2 > e1,
+            "elevation should increase during morning: {e1:.2} -> {e2:.2}"
+        );
     }
 
     #[test]
@@ -274,6 +274,9 @@ mod tests {
         let date = NaiveDate::from_ymd_opt(2025, 12, 21).unwrap();
         let noon = solar_noon(BERLIN_LON, date, Utc);
         let f = daylight_fraction(BERLIN_LAT, BERLIN_LON, noon);
-        assert!((f - 1.0).abs() < 0.01, "winter noon should still be 1.0, got {f}");
+        assert!(
+            (f - 1.0).abs() < 0.01,
+            "winter noon should still be 1.0, got {f}"
+        );
     }
 }
