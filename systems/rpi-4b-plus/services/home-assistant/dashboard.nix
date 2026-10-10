@@ -17,20 +17,15 @@
   ...
 }:
 let
-  inherit (import ../../devices.nix) kinds rooms devices;
+  inherit (import ../../devices.nix) kinds rooms devices lit;
 
   domainOf = d: if d.kind == kinds.light then "light" else "switch";
   entityOf = d: "${domainOf d}.${d.name}";
 
-  # Sun-follow entities are named `<domain>.<device>_sun_follow_<suffix>` by
-  # the ha-entity-rename oneshot, from the same device registry.
-  sunFollowDevices = [
-    devices.living-room.light
-    devices.bedroom.light
-    devices.living-room.carla_desk_lamp
-    devices.living-room.standing_lamp
-    devices.living-room.niko_desk_lamp
-  ];
+  # Lighting entities are named `<domain>.<device>_sun_follow_<suffix>` by
+  # the ha-entity-rename oneshot (their unique_ids predate the lighting
+  # service, see services/lighting/home-assistant.nix).
+  litDevices = builtins.concatMap builtins.attrValues (builtins.attrValues lit);
 
   roomDevices = roomKey: builtins.attrValues devices.${roomKey};
   ofKind = kind: ds: builtins.filter (d: d.kind == kind) ds;
@@ -135,11 +130,6 @@ let
             entity = "sensor.${devices.kitchen.temp_probe.name}_temperature";
             name = "Kitchen temp probe";
           }
-          {
-            type = "tile";
-            entity = "sensor.daylight_percentage";
-            name = "Daylight";
-          }
         ];
       }
       {
@@ -160,23 +150,18 @@ let
     ];
   };
 
-  # One section per sun-following device: the master toggle and the tuning
-  # knobs that differ by kind (lights ramp a brightness curve, plugs flip at a
-  # single sun-elevation threshold).
+  # One section per lit device: who is in charge (auto or held), a button to
+  # hand it back, and the tuning knobs that differ by kind (lights ramp a
+  # brightness curve, plugs flip at a daylight threshold).
   #
-  # Entity ids mirror the sun-follow unique_id suffixes from
-  # mqtt-automations/default.nix, with kebab-case normalised to snake_case the
-  # way HA slugifies them.
-  sunFollowSection =
+  # Entity ids mirror the unique_id suffixes from
+  # services/lighting/home-assistant.nix, with kebab-case normalised to
+  # snake_case the way HA slugifies them.
+  lightingSection =
     d:
     let
       sf = suffix: "${d.name}_sun_follow_${suffix}";
       isLight = d.kind == kinds.light;
-      toggle = suffix: label: {
-        type = "tile";
-        entity = "switch.${sf suffix}";
-        name = label;
-      };
       knob = suffix: label: {
         type = "tile";
         entity = "number.${sf suffix}";
@@ -192,36 +177,71 @@ let
           heading = "${d.room.label} ${prettyName d}";
           heading_style = "title";
         }
-        (toggle "enabled" "Enabled")
-        (toggle "follow_sunrise" "Follow sunrise")
-        (toggle "follow_sunset" "Follow sunset")
-        (toggle "invert" "Invert")
+        {
+          type = "tile";
+          entity = "sensor.${sf "mode"}";
+          name = "Mode";
+        }
+        {
+          type = "tile";
+          entity = "button.${sf "release"}";
+          name = "Release";
+        }
       ]
       ++ lib.optionals isLight [
-        (toggle "allow_wake" "Can turn on")
         (knob "min_brightness" "Min brightness")
         (knob "max_brightness" "Max brightness")
         (knob "gamma" "Curve")
       ]
       ++ lib.optionals (!isLight) [
         (knob "threshold" "Sun threshold")
-      ]
-      ++ [
         {
           type = "tile";
-          entity = "button.${sf "reset"}";
-          name = "Reset";
+          entity = "switch.${sf "invert"}";
+          name = "Invert";
         }
       ];
     };
 
-  sunFollowView = {
-    title = "Sun-follow";
+  lightingView = {
+    title = "Lighting";
     path = "sun-follow";
     icon = "mdi:weather-sunset";
     type = "sections";
     max_columns = 3;
-    sections = map sunFollowSection sunFollowDevices;
+    sections = [
+      {
+        type = "grid";
+        cards = [
+          {
+            type = "heading";
+            heading = "House";
+            heading_style = "title";
+          }
+          {
+            type = "tile";
+            entity = "switch.lights_follow_hue";
+            name = "Colour follows the sun";
+          }
+          {
+            type = "tile";
+            entity = "time.sunrise_start_time";
+            name = "Wake at";
+          }
+          {
+            type = "tile";
+            entity = "number.sunrise_duration";
+            name = "Wake duration";
+          }
+          {
+            type = "tile";
+            entity = "number.sunrise_max_brightness";
+            name = "Wake brightness";
+          }
+        ];
+      }
+    ]
+    ++ map lightingSection litDevices;
   };
 in
 {
@@ -230,7 +250,7 @@ in
     views = [
       homeView
       sensorsView
-      sunFollowView
+      lightingView
     ];
   };
 }

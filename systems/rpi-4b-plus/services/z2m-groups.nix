@@ -149,7 +149,7 @@ let
       # ("bindRsp after 10000ms"), so failure is the normal case until someone
       # presses the button. Retrying on a timer would just spam the radio; the
       # next z2m restart retries anyway, and the software path
-      # (button-dispatcher) keeps the button working meanwhile -- the bind only
+      # (the lights service) keeps the button working meanwhile -- the bind only
       # adds the ability to keep working with this host powered off.
       while read -r from group clusters; do
         echo "binding '$from' -> group '$group' ($clusters)"

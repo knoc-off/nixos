@@ -1,4 +1,6 @@
-# Entity registry GC for the sun-follow MQTT entities.
+# Entity registry GC for the lighting MQTT entities (unique_ids
+# `sun_follow_*`, a name kept from the sun-follow daemons they replaced;
+# see services/lighting/home-assistant.nix).
 #
 # Home Assistant never removes YAML-configured MQTT entities from its entity
 # registry. When one disappears from the config, `__async_remove_impl`
@@ -8,7 +10,7 @@
 # `unavailable` entity, and worse, squats the good entity_id: its live
 # replacement gets registered as `..._2`.
 #
-# unique_id is now keyed on the IEEE address (see mqtt-automations/default.nix)
+# unique_id is keyed on the IEEE address (see services/lighting/home-assistant.nix)
 # so renames no longer churn identity, but the orphans from before that change
 # still need clearing, and a device genuinely removed from the registry should
 # not leave debris behind either.

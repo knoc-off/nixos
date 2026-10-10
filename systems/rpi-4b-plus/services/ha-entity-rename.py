@@ -29,9 +29,9 @@ import websockets
 # zigbee2mqtt mints every entity's unique_id as `<ieee>_<suffix>_zigbee2mqtt`.
 Z2M_SUFFIX = "_zigbee2mqtt"
 
-# Our own sun-follow entities are `sun_follow_<ieee>_<suffix>` (see
-# mqtt-automations/default.nix, where they were re-keyed onto the IEEE
-# address for exactly this reason).
+# Our own lighting entities are `sun_follow_<ieee>_<suffix>` (see
+# services/lighting/home-assistant.nix; keyed on the IEEE address for
+# exactly this reason).
 SUN_FOLLOW_PREFIX = "sun_follow_"
 
 

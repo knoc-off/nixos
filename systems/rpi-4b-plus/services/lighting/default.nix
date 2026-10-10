@@ -22,7 +22,10 @@ let
   };
 in
 {
-  imports = [ self.nixosModules.lighting ];
+  imports = [
+    self.nixosModules.lighting
+    ./home-assistant.nix
+  ];
 
   services.lighting = {
     enable = true;

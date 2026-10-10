@@ -1,9 +1,9 @@
 # Single source of truth for every Zigbee device: which room it's in, what
-# kind of thing it is, its IEEE address, and (optionally) its sun-follow
-# config. Everything else -- zigbee2mqtt's friendly name, HA's suggested
-# area, the sun-follow topics/env, the dashboard -- is derived from this one
-# table. Rename or move a device by editing its entry here; every consumer
-# (z2m topics, sun-follow services, dashboard cards) follows in one rebuild.
+# kind of thing it is, and its IEEE address. Everything else -- zigbee2mqtt's
+# friendly name, HA's suggested area, which bulbs the lighting service drives
+# and its zigbee groups, the dashboard -- is derived from this one table.
+# Rename or move a device by editing its entry here; every consumer follows
+# in one rebuild.
 #
 # Room is structural, not an annotation: a device only exists inside
 # `rawDevices.<room>.<device>`, so it is physically impossible for a device's
