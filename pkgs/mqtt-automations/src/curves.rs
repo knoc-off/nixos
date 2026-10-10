@@ -1,5 +1,5 @@
 //! Shared light curves: pure functions from time-of-day inputs to light
-//! values, used by the room daemon and the legacy sun-follow/sunrise
+//! values, behind the Lua `sun` API and the legacy sun-follow/sunrise
 //! daemons alike.
 
 use std::f64::consts::PI;

@@ -1,7 +1,7 @@
-//! Every light in the house, in one process: each room's logic decides what
-//! the room wants (`mqtt_automations::room`), and the arbiter decides, per
-//! bulb, whether the bulb listens (`mqtt_automations::arbiter`) -- the
-//! automation, or a person who changed it by button, HA or app.
+//! Every light in the house, in one process: each room's Lua script decides
+//! what the room wants (`mqtt_automations::script`), and the arbiter
+//! decides, per bulb, whether the bulb listens (`mqtt_automations::arbiter`)
+//! -- the automation, or a person who changed it by button, HA or app.
 //!
 //! This is the only writer to z2m light and plug `/set` topics. A room-wide
 //! identical change goes out as one group command, so bulbs don't pop on
@@ -13,7 +13,8 @@
 //!   - `lights/<room>/<bulb>/release` (to here): hand one bulb back to the
 //!     automation (the HA "release hold" button).
 //!
-//! Config: a JSON file at `$CONFIG`, see [`Config`].
+//! Config: a JSON file, see [`Config`]. `lights --check <file>` loads it and
+//! every script without connecting, for build-time validation.
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::time::{Duration, Instant};
@@ -21,17 +22,14 @@ use std::time::{Duration, Instant};
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, FixedOffset, Local};
 use mqtt_automations::arbiter::{self, Bulb, Command, Input, Mode, Target};
-use mqtt_automations::room::{self, Event, Request};
 use mqtt_automations::script::Script;
 use mqtt_automations::{Message, Runtime};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
-/// How often the rooms re-evaluate the sun curves.
-const CURVE_TICK: Duration = Duration::from_secs(30);
-/// Room -> arbiter -> room rounds per event. Rooms only republish what
+/// Room -> arbiter -> room rounds per event. Scripts only react to what
 /// changed, so this settles in one or two; the cap is a backstop against a
-/// logic bug turning into a hot loop.
+/// script bug turning into a hot loop.
 const MAX_ROUNDS: usize = 8;
 
 #[derive(Deserialize)]
@@ -49,12 +47,8 @@ struct RoomConfig {
     #[serde(default)]
     group: Option<String>,
     bulbs: BTreeMap<String, BulbConfig>,
-    /// Built-in room logic (the `room` module), or ...
-    #[serde(default)]
-    logic: Option<room::Config>,
-    /// ... a Lua script (the `script` module). Exactly one of the two.
-    #[serde(default)]
-    lua: Option<String>,
+    /// The room's script; see `mqtt_automations::script` for the API.
+    lua: String,
 }
 
 #[derive(Deserialize)]
@@ -82,8 +76,6 @@ struct Out {
 enum Route {
     Report(usize, usize),
     BulbRelease(usize, usize),
-    Sensor(usize),
-    Button(usize),
     Script(usize),
 }
 
@@ -95,26 +87,11 @@ struct BulbSlot {
     published: Option<Value>,
 }
 
-/// What decides a room's wishes. Both speak per-bulb arbiter inputs.
-enum Logic {
-    Builtin(Box<room::Room>),
-    Lua(Script),
-}
-
-impl Logic {
-    fn deadline(&self) -> Option<Instant> {
-        match self {
-            Self::Builtin(r) => r.deadline(),
-            Self::Lua(s) => s.deadline(),
-        }
-    }
-}
-
 struct Room {
     name: String,
     group: Option<String>,
     bulbs: Vec<BulbSlot>,
-    logic: Logic,
+    script: Script,
 }
 
 /// All routing and z2m formatting, without MQTT -- so it can be tested.
@@ -130,43 +107,21 @@ impl House {
         let mut rooms = Vec::new();
         for (r, (name, room)) in cfg.rooms.into_iter().enumerate() {
             let mut route = |topic: String, to: Route| routes.entry(topic).or_default().push(to);
-            let logic = match (room.logic, room.lua) {
-                (Some(mut logic), None) => {
-                    if let Some(light) = logic.lights.keys().find(|l| !room.bulbs.contains_key(*l))
-                    {
-                        bail!("room {name}: logic names unknown bulb {light:?}");
-                    }
-                    (logic.latitude, logic.longitude) = (cfg.latitude, cfg.longitude);
-                    for device in logic.sensors() {
-                        route(format!("zigbee2mqtt/{device}"), Route::Sensor(r));
-                    }
-                    for device in logic.buttons() {
-                        route(format!("zigbee2mqtt/{device}/action"), Route::Button(r));
-                    }
-                    let logic =
-                        room::Room::new(logic, now).with_context(|| format!("room {name}"))?;
-                    Logic::Builtin(Box::new(logic))
-                }
-                (None, Some(source)) => {
-                    let lights = room
-                        .bulbs
-                        .iter()
-                        .map(|(n, b)| (n.clone(), b.device.clone()));
-                    let script = Script::new(
-                        &name,
-                        &source,
-                        lights,
-                        (cfg.latitude, cfg.longitude),
-                        now,
-                        wall,
-                    )?;
-                    for topic in script.topics() {
-                        route(topic, Route::Script(r));
-                    }
-                    Logic::Lua(script)
-                }
-                _ => bail!("room {name}: needs exactly one of `logic` and `lua`"),
-            };
+            let lights = room
+                .bulbs
+                .iter()
+                .map(|(n, b)| (n.clone(), b.device.clone()));
+            let script = Script::new(
+                &name,
+                &room.lua,
+                lights,
+                (cfg.latitude, cfg.longitude),
+                now,
+                wall,
+            )?;
+            for topic in script.topics() {
+                route(topic, Route::Script(r));
+            }
             let bulbs = room
                 .bulbs
                 .into_iter()
@@ -193,7 +148,7 @@ impl House {
                 name,
                 group: room.group,
                 bulbs,
-                logic,
+                script,
             });
         }
         let mut seen = HashMap::new();
@@ -224,14 +179,13 @@ impl House {
             .collect()
     }
 
-    /// The next moment anything changes by itself (not counting the curve
-    /// tick, which the caller adds).
+    /// The next moment anything changes by itself.
     fn deadline(&self) -> Option<Instant> {
         self.rooms
             .iter()
             .flat_map(|room| {
                 let bulbs = room.bulbs.iter().filter_map(|s| s.bulb.deadline());
-                bulbs.chain(room.logic.deadline())
+                bulbs.chain(room.script.deadline())
             })
             .min()
     }
@@ -244,43 +198,28 @@ impl House {
         for route in routes {
             out.extend(match route {
                 Route::Report(r, b) => match parse_report(&msg.payload) {
-                    Some(report) => self.step_bulbs(r, vec![(b, Input::Report(report))], now, wall),
+                    Some(report) => self.step_bulbs(r, vec![(b, Input::Report(report))], now),
                     None => Vec::new(),
                 },
                 Route::BulbRelease(r, b) => {
                     let release = Input::Release {
                         transition: Duration::ZERO,
                     };
-                    self.step_bulbs(r, vec![(b, release)], now, wall)
+                    self.step_bulbs(r, vec![(b, release)], now)
                 }
-                Route::Sensor(r) => {
-                    let device = device_of(&msg.topic);
-                    sensor_events(device, &msg.payload)
-                        .into_iter()
-                        .flat_map(|e| self.step_room(r, e, now, wall))
-                        .collect()
-                }
-                Route::Button(r) => match action_of(&msg.payload) {
-                    Some(action) => {
-                        let device = device_of(msg.topic.trim_end_matches("/action")).to_owned();
-                        self.step_room(r, Event::Action { device, action }, now, wall)
-                    }
-                    None => Vec::new(),
-                },
                 Route::Script(r) => {
-                    let inputs = match &mut self.rooms[r].logic {
-                        Logic::Lua(s) => s.message(&msg.topic, &msg.payload, now, wall),
-                        Logic::Builtin(_) => Vec::new(),
-                    };
-                    let inputs = self.named(r, inputs);
-                    self.step_bulbs(r, inputs, now, wall)
+                    let reqs = self.rooms[r]
+                        .script
+                        .message(&msg.topic, &msg.payload, now, wall);
+                    let inputs = self.named(r, reqs);
+                    self.step_bulbs(r, inputs, now)
                 }
             });
         }
         out
     }
 
-    /// Timers and curves: every room and every due bulb.
+    /// Timers: every room's script and every due bulb.
     fn tick(&mut self, now: Instant, wall: DateTime<FixedOffset>) -> Vec<Out> {
         let mut out = Vec::new();
         for r in 0..self.rooms.len() {
@@ -291,43 +230,18 @@ impl House {
                 .filter(|(_, s)| s.bulb.deadline().is_some_and(|at| at <= now))
                 .map(|(b, _)| (b, Input::Tick))
                 .collect();
-            out.extend(self.step_bulbs(r, due, now, wall));
-            out.extend(self.step_room(r, Event::Tick, now, wall));
+            out.extend(self.step_bulbs(r, due, now));
+            let reqs = self.rooms[r].script.tick(now, wall);
+            let inputs = self.named(r, reqs);
+            out.extend(self.step_bulbs(r, inputs, now));
         }
         out
     }
 
-    /// Feed one event to a room's logic, then its requests to the bulbs.
-    fn step_room(
-        &mut self,
-        r: usize,
-        event: Event,
-        now: Instant,
-        wall: DateTime<FixedOffset>,
-    ) -> Vec<Out> {
-        let inputs = match &mut self.rooms[r].logic {
-            Logic::Builtin(logic) => by_name(logic.step(event, now, wall)),
-            Logic::Lua(script) => match event {
-                Event::Tick => script.tick(now, wall),
-                // Lua rooms get sensor and button messages raw, through
-                // their own subscriptions.
-                _ => Vec::new(),
-            },
-        };
-        let inputs = self.named(r, inputs);
-        self.step_bulbs(r, inputs, now, wall)
-    }
-
     /// Feed inputs to the bulbs as one batch, so a room-wide change can go
     /// out as a single group command. Bulb changes flow back to the room's
-    /// logic, whose answers are fed in the same way until it is quiet.
-    fn step_bulbs(
-        &mut self,
-        r: usize,
-        inputs: Vec<(usize, Input)>,
-        now: Instant,
-        wall: DateTime<FixedOffset>,
-    ) -> Vec<Out> {
+    /// script, whose answers are fed in the same way until it is quiet.
+    fn step_bulbs(&mut self, r: usize, inputs: Vec<(usize, Input)>, now: Instant) -> Vec<Out> {
         let mut out = Vec::new();
         let mut queue = VecDeque::from([inputs]);
         for _ in 0..MAX_ROUNDS {
@@ -343,24 +257,14 @@ impl House {
                     continue;
                 };
                 let held = matches!(slot.bulb.mode, Mode::Held(_));
-                answers.extend(match &mut room.logic {
-                    Logic::Builtin(logic) => {
-                        let event = Event::Bulb {
-                            light: slot.name.clone(),
-                            held,
-                            state,
-                        };
-                        by_name(logic.step(event, now, wall))
-                    }
-                    Logic::Lua(script) => script.bulb(&slot.name, held, state),
-                });
+                answers.extend(room.script.bulb(&slot.name, held, state));
             }
             let next = self.named(r, answers);
             if !next.is_empty() {
                 queue.push_back(next);
             }
         }
-        eprintln!("{}: room and arbiter did not settle", self.rooms[r].name);
+        eprintln!("{}: script and arbiter did not settle", self.rooms[r].name);
         out
     }
 
@@ -417,103 +321,13 @@ impl House {
         changed
     }
 
-    /// Resolve bulb names to indices; `ALL` means every bulb in the room.
+    /// Resolve bulb names to indices. Scripts can only name their own bulbs.
     fn named(&self, r: usize, reqs: Vec<(String, Input)>) -> Vec<(usize, Input)> {
         let bulbs = &self.rooms[r].bulbs;
-        let mut inputs = Vec::new();
-        for (name, input) in reqs {
-            if name == ALL {
-                inputs.extend((0..bulbs.len()).map(|b| (b, input)));
-            } else if let Some(b) = bulbs.iter().position(|s| s.name == name) {
-                inputs.push((b, input));
-            }
-        }
-        inputs
+        reqs.into_iter()
+            .filter_map(|(name, input)| Some((bulbs.iter().position(|s| s.name == name)?, input)))
+            .collect()
     }
-}
-
-/// Bulb name standing for every bulb in the room.
-const ALL: &str = "*";
-
-/// The built-in logic's requests as per-bulb arbiter inputs.
-fn by_name(outs: Vec<room::Out>) -> Vec<(String, Input)> {
-    let mut reqs = Vec::new();
-    for o in outs {
-        match o {
-            room::Out::Auto(Request {
-                bulbs,
-                scale,
-                transition,
-            }) => {
-                let transition = secs(transition);
-                reqs.extend(bulbs.into_iter().map(|(name, target)| {
-                    let input = Input::Auto {
-                        target,
-                        scale,
-                        transition,
-                    };
-                    (name, input)
-                }));
-            }
-            room::Out::User(Request {
-                bulbs, transition, ..
-            }) => {
-                let transition = secs(transition);
-                reqs.extend(
-                    bulbs
-                        .into_iter()
-                        .map(|(name, target)| (name, Input::User { target, transition })),
-                );
-            }
-            room::Out::Release { transition } => {
-                let transition = secs(transition);
-                reqs.push((ALL.to_owned(), Input::Release { transition }));
-            }
-        }
-    }
-    reqs
-}
-
-/// A NaN or negative duration must not panic the process that owns every
-/// light.
-fn secs(s: f32) -> Duration {
-    Duration::try_from_secs_f32(s).unwrap_or_default()
-}
-
-/// `zigbee2mqtt/<device>` -> `<device>`.
-fn device_of(topic: &str) -> &str {
-    topic.strip_prefix("zigbee2mqtt/").unwrap_or(topic)
-}
-
-/// What a z2m sensor message says, in room terms. One message can carry
-/// several fields; a field that is absent says nothing.
-fn sensor_events(device: &str, payload: &Value) -> Vec<Event> {
-    let flag = |key| payload.get(key).and_then(Value::as_bool);
-    let mut events = Vec::new();
-    // SNZB-03P/06P report `occupancy`; the older kitchen sensor `presence`.
-    if let Some(active) = flag("occupancy").or_else(|| flag("presence")) {
-        events.push(Event::Sensor {
-            device: device.to_owned(),
-            active,
-        });
-    }
-    // z2m's contact sensors report `contact: true` when closed.
-    if let Some(contact) = flag("contact") {
-        events.push(Event::Door {
-            device: device.to_owned(),
-            open: !contact,
-        });
-    }
-    events
-}
-
-fn action_of(payload: &Value) -> Option<String> {
-    let action = match payload {
-        Value::String(s) => s.as_str(),
-        Value::Object(m) => m.get("action")?.as_str()?,
-        _ => return None,
-    };
-    (!action.is_empty()).then(|| action.to_owned())
 }
 
 /// A z2m device state message. Messages without `state` (availability,
@@ -581,42 +395,56 @@ fn wall_now() -> DateTime<FixedOffset> {
     Local::now().fixed_offset()
 }
 
+fn load(path: &str) -> Result<Config> {
+    let text = std::fs::read_to_string(path).with_context(|| format!("reading {path:?}"))?;
+    serde_json::from_str(&text).with_context(|| format!("parsing {path:?}"))
+}
+
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
-    let rt = Runtime::from_env("lights").await?;
-    let path = rt.env_or("CONFIG", "");
-    let cfg: Config = serde_json::from_str(
-        &std::fs::read_to_string(&path).with_context(|| format!("reading CONFIG {path:?}"))?,
-    )
-    .context("parsing CONFIG")?;
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if let [flag, path] = &args[..] {
+        if flag == "--check" {
+            let house = House::new(load(path)?, Instant::now(), wall_now())?;
+            println!("{path}: {} rooms ok", house.rooms.len());
+            return Ok(());
+        }
+    }
+    if !args.is_empty() {
+        bail!("usage: lights [--check CONFIG]  (otherwise CONFIG comes from $CONFIG)");
+    }
 
-    let mut house = House::new(cfg, Instant::now(), wall_now())?;
+    let rt = Runtime::from_env("lights").await?;
+    let mut house = House::new(load(&rt.env_or("CONFIG", ""))?, Instant::now(), wall_now())?;
     let mut msgs = rt.subscribe_many(house.topics()).await?;
     for out in house.startup() {
         send(&rt, out).await;
     }
     eprintln!("lights started: {} rooms", house.rooms.len());
 
-    let mut next_curve = Instant::now();
+    // Ticks once straight away, so scripts' top-level requests go out.
+    let mut wake_at = Instant::now();
     loop {
-        let wake_at = house.deadline().map_or(next_curve, |d| d.min(next_curve));
         let outs = tokio::select! {
             Some(msg) = msgs.recv() => house.handle(&msg, Instant::now(), wall_now()),
-            () = tokio::time::sleep_until(wake_at.into()) => {
-                let now = Instant::now();
-                if now >= next_curve {
-                    next_curve = now + CURVE_TICK;
-                }
-                house.tick(now, wall_now())
-            }
+            () = tokio::time::sleep_until(wake_at.into()) => house.tick(Instant::now(), wall_now()),
             () = rt.shutdown_signal() => break,
         };
         for out in outs {
             send(&rt, out).await;
         }
+        // Scripts keep their own `every()` timers, so a deadline always
+        // exists in practice; the fallback only bounds a script without one.
+        let now = Instant::now();
+        wake_at = house
+            .deadline()
+            .unwrap_or(now + IDLE_TICK)
+            .clamp(now, now + IDLE_TICK);
     }
     Ok(())
 }
+
+const IDLE_TICK: Duration = Duration::from_secs(60);
 
 /// A failed publish is logged, not fatal: the next event republishes.
 async fn send(rt: &Runtime, out: Out) {
@@ -635,8 +463,6 @@ mod tests {
     use super::*;
 
     const NOON: &str = "2026-06-21T13:10:00+02:00";
-    /// The rooms' restart grace (`room::Config::interaction_hold`) plus slack.
-    const GRACE: Duration = Duration::from_secs(301);
 
     struct Rig {
         house: House,
@@ -653,7 +479,7 @@ mod tests {
             let now = Instant::now();
             let wall = DateTime::parse_from_rfc3339(NOON).unwrap();
             Ok(Self {
-                house: House::new(config(rooms), now, wall)?,
+                house: House::new(config(rooms)?, now, wall)?,
                 now,
                 wall,
             })
@@ -699,21 +525,15 @@ mod tests {
         json!({ "hallway": {
             "group": "hallway",
             "bulbs": { "a": { "device": "hallway_a" }, "b": { "device": "hallway_b" } },
-            "logic": {
-                "latitude": 52.52, "longitude": 13.405,
-                "sources": [{ "type": "motion", "device": "hallway_motion", "hold": 90 }],
-                "fade": 180,
-                "lights": { "a": { "turnOn": true }, "b": { "turnOn": true } },
-            },
+            "lua": r#"follow{ when = occupancy{ sensors = { "hallway_motion" }, hold = 90 }, fade = 180 }"#,
         } })
     }
 
-    /// Hallway with both bulbs off and adopted, past the restart grace.
+    /// Hallway with both bulbs off and adopted.
     fn quiet_hallway() -> Rig {
         let mut rig = Rig::new(hallway());
         rig.report_all(&["hallway_a", "hallway_b"], json!({ "state": "OFF" }));
-        rig.wait(GRACE);
-        rig.wait(Duration::from_secs(181));
+        rig.wait(Duration::ZERO);
         rig
     }
 
@@ -721,15 +541,22 @@ mod tests {
     fn startup_adopts_bulbs_from_their_reports() {
         let mut rig = Rig::new(hallway());
         // The main loop ticks once at startup, so rooms state their targets
-        // before the first reports come back.
+        // before the first reports come back. The hallway starts vacant.
         rig.wait(Duration::ZERO);
-        let outs = rig.send(
-            "zigbee2mqtt/hallway_a",
-            json!({ "state": "ON", "brightness": 250 }),
-        );
+        let outs = rig.send("zigbee2mqtt/hallway_a", json!({ "state": "OFF" }));
         assert_eq!(
             state(&outs, "lights/hallway/a/state").unwrap()["mode"],
             "auto"
+        );
+        // A light someone left on is not yanked off by a restart.
+        let outs = rig.send(
+            "zigbee2mqtt/hallway_b",
+            json!({ "state": "ON", "brightness": 250 }),
+        );
+        assert!(sets(&outs).is_empty());
+        assert_eq!(
+            state(&outs, "lights/hallway/b/state").unwrap()["mode"],
+            "held"
         );
     }
 
@@ -763,13 +590,16 @@ mod tests {
             Some(false)
         );
 
-        // Hold, fade, vacant: released.
-        rig.wait(Duration::from_secs(91));
-        let outs = rig.wait(Duration::from_secs(181));
+        // Leaving: hold, then vacant -- released, fading off.
+        rig.send("zigbee2mqtt/hallway_motion", json!({ "occupancy": false }));
+        assert!(sets(&rig.wait(Duration::from_secs(89))).is_empty());
+        let outs = rig.wait(Duration::from_secs(1));
         assert_eq!(
             state(&outs, "lights/hallway/a/state").unwrap()["mode"],
             "auto"
         );
+        rig.report_all(&["hallway_a", "hallway_b"], json!({ "state": "OFF" }));
+        rig.wait(Duration::from_secs(181));
 
         // Next walk-through works normally again, as one group command.
         let outs = rig.send("zigbee2mqtt/hallway_motion", json!({ "occupancy": true }));
@@ -777,14 +607,13 @@ mod tests {
     }
 
     #[test]
-    fn button_press_goes_through_room_and_arbiter() {
+    fn button_press_goes_through_script_and_arbiter() {
         let mut rig = Rig::new(json!({ "bedroom": {
             "bulbs": { "light": { "device": "bedroom_light" } },
-            "logic": {
-                "latitude": 52.52, "longitude": 13.405,
-                "lights": { "light": {} },
-                "controls": { "bedroom_button": { "single": { "action": "dimThenOff", "level": 10 } } },
-            },
+            "lua": r#"
+                follow{}
+                button("bedroom_button", { single = toggle() })
+            "#,
         } }));
         rig.send("zigbee2mqtt/bedroom_light", json!({ "state": "OFF" }));
         rig.wait(Duration::from_secs(5));
@@ -796,24 +625,13 @@ mod tests {
         let sets = sets(&outs);
         assert_eq!(sets[0].0, "zigbee2mqtt/bedroom_light/set");
         assert_eq!(sets[0].1["state"], "ON");
-        // On at the curve's own level, so there is nothing to hold: the
-        // arbiter hands it straight back to auto, and the room keeps it on
-        // because it knows a person switched it on.
-        let shown = state(&outs, "lights/bedroom/light/state").unwrap();
-        assert_eq!(
-            (&shown["mode"], &shown["on"]),
-            (&json!("auto"), &json!(true))
-        );
+        // A follow room without occupancy keeps a light on once it is on.
         let later = rig.wait(Duration::from_secs(60));
         assert!(later.iter().all(|o| o.payload["state"] != "OFF"));
 
-        // The room saw the new state through the arbiter: next press dims.
+        // The script saw the new state through the arbiter: next press is off.
         let outs = rig.send("zigbee2mqtt/bedroom_button/action", json!("single"));
-        assert_eq!(sets_of(&outs)["brightness"], 25);
-        assert_eq!(
-            state(&outs, "lights/bedroom/light/state").unwrap()["mode"],
-            "held"
-        );
+        assert_eq!(sets_of(&outs)["state"], "OFF");
     }
 
     fn sets_of(outs: &[Out]) -> &Value {
@@ -835,13 +653,6 @@ mod tests {
             sets(&outs),
             vec![("zigbee2mqtt/hallway_a/set", &sets_of(&outs).clone())]
         );
-    }
-
-    #[test]
-    fn door_contact_opens_and_closes() {
-        let events = sensor_events("door", &json!({ "contact": false, "battery": 90 }));
-        assert!(matches!(&events[..], [Event::Door { open: true, .. }]));
-        assert!(sensor_events("door", &json!({ "battery": 90 })).is_empty());
     }
 
     #[test]
@@ -879,28 +690,22 @@ mod tests {
 
     #[test]
     fn config_errors_are_caught_at_startup() {
-        let mut bad = hallway();
-        bad["hallway"]["logic"]["lights"]["ghost"] = json!({});
-        assert!(Rig::try_new(bad).is_err());
+        let mut ghost = hallway();
+        ghost["hallway"]["lua"] = json!("light('ghost')");
+        assert!(Rig::try_new(ghost).is_err(), "unknown bulb");
 
         let mut twice = hallway();
         twice["attic"] = twice["hallway"].clone();
         assert!(Rig::try_new(twice).is_err(), "bulb in two rooms");
 
-        let mut both = hallway();
-        both["hallway"]["lua"] = json!("");
-        assert!(Rig::try_new(both).is_err(), "logic and lua");
-
-        let broken = json!({ "cupboard": {
-            "bulbs": { "bulb": { "device": "cupboard_bulb" } },
-            "lua": "light('nope')",
-        } });
-        assert!(Rig::try_new(broken).is_err(), "script fails to load");
+        let mut extra = hallway();
+        extra["hallway"]["logic"] = json!({});
+        assert!(Rig::try_new(extra).is_err(), "unknown field");
     }
 
-    fn config(rooms: Value) -> Config {
+    fn config(rooms: Value) -> Result<Config> {
         let cfg = json!({ "latitude": 52.52, "longitude": 13.405, "rooms": rooms });
-        serde_json::from_value(cfg).unwrap()
+        Ok(serde_json::from_value(cfg)?)
     }
 
     /// The cupboard as it will actually be configured: on while the door is

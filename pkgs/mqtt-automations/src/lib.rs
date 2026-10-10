@@ -1,6 +1,5 @@
 pub mod arbiter;
 pub mod curves;
-pub mod room;
 pub mod script;
 pub mod sun;
 
