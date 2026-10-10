@@ -84,6 +84,19 @@ pub fn daylight_fraction<Tz: TimeZone>(lat: f64, lon: f64, dt: DateTime<Tz>) -> 
     ((elev - HORIZON) / (peak - HORIZON)).clamp(0.0, 1.0)
 }
 
+/// How far through today's daylight (sunrise -> sunset) `dt` is, in
+/// `0.0..=1.0`, or `None` at night.
+pub fn day_progress<Tz: TimeZone>(lat: f64, lon: f64, dt: DateTime<Tz>) -> Option<f64> {
+    let date = dt.with_timezone(&Utc).date_naive();
+    let rise = sunrise(lat, lon, date, Utc);
+    let set = sunset(lat, lon, date, Utc);
+    let now = dt.with_timezone(&Utc);
+    if now <= rise || now >= set {
+        return None;
+    }
+    Some((now - rise).num_seconds() as f64 / (set - rise).num_seconds() as f64)
+}
+
 /// Equation of time (minutes) and solar declination (radians).
 fn solar_params(gamma: f64) -> (f64, f64) {
     let eqtime = 229.18

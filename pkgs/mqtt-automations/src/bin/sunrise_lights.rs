@@ -47,7 +47,9 @@ async fn main() -> Result<()> {
         .env_or("START_TIME", "06:30:00")
         .parse()
         .unwrap_or_else(|_| NaiveTime::from_hms_opt(6, 30, 0).expect("valid time"));
-    let mut start = rt.setting::<NaiveTime>("START_TIME_TOPIC", start_init).await?;
+    let mut start = rt
+        .setting::<NaiveTime>("START_TIME_TOPIC", start_init)
+        .await?;
 
     let duration_init: u64 = rt.env_parse("DURATION", 45);
     let mut duration_min = rt.setting::<u64>("DURATION_TOPIC", duration_init).await?;
@@ -62,7 +64,9 @@ async fn main() -> Result<()> {
 
     // Cap the ramp at this brightness percentage (0-100%).
     let max_bri_pct: u8 = rt.env_parse("MAX_BRIGHTNESS", 100);
-    let mut max_bri = rt.setting::<u8>("MAX_BRIGHTNESS_TOPIC", max_bri_pct).await?;
+    let mut max_bri = rt
+        .setting::<u8>("MAX_BRIGHTNESS_TOPIC", max_bri_pct)
+        .await?;
 
     // How much the reported brightness may differ from what we set before
     // we consider it a manual change (zigbee rounding, transitions, etc.).
@@ -121,10 +125,8 @@ async fn main() -> Result<()> {
                     }
                     // Check if brightness was changed manually.
                     if let Some(expected) = last_set_brightness {
-                        if let Some(reported) = msg
-                            .payload
-                            .get("brightness")
-                            .and_then(|v| v.as_u64())
+                        if let Some(reported) =
+                            msg.payload.get("brightness").and_then(|v| v.as_u64())
                         {
                             let reported = reported as u8;
                             let diff = (reported as i16 - expected as i16).unsigned_abs() as u8;
@@ -191,49 +193,14 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Brightness curve: smoothstep (eases in *and* out) shaped by gamma.
-///
-/// Smoothstep has zero slope at both ends, so the ramp neither slams on at the
-/// start nor jumps into the last 10%. `powf` then biases time toward the dim
-/// end to compensate for perceptual brightness.
+/// Brightness curve, shared with the room daemon's wake ramp.
 fn ramp_curve(t: f64, gamma: f64) -> f64 {
-    let s = t * t * (3.0 - 2.0 * t);
-    s.powf(gamma)
+    mqtt_automations::curves::ramp(t, gamma)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn curve_spans_zero_to_one() {
-        assert_eq!(ramp_curve(0.0, 2.2), 0.0);
-        assert!((ramp_curve(1.0, 2.2) - 1.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn curve_is_monotonic() {
-        let mut prev = -1.0;
-        for i in 0..=100 {
-            let v = ramp_curve(i as f64 / 100.0, 2.2);
-            assert!(v >= prev, "not monotonic at t={i}: {prev} -> {v}");
-            prev = v;
-        }
-    }
-
-    #[test]
-    fn curve_is_dim_biased() {
-        // Halfway through the ramp should be well below half brightness.
-        let mid = ramp_curve(0.5, 2.2);
-        assert!(mid < 0.3, "midpoint should be dim, got {mid}");
-    }
-
-    #[test]
-    fn curve_eases_out() {
-        // Slope near the end approaches zero — no jump into full brightness.
-        let d = ramp_curve(1.0, 2.2) - ramp_curve(0.98, 2.2);
-        assert!(d < 0.01, "should ease out, got delta {d}");
-    }
 
     #[test]
     fn next_occurrence_picks_today_then_tomorrow() {

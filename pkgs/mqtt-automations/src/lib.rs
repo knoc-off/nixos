@@ -1,4 +1,6 @@
 pub mod arbiter;
+pub mod curves;
+pub mod room;
 pub mod sun;
 
 use std::collections::HashMap;

@@ -30,6 +30,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::Result;
 use chrono::Local;
+use mqtt_automations::curves::{apply_gamma, brightness_254, decide_switch, wants_off};
 use mqtt_automations::{sun, Message, Runtime};
 use serde_json::json;
 
@@ -276,46 +277,6 @@ fn parse_state(msg: &Message) -> (Option<bool>, Option<u8>) {
     (on, bri)
 }
 
-/// Gamma-shape a 0..=1 daylight fraction. `gamma > 1` reaches high values at
-/// a lower input fraction (the light brightens "sooner" through the day);
-/// `gamma < 1` holds back longer. `gamma == 1` is a no-op.
-fn apply_gamma(frac: f64, gamma: f64) -> f64 {
-    frac.clamp(0.0, 1.0).powf(1.0 / gamma.max(0.01))
-}
-
-/// Interpolate `min_pct..=max_pct` (0-100%) by `frac` (0.0-1.0) into a Z2M
-/// brightness value (1-254). Tolerates a min/max slider crossed the wrong
-/// way. Always returns at least 1 -- callers use [`wants_off`] to decide
-/// between "dim" and "off" instead.
-fn brightness_254(min_pct: u8, max_pct: u8, frac: f64) -> u8 {
-    let lo = min_pct.min(max_pct) as f64;
-    let hi = min_pct.max(max_pct) as f64;
-    let pct = lo + (hi - lo) * frac.clamp(0.0, 1.0);
-    (pct / 100.0 * 254.0).round().clamp(1.0, 254.0) as u8
-}
-
-/// True when the curve calls for the light to be fully off: minimum
-/// brightness is 0 and the (gamma-shaped) daylight fraction has bottomed out.
-/// With `min_pct > 0` a light never auto-turns-off, only dims to the floor.
-fn wants_off(min_pct: u8, max_pct: u8, shaped_frac: f64) -> bool {
-    min_pct.min(max_pct) == 0 && shaped_frac <= 0.0
-}
-
-/// Schmitt-trigger threshold decision: on above `threshold + deadband`, off
-/// below `threshold - deadband`, otherwise holds `last`. Prevents flapping
-/// right at the boundary.
-fn decide_switch(frac: f64, threshold_pct: f64, deadband: f64, last: Option<bool>) -> bool {
-    let high = ((threshold_pct + deadband) / 100.0).clamp(0.0, 1.0);
-    let low = ((threshold_pct - deadband) / 100.0).clamp(0.0, 1.0);
-    if frac >= high {
-        true
-    } else if frac <= low {
-        false
-    } else {
-        last.unwrap_or(false)
-    }
-}
-
 /// React to a Z2M state echo for a light. `last_set_bri` is what we last
 /// commanded (used to detect a manual brightness change); `in_settle`
 /// suppresses transitions during the settle window right after we publish.
@@ -517,74 +478,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn decide_switch_on_above_high_off_below_low() {
-        assert!(decide_switch(0.6, 50.0, 5.0, None));
-        assert!(!decide_switch(0.4, 50.0, 5.0, None));
-    }
-
-    #[test]
-    fn decide_switch_holds_inside_deadband() {
-        assert!(decide_switch(0.52, 50.0, 5.0, Some(true)));
-        assert!(!decide_switch(0.52, 50.0, 5.0, Some(false)));
-    }
-
-    #[test]
-    fn decide_switch_defaults_off_with_no_history() {
-        assert!(!decide_switch(0.52, 50.0, 5.0, None));
-    }
-
-    #[test]
-    fn brightness_254_spans_min_to_max() {
-        assert_eq!(brightness_254(10, 100, 0.0), 25);
-        assert_eq!(brightness_254(10, 100, 1.0), 254);
-    }
-
-    #[test]
-    fn brightness_254_never_zero() {
-        assert_eq!(brightness_254(0, 100, 0.0), 1);
-    }
-
-    #[test]
-    fn brightness_254_tolerates_reversed_slider() {
-        assert_eq!(brightness_254(100, 10, 1.0), brightness_254(10, 100, 1.0));
-        assert_eq!(brightness_254(100, 10, 0.0), brightness_254(10, 100, 0.0));
-    }
-
-    #[test]
-    fn apply_gamma_identity_at_one() {
-        for f in [0.0, 0.25, 0.5, 0.75, 1.0] {
-            assert!((apply_gamma(f, 1.0) - f).abs() < 1e-9, "f={f}");
-        }
-    }
-
-    #[test]
-    fn apply_gamma_above_one_brightens_sooner() {
-        // gamma > 1 should raise mid-range fractions above the identity line.
-        assert!(apply_gamma(0.25, 2.0) > 0.25);
-        assert!(apply_gamma(0.5, 2.0) > 0.5);
-    }
-
-    #[test]
-    fn apply_gamma_below_one_holds_back() {
-        assert!(apply_gamma(0.5, 0.5) < 0.5);
-    }
-
-    #[test]
-    fn apply_gamma_preserves_endpoints() {
-        for gamma in [0.3, 1.0, 3.0] {
-            assert_eq!(apply_gamma(0.0, gamma), 0.0);
-            assert!((apply_gamma(1.0, gamma) - 1.0).abs() < 1e-9);
-        }
-    }
-
-    #[test]
-    fn wants_off_only_when_min_zero_and_frac_zero() {
-        assert!(wants_off(0, 100, 0.0));
-        assert!(!wants_off(1, 100, 0.0));
-        assert!(!wants_off(0, 100, 0.01));
-    }
-
-    #[test]
     fn light_unknown_resolves_from_report() {
         assert_eq!(
             light_on_message(LightState::Unknown, Some(true), None, None, 5, false),
@@ -645,7 +538,14 @@ mod tests {
         // Even a manual-looking OFF or a huge brightness jump is ignored
         // while we're still settling our own transition.
         assert_eq!(
-            light_on_message(LightState::Driving, Some(false), Some(0), Some(100), 5, true),
+            light_on_message(
+                LightState::Driving,
+                Some(false),
+                Some(0),
+                Some(100),
+                5,
+                true
+            ),
             LightState::Driving
         );
         assert_eq!(
@@ -656,17 +556,22 @@ mod tests {
 
     #[test]
     fn light_tick_unknown_and_user_off_never_act() {
-        assert!(light_on_tick(LightState::Unknown, Some(50), None, 100, false, 25, true)
-            .1
-            .is_none());
-        assert!(light_on_tick(LightState::UserOff, Some(50), None, 100, false, 25, true)
-            .1
-            .is_none());
+        assert!(
+            light_on_tick(LightState::Unknown, Some(50), None, 100, false, 25, true)
+                .1
+                .is_none()
+        );
+        assert!(
+            light_on_tick(LightState::UserOff, Some(50), None, 100, false, 25, true)
+                .1
+                .is_none()
+        );
     }
 
     #[test]
     fn light_tick_free_adopts_within_tolerance() {
-        let (state, action) = light_on_tick(LightState::Free, Some(105), None, 100, false, 25, true);
+        let (state, action) =
+            light_on_tick(LightState::Free, Some(105), None, 100, false, 25, true);
         assert_eq!(state, LightState::Driving);
         let action = action.expect("should adopt");
         assert_eq!(action.brightness, 100);
@@ -675,7 +580,8 @@ mod tests {
 
     #[test]
     fn light_tick_free_does_not_adopt_outside_tolerance() {
-        let (state, action) = light_on_tick(LightState::Free, Some(200), None, 100, false, 25, true);
+        let (state, action) =
+            light_on_tick(LightState::Free, Some(200), None, 100, false, 25, true);
         assert_eq!(state, LightState::Free);
         assert!(action.is_none());
     }
@@ -689,21 +595,38 @@ mod tests {
 
     #[test]
     fn light_tick_driving_turns_off_when_curve_bottoms_out() {
-        let (state, action) = light_on_tick(LightState::Driving, Some(50), Some(50), 1, true, 25, true);
+        let (state, action) =
+            light_on_tick(LightState::Driving, Some(50), Some(50), 1, true, 25, true);
         assert_eq!(state, LightState::AutoOff);
         assert_eq!(action.unwrap().set_on, Some(false));
     }
 
     #[test]
     fn light_tick_driving_updates_brightness_when_changed() {
-        let (state, action) = light_on_tick(LightState::Driving, Some(100), Some(100), 150, false, 25, true);
+        let (state, action) = light_on_tick(
+            LightState::Driving,
+            Some(100),
+            Some(100),
+            150,
+            false,
+            25,
+            true,
+        );
         assert_eq!(state, LightState::Driving);
         assert_eq!(action.unwrap().brightness, 150);
     }
 
     #[test]
     fn light_tick_driving_dedupes_unchanged_brightness() {
-        let (state, action) = light_on_tick(LightState::Driving, Some(100), Some(100), 100, false, 25, true);
+        let (state, action) = light_on_tick(
+            LightState::Driving,
+            Some(100),
+            Some(100),
+            100,
+            false,
+            25,
+            true,
+        );
         assert_eq!(state, LightState::Driving);
         assert!(action.is_none());
     }
@@ -733,7 +656,8 @@ mod tests {
     fn light_tick_claim_turns_on_regardless_of_distance() {
         // Light reported far outside adopt_tolerance (or not reported at
         // all) -- claim takes over anyway, unconditionally.
-        let (state, action) = light_on_tick(LightState::Claim, Some(10), None, 240, false, 25, true);
+        let (state, action) =
+            light_on_tick(LightState::Claim, Some(10), None, 240, false, 25, true);
         assert_eq!(state, LightState::Driving);
         let action = action.expect("claim must always act");
         assert_eq!(action.set_on, Some(true));
@@ -803,7 +727,13 @@ mod tests {
 
     #[test]
     fn switch_driving_publishes_on_change() {
-        let (state, publish) = switch_on_tick(SwitchState::Driving, false, Some(true), Some(true), Some(true));
+        let (state, publish) = switch_on_tick(
+            SwitchState::Driving,
+            false,
+            Some(true),
+            Some(true),
+            Some(true),
+        );
         assert_eq!(state, SwitchState::Driving);
         assert_eq!(publish, Some(false));
     }
@@ -811,14 +741,16 @@ mod tests {
     #[test]
     fn switch_not_driving_ignores_disagreement_without_crossing() {
         // last_desired == desired: no crossing, even though it currently disagrees.
-        let (state, publish) = switch_on_tick(SwitchState::NotDriving, true, Some(false), Some(true), None);
+        let (state, publish) =
+            switch_on_tick(SwitchState::NotDriving, true, Some(false), Some(true), None);
         assert_eq!(state, SwitchState::NotDriving);
         assert!(publish.is_none());
     }
 
     #[test]
     fn switch_not_driving_reclaims_on_crossing() {
-        let (state, publish) = switch_on_tick(SwitchState::NotDriving, false, Some(true), Some(true), None);
+        let (state, publish) =
+            switch_on_tick(SwitchState::NotDriving, false, Some(true), Some(true), None);
         assert_eq!(state, SwitchState::Driving);
         assert_eq!(publish, Some(false));
     }
