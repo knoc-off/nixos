@@ -43,29 +43,14 @@ end
 local curves = {}
 local ct_enabled
 
--- `name` on at its sun level and colour, or full brightness if it does not
--- follow the sun (plugs).
-function curve_target(name)
-  local t = curves[name] and curves[name]() or {}
-  return { on = true, brightness = t.brightness, color_temp = t.color_temp }
-end
-
--- Bulbs follow the sun's brightness and colour temperature. Options:
---   lights: names (default: all of the room's)
---   when:   an occupancy(): on while occupied, released and faded off when
---           it empties. Without it the automation never switches the bulbs
---           on or off, it only shapes them while they are on.
---   fade:   seconds to fade out once the room empties (default 60)
---   wake:   a wake_ramp(), which switches the bulbs on and ramps them up
--- The per-bulb knobs are the HA sun-follow sliders, kept on their old
--- topics so existing values carry over.
-function follow(opts)
-  opts = opts or {}
-  local names = opts.lights or lights
-  local occ, wake = opts.when, opts.wake
-  local fade = opts.fade or 60
+-- Give `names` (default: all) a sun curve, on the HA sun-follow sliders,
+-- kept on their old topics so existing values carry over. follow() does
+-- this itself; a room driving its bulbs by hand calls it to use
+-- curve_target(). Top level only.
+function sun_curve(names)
   ct_enabled = ct_enabled or setting("mqtt-auto/color-temp-cycle/enabled", true)
   each(names, function(n)
+    if curves[n] then return end
     local base = "mqtt-auto/sun-follow/" .. light(n):device() .. "/"
     local min = setting(base .. "min-brightness", 5)
     local max = setting(base .. "max-brightness", 100)
@@ -81,6 +66,28 @@ function follow(opts)
       }
     end
   end)
+end
+
+-- `name` on at its sun level and colour, or full brightness without a
+-- curve (plugs).
+function curve_target(name)
+  local t = curves[name] and curves[name]() or {}
+  return { on = true, brightness = t.brightness, color_temp = t.color_temp }
+end
+
+-- Bulbs follow the sun's brightness and colour temperature. Options:
+--   lights: names (default: all of the room's)
+--   when:   an occupancy(): on while occupied, released and faded off when
+--           it empties. Without it the automation never switches the bulbs
+--           on or off, it only shapes them while they are on.
+--   fade:   seconds to fade out once the room empties (default 60)
+--   wake:   a wake_ramp(), which switches the bulbs on and ramps them up
+function follow(opts)
+  opts = opts or {}
+  local names = opts.lights or lights
+  local occ, wake = opts.when, opts.wake
+  local fade = opts.fade or 60
+  sun_curve(names)
 
   local waking = false
   local function update(transition)
@@ -89,6 +96,16 @@ function follow(opts)
     -- before must not keep the room dark.
     if ramp and not waking then
       each(names, function(n) light(n):release() end)
+    end
+    -- Ramp over: stay where it ended rather than jump to the curve. The hold
+    -- ends by itself once the curve comes back down to it in the evening.
+    if waking and not ramp then
+      each(names, function(n)
+        local s = light(n):state()
+        if s and s.on and s.mode == "auto" then
+          light(n):user({ brightness = s.brightness, color_temp = s.color_temp })
+        end
+      end)
     end
     waking = ramp ~= nil
     each(names, function(n)

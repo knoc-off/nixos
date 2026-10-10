@@ -1045,6 +1045,21 @@ mod tests {
             early < later && later <= 77,
             "{early} -> {later}, capped at 30%"
         );
+
+        // Ramp over: held where it ended, not jumped to the curve.
+        let end = Target {
+            on: true,
+            brightness: 77,
+            color_temp: Some(400),
+        };
+        rig.script.bulb("a", false, end);
+        let reqs = rig.wait(20 * 60);
+        assert!(
+            targets(&reqs)
+                .iter()
+                .any(|(n, k, t)| *n == "a" && *k == "user" && t.brightness == 77),
+            "{reqs:?}"
+        );
     }
 
     #[test]

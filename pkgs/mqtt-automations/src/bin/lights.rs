@@ -298,11 +298,13 @@ impl House {
         let first = commands.values().next().copied();
         let all_same =
             commands.len() == room.bulbs.len() && commands.values().all(|c| Some(*c) == first);
-        // A mixed room (bulbs and plugs) never matches as all-same in
-        // practice, but a group of only plugs must still send plug payloads.
+        // One payload must suit every member: a group mixing bulbs and plugs
+        // would get a plug's state-only payload and leave the bulbs at
+        // whatever brightness they had, so those rooms address each device.
         let dimmable = room.bulbs.iter().all(|s| s.dimmable);
+        let uniform = dimmable || room.bulbs.iter().all(|s| !s.dimmable);
         match (&room.group, first) {
-            (Some(group), Some(cmd)) if all_same && room.bulbs.len() > 1 => {
+            (Some(group), Some(cmd)) if all_same && uniform && room.bulbs.len() > 1 => {
                 out.push(set(group, cmd, dimmable));
             }
             _ => out.extend(commands.iter().map(|(&b, &cmd)| {
@@ -653,6 +655,25 @@ mod tests {
             sets(&outs),
             vec![("zigbee2mqtt/hallway_a/set", &sets_of(&outs).clone())]
         );
+    }
+
+    #[test]
+    fn mixed_bulb_and_plug_rooms_never_use_the_group() {
+        let mut rig = Rig::new(json!({ "lounge": {
+            "group": "lounge",
+            "bulbs": {
+                "lamp": { "device": "lamp" },
+                "plug": { "device": "plug", "dimmable": false },
+            },
+            "lua": r#"button("btn", { single = toggle() })"#,
+        } }));
+        rig.report_all(
+            &["lamp", "plug"],
+            json!({ "state": "ON", "brightness": 254 }),
+        );
+        let outs = rig.send("zigbee2mqtt/btn/action", json!("single"));
+        let topics: Vec<_> = sets(&outs).into_iter().map(|(t, _)| t).collect();
+        assert_eq!(topics, ["zigbee2mqtt/lamp/set", "zigbee2mqtt/plug/set"]);
     }
 
     #[test]

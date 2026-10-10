@@ -218,6 +218,10 @@ rec {
   # Zigbee groups. `id` is the Zigbee group ID (1-65534, must be stable --
   # changing it orphans the group on every member device's radio).
   #
+  # One group per lit room, holding exactly the bulbs and plugs the lighting
+  # service drives there (see `lit` below), so a room-wide change can go out
+  # as a single command and the bulbs switch together.
+  #
   # Only `friendly_name` reaches configuration.yaml: z2m removed
   # `groups.<id>.devices` in settings version 2 and silently drops it, so
   # membership is applied at runtime by the z2m-groups oneshot (see
@@ -228,17 +232,42 @@ rec {
   # controlling the group with this host powered off. Left off for now -- the
   # button is battery-powered and must be awake to accept the bind, so it
   # needs a manual press at the moment z2m-groups runs. Re-add when wanted.
-  zigbeeGroups = {
-    living_room = {
-      id = 1;
-      members = with devices.living-room; [
-        light
-        carla_desk_lamp
-        standing_lamp
-        niko_desk_lamp
-      ];
-    };
+  groupIds = {
+    living-room = 1;
+    bathroom = 2;
+    hallway = 3;
+    bedroom = 4;
   };
+  zigbeeGroups = builtins.listToAttrs (
+    map (roomKey: {
+      name = builtins.replaceStrings [ "-" ] [ "_" ] roomKey;
+      value = {
+        id = groupIds.${roomKey};
+        room = roomKey;
+        members = builtins.attrValues lit.${roomKey};
+      };
+    }) (builtins.attrNames groupIds)
+  );
+
+  # Lights and plugs the lighting service owns, per room. Everything of
+  # those kinds, except plugs that power something other than a lamp.
+  notLamps = [ devices.kitchen.plug ];
+  lit = builtins.mapAttrs (
+    _: ds:
+    filterAttrs (
+      _: d: (d.kind == kinds.light || d.kind == kinds.plug) && !(builtins.elem d notLamps)
+    ) ds
+  ) devices;
+  filterAttrs =
+    pred: set:
+    builtins.listToAttrs (
+      builtins.filter (kv: pred kv.name kv.value) (
+        map (name: {
+          inherit name;
+          value = set.${name};
+        }) (builtins.attrNames set)
+      )
+    );
 
   # `rawDevices` with each entry's zigbee2mqtt friendly name (`<slug>_<key>`)
   # and resolved room record filled in, so a consumer holding just the device

@@ -7,7 +7,13 @@
 let
   craneLib = (inputs.crane.mkLib pkgs).overrideToolchain fenix.minimal.toolchain;
 
-  src = craneLib.cleanCargoSource ./.;
+  # cleanCargoSource keeps only Rust/Cargo files; the Lua prelude is
+  # include_str!'d into the binary, so it has to survive the filter too.
+  src = lib.cleanSourceWith {
+    src = ./.;
+    filter = path: type: lib.hasSuffix ".lua" path || craneLib.filterCargoSources path type;
+    name = "source";
+  };
 
   commonArgs = {
     inherit src;

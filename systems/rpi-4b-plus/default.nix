@@ -18,6 +18,7 @@
     ./services/ha-registry-gc.nix
     ./services/ha-entity-rename.nix
     ./services/z2m-groups.nix
+    ./services/lighting
     ./services/caddy-lan.nix
     self.nixosModules.tailnet
     { services.tailnet.enable = true; }
