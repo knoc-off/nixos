@@ -1,3 +1,4 @@
+pub mod arbiter;
 pub mod sun;
 
 use std::collections::HashMap;
@@ -16,8 +17,6 @@ pub struct Message {
     pub topic: String,
     pub payload: serde_json::Value,
 }
-
-// -- Setting: read-only HA -> MQTT value --------------------------------------
 
 /// Types that can be parsed from MQTT JSON payloads.
 ///
@@ -106,16 +105,10 @@ impl Runtime {
     /// Reads `MQTT_HOST` (default `127.0.0.1`) and `MQTT_PORT` (default `1883`)
     /// from the environment.
     pub async fn from_env(name: &str) -> Result<Self> {
-        let host = Self::env_var("MQTT_HOST").unwrap_or_else(|| "127.0.0.1".into());
-        let port: u16 = Self::env_var("MQTT_PORT")
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(1883);
+        let host = env_or("MQTT_HOST", "127.0.0.1");
+        let port: u16 = env_parse("MQTT_PORT", 1883);
 
-        let mut opts = MqttOptions::new(
-            Self::env_var("MQTT_CLIENT_ID").unwrap_or_else(|| name.into()),
-            &host,
-            port,
-        );
+        let mut opts = MqttOptions::new(env_or("MQTT_CLIENT_ID", name), &host, port);
         opts.set_keep_alive(Duration::from_secs(30));
 
         let (client, eventloop) = AsyncClient::new(opts, 32);
@@ -141,24 +134,13 @@ impl Runtime {
         })
     }
 
-    // -- env helpers ----------------------------------------------------------
-
-    fn env_var(key: &str) -> Option<String> {
-        std::env::var(key).ok()
-    }
-
     pub fn env_or(&self, key: &str, default: &str) -> String {
-        std::env::var(key).unwrap_or_else(|_| default.into())
+        env_or(key, default)
     }
 
     pub fn env_parse<T: FromStr>(&self, key: &str, default: T) -> T {
-        std::env::var(key)
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(default)
+        env_parse(key, default)
     }
-
-    // -- mqtt -----------------------------------------------------------------
 
     /// Publish a JSON-serializable payload to a topic.
     pub async fn publish(&self, topic: &str, payload: impl Serialize) -> Result<()> {
@@ -236,16 +218,12 @@ impl Runtime {
         })
     }
 
-    // -- lifecycle ------------------------------------------------------------
-
     /// Future that resolves when a shutdown signal (SIGTERM/SIGINT) is received.
     /// Safe to call repeatedly in `tokio::select!`.
     pub async fn shutdown_signal(&self) {
         let mut rx = self.shutdown_rx.clone();
         let _ = rx.wait_for(|&v| v).await;
     }
-
-    // -- internals ------------------------------------------------------------
 
     async fn event_loop(
         mut eventloop: rumqttc::EventLoop,
@@ -292,6 +270,17 @@ impl Runtime {
             _ = sigint.recv() => {}
         }
     }
+}
+
+fn env_or(key: &str, default: &str) -> String {
+    std::env::var(key).unwrap_or_else(|_| default.into())
+}
+
+fn env_parse<T: FromStr>(key: &str, default: T) -> T {
+    std::env::var(key)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
 }
 
 #[cfg(test)]

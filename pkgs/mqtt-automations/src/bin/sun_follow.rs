@@ -656,14 +656,12 @@ mod tests {
 
     #[test]
     fn light_tick_unknown_and_user_off_never_act() {
-        assert_eq!(
-            light_on_tick(LightState::Unknown, Some(50), None, 100, false, 25, true).1.is_some(),
-            false
-        );
-        assert_eq!(
-            light_on_tick(LightState::UserOff, Some(50), None, 100, false, 25, true).1.is_some(),
-            false
-        );
+        assert!(light_on_tick(LightState::Unknown, Some(50), None, 100, false, 25, true)
+            .1
+            .is_none());
+        assert!(light_on_tick(LightState::UserOff, Some(50), None, 100, false, 25, true)
+            .1
+            .is_none());
     }
 
     #[test]
