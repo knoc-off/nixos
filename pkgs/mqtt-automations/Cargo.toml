@@ -32,8 +32,8 @@ name = "sun-follow"
 path = "src/bin/sun_follow.rs"
 
 [[bin]]
-name = "light-arbiter"
-path = "src/bin/light_arbiter.rs"
+name = "lights"
+path = "src/bin/lights.rs"
 
 [dependencies]
 rumqttc = { version = "0.24", default-features = false }

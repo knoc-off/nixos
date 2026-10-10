@@ -72,6 +72,16 @@ pub struct Config {
 }
 
 impl Config {
+    /// z2m devices whose state messages feed the sources.
+    pub fn sensors(&self) -> impl Iterator<Item = &str> {
+        self.sources.iter().map(Source::device)
+    }
+
+    /// z2m devices whose actions are mapped in `controls`.
+    pub fn buttons(&self) -> impl Iterator<Item = &str> {
+        self.controls.keys().map(String::as_str)
+    }
+
     fn interaction_hold() -> Duration {
         Duration::from_secs(300)
     }
