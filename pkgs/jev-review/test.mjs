@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,12 +19,25 @@ import {
   unreviewedFiles,
   loadProbes,
   listProbes,
+  listLibrary,
+  loadLangs,
+  loadHarness,
+  moduleKind,
+  globRe,
   applies,
   gitDiff,
   runReview,
+  runHarness,
+  runHooks,
+  loadHarnesses,
 } from "./opencode-plugin.js";
 
 const SHIPPED = fileURLToPath(new URL("./probes", import.meta.url));
+const LANG_DIRS = [[fileURLToPath(new URL("./langs", import.meta.url)), "shipped"]];
+const HARNESS_DIRS = [[fileURLToPath(new URL("./harnesses", import.meta.url)), "shipped"]];
+const LANGS = await loadLangs(LANG_DIRS);
+// Hermetic: shipped langs/harnesses only, whatever ~/scratch/jev-probes holds.
+const review = (args, opts) => runReview(args, { langDirs: LANG_DIRS, harnessDirs: HARNESS_DIRS, ...opts });
 const g = (cwd, ...a) =>
   execFileSync("git", ["-c", "user.name=t", "-c", "user.email=t@t", "-c", "init.defaultBranch=main", ...a], { cwd });
 
@@ -106,7 +119,7 @@ async function setup(jevOpts, extraDirs = []) {
   const jev = fakeJev(jevOpts);
   const cache = new Map();
   const go = (args, extra = {}) =>
-    runReview({ from: "HEAD", ...args }, { dir: root, root, diff, ask: jev.ask, cache, probeDirs: [[SHIPPED, "shipped"], ...extraDirs], ...extra });
+    review({ from: "HEAD", ...args }, { dir: root, root, diff, ask: jev.ask, cache, probeDirs: [[SHIPPED, "shipped"], ...extraDirs], ...extra });
   return { inner, root, diff, jev, go };
 }
 
@@ -178,11 +191,12 @@ test("isTest: path, #[test], #[cfg(test)] mod", () => {
   const mod = { file: "a.rs", lang: "rust", kind: "mod", start: 2, end: 5 };
   const inMod = { file: "a.rs", lang: "rust", kind: "fn", start: 4, end: 4 };
   const real = { file: "a.rs", lang: "rust", kind: "fn", start: 6, end: 6 };
-  assert.equal(isTest(inMod, [mod], lines), true);
-  assert.equal(isTest(mod, [mod], lines), true);
-  assert.equal(isTest(real, [mod], lines), false);
-  assert.equal(isTest({ file: "web/x.spec.ts", lang: "typescript" }, [], null), true);
-  assert.equal(isTest({ file: "tests/it.rs", lang: "rust" }, [], null), true);
+  assert.equal(isTest(inMod, [mod], lines, LANGS), true);
+  assert.equal(isTest(mod, [mod], lines, LANGS), true);
+  assert.equal(isTest(real, [mod], lines, LANGS), false);
+  assert.equal(isTest({ file: "web/x.spec.ts", lang: "typescript" }, [], null, LANGS), true);
+  assert.equal(isTest({ file: "tests/it.rs", lang: "rust" }, [], null, LANGS), true);
+  assert.equal(isTest({ file: "pkg/foo_test.py", lang: "py" }, [], null, LANGS), true); // any language by path
 });
 
 test("shipped probes load; whitelists and gates are deterministic", async () => {
@@ -190,7 +204,7 @@ test("shipped probes load; whitelists and gates are deterministic", async () => 
   for (const p of probes.values()) assert.equal(p.error, undefined, `${p.name}: ${p.error}`);
   assert.deepEqual(
     [...probes.keys()].sort(),
-    ["conventions", "misattributed-error", "overbroad-match", "panic", "reentrant-caller", "reentry-side-effect", "rules", "secret-debug", "swallowed-error"]
+    ["comment-quality", "conventions", "misattributed-error", "overbroad-match", "panic", "reentrant-caller", "reentry-side-effect", "rules", "rust-design", "secret-debug", "swallowed-error"]
   );
   // Question-only probes have no fn; code probes do.
   assert.equal(probes.get("panic").fn, null);
@@ -376,7 +390,7 @@ test("changedUnits: small changed container folds; header-only parent dropped", 
   ];
   // New impl Deref (2-7) + a changed body line in fn a (10) + impl Big's closing brace (12).
   const changed = new Map([["a.rs", new Set([2, 3, 4, 5, 6, 7, 10, 12])]]);
-  const units = changedUnits(all, changed, new Map([["a.rs", lines]]));
+  const units = changedUnits(all, changed, new Map([["a.rs", lines]]), LANGS);
   assert.deepEqual(units.map((u) => u.name), ["impl Deref for Name", "fn a"]);
   assert.equal(units[0].changed.size, 6); // whole impl marked changed
 });
@@ -392,7 +406,7 @@ test("gateOn unit: an unchanged status mapping still passes the gate", async () 
 
 test("listProbes: 'true' lists everything, shows direct/always/forced", async () => {
   const all = await listProbes([[SHIPPED, "shipped"]], "true");
-  assert.equal(all.split("\n").length, 9);
+  assert.equal(all.split("\n").length, 11);
   assert.match(all, /^panic\tshipped\trust \[fn,impl,top\]\tdirect, gated\t/m);
   assert.match(all, /^secret-debug\tshipped\trust \[type\]\talways, gated on unit\t/m);
   assert.match(all, /^reentry-side-effect\t.*gated on unit/m);
@@ -525,7 +539,7 @@ async function callerSetup(jevOpts, files = CALLER_FILES) {
   const { root, diff } = await gitDiff(repo, { from: "HEAD~1" });
   const jev = fakeJev(jevOpts);
   const go = (args) =>
-    runReview({ from: "HEAD~1", ...args }, { dir: root, root, diff, ask: jev.ask, cache: new Map(), probeDirs: [[SHIPPED, "shipped"]] });
+    review({ from: "HEAD~1", ...args }, { dir: root, root, diff, ask: jev.ask, cache: new Map(), probeDirs: [[SHIPPED, "shipped"]] });
   return { jev, go };
 }
 
@@ -593,45 +607,156 @@ test("withAttrs: #[...] lines above an item join its unit; isTest still sees #[t
     "#[test]", // 11
     "fn t() {}", // 12
   ];
-  const c = withAttrs({ file: "a.rs", lang: "rust", kind: "type", start: 8, end: 10, text: lines.slice(7, 10).join("\n") }, lines);
+  const c = withAttrs({ file: "a.rs", lang: "rust", kind: "type", start: 8, end: 10, text: lines.slice(7, 10).join("\n") }, lines, LANGS);
   assert.equal(c.start, 3);
   assert.equal(c.head, 8);
   assert.match(c.text, /^#\[derive\(\n    Debug,[\s\S]*pub struct C \{/);
-  const t = withAttrs({ file: "a.rs", lang: "rust", kind: "fn", start: 12, end: 12, text: lines[11] }, lines);
+  const t = withAttrs({ file: "a.rs", lang: "rust", kind: "fn", start: 12, end: 12, text: lines[11] }, lines, LANGS);
   assert.equal(t.start, 11);
-  assert.equal(isTest(t, [], lines), true);
+  assert.equal(isTest(t, [], lines, LANGS), true);
   const plain = { file: "a.rs", lang: "rust", kind: "fn", start: 1, end: 1, text: "use x;" };
-  assert.equal(withAttrs(plain, lines), plain);
+  assert.equal(withAttrs(plain, lines, LANGS), plain);
 });
 
-test("unreviewedFiles + runReview: deleted, renamed, removals-only and non-code files are named", async () => {
+test("unreviewedFiles + runReview: deleted, renamed, removals-only, lockfiles, binary and sops files are named", async () => {
   const repo = mkdtempSync(join(tmpdir(), "jru-"));
   mkdirSync(join(repo, "src"));
   g(repo, "init", "-q");
   writeFileSync(join(repo, "src/gone.rs"), "pub fn gone() -> u8 { 1 }\n");
   writeFileSync(join(repo, "src/old.rs"), "pub fn moved() -> u8 {\n    2\n}\n");
   writeFileSync(join(repo, "src/trim.rs"), "pub fn a() -> u8 {\n    let x = 1;\n    x\n}\n");
-  writeFileSync(join(repo, "Cargo.toml"), '[package]\nname = "x"\n');
+  writeFileSync(join(repo, "Cargo.lock"), "# lock\n");
+  writeFileSync(join(repo, "secrets.yaml"), "k: ENC[AES256_GCM,data:aa==]\nsops:\n    age: []\n");
+  writeFileSync(join(repo, "logo.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 1, 2, 0]));
   g(repo, "add", ".");
   g(repo, "commit", "-qm", "base");
   g(repo, "rm", "-q", "src/gone.rs");
   g(repo, "mv", "src/old.rs", "src/new.rs");
   writeFileSync(join(repo, "src/trim.rs"), "pub fn a() -> u8 {\n    let x = 1;\n}\n");
-  appendFileSync(join(repo, "Cargo.toml"), 'version = "0.2.0"\n');
+  appendFileSync(join(repo, "Cargo.lock"), "[[package]]\n");
+  appendFileSync(join(repo, "secrets.yaml"), "j: ENC[AES256_GCM,data:bb==]\n");
+  writeFileSync(join(repo, "logo.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47, 0, 9, 9, 0]));
   g(repo, "add", "-A");
   const { root, diff } = await gitDiff(repo, { from: "HEAD" });
-  assert.deepEqual(unreviewedFiles(diff).sort(), ["Cargo.toml", "deleted src/gone.rs", "removals only: src/trim.rs", "renamed src/old.rs→src/new.rs"]);
+  assert.deepEqual(unreviewedFiles(diff).sort(), [
+    "Cargo.lock",
+    "binary logo.png",
+    "deleted src/gone.rs",
+    "removals only: src/trim.rs",
+    "renamed src/old.rs→src/new.rs",
+    "sops-encrypted secrets.yaml",
+  ]);
   const jev = fakeJev();
-  const out = await runReview({ from: "HEAD" }, { dir: root, root, diff, ask: jev.ask, cache: new Map(), probeDirs: [[SHIPPED, "shipped"]] });
-  assert.match(out, /^No added Rust\/TypeScript lines; not reviewed: .*deleted src\/gone\.rs/);
-  assert.equal(await runReview({ from: "HEAD" }, { dir: root, root, diff: "", ask: jev.ask, cache: new Map(), probeDirs: [] }), "No changes in that diff.");
+  const out = await review({ from: "HEAD" }, { dir: root, root, diff, ask: jev.ask, cache: new Map(), probeDirs: [[SHIPPED, "shipped"]] });
+  assert.match(out, /^No added lines to review; not reviewed: .*deleted src\/gone\.rs/);
+  assert.equal(await review({ from: "HEAD" }, { dir: root, root, diff: "", ask: jev.ask, cache: new Map(), probeDirs: [] }), "No changes in that diff.");
 
   // with a reviewable change too, they go in the header
   appendFileSync(join(repo, "src/new.rs"), "pub fn added() -> u8 {\n    3\n}\n");
   const d2 = await gitDiff(repo, { from: "HEAD" });
-  const out2 = await runReview({ from: "HEAD", questions: { q: { ask: "x?" } } }, { dir: root, root, diff: d2.diff, ask: jev.ask, cache: new Map(), probeDirs: [[SHIPPED, "shipped"]] });
-  assert.match(out2.split("\n")[0], / · not reviewed: .*Cargo\.toml/);
+  const out2 = await review({ from: "HEAD", questions: { q: { ask: "x?" } } }, { dir: root, root, diff: d2.diff, ask: jev.ask, cache: new Map(), probeDirs: [[SHIPPED, "shipped"]] });
+  assert.match(out2.split("\n")[0], / · not reviewed: .*sops-encrypted secrets\.yaml/);
   assert.ok(!/renamed/.test(out2.split("\n")[0]), "the rename now has added lines: it's reviewed");
+  assert.ok(!out2.includes("secrets.yaml:"), "ciphertext never becomes a unit");
+});
+
+test("any language: files no lang claims become `top` hunks; exclude drops them; probes whitelist by extension", async () => {
+  const repo = mkdtempSync(join(tmpdir(), "jra-"));
+  g(repo, "init", "-q");
+  writeFileSync(join(repo, "default.nix"), "{ pkgs }:\n{\n  a = 1;\n}\n");
+  writeFileSync(join(repo, "notes.md"), "# notes\n");
+  g(repo, "add", ".");
+  g(repo, "commit", "-qm", "base");
+  writeFileSync(join(repo, "default.nix"), '{ pkgs }:\n{\n  a = 1;\n  b = builtins.fetchurl "http://x";\n\n}\n');
+  appendFileSync(join(repo, "notes.md"), "more\n");
+  const user = mkdtempSync(join(tmpdir(), "jp-"));
+  writeFileSync(join(user, "nixonly.mjs"), `export const meta = { description: "nix", langs: ["nix"], kinds: ["top"], question: { ask: "Impure fetch?", options: { impure: "yes", ok: "no" } } };`);
+  const { root, diff } = await gitDiff(repo, { from: "HEAD" });
+  const jev = fakeJev();
+  const opts = { dir: root, root, diff, ask: jev.ask, cache: new Map(), probeDirs: [[user, "user"]] };
+  const out = await review({ from: "HEAD" }, opts);
+  const nix = lineFor(out, "default.nix:2-7 (top level)\t");
+  assert.ok(nix, out);
+  assert.match(nix, /nixonly: impure 0\.80/);
+  assert.match(out, /^notes\.md:1-3 \(top level\)\t.*no probes applied$/m); // md: the nix-only probe skips it
+  const nixCall = jev.calls.find((c) => c.state.unit_path === "default.nix:2-7");
+  assert.equal(nixCall.state.lang, "nix");
+  assert.match(nixCall.state.unit, /^\+   b = builtins\.fetchurl/m);
+  const ex = await review({ from: "HEAD", exclude: ["**/*.md"] }, { ...opts, cache: new Map() });
+  assert.ok(!/^notes\.md/m.test(ex), ex);
+  assert.match(ex.split("\n")[0], /not reviewed: notes\.md/);
+});
+
+test("langs: a user lang turns a language's hunks into real units; broken langs are reported", async () => {
+  const repo = mkdtempSync(join(tmpdir(), "jrl-"));
+  g(repo, "init", "-q");
+  writeFileSync(join(repo, "a.py"), "import os\n\ndef old():\n    return 1\n");
+  g(repo, "add", ".");
+  g(repo, "commit", "-qm", "base");
+  appendFileSync(join(repo, "a.py"), "\ndef fresh(x):\n    return os.path.join(x, 'y')\n");
+  const langs = mkdtempSync(join(tmpdir(), "jl-"));
+  writeFileSync(
+    join(langs, "python.mjs"),
+    `export const meta = { description: "py", display: "Python", exts: [".py"], grammar: "python", kinds: { fn: "{kind: function_definition}" } };`
+  );
+  writeFileSync(join(langs, "bad.mjs"), `export const meta = { description: "no exts" };`);
+  const { root, diff } = await gitDiff(repo, { from: "HEAD" });
+  const jev = fakeJev();
+  const out = await runReview(
+    { from: "HEAD", questions: { q: { ask: "x?" } } },
+    { dir: root, root, diff, ask: jev.ask, cache: new Map(), probeDirs: [], harnessDirs: HARNESS_DIRS, langDirs: [...LANG_DIRS, [langs, "user"]] }
+  );
+  assert.match(out, /^a\.py:6-7 def fresh\t/m);
+  assert.equal(jev.calls[0].state.lang, "Python");
+  assert.equal(jev.calls[0].state.kind, "fn");
+  assert.match(out.split("\n")[0], /langs failing to load: bad/);
+  assert.equal(await moduleKind("python", `export const meta = { exts: [".py"] };`), "lang");
+});
+
+test("runHarness: a custom harness defines units, scope and state; probes and questions run on them", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "jrh-"));
+  mkdirSync(join(dir, "src"));
+  writeFileSync(join(dir, "src/a.rs"), "// increments i\nfn f(i: u8) -> u8 {\n    i + 1\n}\n/// Why: the API caps at 255.\nfn g() {}\n");
+  writeFileSync(join(dir, "src/b.ts"), "// TODO\nconst x = 1;\n");
+  const src = `
+    export const meta = { description: "comments", args: { path: "dir" } };
+    export const scope = (args) => "SCOPE:comments under " + args.path;
+    export async function units(args, h) {
+      const dir = h.resolve(args.path);
+      const files = await h.files(dir, ["src/**"]);
+      const cs = await h.astGrep(dir, ".", { rust: { any: [{ kind: "line_comment" }, { kind: "block_comment" }] }, typescript: { kind: "comment" } }, { kind: "comment" });
+      return { units: cs.filter((c) => files.includes(c.file)).map((c) => ({ ...c, changed: null })), dir, header: "comments: " + files.length + " files" };
+    }
+    export function state(u, base) { return { ...base, file_kind: u.lang }; }`;
+  assert.equal(await moduleKind("c", src), "harness");
+  const harness = await loadHarness("comments", src, "inline");
+  const user = mkdtempSync(join(tmpdir(), "jp-"));
+  writeFileSync(join(user, "todo.mjs"), `export const meta = { description: "bare todo", kinds: ["comment"], gate: /TODO/, question: { ask: "Bare TODO?", options: { bare: "yes", ok: "no" } } };`);
+  const jev = fakeJev({ pick: (ins, opts, st) => (ins.includes("Useful?") && /Why:/.test(st.unit) ? "ok_useful" : null) });
+  const out = await runHarness(
+    harness,
+    { path: dir, route: true, questions: { useful: { ask: "Useful?", options: { useless: "restates code", ok_useful: "explains why" } } } },
+    { directory: "/", ask: jev.ask, cache: new Map(), probeDirs: [[user, "user"]], langDirs: LANG_DIRS }
+  );
+  const lines = out.split("\n");
+  assert.match(lines[0], /^comments: 2 files · 3 unit\(s\)/);
+  assert.match(lineFor(out, "src/a.rs:1-1 // increments i\t"), /useful: useless 0\.80/);
+  assert.match(lineFor(out, "src/a.rs:5-6 /// Why") ?? out, /\t0\.10\tuseful: useless 0\.10$/); // ok_useful picked: ranked last
+  assert.match(lineFor(out, "src/b.ts:1-1 // TODO\t"), /todo: bare 0\.80/);
+  assert.equal(lines[lines.length - 1].split("\t")[0], "src/a.rs:5-6 /// Why: the API caps at 255.");
+  assert.ok(jev.calls.every((c) => Object.values(c.questions).every((q) => q.instructions.endsWith(`SCOPE:comments under ${dir}`))));
+  assert.ok(jev.calls.every((c) => !("neighbours" in c.state) && c.state.file_kind));
+  assert.equal(jev.calls.find((c) => c.state.unit_path.startsWith("src/a.rs")).state.lang, "Rust");
+});
+
+test("globRe and listLibrary", async () => {
+  assert.ok(globRe("**/*.md").test("a/b/c.md") && globRe("**/*.md").test("c.md"));
+  assert.ok(!globRe("src/*.rs").test("src/a/b.rs") && globRe("src/**").test("src/a/b.rs"));
+  const lib = await listLibrary({ probe: [[SHIPPED, "shipped"]], harness: HARNESS_DIRS, lang: LANG_DIRS });
+  assert.match(lib, /## harnesses\ncomments\tshipped\targs: path,glob,skip,lines\t[^\n]*\nedited\tshipped\t[^\n]*\nreview\tshipped\targs: from,to,path,units,tests,exclude\t/);
+  assert.match(lib, /^rust\tshipped\t\.rs \[fn,impl,type,mod\]\t/m);
+  assert.match(lib, /^typescript\tshipped\t\.ts,\.mts,\.cts,\.tsx /m);
+  assert.match(lib, /## probes\n[\s\S]*^panic\tshipped/m);
 });
 
 // Struct with a derived Debug: secret-debug sees the derive in the unit and
@@ -670,4 +795,95 @@ test("secret-debug: derive is in the unit, nested secret found via rg, non-Debug
   assert.equal(asked.length, 1); // Plain: Debug but no secret, own or nested -> no Jev call
   assert.match(asked[0].state.unit, /^\+ #\[derive\(Debug, Clone\)\]/);
   assert.match(asked[0].state.nested_types[0], /src\/api\.rs[\s\S]*password: String/);
+});
+
+const HOOKS_SHIPPED = [[fileURLToPath(new URL("./hooks", import.meta.url)), "shipped"]];
+const hookOpts = (dir, jev, hookDirs = HOOKS_SHIPPED) => ({
+  directory: dir, ask: jev.ask, cache: new Map(), hookDirs, harnessDirs: HARNESS_DIRS, probeDirs: [[SHIPPED, "shipped"]], langDirs: LANG_DIRS,
+});
+
+test("hook comment-quality: flags bad comments the edit touched, ignores the rest", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "jcc-"));
+  const bad = "// This robust, elegant solution leverages caching.\nconst cache = new Map();";
+  const good = "// Proxy kills idle sockets at 30s.\nconst TIMEOUT = 25_000;";
+  writeFileSync(join(dir, "a.ts"), `${good}\n\n${bad}\n`);
+  const jev = fakeJev({ route: (ins, st) => (ins.includes("praise the code") && /robust/.test(st.comment) ? 0.95 : 0.05) });
+  const opts = hookOpts(dir, jev);
+  const check = (args, tool = "edit") => runHooks({ tool, args: { filePath: join(dir, "a.ts"), ...args } }, opts);
+
+  const hit = await check({ oldString: "x", newString: bad });
+  assert.match(hit, /^\[jev comment check\] 1 comment/);
+  assert.match(hit, /a\.ts:4-5 \/\/ This robust.*←  puffery 0\.95/);
+  assert.equal(jev.calls.length, 1); // only the edited comment was asked about
+  assert.equal(await check({ oldString: "x", newString: good }), null);
+  assert.match(await check({ content: `${good}\n\n${bad}\n` }, "write"), /puffery/); // write: every comment in the file
+  const n = jev.calls.length;
+  assert.equal(await check({ oldString: "x", newString: "const y = 2;" }), null); // no comment marker: no Jev call
+  assert.equal(jev.calls.length, n);
+});
+
+test("runHooks: opt-in dir, tools/files match, shared budget, failures dropped", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "jh-"));
+  writeFileSync(join(dir, "a.rs"), "fn f() {}\n");
+  const hooks = mkdtempSync(join(tmpdir(), "jhd-"));
+  const jev = fakeJev();
+  const opts = hookOpts(dir, jev, [[hooks, "user"]]);
+  const edit = (filePath = join(dir, "a.rs"), tool = "edit") => runHooks({ tool, args: { filePath, oldString: "x", newString: "fn f() {}" } }, opts);
+  assert.equal(await edit(), null); // empty user dir: nothing runs (shipped ones are templates)
+  writeFileSync(join(hooks, "rs.mjs"), `export const meta = { description: "d", tools: ["edit"], files: /\\.rs$/ };
+    export default async (e, h) => "rs " + e.rel + " " + JSON.stringify(e.lines) + " " + h.budget.left;`);
+  writeFileSync(join(hooks, "boom.mjs"), `export const meta = { description: "d", tools: ["edit"] }; export default async () => { throw new Error("x"); };`);
+  writeFileSync(join(hooks, "slow.mjs"), `export const meta = { description: "d", tools: ["write"] }; export default async () => "write only";`);
+  writeFileSync(join(hooks, "broken.mjs"), `export const meta = { description: "no tools" };`);
+  assert.equal(await edit(), "rs a.rs [[1,1]] 12"); // boom dropped, slow is write-only, broken never loads as a hook
+  writeFileSync(join(dir, "b.ts"), "fn f() {}\n");
+  assert.equal(await edit(join(dir, "b.ts")), null); // files: /\.rs$/
+  assert.equal(await runHooks({ tool: "edit", args: { filePath: "/nope", newString: "x" } }, opts), null); // never throws
+  assert.equal(await runHooks({ tool: "bash", args: { command: "ls" } }, opts), null);
+  process.env.JEV_HOOKS = "0";
+  assert.equal(await edit(), null);
+  delete process.env.JEV_HOOKS;
+  assert.equal(await moduleKind("k", `export const meta = { tools: ["edit"] }; export default () => null;`), "hook");
+  const lib = await listLibrary({ probe: [[SHIPPED, "shipped"]], harness: HARNESS_DIRS, lang: LANG_DIRS, hookTemplates: HOOKS_SHIPPED, hook: [[hooks, "user"]] });
+  assert.match(lib, /^comment-quality\tshipped\toff \(jev_probe enable\)\tedit,write\t/m);
+  assert.match(lib, /^rs\tuser\ton\tedit \/\\\.rs\$\/\t/m);
+  assert.match(lib, /^broken\tuser\ton\t\tLOAD ERROR/m);
+});
+
+test("edited harness + rust-design: units from line ranges, gated questions, per-question threshold", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "jrd-"));
+  mkdirSync(join(dir, "src"));
+  writeFileSync(join(dir, "Cargo.toml"), "[package]\nname = \"x\"\n");
+  writeFileSync(join(dir, "src/lib.rs"), "pub fn export(r: &R, pretty: bool) -> u8 {\n    1\n}\n\nfn other() -> u8 {\n    2\n}\n");
+  const jev = fakeJev({ route: (ins) => (ins.includes("bool parameter") ? 0.9 : 0.85) });
+  const harness = (await loadHarnesses(HARNESS_DIRS)).get("edited");
+  const opts = { directory: dir, ask: jev.ask, cache: new Map(), probeDirs: [[SHIPPED, "shipped"]], langDirs: LANG_DIRS };
+  const out = await runHarness(harness, { path: join(dir, "src/lib.rs"), lines: [[1, 1]], probes: ["rust-design"] }, opts);
+  assert.match(out, /^edited: .* lines 1-1 · 1 unit\(s\)/);
+  assert.match(lineFor(out, "src/lib.rs:1-3 pub fn export") ?? out, /rust-design: bool_flag_param 0\.90/);
+  const asked = Object.keys(jev.calls[0].questions);
+  assert.ok(asked.length < 5, `only gated questions asked: ${asked}`); // bool, primitive (u8)
+  assert.equal(jev.calls[0].state.crate_kind, "lib");
+  // primitive_domain_value fired at 0.85 but its threshold is 0.9: not in the note
+  assert.doesNotMatch(out, /primitive_domain_value/);
+  const whole = await runHarness(harness, { path: join(dir, "src/lib.rs"), probes: [] }, opts);
+  assert.match(whole, /· 2 unit\(s\)/);
+});
+
+test("hook rust-design: advisory lines for the edited fn only; ts edits never reach it", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "jrh-"));
+  mkdirSync(join(dir, "src"));
+  writeFileSync(join(dir, "Cargo.toml"), "[package]\nname = \"x\"\n");
+  const src = "pub fn export(r: &R, pretty: bool) -> u8 {\n    1\n}\n\nfn other(pretty: bool) -> u8 {\n    2\n}\n";
+  writeFileSync(join(dir, "src/lib.rs"), src);
+  writeFileSync(join(dir, "a.ts"), "const x = 1;\n");
+  const jev = fakeJev({ route: (ins) => (ins.includes("bool parameter") ? 0.9 : 0.05), pick: () => "none" });
+  const hooks = mkdtempSync(join(tmpdir(), "jrhd-"));
+  writeFileSync(join(hooks, "rust-design.mjs"), readFileSync(fileURLToPath(new URL("./hooks/rust-design.mjs", import.meta.url)), "utf8"));
+  const opts = hookOpts(dir, jev, [[hooks, "user"]]);
+  const out = await runHooks({ tool: "edit", args: { filePath: join(dir, "src/lib.rs"), newString: "pub fn export(r: &R, pretty: bool) -> u8 {" } }, opts);
+  assert.match(out, /^\[jev rust feedback\] \(advisory/);
+  assert.match(out, /src\/lib\.rs:1-3 pub fn export  ←  bool_flag_param 0\.90/);
+  assert.doesNotMatch(out, /other/); // not edited
+  assert.equal(await runHooks({ tool: "edit", args: { filePath: join(dir, "a.ts"), newString: "const x = 1;" } }, opts), null);
 });

@@ -1,20 +1,24 @@
-// OpenCode plugin: jev_review + jev_probe -- an inspection engine the calling
-// agent steers, with a library of code probes Jev routes to.
+// OpenCode plugin: jev_run / jev_review / jev_probe -- a language- and
+// task-agnostic inspection engine the calling agent steers.
 //
 // Jev (TypeSafe's System One model) never writes text; it answers typed
 // questions (choice / noul / score) fast and cheap. The calling LLM plans.
-// Probes sit between them: small JS modules (the agent writes and saves
-// them with jev_probe) that check one kind of problem on one code unit,
-// using deterministic code (regex gates, binaries via r.run, other probes via
-// r.probe) and Jev questions. Jev never calls tools itself; it routes:
+// Three kinds of small JS modules (shipped next to this file, user ones in
+// ~/scratch/jev-probes, overriding by name) plug into one engine:
 //
-//   git diff (repo picked by `path`)       -> changed lines per file
-//   ast-grep (tree-sitter) over the repo    -> code units with a kind (fn/impl/type/class/const/mod)
-//   innermost unit per changed line         -> units under review; test units skipped
-//   same-kind token similarity              -> 2 nearest existing units, context in every state
+//   harness  WHAT to look at and how to frame it: produces units (any text
+//            spans: diff hunks, functions, comments, files) + a scope sentence.
+//            Shipped: `review` (changed code in a git diff). jev_review = jev_run
+//            with harness "review".
+//   lang     HOW to split a language into units: ast-grep kinds, trivial/test
+//            patterns, optional attach/isTest hooks. Files with no lang still
+//            work: their changed lines become `top` units.
+//   probe    ONE check on ONE unit: a question, or code using r.run/r.probe.
+//
+//   harness.units()                          -> units (+ all units, for neighbours)
 //   per unit: probe whitelist (langs/kinds) -> gates (deterministic)
-//             -> ONE Jev request: "is <probe description> plausible here?" per probe + agent questions
-//             -> run the routed probes (recursion via r.probe, depth <= 3, shared call budget)
+//             -> ONE Jev request: direct probe questions + routing questions + agent questions
+//             -> run the routed code probes (recursion via r.probe, depth <= 3, shared budget)
 //   ranked lines, worst first
 //
 // Every Jev answer is cached per (state, question) for the life of the
@@ -33,11 +37,21 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 // Both substituted with store paths at build time (default.nix).
 const AST_GREP = "@astGrep@".startsWith("@") ? "ast-grep" : "@astGrep@";
-const SHIPPED_PROBES = "@probesDir@".startsWith("@") ? fileURLToPath(new URL("./probes", import.meta.url)) : "@probesDir@";
+// probes/, harnesses/, langs/ live here (the source dir, or $out/lib/jev-review).
+const SHARE = "@shareDir@".startsWith("@") ? fileURLToPath(new URL(".", import.meta.url)) : "@shareDir@";
+const RG = "@rg@".startsWith("@") ? "rg" : "@rg@";
 // Binaries shipped probes rely on, pinned at build time so r.run works
 // whatever the jail's PATH holds. Anything else resolves via PATH.
-const TOOLS = { "ast-grep": AST_GREP, rg: "@rg@".startsWith("@") ? "rg" : "@rg@" };
-const USER_PROBES = path.join(homedir(), "scratch", "jev-probes");
+const TOOLS = { "ast-grep": AST_GREP, rg: RG };
+const USER_DIR = path.join(homedir(), "scratch", "jev-probes"); // probes at the root, harnesses/ and langs/ below
+const DIRS = {
+  probe: [[path.join(SHARE, "probes"), "shipped"], [USER_DIR, "user"]],
+  harness: [[path.join(SHARE, "harnesses"), "shipped"], [path.join(USER_DIR, "harnesses"), "user"]],
+  lang: [[path.join(SHARE, "langs"), "shipped"], [path.join(USER_DIR, "langs"), "user"]],
+  // Shipped hooks are templates: only the user dir runs (opt in = file present).
+  hookTemplates: [[path.join(SHARE, "hooks"), "shipped"]],
+  hook: [[path.join(USER_DIR, "hooks"), "user"]],
+};
 
 const CONCURRENCY = 8; // Jev requests in flight
 const MAX_UNITS = 200; // units per call
@@ -48,22 +62,29 @@ const ROUTE_MIN = 0.35; // routing noul needed to run a CODE probe (declarative 
 const MAX_POOL = 20000; // ponytail: neighbour candidates; a smarter index if repos outgrow it
 const MAX_UNIT_LINES = 400; // longer units keep the changed region + exit lines (override: max_lines)
 const FOLD_LINES = 60; // a changed container this small is reviewed whole, children folded in
+const TOP_LINES = 80; // a run of changed lines outside any unit is split at this length
 const NEIGHBOUR_LINES = 80;
 const NEIGHBOURS = 2;
+const HOOK_BUDGET = 12; // Jev requests shared by all hooks of one tool call
+const HOOK_TIMEOUT = 20_000;
 const MIN_SIM = 0.25; // low on purpose: a restyled copy shares names more than shape; similarity is shown to Jev
 const GRAM = 5;
 const STOP_GRAM = 500; // shape n-grams shared by more units than this carry no signal
 
-const LANGS = { ".rs": "rust", ".ts": "typescript", ".mts": "typescript", ".cts": "typescript", ".tsx": "typescript" };
-const LANG_NAMES = { rust: "Rust", typescript: "TypeScript" };
 const IE = "insufficient_evidence";
 const NEGATIVE = new Set(["none", "ok", "consistent", "na", "n/a", "not_applicable", "no", "safe", "exact", "accurate", "guarded", "propagated"]);
-const TEST_PATH = /(^|\/)(tests?|__tests__|benches)\/|[._](test|spec)\.[cm]?tsx?$/;
-const TEST_ATTR = /^#\[(?:\w+::)*test\b|^#\[cfg\(test\)\]/;
+const TEST_PATH = /(^|\/)(tests?|__tests__|benches)\/|[._-](test|spec)\.\w+$/;
+// Files never worth a Jev call: lockfiles, generated declarations, minified bundles.
+const SKIP_FILE =
+  /(^|\/)(flake\.lock|Cargo\.lock|package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|poetry\.lock|uv\.lock|Pipfile\.lock|go\.sum|Gemfile\.lock|composer\.lock|mix\.lock)$|\.d\.ts$|\.min\.(js|css)$/;
+const SOPS = /ENC\[AES256_GCM,|^\+\s*"?sops"?:/m;
+// Changed lines in a file with no lang: blank or punctuation only.
+const TRIVIAL_ANY = /^[\s{}()[\];,]*$/;
 
+// Default scope: no harness-specific framing.
 const SCOPE =
-  "Judge only the CHANGED lines of `unit` (prefixed '+'); unprefixed lines are context. " +
-  "`neighbours` are the most similar existing units in the repo (with `similarity`, 0..1): context only, never under review.";
+  "Judge the lines of `unit` prefixed '+'; unprefixed lines are context. " +
+  "`neighbours` (if any) are the most similar other units (with `similarity`, 0..1): context only, never under judgement.";
 
 export const choice = (instructions, options) => ({
   type: "choice",
@@ -109,9 +130,53 @@ function normFinding(out) {
   return { p, label: String(out.label ?? "found"), note: out.note ? String(out.note) : undefined };
 }
 
-// Unified diff -> Map(file -> Set of added new-side line numbers), for
-// supported languages only. Pure.
-export function changedLines(diff) {
+// ---- langs ------------------------------------------------------------------
+
+// Lang modules (langs/*.mjs): `export const meta = { description, exts,
+// grammar (ast-grep language, or a list), kinds: {unitKind: ast-grep rule},
+// display?, trivial?: RegExp }`, optional `attach(u, lines)` /
+// `isTest(u, all, lines)`. Shipped: rust, typescript.
+export async function loadLangs(dirs = DIRS.lang) {
+  const langs = new Map();
+  for (const m of (await loadModules(dirs)).values()) langs.set(m.name, langFrom(m));
+  return langs;
+}
+// {name, source, file, mod | error} -> lang (with `error` if malformed).
+export async function loadLang(name, src, source, file) {
+  const l = langFrom({ name, source, file, mod: await importSource(name, src) });
+  if (l.error) throw new Error(l.error);
+  return l;
+}
+function langFrom(m) {
+  const meta = m.mod?.meta;
+  const bad = m.error ?? (!Array.isArray(meta?.exts) ? "meta.exts must be a list of extensions" : typeof meta.kinds !== "object" || !meta.grammar ? "meta needs grammar and kinds" : null);
+  return { name: m.name, source: m.source, file: m.file, meta: meta ?? {}, attach: m.mod?.attach, isTest: m.mod?.isTest, error: bad ?? undefined };
+}
+export const langOf = (langs, file) => {
+  for (const l of langs.values()) if (!l.error && l.meta.exts.some((e) => file.endsWith(e))) return l;
+  return null;
+};
+// The lang for `file`, or its extension when no lang module claims it (so a
+// probe can whitelist "py" before anyone writes a python lang).
+export const langName = (langs, file) => langOf(langs, file)?.name ?? (path.extname(file).slice(1) || path.basename(file));
+const displayName = (langs, lang) => langs?.get(lang)?.meta?.display ?? lang;
+
+// One ast-grep rule per (lang, grammar, kind); id "<lang>~<grammar>~<kind>".
+const astRules = (langs) =>
+  [...langs.values()]
+    .filter((l) => !l.error)
+    .flatMap((l) => [l.meta.grammar].flat().flatMap((g) => Object.entries(l.meta.kinds).map(([k, r]) => `id: ${l.name}~${g}~${k}\nlanguage: ${g}\nrule: ${r}`)))
+    .join("\n---\n");
+
+// Glob over repo-relative paths -> RegExp: `**/` any dirs, `*`/`?` within one.
+// (Not path.matchesGlob: opencode loads plugins under bun.)
+const GLOB_TOKEN = { "**/": "(?:.*/)?", "**": ".*", "*": "[^/]*", "?": "[^/]" };
+export const globRe = (g) =>
+  new RegExp("^" + g.split(/(\*\*\/|\*\*|\*|\?)/).map((t) => GLOB_TOKEN[t] ?? t.replace(/[.+^${}()|[\]\\]/g, "\\$&")).join("") + "$");
+
+// Unified diff -> Map(file -> Set of added new-side line numbers). Lockfiles
+// and generated files never count; `keep` filters further. Pure.
+export function changedLines(diff, keep = () => true) {
   const out = new Map();
   let file = null;
   let inHunk = false;
@@ -122,7 +187,7 @@ export function changedLines(diff) {
       inHunk = false;
     } else if (!inHunk && line.startsWith("+++ ")) {
       const p = line.slice(4).replace(/^b\//, "");
-      file = p !== "/dev/null" && LANGS[path.extname(p)] && !p.endsWith(".d.ts") ? p : null;
+      file = p !== "/dev/null" && !SKIP_FILE.test(p) && keep(p) ? p : null;
     } else if (line.startsWith("@@")) {
       inHunk = true;
       nl = Number(/^@@ -\d+(?:,\d+)? \+(\d+)/.exec(line)?.[1] ?? 0);
@@ -135,9 +200,9 @@ export function changedLines(diff) {
 }
 
 // Files in the diff that get no units, so nobody mistakes "not reviewed" for
-// "nothing to review": deleted, renamed without edits, removals only, and
-// anything that isn't Rust/TS (Cargo.toml, package.json, …). Pure.
-export function unreviewedFiles(diff) {
+// "nothing to review": deleted, renamed without edits, removals only,
+// binary, sops-encrypted, lockfiles/generated, `exclude`d. Pure.
+export function unreviewedFiles(diff, exclude = () => false) {
   const out = [];
   for (const block of diff.split(/^(?=diff --git )/m)) {
     const m = /^diff --git a\/(.+?) b\/(.+)$/m.exec(block);
@@ -146,34 +211,15 @@ export function unreviewedFiles(diff) {
     const body = block.split(/^@@/m).slice(1).join("\n").split("\n");
     const adds = body.some((l) => l[0] === "+");
     const dels = body.some((l) => l[0] === "-");
-    const code = LANGS[path.extname(b)] && !b.endsWith(".d.ts");
     if (/^deleted file mode/m.test(block)) out.push(`deleted ${a}`);
+    else if (/^Binary files /m.test(block)) out.push(`binary ${b}`);
     else if (/^rename from /m.test(block) && !adds) out.push(`renamed ${a}→${b}${dels ? " (lines removed)" : ""}`);
-    else if (!code) out.push(b);
+    else if (SKIP_FILE.test(b) || exclude(b)) out.push(b);
+    else if (SOPS.test(block)) out.push(`sops-encrypted ${b}`);
     else if (!adds && dels) out.push(`removals only: ${b}`);
   }
   return out;
 }
-
-// ast-grep rules, one per (language, unit kind); rule id "<lang>-<kind>".
-const anyKind = (ks) => `{any: [${ks.map((k) => `{kind: ${k}}`).join(", ")}]}`;
-const TOP = "{inside: {any: [{kind: program}, {kind: export_statement}]}}";
-const FN_VALUE = "{has: {kind: variable_declarator, has: {field: value, any: [{kind: arrow_function}, {kind: function_expression}]}}}";
-const TS_RULES = {
-  fn: `{any: [{kind: function_declaration}, {kind: generator_function_declaration}, {kind: method_definition}, {all: [{kind: lexical_declaration}, ${TOP}, ${FN_VALUE}]}]}`,
-  class: anyKind(["class_declaration", "abstract_class_declaration"]),
-  type: anyKind(["interface_declaration", "type_alias_declaration", "enum_declaration"]),
-  const: `{all: [{kind: lexical_declaration}, ${TOP}, {not: ${FN_VALUE}}]}`,
-};
-const RULES = [
-  ...Object.entries({
-    fn: ["function_item"],
-    impl: ["impl_item"],
-    type: ["struct_item", "enum_item", "trait_item", "type_item", "union_item"],
-    mod: ["mod_item"],
-  }).map(([k, ks]) => `id: rust-${k}\nlanguage: rust\nrule: ${anyKind(ks)}`),
-  ...["typescript", "tsx"].flatMap((l) => Object.entries(TS_RULES).map(([k, r]) => `id: ${l}-${k}\nlanguage: ${l}\nrule: ${r}`)),
-].join("\n---\n");
 
 const run = (cmd, args, cwd, signal, timeout = 0) =>
   new Promise((resolve, reject) =>
@@ -186,20 +232,41 @@ const git = (cwd, args, signal) => run("git", args, cwd, signal);
 // "pub fn foo(a: A) -> B {" -> "pub fn foo"; "impl X for Y {" -> "impl X for Y".
 const unitName = (text) => text.split("\n")[0].split(/[({=]/)[0].trim().slice(0, 60);
 
-// Every unit in the tree at `dir` (respects .gitignore).
-export async function scanUnits(dir, signal) {
-  const out = await run(AST_GREP, ["scan", "--inline-rules", RULES, "--json=stream", "."], dir, signal);
-  return out
+// ast-grep --json=stream output -> units; kindOf(ruleId, file) -> [lang, kind].
+const parseMatches = (out, kindOf) =>
+  out
     .split("\n")
     .filter(Boolean)
     .flatMap((l) => {
       const m = JSON.parse(l);
       const file = m.file.replace(/^\.\//, "");
-      const lang = LANGS[path.extname(file)];
-      if (!lang || file.endsWith(".d.ts")) return [];
-      const kind = m.ruleId.slice(m.ruleId.indexOf("-") + 1);
+      if (SKIP_FILE.test(file)) return [];
+      const [lang, kind] = kindOf(m.ruleId, file);
       return [{ file, lang, kind, start: m.range.start.line + 1, end: m.range.end.line + 1, text: m.text, name: unitName(m.text) }];
     });
+
+// Every lang unit under `paths` of the tree at `dir` (respects .gitignore).
+export async function scanUnits(dir, signal, langs, paths = ["."]) {
+  langs ??= await loadLangs();
+  const rules = astRules(langs);
+  if (!rules) return [];
+  const out = await run(AST_GREP, ["scan", "--inline-rules", rules, "--json=stream", ...paths], dir, signal);
+  return parseMatches(out, (id) => {
+    const [lang, , kind] = id.split("~");
+    return [lang, kind];
+  });
+}
+
+// Ad-hoc ast-grep (harness helper): `rules` maps an ast-grep language to a
+// rule (YAML/JSON string or object); every match becomes a unit of `kind`.
+// Node kinds differ per grammar (rust: line_comment/block_comment; most
+// others: comment) and one unknown kind fails the whole scan.
+export async function astGrep(dir, paths, rules, { kind = "match", signal } = {}) {
+  const text = Object.entries(rules)
+    .map(([g, r]) => `id: ${g}\nlanguage: ${g}\nrule: ${typeof r === "string" ? r : JSON.stringify(r)}`)
+    .join("\n---\n");
+  const out = await run(AST_GREP, ["scan", "--inline-rules", text, "--json=stream", ...[paths].flat()], dir, signal);
+  return parseMatches(out, (id) => [id, kind]);
 }
 
 const innermost = (units, file, line) => {
@@ -210,52 +277,20 @@ const innermost = (units, file, line) => {
   return best;
 };
 
-// Attribute lines directly above `start` (skipping comments/doc comments).
-function attrsAbove(lines, start) {
-  const out = [];
-  for (let i = start - 2; i >= 0; i--) {
-    const t = lines[i]?.trim() ?? "";
-    if (t.startsWith("#[")) out.push(t);
-    else if (!t.startsWith("//")) break;
-  }
-  return out;
-}
-
-// tree-sitter puts `#[...]` next to an item, not in it, so a struct's text
-// starts at `pub struct` and Jev never sees its `#[derive(Debug)]`. Pull
-// the attribute lines directly above (multi-line `#[derive(\n…\n)]` too)
-// into the unit; `head` keeps the item's own first line. `lines`: the file.
-export function withAttrs(u, lines) {
-  if (u.lang !== "rust") return u;
-  let start = u.start;
-  for (let i = start - 2; i >= 0; ) {
-    const t = lines[i].trim();
-    if (t.startsWith("#[") && !t.startsWith("#![")) {
-      start = i + 1;
-      i--;
-      continue;
-    }
-    // continuation of a multi-line attribute: find its `#[` within 20 lines
-    if (!/\]$/.test(t)) break;
-    let j = i - 1;
-    while (j >= 0 && i - j < 20 && !lines[j].trim().startsWith("#[") && !/[;{}]$/.test(lines[j].trim())) j--;
-    if (j < 0 || !lines[j].trim().startsWith("#[")) break;
-    i = j;
-  }
-  return start === u.start ? u : { ...u, start, head: u.start, text: lines.slice(start - 1, u.start - 1).join("\n") + "\n" + u.text };
-}
-
-// Test code: test paths, #[test]-style attributes, or inside a #[cfg(test)] mod.
-export function isTest(u, all, lines) {
+// Lang hooks, applied when the unit's lang defines them. `attach` widens a
+// unit with lines tree-sitter keeps outside it (Rust's #[...]); `isTest`
+// recognises test code beyond TEST_PATH. `lines`: the unit's file.
+export const withAttrs = (u, lines, langs) => langs?.get(u.lang)?.attach?.(u, lines) ?? u;
+export function isTest(u, all, lines, langs) {
   if (TEST_PATH.test(u.file)) return true;
-  if (u.lang !== "rust" || !lines) return false;
-  const own = (x) => lines.slice(x.start - 1, (x.head ?? x.start) - 1).map((t) => t.trim());
-  const tagged = (x) => [...attrsAbove(lines, x.start), ...own(x)].some((a) => TEST_ATTR.test(a));
-  return tagged(u) || all.some((m) => m.kind === "mod" && m.file === u.file && m.start < u.start && u.end <= m.end && tagged(m));
+  return Boolean(langs?.get(u.lang)?.isTest?.(u, all, lines));
 }
 
-// Changed lines that are only imports/attributes/braces/comments aren't worth a call.
-const TRIVIAL = /^\s*(use\s|import\s|export\s*\{|mod\s+\w+;|#!?\[|\/\/|[{}();,\]]*\s*$)/;
+// Changed lines that are only imports/attributes/braces/comments aren't
+// worth a call: the lang's `trivial`, else blank/punctuation.
+const trivialFor = (langs, lang) => langs?.get(lang)?.meta?.trivial ?? TRIVIAL_ANY;
+// Kind names with special meaning across langs: containers fold or drop
+// (mods never fold), `top` is a run of changed lines outside any unit.
 const CONTAINERS = new Set(["impl", "mod", "class"]);
 
 // Changed lines -> units under review. Each line goes to its innermost unit;
@@ -265,9 +300,11 @@ const CONTAINERS = new Set(["impl", "mod", "class"]);
 //     is judged as the impl, not as three fragments;
 //   * otherwise the container is dropped when its own changed lines are only
 //     header/braces/attributes (the children carry the change).
-// Lines outside any unit become top-level pseudo-units (runs, gap <= 3),
-// dropped when trivial. `fileLines` maps file -> its lines.
-export function changedUnits(units, changed, fileLines) {
+// Lines outside any unit (in files with no lang: all of them) become `top`
+// pseudo-units (runs, gap <= 3, split every TOP_LINES), dropped when
+// trivial. `fileLines` maps file -> its lines; `langs` supplies trivial/test
+// hooks and names files no lang claims by extension.
+export function changedUnits(units, changed, fileLines, langs) {
   const picked = new Map();
   let out = [];
   for (const [file, lines] of changed) {
@@ -286,18 +323,20 @@ export function changedUnits(units, changed, fileLines) {
       picked.get(u).changed.add(l);
     }
     const src = fileLines.get(file) ?? [];
+    const lang = langs ? langName(langs, file) : path.extname(file).slice(1);
+    const trivial = trivialFor(langs, lang);
     const runs = [];
     for (const l of orphans) {
       const last = runs[runs.length - 1];
-      if (last && l - last[last.length - 1] <= 3) last.push(l);
+      if (last && l - last[last.length - 1] <= 3 && l - last[0] < TOP_LINES) last.push(l);
       else runs.push([l]);
     }
     for (const r of runs) {
-      if (r.every((l) => TRIVIAL.test(src[l - 1] ?? ""))) continue;
+      if (r.every((l) => trivial.test(src[l - 1] ?? ""))) continue;
       const start = Math.max(1, r[0] - 2);
       const end = Math.min(src.length, r[r.length - 1] + 2);
       const text = src.slice(start - 1, end).join("\n");
-      out.push({ file, lang: LANGS[path.extname(file)], kind: "top", start, end, text, name: "(top level)", changed: new Set(r) });
+      out.push({ file, lang, kind: "top", start, end, text, name: "(top level)", changed: new Set(r) });
     }
   }
 
@@ -315,11 +354,11 @@ export function changedUnits(units, changed, fileLines) {
       c.changed = new Set(Array.from({ length: c.end - c.start + 1 }, (_, i) => c.start + i));
     } else if (kids.length) {
       const own = c.text.split("\n").filter((_, i) => c.changed.has(c.start + i));
-      if (own.every((t) => TRIVIAL.test(t) || isHeader(t, c))) drop.add(c);
+      if (own.every((t) => trivialFor(langs, c.lang).test(t) || isHeader(t, c))) drop.add(c);
     }
   }
   out = out.filter((u) => !drop.has(u));
-  for (const u of out) u.test = isTest(u, units, fileLines.get(u.file));
+  for (const u of out) u.test = isTest(u, units, fileLines.get(u.file), langs);
   return out;
 }
 
@@ -501,15 +540,13 @@ function semaphore(n) {
   };
 }
 
-// ---- probes -----------------------------------------------------------------
+// ---- modules: probes, harnesses, langs ---------------------------------------
 
-// A probe file is an ES module (node: builtins only; it is imported from a
-// content-addressed copy, so relative imports don't resolve):
-//   export const meta = { description, langs?, kinds?, gate?, routable? }
-//   export default async function (unit, r) { return { p, label, note? } | null }
-// Loaded by content hash: an edited probe takes effect on the next call.
+// Every module is an ES module (node: builtins only; it is imported from a
+// content-addressed copy, so relative imports don't resolve). Loaded by
+// content hash: an edited module takes effect on the next call.
 const modules = new Map();
-export async function loadProbe(name, src, source, file) {
+async function importSource(name, src) {
   const h = hash(src).slice(0, 16);
   if (!modules.has(h)) {
     const dir = path.join(tmpdir(), "jev-probes-mod");
@@ -521,38 +558,17 @@ export async function loadProbe(name, src, source, file) {
         .then(() => import(pathToFileURL(f).href))
     );
   }
-  let mod;
   try {
-    mod = await modules.get(h);
+    return await modules.get(h);
   } catch (e) {
     modules.delete(h);
     throw e;
   }
-  if (typeof mod.meta?.description !== "string") throw new Error("must `export const meta = { description: ... }`");
-  const q = mod.meta.question;
-  if (q !== undefined && typeof q !== "function" && (typeof q?.ask !== "string" || typeof q?.options !== "object"))
-    throw new Error("meta.question must be { ask: string, options: {label: description} } or (unit, r) => that");
-  if (typeof mod.default !== "function" && q === undefined)
-    throw new Error("needs `meta.question` (declarative) or `export default async function (unit, r)` (code)");
-  return { name, source, file, meta: mod.meta, fn: typeof mod.default === "function" ? mod.default : null };
 }
 
-// A declarative probe's question for a unit, as a Jev choice.
-const declQuestion = (p, u, r) => {
-  const q = typeof p.meta.question === "function" ? p.meta.question(u, r) : p.meta.question;
-  return choice(`${q.ask}\n${SCOPE}`, q.options);
-};
-
-// Run any probe on a unit: declarative -> one cached choice; code -> its function.
-async function evalProbe(p, u, r) {
-  if (p.fn) return p.fn(u, r);
-  const q = declQuestion(p, u, r);
-  return toFinding(readAnswer((await r.ask({ q })).q, q.criteria));
-}
-
-// [[dir, source], ...] -> Map(name -> probe); later dirs override earlier ones.
-// A probe that fails to load is kept with `error` so it shows up in listings.
-export async function loadProbes(dirs) {
+// [[dir, source], ...] -> Map(name -> {name, source, file, mod} | {…, error});
+// later dirs override earlier ones.
+async function loadModules(dirs) {
   const out = new Map();
   for (const [dir, source] of dirs) {
     let files;
@@ -565,10 +581,87 @@ export async function loadProbes(dirs) {
       const name = f.slice(0, -4);
       const file = path.join(dir, f);
       try {
-        out.set(name, await loadProbe(name, await readFile(file, "utf8"), source, file));
+        out.set(name, { name, source, file, mod: await importSource(name, await readFile(file, "utf8")) });
       } catch (e) {
-        out.set(name, { name, source, file, meta: {}, error: e.message });
+        out.set(name, { name, source, file, error: e.message });
       }
+    }
+  }
+  return out;
+}
+
+// What a module source is, from its exports: a harness exports `units`, a
+// lang has `meta.exts`, a hook has `meta.tools`, anything else is a probe.
+export async function moduleKind(name, src) {
+  const mod = await importSource(name, src);
+  return typeof mod.units === "function" ? "harness" : Array.isArray(mod.meta?.exts) ? "lang" : Array.isArray(mod.meta?.tools) ? "hook" : "probe";
+}
+
+// A probe:
+//   export const meta = { description, langs?, kinds?, gate?, routable?, question? }
+//   export default async function (unit, r) { return { p, label, note? } | null }
+export async function loadProbe(name, src, source, file) {
+  return probeFrom(name, await importSource(name, src), source, file);
+}
+function probeFrom(name, mod, source, file) {
+  if (typeof mod.meta?.description !== "string") throw new Error("must `export const meta = { description: ... }`");
+  const q = mod.meta.question;
+  if (q !== undefined && typeof q !== "function" && (typeof q?.ask !== "string" || typeof q?.options !== "object"))
+    throw new Error("meta.question must be { ask: string, options: {label: description} } or (unit, r) => that");
+  if (typeof mod.default !== "function" && q === undefined)
+    throw new Error("needs `meta.question` (declarative) or `export default async function (unit, r)` (code)");
+  return { name, source, file, meta: mod.meta, fn: typeof mod.default === "function" ? mod.default : null };
+}
+
+// A probe's question for a unit, as a Jev choice.
+const declQuestion = (p, u, r) => {
+  const q = typeof p.meta.question === "function" ? p.meta.question(u, r) : p.meta.question;
+  return choice(`${q.ask}\n${r.scope}`, q.options);
+};
+
+// Run any probe on a unit: declarative -> one cached choice; code -> its function.
+async function evalProbe(p, u, r) {
+  if (p.fn) return p.fn(u, r);
+  const q = declQuestion(p, u, r);
+  return toFinding(readAnswer((await r.ask({ q })).q, q.criteria));
+}
+
+// [[dir, source], ...] -> Map(name -> probe); later dirs override earlier ones.
+// A probe that fails to load is kept with `error` so it shows up in listings.
+export async function loadProbes(dirs = DIRS.probe) {
+  const out = new Map();
+  for (const m of (await loadModules(dirs)).values()) {
+    try {
+      if (m.error) throw new Error(m.error);
+      out.set(m.name, probeFrom(m.name, m.mod, m.source, m.file));
+    } catch (e) {
+      out.set(m.name, { name: m.name, source: m.source, file: m.file, meta: {}, error: e.message });
+    }
+  }
+  return out;
+}
+
+// A harness:
+//   export const meta = { description, args?: {name: description}, neighbours?: bool }
+//   export const scope = "how Jev should read `unit`"     (or (args) => string)
+//   export async function units(args, h) -> { units, all?, header?, empty? }
+//   export function state(unit, base, h)?                  (default: base)
+function harnessFrom(name, mod, source, file) {
+  if (typeof mod.meta?.description !== "string") throw new Error("must `export const meta = { description: ... }`");
+  if (typeof mod.units !== "function") throw new Error("must `export async function units(args, h)`");
+  return { name, source, file, meta: mod.meta, scope: mod.scope, units: mod.units, state: mod.state };
+}
+export async function loadHarness(name, src, source, file) {
+  return harnessFrom(name, await importSource(name, src), source, file);
+}
+export async function loadHarnesses(dirs = DIRS.harness) {
+  const out = new Map();
+  for (const m of (await loadModules(dirs)).values()) {
+    try {
+      if (m.error) throw new Error(m.error);
+      out.set(m.name, harnessFrom(m.name, m.mod, m.source, m.file));
+    } catch (e) {
+      out.set(m.name, { name: m.name, source: m.source, file: m.file, meta: {}, error: e.message });
     }
   }
   return out;
@@ -577,7 +670,7 @@ export async function loadProbes(dirs) {
 // The tag whitelist: a probe only ever sees units of its langs/kinds.
 export const applies = (p, u) => !p.error && (!p.meta.langs || p.meta.langs.includes(u.lang)) && (!p.meta.kinds || p.meta.kinds.includes(u.kind));
 
-// gate: RegExp, { rust: RegExp, typescript: RegExp }, or (unit, r) => bool.
+// gate: RegExp, { <lang>: RegExp }, or (unit, r) => bool.
 // Regexes test the changed lines, or the whole unit with meta.gateOn:
 // "unit" (for bugs where the change is small but the evidence isn't: a new
 // `continue` in front of an unchanged status mapping). No gate: passes.
@@ -589,19 +682,23 @@ async function gatePasses(p, u, r) {
   return re ? re.test(p.meta.gateOn === "unit" ? u.text : changedText(u)) : false;
 }
 
-// Base Jev state for a unit: the unit plus its nearest same-kind neighbours.
+// Base Jev state for a unit: the unit plus (when the harness supplied a
+// pool) its nearest same-kind neighbours; then the harness's `state` hook.
 function unitState(rv, u) {
-  return {
-    lang: LANG_NAMES[u.lang],
+  const base = {
+    lang: displayName(rv.langs, u.lang),
     kind: u.kind,
     unit_path: span(u),
     unit: render(u, rv.maxLines),
-    neighbours: rv.nearest(u).map((n) => ({
-      path: span(n.unit),
-      similarity: Number(n.sim.toFixed(2)),
-      code: n.unit.text.split("\n").slice(0, NEIGHBOUR_LINES).join("\n"),
-    })),
+    ...(rv.pooled && {
+      neighbours: rv.nearest(u).map((n) => ({
+        path: span(n.unit),
+        similarity: Number(n.sim.toFixed(2)),
+        code: n.unit.text.split("\n").slice(0, NEIGHBOUR_LINES).join("\n"),
+      })),
+    }),
   };
+  return rv.harness.state ? rv.harness.state(u, base, rv.h) : base;
 }
 
 // Cached, budgeted, de-duplicated Jev request. questions: { id: question }.
@@ -649,8 +746,10 @@ function runtime(rv, unit, depth, stack) {
     repo: rv.root,
     dir: rv.dir,
     units: rv.all,
+    harness: rv.harness.name,
+    scope: rv.scope,
     lang: unit.lang,
-    langName: LANG_NAMES[unit.lang],
+    langName: displayName(rv.langs, unit.lang),
     budget: rv.budget,
     render: (u = unit) => render(u, rv.maxLines),
     label: (u = unit) => label(u),
@@ -659,16 +758,16 @@ function runtime(rv, unit, depth, stack) {
     state: (extra = {}, u = unit) => ({ ...unitState(rv, u), ...extra }),
     ask: (questions, state = r.state()) => askCached(rv, state, questions),
     noul: async (question, state) => {
-      const a = (await r.ask({ q: { type: "noul", instructions: `${question}\n${SCOPE}` } }, state)).q;
+      const a = (await r.ask({ q: { type: "noul", instructions: `${question}\n${rv.scope}` } }, state)).q;
       if (!Number.isFinite(a?.noul)) throw new Error("malformed Jev noul answer");
       return a.noul;
     },
     choose: async (question, options, state) => {
-      const q = choice(`${question}\n${SCOPE}`, options);
+      const q = choice(`${question}\n${rv.scope}`, options);
       return readAnswer((await r.ask({ q }, state)).q, q.criteria);
     },
     score: async (question, levels, state) =>
-      (await r.ask({ q: { type: "score", instructions: `${question}\n${SCOPE}`, criteria: levels } }, state)).q,
+      (await r.ask({ q: { type: "score", instructions: `${question}\n${rv.scope}`, criteria: levels } }, state)).q,
     finding: toFinding,
     run: (cmd, argv = [], { timeout = 30_000, cwd = rv.dir } = {}) => run(TOOLS[cmd] ?? cmd, argv, cwd, rv.signal, timeout),
     read: (file) => readFile(path.join(rv.dir, file), "utf8"),
@@ -703,12 +802,12 @@ async function invoke(rv, p, u) {
   }
 }
 
-const routeQuestion = (p) => ({
+const routeQuestion = (p, scope) => ({
   type: "noul",
   instructions:
-    `Could the changed lines plausibly have this problem: ${p.meta.description}? ` +
-    "Answer yes only if the changed code contains logic where it could actually occur; this only decides whether to run a closer check.\n" +
-    SCOPE,
+    `Could the '+' lines plausibly have this problem: ${p.meta.description}? ` +
+    "Answer yes only if they contain something where it could actually occur; this only decides whether to run a closer check.\n" +
+    scope,
 });
 
 // One unit: whitelist -> gates -> ONE Jev request holding every applicable
@@ -760,9 +859,9 @@ async function reviewUnit(rv, u) {
       results[p.name] = { error: `question: ${e.message}` };
     }
   }
-  for (const p of toRoute) qs[`route:${p.name}`] = routeQuestion(p);
+  for (const p of toRoute) qs[`route:${p.name}`] = routeQuestion(p, rv.scope);
   for (const [k, q] of Object.entries(rv.args.questions ?? {})) {
-    qs[`ask:${k}`] = choice(`${q.ask}\n${SCOPE}`, q.options ?? { violated: "yes, the changed code has this problem", ok: "no, it does not", na: "the question does not apply to this code" });
+    qs[`ask:${k}`] = choice(`${q.ask}\n${rv.scope}`, q.options ?? { violated: "yes, the '+' lines have this problem", ok: "no, they do not", na: "the question does not apply here" });
   }
   let answers = {};
   if (Object.keys(qs).length) {
@@ -817,45 +916,90 @@ const scoreOf = (results, rankBy) => {
   return ps.length ? Math.max(...ps) : null;
 };
 
-// Everything after `git diff`. `dir` is the tree the diff's new side lives
-// in; `ask(state, questions, signal)` is the Jev call (injected so tests run
-// offline); `cache` persists across calls; `probeDirs` lists probe libraries
-// (later overrides earlier); `extraProbes` adds loaded probes (jev_probe's
-// unsaved scripts).
-export async function runReview(args, { dir, root, diff, ask, cache, signal, probeDirs, extraProbes = [], note }) {
-  const changed = changedLines(diff);
-  const skippedFiles = unreviewedFiles(diff);
-  const notReviewed = skippedFiles.length ? `not reviewed: ${skippedFiles.slice(0, 20).join(" · ")}${skippedFiles.length > 20 ? ` · +${skippedFiles.length - 20} more` : ""}` : "";
-  if (!changed.size && !args.units?.length)
-    return notReviewed ? `No added Rust/TypeScript lines; ${notReviewed}` : "No changes in that diff.";
+// What a harness gets as `h`: the engine's building blocks, bound to this
+// call's langs and abort signal. Paths are relative to `dir` arguments;
+// `resolve` turns an agent-given path (relative to the session dir, ~ ok)
+// into an absolute one.
+function helpers({ directory, signal, langs, preset }) {
+  return {
+    directory,
+    signal,
+    langs,
+    preset,
+    resolve: (p = ".") => path.resolve(directory, p.replace(/^~(?=\/|$)/, homedir())),
+    run: (cmd, argv = [], { cwd = directory, timeout = 0 } = {}) => run(TOOLS[cmd] ?? cmd, argv, cwd, signal, timeout),
+    read: (file, dir = directory) => readFile(path.resolve(dir, file), "utf8"),
+    // Files under `dir` (respects .gitignore; lockfiles/generated skipped),
+    // repo-relative, filtered by globs.
+    files: async (dir, globs = ["**"]) => {
+      const out = await run(RG, ["--files"], dir, signal).catch(() => "");
+      const res = [globs].flat().map(globRe);
+      return out.split("\n").filter((f) => f && !SKIP_FILE.test(f) && res.some((re) => re.test(f))).sort();
+    },
+    glob: globRe,
+    lang: (file) => langName(langs, file),
+    unitName,
+    scanUnits: (dir, paths) => scanUnits(dir, signal, langs, paths),
+    astGrep: async (dir, paths, rules, opts) => (await astGrep(dir, paths, rules, { ...opts, signal })).map((u) => ({ ...u, lang: langName(langs, u.file) })),
+    gitDiff: (a) => gitDiff(directory, { from: a.from, to: a.to, target: a.path }, signal),
+    treeAt: (root, ref) => treeAt(root, ref, signal),
+    changedLines,
+    unreviewedFiles,
+    selectUnits,
+    changedUnits: (all, changed, fileLines) => changedUnits(all, changed, fileLines, langs),
+    withAttrs: (u, lines) => withAttrs(u, lines, langs),
+    isTest: (u, all, lines) => isTest(u, all, lines, langs),
+  };
+}
 
-  const probes = await loadProbes(probeDirs ?? [[SHIPPED_PROBES, "shipped"], [USER_PROBES, "user"]]);
+// One pass of `harness` over its units. `ask(state, questions, signal)` is
+// the Jev call (injected so tests run offline); `cache` persists across
+// calls; `probeDirs`/`langDirs` list libraries (later overrides earlier);
+// `extraProbes` adds loaded probes (jev_probe's unsaved scripts); `preset`
+// is handed to the harness as h.preset (tests feed the review harness a diff).
+export async function runHarness(harness, args, opts) {
+  const r = await evalHarness(harness, args, opts);
+  return r.empty ?? [r.head, ...r.reviewed.slice(0, args.top ?? 20).map(formatLine)].join("\n");
+}
+
+// The same pass, structured: { head, reviewed: [{unit, results, score}] } worst
+// first, or { empty }. `budget` (an object) may be shared across calls.
+export async function evalHarness(harness, args, { directory, ask, cache, signal, probeDirs = DIRS.probe, langDirs = DIRS.lang, extraProbes = [], extraLangs = [], preset, budget }) {
+  if (!harness) throw new Error("unknown harness (jev_probe list)");
+  if (harness.error) throw new Error(`harness ${harness.name} failed to load: ${harness.error}`);
+  const langs = await loadLangs(langDirs);
+  for (const l of extraLangs) langs.set(l.name, l);
+  const h = helpers({ directory, signal, langs, preset });
+  const got = await harness.units(args, h);
+  if (got?.empty) return { empty: got.empty, reviewed: [] };
+  if (!Array.isArray(got?.units)) throw new Error(`harness ${harness.name}: units() must return { units: [...] }`);
+  const dir = got.dir ?? directory;
+  const all = got.all ?? got.units;
+
+  const probes = await loadProbes(probeDirs);
   for (const p of extraProbes) probes.set(p.name, p);
-
-  let all = await scanUnits(dir, signal);
-  const fileLines = new Map();
-  for (const f of changed.keys()) fileLines.set(f, (await readFile(path.join(dir, f), "utf8")).split("\n"));
-  all = all.map((u) => (fileLines.has(u.file) ? withAttrs(u, fileLines.get(u.file)) : u));
-  const cu = changedUnits(all, changed, fileLines);
-  const { units: selected, unmatched } = selectUnits(all, cu, args.units, !args.tests);
-  const testsSkipped = args.units?.length ? 0 : cu.filter((u) => u.test).length * !args.tests;
-  const targets = selected.slice(0, MAX_UNITS);
-
-  const candidates = all.filter((u) => u.end - u.start + 1 >= 3 && u.end - u.start < MAX_UNIT_LINES && !TEST_PATH.test(u.file));
+  const targets = got.units.slice(0, MAX_UNITS);
+  const pooled = Boolean(harness.meta.neighbours);
+  const candidates = pooled ? all.filter((u) => u.end - u.start + 1 >= 3 && u.end - u.start < MAX_UNIT_LINES && !TEST_PATH.test(u.file)) : [];
   const rv = {
     args,
-    root,
+    harness,
+    h,
+    langs,
+    scope: (typeof harness.scope === "function" ? harness.scope(args) : harness.scope) ?? SCOPE,
+    root: got.root ?? dir,
     dir,
     all,
     signal,
     ask,
     cache,
     probes,
+    pooled,
     maxLines: args.max_lines ?? MAX_UNIT_LINES,
     inflight: new Map(),
     limit: semaphore(CONCURRENCY),
     nearest: makeNearest(candidates.slice(0, MAX_POOL)),
-    budget: { left: args.budget ?? MAX_CALLS, used: 0, questions: 0 },
+    budget: budget ?? { left: args.budget ?? MAX_CALLS, used: 0, questions: 0 },
     route: args.route ?? !(args.questions || args.probes),
     forced: [...new Set([...(args.probes ?? []), ...(args.criteria ? ["rules"] : [])])],
     stats: { run: 0, routed: 0, candidates: 0, direct: 0, depthHits: 0, gatedOut: 0 },
@@ -868,14 +1012,14 @@ export async function runReview(args, { dir, root, diff, ask, cache, signal, pro
   reviewed.sort((a, b) => (b.score ?? -1) - (a.score ?? -1) || Boolean(a.results.skipped) - Boolean(b.results.skipped));
 
   const broken = [...probes.values()].filter((p) => p.error).map((p) => p.name);
+  const badLangs = [...langs.values()].filter((l) => l.error).map((l) => l.name);
   const budgetSkipped = reviewed.filter((r) => r.results.skipped).length;
   const bare = reviewed.filter((r) => !r.results.skipped && !Object.keys(r.results).length).length;
   const s = rv.stats;
   const head =
-    `repo: ${root}` +
-    (note ? ` · ${note}` : "") +
+    (got.header ?? `${harness.name}: ${dir}`) +
     ` · ${targets.length} unit(s)` +
-    (testsSkipped ? `, ${testsSkipped} test unit(s) skipped` : "") +
+    (got.counts ?? []).map((c) => `, ${c}`).join("") +
     (bare ? `, ${bare} with no probes applied` : "") +
     ` · ${rv.budget.used} Jev request(s) / ${rv.budget.questions} question(s), budget left ${rv.budget.left}` +
     (budgetSkipped ? ` · ${budgetSkipped} unit(s) skipped: budget exhausted` : "") +
@@ -883,12 +1027,19 @@ export async function runReview(args, { dir, root, diff, ask, cache, signal, pro
     (s.candidates ? `, routed ${s.routed}/${s.candidates}` : "") +
     (s.gatedOut ? ` · ${s.gatedOut} forced probe×unit gated out` : "") +
     (s.depthHits ? ` · ${s.depthHits} r.probe call(s) cut at depth ${MAX_DEPTH}/cycle` : "") +
-    (selected.length > targets.length ? ` · capped, ${selected.length - targets.length} unit(s) skipped` : "") +
+    (got.units.length > targets.length ? ` · capped, ${got.units.length - targets.length} unit(s) skipped` : "") +
     (candidates.length > MAX_POOL ? ` · neighbour search limited to ${MAX_POOL} units` : "") +
-    (unmatched.length ? ` · unmatched units: ${unmatched.join(", ")}` : "") +
     (broken.length ? ` · probes failing to load: ${broken.join(", ")} (jev_probe list)` : "") +
-    (notReviewed ? ` · ${notReviewed}` : "");
-  return [head, ...reviewed.slice(0, args.top ?? 20).map(formatLine)].join("\n");
+    (badLangs.length ? ` · langs failing to load: ${badLangs.join(", ")}` : "") +
+    (got.notes ?? []).map((n) => ` · ${n}`).join("");
+  return { head, reviewed };
+}
+
+// The review harness over an already-computed diff (`dir`: the tree its new
+// side lives in).
+export async function runReview(args, { dir, root, diff, note, harnessDirs = DIRS.harness, ...rest }) {
+  const harness = (await loadHarnesses(harnessDirs)).get("review");
+  return runHarness(harness, args, { ...rest, directory: root, preset: { dir, root, diff, note } });
 }
 
 // ---- git --------------------------------------------------------------------
@@ -955,27 +1106,34 @@ export async function treeAt(root, ref, signal) {
   return trees.get(sha);
 }
 
-// ---- probe library (jev_probe) ----------------------------------------------
+// ---- library (jev_probe) ----------------------------------------------------
 
-async function saveProbe(dir, name, script, message) {
+// Save into the user library (one git repo at USER_DIR; harnesses/ and
+// langs/ are subdirs of it). `sub`: "" | "harnesses" | "langs".
+async function saveModule(sub, name, script, message) {
+  const dir = path.join(USER_DIR, sub);
   await mkdir(dir, { recursive: true });
   try {
-    await stat(path.join(dir, ".git"));
+    await stat(path.join(USER_DIR, ".git"));
   } catch {
-    await git(dir, ["init", "-q"]);
+    await git(USER_DIR, ["init", "-q"]);
   }
-  await writeFile(path.join(dir, `${name}.mjs`), script);
+  const rel = path.join(sub, `${name}.mjs`);
+  await writeFile(path.join(USER_DIR, rel), script);
   try {
-    await git(dir, ["add", "--", `${name}.mjs`]);
-    await git(dir, ["commit", "-q", "-m", message || `probe ${name}`]);
+    await git(USER_DIR, ["add", "--", rel]);
+    await git(USER_DIR, ["commit", "-q", "-m", message || `${sub ? sub.slice(0, -1) : "probe"} ${name}`]);
   } catch {
     // nothing to commit -- fine; the repo is a safety net, not a gate
   }
+  return path.join(USER_DIR, rel);
 }
 
-export async function listProbes(dirs, filter) {
+const needleOf = (filter) => (typeof filter === "string" && filter !== "true" ? filter.toLowerCase() : null);
+
+export async function listProbes(dirs = DIRS.probe, filter) {
   const probes = await loadProbes(dirs);
-  const needle = typeof filter === "string" && filter !== "true" ? filter.toLowerCase() : null;
+  const needle = needleOf(filter);
   const lines = [];
   for (const p of probes.values()) {
     const m = p.meta;
@@ -987,6 +1145,39 @@ export async function listProbes(dirs, filter) {
     if (!needle || row.toLowerCase().includes(needle)) lines.push(row);
   }
   return lines.join("\n") || "No probes.";
+}
+
+// probes + harnesses + langs, one section each.
+export async function listLibrary(dirs = DIRS, filter) {
+  const needle = needleOf(filter);
+  const keep = (row) => !needle || row.toLowerCase().includes(needle);
+  const hs = [...(await loadHarnesses(dirs.harness)).values()]
+    .map((x) => `${x.name}\t${x.source}${x.meta.args ? `\targs: ${Object.keys(x.meta.args).join(",")}` : ""}\t${x.error ? `LOAD ERROR: ${x.error}` : x.meta.description}`)
+    .filter(keep);
+  const ls = [...(await loadLangs(dirs.lang)).values()]
+    .map((x) => `${x.name}\t${x.source}\t${x.meta.exts?.join(",") ?? ""}${x.meta.kinds ? ` [${Object.keys(x.meta.kinds).join(",")}]` : ""}\t${x.error ? `LOAD ERROR: ${x.error}` : x.meta.description}`)
+    .filter(keep);
+  const ps = await listProbes(dirs.probe, filter);
+  // Hooks: shipped templates + user (= on). A user copy that differs from its
+  // template is marked, so a rebuilt template isn't silently stale.
+  const tpls = dirs.hookTemplates ? await loadHooks(dirs.hookTemplates) : new Map();
+  const users = dirs.hook ? await loadHooks(dirs.hook) : new Map();
+  const ks = [];
+  for (const name of [...new Set([...tpls.keys(), ...users.keys()])].sort()) {
+    const u = users.get(name);
+    const t = tpls.get(name);
+    let state = u ? "on" : "off (jev_probe enable)";
+    if (u && t && (await readFile(u.file, "utf8")) !== (await readFile(t.file, "utf8"))) state += ", differs from shipped";
+    const x = u ?? t;
+    const row = `${name}\t${t ? "shipped" : "user"}\t${state}\t${x.meta.tools?.join(",") ?? ""}${x.meta.files ? ` ${x.meta.files}` : ""}\t${x.error ? `LOAD ERROR: ${x.error}` : x.meta.description}`;
+    if (keep(row)) ks.push(row);
+  }
+  return [
+    `## harnesses\n${hs.join("\n") || "none"}`,
+    `## langs (units by ast-grep; other files: changed-line hunks)\n${ls.join("\n") || "none"}`,
+    `## probes\n${ps}`,
+    ...(dirs.hook ? [`## hooks (after a tool call; only those in ~/scratch/jev-probes/hooks run)\n${ks.join("\n") || "none"}`] : []),
+  ].join("\n\n");
 }
 
 // ---- Jev --------------------------------------------------------------------
@@ -1015,29 +1206,150 @@ async function jevAsk(state, questions, signal) {
   }
 }
 
+// ---- hooks ------------------------------------------------------------------
+
+// A hook: runs after matching tool calls; its text is appended to the result.
+//   export const meta = { description, tools: ["edit", "write"], files?: RegExp }
+//   export default async function (edit, h) -> string | null
+// edit: { tool, file (absolute), rel (to the session dir), lines: [[s, e]] | null
+// (null = whole file, i.e. write), added }. h: harness(name, args, engine) ->
+// { head, reviewed: [{unit, results, score}] } | { empty } · line(result) ·
+// ask(state, questions) · budget · signal · read(file) · directory. All hooks
+// of one tool call share HOOK_BUDGET Jev requests and HOOK_TIMEOUT.
+// Only hooks in ~/scratch/jev-probes/hooks run; shipped ones are templates
+// (jev_probe enable). JEV_HOOKS=0 turns them all off.
+
+function hookFrom(name, mod, source, file) {
+  if (typeof mod.meta?.description !== "string") throw new Error("must `export const meta = { description: ... }`");
+  if (!Array.isArray(mod.meta.tools)) throw new Error("meta.tools must list tool ids, e.g. [\"edit\", \"write\"]");
+  if (typeof mod.default !== "function") throw new Error("needs `export default async function (edit, h)`");
+  return { name, source, file, meta: mod.meta, fn: mod.default };
+}
+export async function loadHooks(dirs = DIRS.hook) {
+  const out = new Map();
+  for (const m of (await loadModules(dirs)).values()) {
+    try {
+      if (m.error) throw new Error(m.error);
+      out.set(m.name, hookFrom(m.name, m.mod, m.source, m.file));
+    } catch (e) {
+      out.set(m.name, { name: m.name, source: m.source, file: m.file, meta: {}, error: e.message });
+    }
+  }
+  return out;
+}
+
+// Line ranges of `needle` in `text` (1-based, inclusive).
+export function rangesOf(text, needle) {
+  const out = [];
+  const span = needle.split("\n").length - 1;
+  for (let i = text.indexOf(needle); i !== -1 && out.length < 50; i = text.indexOf(needle, i + needle.length)) {
+    const start = text.slice(0, i).split("\n").length;
+    out.push([start, start + span]);
+  }
+  return out;
+}
+
+// tool.execute.after input -> the edit a hook sees, or null (not an edit).
+async function editOf(input, directory) {
+  const a = input.args ?? {};
+  const added = input.tool === "edit" ? a.newString : input.tool === "write" ? a.content : null;
+  if (!a.filePath || typeof added !== "string" || !added) return null;
+  const file = path.resolve(directory, a.filePath);
+  let lines = null;
+  if (input.tool === "edit") {
+    lines = rangesOf(await readFile(file, "utf8"), added);
+    if (!lines.length) return null;
+  }
+  return { tool: input.tool, file, rel: path.relative(directory, file), lines, added };
+}
+
+// Every matching hook, in parallel; joined output or null. Never throws.
+export async function runHooks(input, { directory, ask, cache, signal, hookDirs = DIRS.hook, harnessDirs = DIRS.harness, ...rest }) {
+  try {
+    if (process.env.JEV_HOOKS === "0") return null;
+    const hooks = [...(await loadHooks(hookDirs)).values()].filter(
+      (k) => !k.error && k.meta.tools.includes(input.tool)
+    );
+    if (!hooks.length) return null;
+    const edit = await editOf(input, directory);
+    if (!edit) return null;
+    const run = hooks.filter((k) => !k.meta.files || k.meta.files.test(edit.file));
+    if (!run.length) return null;
+    const sig = AbortSignal.any([signal, AbortSignal.timeout(HOOK_TIMEOUT)].filter(Boolean));
+    const budget = { left: HOOK_BUDGET, used: 0, questions: 0 };
+    const harnesses = await loadHarnesses(harnessDirs);
+    const h = {
+      directory,
+      signal: sig,
+      budget,
+      read: (f) => readFile(path.resolve(directory, f), "utf8"),
+      line: formatLine,
+      ask: async (state, questions) => {
+        if (budget.left <= 0) throw new BudgetError();
+        budget.left--;
+        budget.used++;
+        return ask(state, questions, sig);
+      },
+      harness: (name, args, engine = {}) =>
+        evalHarness(harnesses.get(name), { ...engine, ...args }, { directory, ask, cache, signal: sig, budget, ...rest }),
+    };
+    const outs = await Promise.all(
+      run.map((k) =>
+        Promise.race([k.fn(edit, h), new Promise((res) => sig.addEventListener("abort", () => res(null), { once: true }))]).catch(() => null)
+      )
+    );
+    const text = outs.filter((o) => typeof o === "string" && o.trim());
+    return text.length ? text.join("\n\n") : null;
+  } catch {
+    return null; // a failed hook must never cost the edit result
+  }
+}
+
+// jev_probe enable: copy a shipped template into the user hooks dir.
+async function enableHook(name) {
+  const tpl = (await loadHooks(DIRS.hookTemplates)).get(name);
+  if (!tpl) return `Error: no shipped hook ${name} (jev_probe list)`;
+  if (tpl.error) return `Error: hook ${name} failed to load: ${tpl.error}`;
+  return `Enabled hook ${name}: ${await saveModule("hooks", name, await readFile(tpl.file, "utf8"), `enable hook ${name}`)}`;
+}
+
 // ---- tools ------------------------------------------------------------------
 
-const REVIEW_DESCRIPTION = `Inspect changed Rust/TypeScript code with Jev, a fast decision model that answers typed questions. You steer: what to ask, where, and which probes run. ~1s per pass.
+const ENGINE_DOC = `- Probes: a library of small checks (list with jev_probe). Default pass, per unit: every probe whose langs/kinds fit and whose deterministic gate passes runs. Question-only probes are asked directly in ONE request per unit together with your \`questions\`; code probes are routed (Jev says whether they're plausible) or always run. \`probes: [names]\` runs exactly those instead.
+- Your own \`questions\` (a choice per unit; default options violated/ok/na) go in the same request. Giving \`questions\` or \`probes\` turns routing off unless \`route: true\`. Spell out close alternatives as separate options (e.g. silent / logged / propagated) instead of yes/no -- in practice the most reliable signal you get. Options named none/ok/na/no/safe/… or prefixed \`ok_\` are not findings; \`minor_\` ones count half.
+- Iterate: start broad, then narrow with \`units\`. Every answer is cached, so repeats only pay for new questions. A check you will want again belongs in a probe (jev_probe).
+- Output: header, then \`path:start-end name<TAB>p<TAB>findings\`, worst first; p is the max over findings (\`rank_by\` picks one probe/question). p is a ranking signal, not calibrated; scores move ~±0.05 between identical runs. \`insufficient_evidence\` is an abstention, never a pass. Jev only classifies/scores: it ranks and labels units, it never writes text.`;
 
-- Units: each changed function/impl/struct/class/const (tree-sitter; Rust units include their #[...] attributes), with '+' on changed lines and its 2 most similar existing units of the same kind as context. A small changed impl/class (header changed, <= ${FOLD_LINES} lines) is one unit; otherwise its changed children are the units (mods always split). Units over \`max_lines\` keep the changed region plus every return/error/status line. Test code (#[test], #[cfg(test)] mods, tests/, *.test.ts, *.spec.ts) is skipped unless \`tests: true\` or picked explicitly. Deleted/renamed/removals-only/non-code files are listed in the header as "not reviewed".
-- Probes: a library of small checks (list with jev_probe). Default pass, per unit: every probe whose langs/kinds fit and whose deterministic gate passes runs. Question-only probes are asked directly in ONE request per unit together with your \`questions\`; code probes are routed (Jev says whether they're plausible) or always run. \`probes: [names]\` runs exactly those instead.
-- Your own \`questions\` (a choice per unit; default options violated/ok/na) go in the same request. Giving \`questions\` or \`probes\` turns routing off unless \`route: true\`. Spell out close alternatives as separate options (e.g. silent / logged / propagated) instead of yes/no -- in practice the most reliable signal you get.
-- Iterate: start broad with the defaults plus 5-10 suspicions specific to this change as \`questions\`, then narrow with \`units\`. Every answer is cached, so repeats only pay for new questions. A check you will want again belongs in a probe (jev_probe).
-- Output: \`repo:\` header, then \`path:start-end name<TAB>p<TAB>findings\`, worst first; p is the max over findings (\`rank_by\` picks one probe/question). p is a ranking signal, not calibrated; scores move ~±0.05 between identical runs. \`insufficient_evidence\` is an abstention, never a pass.
+const REVIEW_DESCRIPTION = `Inspect changed code in a git diff with Jev, a fast decision model that answers typed questions. You steer: what to ask, where, and which probes run. ~1s per pass. Same as jev_run with harness "review".
+
+- Units: each changed function/impl/struct/class/… in a language with a lang module (jev_probe list; shipped: rust, typescript; Rust units include their #[...] attributes), with '+' on changed lines and its 2 most similar existing units of the same kind as context. Changed lines outside any unit, and in files no lang claims (Nix, Python, shell, docs, …), become \`top\` units (runs of changed lines ±2). A small changed impl/class (header changed, <= ${FOLD_LINES} lines) is one unit; otherwise its changed children are the units (mods always split). Units over \`max_lines\` keep the changed region plus every return/error/status line. Test code (test paths; #[test], #[cfg(test)] mods) is skipped unless \`tests: true\` or picked explicitly. Deleted/renamed/removals-only/binary/sops-encrypted/lockfile/\`exclude\`d files are listed in the header as "not reviewed".
+${ENGINE_DOC}
 - \`path\` picks the repo (git runs from there; relative or ~). Refs resolve in THAT repo. Without \`to\`, compares \`from\` against the working tree. A \`from\` that isn't an ancestor (e.g. main after it moved on) is replaced by the merge-base; the header says so.`;
 
-const PROBE_DESCRIPTION = `Manage the probe library jev_review uses. A probe checks ONE kind of problem on ONE code unit. Two shapes:
+const RUN_DESCRIPTION = `Run Jev over any set of units a harness produces -- code review is just the shipped "review" harness (= jev_review). Use it for anything that is "for each X, classify/score/rank X": every comment under a dir by usefulness, every config block against rules, every fn in a crate for an audit, every doc section for staleness. ~1s per pass.
 
+- \`harness\`: a saved one by name (jev_probe list), or \`script\` for an inline one (save with jev_probe name+script once it's worth keeping). \`args\` go to the harness (see its listed args); \`questions\`/\`probes\`/\`budget\`/\`top\`/\`rank_by\`/\`max_lines\` steer the engine as in jev_review.
+- Writing a harness: see jev_probe's description (shape, \`h\` helpers, a worked comments example).
+${ENGINE_DOC}`;
+
+const PROBE_DESCRIPTION = `Manage the library jev_run/jev_review use: probes, harnesses and langs, plus edit hooks. Each is one ES module (node builtins only, no relative imports); the kind is inferred from its exports. Saved to ~/scratch/jev-probes/ (one git repo: probes at the root, harnesses/, langs/ and hooks/ below), overriding a shipped module of the same name.
+
+Pick the smallest one that does the job:
+- a PROBE when the units are right and you want a reusable check on them;
+- a HARNESS when the units themselves are new (comments, config blocks, files, doc sections, anything not "changed code in a diff");
+- a LANG when a language should get real units (fn/class/…) instead of changed-line hunks: it is data, ~10 lines.
+
+## Probe -- ONE check on ONE unit
 Question-only (preferred): asked directly, bundled into the unit's single Jev request.
 \`\`\`js
 export const meta = {
   description: "…",            // what it finds
-  langs: ["rust"],              // whitelist; omit = all ("rust", "typescript")
-  kinds: ["fn", "impl"],        // whitelist; fn impl type mod (rust), fn class type const (ts), top
-  gate: /\\.unwrap\\(/,           // deterministic pre-filter: RegExp, {rust, typescript}, or (unit, r) => bool
-  gateOn: "changed",            // regex tests the changed lines (default) or "unit" (whole unit: a small change can expose unchanged code)
+  langs: ["rust"],              // whitelist of lang names (or file extensions for files no lang claims, e.g. "nix"); omit = all
+  kinds: ["fn", "impl"],        // whitelist of unit kinds (lang kinds, "top", or whatever a harness emits); omit = all
+  gate: /\\.unwrap\\(/,           // deterministic pre-filter: RegExp, {<lang>: RegExp}, or (unit, r) => bool
+  gateOn: "changed",            // regex tests the '+' lines (default) or "unit" (whole unit: a small change can expose unchanged code)
   question: {                   // or (unit, r) => {ask, options}
-    ask: "Question about the changed lines?",
+    ask: "Question about the '+' lines?",
     options: { bad: "…", fine: "…", na: "does not apply" },  // distinct alternatives beat yes/no
   },
 };
@@ -1051,16 +1363,112 @@ export default async function (unit, r) {
   return r.finding(a);          // or { p, label, note } or null (nothing found)
 }
 \`\`\`
-\`unit\`: {file, lang, kind, start, end, name, text, changed: Set<line>|null, test}. \`r\`: noul(q, state?) -> 0..1 · choose(q, options, state?) -> {choice, p, labels, abstain, probabilities} · score(q, levels, state?) · ask({id: question}, state?) raw · state(extra?, unit?) (default: unit + neighbours) · finding(chooseResult) · nearest(unit?) -> [{unit, sim}] · units (all) · render(unit?) · changedText(unit?) · label(unit?) · run(cmd, args, {timeout}) -> stdout, any binary, cwd = repo tree · read(path) · probe(name, unit?) -> finding|null (recursion, depth <= ${MAX_DEPTH}, whitelists apply) · args (jev_review args) · budget. All Jev calls are cached and count against one per-review budget. Options named none/ok/na/no/safe/consistent/… or prefixed \`ok_\` (e.g. ok_invariant) don't count as findings; \`minor_\` options (e.g. minor_vague) count at half weight. node: builtins only, no relative imports.
+\`unit\`: {file, lang, kind, start, end, name, text, changed: Set<line>|null, test, …harness fields}. \`r\`: noul(q, state?) -> 0..1 · choose(q, options, state?) -> {choice, p, labels, abstain, probabilities} · score(q, levels, state?) · ask({id: question}, state?) raw · state(extra?, unit?) (default: the harness's state) · finding(chooseResult) · nearest(unit?) -> [{unit, sim}] · units (all) · render(unit?) · changedText(unit?) · label(unit?) · run(cmd, args, {timeout}) -> stdout, any binary, cwd = the tree · read(path) · probe(name, unit?) -> finding|null (recursion, depth <= ${MAX_DEPTH}, whitelists apply) · args · harness · scope · lang/langName · budget. All Jev calls are cached and count against one per-call budget.
 
-Shapes: \`list\` (true or a filter) · \`name\` + \`script\` saves to ~/scratch/jev-probes/<name>.mjs (git-committed; overrides a shipped probe of that name), then dry-runs it if \`units\` is given · \`script\` alone dry-runs unsaved (needs \`units\`) · \`name\` alone dry-runs a saved probe on \`units\`. Dry runs take the same \`path\`/\`from\`/\`to\` as jev_review (default from=HEAD).`;
+## Harness -- WHAT the units are
+\`\`\`js
+export const meta = {
+  description: "every comment under a path, with the code it annotates",
+  args: { path: "dir to scan", glob: "files to include (default **)" },  // documents jev_run's \`args\`
+  neighbours: false,            // true: each unit gets its 2 most similar units from \`all\` as context
+};
+// How Jev reads \`unit\` (appended to every question). String or (args) => string.
+export const scope = "\`unit\` is one comment; lines prefixed '+' are the comment, the rest is the code below it.";
 
-async function server() {
+export async function units(args, h) {
+  const dir = h.resolve(args.path);
+  const files = await h.files(dir, args.glob ?? "**");
+  // Comment node kinds differ per grammar: rust has line_comment/block_comment, most others \`comment\`.
+  // One unknown kind fails the whole scan, so give each grammar its own rule.
+  const found = await h.astGrep(dir, ".", {
+    rust: { any: [{ kind: "line_comment" }, { kind: "block_comment" }] },
+    typescript: { kind: "comment" }, tsx: { kind: "comment" }, javascript: { kind: "comment" },
+    python: { kind: "comment" }, nix: { kind: "comment" }, bash: { kind: "comment" },
+  }, { kind: "comment" });
+  // Merge adjacent line comments into one block; show 3 lines of code below as context.
+  const out = [];
+  for (const c of found.filter((c) => files.includes(c.file)).sort((a, b) => a.file.localeCompare(b.file) || a.start - b.start)) {
+    const prev = out[out.length - 1];
+    if (prev && prev.file === c.file && c.start === prev.commentEnd + 1) { prev.commentEnd = c.end; continue; }
+    out.push({ ...c, commentStart: c.start, commentEnd: c.end });
+  }
+  const units = [];
+  for (const u of out) {
+    const lines = (await h.read(u.file, dir)).split("\\n");
+    const end = Math.min(lines.length, u.commentEnd + 3);
+    const changed = new Set(Array.from({ length: u.commentEnd - u.commentStart + 1 }, (_, i) => u.commentStart + i));
+    units.push({ ...u, end, text: lines.slice(u.start - 1, end).join("\\n"), name: lines[u.start - 1].trim().slice(0, 60), changed });
+  }
+  return { units, dir, header: \`comments: \${dir} (\${files.length} files)\` };
+}
+// optional: export function state(unit, base, h) { return { ...base, extra: … }; }
+\`\`\`
+Then: \`jev_run({ harness: "comments", args: { path: "X/Y/Z" }, questions: { useful: { ask: "<your criteria>", options: { useless: "restates the code", minor_stale: "…", ok_useful: "explains why" } } }, top: 50 })\`.
+\`units(args, h)\` returns \`{ units, all?, dir?, root?, header?, counts?: [str], notes?: [str] }\` or \`{ empty: "message" }\`. A unit needs file, start, end, text; set \`kind\`, \`name\`, \`lang\` (h.lang(file)) and \`changed\` (Set of line numbers marked '+'; null = whole unit) as fits. Units are ranked worst first; \`top\` caps the listing, ${MAX_UNITS} units per call max.
+\`h\`: resolve(path) (session-relative, ~ ok) · files(dir, globs) (rg --files: .gitignore'd, lockfiles skipped) · read(file, dir?) · run(cmd, args, {cwd, timeout}) · glob(pattern) -> RegExp · lang(file) · unitName(text) · scanUnits(dir, paths?) (every lang unit) · astGrep(dir, paths, {grammar: rule}, {kind}) · gitDiff({from, to, path}) -> {root, diff, note} · treeAt(root, ref) · changedLines(diff, keep?) · unreviewedFiles(diff, exclude?) · changedUnits(all, changed, fileLines) · selectUnits(all, units, selectors, skipTests) · withAttrs(u, lines) · isTest(u, all, lines) · langs · signal. The shipped \`review\` harness is the reference for a diff-based one.
+
+## Lang -- how to split a language into units
+\`\`\`js
+export const meta = {
+  description: "Python: fn, class",
+  display: "Python",                         // shown to Jev
+  exts: [".py"],
+  grammar: "python",                         // ast-grep language (or a list, e.g. ["typescript", "tsx"])
+  kinds: { fn: "{kind: function_definition}", class: "{kind: class_definition}" },  // unit kind -> ast-grep rule (YAML)
+  trivial: /^\\s*(import\\s|from\\s|#|[()[\\],]*\\s*$)/,   // changed lines not worth a call on their own
+};
+// optional: export function attach(unit, fileLines) -> unit (widen, e.g. decorators); export function isTest(unit, all, fileLines) -> bool
+\`\`\`
+Kinds impl/class/mod are containers (a small changed one is reviewed whole; mods never fold); \`top\` is reserved for hunks outside any unit.
+
+## Hook -- live feedback after an edit
+Runs after matching tool calls; a non-empty return is appended to the tool result. Opt-in: only files in ~/scratch/jev-probes/hooks/ run (\`enable\` copies a shipped one there; delete to turn off). All hooks of one call share ${HOOK_BUDGET} Jev requests and ${HOOK_TIMEOUT / 1000}s; a failing hook is dropped.
+\`\`\`js
+export const meta = { description: "…", tools: ["edit", "write"], files: /\\.rs$/ };
+export default async function (edit, h) {   // edit: {tool, file, rel, lines: [[s,e]] | null (write: whole file), added}
+  const r = await h.harness("edited", { path: edit.file, lines: edit.lines }, { probes: ["rust-design"] });
+  const hits = r.reviewed.filter((x) => x.score >= 0.85).slice(0, 3);
+  return hits.length ? \`[my feedback]\\n\${hits.map(h.line).join("\\n")}\` : null;
+}
+\`\`\`
+\`h\`: harness(name, args, engine) -> {head, reviewed: [{unit, results, score}]} | {empty} · line(result) · ask(state, questions) · read(file) · budget · signal · directory.
+
+## Shapes
+\`list\` (true or a filter) · \`enable: name\` turns on a shipped hook · \`name\` + \`script\` saves (git-committed), then dry-runs it if \`units\` is given (probes and langs; dry-run harnesses with jev_run) · \`script\` alone dry-runs an unsaved probe/lang (needs \`units\`) · \`name\` alone dry-runs a saved probe on \`units\`. Dry runs review a diff: same \`path\`/\`from\`/\`to\` as jev_review (default from=HEAD).`;
+
+async function server(pctx) {
+  const hookDir = pctx?.directory ?? process.cwd();
   const require = createRequire((process.env.HOME || "/root") + "/.config/opencode/package.json");
   const { z } = require("zod");
   const cache = new Map(); // ponytail: unbounded, per opencode process; an LRU if long sessions bloat it
-  const dirs = [[SHIPPED_PROBES, "shipped"], [USER_PROBES, "user"]];
   const rules = z.record(z.string(), z.string());
+  const engine = {
+    probes: z.array(z.string()).optional().describe("Run exactly these probes (by name) on every unit whose langs/kinds fit and whose gate passes; turns routing off unless route: true."),
+    route: z.boolean().optional().describe("Let Jev route each unit to library probes. Default: on unless questions/probes are given."),
+    questions: z
+      .record(
+        z.string(),
+        z.object({
+          ask: z.string().describe("The question, about the unit's '+' lines"),
+          options: rules.optional().describe("{label: description}. Name the no-problem options none/ok/na (or ok_*). Default: violated/ok/na."),
+        })
+      )
+      .optional()
+      .describe("Your own questions for this pass, keyed by name."),
+    criteria: z
+      .record(z.string(), rules)
+      .optional()
+      .describe("Named style rules {rule-name: description} per lang name (or `all`); runs the `rules` probe with them."),
+    rank_by: z.string().optional().describe("Rank by this one probe/question instead of the max over all."),
+    budget: z.number().int().positive().optional().describe(`Max Jev requests for this call (default ${MAX_CALLS}); one request carries all of a unit's questions.`),
+    max_lines: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(`Units longer than this are shown as the '+' region +-20 lines plus every return/error/status line (default ${MAX_UNIT_LINES}).`),
+    top: z.number().int().positive().optional().describe("How many units to list (default 20)"),
+  };
   const where = {
     from: z.string().describe("Base ref, e.g. HEAD, main, a merge-base sha"),
     to: z.string().optional().describe("Target ref. Omit to diff against the working tree."),
@@ -1074,44 +1482,43 @@ async function server() {
       .describe("Only these units: `file:line` (any unit, changed or not; pasted output labels work) or a path prefix (changed units under it). Paths relative to the repo root."),
   };
 
-  async function review(args, ctx, extraProbes) {
-    const { root, diff, note } = await gitDiff(ctx.directory, { from: args.from, to: args.to, target: args.path }, ctx.abort);
-    const dir = args.to ? await treeAt(root, args.to, ctx.abort) : root;
-    return runReview(args, { dir, root, diff, ask: jevAsk, cache, signal: ctx.abort, probeDirs: dirs, extraProbes, note });
-  }
+  const go = async (harness, args, ctx, extra = {}) =>
+    runHarness(harness, args, { directory: ctx.directory, ask: jevAsk, cache, signal: ctx.abort, ...extra });
+  const review = async (args, ctx, extra) => go((await loadHarnesses()).get("review"), args, ctx, extra);
+  const NAME = /^[a-z0-9][a-z0-9-]*$/;
 
   return {
+    "tool.execute.after": async (input, output) => {
+      const note = await runHooks(input, { directory: hookDir, ask: jevAsk, cache });
+      if (note) output.output = `${output.output ?? ""}\n\n${note}`;
+    },
     tool: {
+      jev_run: {
+        description: RUN_DESCRIPTION,
+        args: {
+          harness: z.string().optional().describe("Saved harness name (jev_probe list)."),
+          script: z.string().optional().describe("Inline harness module source (unsaved), instead of `harness`."),
+          args: z.record(z.string(), z.any()).optional().describe("Arguments for the harness (its listed args)."),
+          ...engine,
+        },
+        async execute(a, ctx) {
+          try {
+            const harness = a.script ? await loadHarness("inline", a.script, "inline") : a.harness ? (await loadHarnesses()).get(a.harness) : null;
+            if (!harness) return a.harness ? `Error: unknown harness ${a.harness} (jev_probe list)` : "Error: give `harness` or `script`.";
+            const { harness: _h, script: _s, args: hargs, ...rest } = a;
+            return { title: harness.name, output: await go(harness, { ...hargs, ...rest }, ctx) };
+          } catch (e) {
+            return `Error: ${e.message}`;
+          }
+        },
+      },
       jev_review: {
         description: REVIEW_DESCRIPTION,
         args: {
           ...where,
-          probes: z.array(z.string()).optional().describe("Run exactly these probes (by name) on every unit whose langs/kinds fit and whose gate passes; turns routing off unless route: true."),
-          route: z.boolean().optional().describe("Let Jev route each unit to library probes. Default: on unless questions/probes are given."),
-          questions: z
-            .record(
-              z.string(),
-              z.object({
-                ask: z.string().describe("The question, about the changed lines"),
-                options: rules.optional().describe("{label: description}. Name the no-problem options none/ok/na. Default: violated/ok/na."),
-              })
-            )
-            .optional()
-            .describe("Your own questions for this pass, keyed by name."),
-          criteria: z
-            .object({ rust: rules.optional(), typescript: rules.optional(), all: rules.optional() })
-            .optional()
-            .describe("Named style rules {rule-name: description} per language (or `all`); runs the `rules` probe with them."),
+          ...engine,
           tests: z.boolean().optional().describe("Include test code (default: skipped)."),
-          rank_by: z.string().optional().describe("Rank by this one probe/question instead of the max over all."),
-          budget: z.number().int().positive().optional().describe(`Max Jev requests for this call (default ${MAX_CALLS}); one request carries all of a unit's questions.`),
-          max_lines: z
-            .number()
-            .int()
-            .positive()
-            .optional()
-            .describe(`Units longer than this are shown as the changed region +-20 lines plus every return/error/status line (default ${MAX_UNIT_LINES}).`),
-          top: z.number().int().positive().optional().describe("How many units to list (default 20)"),
+          exclude: z.array(z.string()).optional().describe("Globs of files to leave out (e.g. **/*.md); listed as not reviewed."),
         },
         async execute(args, ctx) {
           try {
@@ -1124,32 +1531,39 @@ async function server() {
       jev_probe: {
         description: PROBE_DESCRIPTION,
         args: {
-          list: z.union([z.boolean(), z.string()]).optional().describe("List probes (true) or filter by substring."),
-          name: z.string().optional().describe("Probe name ([a-z0-9-]). With script: save. Alone: dry-run the saved probe."),
-          script: z.string().optional().describe("Probe module source."),
+          list: z.union([z.boolean(), z.string()]).optional().describe("List harnesses, langs, probes and hooks (true) or filter by substring."),
+          name: z.string().optional().describe("Module name ([a-z0-9-]). With script: save. Alone: dry-run the saved probe."),
+          script: z.string().optional().describe("Module source: a probe, harness, lang or hook (inferred from its exports)."),
+          enable: z.string().optional().describe("Turn on a shipped hook: copies it to ~/scratch/jev-probes/hooks/ (delete the file to turn it off)."),
           message: z.string().optional().describe("Git commit message for a save."),
           ...where,
           from: where.from.optional(),
         },
         async execute(args, ctx) {
           try {
-            if (args.list && args.list !== "false") return await listProbes(dirs, args.list);
-            if (args.name && !/^[a-z0-9][a-z0-9-]*$/.test(args.name)) return "Error: name must match [a-z0-9][a-z0-9-]*";
-            let extra = [];
+            if (args.list && args.list !== "false") return await listLibrary(DIRS, args.list);
+            if (args.enable) return await enableHook(args.enable);
+            if (args.name && !NAME.test(args.name)) return "Error: name must match [a-z0-9][a-z0-9-]*";
+            const name = args.name ?? "inline";
+            let extra = {};
             let saved = "";
+            let kind = "probe";
             if (args.script) {
-              const probe = await loadProbe(args.name ?? "inline", args.script, args.name ? "user" : "inline");
-              if (args.name) {
-                await saveProbe(USER_PROBES, args.name, args.script, args.message);
-                saved = `Saved ${args.name} to ${path.join(USER_PROBES, args.name + ".mjs")}.`;
-              } else extra = [probe];
+              kind = await moduleKind(name, args.script);
+              const source = args.name ? "user" : "inline";
+              if (kind === "hook") {
+                hookFrom(name, await importSource(name, args.script), source);
+                return args.name ? `Saved hook ${name} to ${await saveModule("hooks", name, args.script, args.message)} (active from the next edit).` : "Hook loads; save it with a name to turn it on.";
+              }
+              const loaded = await { probe: loadProbe, harness: loadHarness, lang: loadLang }[kind](name, args.script, source);
+              if (args.name) saved = `Saved ${kind} ${name} to ${await saveModule({ probe: "", harness: "harnesses", lang: "langs" }[kind], name, args.script, args.message)}.`;
+              if (kind === "harness") return saved || `Harness loads (${loaded.meta.description}); run it with jev_run({ script, args }).`;
+              if (!args.name) extra = kind === "lang" ? { extraLangs: [loaded] } : { extraProbes: [loaded] };
             } else if (!args.name) return "Error: give list, name, or script.";
             if (!args.units?.length) return saved || "Error: dry runs need `units`.";
-            const out = await review(
-              { from: args.from ?? "HEAD", to: args.to, path: args.path, units: args.units, probes: [args.name ?? "inline"], route: false, tests: true, ungated: true },
-              ctx,
-              extra
-            );
+            const dry = { from: args.from ?? "HEAD", to: args.to, path: args.path, units: args.units, tests: true, ungated: true };
+            // A lang dry run: the units it now produces, with no Jev questions.
+            const out = await review(kind === "lang" ? { ...dry, probes: [], route: false } : { ...dry, probes: [name], route: false }, ctx, extra);
             return [saved, out].filter(Boolean).join("\n");
           } catch (e) {
             return `Error: ${e.message}`;
@@ -1162,3 +1576,4 @@ async function server() {
 
 // V1 shape: the named exports above are not plugins (see pkgs/axiom-ledger).
 export default { id: "jev-review", server };
+

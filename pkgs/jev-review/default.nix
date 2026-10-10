@@ -8,14 +8,17 @@
   ripgrep,
 }:
 
-# jev-review: an opencode plugin (no binary). Two tools: jev_review (Jev
-# inspects every changed tree-sitter unit, routing each to library probes)
-# and jev_probe (the agent writes/saves/dry-runs probes). Shipped probes live
-# in ./probes; user probes in ~/scratch/jev-probes override them by name.
-# See opencode-plugin.js.
+# jev-review: an opencode plugin (no binary). Three tools: jev_run (Jev over
+# any units a harness produces), jev_review (= the shipped `review` harness:
+# changed code in a git diff) and jev_probe (the agent writes/saves/dry-runs
+# probes, harnesses and langs). Shipped modules live in ./probes,
+# ./harnesses, ./langs; user ones in ~/scratch/jev-probes override them by
+# name. Also edit hooks (./hooks, opt-in): the tool.execute.after dispatcher
+# runs every hook in ~/scratch/jev-probes/hooks after edit/write and appends
+# its feedback to the result. See opencode-plugin.js.
 stdenv.mkDerivation {
   pname = "jev-review";
-  version = "0.4.0";
+  version = "0.5.0";
 
   dontUnpack = true;
 
@@ -23,15 +26,18 @@ stdenv.mkDerivation {
     runHook preInstall
     mkdir -p $out/lib/jev-review/plugin
     cp -r ${./probes} $out/lib/jev-review/probes
+    cp -r ${./harnesses} $out/lib/jev-review/harnesses
+    cp -r ${./langs} $out/lib/jev-review/langs
+    cp -r ${./hooks} $out/lib/jev-review/hooks
     substitute ${./opencode-plugin.js} $out/lib/jev-review/plugin/index.js \
       --replace-fail '"@astGrep@".startsWith("@") ? "ast-grep" : "@astGrep@"' '"${lib.getExe ast-grep}"' \
       --replace-fail '"@rg@".startsWith("@") ? "rg" : "@rg@"' '"${lib.getExe ripgrep}"' \
-      --replace-fail '"@probesDir@".startsWith("@") ? fileURLToPath(new URL("./probes", import.meta.url)) : "@probesDir@"' "\"$out/lib/jev-review/probes\""
+      --replace-fail '"@shareDir@".startsWith("@") ? fileURLToPath(new URL(".", import.meta.url)) : "@shareDir@"' "\"$out/lib/jev-review\""
     runHook postInstall
   '';
 
   meta = {
-    description = "OpenCode tools: agent-steered Jev review of changed Rust/TypeScript units, with a probe library";
+    description = "OpenCode tools: agent-steered Jev passes over harness-defined units (code review of any language, and beyond), with a probe library";
     license = lib.licenses.mit;
     platforms = lib.platforms.linux;
   };
@@ -50,7 +56,7 @@ stdenv.mkDerivation {
         src = ./.;
       }
       ''
-        cp -r $src/opencode-plugin.js $src/test.mjs $src/probes .
+        cp -r $src/opencode-plugin.js $src/test.mjs $src/probes $src/harnesses $src/langs $src/hooks .
         HOME=$TMPDIR node --test test.mjs
         touch $out
       '';

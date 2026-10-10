@@ -455,8 +455,10 @@ let
       grep = "allow";
       search = "allow";
       jev_review = "allow";
+      jev_run = "allow";
       # Saves into ~/scratch/jev-probes (its own git repo) and runs the probe
-      # in-process; same trust tier as script_exec.
+      # in-process; same trust tier as script_exec. jev_run runs harnesses
+      # (inline or saved) the same way.
       jev_probe = "allow";
       list = "allow";
       lsp = "allow";
@@ -520,7 +522,7 @@ let
 
     # /review: the model steers, Jev inspects (jev_review + jev_probe, pkgs/jev-review).
     command.review = {
-      description = "Review changed Rust/TypeScript: bugs, repo conventions, duplication";
+      description = "Review changed code (any language): bugs, repo conventions, duplication";
       template = ''
         Review my changes. Jev is good at confirming or ruling out a specific suspicion across many units cheaply, and bad at inventing suspicions -- that part is yours.
 

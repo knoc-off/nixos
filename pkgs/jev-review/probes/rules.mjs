@@ -22,13 +22,14 @@ const DEFAULTS = {
 };
 
 export const meta = {
-  description: "named style/idiom rules (override with jev_review `criteria`)",
+  description: "named style/idiom rules (override with jev_review `criteria`, keyed by lang name or `all`)",
   routable: false,
   question: (unit, r) => {
     const c = r.args?.criteria;
+    const rules = c?.[unit.lang] ?? c?.all ?? DEFAULTS[unit.lang] ?? { unidiomatic: `clearly unidiomatic ${r.langName} for this repo or ecosystem` };
     return {
       ask: `Which rule do the changed ${r.langName} lines violate most clearly? Pick none if they violate no rule.`,
-      options: { ...(c?.[unit.lang] ?? c?.all ?? DEFAULTS[unit.lang]), none: "no rule is violated" },
+      options: { ...rules, none: "no rule is violated" },
     };
   },
 };
