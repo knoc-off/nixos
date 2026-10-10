@@ -34,6 +34,9 @@ let
     button = "button";
     motion = "motion";
     sensor = "sensor";
+    # Mains-powered presence (mmWave): kept apart from `motion` so the
+    # dashboard's battery card doesn't expect a battery entity for it.
+    presence = "presence";
   };
 
   # Display label plus the friendly-name prefix each device in the room gets
@@ -50,6 +53,11 @@ let
     bedroom = {
       label = "Bedroom";
       slug = "bedroom";
+    };
+    # Holding pen for freshly paired devices until they get a real room.
+    unassigned = {
+      label = "Unassigned";
+      slug = "unassigned";
     };
   };
 
@@ -111,6 +119,67 @@ let
         # Tuya TS004F, 4-button scene dial.
         id = "0xa4c13880fa2af7d7";
         kind = kinds.button;
+      };
+    };
+
+    unassigned = {
+      # innr RB 272 T, E27 tunable white.
+      bulb_1 = {
+        id = "0xa4c13853eafa4f03";
+        kind = kinds.light;
+      };
+      bulb_2 = {
+        id = "0xa4c138b5a0df5077";
+        kind = kinds.light;
+      };
+      bulb_3 = {
+        id = "0xa4c138b3cc6dde4f";
+        kind = kinds.light;
+      };
+      bulb_4 = {
+        id = "0xa4c1382ff48143c3";
+        kind = kinds.light;
+      };
+      bulb_5 = {
+        id = "0xa4c138d29d027109";
+        kind = kinds.light;
+      };
+      bulb_6 = {
+        id = "0xa4c1381c62a4dcd6";
+        kind = kinds.light;
+      };
+      bulb_7 = {
+        id = "0xa4c1389ddc727680";
+        kind = kinds.light;
+      };
+      bulb_8 = {
+        id = "0xa4c138375abc6157";
+        kind = kinds.light;
+      };
+      spot_1 = {
+        # innr RS 242 C, GU10 colour spot.
+        id = "0xa4c138065c3b540a";
+        kind = kinds.light;
+      };
+      contact_1 = {
+        # SONOFF SNZB-04P, door/window contact.
+        id = "0x449fdafffe22821e";
+        kind = kinds.sensor;
+      };
+      contact_2 = {
+        # SONOFF SNZB-04P, door/window contact.
+        id = "0x449fdafffe3414d6";
+        kind = kinds.sensor;
+      };
+      motion_1 = {
+        # SONOFF SNZB-03P, PIR.
+        id = "0x8c73dafffe2a469b";
+        kind = kinds.motion;
+      };
+      presence_1 = {
+        # SONOFF SNZB-06P, mmWave presence (mains-powered).
+        id = "0xa4c1381adbb5ffff";
+        kind = kinds.presence;
       };
     };
   };
