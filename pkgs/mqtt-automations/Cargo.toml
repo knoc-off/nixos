@@ -12,26 +12,6 @@ name = "cat-doorbell"
 path = "src/bin/cat_doorbell.rs"
 
 [[bin]]
-name = "sunrise-lights"
-path = "src/bin/sunrise_lights.rs"
-
-[[bin]]
-name = "color-temp-cycle"
-path = "src/bin/color_temp_cycle.rs"
-
-[[bin]]
-name = "bedtime-button"
-path = "src/bin/bedtime_button.rs"
-
-[[bin]]
-name = "button-dispatcher"
-path = "src/bin/button_dispatcher.rs"
-
-[[bin]]
-name = "sun-follow"
-path = "src/bin/sun_follow.rs"
-
-[[bin]]
 name = "lights"
 path = "src/bin/lights.rs"
 

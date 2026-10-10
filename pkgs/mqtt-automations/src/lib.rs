@@ -20,78 +20,6 @@ pub struct Message {
     pub payload: serde_json::Value,
 }
 
-/// Types that can be parsed from MQTT JSON payloads.
-///
-/// `Serialize` is required too: [`Runtime::setting`] publishes the initial
-/// value back to the topic (retained) when nothing is retained there yet, so
-/// a brand-new HA entity doesn't show "Unknown" forever.
-pub trait FromMqttPayload: Copy + Serialize {
-    fn from_payload(value: &serde_json::Value) -> Option<Self>;
-}
-
-macro_rules! impl_from_mqtt_uint {
-    ($($t:ty),+) => { $(
-        impl FromMqttPayload for $t {
-            fn from_payload(v: &serde_json::Value) -> Option<Self> {
-                v.as_u64().and_then(|n| n.try_into().ok())
-                    .or_else(|| v.as_f64().and_then(|n| {
-                        let r = n.round();
-                        if r >= 0.0 && r <= Self::MAX as f64 { Some(r as Self) } else { None }
-                    }))
-                    .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
-            }
-        }
-    )+ };
-}
-
-impl_from_mqtt_uint!(u8, u64);
-
-impl FromMqttPayload for f64 {
-    fn from_payload(v: &serde_json::Value) -> Option<Self> {
-        v.as_f64()
-            .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
-    }
-}
-
-/// HA's `mqtt.time` entity publishes plain `HH:MM:SS`.
-impl FromMqttPayload for chrono::NaiveTime {
-    fn from_payload(v: &serde_json::Value) -> Option<Self> {
-        chrono::NaiveTime::parse_from_str(v.as_str()?, "%H:%M:%S").ok()
-    }
-}
-
-impl FromMqttPayload for bool {
-    fn from_payload(v: &serde_json::Value) -> Option<Self> {
-        v.as_bool().or_else(|| match v.as_str()? {
-            "on" | "true" | "1" => Some(true),
-            "off" | "false" | "0" => Some(false),
-            _ => None,
-        })
-    }
-}
-
-/// A runtime-configurable value backed by an optional MQTT topic (read-only:
-/// HA -> here). Created via [`Runtime::setting`]. If no topic is configured
-/// (env var empty/unset), the setting always returns its initial value.
-pub struct Setting<T> {
-    rx: Option<mpsc::UnboundedReceiver<Message>>,
-    current: T,
-}
-
-impl<T: FromMqttPayload> Setting<T> {
-    /// Drain pending MQTT messages and return the latest value.
-    pub fn get(&mut self) -> T {
-        if let Some(ref mut rx) = self.rx {
-            while let Ok(msg) = rx.try_recv() {
-                if let Some(v) = T::from_payload(&msg.payload) {
-                    self.current = v;
-                }
-            }
-        }
-        self.current
-    }
-}
-
 type Subs = Arc<Mutex<HashMap<String, mpsc::UnboundedSender<Message>>>>;
 
 /// Core runtime — owns the MQTT connection, env helpers, and shutdown coordination.
@@ -188,51 +116,6 @@ impl Runtime {
         Ok(rx)
     }
 
-    /// Create a [`Setting`] backed by an MQTT topic.
-    ///
-    /// `topic_env` is the name of the env var holding the MQTT topic.
-    /// If the env var is empty or unset, the setting always returns `initial`.
-    ///
-    /// If the topic has no retained message yet (a brand-new HA entity),
-    /// `initial` is published back to it retained, so the entity shows a
-    /// real value instead of "Unknown" until someone changes it.
-    pub async fn setting<T: FromMqttPayload>(
-        &self,
-        topic_env: &str,
-        initial: T,
-    ) -> Result<Setting<T>> {
-        let topic = self.env_or(topic_env, "");
-        if topic.is_empty() {
-            return Ok(Setting {
-                rx: None,
-                current: initial,
-            });
-        }
-        let mut rx = self.subscribe(&topic).await?;
-
-        // Give the broker a moment to deliver any retained message before
-        // deciding the topic is unseeded. If one arrives, use it -- otherwise
-        // a reboot would silently revert the setting to `initial` while HA's
-        // UI still shows the last value it sent.
-        let mut current = initial;
-        match tokio::time::timeout(Duration::from_secs(2), rx.recv()).await {
-            Ok(Some(msg)) => {
-                if let Some(v) = T::from_payload(&msg.payload) {
-                    current = v;
-                }
-            }
-            Ok(None) => {}
-            Err(_) => {
-                self.publish_retained(&topic, initial).await?;
-            }
-        }
-
-        Ok(Setting {
-            rx: Some(rx),
-            current,
-        })
-    }
-
     /// Future that resolves when a shutdown signal (SIGTERM/SIGINT) is received.
     /// Safe to call repeatedly in `tokio::select!`.
     pub async fn shutdown_signal(&self) {
@@ -296,37 +179,4 @@ fn env_parse<T: FromStr>(key: &str, default: T) -> T {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(default)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// `Runtime::setting`'s seed-back path serializes `initial` with
-    /// `serde_json` and relies on `FromMqttPayload::from_payload` being able
-    /// to parse it straight back. Every impl must round-trip.
-    #[test]
-    fn naive_time_round_trips_through_serde() {
-        let t = chrono::NaiveTime::from_hms_opt(6, 30, 0).unwrap();
-        let json = serde_json::to_value(t).unwrap();
-        assert_eq!(chrono::NaiveTime::from_payload(&json), Some(t));
-    }
-
-    #[test]
-    fn uint_round_trips_through_serde() {
-        let json = serde_json::to_value(45u64).unwrap();
-        assert_eq!(u64::from_payload(&json), Some(45u64));
-    }
-
-    #[test]
-    fn bool_round_trips_through_serde() {
-        let json = serde_json::to_value(true).unwrap();
-        assert_eq!(bool::from_payload(&json), Some(true));
-    }
-
-    #[test]
-    fn f64_round_trips_through_serde() {
-        let json = serde_json::to_value(2.2f64).unwrap();
-        assert_eq!(f64::from_payload(&json), Some(2.2f64));
-    }
 }
