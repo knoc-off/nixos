@@ -22,6 +22,7 @@ use anyhow::{bail, Context, Result};
 use chrono::{DateTime, FixedOffset, Local};
 use mqtt_automations::arbiter::{self, Bulb, Command, Input, Mode, Target};
 use mqtt_automations::room::{self, Event, Request};
+use mqtt_automations::script::Script;
 use mqtt_automations::{Message, Runtime};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -36,6 +37,8 @@ const MAX_ROUNDS: usize = 8;
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Config {
+    latitude: f64,
+    longitude: f64,
     rooms: BTreeMap<String, RoomConfig>,
 }
 
@@ -46,7 +49,12 @@ struct RoomConfig {
     #[serde(default)]
     group: Option<String>,
     bulbs: BTreeMap<String, BulbConfig>,
-    logic: room::Config,
+    /// Built-in room logic (the `room` module), or ...
+    #[serde(default)]
+    logic: Option<room::Config>,
+    /// ... a Lua script (the `script` module). Exactly one of the two.
+    #[serde(default)]
+    lua: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -76,6 +84,7 @@ enum Route {
     BulbRelease(usize, usize),
     Sensor(usize),
     Button(usize),
+    Script(usize),
 }
 
 struct BulbSlot {
@@ -86,11 +95,26 @@ struct BulbSlot {
     published: Option<Value>,
 }
 
+/// What decides a room's wishes. Both speak per-bulb arbiter inputs.
+enum Logic {
+    Builtin(Box<room::Room>),
+    Lua(Script),
+}
+
+impl Logic {
+    fn deadline(&self) -> Option<Instant> {
+        match self {
+            Self::Builtin(r) => r.deadline(),
+            Self::Lua(s) => s.deadline(),
+        }
+    }
+}
+
 struct Room {
     name: String,
     group: Option<String>,
     bulbs: Vec<BulbSlot>,
-    logic: room::Room,
+    logic: Logic,
 }
 
 /// All routing and z2m formatting, without MQTT -- so it can be tested.
@@ -101,22 +125,45 @@ struct House {
 }
 
 impl House {
-    fn new(cfg: Config, now: Instant) -> Result<Self> {
+    fn new(cfg: Config, now: Instant, wall: DateTime<FixedOffset>) -> Result<Self> {
         let mut routes: HashMap<String, Vec<Route>> = HashMap::new();
         let mut rooms = Vec::new();
         for (r, (name, room)) in cfg.rooms.into_iter().enumerate() {
-            for light in room.logic.lights.keys() {
-                if !room.bulbs.contains_key(light) {
-                    bail!("room {name}: logic names unknown bulb {light:?}");
-                }
-            }
             let mut route = |topic: String, to: Route| routes.entry(topic).or_default().push(to);
-            for device in room.logic.sensors() {
-                route(format!("zigbee2mqtt/{device}"), Route::Sensor(r));
-            }
-            for device in room.logic.buttons() {
-                route(format!("zigbee2mqtt/{device}/action"), Route::Button(r));
-            }
+            let logic = match (room.logic, room.lua) {
+                (Some(mut logic), None) => {
+                    if let Some(light) = logic.lights.keys().find(|l| !room.bulbs.contains_key(*l))
+                    {
+                        bail!("room {name}: logic names unknown bulb {light:?}");
+                    }
+                    (logic.latitude, logic.longitude) = (cfg.latitude, cfg.longitude);
+                    for device in logic.sensors() {
+                        route(format!("zigbee2mqtt/{device}"), Route::Sensor(r));
+                    }
+                    for device in logic.buttons() {
+                        route(format!("zigbee2mqtt/{device}/action"), Route::Button(r));
+                    }
+                    let logic =
+                        room::Room::new(logic, now).with_context(|| format!("room {name}"))?;
+                    Logic::Builtin(Box::new(logic))
+                }
+                (None, Some(source)) => {
+                    let lights = room.bulbs.keys().cloned();
+                    let script = Script::new(
+                        &name,
+                        &source,
+                        lights,
+                        (cfg.latitude, cfg.longitude),
+                        now,
+                        wall,
+                    )?;
+                    for topic in script.topics() {
+                        route(topic, Route::Script(r));
+                    }
+                    Logic::Lua(script)
+                }
+                _ => bail!("room {name}: needs exactly one of `logic` and `lua`"),
+            };
             let bulbs = room
                 .bulbs
                 .into_iter()
@@ -139,7 +186,6 @@ impl House {
                     }
                 })
                 .collect();
-            let logic = room::Room::new(room.logic, now).with_context(|| format!("room {name}"))?;
             rooms.push(Room {
                 name,
                 group: room.group,
@@ -218,6 +264,14 @@ impl House {
                     }
                     None => Vec::new(),
                 },
+                Route::Script(r) => {
+                    let inputs = match &mut self.rooms[r].logic {
+                        Logic::Lua(s) => s.message(&msg.topic, &msg.payload, now, wall),
+                        Logic::Builtin(_) => Vec::new(),
+                    };
+                    let inputs = self.named(r, inputs);
+                    self.step_bulbs(r, inputs, now, wall)
+                }
             });
         }
         out
@@ -248,8 +302,16 @@ impl House {
         now: Instant,
         wall: DateTime<FixedOffset>,
     ) -> Vec<Out> {
-        let outs = self.rooms[r].logic.step(event, now, wall);
-        let inputs = self.inputs(r, outs);
+        let inputs = match &mut self.rooms[r].logic {
+            Logic::Builtin(logic) => by_name(logic.step(event, now, wall)),
+            Logic::Lua(script) => match event {
+                Event::Tick => script.tick(now, wall),
+                // Lua rooms get sensor and button messages raw, through
+                // their own subscriptions.
+                _ => Vec::new(),
+            },
+        };
+        let inputs = self.named(r, inputs);
         self.step_bulbs(r, inputs, now, wall)
     }
 
@@ -277,14 +339,20 @@ impl House {
                 let Some(state) = slot.bulb.showing() else {
                     continue;
                 };
-                let event = Event::Bulb {
-                    light: slot.name.clone(),
-                    held: matches!(slot.bulb.mode, Mode::Held(_)),
-                    state,
-                };
-                answers.extend(room.logic.step(event, now, wall));
+                let held = matches!(slot.bulb.mode, Mode::Held(_));
+                answers.extend(match &mut room.logic {
+                    Logic::Builtin(logic) => {
+                        let event = Event::Bulb {
+                            light: slot.name.clone(),
+                            held,
+                            state,
+                        };
+                        by_name(logic.step(event, now, wall))
+                    }
+                    Logic::Lua(script) => script.bulb(&slot.name, held, state),
+                });
             }
-            let next = self.inputs(r, answers);
+            let next = self.named(r, answers);
             if !next.is_empty() {
                 queue.push_back(next);
             }
@@ -303,12 +371,14 @@ impl House {
         out: &mut Vec<Out>,
     ) -> Vec<usize> {
         let room = &mut self.rooms[r];
-        let mut commands: Vec<(usize, Command)> = Vec::new();
+        // Only each bulb's last command goes out: a handler that releases
+        // and then sets a new target must not flash the bulb in between.
+        let mut commands: BTreeMap<usize, Command> = BTreeMap::new();
         for (b, input) in inputs {
             let slot = &mut room.bulbs[b];
             let before = slot.bulb.mode;
             if let Some(cmd) = slot.bulb.step(input, now) {
-                commands.push((b, cmd));
+                commands.insert(b, cmd);
             }
             if slot.bulb.mode != before {
                 eprintln!(
@@ -318,16 +388,17 @@ impl House {
             }
         }
 
+        let first = commands.values().next().copied();
         let all_same =
-            commands.len() == room.bulbs.len() && commands.windows(2).all(|w| w[0].1 == w[1].1);
+            commands.len() == room.bulbs.len() && commands.values().all(|c| Some(*c) == first);
         // A mixed room (bulbs and plugs) never matches as all-same in
         // practice, but a group of only plugs must still send plug payloads.
         let dimmable = room.bulbs.iter().all(|s| s.dimmable);
-        match (&room.group, commands.first()) {
-            (Some(group), Some(&(_, cmd))) if all_same && room.bulbs.len() > 1 => {
+        match (&room.group, first) {
+            (Some(group), Some(cmd)) if all_same && room.bulbs.len() > 1 => {
                 out.push(set(group, cmd, dimmable));
             }
-            _ => out.extend(commands.iter().map(|&(b, cmd)| {
+            _ => out.extend(commands.iter().map(|(&b, &cmd)| {
                 let slot = &room.bulbs[b];
                 set(&slot.device, cmd, slot.dimmable)
             })),
@@ -343,48 +414,61 @@ impl House {
         changed
     }
 
-    /// Translate a room's requests into per-bulb arbiter inputs.
-    fn inputs(&self, r: usize, outs: Vec<room::Out>) -> Vec<(usize, Input)> {
+    /// Resolve bulb names to indices; `ALL` means every bulb in the room.
+    fn named(&self, r: usize, reqs: Vec<(String, Input)>) -> Vec<(usize, Input)> {
         let bulbs = &self.rooms[r].bulbs;
-        let index = |name: &str| bulbs.iter().position(|s| s.name == name);
         let mut inputs = Vec::new();
-        for o in outs {
-            match o {
-                room::Out::Auto(Request {
-                    bulbs: targets,
-                    scale,
-                    transition,
-                }) => {
-                    let transition = secs(transition);
-                    inputs.extend(targets.into_iter().filter_map(|(name, target)| {
-                        Some((
-                            index(&name)?,
-                            Input::Auto {
-                                target,
-                                scale,
-                                transition,
-                            },
-                        ))
-                    }));
-                }
-                room::Out::User(Request {
-                    bulbs: targets,
-                    transition,
-                    ..
-                }) => {
-                    let transition = secs(transition);
-                    inputs.extend(targets.into_iter().filter_map(|(name, target)| {
-                        Some((index(&name)?, Input::User { target, transition }))
-                    }));
-                }
-                room::Out::Release { transition } => {
-                    let transition = secs(transition);
-                    inputs.extend((0..bulbs.len()).map(|b| (b, Input::Release { transition })));
-                }
+        for (name, input) in reqs {
+            if name == ALL {
+                inputs.extend((0..bulbs.len()).map(|b| (b, input)));
+            } else if let Some(b) = bulbs.iter().position(|s| s.name == name) {
+                inputs.push((b, input));
             }
         }
         inputs
     }
+}
+
+/// Bulb name standing for every bulb in the room.
+const ALL: &str = "*";
+
+/// The built-in logic's requests as per-bulb arbiter inputs.
+fn by_name(outs: Vec<room::Out>) -> Vec<(String, Input)> {
+    let mut reqs = Vec::new();
+    for o in outs {
+        match o {
+            room::Out::Auto(Request {
+                bulbs,
+                scale,
+                transition,
+            }) => {
+                let transition = secs(transition);
+                reqs.extend(bulbs.into_iter().map(|(name, target)| {
+                    let input = Input::Auto {
+                        target,
+                        scale,
+                        transition,
+                    };
+                    (name, input)
+                }));
+            }
+            room::Out::User(Request {
+                bulbs, transition, ..
+            }) => {
+                let transition = secs(transition);
+                reqs.extend(
+                    bulbs
+                        .into_iter()
+                        .map(|(name, target)| (name, Input::User { target, transition })),
+                );
+            }
+            room::Out::Release { transition } => {
+                let transition = secs(transition);
+                reqs.push((ALL.to_owned(), Input::Release { transition }));
+            }
+        }
+    }
+    reqs
 }
 
 /// A NaN or negative duration must not panic the process that owns every
@@ -503,7 +587,7 @@ async fn main() -> Result<()> {
     )
     .context("parsing CONFIG")?;
 
-    let mut house = House::new(cfg, Instant::now())?;
+    let mut house = House::new(cfg, Instant::now(), wall_now())?;
     let mut msgs = rt.subscribe_many(house.topics()).await?;
     for out in house.startup() {
         send(&rt, out).await;
@@ -559,13 +643,17 @@ mod tests {
 
     impl Rig {
         fn new(rooms: Value) -> Self {
+            Self::try_new(rooms).unwrap()
+        }
+
+        fn try_new(rooms: Value) -> Result<Self> {
             let now = Instant::now();
-            let cfg = serde_json::from_value(json!({ "rooms": rooms })).unwrap();
-            Self {
-                house: House::new(cfg, now).unwrap(),
+            let wall = DateTime::parse_from_rfc3339(NOON).unwrap();
+            Ok(Self {
+                house: House::new(config(rooms), now, wall)?,
                 now,
-                wall: DateTime::parse_from_rfc3339(NOON).unwrap(),
-            }
+                wall,
+            })
         }
 
         fn send(&mut self, topic: &str, payload: Value) -> Vec<Out> {
@@ -790,15 +878,108 @@ mod tests {
     fn config_errors_are_caught_at_startup() {
         let mut bad = hallway();
         bad["hallway"]["logic"]["lights"]["ghost"] = json!({});
-        let cfg = serde_json::from_value(json!({ "rooms": bad })).unwrap();
-        assert!(House::new(cfg, Instant::now()).is_err());
+        assert!(Rig::try_new(bad).is_err());
 
         let mut twice = hallway();
         twice["attic"] = twice["hallway"].clone();
-        let cfg = serde_json::from_value(json!({ "rooms": twice })).unwrap();
+        assert!(Rig::try_new(twice).is_err(), "bulb in two rooms");
+
+        let mut both = hallway();
+        both["hallway"]["lua"] = json!("");
+        assert!(Rig::try_new(both).is_err(), "logic and lua");
+
+        let broken = json!({ "cupboard": {
+            "bulbs": { "bulb": { "device": "cupboard_bulb" } },
+            "lua": "light('nope')",
+        } });
+        assert!(Rig::try_new(broken).is_err(), "script fails to load");
+    }
+
+    fn config(rooms: Value) -> Config {
+        let cfg = json!({ "latitude": 52.52, "longitude": 13.405, "rooms": rooms });
+        serde_json::from_value(cfg).unwrap()
+    }
+
+    /// The cupboard as it will actually be configured: on while the door is
+    /// open, off when it closes, at the sun's level.
+    fn cupboard() -> Value {
+        json!({ "cupboard": {
+            "bulbs": { "bulb": { "device": "cupboard_bulb" } },
+            "lua": r#"
+                local bulb = light("bulb")
+                local open = false
+                local function update()
+                  bulb:auto{
+                    on = open,
+                    brightness = sun.level{ min = 30 },
+                    color_temp = sun.ct{},
+                    transition = open and 0.4 or 1,
+                  }
+                end
+                on("cupboard_door", function(p)
+                  if p.contact == nil then return end
+                  open = not p.contact
+                  -- Shut means done: forget any manual change.
+                  if not open then bulb:release{ transition = 1 } end
+                  update()
+                end)
+                every(30, update)
+                update()
+            "#,
+        } })
+    }
+
+    #[test]
+    fn cupboard_is_on_while_the_door_is_open() {
+        let mut rig = Rig::new(cupboard());
+        rig.send("zigbee2mqtt/cupboard_bulb", json!({ "state": "OFF" }));
+        rig.wait(Duration::ZERO);
+
+        let outs = rig.send("zigbee2mqtt/cupboard_door", json!({ "contact": false }));
+        let on = sets_of(&outs);
+        assert_eq!(
+            (&on["state"], &on["transition"]),
+            (&json!("ON"), &json!(0.4))
+        );
+        assert!(on["color_temp"].is_number());
+
+        // Left open for an hour: still on, following the sun.
+        let outs = rig.wait(Duration::from_secs(3600));
+        assert!(sets(&outs).iter().all(|(_, p)| p["state"] == "ON"));
+
+        let outs = rig.send("zigbee2mqtt/cupboard_door", json!({ "contact": true }));
+        assert_eq!(sets_of(&outs)["state"], "OFF");
+
+        // Battery reports carry no `contact`: ignored.
+        assert!(sets(&rig.send("zigbee2mqtt/cupboard_door", json!({ "battery": 80 }))).is_empty());
+    }
+
+    #[test]
+    fn cupboard_manual_change_lasts_until_the_door_shuts() {
+        let mut rig = Rig::new(cupboard());
+        rig.send("zigbee2mqtt/cupboard_bulb", json!({ "state": "OFF" }));
+        rig.wait(Duration::ZERO);
+        rig.send("zigbee2mqtt/cupboard_door", json!({ "contact": false }));
+        rig.wait(Duration::from_secs(5));
+
+        let outs = rig.send(
+            "zigbee2mqtt/cupboard_bulb",
+            json!({ "state": "ON", "brightness": 20 }),
+        );
+        assert_eq!(
+            state(&outs, "lights/cupboard/bulb/state").unwrap()["mode"],
+            "held"
+        );
         assert!(
-            House::new(cfg, Instant::now()).is_err(),
-            "bulb in two rooms"
+            sets(&rig.wait(Duration::from_secs(60))).is_empty(),
+            "held at 20"
+        );
+
+        let outs = rig.send("zigbee2mqtt/cupboard_door", json!({ "contact": true }));
+        assert_eq!(sets_of(&outs)["state"], "OFF");
+        assert_eq!(
+            state(&outs, "lights/cupboard/bulb/state").unwrap()["mode"],
+            "auto"
         );
     }
 

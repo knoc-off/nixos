@@ -49,7 +49,10 @@ mod secs {
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Config {
+    /// Usually filled in from the house-wide location.
+    #[serde(default)]
     pub latitude: f64,
+    #[serde(default)]
     pub longitude: f64,
     #[serde(default)]
     pub sources: Vec<Source>,

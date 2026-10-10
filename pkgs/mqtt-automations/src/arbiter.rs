@@ -21,7 +21,6 @@
 //! against where a running transition should be by now, after a short
 //! settle window that absorbs report latency.
 
-use std::ops::Add;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
@@ -137,16 +136,6 @@ impl Tolerance {
     };
 }
 
-impl Add for Tolerance {
-    type Output = Self;
-    fn add(self, other: Self) -> Self {
-        Self {
-            brightness: self.brightness.saturating_add(other.brightness),
-            color_temp: self.color_temp.saturating_add(other.color_temp),
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug)]
 pub struct Config {
     /// A report further than this from what we commanded is a user change.
@@ -229,29 +218,35 @@ impl Motion {
 
     /// Whether report `r` is just this transition playing out. z2m often
     /// reports the commanded end state straight away (optimistic state);
-    /// a bulb that reports on its own shows somewhere along the curve, a
-    /// little behind.
+    /// a bulb that reports on its own shows somewhere along the curve, up
+    /// to one `settle` period behind.
     fn explains(&self, r: Target, now: Instant, cfg: Config) -> bool {
-        !self.to.differs(r, cfg.change)
-            || !self.at(now).differs(r, cfg.change + self.lag(cfg.settle))
+        let behind = self.at(now.checked_sub(cfg.settle).unwrap_or(now));
+        !self.to.differs(r, cfg.change) || within(r, behind, self.at(now), cfg.change)
     }
+}
 
-    /// How far a report may trail `at(now)`: the distance the curve covers
-    /// in one `settle` period, since reports arrive about that late.
-    fn lag(&self, settle: Duration) -> Tolerance {
-        if self.duration.is_zero() {
-            return Tolerance::EXACT;
-        }
-        let f = (settle.as_secs_f32() / self.duration.as_secs_f32()).min(1.0);
-        let ct = match (self.from.color_temp, self.to.color_temp) {
-            (Some(a), Some(b)) => a.abs_diff(b),
-            _ => 0,
-        };
-        Tolerance {
-            brightness: ((self.from.level() - self.to.level()).abs() * f).round() as u8,
-            color_temp: (f32::from(ct) * f).round() as u16,
-        }
+/// Whether `r` lies between `a` and `b` (give or take `tol`): on or off
+/// like one of them, and brightness and colour temperature in their span.
+fn within(r: Target, a: Target, b: Target, tol: Tolerance) -> bool {
+    if r.on != a.on && r.on != b.on {
+        return false;
     }
+    if !r.on {
+        return true;
+    }
+    let span = |x: f32, y: f32, v: f32, tol: f32| x.min(y) - tol <= v && v <= x.max(y) + tol;
+    let bri = span(
+        a.level(),
+        b.level(),
+        r.brightness.into(),
+        tol.brightness.into(),
+    );
+    let ct = match (r.color_temp, a.color_temp, b.color_temp) {
+        (Some(v), Some(x), Some(y)) => span(x.into(), y.into(), v.into(), tol.color_temp.into()),
+        _ => true,
+    };
+    bri && ct
 }
 
 #[derive(Debug)]
@@ -832,6 +827,17 @@ mod tests {
         rig.wait(secs(90));
         rig.send(Input::Report(on(220)));
         assert_eq!(rig.bulb.held(), Some(on(220)));
+    }
+
+    #[test]
+    fn app_change_after_a_finished_short_transition_is_an_override() {
+        // A 0.4s turn-on from off spans every level from 0 to 254; once it
+        // has finished, a dim report must not pass for it playing out.
+        let mut rig = Rig::light(OFF);
+        rig.send(auto(on(254)));
+        rig.wait(secs(5));
+        rig.send(Input::Report(on(20)));
+        assert_eq!(rig.bulb.held(), Some(on(20)));
     }
 
     #[test]

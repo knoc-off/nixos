@@ -1,0 +1,784 @@
+//! Room logic written in Lua: one sandboxed Lua state per room, driven by
+//! the same events as the built-in logic and answering with the same
+//! per-bulb arbiter inputs, so ownership, fades and group commands stay in
+//! Rust and a script can't fight the user or flicker a bulb.
+//!
+//! API (all durations in seconds, brightness 1-254, colour temperature in
+//! mireds):
+//!   - `on(device, fn(payload))`: z2m messages from `zigbee2mqtt/<device>`.
+//!     `on_topic(topic, fn(payload))` for any other topic. Top level only:
+//!     subscriptions are fixed once the script has loaded.
+//!   - `after(s, fn)` / `every(s, fn)` -> id, `cancel(id)`.
+//!   - `light(name)`: one of the room's bulbs, with
+//!     `:auto{ on, brightness, color_temp, scale, transition }` (what the
+//!     automation wants; the bulb follows unless a person took over),
+//!     `:user{ ... }` (a person's choice: applied and held),
+//!     `:release{ transition }` (hand back to the automation) and
+//!     `:state()` -> `{ mode = "auto"|"held"|"unknown", on, brightness,
+//!     color_temp }` or nil before the bulb has reported.
+//!     `lights` lists the room's bulb names.
+//!   - `sun.level{ min, max, gamma, invert }` -> brightness for now,
+//!     `sun.ct{ warm, cool }` -> mireds, `sun.daylight()` -> 0..1.
+//!   - `clock()` -> local time of day in hours (13.5 = 13:30).
+//!   - `log(...)`.
+//!
+//! A runtime error in a handler is logged and that handler's requests are
+//! dropped; the room keeps running. Errors while loading fail startup.
+
+use std::collections::{BTreeMap, BTreeSet};
+use std::time::{Duration, Instant};
+
+use anyhow::{anyhow, Result};
+use chrono::{DateTime, FixedOffset, Timelike};
+use mlua::serde::SerializeOptions;
+use mlua::{
+    Function, HookTriggers, Lua, LuaOptions, LuaSerdeExt, StdLib, Table, UserData, UserDataMethods,
+    Value, Variadic, VmState,
+};
+
+use crate::arbiter::{Input, Target};
+use crate::{curves, sun};
+
+/// One handler or timer may run this long before it is stopped.
+const CALL_BUDGET: Duration = Duration::from_millis(200);
+const MEMORY_LIMIT: usize = 32 << 20;
+/// Timers firing timers (`after(0, ...)` chains) per tick.
+const MAX_TIMER_ROUNDS: usize = 100;
+const MIN_EVERY: Duration = Duration::from_secs(1);
+
+const HANDLERS: &str = "handlers";
+const TIMERS: &str = "timers";
+
+/// The arbiter's view of a bulb.
+#[derive(Clone, Copy, Debug)]
+struct Shown {
+    held: bool,
+    state: Target,
+}
+
+struct Timer {
+    at: Instant,
+    every: Option<Duration>,
+}
+
+/// Everything the API functions share, kept as Lua app data.
+struct State {
+    room: String,
+    latitude: f64,
+    longitude: f64,
+    now: Instant,
+    wall: DateTime<FixedOffset>,
+    lights: BTreeMap<String, Option<Shown>>,
+    requests: Vec<(String, Input)>,
+    timers: BTreeMap<u64, Timer>,
+    next_timer: u64,
+    topics: BTreeSet<String>,
+    loaded: bool,
+}
+
+/// Real-time cutoff for the running call, checked by the instruction hook.
+struct CallDeadline(std::time::Instant);
+
+pub struct Script {
+    lua: Lua,
+}
+
+impl Script {
+    pub fn new(
+        room: &str,
+        source: &str,
+        lights: impl IntoIterator<Item = String>,
+        (latitude, longitude): (f64, f64),
+        now: Instant,
+        wall: DateTime<FixedOffset>,
+    ) -> Result<Self> {
+        let lua = Lua::new_with(
+            StdLib::STRING | StdLib::TABLE | StdLib::MATH | StdLib::UTF8,
+            LuaOptions::default(),
+        )
+        .map_err(lua_err)?;
+        lua.set_memory_limit(MEMORY_LIMIT).map_err(lua_err)?;
+        lua.set_app_data(State {
+            room: room.to_owned(),
+            latitude,
+            longitude,
+            now,
+            wall,
+            lights: lights.into_iter().map(|l| (l, None)).collect(),
+            requests: Vec::new(),
+            timers: BTreeMap::new(),
+            next_timer: 1,
+            topics: BTreeSet::new(),
+            loaded: false,
+        });
+        let triggers = HookTriggers::new().every_nth_instruction(10_000);
+        lua.set_hook(triggers, |lua, _| {
+            match lua.try_app_data_ref::<CallDeadline>() {
+                Ok(Some(d)) if std::time::Instant::now() > d.0 => {
+                    Err(mlua::Error::runtime("took too long, stopped"))
+                }
+                _ => Ok(VmState::Continue),
+            }
+        })
+        .map_err(lua_err)?;
+        install(&lua).map_err(lua_err)?;
+
+        let script = Self { lua };
+        script.budget();
+        script
+            .lua
+            .load(source)
+            .set_name(format!("@{room}.lua"))
+            .exec()
+            .map_err(|e| anyhow!("room {room}: {e}"))?;
+        script.state().loaded = true;
+        Ok(script)
+    }
+
+    /// Topics the script listens to.
+    pub fn topics(&self) -> Vec<String> {
+        self.state().topics.iter().cloned().collect()
+    }
+
+    pub fn deadline(&self) -> Option<Instant> {
+        self.state().timers.values().map(|t| t.at).min()
+    }
+
+    pub fn message(
+        &mut self,
+        topic: &str,
+        payload: &serde_json::Value,
+        now: Instant,
+        wall: DateTime<FixedOffset>,
+    ) -> Vec<(String, Input)> {
+        self.set_clock(now, wall);
+        let handlers = self
+            .lua
+            .named_registry_value::<Table>(HANDLERS)
+            .and_then(|h| h.get::<Option<Table>>(topic));
+        if let Ok(Some(list)) = handlers {
+            let payload = self.lua.to_value_with(payload, serialize_options());
+            match payload {
+                Ok(payload) => {
+                    for f in list.sequence_values::<Function>().flatten() {
+                        self.call(&f, payload.clone());
+                    }
+                }
+                Err(e) => self.log(&format!("{topic}: {e}")),
+            }
+        }
+        self.take()
+    }
+
+    pub fn bulb(&mut self, light: &str, held: bool, state: Target) -> Vec<(String, Input)> {
+        if let Some(slot) = self.state().lights.get_mut(light) {
+            *slot = Some(Shown { held, state });
+        }
+        self.take()
+    }
+
+    /// Run due timers, plus anything the script did while loading.
+    pub fn tick(&mut self, now: Instant, wall: DateTime<FixedOffset>) -> Vec<(String, Input)> {
+        self.set_clock(now, wall);
+        for _ in 0..MAX_TIMER_ROUNDS {
+            let due = {
+                let state = self.state();
+                let mut due: Vec<_> = state.timers.iter().filter(|(_, t)| t.at <= now).collect();
+                due.sort_by_key(|(id, t)| (t.at, **id));
+                due.into_iter().map(|(id, _)| *id).collect::<Vec<_>>()
+            };
+            if due.is_empty() {
+                return self.take();
+            }
+            for id in due {
+                let Ok(Some(f)) = self
+                    .lua
+                    .named_registry_value::<Table>(TIMERS)
+                    .and_then(|t| t.get::<Option<Function>>(id))
+                else {
+                    continue;
+                };
+                {
+                    let mut state = self.state();
+                    match state.timers.get_mut(&id) {
+                        Some(Timer { at, every: Some(d) }) => *at = now + *d,
+                        Some(_) => {
+                            state.timers.remove(&id);
+                        }
+                        // Cancelled by an earlier timer this round.
+                        None => continue,
+                    }
+                }
+                if !self.state().timers.contains_key(&id) {
+                    let _ = self
+                        .lua
+                        .named_registry_value::<Table>(TIMERS)
+                        .and_then(|t| t.set(id, Value::Nil));
+                }
+                self.call(&f, Value::Nil);
+            }
+        }
+        self.log("timers keep firing immediately, deferring the rest");
+        self.take()
+    }
+
+    fn call(&self, f: &Function, arg: Value) {
+        let mark = self.state().requests.len();
+        self.budget();
+        if let Err(e) = f.call::<()>(arg) {
+            // A half-run handler would leave the room half-applied.
+            self.state().requests.truncate(mark);
+            self.log(&e.to_string());
+        }
+    }
+
+    fn budget(&self) {
+        self.lua
+            .set_app_data(CallDeadline(std::time::Instant::now() + CALL_BUDGET));
+    }
+
+    fn set_clock(&self, now: Instant, wall: DateTime<FixedOffset>) {
+        let mut state = self.state();
+        state.now = now;
+        state.wall = wall;
+    }
+
+    fn take(&self) -> Vec<(String, Input)> {
+        std::mem::take(&mut self.state().requests)
+    }
+
+    fn log(&self, msg: &str) {
+        eprintln!("{}: {msg}", self.state().room);
+    }
+
+    fn state(&self) -> mlua::AppDataRefMut<'_, State> {
+        self.lua
+            .app_data_mut::<State>()
+            .expect("state is installed in new")
+    }
+}
+
+fn serialize_options() -> SerializeOptions {
+    // Absent JSON fields and `null` should both read as nil in Lua.
+    SerializeOptions::new()
+        .serialize_none_to_null(false)
+        .serialize_unit_to_null(false)
+}
+
+/// mlua errors aren't `Send`; keep the message.
+fn lua_err(e: mlua::Error) -> anyhow::Error {
+    anyhow!("{e}")
+}
+
+fn state(lua: &Lua) -> mlua::Result<mlua::AppDataRefMut<'_, State>> {
+    lua.app_data_mut::<State>()
+        .ok_or_else(|| mlua::Error::runtime("room state missing"))
+}
+
+fn install(lua: &Lua) -> mlua::Result<()> {
+    lua.set_named_registry_value(HANDLERS, lua.create_table()?)?;
+    lua.set_named_registry_value(TIMERS, lua.create_table()?)?;
+    let g = lua.globals();
+
+    g.set(
+        "on",
+        lua.create_function(|lua, (device, f): (String, Function)| {
+            subscribe(lua, format!("zigbee2mqtt/{device}"), f)
+        })?,
+    )?;
+    g.set(
+        "on_topic",
+        lua.create_function(|lua, (topic, f): (String, Function)| subscribe(lua, topic, f))?,
+    )?;
+    g.set(
+        "after",
+        lua.create_function(|lua, (s, f): (f64, Function)| schedule(lua, s, f, false))?,
+    )?;
+    g.set(
+        "every",
+        lua.create_function(|lua, (s, f): (f64, Function)| schedule(lua, s, f, true))?,
+    )?;
+    g.set(
+        "cancel",
+        lua.create_function(|lua, id: u64| {
+            state(lua)?.timers.remove(&id);
+            lua.named_registry_value::<Table>(TIMERS)?
+                .set(id, Value::Nil)
+        })?,
+    )?;
+    g.set(
+        "light",
+        lua.create_function(|lua, name: String| {
+            if !state(lua)?.lights.contains_key(&name) {
+                return Err(mlua::Error::runtime(format!(
+                    "no bulb {name:?} in this room"
+                )));
+            }
+            Ok(Light(name))
+        })?,
+    )?;
+    let names: Vec<String> = state(lua)?.lights.keys().cloned().collect();
+    g.set("lights", names)?;
+
+    let sun_table = lua.create_table()?;
+    sun_table.set(
+        "level",
+        lua.create_function(|lua, opts: Option<Table>| {
+            let opts = Opts::new(opts, &["min", "max", "gamma", "invert"])?;
+            let (min, max) = (opts.pct("min", 1)?, opts.pct("max", 100)?);
+            let gamma = opts.number("gamma", 1.0, 0.1, 10.0)?;
+            let invert = opts.flag("invert", false)?;
+            let raw = daylight(lua)?;
+            let frac = if invert { 1.0 - raw } else { raw };
+            Ok(curves::brightness_254(
+                min,
+                max,
+                curves::apply_gamma(frac, gamma),
+            ))
+        })?,
+    )?;
+    sun_table.set(
+        "ct",
+        lua.create_function(|lua, opts: Option<Table>| {
+            let opts = Opts::new(opts, &["warm", "cool"])?;
+            let warm = opts.number("warm", 454.0, 100.0, 1000.0)? as u16;
+            let cool = opts.number("cool", 250.0, 100.0, 1000.0)? as u16;
+            let s = state(lua)?;
+            let progress = sun::day_progress(s.latitude, s.longitude, s.wall);
+            Ok(curves::color_temp(progress, warm, cool))
+        })?,
+    )?;
+    sun_table.set("daylight", lua.create_function(|lua, ()| daylight(lua))?)?;
+    g.set("sun", sun_table)?;
+
+    g.set(
+        "clock",
+        lua.create_function(|lua, ()| {
+            let t = state(lua)?.wall.time();
+            Ok(f64::from(t.num_seconds_from_midnight()) / 3600.0)
+        })?,
+    )?;
+    g.set(
+        "log",
+        lua.create_function(|lua, args: Variadic<Value>| {
+            let parts: Vec<String> = args
+                .iter()
+                .map(|v| v.to_string().unwrap_or_else(|_| format!("{v:?}")))
+                .collect();
+            eprintln!("{}: {}", state(lua)?.room, parts.join(" "));
+            Ok(())
+        })?,
+    )?;
+    Ok(())
+}
+
+fn subscribe(lua: &Lua, topic: String, f: Function) -> mlua::Result<()> {
+    if state(lua)?.loaded {
+        return Err(mlua::Error::runtime(
+            "on() only works at the top level of the script",
+        ));
+    }
+    let handlers = lua.named_registry_value::<Table>(HANDLERS)?;
+    let list = match handlers.get::<Option<Table>>(topic.as_str())? {
+        Some(list) => list,
+        None => {
+            let list = lua.create_table()?;
+            handlers.set(topic.as_str(), &list)?;
+            list
+        }
+    };
+    list.push(f)?;
+    state(lua)?.topics.insert(topic);
+    Ok(())
+}
+
+fn schedule(lua: &Lua, secs: f64, f: Function, every: bool) -> mlua::Result<u64> {
+    let d = Duration::try_from_secs_f64(secs)
+        .map_err(|_| mlua::Error::runtime(format!("bad duration {secs}")))?;
+    if every && d < MIN_EVERY {
+        return Err(mlua::Error::runtime("every() needs at least 1 second"));
+    }
+    let id = {
+        let mut s = state(lua)?;
+        let id = s.next_timer;
+        s.next_timer += 1;
+        let at = s.now + d;
+        s.timers.insert(
+            id,
+            Timer {
+                at,
+                every: every.then_some(d),
+            },
+        );
+        id
+    };
+    lua.named_registry_value::<Table>(TIMERS)?.set(id, f)?;
+    Ok(id)
+}
+
+fn daylight(lua: &Lua) -> mlua::Result<f64> {
+    let s = state(lua)?;
+    Ok(sun::daylight_fraction(s.latitude, s.longitude, s.wall))
+}
+
+/// A table of named options; unknown keys are errors, so typos surface.
+struct Opts(Option<Table>);
+
+impl Opts {
+    fn new(t: Option<Table>, allowed: &[&str]) -> mlua::Result<Self> {
+        if let Some(t) = &t {
+            for pair in t.pairs::<Value, Value>() {
+                let (key, _) = pair?;
+                let key = key.to_string()?;
+                if !allowed.contains(&key.as_str()) {
+                    return Err(mlua::Error::runtime(format!(
+                        "unknown option {key:?} (expected one of {})",
+                        allowed.join(", ")
+                    )));
+                }
+            }
+        }
+        Ok(Self(t))
+    }
+
+    fn get<T: mlua::FromLua>(&self, key: &str) -> mlua::Result<Option<T>> {
+        match &self.0 {
+            Some(t) => t.get(key),
+            None => Ok(None),
+        }
+    }
+
+    fn number(&self, key: &str, default: f64, lo: f64, hi: f64) -> mlua::Result<f64> {
+        let Some(v) = self.get::<f64>(key)? else {
+            return Ok(default);
+        };
+        if !(lo..=hi).contains(&v) {
+            return Err(mlua::Error::runtime(format!(
+                "{key} = {v} is outside {lo}..{hi}"
+            )));
+        }
+        Ok(v)
+    }
+
+    fn pct(&self, key: &str, default: u8) -> mlua::Result<u8> {
+        Ok(self.number(key, default.into(), 0.0, 100.0)?.round() as u8)
+    }
+
+    fn flag(&self, key: &str, default: bool) -> mlua::Result<bool> {
+        Ok(self.get(key)?.unwrap_or(default))
+    }
+
+    fn transition(&self) -> mlua::Result<Duration> {
+        Ok(Duration::from_secs_f64(self.number(
+            "transition",
+            0.0,
+            0.0,
+            3600.0,
+        )?))
+    }
+
+    fn target(&self) -> mlua::Result<Target> {
+        Ok(Target {
+            on: self.flag("on", true)?,
+            brightness: self
+                .number("brightness", Target::FULL.into(), 1.0, 254.0)?
+                .round() as u8,
+            color_temp: match self.get::<f64>("color_temp")? {
+                Some(_) => Some(self.number("color_temp", 0.0, 100.0, 1000.0)?.round() as u16),
+                None => None,
+            },
+        })
+    }
+}
+
+const TARGET_KEYS: [&str; 5] = ["on", "brightness", "color_temp", "scale", "transition"];
+
+/// A bulb handle from `light(name)`.
+struct Light(String);
+
+impl Light {
+    fn request(&self, lua: &Lua, input: Input) -> mlua::Result<()> {
+        state(lua)?.requests.push((self.0.clone(), input));
+        Ok(())
+    }
+}
+
+impl UserData for Light {
+    fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
+        methods.add_method("auto", |lua, this, t: Option<Table>| {
+            let opts = Opts::new(t, &TARGET_KEYS)?;
+            let input = Input::Auto {
+                target: opts.target()?,
+                scale: opts.number("scale", 1.0, 0.0, 1.0)? as f32,
+                transition: opts.transition()?,
+            };
+            this.request(lua, input)
+        });
+        methods.add_method("user", |lua, this, t: Option<Table>| {
+            let opts = Opts::new(t, &["on", "brightness", "color_temp", "transition"])?;
+            let input = Input::User {
+                target: opts.target()?,
+                transition: opts.transition()?,
+            };
+            this.request(lua, input)
+        });
+        methods.add_method("release", |lua, this, t: Option<Table>| {
+            let opts = Opts::new(t, &["transition"])?;
+            let input = Input::Release {
+                transition: opts.transition()?,
+            };
+            this.request(lua, input)
+        });
+        methods.add_method("state", |lua, this, ()| {
+            let Some(shown) = state(lua)?.lights.get(&this.0).copied().flatten() else {
+                return Ok(None);
+            };
+            let t = lua.create_table()?;
+            t.set("mode", if shown.held { "held" } else { "auto" })?;
+            t.set("on", shown.state.on)?;
+            t.set("brightness", shown.state.brightness)?;
+            t.set("color_temp", shown.state.color_temp)?;
+            Ok(Some(t))
+        });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    const NOON: &str = "2026-06-21T13:10:00+02:00";
+
+    struct Rig {
+        script: Script,
+        now: Instant,
+        wall: DateTime<FixedOffset>,
+    }
+
+    impl Rig {
+        fn new(source: &str) -> Self {
+            Self::try_new(source).unwrap()
+        }
+
+        fn try_new(source: &str) -> Result<Self> {
+            let now = Instant::now();
+            let wall = DateTime::parse_from_rfc3339(NOON).unwrap();
+            let lights = ["a", "b"].map(String::from);
+            Ok(Self {
+                script: Script::new("test", source, lights, (52.52, 13.405), now, wall)?,
+                now,
+                wall,
+            })
+        }
+
+        fn send(&mut self, device: &str, payload: serde_json::Value) -> Vec<(String, Input)> {
+            let topic = format!("zigbee2mqtt/{device}");
+            self.script.message(&topic, &payload, self.now, self.wall)
+        }
+
+        fn wait(&mut self, secs: u64) -> Vec<(String, Input)> {
+            self.now += Duration::from_secs(secs);
+            self.wall += chrono::TimeDelta::seconds(secs as i64);
+            self.script.tick(self.now, self.wall)
+        }
+    }
+
+    fn auto_on(reqs: &[(String, Input)]) -> Vec<(&str, bool)> {
+        reqs.iter()
+            .filter_map(|(name, i)| match i {
+                Input::Auto { target, .. } => Some((name.as_str(), target.on)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn handlers_get_the_z2m_payload_and_request_targets() {
+        let mut rig = Rig::new(
+            r#"
+            on("door", function(p)
+              light("a"):auto{ on = not p.contact, brightness = 120, transition = 0.4 }
+            end)
+            "#,
+        );
+        assert_eq!(rig.script.topics(), ["zigbee2mqtt/door"]);
+        let reqs = rig.send("door", json!({ "contact": false, "battery": 90 }));
+        match &reqs[..] {
+            [(
+                name,
+                Input::Auto {
+                    target,
+                    scale,
+                    transition,
+                },
+            )] => {
+                assert_eq!(name, "a");
+                assert_eq!(
+                    *target,
+                    Target {
+                        on: true,
+                        brightness: 120,
+                        color_temp: None
+                    }
+                );
+                assert_eq!((*scale, *transition), (1.0, Duration::from_millis(400)));
+            }
+            other => panic!("{other:?}"),
+        }
+    }
+
+    #[test]
+    fn json_null_and_missing_fields_are_nil() {
+        let mut rig = Rig::new(
+            r#"
+            on("door", function(p)
+              assert(p.contact == nil and p.missing == nil)
+              light("a"):auto{ on = false }
+            end)
+            "#,
+        );
+        assert_eq!(
+            auto_on(&rig.send("door", json!({ "contact": null }))),
+            [("a", false)]
+        );
+    }
+
+    #[test]
+    fn timers_fire_on_the_fake_clock_and_can_be_cancelled() {
+        let mut rig = Rig::new(
+            r#"
+            local t
+            on("button", function(p)
+              if p.action == "single" then
+                light("a"):user{ brightness = 25 }
+                if t then cancel(t) end
+                t = after(300, function() light("a"):user{ on = false } end)
+              elseif p.action == "double" and t then
+                cancel(t); t = nil
+              end
+            end)
+            "#,
+        );
+        rig.send("button", json!({ "action": "single" }));
+        assert_eq!(
+            rig.script.deadline(),
+            Some(rig.now + Duration::from_secs(300))
+        );
+        assert!(rig.wait(299).is_empty());
+        let reqs = rig.wait(1);
+        assert!(matches!(&reqs[..], [(_, Input::User { target, .. })] if !target.on));
+        assert_eq!(rig.script.deadline(), None);
+
+        rig.send("button", json!({ "action": "single" }));
+        rig.send("button", json!({ "action": "double" }));
+        assert!(rig.wait(600).is_empty());
+    }
+
+    #[test]
+    fn every_repeats_and_top_level_requests_go_out_on_the_first_tick() {
+        let mut rig = Rig::new(
+            r#"
+            local function update() light("a"):auto{ brightness = sun.level{ min = 5 } } end
+            update()
+            every(30, update)
+            "#,
+        );
+        assert_eq!(auto_on(&rig.wait(0)), [("a", true)]);
+        assert!(rig.wait(29).is_empty());
+        assert_eq!(rig.wait(1).len(), 1);
+        assert_eq!(rig.wait(30).len(), 1);
+    }
+
+    #[test]
+    fn a_failing_handler_drops_its_half_made_requests_and_keeps_running() {
+        let mut rig = Rig::new(
+            r#"
+            on("door", function(p)
+              light("a"):auto{ on = true }
+              if p.contact then error("boom") end
+              light("b"):auto{ on = true }
+            end)
+            "#,
+        );
+        assert!(rig.send("door", json!({ "contact": true })).is_empty());
+        assert_eq!(rig.send("door", json!({ "contact": false })).len(), 2);
+    }
+
+    #[test]
+    fn runaway_handlers_are_stopped() {
+        let mut rig = Rig::new(r#"on("x", function() while true do end end)"#);
+        assert!(rig.send("x", json!({})).is_empty());
+    }
+
+    #[test]
+    fn sandbox_has_no_os_or_io() {
+        let mut rig = Rig::new(
+            r#"on("x", function() assert(os == nil and io == nil and require == nil and load); light("a"):auto{} end)"#,
+        );
+        assert_eq!(rig.send("x", json!({})).len(), 1);
+    }
+
+    #[test]
+    fn mistakes_fail_at_load_time() {
+        for source in [
+            r#"light("nope")"#,
+            r#"light("a"):auto{ brigthness = 3 }"#,
+            r#"light("a"):auto{ brightness = 300 }"#,
+            r#"every(0.1, function() end)"#,
+            r#"this is not lua"#,
+        ] {
+            assert!(Rig::try_new(source).is_err(), "{source}");
+        }
+    }
+
+    #[test]
+    fn subscribing_after_load_is_an_error() {
+        let mut rig =
+            Rig::new(r#"on("x", function() on("y", function() end); light("a"):auto{} end)"#);
+        assert!(rig.send("x", json!({})).is_empty());
+        assert_eq!(rig.script.topics(), ["zigbee2mqtt/x"]);
+    }
+
+    #[test]
+    fn state_reflects_the_arbiter() {
+        let mut rig = Rig::new(
+            r#"
+            on("x", function()
+              local s = light("a"):state()
+              if s and s.mode == "held" and s.on then light("b"):user{ brightness = s.brightness } end
+            end)
+            "#,
+        );
+        assert!(rig.send("x", json!({})).is_empty());
+        rig.script.bulb(
+            "a",
+            true,
+            Target {
+                on: true,
+                brightness: 80,
+                color_temp: None,
+            },
+        );
+        let reqs = rig.send("x", json!({}));
+        assert!(
+            matches!(&reqs[..], [(b, Input::User { target, .. })] if b == "b" && target.brightness == 80)
+        );
+    }
+
+    #[test]
+    fn sun_and_clock() {
+        let mut rig = Rig::new(
+            r#"
+            on("x", function()
+              assert(math.abs(clock() - 13.1667) < 0.01, clock())
+              assert(sun.daylight() > 0.95)
+              assert(sun.level{ min = 5, max = 50 } > 120)
+              assert(sun.ct{} < 260)
+              light("a"):auto{}
+            end)
+            "#,
+        );
+        assert_eq!(rig.send("x", json!({})).len(), 1);
+    }
+}

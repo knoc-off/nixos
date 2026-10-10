@@ -42,6 +42,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"
 chrono = { version = "0.4", features = ["serde"] }
+mlua = { version = "0.12.2", features = ["lua54", "vendored", "serialize"] }
 
 [profile.release]
 opt-level = 1
