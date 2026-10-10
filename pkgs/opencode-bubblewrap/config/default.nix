@@ -583,6 +583,8 @@ let
 
   tuiJson = {
     "$schema" = "https://opencode.ai/tui.json";
+    # /jev: toggle jev-review edit hooks in a dialog (TUI plugins aren't auto-discovered).
+    plugin = [ "${jevReview}/lib/jev-review/plugin/tui.js" ];
     theme = "customtheme";
     scroll_speed = 1;
     keybinds = {

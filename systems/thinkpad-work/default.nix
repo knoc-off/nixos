@@ -118,6 +118,15 @@ in
       };
     }
 
+    # onepass
+    {
+      programs._1password.enable = true;
+      programs._1password-gui = {
+        enable = true;
+        polkitPolicyOwners = [ "knoff" ];
+      };
+    }
+
     {
       services.greetd =
         let

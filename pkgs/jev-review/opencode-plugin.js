@@ -28,7 +28,7 @@
 
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, rename, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { homedir, tmpdir } from "node:os";
 import path from "node:path";
@@ -48,10 +48,10 @@ const DIRS = {
   probe: [[path.join(SHARE, "probes"), "shipped"], [USER_DIR, "user"]],
   harness: [[path.join(SHARE, "harnesses"), "shipped"], [path.join(USER_DIR, "harnesses"), "user"]],
   lang: [[path.join(SHARE, "langs"), "shipped"], [path.join(USER_DIR, "langs"), "user"]],
-  // Shipped hooks are templates: only the user dir runs (opt in = file present).
-  hookTemplates: [[path.join(SHARE, "hooks"), "shipped"]],
-  hook: [[path.join(USER_DIR, "hooks"), "user"]],
+  // Hooks: one dir; shipped ones are symlinked in by seedHooks (see "hooks").
+  hook: path.join(USER_DIR, "hooks"),
 };
+const SHIPPED_HOOKS = path.join(SHARE, "hooks");
 
 const CONCURRENCY = 8; // Jev requests in flight
 const MAX_UNITS = 200; // units per call
@@ -77,7 +77,10 @@ const TEST_PATH = /(^|\/)(tests?|__tests__|benches)\/|[._-](test|spec)\.\w+$/;
 // Files never worth a Jev call: lockfiles, generated declarations, minified bundles.
 const SKIP_FILE =
   /(^|\/)(flake\.lock|Cargo\.lock|package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|poetry\.lock|uv\.lock|Pipfile\.lock|go\.sum|Gemfile\.lock|composer\.lock|mix\.lock)$|\.d\.ts$|\.min\.(js|css)$/;
-const SOPS = /ENC\[AES256_GCM,|^\+\s*"?sops"?:/m;
+// Added lines that are sops ciphertext (`key: ENC[...]`, `"key": "ENC[...]"`,
+// `KEY=ENC[...]`, `- ENC[...]`) or its metadata key -- not code that merely
+// mentions ENC[ (a test fixture string).
+const SOPS = /^\+\s*(?:-\s*|"?[\w.-]+"?\s*[:=]\s*)"?ENC\[AES256_GCM,|^\+\s*"?sops"?:/m;
 // Changed lines in a file with no lang: blank or punctuation only.
 const TRIVIAL_ANY = /^[\s{}()[\];,]*$/;
 
@@ -186,7 +189,8 @@ export function changedLines(diff, keep = () => true) {
       file = null;
       inHunk = false;
     } else if (!inHunk && line.startsWith("+++ ")) {
-      const p = line.slice(4).replace(/^b\//, "");
+      // git appends a tab to a name containing spaces
+      const p = line.slice(4).replace(/\t$/, "").replace(/^b\//, "");
       file = p !== "/dev/null" && !SKIP_FILE.test(p) && keep(p) ? p : null;
     } else if (line.startsWith("@@")) {
       inHunk = true;
@@ -591,10 +595,10 @@ async function loadModules(dirs) {
 }
 
 // What a module source is, from its exports: a harness exports `units`, a
-// lang has `meta.exts`, a hook has `meta.tools`, anything else is a probe.
+// lang has `meta.exts`, a hook exports `afterEdit`, anything else is a probe.
 export async function moduleKind(name, src) {
   const mod = await importSource(name, src);
-  return typeof mod.units === "function" ? "harness" : Array.isArray(mod.meta?.exts) ? "lang" : Array.isArray(mod.meta?.tools) ? "hook" : "probe";
+  return typeof mod.units === "function" ? "harness" : Array.isArray(mod.meta?.exts) ? "lang" : typeof mod.afterEdit === "function" ? "hook" : "probe";
 }
 
 // A probe:
@@ -1032,7 +1036,7 @@ export async function evalHarness(harness, args, { directory, ask, cache, signal
     (broken.length ? ` · probes failing to load: ${broken.join(", ")} (jev_probe list)` : "") +
     (badLangs.length ? ` · langs failing to load: ${badLangs.join(", ")}` : "") +
     (got.notes ?? []).map((n) => ` · ${n}`).join("");
-  return { head, reviewed };
+  return { head, reviewed, dir };
 }
 
 // The review harness over an already-computed diff (`dir`: the tree its new
@@ -1083,7 +1087,9 @@ export async function gitDiff(directory, { from, to, target }, signal) {
         }
       }
     }
-    const argv = ["diff", "--no-color", "--no-ext-diff", "--no-relative", "-U3", base];
+    // Pin what the parser expects whatever the user's config: a/ b/ prefixes
+    // (diff.noprefix, diff.mnemonicPrefix) and unquoted non-ASCII names.
+    const argv = ["-c", "core.quotePath=false", "diff", "--no-color", "--no-ext-diff", "--no-relative", "--src-prefix=a/", "--dst-prefix=b/", "-U3", base];
     if (to) argv.push(to);
     argv.push("--", spec);
     return { root, diff: await git(cwd, argv, signal), note };
@@ -1097,12 +1103,20 @@ export async function gitDiff(directory, { from, to, target }, signal) {
 const trees = new Map();
 export async function treeAt(root, ref, signal) {
   const sha = (await git(root, ["rev-parse", "--verify", `${ref}^{tree}`], signal)).trim();
-  if (!trees.has(sha)) {
-    const dir = await mkdtemp(path.join(tmpdir(), "jev-review-"));
-    await git(root, ["archive", "--format=tar", "-o", path.join(dir, ".tree.tar"), sha], signal);
-    await run("tar", ["-xf", ".tree.tar"], dir, signal);
-    trees.set(sha, dir);
-  }
+  // the promise is cached, so concurrent callers share one extraction
+  if (!trees.has(sha))
+    trees.set(
+      sha,
+      (async () => {
+        const dir = await mkdtemp(path.join(tmpdir(), "jev-review-"));
+        await git(root, ["archive", "--format=tar", "-o", path.join(dir, ".tree.tar"), sha], signal);
+        await run("tar", ["-xf", ".tree.tar"], dir, signal);
+        return dir;
+      })().catch((e) => {
+        trees.delete(sha);
+        throw e;
+      })
+    );
   return trees.get(sha);
 }
 
@@ -1158,25 +1172,12 @@ export async function listLibrary(dirs = DIRS, filter) {
     .map((x) => `${x.name}\t${x.source}\t${x.meta.exts?.join(",") ?? ""}${x.meta.kinds ? ` [${Object.keys(x.meta.kinds).join(",")}]` : ""}\t${x.error ? `LOAD ERROR: ${x.error}` : x.meta.description}`)
     .filter(keep);
   const ps = await listProbes(dirs.probe, filter);
-  // Hooks: shipped templates + user (= on). A user copy that differs from its
-  // template is marked, so a rebuilt template isn't silently stale.
-  const tpls = dirs.hookTemplates ? await loadHooks(dirs.hookTemplates) : new Map();
-  const users = dirs.hook ? await loadHooks(dirs.hook) : new Map();
-  const ks = [];
-  for (const name of [...new Set([...tpls.keys(), ...users.keys()])].sort()) {
-    const u = users.get(name);
-    const t = tpls.get(name);
-    let state = u ? "on" : "off (jev_probe enable)";
-    if (u && t && (await readFile(u.file, "utf8")) !== (await readFile(t.file, "utf8"))) state += ", differs from shipped";
-    const x = u ?? t;
-    const row = `${name}\t${t ? "shipped" : "user"}\t${state}\t${x.meta.tools?.join(",") ?? ""}${x.meta.files ? ` ${x.meta.files}` : ""}\t${x.error ? `LOAD ERROR: ${x.error}` : x.meta.description}`;
-    if (keep(row)) ks.push(row);
-  }
+  const ks = dirs.hook ? (await hookRows(dirs.hook)).filter(keep) : [];
   return [
     `## harnesses\n${hs.join("\n") || "none"}`,
     `## langs (units by ast-grep; other files: changed-line hunks)\n${ls.join("\n") || "none"}`,
     `## probes\n${ps}`,
-    ...(dirs.hook ? [`## hooks (after a tool call; only those in ~/scratch/jev-probes/hooks run)\n${ks.join("\n") || "none"}`] : []),
+    ...(dirs.hook ? [`## hooks (after edit/write; the user toggles them in /jev)\n${ks.join("\n") || "none"}`] : []),
   ].join("\n\n");
 }
 
@@ -1208,34 +1209,80 @@ async function jevAsk(state, questions, signal) {
 
 // ---- hooks ------------------------------------------------------------------
 
-// A hook: runs after matching tool calls; its text is appended to the result.
-//   export const meta = { description, tools: ["edit", "write"], files?: RegExp }
-//   export default async function (edit, h) -> string | null
+// A hook: runs after every edit/write; its text is appended to the result.
+//   export const meta = { description, files?: RegExp }
+//   export async function afterEdit(edit, h) -> string | null
 // edit: { tool, file (absolute), rel (to the session dir), lines: [[s, e]] | null
 // (null = whole file, i.e. write), added }. h: harness(name, args, engine) ->
-// { head, reviewed: [{unit, results, score}] } | { empty } · line(result) ·
-// ask(state, questions) · budget · signal · read(file) · directory. All hooks
-// of one tool call share HOOK_BUDGET Jev requests and HOOK_TIMEOUT.
-// Only hooks in ~/scratch/jev-probes/hooks run; shipped ones are templates
-// (jev_probe enable). JEV_HOOKS=0 turns them all off.
+// { head, reviewed: [{unit, results, score}] } | { empty } · line(result) (its
+// path relative to the session dir) · ask(state, questions) · budget · signal ·
+// read(file) · directory. All hooks of one call share HOOK_BUDGET Jev requests
+// and HOOK_TIMEOUT.
+// One dir, the file name is the state: X.mjs runs, X.mjs.disabled doesn't.
+// Shipped hooks are seeded into it as symlinks (off); symlinks there are
+// plugin-managed, regular files are the user's.
+
+const OFF = ".mjs.disabled";
 
 function hookFrom(name, mod, source, file) {
   if (typeof mod.meta?.description !== "string") throw new Error("must `export const meta = { description: ... }`");
-  if (!Array.isArray(mod.meta.tools)) throw new Error("meta.tools must list tool ids, e.g. [\"edit\", \"write\"]");
-  if (typeof mod.default !== "function") throw new Error("needs `export default async function (edit, h)`");
-  return { name, source, file, meta: mod.meta, fn: mod.default };
+  if (typeof mod.afterEdit !== "function") throw new Error("needs `export async function afterEdit(edit, h)`");
+  return { name, source, file, meta: mod.meta, fn: mod.afterEdit };
 }
-export async function loadHooks(dirs = DIRS.hook) {
+
+// name -> { on, kind: "file" | "link" } for every X.mjs / X.mjs.disabled in dir (X.mjs wins).
+async function hookFiles(dir) {
   const out = new Map();
-  for (const m of (await loadModules(dirs)).values()) {
+  for (const e of (await readdir(dir, { withFileTypes: true }).catch(() => [])).sort((a, b) => b.name.localeCompare(a.name))) {
+    const m = /^(.+)\.mjs(\.disabled)?$/.exec(e.name);
+    if (m) out.set(m[1], { on: !m[2], kind: e.isSymbolicLink() ? "link" : "file", file: path.join(dir, e.name) });
+  }
+  return out;
+}
+
+export async function loadHooks(dir = DIRS.hook) {
+  const out = new Map();
+  for (const [name, f] of await hookFiles(dir)) {
+    const source = f.kind === "link" ? "shipped" : "user";
     try {
-      if (m.error) throw new Error(m.error);
-      out.set(m.name, hookFrom(m.name, m.mod, m.source, m.file));
+      out.set(name, { ...hookFrom(name, await importSource(name, await readFile(f.file, "utf8")), source, f.file), on: f.on });
     } catch (e) {
-      out.set(m.name, { name: m.name, source: m.source, file: m.file, meta: {}, error: e.message });
+      out.set(name, { name, source, file: f.file, on: f.on, meta: {}, error: e.message });
     }
   }
   return out;
+}
+
+// Mirror the shipped hooks into `dir` as symlinks: new ones start off, existing
+// links are re-pointed (keeping their on/off name), links to hooks no longer
+// shipped are removed. Regular files are never touched.
+export async function seedHooks(shipped = SHIPPED_HOOKS, dir = DIRS.hook) {
+  await mkdir(dir, { recursive: true });
+  const want = new Set((await readdir(shipped).catch(() => [])).filter((f) => f.endsWith(".mjs")).map((f) => f.slice(0, -4)));
+  const have = await hookFiles(dir);
+  for (const [name, f] of have) {
+    if (f.kind !== "link") continue;
+    await rm(f.file, { force: true });
+    if (want.has(name)) await symlink(path.join(shipped, `${name}.mjs`), f.file);
+  }
+  for (const name of want) {
+    if (!have.has(name)) await symlink(path.join(shipped, `${name}.mjs`), path.join(dir, name + OFF));
+  }
+}
+
+// Every hook, sorted: [{ name, source, on, meta, error? }]. Shared with tui.js.
+export const listHooks = async (dir = DIRS.hook) => [...(await loadHooks(dir)).values()].sort((a, b) => a.name.localeCompare(b.name));
+
+const hookRows = async (dir) =>
+  (await listHooks(dir)).map(
+    (k) => `${k.name}\t${k.source}\t${k.on ? "on" : "off"}${k.meta.files ? `\t${k.meta.files}` : ""}\t${k.error ? `LOAD ERROR: ${k.error}` : k.meta.description}`
+  );
+
+// On/off is the file name: rename X.mjs <-> X.mjs.disabled.
+export async function setHook(name, on, dir = DIRS.hook) {
+  const f = (await hookFiles(dir)).get(name);
+  if (!f) throw new Error(`no hook ${name}`);
+  if (f.on !== on) await rename(f.file, path.join(dir, name + (on ? ".mjs" : OFF)));
 }
 
 // Line ranges of `needle` in `text` (1-based, inclusive).
@@ -1264,12 +1311,9 @@ async function editOf(input, directory) {
 }
 
 // Every matching hook, in parallel; joined output or null. Never throws.
-export async function runHooks(input, { directory, ask, cache, signal, hookDirs = DIRS.hook, harnessDirs = DIRS.harness, ...rest }) {
+export async function runHooks(input, { directory, ask, cache, signal, hookDir = DIRS.hook, harnessDirs = DIRS.harness, ...rest }) {
   try {
-    if (process.env.JEV_HOOKS === "0") return null;
-    const hooks = [...(await loadHooks(hookDirs)).values()].filter(
-      (k) => !k.error && k.meta.tools.includes(input.tool)
-    );
+    const hooks = [...(await loadHooks(hookDir)).values()].filter((k) => !k.error && k.on);
     if (!hooks.length) return null;
     const edit = await editOf(input, directory);
     if (!edit) return null;
@@ -1283,15 +1327,19 @@ export async function runHooks(input, { directory, ask, cache, signal, hookDirs 
       signal: sig,
       budget,
       read: (f) => readFile(path.resolve(directory, f), "utf8"),
-      line: formatLine,
+      // unit paths are relative to the harness's tree; show them session-relative
+      line: (x) => path.relative(directory, path.resolve(x.dir ?? directory, x.unit.file)) + formatLine(x).slice(x.unit.file.length),
       ask: async (state, questions) => {
         if (budget.left <= 0) throw new BudgetError();
         budget.left--;
         budget.used++;
         return ask(state, questions, sig);
       },
-      harness: (name, args, engine = {}) =>
-        evalHarness(harnesses.get(name), { ...engine, ...args }, { directory, ask, cache, signal: sig, budget, ...rest }),
+      harness: async (name, args, engine = {}) => {
+        const r = await evalHarness(harnesses.get(name), { ...engine, ...args }, { directory, ask, cache, signal: sig, budget, ...rest });
+        for (const x of r.reviewed) x.dir = r.dir;
+        return r;
+      },
     };
     const outs = await Promise.all(
       run.map((k) =>
@@ -1305,13 +1353,6 @@ export async function runHooks(input, { directory, ask, cache, signal, hookDirs 
   }
 }
 
-// jev_probe enable: copy a shipped template into the user hooks dir.
-async function enableHook(name) {
-  const tpl = (await loadHooks(DIRS.hookTemplates)).get(name);
-  if (!tpl) return `Error: no shipped hook ${name} (jev_probe list)`;
-  if (tpl.error) return `Error: hook ${name} failed to load: ${tpl.error}`;
-  return `Enabled hook ${name}: ${await saveModule("hooks", name, await readFile(tpl.file, "utf8"), `enable hook ${name}`)}`;
-}
 
 // ---- tools ------------------------------------------------------------------
 
@@ -1422,22 +1463,23 @@ export const meta = {
 Kinds impl/class/mod are containers (a small changed one is reviewed whole; mods never fold); \`top\` is reserved for hunks outside any unit.
 
 ## Hook -- live feedback after an edit
-Runs after matching tool calls; a non-empty return is appended to the tool result. Opt-in: only files in ~/scratch/jev-probes/hooks/ run (\`enable\` copies a shipped one there; delete to turn off). All hooks of one call share ${HOOK_BUDGET} Jev requests and ${HOOK_TIMEOUT / 1000}s; a failing hook is dropped.
+Runs after every edit/write (\`meta.files\` narrows by path); a non-empty return is appended to the tool result. Saved as \`~/scratch/jev-probes/hooks/<name>.mjs\` (= on; \`<name>.mjs.disabled\` = off); the user toggles them in the \`/jev\` dialog. Shipped hooks appear there as symlinks (off until enabled); saving one under a shipped name replaces it with your copy. All hooks of one call share ${HOOK_BUDGET} Jev requests and ${HOOK_TIMEOUT / 1000}s; a failing hook is dropped.
 \`\`\`js
-export const meta = { description: "…", tools: ["edit", "write"], files: /\\.rs$/ };
-export default async function (edit, h) {   // edit: {tool, file, rel, lines: [[s,e]] | null (write: whole file), added}
+export const meta = { description: "…", files: /\\.rs$/ };
+export async function afterEdit(edit, h) {   // edit: {tool, file, rel, lines: [[s,e]] | null (write: whole file), added}
   const r = await h.harness("edited", { path: edit.file, lines: edit.lines }, { probes: ["rust-design"] });
   const hits = r.reviewed.filter((x) => x.score >= 0.85).slice(0, 3);
   return hits.length ? \`[my feedback]\\n\${hits.map(h.line).join("\\n")}\` : null;
 }
 \`\`\`
-\`h\`: harness(name, args, engine) -> {head, reviewed: [{unit, results, score}]} | {empty} · line(result) · ask(state, questions) · read(file) · budget · signal · directory.
+\`h\`: harness(name, args, engine) -> {head, reviewed: [{unit, results, score}]} | {empty} · line(result) (session-relative path) · ask(state, questions) · read(file) · budget · signal · directory.
 
 ## Shapes
-\`list\` (true or a filter) · \`enable: name\` turns on a shipped hook · \`name\` + \`script\` saves (git-committed), then dry-runs it if \`units\` is given (probes and langs; dry-run harnesses with jev_run) · \`script\` alone dry-runs an unsaved probe/lang (needs \`units\`) · \`name\` alone dry-runs a saved probe on \`units\`. Dry runs review a diff: same \`path\`/\`from\`/\`to\` as jev_review (default from=HEAD).`;
+\`list\` (true or a filter) · \`name\` + \`script\` saves (git-committed), then dry-runs it if \`units\` is given (probes and langs; dry-run harnesses with jev_run) · \`script\` alone dry-runs an unsaved probe/lang (needs \`units\`) · \`name\` alone dry-runs a saved probe on \`units\`. Dry runs review a diff: same \`path\`/\`from\`/\`to\` as jev_review (default from=HEAD).`;
 
 async function server(pctx) {
-  const hookDir = pctx?.directory ?? process.cwd();
+  const sessionDir = pctx?.directory ?? process.cwd();
+  await seedHooks().catch(() => {}); // a read-only or missing scratch dir must not cost the plugin
   const require = createRequire((process.env.HOME || "/root") + "/.config/opencode/package.json");
   const { z } = require("zod");
   const cache = new Map(); // ponytail: unbounded, per opencode process; an LRU if long sessions bloat it
@@ -1489,7 +1531,7 @@ async function server(pctx) {
 
   return {
     "tool.execute.after": async (input, output) => {
-      const note = await runHooks(input, { directory: hookDir, ask: jevAsk, cache });
+      const note = await runHooks(input, { directory: sessionDir, ask: jevAsk, cache });
       if (note) output.output = `${output.output ?? ""}\n\n${note}`;
     },
     tool: {
@@ -1534,7 +1576,6 @@ async function server(pctx) {
           list: z.union([z.boolean(), z.string()]).optional().describe("List harnesses, langs, probes and hooks (true) or filter by substring."),
           name: z.string().optional().describe("Module name ([a-z0-9-]). With script: save. Alone: dry-run the saved probe."),
           script: z.string().optional().describe("Module source: a probe, harness, lang or hook (inferred from its exports)."),
-          enable: z.string().optional().describe("Turn on a shipped hook: copies it to ~/scratch/jev-probes/hooks/ (delete the file to turn it off)."),
           message: z.string().optional().describe("Git commit message for a save."),
           ...where,
           from: where.from.optional(),
@@ -1542,7 +1583,6 @@ async function server(pctx) {
         async execute(args, ctx) {
           try {
             if (args.list && args.list !== "false") return await listLibrary(DIRS, args.list);
-            if (args.enable) return await enableHook(args.enable);
             if (args.name && !NAME.test(args.name)) return "Error: name must match [a-z0-9][a-z0-9-]*";
             const name = args.name ?? "inline";
             let extra = {};
@@ -1553,7 +1593,10 @@ async function server(pctx) {
               const source = args.name ? "user" : "inline";
               if (kind === "hook") {
                 hookFrom(name, await importSource(name, args.script), source);
-                return args.name ? `Saved hook ${name} to ${await saveModule("hooks", name, args.script, args.message)} (active from the next edit).` : "Hook loads; save it with a name to turn it on.";
+                if (!args.name) return "Hook loads; save it with a name to turn it on.";
+                // drop a shipped symlink / disabled copy: writeFile would follow the link into the store
+                for (const f of [`${name}.mjs`, name + OFF]) await rm(path.join(DIRS.hook, f), { force: true });
+                return `Saved hook ${name} to ${await saveModule("hooks", name, args.script, args.message)} (on from the next edit; the user toggles it in /jev).`;
               }
               const loaded = await { probe: loadProbe, harness: loadHarness, lang: loadLang }[kind](name, args.script, source);
               if (args.name) saved = `Saved ${kind} ${name} to ${await saveModule({ probe: "", harness: "harnesses", lang: "langs" }[kind], name, args.script, args.message)}.`;

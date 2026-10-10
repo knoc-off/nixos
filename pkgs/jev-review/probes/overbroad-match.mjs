@@ -1,10 +1,12 @@
 // Prefix / substring / case-insensitive matching where identity was meant:
 // is_sibling_name accepting "Nelly_backup" as an install.
+const JS = /startsWith|endsWith|includes\(|indexOf\(|toLowerCase|toUpperCase|localeCompare|new RegExp|\/[^/\n]+\/[gimsuy]*\.test\(|match\(/;
 export const meta = {
   description: "a name/path/id comparison by prefix, suffix, substring or case-insensitively that also accepts unrelated values (e.g. a 'foo_backup' folder counting as 'foo')",
   gate: {
     rust: /starts_with|ends_with|contains|to_lowercase|to_uppercase|eq_ignore_ascii_case|strip_prefix|strip_suffix|Regex::new|\bglob\b/,
-    typescript: /startsWith|endsWith|includes\(|indexOf\(|toLowerCase|toUpperCase|localeCompare|new RegExp|\/[^/\n]+\/[gimsuy]*\.test\(|match\(/,
+    typescript: JS,
+    javascript: JS,
   },
   question: {
     ask: "Does a string/name/path match in the changed lines accept more than it should? Think of a concrete near-miss value (backup copy, longer name with the same prefix, different case).",

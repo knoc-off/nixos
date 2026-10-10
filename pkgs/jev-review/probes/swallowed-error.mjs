@@ -1,11 +1,13 @@
 // Errors that disappear. Distinguishes silent from logged from propagated,
 // which a yes/no question blurred (discover_legacy_installs: all but one
 // early return logged a warning).
+const JS = /catch|\.catch\(|\?\.|\?\?|return (null|undefined|\[\]|;)|console\.(warn|error)|void /;
 export const meta = {
   description: "an error or failed result that is discarded, or only logged where the caller needs to know, so a failure looks like success",
   gate: {
     rust: /\.ok\(\)|let _ =|unwrap_or|unwrap_or_default|unwrap_or_else|\.ok\?|if let (Ok|Some)|Err\(_\)|=> \{\s*\}|=> \(\)|filter_map|flatten\(\)|warn!|error!|return (None|Ok\(\(\)\)|;)/,
-    typescript: /catch|\.catch\(|\?\.|\?\?|return (null|undefined|\[\]|;)|console\.(warn|error)|void /,
+    typescript: JS,
+    javascript: JS,
   },
   question: {
     ask: "Look at every place in the changed lines where an error, Err, None, rejected promise or failed call is handled. What happens to the failure?",

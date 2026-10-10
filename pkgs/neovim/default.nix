@@ -31,5 +31,6 @@ nixvim.makeNixvimWithModule {
   extraSpecialArgs = { inherit color-lib theme rustAnalyzerSettings; };
   module = {
     imports = [ ./configurations/minimal.nix ];
+    package = inputs.neovim-nightly-overlay.packages.${pkgs.stdenv.hostPlatform.system}.default;
   };
 }

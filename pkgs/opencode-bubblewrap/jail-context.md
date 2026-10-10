@@ -141,6 +141,53 @@ In the shell: git, nix (build/shell/run via daemon), jq, curl, tar.
   as whatever identity is already configured. If that's missing or wrong, stop and
   ask the user instead of making one up or impersonating anyone.
 
+## Git fixups via `git-absorb`
+
+```txt
+Automatically absorb staged changes into your current branch
+
+Usage: git-absorb [OPTIONS] [-- <REBASE_OPTIONS>...]
+
+Arguments:
+  [REBASE_OPTIONS]...  Extra arguments to pass to git rebase. Only valid if --and-rebase is set
+
+Options:
+  -b, --base <BASE>              Use this commit as the base of the absorb stack
+  -n, --dry-run                  Don't make any actual changes
+      --no-limit                 Remove absorb stack limit. Be careful with this
+      --force-author             Generate fixups to commits not made by you
+      --force-detach             Generate fixups even when on a non-branch (detached) HEAD
+  -f, --force                    Skip all safety checks as if all --force-* flags were given
+  -v, --verbose                  Display more output
+  -r, --and-rebase               Run rebase if successful
+      --gen-completions <SHELL>  Generate completions [possible values: bash, fish, nushell, zsh, powershell, elvish]
+  -w, --whole-file               Match the change against the complete file
+  -F, --one-fixup-per-commit     Only generate one fixup per commit
+  -s, --squash                   Create squash commits instead of fixup
+  -m, --message <MESSAGE>        Commit message body that is given to all fixup commits
+  -h, --help                     Print help
+  -V, --version                  Print version
+```
+
+## Git Stacks via `gh-stack`
+
+- use gh-stack to manage and view stacks.
+- do not use the `gh` command, to run `gh stack` because the `gh` command requires authentication
+  this jail is not authenticated. We can use the Host_exec tool to run the `gh` command on the host.
+  We must stick to Read-Only requests whenever possible. And you Must get explicit permission for write-requests that touch the network.
+- use stacks whenever it makes sense to split a PR into multiple smaller PRs, to keep it reviewable,
+  and around ~500 lines changed (Excluding auto-generated files.) per PR
+- Command reference:
+  ```
+  Stack management:
+    add         Add a new branch on top of the current stack
+    checkout    Checkout a stack from a PR number or branch name
+    init        Initialize a new stack
+    modify      Interactively restructure a stack
+    unstack     Delete a stack locally and on GitHub
+    view        View the current stack
+  ```
+
 ## Key facts
 
 - Nix daemon socket is mounted — `nix build`, `nix shell`, `nix run` all work
@@ -156,7 +203,7 @@ permission before making changes — the sandbox is your safety net.
 before reading files, before dispatching an explore agent: one `search` call
 (~1s) gives you the lay of the land, then you continue with exact Grep and
 narrow Reads. This covers "where is X handled", "how does Y work", "what calls
-into Z", getting your bearings in an unfamiliar repo, and *also* the cases
+into Z", getting your bearings in an unfamiliar repo, and _also_ the cases
 where you think you know the identifier but aren't sure which file it's in.
 Describe what you're looking for in plain language, the way you'd ask a
 colleague: `search(query: "where are auth tokens verified?")`, optionally with
@@ -189,11 +236,11 @@ hits.
 Three read-only, context-budgeted sub-agents that each hand back one
 condensed answer:
 
-| Agent           | Use for                                                                    |
-| --------------- | -------------------------------------------------------------------------- |
-| `explore-quick` | **Default.** "Where is X", grep/glob sweeps, confirming an assumption      |
-| `explore-mid`   | Lookups needing judgement: tracing logic across files, picking candidates  |
-| `explore-deep`  | Rare, expensive. Narrow hard questions a cheap model would botch           |
+| Agent           | Use for                                                                   |
+| --------------- | ------------------------------------------------------------------------- |
+| `explore-quick` | **Default.** "Where is X", grep/glob sweeps, confirming an assumption     |
+| `explore-mid`   | Lookups needing judgement: tracing logic across files, picking candidates |
+| `explore-deep`  | Rare, expensive. Narrow hard questions a cheap model would botch          |
 
 - **Do it yourself** when you can name the file (Read it), when one command
   answers it outright (very often a single `search`), or when you are executing (editing, building, git,

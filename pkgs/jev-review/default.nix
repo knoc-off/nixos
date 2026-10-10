@@ -13,9 +13,10 @@
 # changed code in a git diff) and jev_probe (the agent writes/saves/dry-runs
 # probes, harnesses and langs). Shipped modules live in ./probes,
 # ./harnesses, ./langs; user ones in ~/scratch/jev-probes override them by
-# name. Also edit hooks (./hooks, opt-in): the tool.execute.after dispatcher
-# runs every hook in ~/scratch/jev-probes/hooks after edit/write and appends
-# its feedback to the result. See opencode-plugin.js.
+# name. Also edit hooks: ~/scratch/jev-probes/hooks/<name>.mjs runs after
+# edit/write, <name>.mjs.disabled doesn't; the plugin symlinks ./hooks in
+# there (off) at startup; the `/jev` TUI dialog (tui.js, a separate TUI
+# plugin listed in tui.json) toggles them by renaming. See opencode-plugin.js.
 stdenv.mkDerivation {
   pname = "jev-review";
   version = "0.5.0";
@@ -33,6 +34,7 @@ stdenv.mkDerivation {
       --replace-fail '"@astGrep@".startsWith("@") ? "ast-grep" : "@astGrep@"' '"${lib.getExe ast-grep}"' \
       --replace-fail '"@rg@".startsWith("@") ? "rg" : "@rg@"' '"${lib.getExe ripgrep}"' \
       --replace-fail '"@shareDir@".startsWith("@") ? fileURLToPath(new URL(".", import.meta.url)) : "@shareDir@"' "\"$out/lib/jev-review\""
+    cp ${./tui.js} $out/lib/jev-review/plugin/tui.js
     runHook postInstall
   '';
 

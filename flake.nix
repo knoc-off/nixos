@@ -232,6 +232,12 @@
     };
 
     nixvim.url = "github:nix-community/nixvim";
+    # Neovim master (0.13-dev). 0.12.x has the multi-client inlay-hint
+    # "Invalid 'col': out of range" bug (shared bufstate.version).
+    neovim-nightly-overlay = {
+      url = "github:nix-community/neovim-nightly-overlay";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
     nixneovimplugins.url = "github:NixNeovim/NixNeovimPlugins";
 
     hardware.url = "github:nixos/nixos-hardware";

@@ -3,6 +3,7 @@
 // it is small (a `continue`), the status mapping it falls through to is
 // unchanged -- so the gate looks at the whole unit, and the question is
 // about paths the change creates or alters.
+const JS = /\bthrow\b|reject\(|\bstatus\b|\b[45]\d\d\b|Error\(/;
 export const meta = {
   description:
     "an error, status code or message that blames the wrong cause, e.g. a fallthrough or empty-result path reporting 'unauthorized'/'not found' when the real reason was something else (all items skipped, unsupported type, parse failure)",
@@ -10,7 +11,8 @@ export const meta = {
   gateOn: "unit",
   gate: {
     rust: /Err\(|bail!|anyhow!|StatusCode|\bstatus\b|\b[45]\d\d\b|Error::/,
-    typescript: /\bthrow\b|reject\(|\bstatus\b|\b[45]\d\d\b|Error\(/,
+    typescript: JS,
+    javascript: JS,
   },
   question: {
     ask:

@@ -5,6 +5,7 @@
 // The gate tests the whole unit: a change inside a state-machine arm rarely
 // touches the `loop`/`match` line, so the changed-lines gate never reached
 // run_inner / auth_state.
+const JS = /\bwhile\b|setInterval|useEffect|\bon[A-Z]\w*\b|\.on\(|addEventListener|subscribe\(|\b(retry|poll|tick|reconnect)\w*/;
 export const meta = {
   description:
     "a side effect (request, write, migration, message, spawn) inside looping/re-entered code (state machine, event handler, poll, retry loop) that repeats on every pass with nothing recording that it already happened",
@@ -12,7 +13,8 @@ export const meta = {
   gateOn: "unit",
   gate: {
     rust: /\bloop\b|\bwhile\b|match\s+[^{]*\b(state|status|event|ev|msg|message|cmd)\b|\bState::|\bStatus::|\bEvent::|\b(on_\w+|handle_\w+|run_inner|tick|poll|retry|reconnect)\b/,
-    typescript: /\bwhile\b|setInterval|useEffect|\bon[A-Z]\w*\b|\.on\(|addEventListener|subscribe\(|\b(retry|poll|tick|reconnect)\w*/,
+    typescript: JS,
+    javascript: JS,
   },
   question: {
     ask:

@@ -200,6 +200,7 @@ let
 
     # Version control
     git
+    gh-stack
     openssh # git over SSH, scp
 
     # Non-interactive SSH auth (used by the windows-vm-* helper scripts).
@@ -235,6 +236,9 @@ let
 
     # Patching
     gnupatch
+
+    # Editor -- the same nixvim build as the host (pkgs/neovim).
+    selfPkgs.neovim
 
     # Run any nixpkgs program by name without knowing its attr path.
     commaWithDb

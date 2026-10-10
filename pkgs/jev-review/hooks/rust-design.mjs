@@ -3,14 +3,13 @@
 // swallowed errors. Live feedback, not a gate: at most 3 lines.
 export const meta = {
   description: "after edit/write of a .rs file: design smells, reachable panics and swallowed errors in the edited units (advisory)",
-  tools: ["edit", "write"],
   files: /\.rs$/,
 };
 
 const MAX = 3;
 const MIN = 0.8; // panic / swallowed-error findings; rust-design applies its own per-question thresholds
 
-export default async function (edit, h) {
+export async function afterEdit(edit, h) {
   const r = await h.harness("edited", { path: edit.file, lines: edit.lines }, { probes: ["rust-design", "panic", "swallowed-error"] });
   const hits = r.reviewed
     .map((x) => {
@@ -23,9 +22,8 @@ export default async function (edit, h) {
     .slice(0, MAX);
   if (!hits.length) return null;
   const rows = hits.map((x) => {
-    const [where] = h.line(x).split("\t");
     const what = Object.entries(x.results).map(([k, v]) => `${k === "rust-design" ? "" : `${k}: `}${v.label} ${v.p.toFixed(2)}${v.note ? ` ${v.note}` : ""}`);
-    return `  ${edit.rel.slice(0, -x.unit.file.length)}${where}  ←  ${what.join(" · ")}`;
+    return `  ${h.line(x).split("\t")[0]}  ←  ${what.join(" · ")}`;
   });
   return `[jev rust feedback] (advisory; act on it only if it fits the task)\n${rows.join("\n")}`;
 }
