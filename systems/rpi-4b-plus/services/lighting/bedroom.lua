@@ -1,7 +1,14 @@
 -- The light follows the sun while on and ramps up on the fixed-clock wake
--- schedule (HA "Sunrise ..." settings).
+-- schedule (HA "Sunrise ..." settings). Walking in switches it on, except
+-- 22:00-08:00; it goes off two minutes after the sensor last saw anyone.
 local names = { "light", "bulb_1" }
-follow{ lights = names, wake = wake_ramp() }
+follow{
+  lights = names,
+  wake = wake_ramp(),
+  when = occupancy{ sensors = { "bedroom_presence" }, hold = 120 },
+  fade = 30,
+  quiet = { 22, 8 },
+}
 
 local LOW = 25 -- of 254
 local evening = function()

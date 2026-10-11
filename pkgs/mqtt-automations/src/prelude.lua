@@ -82,12 +82,26 @@ end
 --           on or off, it only shapes them while they are on.
 --   fade:   seconds to fade out once the room empties (default 60)
 --   wake:   a wake_ramp(), which switches the bulbs on and ramps them up
+--   quiet:  { from, to } hours (e.g. { 22, 8 }): arriving in this window
+--           does not switch the bulbs on. Only arrival counts, so lights
+--           already on stay on into it and nothing switches on at its end.
+--           The wake ramp and buttons are unaffected.
 function follow(opts)
   opts = opts or {}
   local names = opts.lights or lights
-  local occ, wake = opts.when, opts.wake
+  local occ, wake, quiet = opts.when, opts.wake, opts.quiet
   local fade = opts.fade or 60
   sun_curve(names)
+
+  local function quiet_now()
+    if not quiet then return false end
+    local h, from, to = clock(), quiet[1], quiet[2]
+    if from <= to then return h >= from and h < to end
+    return h >= from or h < to
+  end
+
+  -- Whether this visit switched the bulbs on.
+  local lit = false
 
   local waking = false
   local function update(transition)
@@ -114,7 +128,7 @@ function follow(opts)
       if ramp then
         t.brightness = ramp
       elseif occ then
-        t.on = occ.occupied
+        t.on = lit
       else
         t.on = s ~= nil and s.on
       end
@@ -130,6 +144,7 @@ function follow(opts)
 
   if occ then
     occ.watch(function(occupied)
+      lit = occupied and not quiet_now()
       if not occupied then
         -- A manual change lasts as long as the visit.
         each(names, function(n) light(n):release({ transition = fade }) end)

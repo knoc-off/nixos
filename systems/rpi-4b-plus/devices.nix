@@ -152,6 +152,11 @@ let
         id = "0xa4c13853eafa4f03";
         kind = kinds.light;
       };
+      presence = {
+        # SONOFF SNZB-06P, mmWave presence (mains-powered).
+        id = "0xa4c1381adca2ffff";
+        kind = kinds.presence;
+      };
     };
 
     # Sensor placement below is provisional -- move each entry once the

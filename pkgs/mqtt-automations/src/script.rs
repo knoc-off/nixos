@@ -922,6 +922,62 @@ mod tests {
         follow{ when = occupancy{ sensors = { "p1", "p2" }, doors = { "door" }, hold = 30, door_hold = 60, close_grace = 3 }, fade = 20 }
     "#;
 
+    const BEDROOM: &str = r#"
+        follow{ wake = wake_ramp(), when = occupancy{ sensors = { "p" }, hold = 120 }, fade = 30, quiet = { 22, 8 } }
+    "#;
+
+    fn at(rig: &mut Rig, time: &str) {
+        rig.wall = DateTime::parse_from_rfc3339(&format!("2026-06-21T{time}+02:00")).unwrap();
+    }
+
+    #[test]
+    fn quiet_hours_block_arrival_but_not_lights_already_on() {
+        let mut rig = Rig::new(BEDROOM);
+        at(&mut rig, "23:00:00");
+        rig.wait(0);
+        assert_eq!(
+            last_auto_on(&rig.send("p", json!({ "occupancy": true })), "a"),
+            Some(false),
+            "arriving at night"
+        );
+        assert_ne!(last_auto_on(&rig.wait(600), "a"), Some(true));
+
+        rig.send("p", json!({ "occupancy": false }));
+        rig.wait(121);
+        at(&mut rig, "21:50:00");
+        assert_eq!(
+            last_auto_on(&rig.send("p", json!({ "occupancy": true })), "a"),
+            Some(true),
+            "arriving by day"
+        );
+        assert_eq!(
+            last_auto_on(&rig.wait(20 * 60), "a"),
+            Some(true),
+            "stays on past 22:00"
+        );
+
+        rig.send("p", json!({ "occupancy": false }));
+        assert_eq!(last_auto_on(&rig.wait(120), "a"), Some(false), "empty: off");
+    }
+
+    #[test]
+    fn quiet_hours_ending_switch_nothing_on() {
+        let mut rig = Rig::new(BEDROOM);
+        at(&mut rig, "07:55:00");
+        rig.wait(0);
+        rig.send("p", json!({ "occupancy": true }));
+        assert_ne!(last_auto_on(&rig.wait(600), "a"), Some(true));
+    }
+
+    #[test]
+    fn wake_ramp_runs_inside_quiet_hours() {
+        let mut rig = Rig::new(BEDROOM);
+        at(&mut rig, "06:29:00");
+        rig.wait(0);
+        rig.send("p", json!({ "occupancy": true }));
+        assert_eq!(last_auto_on(&rig.wait(5 * 60), "a"), Some(true));
+    }
+
     #[test]
     fn door_shut_with_nobody_detected_empties_after_the_grace() {
         let mut rig = Rig::new(BATHROOM);
