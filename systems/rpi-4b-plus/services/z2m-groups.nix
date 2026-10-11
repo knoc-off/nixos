@@ -6,10 +6,9 @@
 # after every z2m start, which gets the declarative behaviour back without
 # fighting z2m over the config file.
 #
-# Add-only by design: members present on the device but absent from the
-# registry are reported and left alone, so adding a device through the z2m
-# frontend isn't silently reverted on the next restart. Flip to strict
-# reconciliation only if the frontend stops being used for this.
+# Strict: members absent from the registry are removed, so moving a bulb in
+# devices.nix takes it out of its old room's group. Membership edits made in
+# the z2m frontend are reverted on the next z2m start.
 {
   lib,
   pkgs,
@@ -128,17 +127,24 @@ let
         ' "$desired"
       ) || rc=1
 
-      # Extra members are reported, not removed -- see the header.
-      jq -r --argjson groups "$groups" --argjson devices "$devices" '
-        ($devices | map({key: .ieee_address, value: .friendly_name}) | from_entries) as $names
-        | .[]
-        | .group as $group
-        | .members as $want
-        | [ $groups[] | select(.friendly_name == $group) | .members[]
-            | $names[.ieee_address] // .ieee_address ] as $live
-        | ($live - $want)[]
-        | "note: \(.) is in group \($group) but not in the registry (left alone)"
-      ' "$desired"
+      # Members to remove: live minus desired. A bulb moved to another room
+      # would otherwise keep answering this group's commands.
+      while read -r group device; do
+        echo "removing '$device' from group '$group'"
+        request "group/members/remove" \
+          "$(jq -nc --arg g "$group" --arg d "$device" '{group: $g, device: $d}')" || rc=1
+      done < <(
+        jq -r --argjson groups "$groups" --argjson devices "$devices" '
+          ($devices | map({key: .ieee_address, value: .friendly_name}) | from_entries) as $names
+          | .[]
+          | .group as $group
+          | .members as $want
+          | [ $groups[] | select(.friendly_name == $group) | .members[]
+              | $names[.ieee_address] // .ieee_address ] as $live
+          | ($live - $want)[]
+          | "\($group) \(.)"
+        ' "$desired"
+      ) || rc=1
 
       # Binds: only those already targeting this group count as satisfied.
       # Coordinator binds (reporting) have target.type == "endpoint" and are

@@ -115,7 +115,7 @@ let
 
     kitchen = {
       light = {
-        id = "0x001788010f2c225a";
+        id = "0x001788010f2c1a11";
         kind = kinds.light;
       };
       plug = {
@@ -134,10 +134,6 @@ let
     };
 
     bedroom = {
-      light = {
-        id = "0x001788010f2c1a11";
-        kind = kinds.light;
-      };
       button = {
         id = "0xa4c138aa5aaccfa5";
         kind = kinds.button;
@@ -150,6 +146,10 @@ let
       # innr RB 272 T, E27 tunable white.
       bulb_1 = {
         id = "0xa4c13853eafa4f03";
+        kind = kinds.light;
+      };
+      bulb_2 = {
+        id = "0xa4c1382ff48143c3";
         kind = kinds.light;
       };
       presence = {
@@ -205,10 +205,12 @@ let
       };
     };
 
+    # Hue bulbs sit alone (kitchen, cupboard) and the innr ones together: the
+    # brands render the same colour temperature differently.
     cupboard = {
-      # innr RB 272 T, E27 tunable white.
+      # Philips Hue.
       bulb = {
-        id = "0xa4c1382ff48143c3";
+        id = "0x001788010f2c225a";
         kind = kinds.light;
       };
       door = {
