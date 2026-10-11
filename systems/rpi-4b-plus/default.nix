@@ -60,6 +60,16 @@
   # max-jobs = 0 above, this host never evaluates a system closure anyway.
   environment.variables.GC_INITIAL_HEAP_SIZE = null;
 
+  # The SD card is small and every deploy adds a generation; without this the
+  # root filesystem filled up and deploys failed with ENOSPC.
+  nix.gc = {
+    automatic = true;
+    dates = "weekly";
+    options = "--delete-older-than 14d";
+  };
+  nix.optimise.automatic = true;
+  services.journald.extraConfig = "SystemMaxUse=200M";
+
   boot = {
     # Use the mainline aarch64 kernel: it is prebuilt on cache.nixos.org, whereas
     # the Raspberry Pi vendor kernel (linux-rpi) is cached nowhere and rebuilds
