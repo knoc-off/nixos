@@ -918,6 +918,52 @@ mod tests {
         assert_eq!(last_auto_on(&rig.wait(30), "a"), Some(false));
     }
 
+    const BATHROOM: &str = r#"
+        follow{ when = occupancy{ sensors = { "p1", "p2" }, doors = { "door" }, hold = 30, door_hold = 60, close_grace = 3 }, fade = 20 }
+    "#;
+
+    #[test]
+    fn door_shut_with_nobody_detected_empties_after_the_grace() {
+        let mut rig = Rig::new(BATHROOM);
+        rig.wait(0);
+        rig.send("door", json!({ "contact": false }));
+        rig.wait(5);
+        rig.send("door", json!({ "contact": true }));
+        assert_ne!(last_auto_on(&rig.wait(2), "a"), Some(false));
+        assert_eq!(last_auto_on(&rig.wait(1), "a"), Some(false));
+    }
+
+    #[test]
+    fn door_shut_on_someone_inside_keeps_the_light_until_both_sensors_clear() {
+        let mut rig = Rig::new(BATHROOM);
+        rig.wait(0);
+        rig.send("door", json!({ "contact": false }));
+        rig.send("p1", json!({ "occupancy": true }));
+        rig.send("door", json!({ "contact": true }));
+        rig.send("p2", json!({ "occupancy": true }));
+        assert_ne!(last_auto_on(&rig.wait(600), "a"), Some(false));
+
+        // One sensor losing you is not enough.
+        rig.send("p1", json!({ "occupancy": false }));
+        assert_ne!(last_auto_on(&rig.wait(600), "a"), Some(false));
+
+        rig.send("p2", json!({ "occupancy": false }));
+        assert_ne!(last_auto_on(&rig.wait(29), "a"), Some(false));
+        assert_eq!(last_auto_on(&rig.wait(1), "a"), Some(false));
+    }
+
+    #[test]
+    fn leaving_and_shutting_the_door_cuts_the_sensor_hold_short() {
+        let mut rig = Rig::new(BATHROOM);
+        rig.wait(0);
+        rig.send("p1", json!({ "occupancy": true }));
+        rig.send("p1", json!({ "occupancy": false }));
+        rig.wait(1);
+        rig.send("door", json!({ "contact": false }));
+        rig.send("door", json!({ "contact": true }));
+        assert_eq!(last_auto_on(&rig.wait(3), "a"), Some(false));
+    }
+
     #[test]
     fn follow_without_occupancy_keeps_bulbs_as_they_are() {
         let mut rig = Rig::new("follow{}");

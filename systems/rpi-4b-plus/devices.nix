@@ -176,6 +176,10 @@ let
         id = "0xa4c1381adbb5ffff";
         kind = kinds.presence;
       };
+      presence_2 = {
+        id = "0xa4c1381ad1beffff";
+        kind = kinds.presence;
+      };
     };
 
     hallway = {

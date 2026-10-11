@@ -145,13 +145,17 @@ end
 --   sensors:   devices reporting `occupancy` (or `presence`); occupied while
 --              any says so, and for `hold` seconds after it clears
 --   doors:     contact sensors; opening one counts as someone there for
---              `door_hold` seconds, until a sensor picks them up
+--              `door_hold` seconds, until a sensor picks them up; shutting
+--              one with no sensor active empties the room after
+--              `close_grace` seconds
 --   hold:      default 60
 --   door_hold: default 120
+--   close_grace: default 3
 -- Starts vacant: after a restart the first motion turns the lights on, and a
 -- light someone left on is held until the next visit ends.
 function occupancy(opts)
   local hold, door_hold = opts.hold or 60, opts.door_hold or 120
+  local close_grace = opts.close_grace or 3
   local self = { occupied = false }
   local watchers, active, timers = {}, {}, {}
 
@@ -203,11 +207,22 @@ function occupancy(opts)
   end
   for _, dev in ipairs(opts.doors or {}) do
     on(dev, function(p)
+      if type(p) ~= "table" or type(p.contact) ~= "boolean" then return end
       -- z2m: `contact = true` is closed.
-      if type(p) == "table" and p.contact == false then
+      if not p.contact then
         evidence(dev, door_hold)
-        evaluate()
+      else
+        -- Shut with nobody detected: empty after a short grace, for a
+        -- sensor that hasn't spotted someone who just walked in. Sensors
+        -- that still see someone keep the room occupied; ones counting
+        -- down their hold (someone just left) are cut short too. Only
+        -- shortens: a door shutting on an empty room lights nothing.
+        if timers[dev] then evidence(dev, close_grace) end
+        for _, s in ipairs(opts.sensors or {}) do
+          if timers[s] then evidence(s, close_grace) end
+        end
       end
+      evaluate()
     end)
   end
   return self
