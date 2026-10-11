@@ -126,6 +126,11 @@ let
         id = "0xa4c138ce243fe709";
         kind = kinds.motion;
       };
+      motion_2 = {
+        # SONOFF SNZB-03P, PIR.
+        id = "0x8c73dafffe69f863";
+        kind = kinds.motion;
+      };
       temp_probe = {
         # SONOFF SNZB-02LD, waterproof probe.
         id = "0xa4c1380900f2ffff";
