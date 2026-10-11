@@ -123,10 +123,6 @@ let
         kind = kinds.plug;
       };
       motion = {
-        id = "0xa4c138ce243fe709";
-        kind = kinds.motion;
-      };
-      motion_2 = {
         # SONOFF SNZB-03P, PIR.
         id = "0x8c73dafffe69f863";
         kind = kinds.motion;
@@ -225,7 +221,13 @@ let
       };
     };
 
-    unassigned = { };
+    unassigned = {
+      # Tuya ZG-204ZM, presence + motion size; drives the cat doorbell.
+      cat_motion = {
+        id = "0xa4c138ce243fe709";
+        kind = kinds.motion;
+      };
+    };
   };
 in
 rec {

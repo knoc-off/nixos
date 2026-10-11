@@ -25,7 +25,7 @@ in
     ];
     wantedBy = [ "multi-user.target" ];
     environment = {
-      SENSOR_TOPIC = "zigbee2mqtt/${devices.kitchen.motion.name}";
+      SENSOR_TOPIC = "zigbee2mqtt/${devices.unassigned.cat_motion.name}";
       NTFY_URL = "https://ntfy.niko.ink";
       NTFY_TOPIC = "cat-doorbell";
       COOLDOWN_SECONDS = "300";

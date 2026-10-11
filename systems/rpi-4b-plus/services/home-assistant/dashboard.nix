@@ -117,12 +117,12 @@ let
           }
           {
             type = "tile";
-            entity = "binary_sensor.${devices.kitchen.motion.name}_presence";
+            entity = "binary_sensor.${devices.kitchen.motion.name}_occupancy";
             name = "Kitchen presence";
           }
           {
             type = "tile";
-            entity = "sensor.${devices.kitchen.motion.name}_illuminance";
+            entity = "sensor.${devices.kitchen.motion.name}_illumination";
             name = "Kitchen light level";
           }
           {
