@@ -97,6 +97,11 @@ let
         id = "0xa4c1381618f0f10c";
         kind = kinds.button;
       };
+      presence = {
+        # SONOFF SNZB-06P, mmWave presence (mains-powered).
+        id = "0xa4c1381adbb5ffff";
+        kind = kinds.presence;
+      };
       # innr RB 272 T, E27 tunable white.
       bulb_1 = {
         id = "0xa4c138b3cc6dde4f";
@@ -173,10 +178,6 @@ let
       };
       presence = {
         # SONOFF SNZB-06P, mmWave presence (mains-powered).
-        id = "0xa4c1381adbb5ffff";
-        kind = kinds.presence;
-      };
-      presence_2 = {
         id = "0xa4c1381ad1beffff";
         kind = kinds.presence;
       };
