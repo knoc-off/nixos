@@ -220,8 +220,19 @@ impl Motion {
     /// reports the commanded end state straight away (optimistic state);
     /// a bulb that reports on its own shows somewhere along the curve, up
     /// to one `settle` period behind.
+    ///
+    /// During a fade (longer than `settle`), anywhere back to its start
+    /// counts: a command z2m had to retry over a weak link starts late, and
+    /// a bulb still at the start level is not someone setting it there.
+    /// Short transitions keep the tight window, so a quick change right
+    /// after a switch-on still reads as the user's.
     fn explains(&self, r: Target, now: Instant, cfg: Config) -> bool {
-        let behind = self.at(now.checked_sub(cfg.settle).unwrap_or(now));
+        let fading = self.duration > cfg.settle && now < self.start + self.duration + cfg.settle;
+        let behind = if fading {
+            self.from
+        } else {
+            self.at(now.checked_sub(cfg.settle).unwrap_or(now))
+        };
         !self.to.differs(r, cfg.change) || within(r, behind, self.at(now), cfg.change)
     }
 }
@@ -800,6 +811,22 @@ mod tests {
         rig.send(fade(OFF, 1.0));
         rig.wait(secs(90));
         rig.send(Input::Report(on(104)));
+        assert_eq!(rig.bulb.mode, Mode::Auto);
+    }
+
+    #[test]
+    fn late_starting_fade_is_not_an_override() {
+        // Seen live: a 30s fade-out whose command z2m delivered late, so the
+        // bulb still reported its start level 13s in, then off.
+        let mut rig = Rig::light(on(247));
+        rig.send(Input::Auto {
+            target: on(247),
+            scale: 0.0,
+            transition: secs(30),
+        });
+        rig.wait(secs(13));
+        rig.send(Input::Report(on(247)));
+        rig.send(Input::Report(OFF));
         assert_eq!(rig.bulb.mode, Mode::Auto);
     }
 
