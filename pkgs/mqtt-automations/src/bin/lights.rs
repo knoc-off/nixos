@@ -12,6 +12,7 @@
 //!     `{ "mode": "auto"|"held"|"unknown", "on", "brightness", "color_temp" }`.
 //!   - `lights/<room>/<bulb>/release` (to here): hand one bulb back to the
 //!     automation (the HA "release hold" button).
+//!   - `lights/release` (to here): the same for every bulb in the house.
 //!
 //! Config: a JSON file, see [`Config`]. `lights --check <file>` loads it and
 //! every script without connecting, for build-time validation.
@@ -131,6 +132,7 @@ impl House {
                         format!("lights/{name}/{bulb_name}/release"),
                         Route::BulbRelease(r, b),
                     );
+                    route("lights/release".into(), Route::BulbRelease(r, b));
                     route(format!("zigbee2mqtt/{}", bulb.device), Route::Report(r, b));
                     BulbSlot {
                         name: bulb_name,
@@ -537,6 +539,26 @@ mod tests {
         rig.report_all(&["hallway_a", "hallway_b"], json!({ "state": "OFF" }));
         rig.wait(Duration::ZERO);
         rig
+    }
+
+    #[test]
+    fn global_release_hands_every_bulb_back() {
+        let mut rig = quiet_hallway();
+        rig.send(
+            "zigbee2mqtt/hallway_a",
+            json!({ "state": "ON", "brightness": 200 }),
+        );
+        rig.send(
+            "zigbee2mqtt/hallway_b",
+            json!({ "state": "ON", "brightness": 200 }),
+        );
+        let outs = rig.send("lights/release", json!("release"));
+        for b in ["a", "b"] {
+            assert_eq!(
+                state(&outs, &format!("lights/hallway/{b}/state")).unwrap()["mode"],
+                "auto"
+            );
+        }
     }
 
     #[test]

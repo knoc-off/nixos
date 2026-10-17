@@ -122,7 +122,16 @@ let
     command_topic = "lights/${d.roomKey}/${d.key}/release";
     payload_press = "release";
     device = device d;
-  }) lamps;
+  }) lamps
+  ++ [
+    {
+      unique_id = "lights_release_all";
+      name = "Release all lights";
+      icon = "mdi:hand-back-left-off";
+      command_topic = "lights/release";
+      payload_press = "release";
+    }
+  ];
 
   modeSensors = map (d: {
     unique_id = "sun_follow_${d.id}_mode";
