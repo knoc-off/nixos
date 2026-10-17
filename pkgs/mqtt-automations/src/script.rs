@@ -1103,6 +1103,49 @@ mod tests {
         assert_eq!(targets(&reqs)[0].2.color_temp, None);
     }
 
+    const HELD_OFF: Target = Target {
+        on: false,
+        brightness: 1,
+        color_temp: None,
+    };
+    const HELD_ON: Target = Target {
+        on: true,
+        brightness: 254,
+        color_temp: None,
+    };
+
+    #[test]
+    fn arrival_releases_a_bulb_held_off_but_keeps_one_held_on() {
+        let mut rig = Rig::new(MOTION_ROOM);
+        rig.wait(0);
+        // Held while the room was empty: off on the way out, and on at
+        // the wall switch.
+        rig.script.bulb("a", true, HELD_OFF);
+        rig.script.bulb("b", true, HELD_ON);
+        let reqs = rig.send("motion", json!({ "occupancy": true }));
+        let released: Vec<_> = reqs
+            .iter()
+            .filter(|(_, i)| matches!(i, Input::Release { .. }))
+            .map(|(n, _)| n.as_str())
+            .collect();
+        assert_eq!(released, ["a"]);
+        assert_eq!(last_auto_on(&reqs, "a"), Some(true));
+    }
+
+    #[test]
+    fn a_manual_off_during_the_wake_ramp_survives_the_room_emptying() {
+        let mut rig = Rig::new(BEDROOM);
+        at(&mut rig, "06:40:00");
+        rig.wait(0);
+        rig.send("p", json!({ "occupancy": true }));
+        rig.script.bulb("a", true, HELD_OFF);
+        rig.send("p", json!({ "occupancy": false }));
+        let reqs = rig.wait(121);
+        assert_eq!(releases(&reqs), 0, "vacancy during the ramp");
+        let reqs = rig.send("p", json!({ "occupancy": true }));
+        assert_eq!(releases(&reqs), 0, "arrival during the ramp");
+    }
+
     #[test]
     fn wake_ramp_switches_on_dim_and_releases_a_night_off() {
         let mut rig = Rig::new("follow{ wake = wake_ramp() }");

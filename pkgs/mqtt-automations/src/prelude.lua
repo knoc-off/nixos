@@ -145,10 +145,22 @@ function follow(opts)
   if occ then
     occ.watch(function(occupied)
       lit = occupied and not quiet_now()
-      if not occupied then
-        -- A manual change lasts as long as the visit.
-        each(names, function(n) light(n):release({ transition = fade }) end)
-      end
+      -- A wake ramp ignores occupancy, so releasing during it would undo a
+      -- manual off the moment the sensor loses someone lying in bed.
+      local ramping = wake and wake.level()
+      each(names, function(n)
+        if ramping then return end
+        local s = light(n):state()
+        if not occupied then
+          -- A manual change lasts as long as the visit.
+          light(n):release({ transition = fade })
+        elseif s and s.mode == "held" and not s.on then
+          -- Held off from before this visit (an off made on the way out,
+          -- or a report misread during the fade-out): walking in means
+          -- light. Held on (the wall switch, say) is kept.
+          light(n):release()
+        end
+      end)
       update(occupied and 0.4 or fade)
     end)
   end
