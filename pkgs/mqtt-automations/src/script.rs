@@ -20,6 +20,9 @@
 //!   - `sun.level{ min, max, gamma, invert }` -> brightness for now,
 //!     `sun.ct{ warm, cool }` -> mireds, `sun.daylight()` -> 0..1.
 //!   - `clock()` -> local time of day in hours (13.5 = 13:30).
+//!   - `room`: this room's name. `publish(name, value)`: retain `value`
+//!     (string, number or boolean, sent bare) on `lights/<room>/<name>`,
+//!     for HA to show; `name` is lowercase letters, digits, `_` and `-`.
 //!   - `log(...)`.
 //!
 //! A runtime error in a handler is logged and that handler's requests are
@@ -75,6 +78,8 @@ struct State {
     wall: DateTime<FixedOffset>,
     lights: BTreeMap<String, Bulb>,
     requests: Vec<(String, Input)>,
+    /// `publish()` calls not yet collected: (name, value).
+    published: Vec<(String, serde_json::Value)>,
     timers: BTreeMap<u64, Timer>,
     next_timer: u64,
     topics: BTreeSet<String>,
@@ -124,6 +129,7 @@ impl Script {
                 })
                 .collect(),
             requests: Vec::new(),
+            published: Vec::new(),
             timers: BTreeMap::new(),
             next_timer: 1,
             topics: BTreeSet::new(),
@@ -248,13 +254,24 @@ impl Script {
     }
 
     fn call(&self, f: &Function, arg: Value) {
-        let mark = self.state().requests.len();
+        let marks = {
+            let s = self.state();
+            (s.requests.len(), s.published.len())
+        };
         self.budget();
         if let Err(e) = f.call::<()>(arg) {
             // A half-run handler would leave the room half-applied.
-            self.state().requests.truncate(mark);
+            let mut s = self.state();
+            s.requests.truncate(marks.0);
+            s.published.truncate(marks.1);
+            drop(s);
             self.log(&e.to_string());
         }
+    }
+
+    /// Values the script published since the last call, as (name, value).
+    pub fn take_published(&mut self) -> Vec<(String, serde_json::Value)> {
+        std::mem::take(&mut self.state().published)
     }
 
     fn budget(&self) {
@@ -344,6 +361,31 @@ fn install(lua: &Lua) -> mlua::Result<()> {
     )?;
     let names: Vec<String> = state(lua)?.lights.keys().cloned().collect();
     g.set("lights", names)?;
+    let room = state(lua)?.room.clone();
+    g.set("room", room)?;
+    g.set(
+        "publish",
+        lua.create_function(|lua, (name, value): (String, Value)| {
+            let ok = !name.is_empty()
+                && name.bytes().all(|b| {
+                    b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-'
+                });
+            if !ok {
+                return Err(mlua::Error::runtime(format!("bad publish name {name:?}")));
+            }
+            if !matches!(
+                value,
+                Value::String(_) | Value::Boolean(_) | Value::Integer(_) | Value::Number(_)
+            ) {
+                return Err(mlua::Error::runtime(
+                    "publish() takes a string, number or boolean",
+                ));
+            }
+            let value: serde_json::Value = lua.from_value(value)?;
+            state(lua)?.published.push((name, value));
+            Ok(())
+        })?,
+    )?;
 
     let sun_table = lua.create_table()?;
     sun_table.set(
@@ -610,6 +652,114 @@ mod tests {
             self.wall += chrono::TimeDelta::seconds(secs as i64);
             self.script.tick(self.now, self.wall)
         }
+
+        fn topic(&mut self, topic: &str, payload: serde_json::Value) -> Vec<(String, Input)> {
+            self.script.message(topic, &payload, self.now, self.wall)
+        }
+    }
+
+    fn last_auto(reqs: &[(String, Input)], bulb: &str) -> Option<Target> {
+        reqs.iter().rev().find_map(|(n, i)| match i {
+            Input::Auto { target, .. } if n == bulb => Some(*target),
+            _ => None,
+        })
+    }
+
+    #[test]
+    fn scene_sets_brightness_without_holding_and_ends_with_the_visit() {
+        let mut rig = Rig::new(MOTION_ROOM);
+        rig.wait(0);
+        rig.send("motion", json!({ "occupancy": true }));
+        let reqs = rig.topic("lights/test/scene", json!("dim"));
+        let t = last_auto(&reqs, "a").expect("applied at once");
+        assert_eq!((t.on, t.brightness), (true, 76));
+        assert!(
+            reqs.iter().all(|(_, i)| matches!(i, Input::Auto { .. })),
+            "a scene is automation, not a hold"
+        );
+
+        rig.send("motion", json!({ "occupancy": false }));
+        let reqs = rig.wait(60);
+        assert_eq!(last_auto(&reqs, "a").map(|t| t.on), Some(false));
+        assert!(rig
+            .script
+            .take_published()
+            .contains(&("scene".into(), json!("auto"))));
+        let reqs = rig.send("motion", json!({ "occupancy": true }));
+        assert_ne!(
+            last_auto(&reqs, "a").unwrap().brightness,
+            76,
+            "back on the curve"
+        );
+    }
+
+    #[test]
+    fn night_scene_is_warm_and_unknown_scenes_are_ignored() {
+        let mut rig = Rig::new(
+            "sun_curve(); on_topic('x', function() light('a'):auto(curve_target('a')) end)",
+        );
+        rig.topic("lights/test/scene", json!("night"));
+        let t = last_auto(&rig.topic("x", json!({})), "a").unwrap();
+        assert_eq!((t.brightness, t.color_temp), (8, Some(454)));
+        rig.topic("lights/test/scene", json!("disco"));
+        let t = last_auto(&rig.topic("x", json!({})), "a").unwrap();
+        assert_eq!(t.brightness, 8);
+    }
+
+    #[test]
+    fn automatic_off_stops_switching_but_keeps_shaping() {
+        let mut rig = Rig::new(MOTION_ROOM);
+        rig.wait(0);
+        rig.topic("lights/test/automatic", json!(false));
+        let reqs = rig.send("motion", json!({ "occupancy": true }));
+        assert_ne!(last_auto(&reqs, "a").map(|t| t.on), Some(true));
+        assert_eq!(releases(&reqs), 0);
+
+        let reqs = rig.topic("lights/test/automatic", json!(true));
+        assert_eq!(
+            last_auto(&reqs, "a").map(|t| t.on),
+            Some(true),
+            "catches up"
+        );
+    }
+
+    #[test]
+    fn room_and_house_release_free_every_bulb_and_end_the_scene() {
+        for topic in ["lights/test/release", "lights/release"] {
+            let mut rig = Rig::new(MOTION_ROOM);
+            rig.wait(0);
+            rig.topic("lights/test/scene", json!("bright"));
+            let reqs = rig.topic(topic, json!("release"));
+            assert_eq!(releases(&reqs), 2, "{topic}");
+            assert!(rig
+                .script
+                .take_published()
+                .contains(&("scene".into(), json!("auto"))));
+        }
+    }
+
+    #[test]
+    fn publish_reports_occupancy_and_rejects_bad_input() {
+        let mut rig = Rig::new(MOTION_ROOM);
+        assert!(rig
+            .script
+            .take_published()
+            .contains(&("occupied".into(), json!(false))));
+        rig.send("motion", json!({ "occupancy": true }));
+        assert_eq!(
+            rig.script.take_published(),
+            [("occupied".into(), json!(true))]
+        );
+
+        let mut rig = Rig::new(
+            r#"
+            on_topic("x", function(p) publish(p, 1) end)
+            on_topic("y", function() publish("ok", {}) end)
+            "#,
+        );
+        rig.topic("x", json!("a/b"));
+        rig.topic("y", json!({}));
+        assert!(rig.script.take_published().is_empty());
     }
 
     fn auto_on(reqs: &[(String, Input)]) -> Vec<(&str, bool)> {
@@ -630,7 +780,7 @@ mod tests {
             end)
             "#,
         );
-        assert_eq!(rig.script.topics(), ["zigbee2mqtt/door"]);
+        assert!(rig.script.topics().contains(&"zigbee2mqtt/door".to_owned()));
         let reqs = rig.send("door", json!({ "contact": false, "battery": 90 }));
         match &reqs[..] {
             [(
@@ -765,7 +915,7 @@ mod tests {
         let mut rig =
             Rig::new(r#"on("x", function() on("y", function() end); light("a"):auto{} end)"#);
         assert!(rig.send("x", json!({})).is_empty());
-        assert_eq!(rig.script.topics(), ["zigbee2mqtt/x"]);
+        assert!(!rig.script.topics().contains(&"zigbee2mqtt/y".to_owned()));
     }
 
     #[test]

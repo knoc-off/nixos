@@ -13,6 +13,12 @@
 //!   - `lights/<room>/<bulb>/release` (to here): hand one bulb back to the
 //!     automation (the HA "release hold" button).
 //!   - `lights/release` (to here): the same for every bulb in the house.
+//!   - `lights/<room>/mode` (retained, from here): "held" if any of the
+//!     room's bulbs is, else "auto".
+//!   - `lights/<room>/<name>` (retained, from here): whatever the room's
+//!     script `publish()`es -- the prelude's `occupied` and `scene`.
+//!   - Room controls the prelude reads (`release`, `scene`, `automatic`
+//!     under `lights/<room>/`) arrive as script topics.
 //!
 //! Config: a JSON file, see [`Config`]. `lights --check <file>` loads it and
 //! every script without connecting, for build-time validation.
@@ -93,6 +99,8 @@ struct Room {
     group: Option<String>,
     bulbs: Vec<BulbSlot>,
     script: Script,
+    /// Last `lights/<room>/mode` sent.
+    mode: Option<&'static str>,
 }
 
 /// All routing and z2m formatting, without MQTT -- so it can be tested.
@@ -132,7 +140,6 @@ impl House {
                         format!("lights/{name}/{bulb_name}/release"),
                         Route::BulbRelease(r, b),
                     );
-                    route("lights/release".into(), Route::BulbRelease(r, b));
                     route(format!("zigbee2mqtt/{}", bulb.device), Route::Report(r, b));
                     BulbSlot {
                         name: bulb_name,
@@ -151,6 +158,7 @@ impl House {
                 group: room.group,
                 bulbs,
                 script,
+                mode: None,
             });
         }
         let mut seen = HashMap::new();
@@ -244,6 +252,39 @@ impl House {
     /// out as a single group command. Bulb changes flow back to the room's
     /// script, whose answers are fed in the same way until it is quiet.
     fn step_bulbs(&mut self, r: usize, inputs: Vec<(usize, Input)>, now: Instant) -> Vec<Out> {
+        let mut out = self.step_rounds(r, inputs, now);
+        let room = &mut self.rooms[r];
+        out.extend(
+            room.script
+                .take_published()
+                .into_iter()
+                .map(|(name, value)| Out {
+                    topic: format!("lights/{}/{name}", room.name),
+                    payload: value,
+                    retain: true,
+                }),
+        );
+        let mode = if room
+            .bulbs
+            .iter()
+            .any(|s| matches!(s.bulb.mode, Mode::Held(_)))
+        {
+            "held"
+        } else {
+            "auto"
+        };
+        if room.mode != Some(mode) {
+            room.mode = Some(mode);
+            out.push(Out {
+                topic: format!("lights/{}/mode", room.name),
+                payload: json!(mode),
+                retain: true,
+            });
+        }
+        out
+    }
+
+    fn step_rounds(&mut self, r: usize, inputs: Vec<(usize, Input)>, now: Instant) -> Vec<Out> {
         let mut out = Vec::new();
         let mut queue = VecDeque::from([inputs]);
         for _ in 0..MAX_ROUNDS {
@@ -552,6 +593,7 @@ mod tests {
             "zigbee2mqtt/hallway_b",
             json!({ "state": "ON", "brightness": 200 }),
         );
+        assert_eq!(rig.house.rooms[0].mode, Some("held"));
         let outs = rig.send("lights/release", json!("release"));
         for b in ["a", "b"] {
             assert_eq!(
@@ -559,6 +601,19 @@ mod tests {
                 "auto"
             );
         }
+        assert_eq!(state(&outs, "lights/hallway/mode"), Some(&json!("auto")));
+    }
+
+    #[test]
+    fn script_publishes_are_retained_under_the_room() {
+        let mut rig = Rig::new(hallway());
+        rig.wait(Duration::ZERO);
+        let outs = rig.send("zigbee2mqtt/hallway_motion", json!({ "occupancy": true }));
+        let out = outs
+            .iter()
+            .find(|o| o.topic == "lights/hallway/occupied")
+            .unwrap();
+        assert_eq!((&out.payload, out.retain), (&json!(true), true));
     }
 
     #[test]

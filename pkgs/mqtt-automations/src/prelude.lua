@@ -13,9 +13,9 @@ local function each(names, f)
 end
 
 -- A value HA controls through a retained MQTT topic, as a getter. Payloads
--- that don't parse as the default's type are ignored. Top level only, like
--- on_topic.
-function setting(topic, default)
+-- that don't parse as the default's type are ignored. `changed`, if given,
+-- runs after each new value. Top level only, like on_topic.
+function setting(topic, default, changed)
   local value = default
   on_topic(topic, function(p)
     local v
@@ -32,11 +32,61 @@ function setting(topic, default)
     end
     if v ~= nil then
       value = v
+      if changed then changed(v) end
     end
   end)
   return function()
     return value
   end
+end
+
+-- Room controls from HA, on `lights/<room>/...`:
+--   scene:     "auto" follows the sun; "bright", "dim" and "night" replace
+--              its brightness (and colour, for night) without holding the
+--              bulbs, so they still switch on and off by themselves. Ends
+--              when the room empties or is released.
+--   automatic: false stops occupancy switching the bulbs on and off.
+--   release:   every bulb back to the automation, scene back to "auto".
+-- `lights/release` releases the whole house the same way.
+local SCENES = {
+  bright = { brightness = 254 },
+  dim = { brightness = 76 },
+  night = { brightness = 8, color_temp = 454 },
+}
+local room_watchers = {}
+local function room_changed()
+  for _, f in ipairs(room_watchers) do f() end
+end
+local scene_name = "auto"
+-- Retained back, so HA shows the scene in use after a restart too; our own
+-- echo arrives unchanged and stops there.
+local function use_scene(name)
+  if name ~= "auto" and not SCENES[name] then return end
+  if name ~= scene_name then
+    scene_name = name
+    publish("scene", name)
+    room_changed()
+  end
+end
+on_topic("lights/" .. room .. "/scene", use_scene)
+automatic = setting("lights/" .. room .. "/automatic", true, room_changed)
+
+-- Back to "auto".
+function end_scene()
+  use_scene("auto")
+end
+
+local function release_room()
+  each(lights, function(n) light(n):release() end)
+  end_scene()
+  room_changed()
+end
+on_topic("lights/" .. room .. "/release", release_room)
+on_topic("lights/release", release_room)
+
+-- Run `f` whenever a room control changes, so the bulbs follow at once.
+function watch_room(f)
+  table.insert(room_watchers, f)
 end
 
 -- Bulb -> function returning what the sun says for it right now.
@@ -69,9 +119,14 @@ function sun_curve(names)
 end
 
 -- `name` on at its sun level and colour, or full brightness without a
--- curve (plugs).
+-- curve (plugs). The room's scene, if any, replaces the curve's values.
 function curve_target(name)
   local t = curves[name] and curves[name]() or {}
+  local s = SCENES[scene_name]
+  if s and curves[name] then
+    t.brightness = s.brightness
+    t.color_temp = s.color_temp or t.color_temp
+  end
   return { on = true, brightness = t.brightness, color_temp = t.color_temp }
 end
 
@@ -122,12 +177,14 @@ function follow(opts)
       end)
     end
     waking = ramp ~= nil
+    -- The HA "automatic" switch off: shape the bulbs, never switch them.
+    local switching = occ and automatic()
     each(names, function(n)
       local t = curve_target(n)
       local s = light(n):state()
       if ramp then
         t.brightness = ramp
-      elseif occ then
+      elseif switching then
         t.on = lit
       else
         t.on = s ~= nil and s.on
@@ -136,7 +193,7 @@ function follow(opts)
       light(n):auto(t)
       -- Off by hand where the automation would leave it off anyway: nothing
       -- to hold, and the state topic shouldn't say "held".
-      if not occ and not ramp and s and s.mode == "held" and not s.on then
+      if not switching and not ramp and s and s.mode == "held" and not s.on then
         light(n):release()
       end
     end)
@@ -145,11 +202,13 @@ function follow(opts)
   if occ then
     occ.watch(function(occupied)
       lit = occupied and not quiet_now()
+      -- A scene lasts as long as the visit, like a manual change.
+      if not occupied then end_scene() end
       -- A wake ramp ignores occupancy, so releasing during it would undo a
       -- manual off the moment the sensor loses someone lying in bed.
       local ramping = wake and wake.level()
       each(names, function(n)
-        if ramping then return end
+        if ramping or not automatic() then return end
         local s = light(n):state()
         if not occupied then
           -- A manual change lasts as long as the visit.
@@ -163,7 +222,10 @@ function follow(opts)
       end)
       update(occupied and 0.4 or fade)
     end)
+    -- Switched back to automatic: catch up with whether anyone is there.
+    watch_room(function() lit = occ.occupied and not quiet_now() end)
   end
+  watch_room(function() update(0.4) end)
   every(30, function() update() end)
   update(0.4)
 end
@@ -195,11 +257,13 @@ function occupancy(opts)
     if now ~= self.occupied then
       self.occupied = now
       log(now and "occupied" or "vacant")
+      publish("occupied", now)
       for _, f in ipairs(watchers) do
         f(now)
       end
     end
   end
+  publish("occupied", false)
 
   local function stop(dev)
     if timers[dev] then
