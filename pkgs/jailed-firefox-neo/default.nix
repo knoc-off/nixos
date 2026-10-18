@@ -6,7 +6,7 @@
 # modules/firefox-neo (profile, Sidebery + settings, userChrome, chrome/JS),
 # and nothing survives exit. The host's real profile is never visible.
 #
-# Built with jail.nix (same builder as pkgs/opencode-bubblewrap) rather than a
+# Built with jail.nix (same builder as opencode-bubblewrap (private input)) rather than a
 # hand-rolled bwrap line. The point is to isolate *configuration*, so the
 # permission list is deliberately generous for a browser -- gui/gpu/network --
 # and stops at the host's files.
@@ -78,7 +78,7 @@ jail "jailed-firefox-neo" ffCfg.finalPackage (
     # browser-exec's bridge (loaded via modules/firefox-neo) binds a unix
     # socket under the real $XDG_RUNTIME_DIR, not under jailHome -- bound at
     # its real host path so opencode's jail (which binds the identical path,
-    # see pkgs/opencode-bubblewrap) can reach whichever firefox-neo instance
+    # see opencode-bubblewrap (private input)) can reach whichever firefox-neo instance
     # happens to be running, this jailed one or the real profile.
     (add-runtime ''
       mkdir -p "$XDG_RUNTIME_DIR/browser-exec"

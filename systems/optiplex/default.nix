@@ -16,7 +16,8 @@ in
     ./services/minecraft-snapshots.nix
     ./services/nix-autobuild.nix
     ./services/anki.nix
-    self.nixosModules.compat-proxy
+    inputs.private.nixosModules.compat-proxy
+    { services.compat-proxy.oauthTokenSopsFile = ../../modules/shared-secrets.yaml; }
     ./services/ai.nix
 
     self.nixosModules.sops
@@ -28,6 +29,7 @@ in
           "services/ntfy/publish-token".sopsFile = ../../modules/shared-secrets.yaml;
           "services/minecraft/RCON_PASSWORD" = { };
           "services/nix-autobuild/deploy-key" = { };
+          "services/nix-autobuild/private-deploy-key" = { };
           "services/anki-sync-server/password" = { };
         };
       };
@@ -529,6 +531,8 @@ in
   services.nixAutobuild = {
     enable = true;
     deployKeyFile = config.sops.secrets."services/nix-autobuild/deploy-key".path;
+    extraDeployKeys."knoc-off/private-inputs" =
+      config.sops.secrets."services/nix-autobuild/private-deploy-key".path;
     ntfyTokenFile = config.sops.secrets."services/ntfy/publish-token".path;
   };
 

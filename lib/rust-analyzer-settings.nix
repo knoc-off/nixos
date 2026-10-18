@@ -11,7 +11,7 @@
 # Consumed by:
 #   * pkgs/neovim/configurations/modules/languages/rust.nix (rustaceanvim
 #     `server.default_settings`)
-#   * modules/opencode.nix (`lsp.rust.initialization`)
+#   * opencode-bubblewrap config in the private input (`lsp.rust.initialization`)
 #
 # `cargo.target` is deliberately absent: it is per-session and neovim injects it
 # at startup from the session metadata. opencode's config is static JSON and

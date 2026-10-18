@@ -126,7 +126,21 @@
             ];
           };
         in
-        discoverPackages pkgs ./pkgs;
+        discoverPackages pkgs ./pkgs
+        // {
+          # Lives in the private input; the packages and settings it shares
+          # with the rest of this config are handed in from here.
+          opencode-bubblewrap = inputs.private.lib.mkOpencodeBubblewrap pkgs {
+            inherit (self.packages.${system})
+              neovim
+              lspmux
+              lspmux-session
+              jegrep
+              browser-exec
+              ;
+            inherit (libExtra) theme color-lib rustAnalyzerSettings;
+          };
+        };
 
       # just iterate over toplevels, build all things that i would need to build
       mkCacheJobs =
@@ -314,21 +328,13 @@
 
     jail-nix.url = "sourcehut:~alexdavid/jail.nix";
 
-    # Prebuilt `comma`/nix-index database (weekly), used by the jailed
-    # opencode toolbelt so `, <program>` works without a first-use index
-    # build inside the jail.
-    nix-index-database = {
-      url = "github:nix-community/nix-index-database";
-      inputs.nixpkgs.follows = "nixpkgs-unstable";
-    };
-
-    # opencode plugin consumed straight from the checkout (no build step, it's
-    # JS + markdown). Referenced by store path in the jail's opencode config so
-    # opencode never npm-installs it at runtime.
-    ponytail = {
-      url = "github:DietrichGebert/ponytail";
-      flake = false;
-    };
+    # Private repo: compat-proxy, the patched opencode and its bubblewrap jail.
+    # Pinned by rev (not just locked) so nix-autobuild's `nix flake update`
+    # can't move it -- it carries its own nixpkgs pin for opencode and
+    # claude-code, and both break on upstream bumps. To bump, push there and
+    # update the rev here. Local iteration:
+    #   --override-input private path:/home/knoff/workspaces/private
+    private.url = "git+ssh://git@github.com/knoc-off/private-inputs?rev=ca3234eba9158e0bc3204d79e74071c0d9c2dd7b";
   };
 
   nixConfig = {

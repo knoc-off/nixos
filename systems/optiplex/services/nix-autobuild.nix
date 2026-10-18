@@ -41,6 +41,37 @@ let
   # bootstrap time regardless.
   githubKnownHost = "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
 
+  # Credential name for each extra deploy key (credential names can't contain "/").
+  extraKeyCred = repo: "deploy-key-${lib.replaceStrings [ "/" ] [ "-" ] repo}";
+
+  # GitHub deploy keys are per-repository, and the server accepts the first
+  # key offered at auth time and only then rejects the repo -- so listing
+  # every key with -i doesn't work. Pick the key from the repo path git
+  # passes as the remote command (e.g. "git-upload-pack 'knoc-off/private-inputs.git'").
+  # Used by both the autobuild clone and nix fetching git+ssh inputs, since
+  # nix runs in-process here and inherits GIT_SSH_COMMAND.
+  sshWrapper = pkgs.writeShellScript "nix-autobuild-ssh" ''
+    remote_cmd="''${*: -1}"
+    repo="''${remote_cmd#* }"
+    repo="''${repo//\'/}"
+    repo="''${repo#/}"
+    repo="''${repo%.git}"
+    key="$CREDENTIALS_DIRECTORY/deploy-key"
+    case "$repo" in
+    ${lib.concatMapStrings (repo: ''
+      ${escapeShellArg repo}) key="$CREDENTIALS_DIRECTORY/${extraKeyCred repo}" ;;
+    '') (lib.attrNames cfg.extraDeployKeys)}
+    esac
+    exec ${getExe' pkgs.openssh "ssh"} -i "$key" -o IdentitiesOnly=yes \
+      -o UserKnownHostsFile=${escapeShellArg cfg.stateDir}/known_hosts "$@"
+  '';
+
+  loadCredentials = [
+    "deploy-key:${cfg.deployKeyFile}"
+    "ntfy-token:${cfg.ntfyTokenFile}"
+  ]
+  ++ lib.mapAttrsToList (repo: file: "${extraKeyCred repo}:${file}") cfg.extraDeployKeys;
+
   runner = pkgs.writeShellApplication {
     name = "nix-autobuild-run";
     runtimeInputs = [
@@ -86,7 +117,7 @@ let
 
       printf '%s\n' ${escapeShellArg githubKnownHost} > "$known_hosts"
 
-      export GIT_SSH_COMMAND="ssh -i $CREDENTIALS_DIRECTORY/deploy-key -o IdentitiesOnly=yes -o UserKnownHostsFile=$known_hosts"
+      export GIT_SSH_COMMAND=${sshWrapper}
 
       notify() {
         local priority="$1" title="$2" message="$3"
@@ -253,10 +284,21 @@ in
       type = types.path;
       description = ''
         Path (sops secret) to an ed25519 private key with push access to
-        `repoUrl`. Registered as a GitHub deploy key on knoc-off/nixos; if any
-        flake input is a private repo (e.g. minecraft-modpack), the same
-        public key needs adding as a deploy key there too, since GitHub deploy
-        keys are per-repository.
+        `repoUrl`. Registered as a GitHub deploy key on knoc-off/nixos. Keys
+        for private flake inputs go in `extraDeployKeys`: GitHub refuses to
+        register one deploy key on a second repository.
+      '';
+    };
+
+    extraDeployKeys = mkOption {
+      type = types.attrsOf types.path;
+      default = { };
+      example = {
+        "knoc-off/private-inputs" = "/run/secrets/services/nix-autobuild/private-deploy-key";
+      };
+      description = ''
+        Read-only deploy keys for private git+ssh flake inputs, keyed by
+        GitHub "owner/repo". Selected per connection by the ssh wrapper.
       '';
     };
 
@@ -320,9 +362,9 @@ in
             --unit="nix-autobuild-manual-$(date +%s)" \
             --collect --pty --wait --same-dir \
             -p Type=oneshot \
-            -p 'LoadCredential=deploy-key:${cfg.deployKeyFile}' \
-            -p 'LoadCredential=ntfy-token:${cfg.ntfyTokenFile}' \
-            ${getExe runner} "$@"
+            ${
+              lib.concatMapStrings (c: "-p ${escapeShellArg "LoadCredential=${c}"} \\\n") loadCredentials
+            }${getExe runner} "$@"
         '';
       })
     ];
@@ -333,10 +375,7 @@ in
         Type = "oneshot";
         ExecStart = getExe runner;
         StateDirectory = "nix-autobuild";
-        LoadCredential = [
-          "deploy-key:${cfg.deployKeyFile}"
-          "ntfy-token:${cfg.ntfyTokenFile}"
-        ];
+        LoadCredential = loadCredentials;
 
         # Runs as root deliberately (see header): it talks to the nix daemon
         # and to git/ssh, neither of which is a privilege gain either way.

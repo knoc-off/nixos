@@ -1,5 +1,5 @@
 # Anthropic/OpenAI-compatible endpoint over the tailnet, backed by this
-# host's own Claude Code subscription (see modules/compat-proxy.nix for the
+# host's own Claude Code subscription (see compat-proxy.nix in the private input for the
 # actual service, credential handling and usage-window session pings).
 #
 # Two paths on the same vhost, both tailnet-only:

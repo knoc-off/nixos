@@ -7,7 +7,7 @@
 
 # browser-exec: a Firefox bridge (unix-socket chrome/page eval, fx-autoconfig
 # userscript loader) plus the OpenCode plugin that talks to it. Same shape as
-# pkgs/script-exec: no daemon, no binary. The chrome/JS half is installed into
+# script-exec (private input): no daemon, no binary. The chrome/JS half is installed into
 # firefox-neo's profile by modules/firefox-neo; the plugin half runs inside
 # the opencode jail. See bridge.sys.mjs and opencode-plugin.js for protocol and
 # tool documentation respectively.
