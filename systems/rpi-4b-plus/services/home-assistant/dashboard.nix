@@ -334,6 +334,7 @@ let
   # Rooms whose script uses occupancy(): only those publish `occupied` and
   # have anything for the automatic switch to turn off.
   occupancyRooms = [
+    "living-room"
     "kitchen"
     "bedroom"
     "bathroom"

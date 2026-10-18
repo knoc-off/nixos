@@ -1,6 +1,11 @@
--- Ceiling light and three lamp plugs. No occupancy sensor yet: the light
--- follows the sun while on, the plugs switch with daylight.
-follow{ lights = { "light", "bulb_1", "bulb_2" } }
+-- Ceiling light and bulbs follow presence and the sun; the three lamp plugs
+-- switch with daylight. Long hold: people sit still here, and mmWave can
+-- briefly lose someone on the sofa.
+follow{
+  lights = { "light", "bulb_1", "bulb_2" },
+  when = occupancy{ sensors = { "livingroom_presence" }, hold = 600 },
+  fade = 60,
+}
 sun_switch{ lights = { "carla_desk_lamp", "standing_lamp", "niko_desk_lamp" } }
 
 -- Single toggles the ceiling light; double or hold the whole room.
