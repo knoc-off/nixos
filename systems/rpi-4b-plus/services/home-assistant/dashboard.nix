@@ -17,7 +17,7 @@
   ...
 }:
 let
-  inherit (import ../../devices.nix) kinds rooms devices lit;
+  inherit (import ../../devices.nix) kinds rooms devices lit zigbeeGroups;
 
   domainOf = d: if d.kind == kinds.light then "light" else "switch";
   entityOf = d: "${domainOf d}.${d.name}";
@@ -243,6 +243,128 @@ let
     ]
     ++ map lightingSection litDevices;
   };
+
+  # Each room as one unit: the whole room's light (its zigbee group, or its
+  # only bulb) with brightness and colour, then the room controls from
+  # services/lighting/home-assistant.nix, then the bulbs without sliders.
+  # Not the default view yet: Home stays first.
+  roomCard =
+    roomKey:
+    let
+      ds = builtins.attrValues lit.${roomKey};
+      room = rooms.${roomKey};
+      group = lib.findFirst (g: zigbeeGroups.${g}.room == roomKey) null (builtins.attrNames zigbeeGroups);
+      lamps = ofKind kinds.light ds;
+      main =
+        if group != null then
+          "light.${group}"
+        else if builtins.length lamps == 1 then
+          entityOf (builtins.head lamps)
+        else
+          null;
+      # Matches the names in lighting/home-assistant.nix, slugified.
+      ctl = domain: suffix: "${domain}.${lib.toLower (builtins.replaceStrings [ " " ] [ "_" ] room.label)}_${suffix}";
+      hasOccupancy = builtins.elem roomKey occupancyRooms;
+    in
+    {
+      type = "grid";
+      cards = [
+        {
+          type = "heading";
+          heading = room.label;
+          heading_style = "title";
+        }
+      ]
+      ++ lib.optional (main != null) {
+        type = "tile";
+        entity = main;
+        name = "${room.label} lights";
+        grid_options.columns = "full";
+        features = [
+          { type = "light-brightness"; }
+          { type = "light-color-temp"; }
+        ];
+      }
+      ++ [
+        {
+          type = "tile";
+          entity = ctl "select" "scene";
+          name = "Scene";
+          grid_options.columns = "full";
+          features = [
+            {
+              type = "select-options";
+            }
+          ];
+        }
+      ]
+      ++ lib.optional hasOccupancy {
+        type = "tile";
+        entity = ctl "binary_sensor" "occupied";
+        name = "Occupied";
+      }
+      ++ [
+        {
+          type = "tile";
+          entity = ctl "sensor" "mode";
+          name = "Mode";
+        }
+      ]
+      ++ lib.optional hasOccupancy {
+        type = "tile";
+        entity = ctl "switch" "automatic";
+        name = "Automatic";
+      }
+      ++ [
+        {
+          type = "tile";
+          entity = ctl "button" "release";
+          name = "Release";
+        }
+      ]
+      ++ map (d: {
+        type = "tile";
+        entity = entityOf d;
+        name = prettyName d;
+        vertical = true;
+        grid_options.columns = 4;
+      }) (if main != null && group == null then [ ] else ds);
+    };
+
+  # Rooms whose script uses occupancy(): only those publish `occupied` and
+  # have anything for the automatic switch to turn off.
+  occupancyRooms = [
+    "kitchen"
+    "bedroom"
+    "bathroom"
+    "hallway"
+  ];
+
+  roomsView = {
+    title = "Rooms";
+    path = "rooms";
+    icon = "mdi:floor-plan";
+    type = "sections";
+    max_columns = 3;
+    sections = [
+      {
+        type = "grid";
+        cards = [
+          {
+            type = "heading";
+            heading = "House";
+            heading_style = "title";
+          }
+          {
+            type = "tile";
+            entity = "button.release_all_lights";
+            name = "Release all";
+          }
+        ];
+      }
+    ]
+    ++ map roomCard (builtins.filter (r: lit.${r} != { }) (builtins.attrNames lit));
+  };
 in
 {
   services.home-assistant.lovelaceConfig = {
@@ -251,6 +373,7 @@ in
       homeView
       sensorsView
       lightingView
+      roomsView
     ];
   };
 }

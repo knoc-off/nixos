@@ -145,6 +145,67 @@ let
   sunrise = suffix: "mqtt-auto/sunrise-lights/${suffix}";
   colorTempTopic = "mqtt-auto/color-temp-cycle/enabled";
 
+  # Room controls (see `lights/<room>/...` in the prelude). Entity ids come
+  # from the names (`select.bedroom_scene`), which the Rooms dashboard view
+  # relies on. `lights` publishes JSON, so strings arrive quoted.
+  roomTopic = roomKey: suffix: "lights/${roomKey}/${suffix}";
+  roomKeys = builtins.filter (r: lit.${r} != { }) (builtins.attrNames lit);
+  roomLabel = roomKey: (import ../../devices.nix).rooms.${roomKey}.label;
+  jsonValue = "{{ value | from_json }}";
+
+  roomScenes = map (r: {
+    unique_id = "lights_${r}_scene";
+    name = "${roomLabel r} scene";
+    icon = "mdi:palette-swatch";
+    command_topic = roomTopic r "scene";
+    command_template = "{{ value | to_json }}";
+    state_topic = roomTopic r "scene";
+    value_template = jsonValue;
+    options = [
+      "auto"
+      "bright"
+      "dim"
+      "night"
+    ];
+  }) roomKeys;
+
+  roomAutomatic = map (r: {
+    unique_id = "lights_${r}_automatic";
+    name = "${roomLabel r} automatic";
+    icon = "mdi:motion-sensor";
+    command_topic = roomTopic r "automatic";
+    state_topic = roomTopic r "automatic";
+    retain = true;
+    payload_on = "true";
+    payload_off = "false";
+  }) roomKeys;
+
+  roomRelease = map (r: {
+    unique_id = "lights_${r}_release";
+    name = "${roomLabel r} release";
+    icon = "mdi:hand-back-left-off";
+    command_topic = roomTopic r "release";
+    payload_press = "release";
+  }) roomKeys;
+
+  roomMode = map (r: {
+    unique_id = "lights_${r}_mode";
+    name = "${roomLabel r} mode";
+    icon = "mdi:account-hard-hat";
+    state_topic = roomTopic r "mode";
+    value_template = jsonValue;
+  }) roomKeys;
+
+  # Only rooms whose script runs occupancy() publish this.
+  roomOccupied = map (r: {
+    unique_id = "lights_${r}_occupied";
+    name = "${roomLabel r} occupied";
+    device_class = "occupancy";
+    state_topic = roomTopic r "occupied";
+    payload_on = "true";
+    payload_off = "false";
+  }) roomKeys;
+
   seeds =
     map (k: {
       topic = k.entity.command_topic;
@@ -153,7 +214,11 @@ let
     ++ map (s: {
       topic = s.command_topic;
       value = "false";
-    }) plugSwitches;
+    }) plugSwitches
+    ++ map (s: {
+      topic = s.command_topic;
+      value = "true";
+    }) roomAutomatic;
 
   seed = pkgs.writeShellApplication {
     name = "lighting-seed";
@@ -237,7 +302,7 @@ in
       }
     ];
 
-    mqtt.switch = plugSwitches ++ [
+    mqtt.switch = plugSwitches ++ roomAutomatic ++ [
       {
         unique_id = "lights_follow_hue";
         name = "Lights follow hue";
@@ -250,7 +315,9 @@ in
       }
     ];
 
-    mqtt.button = releaseButtons;
-    mqtt.sensor = modeSensors;
+    mqtt.button = releaseButtons ++ roomRelease;
+    mqtt.sensor = modeSensors ++ roomMode;
+    mqtt.select = roomScenes;
+    mqtt.binary_sensor = roomOccupied;
   };
 }
