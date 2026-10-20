@@ -82,14 +82,10 @@ let
         kind = kinds.light;
       };
       carla_desk_lamp = {
-        id = "0xa4c1385aef501143";
-        kind = kinds.plug;
-      };
-      standing_lamp = {
         id = "0xa4c13861447acbe2";
         kind = kinds.plug;
       };
-      niko_desk_lamp = {
+      standing_lamp = {
         id = "0xa4c1388762b9e41c";
         kind = kinds.plug;
       };
@@ -227,12 +223,21 @@ let
         id = "0xa4c138ce243fe709";
         kind = kinds.motion;
       };
+      # Tuya TS011F plug, inactive (was the living room's Carla desk lamp).
+      plug_1 = {
+        id = "0xa4c1385aef501143";
+        kind = kinds.plug;
+      };
     };
   };
 in
 rec {
   inherit kinds;
   rooms = builtins.mapAttrs (roomKey: meta: meta // { name = roomKey; }) roomMeta;
+
+  # Dashboard order: these first, the rest alphabetically after.
+  pinnedRooms = [ "living-room" "bedroom" ];
+  roomOrder = pinnedRooms ++ builtins.filter (r: !builtins.elem r pinnedRooms) (builtins.attrNames roomMeta);
 
   # Zigbee groups. `id` is the Zigbee group ID (1-65534, must be stable --
   # changing it orphans the group on every member device's radio).
@@ -269,14 +274,15 @@ rec {
   );
 
   # Lights and plugs the lighting service owns, per room. Everything of
-  # those kinds, except plugs that power something other than a lamp.
+  # those kinds, except plugs that power something other than a lamp and
+  # the unassigned holding pen (no room script drives it).
   notLamps = [ devices.kitchen.plug ];
   lit = builtins.mapAttrs (
     _: ds:
     filterAttrs (
       _: d: (d.kind == kinds.light || d.kind == kinds.plug) && !(builtins.elem d notLamps)
     ) ds
-  ) devices;
+  ) (builtins.removeAttrs devices [ "unassigned" ]);
   filterAttrs =
     pred: set:
     builtins.listToAttrs (

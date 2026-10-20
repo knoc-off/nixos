@@ -74,22 +74,34 @@ def plan_renames(registry, wanted):
     `registry` is the entity list from config/entity_registry/list, `wanted`
     maps IEEE address -> desired device name (generated from devices.nix).
 
-    Returns (todo, blocked).
+    Returns (todo, blocked). `todo` is in a safe order: a rename onto an id
+    that another rename in the plan frees comes after it, so names can move
+    along a chain (A -> B, B -> C) in one run. A true cycle (a swap) stays
+    blocked.
     """
-    taken = {e["entity_id"] for e in registry}
-
-    todo, blocked = [], []
+    current = {e["entity_id"] for e in registry}
+    pending = []
     for e in registry:
         target = target_for(e, wanted)
-        if target is None or target == e["entity_id"]:
-            continue
-        # Renaming onto an id that is already in use makes recorder drop the
-        # history migration ("because the new entity_id is already in use"),
-        # so report it and leave the entity alone.
-        entry = {"from": e["entity_id"], "to": target}
-        (blocked if target in taken else todo).append(entry)
+        if target is not None and target != e["entity_id"]:
+            pending.append({"from": e["entity_id"], "to": target})
 
-    return todo, blocked
+    # Renaming onto an id that is still in use makes recorder drop the
+    # history migration ("because the new entity_id is already in use"), so
+    # only take a rename once its target is free, and report the rest.
+    todo = []
+    progress = True
+    while progress:
+        progress = False
+        for r in list(pending):
+            if r["to"] not in current:
+                todo.append(r)
+                pending.remove(r)
+                current.discard(r["from"])
+                current.add(r["to"])
+                progress = True
+
+    return todo, pending
 
 
 async def run(url, token, wanted):
@@ -176,6 +188,20 @@ def selftest():
     ]
     todo, blocked = plan_renames(reg, W)
     assert (todo, len(blocked)) == ([], 1), (todo, blocked)
+
+    # A chain moves in one run, freed ids first; a swap stays blocked.
+    W2 = {"0xA": "x", "0xB": "y", "0xC": "z"}
+    reg = [
+        e("switch.y", "0xA_switch_zigbee2mqtt"),
+        e("switch.z", "0xB_switch_zigbee2mqtt"),
+        e("switch.x", "0xC_switch_zigbee2mqtt"),
+    ]
+    todo, blocked = plan_renames(reg, W2)
+    assert len(todo) == 0 and len(blocked) == 3, (todo, blocked)
+    reg[2] = e("switch.old", "0xC_switch_zigbee2mqtt")
+    todo, blocked = plan_renames(reg, W2)
+    assert [r["to"] for r in todo] == ["switch.x", "switch.y", "switch.z"], todo
+    assert not blocked
 
     # Renaming is idempotent: applying the plan leaves nothing to do.
     reg = [e("light.light_1", "0xAAA_light_zigbee2mqtt")]

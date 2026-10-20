@@ -17,7 +17,7 @@
   ...
 }:
 let
-  inherit (import ../../devices.nix) kinds rooms devices lit zigbeeGroups;
+  inherit (import ../../devices.nix) kinds rooms devices lit zigbeeGroups roomOrder;
 
   domainOf = d: if d.kind == kinds.light then "light" else "switch";
   entityOf = d: "${domainOf d}.${d.name}";
@@ -25,7 +25,7 @@ let
   # Lighting entities are named `<domain>.<device>_sun_follow_<suffix>` by
   # the ha-entity-rename oneshot (their unique_ids predate the lighting
   # service, see services/lighting/home-assistant.nix).
-  litDevices = builtins.concatMap builtins.attrValues (builtins.attrValues lit);
+  litDevices = builtins.concatMap (r: builtins.attrValues (lit.${r} or { })) roomOrder;
 
   roomDevices = roomKey: builtins.attrValues devices.${roomKey};
   ofKind = kind: ds: builtins.filter (d: d.kind == kind) ds;
@@ -92,10 +92,10 @@ let
     icon = "mdi:home";
     type = "sections";
     max_columns = 3;
-    sections = builtins.concatMap roomSection (builtins.attrNames devices);
+    sections = builtins.concatMap roomSection roomOrder;
   };
 
-  allDevices = builtins.concatMap roomDevices (builtins.attrNames devices);
+  allDevices = builtins.concatMap roomDevices roomOrder;
 
   # Battery-powered things worth seeing at a glance, plus the environment
   # readings. Buttons/motion/sensors have no controllable entity, so they get
@@ -319,7 +319,7 @@ let
         {
           type = "tile";
           entity = ctl "button" "release";
-          name = "Release";
+          name = "Reset";
         }
       ]
       ++ map (d: {
@@ -358,23 +358,28 @@ let
           }
           {
             type = "tile";
+            entity = "switch.house_automatic";
+            name = "Automatic";
+          }
+          {
+            type = "tile";
             entity = "button.release_all_lights";
-            name = "Release all";
+            name = "Reset all";
           }
         ];
       }
     ]
-    ++ map roomCard (builtins.filter (r: lit.${r} != { }) (builtins.attrNames lit));
+    ++ map roomCard (builtins.filter (r: (lit.${r} or { }) != { }) roomOrder);
   };
 in
 {
   services.home-assistant.lovelaceConfig = {
     title = "Home";
     views = [
+      roomsView
       homeView
       sensorsView
       lightingView
-      roomsView
     ];
   };
 }

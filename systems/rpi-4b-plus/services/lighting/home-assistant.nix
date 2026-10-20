@@ -127,7 +127,7 @@ let
     {
       unique_id = "lights_release_all";
       name = "Release all lights";
-      icon = "mdi:hand-back-left-off";
+      icon = "mdi:restore";
       command_topic = "lights/release";
       payload_press = "release";
     }
@@ -206,6 +206,18 @@ let
     payload_off = "false";
   }) roomKeys;
 
+  # A room runs only while both its own switch and this one are on.
+  houseAutomatic = {
+    unique_id = "lights_house_automatic";
+    name = "House automatic";
+    icon = "mdi:home-automation";
+    command_topic = "lights/automatic";
+    state_topic = "lights/automatic";
+    retain = true;
+    payload_on = "true";
+    payload_off = "false";
+  };
+
   seeds =
     map (k: {
       topic = k.entity.command_topic;
@@ -218,7 +230,7 @@ let
     ++ map (s: {
       topic = s.command_topic;
       value = "true";
-    }) roomAutomatic;
+    }) (roomAutomatic ++ [ houseAutomatic ]);
 
   seed = pkgs.writeShellApplication {
     name = "lighting-seed";
@@ -303,6 +315,7 @@ in
     ];
 
     mqtt.switch = plugSwitches ++ roomAutomatic ++ [
+      houseAutomatic
       {
         unique_id = "lights_follow_hue";
         name = "Lights follow hue";

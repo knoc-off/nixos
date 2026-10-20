@@ -8,8 +8,8 @@
 //!   - `Auto`: the bulb follows the automation target.
 //!   - `Held`: the user set a value -- via a button (`Input::User`), or in
 //!     HA/the app, seen as a z2m report we didn't cause. The automation's
-//!     target is ignored until a `Release`, or until it converges onto the
-//!     held value.
+//!     target is ignored until a `Release`; when a hold ends is the room
+//!     script's policy, not the arbiter's.
 //!
 //! On top of either, the room's `scale` (0..1) dims the output: that is how
 //! a leaving room fades out. It applies to held bulbs too, so the warning
@@ -139,7 +139,6 @@ impl Tolerance {
 #[derive(Clone, Copy, Debug)]
 pub struct Config {
     /// A report further than this from what we commanded is a user change.
-    /// Also how close the auto target must come for a hold to converge.
     pub change: Tolerance,
     /// Startup only: a bulb this close to the target is adopted as `Auto`
     /// (the correction is small enough to be invisible), else held as-is.
@@ -265,7 +264,6 @@ pub struct Bulb {
     pub mode: Mode,
     cfg: Config,
     auto: Option<Target>,
-    prev_auto: Option<Target>,
     auto_transition: Duration,
     scale: f32,
     reported: Option<Target>,
@@ -283,7 +281,6 @@ impl Bulb {
             mode: Mode::Unknown,
             cfg,
             auto: None,
-            prev_auto: None,
             auto_transition: Duration::ZERO,
             scale: 1.0,
             reported: None,
@@ -320,14 +317,11 @@ impl Bulb {
                 scale,
                 transition,
             } => {
-                let target = self.normalize(target);
-                self.prev_auto = self.auto.replace(target);
+                self.auto = Some(self.normalize(target));
                 self.auto_transition = transition;
                 self.scale = scale.clamp(0.0, 1.0);
-                match self.mode {
-                    Mode::Unknown => return self.try_adopt(now),
-                    Mode::Held(h) if self.converged(h.value, target) => self.mode = Mode::Auto,
-                    _ => {}
+                if self.mode == Mode::Unknown {
+                    return self.try_adopt(now);
                 }
                 self.apply(transition, now)
             }
@@ -402,36 +396,6 @@ impl Bulb {
     fn accept(&mut self, r: Target, now: Instant) {
         self.expected = Some(Motion::still(r, now));
         self.switch_off_at = None;
-    }
-
-    /// A hold ends by itself once the automation comes back to the user's
-    /// value: within tolerance, or the curve crossed it since the last
-    /// target. Crossing matters because a slow curve stepping past the held
-    /// value can skip the tolerance band entirely. Nearness alone (as in
-    /// adoption) would snap a deliberate setting back to the curve.
-    /// Off never converges -- a manual off only ends at a real release.
-    fn converged(&self, held: Target, t: Target) -> bool {
-        if !held.on || !t.on {
-            return false;
-        }
-        let prev = self.prev_auto.filter(|p| p.on);
-        let tol = self.cfg.change;
-        let bri = reached(
-            prev.map(|p| p.brightness.into()),
-            t.brightness.into(),
-            held.brightness.into(),
-            tol.brightness.into(),
-        );
-        let ct = match (held.color_temp, t.color_temp) {
-            (Some(h), Some(c)) => reached(
-                prev.and_then(|p| p.color_temp).map(Into::into),
-                c.into(),
-                h.into(),
-                tol.color_temp.into(),
-            ),
-            _ => true,
-        };
-        bri && ct
     }
 
     /// Plugs have one channel; dropping the rest at every entry point means
@@ -512,13 +476,6 @@ impl Bulb {
             transition,
         })
     }
-}
-
-/// Whether a curve moving from `prev` to `now` has reached `goal`: it is
-/// within `tol`, or it stepped from one side of `goal` to the other.
-fn reached(prev: Option<i32>, now: i32, goal: i32, tol: i32) -> bool {
-    let side = |v: i32| (v - goal).signum();
-    (now - goal).abs() <= tol || prev.is_some_and(|p| side(p) * side(now) < 0)
 }
 
 #[cfg(test)]
@@ -729,49 +686,17 @@ mod tests {
     }
 
     #[test]
-    fn hold_converges_when_curve_reaches_the_held_value() {
-        let mut rig = Rig::light(on(100));
-        rig.send(user(on(60)));
-        assert_eq!(rig.send(auto(on(80))), None);
-        assert_eq!(rig.send(auto(on(63))), Some(on(63)));
-        assert_eq!(rig.bulb.mode, Mode::Auto);
-    }
-
-    #[test]
-    fn hold_converges_when_curve_steps_across_the_held_value() {
-        let mut rig = Rig::light(on(100));
-        rig.send(user(on(60)));
-        rig.send(auto(on(70)));
-        assert_eq!(rig.send(auto(on(50))), Some(on(50)));
-        assert_eq!(rig.bulb.mode, Mode::Auto);
-    }
-
-    #[test]
-    fn hold_does_not_snap_back_when_merely_nearby() {
-        // Within the startup adoption band, but a deliberate setting.
-        let mut rig = Rig::light(on(100));
-        rig.send(user(on(100)));
-        assert_eq!(rig.send(auto(on(120))), None);
-        assert_eq!(rig.send(auto(on(119))), None);
-        assert_eq!(rig.bulb.held(), Some(on(100)));
-    }
-
-    #[test]
-    fn held_off_never_converges() {
-        let mut rig = Rig::light(on(100));
-        rig.send(user(OFF));
-        rig.send(auto(OFF));
-        assert_eq!(rig.send(auto(on(50))), None);
-        assert_eq!(rig.bulb.held(), Some(OFF));
-    }
-
-    #[test]
-    fn held_colour_survives_brightness_convergence() {
+    fn hold_survives_the_curve_passing_through_it() {
+        // A person's value is kept until a release, wherever the curve goes.
         let mut rig = Rig::light(on_ct(100, 300));
         rig.send(user(on_ct(60, 454)));
-        rig.send(auto(on_ct(70, 300)));
-        assert_eq!(rig.send(auto(on_ct(50, 300))), None);
+        for b in [80, 60, 50, 60, 120] {
+            assert_eq!(rig.send(auto(on_ct(b, 454))), None);
+        }
         assert_eq!(rig.bulb.held(), Some(on_ct(60, 454)));
+        rig.send(user(OFF));
+        assert_eq!(rig.send(auto(on(50))), None);
+        assert_eq!(rig.bulb.held(), Some(OFF));
     }
 
     #[test]

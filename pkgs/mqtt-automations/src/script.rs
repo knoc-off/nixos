@@ -23,6 +23,7 @@
 //!   - `room`: this room's name. `publish(name, value)`: retain `value`
 //!     (string, number or boolean, sent bare) on `lights/<room>/<name>`,
 //!     for HA to show; `name` is lowercase letters, digits, `_` and `-`.
+//!     `publish_house(name, value)`: the same on `lights/<name>`.
 //!   - `log(...)`.
 //!
 //! A runtime error in a handler is logged and that handler's requests are
@@ -78,7 +79,7 @@ struct State {
     wall: DateTime<FixedOffset>,
     lights: BTreeMap<String, Bulb>,
     requests: Vec<(String, Input)>,
-    /// `publish()` calls not yet collected: (name, value).
+    /// `publish()` calls not yet collected: (full topic, value).
     published: Vec<(String, serde_json::Value)>,
     timers: BTreeMap<u64, Timer>,
     next_timer: u64,
@@ -269,7 +270,7 @@ impl Script {
         }
     }
 
-    /// Values the script published since the last call, as (name, value).
+    /// Values the script published since the last call, as (topic, value).
     pub fn take_published(&mut self) -> Vec<(String, serde_json::Value)> {
         std::mem::take(&mut self.state().published)
     }
@@ -366,24 +367,14 @@ fn install(lua: &Lua) -> mlua::Result<()> {
     g.set(
         "publish",
         lua.create_function(|lua, (name, value): (String, Value)| {
-            let ok = !name.is_empty()
-                && name.bytes().all(|b| {
-                    b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-'
-                });
-            if !ok {
-                return Err(mlua::Error::runtime(format!("bad publish name {name:?}")));
-            }
-            if !matches!(
-                value,
-                Value::String(_) | Value::Boolean(_) | Value::Integer(_) | Value::Number(_)
-            ) {
-                return Err(mlua::Error::runtime(
-                    "publish() takes a string, number or boolean",
-                ));
-            }
-            let value: serde_json::Value = lua.from_value(value)?;
-            state(lua)?.published.push((name, value));
-            Ok(())
+            let room = state(lua)?.room.clone();
+            publish(lua, format!("lights/{room}"), name, value)
+        })?,
+    )?;
+    g.set(
+        "publish_house",
+        lua.create_function(|lua, (name, value): (String, Value)| {
+            publish(lua, "lights".into(), name, value)
         })?,
     )?;
 
@@ -436,6 +427,27 @@ fn install(lua: &Lua) -> mlua::Result<()> {
             Ok(())
         })?,
     )?;
+    Ok(())
+}
+
+fn publish(lua: &Lua, prefix: String, name: String, value: Value) -> mlua::Result<()> {
+    let ok = !name.is_empty()
+        && name
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-');
+    if !ok {
+        return Err(mlua::Error::runtime(format!("bad publish name {name:?}")));
+    }
+    if !matches!(
+        value,
+        Value::String(_) | Value::Boolean(_) | Value::Integer(_) | Value::Number(_)
+    ) {
+        return Err(mlua::Error::runtime(
+            "publish() takes a string, number or boolean",
+        ));
+    }
+    let value: serde_json::Value = lua.from_value(value)?;
+    state(lua)?.published.push((format!("{prefix}/{name}"), value));
     Ok(())
 }
 
@@ -665,8 +677,31 @@ mod tests {
         })
     }
 
+    fn published(rig: &mut Rig) -> Vec<(String, serde_json::Value)> {
+        rig.script.take_published()
+    }
+
+    fn has(published: &[(String, serde_json::Value)], topic: &str, v: serde_json::Value) -> bool {
+        published.contains(&(topic.into(), v))
+    }
+
+    fn users(reqs: &[(String, Input)], bulb: &str) -> Vec<Target> {
+        reqs.iter()
+            .filter_map(|(n, i)| match i {
+                Input::User { target, .. } if n == bulb => Some(*target),
+                _ => None,
+            })
+            .collect()
+    }
+
+    const DIM_80: Target = Target {
+        on: true,
+        brightness: 80,
+        color_temp: Some(400),
+    };
+
     #[test]
-    fn scene_sets_brightness_without_holding_and_ends_with_the_visit() {
+    fn scene_sets_brightness_without_holding_and_outlasts_a_short_absence() {
         let mut rig = Rig::new(MOTION_ROOM);
         rig.wait(0);
         rig.send("motion", json!({ "occupancy": true }));
@@ -681,16 +716,64 @@ mod tests {
         rig.send("motion", json!({ "occupancy": false }));
         let reqs = rig.wait(60);
         assert_eq!(last_auto(&reqs, "a").map(|t| t.on), Some(false));
-        assert!(rig
-            .script
-            .take_published()
-            .contains(&("scene".into(), json!("auto"))));
+        assert!(!has(&published(&mut rig), "lights/test/scene", json!("auto")));
+        rig.wait(30 * 60);
         let reqs = rig.send("motion", json!({ "occupancy": true }));
-        assert_ne!(
-            last_auto(&reqs, "a").unwrap().brightness,
-            76,
-            "back on the curve"
-        );
+        assert_eq!(last_auto(&reqs, "a").unwrap().brightness, 76, "still dim");
+
+        // Gone for longer than reset_after: back to the curve.
+        rig.send("motion", json!({ "occupancy": false }));
+        rig.wait(60);
+        rig.wait(3600);
+        assert!(has(&published(&mut rig), "lights/test/scene", json!("auto")));
+        let reqs = rig.send("motion", json!({ "occupancy": true }));
+        assert_ne!(last_auto(&reqs, "a").unwrap().brightness, 76);
+    }
+
+    #[test]
+    fn manual_settings_come_back_after_a_short_absence_and_go_after_a_long_one() {
+        let mut rig = Rig::new(MOTION_ROOM);
+        rig.wait(0);
+        rig.send("motion", json!({ "occupancy": true }));
+        rig.script.bulb("a", true, DIM_80);
+        rig.script.bulb("b", true, HELD_OFF);
+        rig.send("motion", json!({ "occupancy": false }));
+        let reqs = rig.wait(60);
+        assert_eq!(releases(&reqs), 2, "the room still fades out");
+        // The fade released them; the arbiter now shows them as automatic.
+        rig.script.bulb("a", false, HELD_OFF);
+        rig.script.bulb("b", false, HELD_OFF);
+
+        rig.wait(59 * 60 - 60);
+        let reqs = rig.send("motion", json!({ "occupancy": true }));
+        assert_eq!(users(&reqs, "a"), [DIM_80], "brightness and colour back");
+        assert_eq!(users(&reqs, "b").iter().map(|t| t.on).collect::<Vec<_>>(), [false], "a manual off stays off");
+
+        // Restored, so held again, and gone longer than the hour this time.
+        rig.script.bulb("a", true, DIM_80);
+        rig.script.bulb("b", true, HELD_OFF);
+        rig.send("motion", json!({ "occupancy": false }));
+        rig.wait(60);
+        rig.script.bulb("a", false, HELD_OFF);
+        rig.script.bulb("b", false, HELD_OFF);
+        rig.wait(3600);
+        let reqs = rig.send("motion", json!({ "occupancy": true }));
+        assert!(users(&reqs, "a").is_empty() && users(&reqs, "b").is_empty());
+        assert_eq!(last_auto_on(&reqs, "b"), Some(true), "forgotten: on at the curve");
+    }
+
+    #[test]
+    fn a_hold_made_while_empty_is_not_remembered() {
+        let mut rig = Rig::new(MOTION_ROOM);
+        rig.wait(0);
+        rig.send("motion", json!({ "occupancy": true }));
+        rig.send("motion", json!({ "occupancy": false }));
+        rig.wait(60);
+        // A late report during the fade-out, misread as a manual off.
+        rig.script.bulb("a", true, HELD_OFF);
+        let reqs = rig.send("motion", json!({ "occupancy": true }));
+        assert!(users(&reqs, "a").is_empty());
+        assert_eq!(last_auto_on(&reqs, "a"), Some(true));
     }
 
     #[test]
@@ -707,48 +790,60 @@ mod tests {
     }
 
     #[test]
-    fn automatic_off_stops_switching_but_keeps_shaping() {
-        let mut rig = Rig::new(MOTION_ROOM);
-        rig.wait(0);
-        rig.topic("lights/test/automatic", json!(false));
-        let reqs = rig.send("motion", json!({ "occupancy": true }));
-        assert_ne!(last_auto(&reqs, "a").map(|t| t.on), Some(true));
-        assert_eq!(releases(&reqs), 0);
+    fn automatic_off_leaves_the_bulbs_alone_room_or_house() {
+        for topic in ["lights/test/automatic", "lights/automatic"] {
+            let mut rig = Rig::new(MOTION_ROOM);
+            rig.wait(0);
+            rig.topic(topic, json!(false));
+            let mut reqs = rig.send("motion", json!({ "occupancy": true }));
+            reqs.extend(rig.wait(600));
+            rig.send("motion", json!({ "occupancy": false }));
+            reqs.extend(rig.wait(600));
+            assert!(reqs.is_empty(), "{topic}: {reqs:?}");
 
-        let reqs = rig.topic("lights/test/automatic", json!(true));
-        assert_eq!(
-            last_auto(&reqs, "a").map(|t| t.on),
-            Some(true),
-            "catches up"
-        );
+            rig.send("motion", json!({ "occupancy": true }));
+            let reqs = rig.topic(topic, json!(true));
+            assert_eq!(last_auto_on(&reqs, "a"), Some(true), "{topic}: catches up");
+        }
     }
 
     #[test]
-    fn room_and_house_release_free_every_bulb_and_end_the_scene() {
-        for topic in ["lights/test/release", "lights/release"] {
+    fn room_and_house_reset_free_everything_and_switch_automatic_back_on() {
+        for (topic, house) in [("lights/test/release", false), ("lights/release", true)] {
             let mut rig = Rig::new(MOTION_ROOM);
             rig.wait(0);
+            rig.send("motion", json!({ "occupancy": true }));
+            rig.script.bulb("a", true, DIM_80);
+            rig.send("motion", json!({ "occupancy": false }));
+            rig.wait(60);
             rig.topic("lights/test/scene", json!("bright"));
+            rig.topic("lights/test/automatic", json!(false));
+            rig.topic("lights/automatic", json!(false));
+            published(&mut rig);
+
             let reqs = rig.topic(topic, json!("release"));
             assert_eq!(releases(&reqs), 2, "{topic}");
-            assert!(rig
-                .script
-                .take_published()
-                .contains(&("scene".into(), json!("auto"))));
+            let p = published(&mut rig);
+            assert!(has(&p, "lights/test/scene", json!("auto")), "{topic}");
+            assert!(has(&p, "lights/test/automatic", json!(true)), "{topic}");
+            assert_eq!(has(&p, "lights/automatic", json!(true)), house, "{topic}");
+            if !house {
+                rig.topic("lights/automatic", json!(true));
+            }
+            let reqs = rig.send("motion", json!({ "occupancy": true }));
+            assert!(users(&reqs, "a").is_empty(), "{topic}: memory forgotten");
+            assert_eq!(last_auto_on(&reqs, "a"), Some(true), "{topic}");
         }
     }
 
     #[test]
     fn publish_reports_occupancy_and_rejects_bad_input() {
         let mut rig = Rig::new(MOTION_ROOM);
-        assert!(rig
-            .script
-            .take_published()
-            .contains(&("occupied".into(), json!(false))));
+        assert!(has(&published(&mut rig), "lights/test/occupied", json!(false)));
         rig.send("motion", json!({ "occupancy": true }));
         assert_eq!(
             rig.script.take_published(),
-            [("occupied".into(), json!(true))]
+            [("lights/test/occupied".into(), json!(true))]
         );
 
         let mut rig = Rig::new(
@@ -1108,6 +1203,22 @@ mod tests {
 
         rig.send("p", json!({ "occupancy": false }));
         assert_eq!(last_auto_on(&rig.wait(120), "a"), Some(false), "empty: off");
+    }
+
+    #[test]
+    fn hold_can_depend_on_the_time_of_day() {
+        let room = r#"
+            follow{ when = occupancy{ sensors = { "p" }, hold = function() return between(22, 8) and 120 or 1800 end }, fade = 10 }
+        "#;
+        for (time, hold) in [("13:00:00", 1800), ("23:30:00", 120), ("07:00:00", 120)] {
+            let mut rig = Rig::new(room);
+            at(&mut rig, time);
+            rig.wait(0);
+            rig.send("p", json!({ "occupancy": true }));
+            rig.send("p", json!({ "occupancy": false }));
+            assert_ne!(last_auto_on(&rig.wait(hold - 1), "a"), Some(false), "{time}");
+            assert_eq!(last_auto_on(&rig.wait(1), "a"), Some(false), "{time}");
+        }
     }
 
     #[test]

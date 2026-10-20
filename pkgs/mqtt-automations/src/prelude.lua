@@ -6,6 +6,13 @@ local function clamp(x, lo, hi)
   return math.max(lo, math.min(hi, x))
 end
 
+-- Is the time of day in [from, to) hours? Wraps past midnight ({ 22, 8 }).
+function between(from, to)
+  local h = clock()
+  if from <= to then return h >= from and h < to end
+  return h >= from or h < to
+end
+
 local function each(names, f)
   for _, n in ipairs(names or lights) do
     f(n)
@@ -14,7 +21,8 @@ end
 
 -- A value HA controls through a retained MQTT topic, as a getter. Payloads
 -- that don't parse as the default's type are ignored. `changed`, if given,
--- runs after each new value. Top level only, like on_topic.
+-- runs after each new value. Top level only, like on_topic. The second
+-- return value sets it locally (for a reset that also publishes it).
 function setting(topic, default, changed)
   local value = default
   on_topic(topic, function(p)
@@ -37,23 +45,28 @@ function setting(topic, default, changed)
   end)
   return function()
     return value
+  end, function(v)
+    value = v
   end
 end
 
 -- Room controls from HA, on `lights/<room>/...`:
 --   scene:     "auto" follows the sun; "bright", "dim" and "night" replace
 --              its brightness (and colour, for night) without holding the
---              bulbs, so they still switch on and off by themselves. Ends
---              when the room empties or is released.
---   automatic: false stops occupancy switching the bulbs on and off.
---   release:   every bulb back to the automation, scene back to "auto".
--- `lights/release` releases the whole house the same way.
+--              bulbs, so they still switch on and off by themselves. Lasts
+--              until the room has been empty for follow{}'s `reset_after`.
+--   automatic: false leaves the bulbs entirely alone: no switching, no sun
+--              shaping, no wake ramp. Buttons still work.
+--   release:   reset: every bulb back to the automation, scene back to
+--              "auto", remembered settings forgotten, automatic back on.
+-- `lights/automatic` and `lights/release` do the same for the whole house;
+-- a room runs only while both its own and the house switch are on.
 local SCENES = {
   bright = { brightness = 254 },
   dim = { brightness = 76 },
   night = { brightness = 8, color_temp = 454 },
 }
-local room_watchers = {}
+local room_watchers, reset_watchers = {}, {}
 local function room_changed()
   for _, f in ipairs(room_watchers) do f() end
 end
@@ -69,24 +82,40 @@ local function use_scene(name)
   end
 end
 on_topic("lights/" .. room .. "/scene", use_scene)
-automatic = setting("lights/" .. room .. "/automatic", true, room_changed)
+local room_auto, set_room_auto = setting("lights/" .. room .. "/automatic", true, room_changed)
+local house_auto, set_house_auto = setting("lights/automatic", true, room_changed)
+function automatic()
+  return room_auto() and house_auto()
+end
 
 -- Back to "auto".
 function end_scene()
   use_scene("auto")
 end
 
-local function release_room()
+local function reset(house)
   each(lights, function(n) light(n):release() end)
   end_scene()
+  for _, f in ipairs(reset_watchers) do f() end
+  set_room_auto(true)
+  publish("automatic", true)
+  if house then
+    set_house_auto(true)
+    publish_house("automatic", true)
+  end
   room_changed()
 end
-on_topic("lights/" .. room .. "/release", release_room)
-on_topic("lights/release", release_room)
+on_topic("lights/" .. room .. "/release", function() reset(false) end)
+on_topic("lights/release", function() reset(true) end)
 
 -- Run `f` whenever a room control changes, so the bulbs follow at once.
 function watch_room(f)
   table.insert(room_watchers, f)
+end
+
+-- Run `f` on a room or house reset, to drop whatever the room remembers.
+function on_reset(f)
+  table.insert(reset_watchers, f)
 end
 
 -- Bulb -> function returning what the sun says for it right now.
@@ -132,10 +161,13 @@ end
 
 -- Bulbs follow the sun's brightness and colour temperature. Options:
 --   lights: names (default: all of the room's)
---   when:   an occupancy(): on while occupied, released and faded off when
---           it empties. Without it the automation never switches the bulbs
---           on or off, it only shapes them while they are on.
+--   when:   an occupancy(): on while occupied, faded off when it empties.
+--           Without it the automation never switches the bulbs on or off,
+--           it only shapes them while they are on.
 --   fade:   seconds to fade out once the room empties (default 60)
+--   reset_after: seconds the room must stay empty before the scene and any
+--           manual setting (a brightness, a colour, an off) are forgotten
+--           (default 3600). Coming back sooner restores them as left.
 --   wake:   a wake_ramp(), which switches the bulbs on and ramps them up
 --   quiet:  { from, to } hours (e.g. { 22, 8 }): arriving in this window
 --           does not switch the bulbs on. Only arrival counts, so lights
@@ -146,45 +178,56 @@ function follow(opts)
   local names = opts.lights or lights
   local occ, wake, quiet = opts.when, opts.wake, opts.quiet
   local fade = opts.fade or 60
+  local reset_after = opts.reset_after or 3600
   sun_curve(names)
 
   local function quiet_now()
-    if not quiet then return false end
-    local h, from, to = clock(), quiet[1], quiet[2]
-    if from <= to then return h >= from and h < to end
-    return h >= from or h < to
+    return quiet ~= nil and between(quiet[1], quiet[2])
   end
 
   -- Whether this visit switched the bulbs on.
   local lit = false
+  -- Manual settings the room had when it emptied, by bulb, and the timer
+  -- that forgets them (and the scene).
+  local remembered, forget_timer = {}, nil
+  -- Holds the wake ramp made itself, by bulb (brightness): not a person's
+  -- choice, so not worth remembering.
+  local ramp_held = {}
+
+  local function forget()
+    if forget_timer then cancel(forget_timer) end
+    forget_timer, remembered, ramp_held = nil, {}, {}
+  end
+  on_reset(forget)
 
   local waking = false
   local function update(transition)
+    -- Automations off: hands off entirely.
+    if not automatic() then return end
     local ramp = wake and wake.level()
     -- The ramp starting is a new instruction: a manual off from the night
     -- before must not keep the room dark.
     if ramp and not waking then
       each(names, function(n) light(n):release() end)
     end
-    -- Ramp over: stay where it ended rather than jump to the curve. The hold
-    -- ends by itself once the curve comes back down to it in the evening.
+    -- Ramp over: stay where it ended rather than jump to the curve, until
+    -- the room empties.
     if waking and not ramp then
       each(names, function(n)
         local s = light(n):state()
         if s and s.on and s.mode == "auto" then
           light(n):user({ brightness = s.brightness, color_temp = s.color_temp })
+          ramp_held[n] = s.brightness
         end
       end)
     end
     waking = ramp ~= nil
-    -- The HA "automatic" switch off: shape the bulbs, never switch them.
-    local switching = occ and automatic()
     each(names, function(n)
       local t = curve_target(n)
       local s = light(n):state()
       if ramp then
         t.brightness = ramp
-      elseif switching then
+      elseif occ then
         t.on = lit
       else
         t.on = s ~= nil and s.on
@@ -193,7 +236,7 @@ function follow(opts)
       light(n):auto(t)
       -- Off by hand where the automation would leave it off anyway: nothing
       -- to hold, and the state topic shouldn't say "held".
-      if not switching and not ramp and s and s.mode == "held" and not s.on then
+      if not occ and not ramp and s and s.mode == "held" and not s.on then
         light(n):release()
       end
     end)
@@ -202,24 +245,47 @@ function follow(opts)
   if occ then
     occ.watch(function(occupied)
       lit = occupied and not quiet_now()
-      -- A scene lasts as long as the visit, like a manual change.
-      if not occupied then end_scene() end
+      if not automatic() then return end
       -- A wake ramp ignores occupancy, so releasing during it would undo a
       -- manual off the moment the sensor loses someone lying in bed.
-      local ramping = wake and wake.level()
-      each(names, function(n)
-        if ramping or not automatic() then return end
-        local s = light(n):state()
-        if not occupied then
-          -- A manual change lasts as long as the visit.
-          light(n):release({ transition = fade })
-        elseif s and s.mode == "held" and not s.on then
-          -- Held off from before this visit (an off made on the way out,
-          -- or a report misread during the fade-out): walking in means
-          -- light. Held on (the wall switch, say) is kept.
-          light(n):release()
+      if not (wake and wake.level()) then
+        if occupied then
+          if forget_timer then cancel(forget_timer) end
+          forget_timer = nil
         end
-      end)
+        each(names, function(n)
+          local s = light(n):state()
+          if not occupied then
+            -- Remember a person's setting, then fade out like the rest.
+            local by_ramp = ramp_held[n] and s and math.abs(s.brightness - ramp_held[n]) <= 5
+            if s and s.mode == "held" and not by_ramp then
+              remembered[n] = { on = s.on, brightness = s.brightness, color_temp = s.color_temp }
+            end
+            light(n):release({ transition = fade })
+          elseif remembered[n] then
+            light(n):user({
+              on = remembered[n].on,
+              brightness = remembered[n].brightness,
+              color_temp = remembered[n].color_temp,
+              transition = 0.4,
+            })
+          elseif s and s.mode == "held" and not s.on then
+            -- Held off from while the room was empty (a report misread
+            -- during the fade-out): walking in means light. Held on (the
+            -- wall switch, say) is kept.
+            light(n):release()
+          end
+        end)
+        if occupied then
+          remembered = {}
+        else
+          ramp_held = {}
+          forget_timer = after(reset_after, function()
+            forget_timer, remembered = nil, {}
+            end_scene()
+          end)
+        end
+      end
       update(occupied and 0.4 or fade)
     end)
     -- Switched back to automatic: catch up with whether anyone is there.
@@ -237,13 +303,18 @@ end
 --              `door_hold` seconds, until a sensor picks them up; shutting
 --              one with no sensor active empties the room after
 --              `close_grace` seconds
---   hold:      default 60
+--   hold:      seconds, or a function returning them, asked each time a
+--              sensor clears (e.g. shorter at night); default 60
 --   door_hold: default 120
 --   close_grace: default 3
 -- Starts vacant: after a restart the first motion turns the lights on, and a
 -- light someone left on is held until the next visit ends.
 function occupancy(opts)
-  local hold, door_hold = opts.hold or 60, opts.door_hold or 120
+  local hold_opt, door_hold = opts.hold or 60, opts.door_hold or 120
+  local function hold()
+    if type(hold_opt) == "function" then return hold_opt() end
+    return hold_opt
+  end
   local close_grace = opts.close_grace or 3
   local self = { occupied = false }
   local watchers, active, timers = {}, {}, {}
@@ -291,7 +362,7 @@ function occupancy(opts)
         stop(dev)
       elseif active[dev] then
         active[dev] = nil
-        evidence(dev, hold)
+        evidence(dev, hold())
       end
       evaluate()
     end)
@@ -330,6 +401,7 @@ function sun_switch(opts)
     local invert = setting(base .. "invert", false)
     local last
     local function update()
+      if not automatic() then return end
       local frac = sun.daylight()
       if invert() then frac = 1 - frac end
       local t = clamp(threshold(), 0, 100) / 100
@@ -346,6 +418,7 @@ function sun_switch(opts)
       light(n):auto({ on = want })
     end
     every(30, update)
+    watch_room(update)
     update()
   end)
 end

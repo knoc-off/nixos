@@ -258,8 +258,8 @@ impl House {
             room.script
                 .take_published()
                 .into_iter()
-                .map(|(name, value)| Out {
-                    topic: format!("lights/{}/{name}", room.name),
+                .map(|(topic, value)| Out {
+                    topic,
                     payload: value,
                     retain: true,
                 }),
@@ -680,7 +680,19 @@ mod tests {
         rig.report_all(&["hallway_a", "hallway_b"], json!({ "state": "OFF" }));
         rig.wait(Duration::from_secs(181));
 
-        // Next walk-through works normally again, as one group command.
+        // Back within the hour: the manual off is remembered.
+        let outs = rig.send("zigbee2mqtt/hallway_motion", json!({ "occupancy": true }));
+        assert_eq!(
+            sets(&outs).iter().map(|s| s.0).collect::<Vec<_>>(),
+            ["zigbee2mqtt/hallway_b/set"]
+        );
+
+        // Empty for over an hour: forgotten, the next walk-through works
+        // normally again, as one group command.
+        rig.send("zigbee2mqtt/hallway_motion", json!({ "occupancy": false }));
+        rig.wait(Duration::from_secs(90));
+        rig.report_all(&["hallway_a", "hallway_b"], json!({ "state": "OFF" }));
+        rig.wait(Duration::from_secs(3600));
         let outs = rig.send("zigbee2mqtt/hallway_motion", json!({ "occupancy": true }));
         assert_eq!(sets(&outs)[0].0, "zigbee2mqtt/hallway/set");
     }
