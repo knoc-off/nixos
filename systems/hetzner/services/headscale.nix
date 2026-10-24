@@ -88,7 +88,21 @@ in
           # player-facing entrypoint, and optiplex's firewall only accepts the
           # game port from Gate's address. A split-horizon record here would
           # create a second path that the firewall would then reject anyway.
-        ];
+        ]
+        # nixflix web UIs (optiplex's services/usenet.nix).
+        ++
+          map
+            (s: {
+              name = "${s}.optiplex.tail.niko.ink";
+              type = "A";
+              value = tailnet.optiplex;
+            })
+            [
+              "sonarr"
+              "radarr"
+              "prowlarr"
+              "sabnzbd"
+            ];
       };
     };
   };

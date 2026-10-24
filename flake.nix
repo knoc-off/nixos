@@ -282,6 +282,12 @@
 
     nix-minecraft.url = "github:Infinidoge/nix-minecraft";
 
+    # Declarative *arr/SABnzbd stack (optiplex's services/usenet.nix).
+    nixflix = {
+      url = "github:kiriwalawren/nixflix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     minecraft-modpack = {
       url = "github:knoc-off/minecraft-modpack";
       inputs.nixpkgs.follows = "nixpkgs-unstable";

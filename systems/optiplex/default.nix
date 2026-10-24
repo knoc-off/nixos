@@ -19,6 +19,7 @@ in
     inputs.private.nixosModules.compat-proxy
     { services.compat-proxy.oauthTokenSopsFile = ../../modules/shared-secrets.yaml; }
     ./services/ai.nix
+    ./services/usenet.nix
 
     self.nixosModules.sops
     {
@@ -387,10 +388,6 @@ in
     }
 
     {
-      # services.sabnzbd = {
-      #   enable = true;
-      # };
-
       # need to add a UI, to the user.
       services.jellyfin = {
         enable = true;
@@ -403,9 +400,11 @@ in
       # Runs as jellyfin:jellyfin with no supplementary groups, so it cannot
       # open /dev/dri/renderD128 (root:render 0660). Without this, hardware
       # transcoding fails silently and every stream is transcoded on the CPU.
+      # "media" is nixflix's library group (services/usenet.nix).
       users.users.jellyfin.extraGroups = [
         "render"
         "video"
+        "media"
       ];
     }
 
