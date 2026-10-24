@@ -260,8 +260,8 @@ in
         enable = true;
         type = "lanzaboote";
         efiSupport = true;
-        # Hard ceiling imposed by systemd-pcrlock (systemd/systemd#41526).
-        configurationLimit = 8;
+        # Hard ceiling: lanzaboote's measuredBoot asserts <= 4 (systemd-pcrlock).
+        configurationLimit = 4;
       };
 
       # The BIOS "Delete All Keys" step left this board in Audit Mode

@@ -54,13 +54,13 @@
         configurationLimit = mkOption {
           type = types.nullOr types.int;
           default = null;
-          example = 8;
+          example = 4;
           description = ''
             Number of generations to keep on the ESP. null means unlimited.
 
             Worth bounding under lanzaboote: UKIs bundle the kernel and initrd
-            (~100 MB each), and systemd-pcrlock refuses to build a policy for
-            more than 8 variants, so measuredBoot requires a limit of 1..8.
+            (~100 MB each), and lanzaboote's measuredBoot asserts a limit of
+            1..4 (enforced for systemd-pcrlock).
           '';
         };
 
