@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseUserscript, globToRegExp, matchesAny } from "./match.mjs";
-import { makeHeader, parseHeader, stripHeader, withHeader, wrapForWorld } from "./opencode-plugin.js";
+import { makeHeader, parseHeader, stripHeader, withHeader, wrapForWorld, renderReply } from "./opencode-plugin.js";
 import { validateChoice, actionSpace, decisionRequest, readDecision, rateWindow, toCriteria, actJs } from "./jevkit.mjs";
 
 test("parseUserscript collects @grant, dropping none", () => {
@@ -210,11 +210,24 @@ test("wrapForWorld budgets the page-world probe under the caller's timeout", () 
   assert.ok(budget < 60000, "budget must stay under the socket timeout");
 });
 
-test("wrapForWorld escapes backticks and ${} so a body can't break out", () => {
-  const wrapped = wrapForWorld("return `a${b}` + '\\\\';", "page", 15000);
-  // Everything between the pageEval backticks must be inert: no unescaped
-  // backtick or interpolation can survive into the template literal.
-  const inner = wrapped.slice(wrapped.indexOf("`") + 1, wrapped.lastIndexOf("`"));
-  assert.ok(!/(^|[^\\])`/.test(inner), "no unescaped backtick");
-  assert.ok(!/(^|[^\\])\$\{/.test(inner), "no unescaped interpolation");
+test("wrapForWorld embeds the body as an inert JSON string", () => {
+  const src = "return `a${b}` + '\\\\' + \"q\";";
+  const wrapped = wrapForWorld(src, "page", 15000);
+  // The first argument must parse back to exactly the original source.
+  const lit = wrapped.slice(wrapped.indexOf("(") + 1, wrapped.indexOf(", null,"));
+  assert.equal(JSON.parse(lit), src);
+});
+
+test("wrapForWorld pins the tab: URL prefix as string, numeric id as {tab}", () => {
+  assert.match(wrapForWorld("1", "page", 15000, "https://a/"), /, "https:\/\/a\/", \d+\);$/);
+  assert.match(wrapForWorld("1", "page", 15000, 42), /, \{tab:42\}, \d+\);$/);
+  assert.match(wrapForWorld("1", "page", 15000, "42"), /, \{tab:42\}, \d+\);$/);
+});
+
+test("renderReply prints strings raw, objects as JSON, errors as Error:", () => {
+  assert.equal(renderReply('{"ok":true,"value":"a\\nb"}'), "a\nb");
+  assert.equal(renderReply('{"ok":true,"value":{"x":1}}'), '{\n  "x": 1\n}');
+  assert.equal(renderReply('{"ok":false,"error":"boom"}'), "Error: boom");
+  assert.match(renderReply('{"ok":true,"value":null,"note":"missing return"}'), /missing return/);
+  assert.equal(renderReply("not json"), "not json");
 });

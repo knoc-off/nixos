@@ -221,6 +221,7 @@
                 prismlauncher
 
                 gnome-calculator
+                dragon-drop
 
                 openscad
 

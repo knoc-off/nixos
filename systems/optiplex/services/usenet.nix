@@ -148,6 +148,14 @@ in
     recyclarr.enable = true;
   };
 
+  # Keep downloads/unpacking from competing with mpv and Jellyfin on the
+  # shared NVMe. ponytail: the idle IO class only takes effect under bfq;
+  # nvme0n1 runs scheduler "none", so switch it via udev if stutters persist.
+  systemd.services.sabnzbd.serviceConfig = {
+    IOSchedulingClass = "idle";
+    Nice = 10;
+  };
+
   services.caddy.virtualHosts = lib.genAttrs (map (s: "${s}.${domain}") [
     "sonarr"
     "radarr"

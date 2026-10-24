@@ -211,6 +211,7 @@
               spotify
 
               gnome-calculator
+              dragon-drop
 
               usbutils
               watchexec

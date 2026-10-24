@@ -124,6 +124,25 @@ function clip(s) {
   return s.slice(0, OUTPUT_CAP) + `\n... (output truncated at ${OUTPUT_CAP} chars)`;
 }
 
+// The bridge replies {ok, value | error, stack?, note?}. Render it for a
+// reader instead of echoing the envelope: a string value prints raw (real
+// newlines, not "\n" escapes inside a JSON string), anything else as
+// indented JSON; errors print as "Error: ..." so they can't be mistaken for
+// a result.
+export function renderReply(raw) {
+  let r;
+  try {
+    r = JSON.parse(raw);
+  } catch {
+    return raw.trim() || "(no output)";
+  }
+  if (!r || typeof r !== "object" || !("ok" in r)) return raw.trim();
+  if (!r.ok) return `Error: ${r.error}${r.stack ? `\n${r.stack}` : ""}`;
+  const v = r.value;
+  const body = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+  return r.note ? `${body}\n(${r.note})` : body;
+}
+
 // One base64-encoded JS body per connection, newline-terminated; reply is one
 // line of JSON then EOF. See pkgs/browser-exec/bridge.sys.mjs for the server
 // side of this protocol.
@@ -250,21 +269,24 @@ async function pruneTemp() {
 }
 
 // Wraps a snippet body so it can call the bridge's pageEval() from a chrome-
-// world script -- `world: "page"` snippets are just `return pageEval(\`...\`)`
+// world script -- `world: "page"` snippets are just `return pageEval(...)`
 // under the hood, but that indirection would be tedious to write by hand for
 // every request, so the tool does it based on the header/arg instead.
 //
+// The body travels as a JSON string literal: no template-literal escaping to
+// get wrong. `tab` (URL prefix, or a numeric tab id) pins the target tab, so
+// a page-world call doesn't silently hit whatever the user has focused.
+//
 // The bridge's own content-probe timeout is passed explicitly and set below
 // this tool's socket timeout. Otherwise the bridge's 8s default silently caps
-// every page-world snippet: ask for `timeout: 60`, wait 8s, get "content
-// probe timed out" and go looking for the bug in the page.
-export function wrapForWorld(body, world, timeoutMs) {
+// every page-world snippet: ask for `timeout: 60`, wait 8s, get "page eval
+// timed out" and go looking for the bug in the page.
+export function wrapForWorld(body, world, timeoutMs, tab) {
   if (world === "page") {
-    // Backtick-embed: escape backtick/backslash/${ so the body can't break
-    // out of the template literal it's wrapped in.
-    const escaped = body.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\$\{/g, "\\${");
     const budget = Math.max(1000, Math.floor((timeoutMs || 15000) * 0.9));
-    return `return await pageEval(\`${escaped}\`, null, ${budget});`;
+    const target =
+      tab == null || tab === "" ? "null" : /^\d+$/.test(String(tab)) ? `{tab:${Number(tab)}}` : JSON.stringify(String(tab));
+    return `return await pageEval(${JSON.stringify(body)}, ${target}, ${budget});`;
   }
   return body;
 }
@@ -286,14 +308,27 @@ export default async (_ctx) => {
         "session. " +
         "What: evaluate JavaScript against a running Firefox (firefox-neo), " +
         "either chrome-privileged (`world: 'chrome'`, default -- full browser " +
-        "UI/XPCOM access, sandbox helpers: tabs(), openTab(url), $/$$, cs(), R(), " +
-        "readable(), contentEval(), pageEval(), reloadUserscripts(), jev, snippet()) or scoped " +
-        "to the active tab's page (`world: 'page'` -- runs in that page's own " +
-        "content window). " +
-        "When: extracting structure/text from a page, driving the browser UI, " +
-        "or iterating on a userscript before saving it. Requires firefox-neo " +
-        "running with browser-exec's bridge.sys.mjs loaded (unix socket, no " +
-        "auth beyond filesystem permissions -- see pkgs/browser-exec). " +
+        "UI/XPCOM access) or in a tab's page (`world: 'page'` -- the page's " +
+        "own JS environment, no Xrays: spreading NodeLists, page globals and " +
+        "frameworks all work like the devtools console). Pin the tab with " +
+        "`tab` (URL prefix or tab id); without it, page code runs in whatever " +
+        "tab the user has focused. " +
+        "Chrome-world helpers: `tabs()` -> [{tab, window, url, title, " +
+        "selected, ...}] (each row is a valid target); `await openTab(url, " +
+        "{selector?, select?, wait?})` opens a tab, waits for load (or the " +
+        "selector), returns its target; `selectTab(target)`, " +
+        "`closeTab(target)`; `await waitFor(target, {selector?, timeout?})`; " +
+        "`await pageEval(code, target?, timeoutMs?)` runs page-world code in " +
+        "that tab (code is a string; `return` optional); `readable(target?)`; " +
+        "`sidebarEval(code)` targets the Sidebery sidebar, NOT a page; " +
+        "`sleep(ms)`; $/$$/cs()/R() on chrome DOM; reloadUserscripts(); jev; " +
+        "snippet(name). A target is a tab id ({tab: n}), a URL prefix string " +
+        "or RegExp, or a window id. " +
+        "When: extracting structure/text from a page, filling forms, driving " +
+        "the browser UI, or iterating on a userscript before saving it. " +
+        "Requires firefox-neo running with browser-exec's bridge.sys.mjs " +
+        "loaded (unix socket, no auth beyond filesystem permissions -- see " +
+        "pkgs/browser-exec). " +
         "Shapes: `list` (true, or a substring) returns saved snippets without " +
         "evaluating anything -- do this first; `script` alone evals once, " +
         "nothing saved; `script`+`name`(+`description`) saves to the snippet " +
@@ -321,17 +356,26 @@ export default async (_ctx) => {
           .string()
           .optional()
           .describe(
-            "JS *body*, not an expression: it must `return` the value you " +
-              "want back, and bare `await` works. A body with no `return` " +
-              "yields null. In `world: 'page'` the body runs against the " +
-              "tab's own window, so ordinary page JS (document, location, " +
-              "setTimeout, fetch) works as written. Omit to re-run a saved " +
-              "snippet by name, reload, or list."
+            "JS body. `return` is optional: a lone expression (e.g. " +
+              "`document.title`) returns its value; a multi-statement body " +
+              "needs `return`. Bare `await` works. In `world: 'page'` the " +
+              "body runs in the page's own window (document, location, " +
+              "fetch, page globals). Omit to re-run a saved snippet by name, " +
+              "reload, or list."
           ),
         world: z
           .enum(["chrome", "page"])
           .optional()
-          .describe("'chrome' (default) or 'page' (active tab's content window)."),
+          .describe("'chrome' (default) or 'page' (a tab's content window; see `tab`)."),
+        tab: z
+          .union([z.string(), z.number()])
+          .optional()
+          .describe(
+            "world 'page' only: which tab -- a URL prefix (e.g. " +
+              "'https://www.kingston.com/en/support/rma') or a tab id from " +
+              "tabs(). Default: the focused tab, which the user may change " +
+              "under you."
+          ),
         name: z
           .string()
           .optional()
@@ -367,8 +411,8 @@ export default async (_ctx) => {
       async execute(args) {
           if (args.reload) {
             try {
-              const out = await evalOverBridge("return await reloadUserscripts();", 15000);
-              return `reload: ${out.trim()}`;
+            const out = await evalOverBridge("return await reloadUserscripts();", 15000);
+            return `reload: ${renderReply(out)}`;
             } catch (e) {
               return `Error: ${e.message}`;
             }
@@ -444,8 +488,8 @@ export default async (_ctx) => {
 
           const timeoutMs = Math.min(Number(args.timeout) || 15, 120) * 1000;
           try {
-            const out = await evalOverBridge(wrapForWorld(body, world, timeoutMs), timeoutMs);
-            return `${savedMsg}$ browser_exec [${world}] ${label}\n${clip(out.trim() || "(no output)")}`;
+            const out = await evalOverBridge(wrapForWorld(body, world, timeoutMs, args.tab), timeoutMs);
+            return `${savedMsg}$ browser_exec [${world}] ${label}\n${clip(renderReply(out))}`;
           } catch (e) {
             return `${savedMsg}$ browser_exec [${world}] ${label}\nError: ${e.message}`;
           }

@@ -217,9 +217,20 @@
                 "keep-open" = "always";
                 "force-window" = true;
                 "idle" = "yes";
+                # Tiled, Hyprland composited every 4K frame on top of mpv's own
+                # rendering (directScanoutBlockedBy: windowed mode).
+                fullscreen = true;
 
-                vo = "gpu";
+                # The TV stays at 4K60, so 24/25 fps content cannot map evenly
+                # onto refreshes (25 -> 60 is a 2/3 pulldown judder). Resampling
+                # to the display clock and blending frames fixes that for every
+                # source rate without switching modes; oversample is the
+                # cheapest tscale, which matters on the UHD 630 at 2160p.
+                vo = "gpu-next";
                 hwdec = "auto-safe";
+                "video-sync" = "display-resample";
+                interpolation = true;
+                tscale = "oversample";
 
                 volume = 70;
                 "audio-file-auto" = "fuzzy";
@@ -257,7 +268,11 @@
                 };
               };
 
-              defaultProfiles = [ "gpu-hq" ];
+              # The UHD 630 render engine sat at 87-100% (intel_gpu_top) with
+              # the default lanczos 1080p->2160p upscale, per-frame HDR peak
+              # detection and interpolation. "fast" drops to bilinear and
+              # hdr-compute-peak=no, which is what leaves room for interpolation.
+              defaultProfiles = [ "fast" ];
 
               bindings = {
                 "WHEEL_UP" = "seek 5";

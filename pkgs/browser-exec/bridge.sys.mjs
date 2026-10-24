@@ -52,8 +52,7 @@ const SOCK_PATH = (() => {
   }
 })();
 
-// Sidebery, kept as the default `contentEval` target for backward
-// compatibility with existing zdbg-style scripts. Overridable via pref.
+// Sidebery, the default `sidebarEval` target. Overridable via pref.
 const DEFAULT_EXT_ID = "{3c078156-979c-498b-8990-85f7987dd929}";
 const extensionId = () => {
   try {
@@ -129,6 +128,9 @@ const tabsOf = (target) => {
     for (const t of w.gBrowser.tabs) {
       out.push({
         id: idOf(t.linkedBrowser),
+        // Same id under the key targets use, so a row from tabs() can be
+        // passed straight to pageEval/selectTab/waitFor as a target.
+        tab: idOf(t.linkedBrowser),
         window: windowId,
         url: t.linkedBrowser.currentURI.spec,
         title: t.label,
@@ -203,18 +205,32 @@ function findExtensionBrowser(win, extId) {
 }
 
 // Resolve the <browser> a page-level helper should target. A target of
-// `{ tab: id }` addresses one specific tab in any window; a window id (bare or
-// `{ window: id }`) addresses that window's selected tab; nothing addresses
-// the most recent window's selected tab.
+// `{ tab: id }` addresses one specific tab in any window; a URL string or
+// RegExp addresses the first tab whose URL matches (and is how a snippet
+// pins "the page I opened" instead of racing the user's focus); a window id
+// (bare number or `{ window: id }`) addresses that window's selected tab;
+// nothing addresses the most recent window's selected tab.
+const findTab = (pred) => {
+  for (const w of allWins()) {
+    if (!w.gBrowser) continue;
+    for (const t of w.gBrowser.tabs) if (pred(t, w)) return { tab: t, win: w };
+  }
+  return null;
+};
+
+const urlMatches = (spec, m) =>
+  m instanceof RegExp ? m.test(spec) : spec === m || spec.startsWith(m);
+
 const targetBrowser = (target) => {
+  if (typeof target === "string" || target instanceof RegExp) {
+    const hit = findTab((t) => urlMatches(t.linkedBrowser.currentURI.spec, target));
+    if (!hit) throw new Error("no tab matching " + String(target));
+    return hit.tab.linkedBrowser;
+  }
   if (target && typeof target === "object" && target.tab != null) {
-    for (const w of allWins()) {
-      if (!w.gBrowser) continue;
-      for (const t of w.gBrowser.tabs) {
-        if (idOf(t.linkedBrowser) === target.tab) return t.linkedBrowser;
-      }
-    }
-    throw new Error("no tab with id " + JSON.stringify(target.tab));
+    const hit = findTab((t) => idOf(t.linkedBrowser) === target.tab);
+    if (!hit) throw new Error("no tab with id " + JSON.stringify(target.tab));
+    return hit.tab.linkedBrowser;
   }
   const win = needWin(target);
   if (!win.gBrowser) throw new Error("window has no gBrowser");
@@ -231,46 +247,76 @@ const CONTENT_TIMEOUT_MS = 8000;
 // Pure string building, kept separate from the IPC so the shape below is
 // readable and reviewable on its own.
 //
-// Three hazards are handled here, each of which previously cost a debugging
-// round-trip and so is encoded rather than documented-and-forgotten:
+// The body is evaluated with Cu.evalInSandbox in a sandbox whose prototype
+// is the page's own window and `wantXrays: false`. That buys three things
+// over a plain frame-script eval, each of which previously cost a debugging
+// round-trip:
 //
-//   1. Frame scripts get `content` (the tab's window) as their only content
-//      global. There is no bare `document`/`window`, so naive page JS throws
-//      "document is not defined" -- in the one place whose entire purpose is
-//      running page JS. Aliasing those two is necessary but was not
-//      sufficient: `location`, `setTimeout`, `fetch`, `XMLHttpRequest` and
-//      every other page global stayed undefined, each one its own surprise
-//      at its own moment. `with (window)` puts the whole content global
-//      object on the scope chain in one move, so the set can't drift out of
-//      date the way a hand-maintained alias list does.
+//   1. Every page global (`document`, `location`, `fetch`, ...) is in scope
+//      via the prototype chain -- no hand-maintained alias list, no `with`.
 //
-//      The `with` tradeoff: an assignment to a bare name inside `code` now
-//      hits the page's global if the page already defines that name. For DOM
-//      probing -- what this is for -- that is a fair trade against globals
-//      silently missing. Frame scripts are non-strict, so `with` is legal.
+//   2. No Xray wrappers: the body sees the page's real objects, so
+//      `[...document.querySelectorAll(..)]`, page-defined globals and
+//      framework internals all work like they would in the page's console.
+//      (Through Xrays, spreading a NodeList throws "Permission denied to
+//      access property Symbol.iterator" -- the single most common failure.)
 //
-//   2. `code` is a body, not an expression: it needs an explicit `return`.
-//      Without one it evaluates to `undefined`, which is indistinguishable
-//      from a probe that legitimately found nothing.
+//   3. `return` is optional. A body with no `return` is wrapped as an
+//      expression first, so `document.title` alone yields the title; only
+//      if that doesn't parse (a real multi-statement body) is it wrapped as
+//      a function body. A syntax error in either form is caught and reported
+//      *as a syntax error* instead of the probe silently timing out.
 //
-//   3. Awaiting before sending. A pending Promise structured-clones to `{}`
-//      with no error, silently swallowing every async probe.
+// Awaiting before sending matters: a pending Promise structured-clones to
+// `{}` with no error, silently swallowing every async probe. A thrown error
+// comes back tagged so the chrome side can reject rather than hand the
+// caller a successful-looking result object (see receiveMessage).
 //
-// A thrown error comes back tagged so the chrome side can reject rather than
-// hand the caller a successful-looking result object (see receiveMessage).
-const frameScriptFor = (code, id) =>
-  "(async function(){var window=content,document=content.document;var r;" +
-  "try{r=await (async function(){with(window){" +
-  code +
-  "\n}})()}catch(e){r={__bxError:String(e)}}" +
-  "sendAsyncMessage('bxdbg-result',{__id:" +
-  JSON.stringify(id) +
-  ",result:r})})()";
+// mode "frame" is the old behaviour, kept for internal callers that need it:
+// the body runs in the frame script's own (system-principal) scope with the
+// page reached through Xrays. readable() needs that for ChromeUtils, and
+// jev needs it because its node cache lives on an Xray expando
+// (window.__jevFast) -- expandos are per-compartment, so a fresh sandbox per
+// call would lose the cache between observe() and act().
+export const frameScriptFor = (code, id, mode = "page") => {
+  const send =
+    "sendAsyncMessage('bxdbg-result',{__id:" + JSON.stringify(id) + ",result:r})";
+  if (mode === "frame") {
+    return (
+      "(async function(){var window=content,document=content.document;var r;" +
+      "try{r=await (async function(){with(window){" +
+      code +
+      "\n}})()}catch(e){r={__bxError:String(e)}}" +
+      send +
+      "})()"
+    );
+  }
+  // Expression form first (trailing `;` stripped so `document.title;` still
+  // counts), statement-body form as the fallback. Compiling either does not
+  // run it, so nothing executes twice.
+  const expr = "(async function(){return (\n" + code.replace(/[\s;]+$/, "") + "\n)})";
+  const body = "(async function(){\n" + code + "\n})";
+  return (
+    "(async function(){var r;try{var Cu=Components.utils;" +
+    "var sb=Cu.Sandbox(content,{sandboxPrototype:content,wantXrays:false," +
+    "sandboxName:'browser-exec:pageEval'});var fn;" +
+    "try{fn=Cu.evalInSandbox(" + JSON.stringify(expr) + ",sb)}" +
+    "catch(e1){try{fn=Cu.evalInSandbox(" + JSON.stringify(body) + ",sb)}" +
+    "catch(e2){throw new Error('syntax error in page code: '+e2.message)}}" +
+    "r=await fn();" +
+    // Page objects (wantXrays:false) don't structured-clone reliably; a JSON
+    // round-trip through the frame script's own JSON makes them plain data.
+    "if(r&&typeof r==='object'){try{r=JSON.parse(JSON.stringify(r))}catch(_){r=String(r)}}" +
+    "}catch(e){r={__bxError:String(e&&e.message||e)}}" +
+    send +
+    "})()"
+  );
+};
 
 // Run code inside a remote <browser>'s content document via a frame-script
 // round trip -- the only way to reach a process-separated document from
-// chrome. Shared by contentEval (sidebar) and pageEval (active tab).
-const evalInBrowser = (browserEl, code, timeoutMs) =>
+// chrome. Shared by sidebarEval, pageEval, readable and jev.
+const evalInBrowser = (browserEl, code, timeoutMs, mode = "page") =>
   new Promise((resolve, reject) => {
     if (!browserEl) {
       reject(new Error("target browser not found"));
@@ -304,31 +350,30 @@ const evalInBrowser = (browserEl, code, timeoutMs) =>
     };
     mm.addMessageListener("bxdbg-result", onMsg);
     // Unique id in the URL doubles as a cache-buster; frame scripts are
-    // keyed by URL and would otherwise be reused.
+    // keyed by URL and would otherwise be reused. The explicit charset is
+    // load-bearing: a bare `data:,` script is decoded as Latin-1, so every
+    // non-ASCII character in the code ("°", "ü") reached the page mangled.
     mm.loadFrameScript(
-      "data:," + encodeURIComponent(frameScriptFor(code, id)),
+      "data:text/javascript;charset=utf-8," +
+        encodeURIComponent(frameScriptFor(code, id, mode)),
       false
     );
     setTimeout(() => {
       try {
         mm.removeMessageListener("bxdbg-result", onMsg);
       } catch (e) {}
-      // A syntax error in `code` also lands here rather than in the content
-      // try/catch: the frame script fails to parse, so nothing ever calls
-      // sendAsyncMessage. Say so, since "timed out" alone sends people
-      // hunting a slow page instead of a stray brace.
-      reject(
-        new Error(
-          "content probe timed out after " +
-            limit +
-            "ms (code still running, or a syntax error kept the frame " +
-            "script from parsing at all)"
-        )
-      );
+      // Page-mode syntax errors are caught and reported in content; a timeout
+      // here means the code is still running (or, in frame mode only, failed
+      // to parse).
+      reject(new Error("page eval timed out after " + limit + "ms"));
     }, limit);
   });
 
-const contentEval = (code, target, timeoutMs) =>
+// Evaluate in an extension's sidebar document (Sidebery by default). This
+// used to be called `contentEval`, a name that read as "evaluate in the
+// page" and sent people poking at a sidebar that had no idea what
+// `document.getElementById('PartNo')` was. The page helper is `pageEval`.
+const sidebarEval = (code, target, timeoutMs) =>
   evalInBrowser(
     findExtensionBrowser(getWin(target), extensionId()),
     code,
@@ -337,6 +382,39 @@ const contentEval = (code, target, timeoutMs) =>
 
 const pageEval = (code, target, timeoutMs) =>
   evalInBrowser(targetBrowser(target), code, timeoutMs);
+
+// Internal: old frame-scope semantics (see frameScriptFor). Not exposed to
+// snippets.
+const frameEval = (code, target, timeoutMs) =>
+  evalInBrowser(targetBrowser(target), code, timeoutMs, "frame");
+
+// Wait until a tab's document is loaded (and optionally until `selector`
+// exists in it). The common pattern "openTab(); sleep(7000); probe" guesses
+// at a delay and either wastes seconds or races the page; this polls.
+const waitFor = async (target, { selector, timeout = 15000, interval = 250 } = {}) => {
+  // A fresh tab is about:blank -- already "complete" -- before it navigates,
+  // so a bare readyState check would return before the real page started.
+  const notBlank = "location.href !== 'about:blank' && ";
+  const probe = selector
+    ? notBlank + "document.readyState !== 'loading' && !!document.querySelector(" + JSON.stringify(selector) + ")"
+    : notBlank + "document.readyState === 'complete'";
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    let ok = false;
+    try {
+      ok = await pageEval(probe, target, 2000);
+    } catch (_) {
+      // document mid-navigation: try again
+    }
+    if (ok) return true;
+    if (Date.now() > deadline) {
+      throw new Error(
+        "waitFor: timed out after " + timeout + "ms waiting for " + (selector || "load")
+      );
+    }
+    await new Promise((r) => setTimeout(r, interval));
+  }
+};
 
 // Article extraction via Firefox's own bundled Readability, on a page
 // holding your real session. No dependency, no separate extraction lib.
@@ -353,7 +431,7 @@ const READABLE_SNIPPET = `
     if (!article) return null;
     return { title: article.title, byline: article.byline, textContent: article.textContent, length: article.length };
   `;
-const readable = (target) => pageEval(READABLE_SNIPPET, target);
+const readable = (target) => frameEval(READABLE_SNIPPET, target);
 
 // A system-principal sandbox with no window prototype. Evaluating in the
 // chrome window's own scope trips its CSP ("Missing 'unsafe-eval'"), and a
@@ -377,8 +455,18 @@ const mkSandbox = () => {
   try {
     s.InspectorUtils = InspectorUtils;
   } catch (e) {}
-  s.contentEval = contentEval;
+  s.sidebarEval = sidebarEval;
+  // Hard failure, not a silent alias: the old name was the trap (see
+  // sidebarEval's comment), so a stale snippet should fail loudly.
+  s.contentEval = () => {
+    throw new Error(
+      "contentEval was removed: use pageEval(code, target?) for the page, " +
+        "or sidebarEval(code) for the extension sidebar"
+    );
+  };
   s.pageEval = pageEval;
+  s.waitFor = waitFor;
+  s.sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   s.readable = readable;
   s.sidebarBrowser = (id) => findExtensionBrowser(getWin(), id || extensionId());
 
@@ -388,13 +476,41 @@ const mkSandbox = () => {
   s.windows = windows;
   s.getWindow = (target) => getWin(target);
   s.tabs = tabsOf;
-  s.openTab = (url, target) => {
-    const w = needWin(target);
+  // Open a tab and, unless {wait:false}, resolve once its document has
+  // loaded. Returns a target usable by every page helper, so
+  //   const t = await openTab(url); await pageEval("document.title", t)
+  // addresses that tab no matter what the user clicks on meanwhile.
+  s.openTab = async (url, opts = {}) => {
+    const w = needWin(opts.window);
     const tab = w.gBrowser.addTab(url, {
       triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
     });
-    w.gBrowser.selectedTab = tab;
-    return { url, window: idOf(w), id: idOf(tab.linkedBrowser) };
+    if (opts.select !== false) w.gBrowser.selectedTab = tab;
+    const target = { tab: idOf(tab.linkedBrowser), window: idOf(w), url };
+    if (opts.wait !== false) {
+      await waitFor(target, { selector: opts.selector, timeout: opts.timeout || 15000 });
+    }
+    return target;
+  };
+  // Bring an existing tab (by id, URL prefix or RegExp) to the front.
+  s.selectTab = (target) => {
+    const hit =
+      typeof target === "string" || target instanceof RegExp
+        ? findTab((t) => urlMatches(t.linkedBrowser.currentURI.spec, target))
+        : findTab((t) => idOf(t.linkedBrowser) === (target && target.tab != null ? target.tab : target));
+    if (!hit) throw new Error("selectTab: no tab matching " + String(target && target.tab != null ? target.tab : target));
+    hit.win.gBrowser.selectedTab = hit.tab;
+    hit.win.focus();
+    return { tab: idOf(hit.tab.linkedBrowser), window: idOf(hit.win), url: hit.tab.linkedBrowser.currentURI.spec };
+  };
+  s.closeTab = (target) => {
+    const hit =
+      typeof target === "string" || target instanceof RegExp
+        ? findTab((t) => urlMatches(t.linkedBrowser.currentURI.spec, target))
+        : findTab((t) => idOf(t.linkedBrowser) === (target && target.tab != null ? target.tab : target));
+    if (!hit) return false;
+    hit.win.gBrowser.removeTab(hit.tab);
+    return true;
   };
 
   // Window-scoped DOM helpers. Resolved against the target window at call
@@ -427,7 +543,7 @@ const mkSandbox = () => {
   // module can't take the whole bridge down with it.
   Object.defineProperty(s, "jev", {
     get: () =>
-      ChromeUtils.importESModule("chrome://userscripts/content/jev.sys.mjs").makeJev(pageEval),
+      ChromeUtils.importESModule("chrome://userscripts/content/jev.sys.mjs").makeJev(frameEval),
   });
   // Run a saved browser_exec snippet by name, in the world its header says.
   // Lets a script hand a reviewed snippet to jev.run({ops}) as an operation.
@@ -437,20 +553,40 @@ const mkSandbox = () => {
       Services.env.get("HOME") + "/.local/share/browser-exec/snippets/" + name + ".js"
     );
     if (/^\/\/\s*world\s*=\s*"page"\s*$/m.test(src)) return pageEval(src, target);
-    return Cu.evalInSandbox("(async function(){\n" + src + "\n})()", mkSandbox());
+    return runChrome(src);
   };
   return s;
 };
 
-// atob is a window property in a *.uc.js and not reliably a system-global one.
-// Prefer the global if this build provides it, else borrow a window's, else
-// fail loudly rather than silently evaluating "" (which returned `undefined`
-// for every request and looked like a hang on the client side).
+// The wire carries base64 of UTF-8 bytes. atob alone yields one char per
+// *byte* (Latin-1), so any non-ASCII text in a script ("42 °C", umlauts in a
+// form value) arrived mangled. Decode the bytes as UTF-8 explicitly.
+// atob is a window property in a *.uc.js and not reliably a system-global
+// one: prefer the global, else borrow a window's.
 const b64decode = (text) => {
-  if (typeof atob === "function") return atob(text);
-  const win = getWin();
-  if (win) return win.atob(text);
-  throw new Error("no base64 decoder available");
+  const raw =
+    typeof atob === "function"
+      ? atob(text)
+      : getWin()
+        ? getWin().atob(text)
+        : null;
+  if (raw == null) throw new Error("no base64 decoder available");
+  return new TextDecoder().decode(Uint8Array.from(raw, (c) => c.charCodeAt(0)));
+};
+
+// Compile a chrome-world body: expression form first, so a bare
+// `tabs().length` returns its value; statement-body form as the fallback.
+// Same rule as page-world code (see frameScriptFor), so the two worlds can't
+// disagree about whether `return` is needed.
+const runChrome = (src) => {
+  const sb = mkSandbox();
+  let fn;
+  try {
+    fn = Cu.evalInSandbox("(async function(){return (\n" + src.replace(/[\s;]+$/, "") + "\n)})", sb);
+  } catch (_) {
+    fn = Cu.evalInSandbox("(async function(){\n" + src + "\n})", sb);
+  }
+  return fn();
 };
 
 function handleConnection(transport) {
@@ -472,15 +608,19 @@ function handleConnection(transport) {
   const respond = async (line) => {
     let payload;
     try {
-      const src = b64decode(line.trim());
-      let value = Cu.evalInSandbox(
-        "(async function(){\n" + src + "\n})()",
-        mkSandbox()
-      );
-      value = await value;
-      payload = { ok: true, value };
+      const value = await runChrome(b64decode(line.trim()));
+      payload =
+        value === undefined
+          ? { ok: true, value: null, note: "script returned undefined (missing `return`?)" }
+          : { ok: true, value };
     } catch (e) {
-      payload = { ok: false, error: String(e), stack: e && e.stack };
+      payload = { ok: false, error: String(e) };
+      // Bridge-internal frames are pure noise (every error "comes from"
+      // respond/onInputStreamReady); keep only frames from the caller's code.
+      const own = String((e && e.stack) || "")
+        .split("\n")
+        .filter((l) => l && !/bridge\.sys\.mjs/.test(l));
+      if (own.length) payload.stack = own.join("\n");
     }
 
     let text;
