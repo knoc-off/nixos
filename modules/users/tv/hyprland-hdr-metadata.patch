@@ -1,0 +1,14 @@
+--- a/src/render/Renderer.cpp
++++ b/src/render/Renderer.cpp
+@@ -2355,7 +2355,10 @@
+                 wantHDR                 = *PAUTOHDR && surfaceIsHDR;
+                 if (FULLSCREEN_WINDOW && FULLSCREEN_WINDOW->m_ruleApplicator->noAutoHDR().valueOrDefault())
+                     wantHDR = configuredHDR;
+-                if (surfaceIsHDR && !SURF->m_colorManagement->isWindowsScRGB() && !pMonitor->m_lastScanout.expired()) {
++                // Patched (nixos tv): also when composited into an HDR output, not only when
++                // direct-scanned-out. Otherwise the infoframe gets the monitor's placeholder
++                // (mastering 10000 nits, MaxCLL/FALL 0) instead of the video's HDR10 metadata.
++                if (surfaceIsHDR && !SURF->m_colorManagement->isWindowsScRGB() && (!pMonitor->m_lastScanout.expired() || (configuredHDR && wantHDR))) {
+                     // DS HDR
+                     bool needsHdrMetadataUpdate =
+                         SURF->m_colorManagement->needsHdrMetadataUpdate() || pMonitor->m_previousFSWindow != FULLSCREEN_WINDOW || pMonitor->m_needsHDRupdate;

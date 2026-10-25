@@ -27,8 +27,23 @@
       mpvRefreshRate = pkgs.runCommand "mpv-refresh-rate" { scriptName = "refresh-rate.lua"; } ''
         mkdir -p $out/share/mpv/scripts
         substitute ${./mpv-refresh-rate.lua} $out/share/mpv/scripts/refresh-rate.lua \
-          --replace-fail @hyprctl@ ${lib.getExe' upkgs.hyprland "hyprctl"}
+          --replace-fail @hyprctl@ ${lib.getExe' hyprland "hyprctl"}
       '';
+
+      # Hyprland 0.56 only puts a fullscreen surface's own HDR10 metadata
+      # (mastering luminance, MaxCLL/FALL) into the HDMI infoframe when the
+      # surface is direct-scanned-out; mpv is composited, so the projector got
+      # a placeholder (10000 nits, CLL 0) and tone-mapped for the wrong range.
+      # Pinned to the version the patch was written against: a bump must fail
+      # here instead of silently dropping or misapplying it. Plugins are built
+      # against upkgs.hyprland; the patch only touches a .cpp, so the ABI and
+      # headers they link are unchanged.
+      hyprland =
+        assert lib.assertMsg (upkgs.hyprland.version == "0.56.2")
+          "hyprland is ${upkgs.hyprland.version}: re-check ./hyprland-hdr-metadata.patch (upstream may have fixed it) and bump this pin";
+        upkgs.hyprland.overrideAttrs (old: {
+          patches = (old.patches or [ ]) ++ [ ./hyprland-hdr-metadata.patch ];
+        });
 
       # The embedded libmpv never reads ~/.config/mpv (config=no) and sets
       # other_conf as properties after mpv_initialize, where "scripts" is
@@ -70,6 +85,8 @@
     in
     {
       imports = [ inputs.home-manager.nixosModules.home-manager ];
+
+      programs.hyprland.package = lib.mkForce hyprland;
 
       # The bridge is D-Bus activated by xdg-desktop-portal, so its
       # share/dbus-1/services entry has to be on the session bus search path.
@@ -121,6 +138,7 @@
 
               self.homeModules.noctalia
               self.homeModules.hyprland-tv
+              { wayland.windowManager.hyprland.package = lib.mkForce hyprland; }
               ./away.nix
               ./files.nix
               self.homeModules.stylix
