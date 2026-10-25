@@ -471,7 +471,6 @@ in
         wl-clipboard
         xdg-utils
         dwl
-        firefox
         mpv
 
         bluetuith

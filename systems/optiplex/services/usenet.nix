@@ -13,6 +13,7 @@
   config,
   inputs,
   lib,
+  pkgs,
   ...
 }:
 let
@@ -156,6 +157,16 @@ in
     # /dev/dri and runs in the "media" library group.
     jellyfin = {
       enable = true;
+      # 10.11's ContainsSubPath is an unanchored substring test, so the
+      # /media library below makes every scan drop /srv/media/{movies,tv} as
+      # "duplicate paths" and new imports never appear. Backport of upstream
+      # 4e1c5503 (in 12.x); drop once nixflix's jellyfin is >= 12.
+      package =
+        assert lib.assertMsg (pkgs.jellyfin.version == "10.11.11")
+          "jellyfin is ${pkgs.jellyfin.version}: drop ./jellyfin-contains-subpath.patch if it has upstream 4e1c5503";
+        pkgs.jellyfin.overrideAttrs (old: {
+          patches = (old.patches or [ ]) ++ [ ./jellyfin-contains-subpath.patch ];
+        });
       apiKey = secret "services/jellyfin/api-key";
       # LAN clients (phone app, other TVs) and their 1900/7359 UDP discovery.
       openFirewall = true;
