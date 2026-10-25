@@ -273,6 +273,11 @@
                 vo = "gpu-next";
                 hwdec = "auto-safe";
                 "video-sync" = "display-resample";
+                # Pass HDR through instead of tone-mapping: mpv tags its surface
+                # with the source colorspace, and refresh-rate.lua switches the
+                # output to 10-bit cm=hdr for PQ/HLG content.
+                "target-colorspace-hint" = "yes";
+                "target-colorspace-hint-mode" = "source";
 
                 volume = 70;
                 "audio-file-auto" = "fuzzy";
