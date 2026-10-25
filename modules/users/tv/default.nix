@@ -279,8 +279,13 @@
                 "video-sync" = "display-resample";
                 # Pass HDR through instead of tone-mapping: mpv tags its surface
                 # with the source colorspace, and refresh-rate.lua switches the
-                # output to 10-bit cm=hdr for PQ/HLG content.
-                "target-colorspace-hint" = "yes";
+                # output to 10-bit cm=hdr for PQ/HLG content. Only for HDR (see
+                # the hdr profile): with the hint on for SDR, mpv tags the
+                # surface BT.1886 and Hyprland 0.56 "converts" that to its sRGB
+                # output with the BT.709 OETF and a 100-nit -> 80-nit range,
+                # which lifts the whole image (measured 128 -> 154) and clips
+                # above ~90%. Untagged, Hyprland passes it through bit-exact.
+                "target-colorspace-hint" = "no";
                 "target-colorspace-hint-mode" = "source";
 
                 volume = 70;
@@ -298,6 +303,12 @@
               };
 
               profiles = {
+                hdr = {
+                  "profile-desc" = "HDR passthrough: tag the surface so Hyprland gets PQ/HLG";
+                  "profile-cond" = ''get("video-params/gamma") == "pq" or get("video-params/gamma") == "hlg"'';
+                  "profile-restore" = "copy";
+                  "target-colorspace-hint" = "yes";
+                };
                 "low-latency-stream" = {
                   "profile-desc" = "Profile for low-latency network streaming";
                   "network-timeout" = 2;
@@ -536,8 +547,27 @@
             # module. Removed rather than fixed: mirroring isn't wanted, and remote
             # input goes through the RemoteDesktop portal instead.
 
-            programs.firefox.enable = true;
-            programs.firefox.configPath = "${config.xdg.configHome}/mozilla/firefox";
+            programs.firefox = {
+              enable = true;
+              configPath = "${config.xdg.configHome}/mozilla/firefox";
+              # ff2mpv-rust launches whatever `mpv` is on PATH, i.e. the hm one
+              # above, so links get the same mpv.conf and refresh-rate.lua.
+              nativeMessagingHosts = [ pkgs.ff2mpv-rust ];
+              # Policies rather than profiles.<name>.extensions: AMO keeps them
+              # updated and the existing profile stays unmanaged.
+              policies.ExtensionSettings =
+                lib.mapAttrs
+                  (_: slug: {
+                    installation_mode = "force_installed";
+                    install_url = "https://addons.mozilla.org/firefox/downloads/latest/${slug}/latest.xpi";
+                  })
+                  {
+                    "uBlock0@raymondhill.net" = "ublock-origin";
+                    "sponsorBlocker@ajay.app" = "sponsorblock";
+                    "ff2mpv@yossarian.net" = "ff2mpv";
+                    "{762f9885-5a13-4abd-9c77-433dcd38b8fd}" = "return-youtube-dislikes";
+                  };
+            };
 
             # Inlined from tv-xdg-env.nix
             xdg = {
