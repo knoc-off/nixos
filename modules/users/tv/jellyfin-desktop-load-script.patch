@@ -1,0 +1,33 @@
+diff --git a/src/player/PlayerComponent.cpp b/src/player/PlayerComponent.cpp
+index b53e684..05dded4 100644
+--- a/src/player/PlayerComponent.cpp
++++ b/src/player/PlayerComponent.cpp
+@@ -1490,6 +1490,16 @@ void PlayerComponent::setOtherConfiguration()
+     {
+       QString configurationKey = configuration.left(splitIndex).remove(QRegularExpression("^([\"]+)")).remove(QRegularExpression("([\"]+)$"));
+       QString configurationValue = configuration.right(configurationLength - splitIndex - 1).remove(QRegularExpression("^([\"]+)")).remove(QRegularExpression("([\"]+)$"));
++      if (configurationKey == "load-script")
++      {
++        // "scripts" is only read at mpv_initialize, which already happened.
++        if (!m_loadedScripts.contains(configurationValue))
++        {
++          m_loadedScripts << configurationValue;
++          m_mpv->command(QStringList() << "load-script" << configurationValue);
++        }
++        continue;
++      }
+       m_mpv->setProperty( configurationKey, configurationValue);
+     }
+   }
+diff --git a/src/player/PlayerComponent.h b/src/player/PlayerComponent.h
+index b3542ce..c50ba2e 100644
+--- a/src/player/PlayerComponent.h
++++ b/src/player/PlayerComponent.h
+@@ -263,6 +263,7 @@ private:
+   void reselectStream(const QVariant &streamSelection, MediaType target);
+ 
+   MpvController* m_mpv = nullptr;
++  QStringList m_loadedScripts;
+ 
+   State m_state;
+   bool m_paused;

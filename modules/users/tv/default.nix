@@ -22,6 +22,47 @@
       toMimeApps = lib.concatMapAttrs (
         type: lib.mapAttrs' (sub: apps: lib.nameValuePair "${type}/${sub}" apps)
       );
+
+      # Shared by standalone mpv and jellyfin-desktop's embedded one.
+      mpvRefreshRate = pkgs.runCommand "mpv-refresh-rate" { scriptName = "refresh-rate.lua"; } ''
+        mkdir -p $out/share/mpv/scripts
+        substitute ${./mpv-refresh-rate.lua} $out/share/mpv/scripts/refresh-rate.lua \
+          --replace-fail @hyprctl@ ${lib.getExe' upkgs.hyprland "hyprctl"}
+      '';
+
+      # The embedded libmpv never reads ~/.config/mpv (config=no) and sets
+      # other_conf as properties after mpv_initialize, where "scripts" is
+      # ignored. The patch turns other_conf "load-script=<path>" lines into
+      # mpv load-script commands.
+      jellyfinDesktop = pkgs.jellyfin-desktop.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [ ./jellyfin-desktop-load-script.patch ];
+      });
+
+      # Merged into the app's own settings file on activation: the app rewrites
+      # that file itself, so it cannot be a read-only store symlink.
+      jellyfinDesktopSettings = {
+        # The default "bundled" start page navigates qrc: -> http, and the
+        # NativeShell user script is lost on that hop (Qt 6.11): jellyfin-web
+        # then loads only its HTML5 player, the server transcodes HEVC/DTS to
+        # H.264/AAC and flattens HDR to bt709 (washed out). Starting on the
+        # server URL keeps the mpv player plugin.
+        path.startupurl_desktop = "http://localhost:8096/web/";
+        # vaapi zero-copy instead of the default auto-copy readback.
+        video.hardwareDecoding = "enabled";
+        # Same cheap-render settings as standalone mpv's "fast" profile: the
+        # UHD 630 render engine otherwise sits at 100% upscaling to 2160p.
+        other.other_conf = lib.concatStringsSep "\n" [
+          "scale=bilinear"
+          "cscale=bilinear"
+          "dscale=bilinear"
+          "dither-depth=no"
+          "correct-downscaling=no"
+          "linear-downscaling=no"
+          "sigmoid-upscaling=no"
+          "hdr-compute-peak=no"
+          "load-script=${mpvRefreshRate}/share/mpv/scripts/refresh-rate.lua"
+        ];
+      };
     in
     {
       imports = [ inputs.home-manager.nixosModules.home-manager ];
@@ -202,7 +243,10 @@
 
             programs.mpv = {
               enable = true;
-              scripts = [ pkgs.mpvScripts.mpris ];
+              scripts = [
+                pkgs.mpvScripts.mpris
+                mpvRefreshRate
+              ];
               scriptOpts = {
                 osc = {
                   seekbarstyle = "bar";
@@ -221,16 +265,14 @@
                 # rendering (directScanoutBlockedBy: windowed mode).
                 fullscreen = true;
 
-                # The TV stays at 4K60, so 24/25 fps content cannot map evenly
-                # onto refreshes (25 -> 60 is a 2/3 pulldown judder). Resampling
-                # to the display clock and blending frames fixes that for every
-                # source rate without switching modes; oversample is the
-                # cheapest tscale, which matters on the UHD 630 at 2160p.
+                # 24/25 fps content cannot map evenly onto a 4K60 output (25 ->
+                # 60 is a 2/3 pulldown judder). Interpolation was tried and
+                # removed: tscale=oversample ghosted high-contrast motion
+                # (white ice on dark water) and the cadence still showed. The
+                # fix for that is matching the refresh rate, not blending.
                 vo = "gpu-next";
                 hwdec = "auto-safe";
                 "video-sync" = "display-resample";
-                interpolation = true;
-                tscale = "oversample";
 
                 volume = 70;
                 "audio-file-auto" = "fuzzy";
@@ -269,9 +311,8 @@
               };
 
               # The UHD 630 render engine sat at 87-100% (intel_gpu_top) with
-              # the default lanczos 1080p->2160p upscale, per-frame HDR peak
-              # detection and interpolation. "fast" drops to bilinear and
-              # hdr-compute-peak=no, which is what leaves room for interpolation.
+              # the default lanczos 1080p->2160p upscale and per-frame HDR peak
+              # detection. "fast" drops to bilinear and hdr-compute-peak=no.
               defaultProfiles = [ "fast" ];
 
               bindings = {
@@ -314,6 +355,11 @@
               noto-fonts-color-emoji
 
               qview # Image viewer (from tv-xdg-env.nix)
+
+              # Jellyfin client for this box's own screen: plays through mpv,
+              # so local files direct-play (4K/HDR/lossless audio) with no
+              # server-side transcode. Also in the noctalia launcher.
+              jellyfinDesktop
             ];
 
             services.kdeconnect = {
@@ -403,6 +449,10 @@
                     name = "Spotify";
                     command = "${tvRemote} app spotify";
                   };
+                  "32-jellyfin" = {
+                    name = "Jellyfin";
+                    command = "${tvRemote} app jellyfin";
+                  };
                   "40-close" = {
                     name = "Close Window";
                     command = "${tvRemote} close";
@@ -449,6 +499,25 @@
             home.activation.rebuildKdeCache = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
               export PATH="${pkgs.kdePackages.kservice}/bin:$PATH"
               kbuildsycoca6 --noincremental || echo "Warning: kbuildsycoca6 failed, but continuing..."
+            '';
+
+            # Profiles live under a generated id, so merge into each one that
+            # exists. A running instance overwrites the file on exit, hence
+            # the restart hint rather than a silent no-op.
+            home.activation.jellyfinDesktopSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+              for conf in "${config.xdg.dataHome}"/jellyfin-desktop/profiles/*/jellyfin-desktop.conf; do
+                [ -f "$conf" ] || continue
+                tmp=$(mktemp)
+                if ${lib.getExe pkgs.jq} --argjson s ${lib.escapeShellArg (builtins.toJSON jellyfinDesktopSettings)} \
+                    '.sections *= $s' "$conf" >"$tmp"; then
+                  if ! cmp -s "$tmp" "$conf"; then
+                    run install -m644 "$tmp" "$conf"
+                    ${pkgs.procps}/bin/pgrep -x .jellyfin-deskt >/dev/null \
+                      && echo "jellyfin-desktop: settings updated, restart it to apply"
+                  fi
+                fi
+                rm -f "$tmp"
+              done
             '';
 
             # A kded-modules unit lived here. It loaded Plasma kded module names

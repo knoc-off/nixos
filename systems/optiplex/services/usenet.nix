@@ -175,6 +175,11 @@ in
           "vc1"
           "vp9"
         ];
+        # Without this, an HDR10 source transcoded for an SDR client (most
+        # phones on mobile data, browsers) is only relabelled bt709 and looks
+        # washed out. OpenCL tone mapping runs on the iGPU via the legacy
+        # compute runtime set in default.nix (clinfo lists UHD 630).
+        enableTonemapping = true;
       };
     };
   };
