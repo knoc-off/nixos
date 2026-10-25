@@ -33,9 +33,13 @@
       # The embedded libmpv never reads ~/.config/mpv (config=no) and sets
       # other_conf as properties after mpv_initialize, where "scripts" is
       # ignored. The patch turns other_conf "load-script=<path>" lines into
-      # mpv load-script commands.
+      # mpv load-script commands, and hands direct-play HDR items to a
+      # separate system mpv: the embedded one draws into Qt's sRGB surface,
+      # which cannot carry HDR10 to the compositor.
       jellyfinDesktop = pkgs.jellyfin-desktop.overrideAttrs (old: {
-        patches = (old.patches or [ ]) ++ [ ./jellyfin-desktop-load-script.patch ];
+        patches = (old.patches or [ ]) ++ [ ./jellyfin-desktop.patch ];
+        # The external player is whatever "mpv" the session resolves: the
+        # home-manager one, so it gets mpv.conf and refresh-rate.lua.
       });
 
       # Merged into the app's own settings file on activation: the app rewrites

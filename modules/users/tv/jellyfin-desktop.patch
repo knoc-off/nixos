@@ -1,0 +1,214 @@
+diff --git a/native/mpvVideoPlayer.js b/native/mpvVideoPlayer.js
+index e3e8e95..d1aaf2b 100644
+--- a/native/mpvVideoPlayer.js
++++ b/native/mpvVideoPlayer.js
+@@ -7,8 +7,9 @@
+     }
+ 
+     class mpvVideoPlayer {
+-        constructor({ events, loading, appRouter, globalize, appHost, appSettings, confirm, dashboard }) {
++        constructor({ events, loading, appRouter, globalize, appHost, appSettings, confirm, dashboard, playbackManager }) {
+             this.events = events;
++            this.playbackManager = playbackManager;
+             this.loading = loading;
+             this.appRouter = appRouter;
+             this.globalize = globalize;
+@@ -338,6 +339,16 @@
+ 
+                 console.log('[MPV] Mapped audio index:', this._audioTrackIndexToSetOnPlaying, '->', audioRelIndex);
+ 
++                // HDR needs a surface the compositor can switch to HDR10,
++                // which the embedded libmpv (Qt sRGB surface) cannot give,
++                // so hand direct-play HDR items to a separate system mpv.
++                const video = streams.find((s) => s.Type === 'Video');
++                const hdr = /^(HDR|HLG|DOVI)/.test(video?.VideoRangeType || '') || video?.VideoRange === 'HDR';
++                if (hdr && options.playMethod === 'DirectPlay') {
++                    this.playExternal(val, ms, audioRelIndex, subtitleParam, resolve);
++                    return;
++                }
++
+                 player.load(val,
+                     { startMilliseconds: ms, autoplay: true },
+                     streamdata,
+@@ -347,6 +358,46 @@
+             });
+         }
+ 
++        /**
++         * @private
++         */
++        playExternal(url, startMs, audioRelIndex, subtitleParam, resolve) {
++            const player = window.api.player;
++            console.log('[MPV] HDR item, playing in external mpv:', url);
++            this._external = true;
++            const done = (positionMs, eof) => {
++                player.externalFinished.disconnect(done);
++                this._external = false;
++                if (positionMs >= 0) {
++                    this._currentTime = positionMs;
++                }
++                this.loading.hide();
++                if (eof) {
++                    // Same as the embedded player reaching the end: marks it
++                    // watched and lets playbackManager move to the next item.
++                    this.removeMediaDialog();
++                    this.onEndedInternal();
++                } else {
++                    // A quit: go through playbackManager.stop like the OSD stop
++                    // button, which reports currentTime() as the resume point
++                    // and does not auto-advance. A bare "stopped" event would
++                    // start the next episode and report position 0.
++                    this.playbackManager.stop(this);
++                }
++            };
++            player.externalFinished.connect(done);
++            player.playExternal(url, startMs, audioRelIndex ?? -1, subtitleParam ?? -1);
++            this._started = true;
++            this._currentTime = startMs;
++            this.loading.hide();
++            resolve();
++            // Like the embedded player, "playing" must come after play()
++            // resolves: playbackManager only registers the current player
++            // then, and an early event throws "player cannot be null", which
++            // it treats as a playback error and retries as an HLS transcode.
++            setTimeout(() => this.events.trigger(this, 'playing'), 500);
++        }
++
+         setSubtitleStreamIndex(index) {
+             console.log('[MPV] setSubtitleStreamIndex called with index:', index);
+             this._subtitleTrackIndexToSetOnPlaying = index;
+diff --git a/src/player/PlayerComponent.cpp b/src/player/PlayerComponent.cpp
+index b53e684..945c037 100644
+--- a/src/player/PlayerComponent.cpp
++++ b/src/player/PlayerComponent.cpp
+@@ -21,6 +21,8 @@
+ #include <string.h>
+ #include <shared/Paths.h>
+ #include <QRegularExpression>
++#include <QProcess>
++#include <QTemporaryFile>
+ 
+ #if !defined(Q_OS_WIN)
+ #include <unistd.h>
+@@ -1490,6 +1492,16 @@ void PlayerComponent::setOtherConfiguration()
+     {
+       QString configurationKey = configuration.left(splitIndex).remove(QRegularExpression("^([\"]+)")).remove(QRegularExpression("([\"]+)$"));
+       QString configurationValue = configuration.right(configurationLength - splitIndex - 1).remove(QRegularExpression("^([\"]+)")).remove(QRegularExpression("([\"]+)$"));
++      if (configurationKey == "load-script")
++      {
++        // "scripts" is only read at mpv_initialize, which already happened.
++        if (!m_loadedScripts.contains(configurationValue))
++        {
++          m_loadedScripts << configurationValue;
++          m_mpv->command(QStringList() << "load-script" << configurationValue);
++        }
++        continue;
++      }
+       m_mpv->setProperty( configurationKey, configurationValue);
+     }
+   }
+@@ -1511,6 +1523,72 @@ void PlayerComponent::userCommand(QString command)
+   mpv_command_string(m_mpv->mpv(), cmdUtf8.data());
+ }
+ 
++/////////////////////////////////////////////////////////////////////////////////////////
++void PlayerComponent::playExternal(const QString& url, qint64 startMs, int audioIndex, const QVariant& subtitle)
++{
++  // The script reports where playback ended on stdout; mpv's own exit code
++  // cannot tell "quit at 12:34" from "reached the end".
++  static const char* report =
++    "local p, eof = 0, false\n"
++    "mp.observe_property('time-pos', 'number', function(_, v) if v then p = v end end)\n"
++    "mp.register_event('end-file', function(e) eof = e.reason == 'eof' end)\n"
++    "mp.register_event('shutdown', function() io.stdout:write(string.format('JMP_EXTERNAL %d %d\\n', math.floor(p * 1000), eof and 1 or 0)); io.stdout:flush() end)\n";
++
++  auto* script = new QTemporaryFile(QDir::tempPath() + "/jmp-external-XXXXXX.lua", this);
++  script->open();
++  script->write(report);
++  script->flush();
++
++  QStringList args = {
++    "--fullscreen",
++    "--force-window=immediate",
++    "--keep-open=no",
++    "--idle=no",
++    "--save-position-on-quit=no",
++    // Jellyfin owns the resume point; a stale watch_later entry for the same
++    // URL must not override --start.
++    "--resume-playback=no",
++    // Lets the box (and tests) stop it cleanly; quit still runs the shutdown
++    // hook that reports the position.
++    "--input-ipc-server=" + QDir::tempPath() + "/jmp-external-mpv.sock",
++    "--script=" + script->fileName(),
++    "--start=" + QString::number(startMs / 1000.0, 'f', 3),
++  };
++  if (audioIndex > 0)
++    args << "--aid=" + QString::number(audioIndex);
++  if (subtitle.typeId() == QMetaType::QString && subtitle.toString().startsWith("#,"))
++    args << "--sub-file=" + subtitle.toString().mid(2);
++  else if (subtitle.toInt() > 0)
++    args << "--sid=" + QString::number(subtitle.toInt());
++  else
++    args << "--sid=no";
++  args << "--" << url;
++
++  auto* proc = new QProcess(this);
++  proc->setProcessChannelMode(QProcess::ForwardedErrorChannel);
++  connect(proc, &QProcess::finished, this, [this, proc, script](int, QProcess::ExitStatus)
++  {
++    qint64 pos = -1;
++    bool eof = false;
++    for (const QString& line : QString::fromUtf8(proc->readAllStandardOutput()).split('\n'))
++    {
++      if (line.startsWith("JMP_EXTERNAL "))
++      {
++        QStringList f = line.split(' ');
++        pos = f.value(1).toLongLong();
++        eof = f.value(2) == "1";
++      }
++    }
++    qInfo() << "External player exited at" << pos << "ms, eof:" << eof;
++    proc->deleteLater();
++    script->deleteLater();
++    emit externalFinished(pos, eof);
++  });
++
++  qInfo() << "Starting external player for" << url;
++  proc->start("mpv", args);
++}
++
+ /////////////////////////////////////////////////////////////////////////////////////////
+ void PlayerComponent::initializeCodecSupport()
+ {
+diff --git a/src/player/PlayerComponent.h b/src/player/PlayerComponent.h
+index b3542ce..bbad1cc 100644
+--- a/src/player/PlayerComponent.h
++++ b/src/player/PlayerComponent.h
+@@ -124,6 +124,11 @@ public:
+ 
+   Q_INVOKABLE void userCommand(QString command);
+ 
++  // Play url in a separate system mpv (HDR passthrough, which the embedded
++  // libmpv inside the Qt surface cannot do). Emits externalFinished with the
++  // last position in ms and whether playback reached the end.
++  Q_INVOKABLE void playExternal(const QString& url, qint64 startMs, int audioIndex, const QVariant& subtitle);
++
+   // Set the region in which video should be rendered. This uses Qt pixel
+   // coordinates (x=0,y=0 is the top/left corner).
+   // If the aspect ratio mismatches, the video will be letterboxed or pillarboxed.
+@@ -198,6 +203,7 @@ Q_SIGNALS:
+   void error(const QString& msg); // playback stopped due to external error
+   // To be phased out. Raised on finished() and canceled().
+   void stopped();                 // playback finished successfully, or was stopped with stop()
++  void externalFinished(qint64 positionMs, bool eof);
+   void stateChanged(State newState, State oldState); // all state changes
+ 
+   // true if the video (or music) is actually playing
+@@ -263,6 +269,7 @@ private:
+   void reselectStream(const QVariant &streamSelection, MediaType target);
+ 
+   MpvController* m_mpv = nullptr;
++  QStringList m_loadedScripts;
+ 
+   State m_state;
+   bool m_paused;

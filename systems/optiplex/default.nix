@@ -339,6 +339,15 @@ in
           ];
         }
       ];
+
+      # Every TV mode change (refresh-rate / HDR switch at playback start)
+      # drops the HDMI sink for a moment, and WirePlumber then MPRIS-pauses
+      # every player that was linked to it, so the video sat paused right
+      # after starting. The TV is the only output, so pausing on "output
+      # removed" has nothing to protect.
+      services.pipewire.wireplumber.extraConfig."99-no-pause-on-sink-loss"."wireplumber.settings" = {
+        "linking.pause-playback" = false;
+      };
     }
     self.nixosModules.users.tv
     self.nixosModules.nix
