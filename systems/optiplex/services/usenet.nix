@@ -181,6 +181,14 @@ in
         # compute runtime set in default.nix (clinfo lists UHD 630).
         enableTonemapping = true;
       };
+      # Drives udisks automounts under /media (mountOnMedia in default.nix).
+      # The realtime monitor picks up a drive as soon as it's plugged in;
+      # unplugging one drops its items on the next scan.
+      libraries."External drives" = {
+        collectionType = "movies";
+        paths = [ "/media" ];
+        enableRealtimeMonitor = true;
+      };
     };
   };
 

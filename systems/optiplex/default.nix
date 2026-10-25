@@ -353,6 +353,11 @@ in
     self.nixosModules.nix
 
     {
+      # Mount plugged-in drives at /media/<label> instead of
+      # /run/media/tv/<label>: that parent is ACL'd to tv only, so the
+      # jellyfin user could not reach them (see the "External drives"
+      # library in services/usenet.nix).
+      services.udisks2.mountOnMedia = true;
       services.udisks2.enable = true;
       services.gvfs.enable = true;
       services.devmon.enable = true;
