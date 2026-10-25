@@ -307,6 +307,12 @@
                 "target-colorspace-hint-mode" = "source";
 
                 volume = 70;
+                # Bitstream surround to the projector's Atmos soundbar instead
+                # of decoding and downmixing to its 2-channel PCM sink. The
+                # sink advertises these (iec958.codecs, from the HDMI ELD).
+                # TrueHD carries the Atmos layer; mpv's volume no longer
+                # applies to these, the soundbar's does.
+                "audio-spdif" = "ac3,eac3,dts,dts-hd,truehd";
                 "audio-file-auto" = "fuzzy";
 
                 "network-timeout" = 5;
