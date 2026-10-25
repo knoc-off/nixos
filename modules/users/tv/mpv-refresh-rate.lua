@@ -66,8 +66,10 @@ end
 
 -- Smallest integer multiple of fps that is >= 48 Hz and offered at the
 -- current resolution (25 -> 50, 29.97 -> 59.94), else fps itself (24 -> 24,
--- 23.976 -> 23.98), else nil.
-local function pick(fps, m)
+-- 23.976 -> 23.98), else nil. HDR takes fps itself first: the DP link
+-- (HBR2 x4, no DSC) has no room for 10 bpc at 4K50/60, and i915 then
+-- silently sends 8 bpc PQ (banding); 4K at <= 30 Hz gets the full 10 bpc.
+local function pick(fps, m, hdr)
 	local rates = {}
 	for _, s in ipairs(m.availableModes or {}) do
 		local w, h, r = s:match("^(%d+)x(%d+)@([%d%.]+)Hz$")
@@ -85,6 +87,9 @@ local function pick(fps, m)
 			end
 		end
 		return best
+	end
+	if hdr and has(fps) then
+		return has(fps)
 	end
 	for k = 1, 3 do
 		local t = fps * k
@@ -122,7 +127,7 @@ mp.observe_property("video-params", "native", function(_, p)
 	-- and tone-maps itself, so HDR output would only wash it out.
 	local hdr = (p.gamma == "pq" or p.gamma == "hlg") and not (mp.get_property("vo") or ""):find("libmpv")
 	local want = {
-		rate = fps and pick(fps, m) or base.rate,
+		rate = fps and pick(fps, m, hdr) or base.rate,
 		bitdepth = hdr and 10 or base.bitdepth,
 		cm = hdr and "hdr" or base.cm,
 	}
