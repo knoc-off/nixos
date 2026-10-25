@@ -388,27 +388,6 @@ in
     }
 
     {
-      # need to add a UI, to the user.
-      services.jellyfin = {
-        enable = true;
-        # The firewall is enabled below, so the LAN ports (8096/8920 TCP,
-        # 1900/7359 UDP discovery) have to be opened explicitly or streaming to
-        # anything other than this box's own display breaks.
-        openFirewall = true;
-      };
-
-      # Runs as jellyfin:jellyfin with no supplementary groups, so it cannot
-      # open /dev/dri/renderD128 (root:render 0660). Without this, hardware
-      # transcoding fails silently and every stream is transcoded on the CPU.
-      # "media" is nixflix's library group (services/usenet.nix).
-      users.users.jellyfin.extraGroups = [
-        "render"
-        "video"
-        "media"
-      ];
-    }
-
-    {
       # Idle policy (screen off, no lock/suspend) lives in the tv-away module.
       home-manager.users.${user} = {
         systemd.user.services.sway-audio-idle-inhibit = {

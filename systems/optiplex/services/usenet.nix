@@ -36,6 +36,8 @@ in
     "services/indexers/nzbfinder/api-key"
     "services/usenet/frugal/username"
     "services/usenet/frugal/password"
+    "services/jellyfin/api-key"
+    "services/jellyfin/password"
   ] (_: { });
 
   nixflix = {
@@ -146,6 +148,35 @@ in
     };
 
     recyclarr.enable = true;
+
+    # nixflix runs its own jellyfin unit (not nixpkgs' services.jellyfin):
+    # it completes the setup wizard, creates the Shows/Movies libraries from
+    # the Sonarr/Radarr root folders, and has Sonarr/Radarr ping Jellyfin to
+    # rescan after each import. It already adds the video/render groups for
+    # /dev/dri and runs in the "media" library group.
+    jellyfin = {
+      enable = true;
+      apiKey = secret "services/jellyfin/api-key";
+      # LAN clients (phone app, other TVs) and their 1900/7359 UDP discovery.
+      openFirewall = true;
+      users.tv = {
+        password = secret "services/jellyfin/password";
+        policy.isAdministrator = true;
+      };
+      # UHD 630 (Gen9.5): QSV would need the EOL intel-media-sdk, so VA-API
+      # via intel-media-driver (see hardware.intelgpu in default.nix). Only
+      # matters for remote clients; the local app direct-plays.
+      encoding = {
+        hardwareAccelerationType = "vaapi";
+        hardwareDecodingCodecs = [
+          "h264"
+          "hevc"
+          "mpeg2video"
+          "vc1"
+          "vp9"
+        ];
+      };
+    };
   };
 
   # Keep downloads/unpacking from competing with mpv and Jellyfin on the
@@ -161,5 +192,6 @@ in
     "radarr"
     "prowlarr"
     "sabnzbd"
+    "jellyfin"
   ]) (name: { useACMEHost = name; });
 }

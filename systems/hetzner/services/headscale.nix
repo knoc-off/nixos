@@ -102,6 +102,7 @@ in
               "radarr"
               "prowlarr"
               "sabnzbd"
+              "jellyfin"
             ];
       };
     };

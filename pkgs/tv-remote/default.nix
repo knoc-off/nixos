@@ -60,7 +60,7 @@ writeShellApplication {
       close       close the focused window
       launcher    toggle the noctalia launcher
       files       toggle the couch file browser
-      app NAME    focus NAME if running, else start it (firefox, spotify)
+      app NAME    focus NAME if running, else start it (firefox, spotify, jellyfin)
       sleep       blank the screen and tear down tv-active.target
     EOF
     }
@@ -93,6 +93,13 @@ writeShellApplication {
               # Started as a unit so it lands in its own cgroup with a stable
               # name, the same one the session autostart uses.
               systemctl --user start spotify.service
+            fi
+            ;;
+          jellyfin)
+            if running jellyfin; then
+              dispatch 'hl.dsp.focus({ window = "class:(?i)jellyfin" })'
+            else
+              dispatch 'hl.dsp.exec_cmd("jellyfin-desktop --tv --fullscreen")'
             fi
             ;;
           *) echo "tv-remote: unknown app ''${2:-}" >&2; exit 1 ;;
