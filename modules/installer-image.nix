@@ -24,8 +24,26 @@
             htop
           ];
 
+          # Reachable as <hostname>.local without reading an IP off the
+          # console. On a name clash avahi renames itself (<hostname>-2.local)
+          # and logs it.
+          services.avahi = {
+            enable = lib.mkForce true;
+            nssmdns4 = true;
+            publish = {
+              enable = true;
+              addresses = true;
+            };
+          };
+
+          # agetty expands \n (hostname) and \4 (IPv4) and redraws the prompt
+          # when addresses change, so this stays correct after DHCP.
+          services.getty.helpLine = ''
+
+            SSH: root@\n.local  (\4)
+          '';
+
           time.timeZone = "Europe/Berlin";
-          networking.networkmanager.enable = lib.mkForce false;
         }
         // (
           # Check if disko option exists before forcing it false
