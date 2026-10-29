@@ -85,6 +85,8 @@ in
     self.nixosModules.hyprland
     self.nixosModules.noctalia
     {
+      # No eDP-1 here, so the default auto-center-up would go negative.
+      home-manager.users.${user}.hyprland.monitorPosition = "auto";
       services.greetd = {
         enable = true;
         settings.default_session = {

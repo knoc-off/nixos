@@ -133,10 +133,25 @@
         M.playerctl = "${lib.getExe pkgs.playerctl}"
         M.qs_overview_cmd = "echo 'no'"
         M.display_scale = ${toString displayScale}
+        M.monitor_position = "${config.hyprland.monitorPosition}"
         return M
       '';
     in
     {
+      imports = [
+        {
+          options.hyprland.monitorPosition = lib.mkOption {
+            type = lib.types.str;
+            default = "auto-center-up";
+            description = ''
+              Position of monitors other than eDP-1. auto-center-up is relative
+              to eDP-1, so hosts without one need "auto" -- otherwise the monitor
+              lands at negative coords and XWayland games mis-warp the pointer.
+            '';
+          };
+        }
+      ];
+
       # XWayland renders at 96 DPI without this -- compositor upscales (blurry)
       xresources.properties."Xft.dpi" = builtins.floor (96 * displayScale);
 

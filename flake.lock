@@ -544,11 +544,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1788591098,
-        "narHash": "sha256-iHF79KHHRTgL0U7coOP5oas04dN9hsQW1nrfakGusMo=",
+        "lastModified": 1793303922,
+        "narHash": "sha256-+ZJsGA7AuCqZLfjrVQK191+Vx79popw2f3PBMxSeb2o=",
         "owner": "knoc-off",
         "repo": "minecraft-modpack",
-        "rev": "bbd3e47b47fbc2e4c35fc5e7739985f6e314c0ff",
+        "rev": "b9beb9bcc0b922e5ebc19c1e9e9cf2490d33f71c",
         "type": "github"
       },
       "original": {
