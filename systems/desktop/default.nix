@@ -152,6 +152,8 @@ in
     gvfs.enable = true;
     udisks2.enable = true;
     openssh.settings = {
+      # misc.nix defaults to "no"; nixos-rebuild --target-host root@desktop needs keys.
+      PermitRootLogin = "prohibit-password";
       PasswordAuthentication = false;
       KbdInteractiveAuthentication = false;
     };
