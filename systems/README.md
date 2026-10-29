@@ -70,10 +70,35 @@ Use hex, not raw bytes. disko feeds the key through `"$(cat file)"`, which strip
 trailing newlines and NUL bytes, so a binary key can differ from what gets
 enrolled. Hex is also easy to type at a console.
 
+### Pre-generate the host key (for sops and tailnet)
+
+sops-nix decrypts with the host's `/etc/ssh/ssh_host_ed25519_key`, and the
+tailnet authkey lives in `modules/shared-secrets.yaml`. Generate the key before
+install so the host can decrypt (and join the tailnet) on first boot:
+
+```sh
+mkdir -p ~/scratch/<hostname>-install/extra-files/etc/ssh
+ssh-keygen -t ed25519 -N "" -C "<hostname> host key" \
+  -f ~/scratch/<hostname>-install/extra-files/etc/ssh/ssh_host_ed25519_key
+nix run nixpkgs#ssh-to-age < ~/scratch/<hostname>-install/extra-files/etc/ssh/ssh_host_ed25519_key.pub
+```
+
+- Add the age key to `.sops.yaml` (`keys`, a `systems/<hostname>/secrets\.yaml$`
+  rule, and the `modules/shared-secrets\.yaml$` rule), then
+  `sops updatekeys modules/shared-secrets.yaml`.
+- Add the `.pub` to `lib/ssh.nix` `hostKeys`, and the host to `lib/nix-cache.nix`
+  `clients` if it uses `services.nixCache.leaf`. optiplex must be redeployed
+  before the new host can build there.
+
+Pass the key to nixos-anywhere with
+`--extra-files ~/scratch/<hostname>-install/extra-files`, then delete the
+private key locally once the install succeeds.
+
 ```sh
 nix run github:nix-community/nixos-anywhere -- \
   --flake .#<hostname> \
   --disk-encryption-keys /tmp/secret.key /tmp/luks.key \
+  --extra-files ~/scratch/<hostname>-install/extra-files \
   --build-on local \
   root@<ip>
 ```

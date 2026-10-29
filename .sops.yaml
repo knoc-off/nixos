@@ -6,6 +6,7 @@ keys:
   - &rpi-4b-plus age1h2339ke56fkn0svx7jlejcnwdf83hl4tg5vaa7e0aqgnhr7qedqstxcxcg
   - &work age14tstqskklfdq4uclxvxeygh6xj40f6axfm82r8umzvvs0de2f5zqen9vrd
   - &optiplex age13yardd2dl3ex60phynx4t9sgxm3wy07jxhee6yu2dxzs99ld34ns9zpve7
+  - &desktop age1e2rm0yky629qvg944ktyg0dtqxqauhgq0pawhccywfgatmml739qc72uek
 
 creation_rules:
   - path_regex: systems/hetzner/secrets\.yaml$
@@ -33,6 +34,11 @@ creation_rules:
       - age:
           - *optiplex
           - *framework13h
+  - path_regex: systems/desktop/secrets\.yaml$
+    key_groups:
+      - age:
+          - *framework13h
+          - *desktop
   # Secrets shared across every host (colocated under modules/ rather than
   # systems/ so it isn't mistaken for a per-host directory -- it isn't one).
   - path_regex: modules/shared-secrets\.yaml$
@@ -44,3 +50,4 @@ creation_rules:
           - *rpi-4b-plus
           - *work
           - *optiplex
+          - *desktop

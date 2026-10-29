@@ -25,6 +25,7 @@
     "thinkpad-work"
     "hetzner"
     "rpi-4b-plus"
+    "desktop"
   ];
 
   # nix.buildMachines tuning for the server.
