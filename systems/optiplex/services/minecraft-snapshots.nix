@@ -16,14 +16,16 @@
 # edits to already-generated chunks accrue. Steady state is ~130 snapshots,
 # growing 52/year, which is well within what btrfs handles comfortably.
 #
-# There is deliberately no `target` section here. btrbk skips snapshot deletion
-# entirely whenever a configured target is unreachable (btrbk(1), "run", step
-# 4), so folding the planned USB archive into this config would silently stop
-# local pruning for as long as the stick stays unplugged. That archive needs its
-# own config file, not another section in this one.
+# The hourly instance deliberately has no `target`. btrbk skips snapshot
+# deletion entirely whenever a configured target is unreachable (btrbk(1),
+# "run", step 4), so a USB target in the same config would silently stop local
+# pruning for as long as the drive is missing. The USB copy is therefore a
+# second instance (minecraft-usb) that only sends existing snapshots and never
+# creates or deletes any on the NVMe.
 #
-# These snapshots share a disk with the world, so they defend against mistakes
-# and corruption, not against drive failure.
+# The hourly snapshots share a disk with the world, so they defend against
+# mistakes and corruption, not drive failure. The USB copy covers the NVMe
+# dying, but sits in the same box, so not theft, fire or a bad PSU.
 {
   self,
   config,
@@ -36,6 +38,7 @@ let
   rconPort = 25575;
   dataDir = "/srv/minecraft";
   snapshotDir = "${dataDir}/.snapshots";
+  backupDir = "/mnt/backup";
 
   envFile = config.sops.templates."minecraft.env".path;
   rcon = self.packages.${pkgs.stdenv.hostPlatform.system}.rcon-cli;
@@ -112,8 +115,35 @@ in
     };
   };
 
+  # Daily copy of the snapshots above to the USB drive (/mnt/backup, set up in
+  # default.nix). Incremental: btrbk picks the newest snapshot both sides share
+  # as parent, and the weekly ones kept forever above guarantee one exists
+  # however long the drive was away.
+  services.btrbk.instances.minecraft-usb = {
+    # Off the hour, so it never races the hourly instance pruning a snapshot
+    # mid-send.
+    onCalendar = "*-*-* 04:30:00";
+    settings = {
+      # Never touch the NVMe side: creation and pruning belong to the hourly
+      # instance.
+      snapshot_create = "no";
+      snapshot_preserve_min = "all";
+      target_preserve_min = "2d";
+      target_preserve = "30d *w";
+      timestamp_format = "long-iso";
+      lockfile = "/var/lib/btrbk/minecraft-usb.lock";
+      subvolume.${dataDir} = {
+        snapshot_dir = snapshotDir;
+        snapshot_name = "minecraft";
+        # The drive's root, not a subdir: btrbk never creates target dirs, and
+        # a tmpfiles one would land on the root fs whenever the drive is away.
+        target = backupDir;
+      };
+    };
+  };
+
   systemd.services.btrbk-minecraft = {
-    onFailure = [ "btrbk-minecraft-failure.service" ];
+    onFailure = [ "btrbk-failure@minecraft.service" ];
     serviceConfig = {
       ExecStartPre = "+${quiesce}";
       ExecStopPost = "+${unquiesce}";
@@ -123,30 +153,46 @@ in
     unitConfig.RequiresMountsFor = dataDir;
   };
 
-  systemd.services.btrbk-minecraft-failure = {
-    description = "Report a failed Minecraft snapshot run to ntfy";
+  systemd.services.btrbk-minecraft-usb = {
+    onFailure = [ "btrbk-failure@minecraft-usb.service" ];
+    # A missing drive fails this unit (and alerts) instead of receiving into
+    # an empty /mnt/backup on the root filesystem.
+    unitConfig.RequiresMountsFor = [
+      dataDir
+      backupDir
+    ];
+  };
+
+  systemd.services."btrbk-failure@" = {
+    description = "Report a failed btrbk-%i run to ntfy";
     serviceConfig = {
       Type = "oneshot";
       LoadCredential = "ntfy-token:${config.sops.secrets."services/ntfy/publish-token".path}";
     };
+    scriptArgs = "%i";
     script = ''
       ${pkgs.curl}/bin/curl -fsS \
         -H "Authorization: Bearer $(cat "$CREDENTIALS_DIRECTORY/ntfy-token")" \
-        -H "Title: Minecraft snapshot failed" \
+        -H "Title: btrbk-$1 failed" \
         -H "Priority: high" \
         -H "Tags: warning" \
-        -d "btrbk-minecraft failed on ${config.networking.hostName}. Check journalctl -u btrbk-minecraft" \
+        -d "btrbk-$1 failed on ${config.networking.hostName}. Check journalctl -u btrbk-$1" \
         https://ntfy.niko.ink/alerts
     '';
   };
 
   # Snapshots kept forever are only as good as the bytes under them, and scrub
-  # is what surfaces silent corruption. Every subvolume lives on one filesystem,
-  # so scrubbing / covers the world too; the default (every btrfs mount point)
-  # would scrub the same device repeatedly.
+  # is what surfaces silent corruption. Every NVMe subvolume lives on one
+  # filesystem, so scrubbing / covers the world too; the default (every btrfs
+  # mount point) would scrub the same device repeatedly. On the single-disk USB
+  # drive scrub can only detect, not repair -- which is still the signal that
+  # the backup has rotted.
   services.btrfs.autoScrub = {
     enable = true;
     interval = "monthly";
-    fileSystems = [ "/" ];
+    fileSystems = [
+      "/"
+      backupDir
+    ];
   };
 }

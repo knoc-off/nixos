@@ -260,8 +260,9 @@ in
         enable = true;
         type = "lanzaboote";
         efiSupport = true;
-        # Hard ceiling imposed by systemd-pcrlock (systemd/systemd#41526).
-        configurationLimit = 8;
+        # Hard ceiling enforced by lanzaboote's measuredBoot assertion, which
+        # tracks systemd-pcrlock's variant limit (systemd/systemd#41526).
+        configurationLimit = 4;
       };
 
       # The BIOS "Delete All Keys" step left this board in Audit Mode
@@ -361,6 +362,33 @@ in
       services.udisks2.enable = true;
       services.gvfs.enable = true;
       services.devmon.enable = true;
+    }
+
+    {
+      # Kingston XS2000 USB SSD: LUKS + btrfs receive target for the Minecraft
+      # world (services/minecraft-snapshots.nix). The keyfile lives on the
+      # TPM-unlocked root fs; a passphrase slot is the off-host recovery path.
+      # nofail everywhere: a dead or unplugged drive must never block boot,
+      # it only fails btrbk-minecraft-usb, which alerts via ntfy.
+      environment.etc.crypttab.text = ''
+        backup /dev/disk/by-id/usb-Kingston_XS2000_50026B7283103E35-0:0 /root/backup-usb.key nofail,x-systemd.device-timeout=10s
+      '';
+      fileSystems."/mnt/backup" = {
+        device = "/dev/mapper/backup";
+        fsType = "btrfs";
+        options = [
+          "nofail"
+          "noatime"
+          "compress=zstd"
+          "x-systemd.device-timeout=10s"
+        ];
+      };
+      # Otherwise udisks/devmon also mount it under /media, where Jellyfin
+      # and anyone browsing drives would see the raw snapshots.
+      services.udev.extraRules = ''
+        ENV{ID_SERIAL_SHORT}=="50026B7283103E35", ENV{UDISKS_IGNORE}="1"
+        ENV{DM_NAME}=="backup", ENV{UDISKS_IGNORE}="1"
+      '';
     }
 
     {
