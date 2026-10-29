@@ -8,6 +8,9 @@ require("plugins")
 -- Monitors
 hl.monitor({ output = "eDP-1", mode = "preferred", position = "0x0", scale = env.display_scale })
 hl.monitor({ output = "", mode = "preferred", position = "auto-center-up", scale = 1 })
+-- desktop: auto-center-up is relative to eDP-1, which it lacks, so the lone
+-- monitor landed at -960x-1080 and XWayland games mis-warped the pointer.
+hl.monitor({ output = "desc:Samsung Electric Company S27F350 H4ZM800171", mode = "preferred", position = "0x0", scale = 1 })
 
 -- Config
 hl.config({
