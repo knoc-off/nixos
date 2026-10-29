@@ -89,6 +89,11 @@ impl Outcome {
     pub fn media_deletes(&self) -> Vec<String> {
         self.changes.iter().filter(|c| c.kind == ChangeKind::MediaDelete).map(|c| c.id.clone()).collect()
     }
+
+    /// Project-relative paths of the planned `MediaSourceDelete` changes.
+    pub fn media_source_deletes(&self) -> Vec<String> {
+        self.changes.iter().filter(|c| c.kind == ChangeKind::MediaSourceDelete).map(|c| c.id.clone()).collect()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, strum::IntoStaticStr)]
@@ -101,6 +106,10 @@ pub enum ChangeKind {
     Media,
     /// An unused renderer media file is deleted (id = filename).
     MediaDelete,
+    /// An unused source file under `.marki/media/` is deleted (id = its
+    /// path relative to the project root). Only files git has committed
+    /// as they are, so history keeps them.
+    MediaSourceDelete,
     Add,
     Update,
     Move,

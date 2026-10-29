@@ -10,7 +10,9 @@
 #      schema change, so a full upload) pulls first and keeps the review;
 #   4. a plan that changed between simulate and confirm is refused;
 #   5. a deleted card (delete_orphans / --prune) and its unused media file
-#      disappear from the phone.
+#      disappear from the phone;
+#   6. a flag set with marki_set_flag reaches the phone;
+#   7. deck options set with marki_set_deck_options reach the phone.
 #
 # Usage: tests/e2e-server.sh [path/to/marki]   (defaults to target/debug/marki)
 set -euo pipefail
@@ -75,6 +77,11 @@ elif action == "check":
           if col.models.by_name("marki:duo") else "types -")
     media = sorted(m for m in os.listdir(col.media.dir()) if m.startswith("marki-"))
     print("media", " ".join(media))
+    print("flags", " ".join(str(col.get_card(c).user_flag()) for c in sorted(col.find_cards("tag:marki"))))
+    did = col.decks.id_for_name("deck")
+    conf = col.decks.config_dict_for_deck_id(did)
+    print("preset", conf["name"], conf["new"]["perDay"], " ".join(str(s) for s in conf["new"]["delays"]))
+    print("decklimit", col.decks.get(did).get("newLimit"))
 col.close()
 EOF
 }
@@ -163,17 +170,44 @@ def tool(name, args):
     text = r["content"][0]["text"]
     return (json.loads(text) if not r.get("isError") else None), text
 sim, _ = tool("marki_push", {"delete_orphans": True})
-assert sim and sim["summary"] == {"orphan": 1, "media_delete": 1}, sim
+# dot.md was the only card using .marki/media/icons/dot.svg: the source goes too.
+assert sim and sim["summary"] == {"orphan": 1, "media_delete": 1, "media_source_delete": 1}, sim
 _, err = tool("marki_push", {"confirm": True, "plan_hash": "0000", "delete_orphans": True})
 assert "plan changed" in err, err
 done, text = tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"], "delete_orphans": True})
 assert done and done["ok"], text
 steps = {s["name"]: s["status"] for s in done["steps"]}
 assert steps == {"pull": "ok", "media": "ok", "collection": "ok", "media cleanup": "ok", "sync": "ok", "git": "ok"}, steps
+# 6. marki_set_flag pulls, flags and syncs up in one call.
+r, text = tool("marki_set_flag", {"path": "deck/ocean.md", "card": "Ask", "color": "blue"})
+assert r and r["cards_changed"] == 1 and r["sync"], text
+_, err = tool("marki_set_flag", {"path": "deck/ocean.md", "card": "Nope", "color": "blue"})
+assert "its cards are Ask" in err, err
+# 7. Deck options: a new preset with changed settings and a deck limit.
+opts, text = tool("marki_deck_options", {"deck": "deck"})
+assert opts and opts["deck"]["preset"] == "Default" and opts["deck"]["limits"] == {}, text
+assert opts["presets"][0]["settings"]["learn_steps"] == "1m 10m", text
+r, text = tool("marki_set_deck_options", {"deck": "deck", "preset": "Slow", "subdecks": True,
+    "settings": {"new_per_day": 5, "learn_steps": "1m 1h 1d", "review_order": "random"},
+    "limits": {"new_per_day": 3}})
+assert r and r["created_preset"] and r["deck"] == {"name": "deck", "preset": "Slow", "limits": {"new_per_day": 3}}, text
+assert r["preset"]["settings"]["learn_steps"] == "1m 1h 1d" and r["preset"]["decks"] == ["deck"] and r["sync"] == "normal", text
+r, text = tool("marki_set_deck_options", {"deck": "deck", "settings": {"bury_new": True}})
+assert r and not r["created_preset"] and r["deck"]["preset"] == "Slow" and r["preset"]["settings"]["bury_new"], text
+assert r["preset"]["settings"]["new_per_day"] == 5 and r["sync"] == "normal", text
+_, err = tool("marki_set_deck_options", {"deck": "deck", "settings": {"fsrs_params_5": [1]}})
+assert "unknown settings fsrs_params_5" in err, err
+_, err = tool("marki_set_deck_options", {"deck": "deck", "settings": {"learn_steps": "soon"}})
+assert "bad step" in err, err
+_, err = tool("marki_set_deck_options", {"deck": "nope", "preset": "Slow"})
+assert "no deck 'nope'" in err, err
 EOF
 res=$(phone check)
 grep -q '^marki 1$' <<<"$res" || fail "the deleted note should be gone from the phone: $res"
 grep -q '^media $' <<<"$res" || fail "the unused media file should be gone from the phone: $res"
-echo "ok: stale plan refused; deletion reaches the phone"
+grep -q '^flags 4$' <<<"$res" || fail "the phone should see the card flagged blue: $res"
+grep -q '^preset Slow 5 1.0 60.0 1440.0$' <<<"$res" || fail "the phone should see the deck on preset Slow: $res"
+grep -q '^decklimit 3$' <<<"$res" || fail "the phone should see the deck's own new limit: $res"
+echo "ok: stale plan refused; deletion, flag and deck options reach the phone"
 
 echo "all server e2e checks passed"

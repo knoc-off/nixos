@@ -139,6 +139,11 @@ impl Project {
         client::sync(sync, &s.collection, Mode::Push { allow_upload }).map(Some)
     }
 
+    /// Run a deck-options request (`sync/deck_options.py`) on the local copy.
+    pub fn deck_options(&self, req: serde_json::Value) -> Result<serde_json::Value> {
+        client::deck_options(&self.store()?.collection, req)
+    }
+
     /// One scan -> reconcile -> (optionally) write cycle against `col`.
     /// Collection only; media is the caller's (see [`Project::push`]).
     fn cycle(&mut self, col: &mut Collection, dry_run: bool, prune: bool) -> Result<Outcome> {
@@ -158,13 +163,32 @@ impl Project {
         o.changes.extend(media::plan(&o.assets, &media_dir));
         if o.errors.is_empty() {
             let unused = media::unused(&o.media_refs, &media_dir)?;
+            // Notes without an #id aren't rendered, so what they use is unknown.
+            let sources = if o.unformatted == 0 { self.unused_media_sources(&o.media_refs) } else { vec![] };
             if prune {
                 o.changes.extend(media::delete_changes(&unused));
+                o.changes.extend(media::source_delete_changes(&sources));
             } else {
-                o.media_orphans = unused.len();
+                o.media_orphans = unused.len() + sources.len();
             }
         }
         Ok(o)
+    }
+
+    /// Files under `.marki/media/` that no card uses (their asset name is in
+    /// none of `refs`), as project-relative paths. Only files git has
+    /// committed unchanged count, so deleting one loses nothing; outside a
+    /// git repo nothing does.
+    pub fn unused_media_sources(&self, refs: &std::collections::HashSet<String>) -> Vec<String> {
+        let dir = self.cfg.builtin_media_dir();
+        let committed = media::git_committed(&dir);
+        let sources = [(marki_media::BUILTIN_SOURCE.to_string(), dir)];
+        marki_media::media_files(&sources, "", None)
+            .into_iter()
+            .filter(|(_, p)| committed.contains(p))
+            .filter(|(_, p)| marki_media::asset_name(p).is_ok_and(|n| !refs.contains(&n)))
+            .map(|(_, p)| p.strip_prefix(&self.cfg.project_root).unwrap_or(&p).display().to_string())
+            .collect()
     }
 
     /// What a push would change against the local copy as last synced
@@ -250,9 +274,13 @@ impl Project {
                     ));
                     // Only after the notes stopped naming them.
                     let deletes = plan.media_deletes();
-                    if !deletes.is_empty() {
-                        steps.push(match media::delete(&deletes, &s.media_dir) {
-                            Ok(n) => Step::ok("media cleanup", format!("{n} unused file(s) deleted")),
+                    let sources = plan.media_source_deletes();
+                    if !deletes.is_empty() || !sources.is_empty() {
+                        let root = self.cfg.project_root.clone();
+                        steps.push(match media::delete(&deletes, &s.media_dir).and_then(|n| {
+                            Ok((n, media::delete_sources(&sources, &root)?))
+                        }) {
+                            Ok((n, k)) => Step::ok("media cleanup", format!("{n} unused file(s) deleted, {k} unused source file(s) under .marki/media")),
                             Err(e) => Step::error("media cleanup", &e),
                         });
                     }

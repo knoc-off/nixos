@@ -81,6 +81,65 @@ pub fn delete(names: &[String], media_dir: &Path) -> Result<usize> {
     Ok(names.len())
 }
 
+/// One `MediaSourceDelete` change per unused `.marki/media/` file.
+pub fn source_delete_changes(paths: &[String]) -> Vec<Change> {
+    paths
+        .iter()
+        .map(|p| Change {
+            kind: ChangeKind::MediaSourceDelete,
+            id: p.clone(),
+            path: None,
+            detail: "no card uses it (git history keeps it)".into(),
+            content_hash: String::new(),
+            full_sync: false,
+        })
+        .collect()
+}
+
+/// Remove project-relative source files, and their directory once empty.
+pub fn delete_sources(paths: &[String], root: &Path) -> Result<usize> {
+    for p in paths {
+        let full = root.join(p);
+        match std::fs::remove_file(&full) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+                return Err(e).with_context(|| format!("remove {p}"));
+            }
+            _ => {}
+        }
+        if let Some(d) = full.parent() {
+            let _ = std::fs::remove_dir(d); // only succeeds when empty
+        }
+    }
+    Ok(paths.len())
+}
+
+/// Files under `dir` that git has committed and that are unchanged since:
+/// safe to delete, history has them. Empty outside a repo or when git fails.
+pub fn git_committed(dir: &Path) -> HashSet<std::path::PathBuf> {
+    let git = |args: &[&str]| -> Option<Vec<std::path::PathBuf>> {
+        let out = std::process::Command::new("git").arg("-C").arg(dir).args(args).output().ok()?;
+        out.status.success().then(|| {
+            out.stdout
+                .split(|b| *b == 0)
+                .filter(|s| !s.is_empty())
+                .map(|s| dir.join(String::from_utf8_lossy(s).as_ref()))
+                .collect()
+        })
+    };
+    if !dir.is_dir() {
+        return HashSet::new();
+    }
+    // Both list paths relative to `dir`.
+    let (Some(tracked), Some(changed)) = (
+        git(&["ls-tree", "-r", "-z", "--name-only", "HEAD"]),
+        git(&["diff", "--name-only", "-z", "--relative", "HEAD"]),
+    ) else {
+        return HashSet::new();
+    };
+    let changed: HashSet<_> = changed.into_iter().collect();
+    tracked.into_iter().filter(|p| !changed.contains(p)).collect()
+}
+
 /// Assets missing from, or different in, the media folder: one `Media`
 /// change each.
 pub fn plan(assets: &[Asset], media_dir: &Path) -> Vec<Change> {

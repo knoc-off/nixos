@@ -164,6 +164,7 @@ the directory that contains `.marki/`.
 | `lib_dir`       | `.marki/lib`         | Shared Lua modules for `require`                            |
 | `media_sources` | `{}`                 | Named directories for ` ```media ` blocks; `.marki/media` is always searched first |
 | `typst_binary`  | none                 | `typst` executable. If unset, typst blocks are only highlighted |
+| `browser_binary` | none                | Headless Chromium for whole-card screenshots in `marki_preview`. If unset, previews only draw map/typst figures. Needs fonts (`FONTCONFIG_FILE`), or it draws no text |
 | `map`           | none                 | `[map.defaults]` and `[[map.rules]]` for map blocks, merged under each card's own block |
 | `sync_interval` | `300`                | `watch` heartbeat in seconds, or `"5m"`, `"1h"`, `"1d"`     |
 | `debounce_ms`   | `250`                | How long `watch` waits after a file change                  |
@@ -204,9 +205,10 @@ respecting `.gitignore`, and skipping hidden files.
 | `marki watch`                 | Push on every file change and on the heartbeat interval             |
 | `marki render <file>`         | Write `./out/preview.html` (every card, front and back, with model CSS) and assets, without touching Anki; `--stdout` dumps raw assets |
 
-Global flags: `--config`, `--cards-dir`, `--collection`, `--media-dir` and
-`--typst-binary`, with env equivalents `MARKI_CONFIG`, `MARKI_COLLECTION`,
-`MARKI_MEDIA_DIR` and `MARKI_TYPST`. Add `-v` or `-vv` for more logging.
+Global flags: `--config`, `--cards-dir`, `--collection`, `--media-dir`,
+`--typst-binary` and `--browser-binary`, with env equivalents `MARKI_CONFIG`,
+`MARKI_COLLECTION`, `MARKI_MEDIA_DIR`, `MARKI_TYPST` and `MARKI_BROWSER`. Add
+`-v` or `-vv` for more logging.
 
 Every note marki manages carries the `marki` tag, plus a `marki::hash:...` tag
 it uses to detect changes. Leave both alone.
@@ -228,15 +230,38 @@ headers, so put an auth proxy on the same host in front of it (the NixOS
 module uses mcp-auth-proxy).
 
 Tools: `marki_context`, `marki_docs`, `marki_search_cards`, `marki_read_card`,
-`marki_preview`, `marki_write_card`, `marki_write_cards`, `marki_move_card`,
+`marki_preview`, `marki_write_cards`, `marki_move_card`,
 `marki_delete_card`, `marki_add_media`, `marki_read_model`,
 `marki_write_model`, `marki_status`, `marki_push`, `marki_query`,
-`marki_map_render`. Plus docs, cards and models as resources and a
-`make-cards` prompt.
+`marki_flagged`, `marki_set_flag`, `marki_deck_options`,
+`marki_set_deck_options`, `marki_map_render`. Plus docs, cards and models
+as resources and a `make-cards` prompt.
 
-`marki_preview` also returns a PNG (max 512 px) of every SVG figure (maps,
-typst) on each card side, and `marki_map_render` renders a bare map block's
-front and back, so an agent can see what it drew.
+`marki_preview` returns each card side as plain text (`html=true` for the
+HTML and CSS) plus a PNG of it. With `browser_binary` set that is a
+screenshot of the whole side as Anki shows it, 480 px wide; without, a PNG
+(max 512 px) of every SVG figure (maps, typst). `marki_map_render` renders a
+bare map block's front and back, so an agent can see what it drew.
+
+`marki_add_media` takes SVG as `text`, a URL or base64, and returns a
+thumbnail. `marki_media_list` with `used_by` or `unused` lists which cards
+use each file.
+
+`marki_search_cards` filters by `deck` (and subdecks), `tag` and `flagged`
+(a colour or `any`). `marki_flagged` lists flagged cards, and
+`marki_set_flag` sets or clears a flag (on all of a note's cards, or one
+card type) and syncs it straight away. Flags aren't in the card files, so
+this skips the push plan.
+
+`marki_deck_options` lists Anki's deck option presets with their main
+settings (daily limits, learning steps, intervals, desired retention, card
+orders, burying, leeches) and the decks using each. `marki_set_deck_options`
+gives a deck a preset (existing or new), changes that preset's settings,
+optionally for subdecks too, and sets the deck's own daily limits, then
+syncs straight away like `marki_set_flag`. It goes through Anki's own Deck
+Options call (`sync/deck_options.py`, run with `MARKI_PYTHON`), so Anki
+checks the values. It never deletes presets, switches FSRS or reschedules
+cards.
 
 Block renderers add their own: each ships its README as `marki_docs("<block>")`
 and may offer tools named `marki_<block>_<name>` (`marki_map_units`,
@@ -249,8 +274,8 @@ The guard rails:
 
 - Paths are confined to the cards dir; files under `.marki/` are only
   reachable through the model and media tools.
-- `marki_write_card` formats and renders a card before saving, and only
-  overwrites a card when given its current `#id`.
+- `marki_write_cards` formats and renders every card before saving any, and
+  only overwrites a card when given its current `#id`.
 - `marki_write_model` needs `M.describe()` and must render every note that
   uses the model. The model reference is the `marki://docs/models` resource.
 - `marki_push` without `confirm` only simulates. Pushing needs `confirm` plus
@@ -266,13 +291,19 @@ The guard rails:
   changes deck; the push moves the note and keeps its reviews.
 - A push that changes a note clears the flags on its cards (shown as `unflag`
   in the plan): fixing a flagged card is what the flag asked for.
+- Media files under `.marki/media/` that no card uses are orphans like
+  unused rendered media: counted in `media_orphans`, deleted by a push with
+  `delete_orphans=true`, and committed, so git history keeps them. Only files
+  committed unchanged are candidates, and none while a card lacks an `#id`
+  or fails to render.
 
 The server rereads `.marki/config.toml` when it changes. If the file stops
 parsing, every tool fails with the parse error until it's fixed.
 
 On NixOS, `modules/marki-mcp.nix` runs it as a service, with the collection
-in its state directory and the sync password as a credential
-(`MARKI_SYNC_PASSWORD_FILE`).
+in its state directory, the sync password as a credential
+(`MARKI_SYNC_PASSWORD_FILE`), and Chromium plus fonts for previews
+(`services.marki-mcp.browser`).
 
 ## Layout
 

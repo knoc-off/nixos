@@ -352,6 +352,35 @@ impl Collection {
         Ok(rows)
     }
 
+    /// Cards of the note `guid`, or of every note, with their user flag.
+    /// Cloze cards are named `Cloze N` (their single template serves every
+    /// ord), like marki's preview names them.
+    pub fn card_infos(&self, guid: Option<&str>) -> Result<Vec<CardInfo>> {
+        let mut stmt = self.db.prepare(
+            "SELECT c.id, n.guid, c.ord, t.name, d.name, c.flags & 7 FROM cards c \
+             JOIN notes n ON n.id = c.nid JOIN decks d ON d.id = c.did \
+             LEFT JOIN templates t ON t.ntid = n.mid AND t.ord = c.ord \
+             WHERE ?1 IS NULL OR n.guid = ?1 ORDER BY n.guid, c.ord",
+        )?;
+        let rows = stmt
+            .query_map([guid], |r| {
+                let ord: i64 = r.get(2)?;
+                let template: Option<String> = r.get(3)?;
+                Ok(CardInfo {
+                    card_id: r.get(0)?,
+                    guid: r.get(1)?,
+                    card: match template {
+                        Some(t) if t != notetype::CLOZE_TEMPLATE => t,
+                        _ => format!("Cloze {}", ord + 1),
+                    },
+                    deck: deck::native_to_human(&r.get::<_, String>(4)?),
+                    flag: r.get(5)?,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
     /// `(guid, raw flds)` of every note, managed or not.
     pub fn all_note_fields(&self) -> Result<Vec<(String, String)>> {
         let mut stmt = self.db.prepare("SELECT guid, flds FROM notes")?;
@@ -522,6 +551,19 @@ pub struct RawManagedNote {
     pub card_ids: Vec<i64>,
     /// Any of the note's cards carries a user flag (`cards.flags & 7`).
     pub flagged: bool,
+}
+
+/// One card as [`Collection::card_infos`] reads it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CardInfo {
+    pub card_id: i64,
+    pub guid: String,
+    /// Card type (template) name, or `Cloze N`.
+    pub card: String,
+    /// Human `::`-separated deck name.
+    pub deck: String,
+    /// User flag, `cards.flags & 7`: 0 none, 1 red .. 7 purple.
+    pub flag: u8,
 }
 
 /// Mutation handle scoped to one `transact` batch. Holds the usn every
@@ -940,6 +982,28 @@ impl NoteWriter<'_> {
                 params![self.usn, now_secs(), note_id],
             )
             .with_context(|| format!("clear flags of note {note_id}"))?;
+        if n > 0 {
+            self.mutated = true;
+        }
+        Ok(n)
+    }
+
+    /// Set the user flag (`flags & 7`; 0 clears) on these cards, keeping the
+    /// other flag bits. Returns the number of cards that changed.
+    pub fn set_card_flags(&mut self, card_ids: &[i64], flag: u8) -> Result<usize> {
+        if flag > 7 {
+            bail!("flag must be 0..=7, got {flag}");
+        }
+        let mut n = 0;
+        for id in card_ids {
+            n += self
+                .tx
+                .execute(
+                    "UPDATE cards SET flags = (flags & ~7) | ?1, usn=?2, mod=?3 WHERE id=?4 AND flags & 7 != ?1",
+                    params![flag, self.usn, now_secs(), id],
+                )
+                .with_context(|| format!("flag card {id}"))?;
+        }
         if n > 0 {
             self.mutated = true;
         }

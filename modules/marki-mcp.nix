@@ -48,6 +48,9 @@
           "@system-service"
           "~@privileged"
         ];
+        # Fail filtered syscalls instead of killing the process: Chromium
+        # (card previews) probes a few and copes with EPERM, but not SIGSYS.
+        SystemCallErrorNumber = "EPERM";
         RestrictAddressFamilies = [
           "AF_INET"
           "AF_INET6"
@@ -99,6 +102,17 @@
           type = types.listOf types.package;
           default = [ ];
           description = "Extra tools on PATH (e.g. typst for ```typst blocks).";
+        };
+
+        browser = mkOption {
+          type = types.nullOr types.package;
+          default = pkgs.chromium;
+          defaultText = literalExpression "pkgs.chromium";
+          description = ''
+            Headless Chromium that `marki_preview` screenshots whole cards with
+            (exported as `MARKI_BROWSER`). `null` keeps previews to map/typst
+            figures only.
+          '';
         };
 
         proxy = {
@@ -195,6 +209,17 @@
           }
           // lib.optionalAttrs (cfg.syncPasswordFile != null) {
             MARKI_SYNC_PASSWORD_FILE = "%d/sync-password";
+          }
+          // lib.optionalAttrs (cfg.browser != null) {
+            MARKI_BROWSER = getExe cfg.browser;
+            # Without fonts headless Chromium draws no text at all.
+            FONTCONFIG_FILE = pkgs.makeFontsConf {
+              fontDirectories = [
+                pkgs.dejavu_fonts
+                pkgs.noto-fonts
+                pkgs.noto-fonts-cjk-sans
+              ];
+            };
           };
 
           serviceConfig = hardening // {

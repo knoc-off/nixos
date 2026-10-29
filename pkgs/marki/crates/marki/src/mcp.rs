@@ -49,9 +49,9 @@ ref; marki_context lists existing ones under custom_geometry.
 
 Workflow: call marki_context first (models, decks, media dirs, available \
 blocks and doc topics). Draft a card, \
-check it with marki_preview (pass `source` to preview without saving), then \
-marki_write_card (marki_write_cards for more than a few). When done, \
-marki_push without confirm simulates and returns \
+check it with marki_preview (pass `source` to preview without saving; look \
+at the screenshots), then save with marki_write_cards (one card or many). \
+When done, marki_push without confirm simulates and returns \
 a plan_hash; show the user the planned changes, and only after they agree \
 call marki_push with confirm=true and that plan_hash. Check `ok` and `steps` \
 of the result; never report success when a step says error. marki_status \
@@ -64,8 +64,9 @@ as an orphan and suspends its cards. Only with the user's explicit consent \
 pass delete_orphans=true (to both the simulation and the confirm) to delete \
 the note and its review history instead. To change a card's deck, \
 marki_move_card it; the push moves the note and keeps its reviews. \
-`media_orphans: N` counts rendered media files (maps, typst, media blocks) \
-no card uses any more; delete_orphans=true also deletes those.
+`media_orphans: N` counts media files no card uses any more (rendered maps, \
+typst and media in Anki, and source files under .marki/media); \
+delete_orphans=true also deletes those (git history keeps the sources).
 
 Cards: one .md file = one note; the directory is the deck (a/b/x.md -> a::b), \
 or #deck(a::b). `---` splits front from back. Tags are #words anywhere; \
@@ -76,11 +77,12 @@ write; when editing, keep the existing #id and pass it as expected_id.
 Good cards test one fact, have a short unambiguous front, and put context on \
 the back. Prefer several small cards over one big one.
 
-Media: marki_add_media saves a file, then reference it in a ```media block \
-(marki_docs(\"media\")). Maps: a ```map block renders the map itself \
-(marki_docs(\"map\")); never download a map image. marki_preview returns a \
-PNG of each map, and marki_map_render renders a bare map block: look at them \
-to check the frame, gaps and overlaps. Math: $inline$ and \
+Media: marki_add_media saves a file (SVG you write goes in `text`), then \
+reference it in a ```media block (marki_docs(\"media\")); marki_media_list \
+shows which cards use each file. Maps: a ```map block renders the map itself \
+(marki_docs(\"map\")); never download a map image. marki_preview returns \
+screenshots of the card, and marki_map_render renders a bare map block: look \
+at them to check the frame, gaps and overlaps. Math: $inline$ and \
 $$display$$.
 
 Models: read marki_docs(\"models\") before writing one; \
@@ -94,10 +96,13 @@ old->new; dropping needs M.allow_card_removal and the user's consent.
 marki_query runs read-only SQL on marki's copy of the collection as last \
 synced (tables \
 notes, cards, revlog, decks, notetypes); select n.guid to get each card's \
-file path. Flags (cards.flags & 7: 1 red .. 7 purple) usually mean 'fix this \
-card': select distinct n.guid from cards c join notes n on n.id=c.nid where \
-c.flags & 7 = 1. A push that changes a flagged note clears its flags \
-(`unflag` in the change detail).";
+file path. Flags: the user flags cards in Anki to say 'fix this card' (red \
+usually). marki_flagged lists them, marki_search_cards(flagged=...) filters \
+by them, and marki_set_flag sets or clears one right away. A push that \
+changes a flagged note clears its flags (`unflag` in the change detail). \
+Deck options (daily limits, steps, presets): marki_deck_options reads them, \
+marki_set_deck_options changes them right away (no push); a preset can be \
+shared by several decks.";
 
 type Job = Box<dyn FnOnce(&mut Handler) + Send>;
 pub type Reload = Box<dyn Fn() -> Result<Config> + Send>;
@@ -205,6 +210,13 @@ pub struct SearchArgs {
     /// Case-insensitive substring of path or content; empty lists all.
     #[serde(default)]
     pub query: String,
+    /// Only this deck and its subdecks, e.g. `geography::europe`.
+    pub deck: Option<String>,
+    /// Only notes with this tag (or a child: `geo` matches `geo::europe`).
+    pub tag: Option<String>,
+    /// Only notes with a flagged card in Anki: a colour (red orange green
+    /// blue pink turquoise purple) or `any`. Adds `flags` to each result.
+    pub flagged: Option<String>,
     /// Max results (default 50).
     pub limit: Option<usize>,
 }
@@ -225,8 +237,12 @@ pub struct PreviewArgs {
     pub model_lua: Option<String>,
     /// Draft CSS for the card's model.
     pub model_css: Option<String>,
-    /// Attach PNG snapshots of maps/typst figures (default true).
+    /// Attach PNGs (default true): a screenshot of every card side, or
+    /// without a configured browser, of each map/typst figure.
     pub images: Option<bool>,
+    /// Return each side's HTML (and the model CSS) instead of plain text.
+    #[serde(default)]
+    pub html: bool,
 }
 
 /// JSON text first, then one label + image pair per PNG.
@@ -242,6 +258,7 @@ fn with_pngs(json: &serde_json::Value, pngs: Vec<(String, Vec<u8>)>) -> Vec<Cont
 
 #[derive(Deserialize, JsonSchema)]
 pub struct WriteCardArgs {
+    /// Card path, e.g. `geography/europe/france.md`; the directory is the deck.
     pub path: String,
     /// Full card markdown. Formatted on write (tags moved to the last line).
     pub source: String,
@@ -251,8 +268,53 @@ pub struct WriteCardArgs {
 
 #[derive(Deserialize, JsonSchema)]
 pub struct WriteCardsArgs {
-    /// Up to 500 cards; each like marki_write_card's arguments.
+    /// 1 to 500 cards.
     pub cards: Vec<WriteCardArgs>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct FlaggedArgs {
+    /// Only this colour: red orange green blue pink turquoise purple.
+    pub color: Option<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct SetFlagArgs {
+    /// Card path.
+    pub path: String,
+    /// red orange green blue pink turquoise purple, or `none` to clear.
+    pub color: String,
+    /// One card type of the note (e.g. `Card`, `Locate`, `Cloze 2`); omit
+    /// for all of its cards.
+    pub card: Option<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct DeckOptionsArgs {
+    /// A deck (e.g. `geo::europe`): adds its preset and own limits.
+    pub deck: Option<String>,
+}
+
+#[derive(Deserialize, JsonSchema)]
+pub struct SetDeckOptionsArgs {
+    /// The deck, e.g. `geo::europe`. Must exist (decks come from card dirs).
+    pub deck: String,
+    /// Preset to give the deck: an existing one (edited by `settings`), or a
+    /// new name (created from `clone_from`, else Anki's defaults). Omit to
+    /// edit the deck's current preset -- which changes it for every deck
+    /// sharing it.
+    pub preset: Option<String>,
+    /// For a new preset: copy this existing one first.
+    pub clone_from: Option<String>,
+    /// Preset fields to change, as marki_deck_options shows them, e.g.
+    /// {"new_per_day": 10, "learn_steps": "1m 10m", "review_order": "day"}.
+    pub settings: Option<serde_json::Map<String, serde_json::Value>>,
+    /// Give every subdeck the preset too.
+    #[serde(default)]
+    pub subdecks: bool,
+    /// This deck's own daily limits, overriding the preset's:
+    /// {"new_per_day": n, "reviews_per_day": n}; null clears one.
+    pub limits: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -261,7 +323,9 @@ pub struct MediaArgs {
     pub dir: String,
     /// File name with extension (svg png webp jpg gif mp3 ogg m4a wav).
     pub name: String,
-    /// http(s) URL to download.
+    /// The file's text, for SVG you write yourself.
+    pub text: Option<String>,
+    /// Or an http(s) URL to download.
     pub url: Option<String>,
     /// Or the file content, base64.
     pub base64: Option<String>,
@@ -370,9 +434,10 @@ impl Marki {
         })
     }
 
-    #[tool(description = "Search card files by path or content.")]
+    #[tool(description = "Search card files by path or content, optionally only a deck (and subdecks), a tag, or notes flagged in Anki (flagged=\"any\" or a colour).")]
     async fn marki_search_cards(&self, Parameters(a): Parameters<SearchArgs>) -> Result<CallToolResult, McpError> {
-        self.tool(move |h| h.search_cards(&a.query, a.limit.unwrap_or(50))).await
+        let f = crate::mcp_tools::SearchFilter { deck: a.deck, tag: a.tag, flagged: a.flagged };
+        self.tool(move |h| h.search_cards(&a.query, &f, a.limit.unwrap_or(50))).await
     }
 
     #[tool(description = "Read a card's markdown source.")]
@@ -380,12 +445,12 @@ impl Marki {
         self.tool(move |h| h.read_card(&a.path)).await
     }
 
-    #[tool(description = "Render a card (saved or draft source, optionally with a draft model) to the HTML of every card front/back it generates, plus render errors, plus a PNG (max 512 px) of each map/typst figure per card side so you can check what it looks like (`images` lists their labels; images=false skips them). Writes nothing.")]
+    #[tool(description = "Render a card (saved, or a draft `source`, optionally with a draft model) without writing anything: every card front/back it generates as plain text, render errors, and a PNG screenshot of each card side as Anki shows it (`images` lists their labels; images=false skips them). Look at the images to check layout, maps and media. html=true returns the HTML and CSS instead of text.")]
     async fn marki_preview(&self, Parameters(a): Parameters<PreviewArgs>) -> Result<CallToolResult, McpError> {
         let images = a.images.unwrap_or(true);
         let r = self
             .run(move |h| {
-                h.preview(&a.path, a.source.as_deref(), a.model_lua.as_deref(), a.model_css.as_deref(), images)
+                h.preview(&a.path, a.source.as_deref(), (a.model_lua.as_deref(), a.model_css.as_deref()), images, a.html)
             })
             .await;
         Ok(match r {
@@ -394,37 +459,44 @@ impl Marki {
         })
     }
 
-    #[tool(description = "Format, validate and save a card file. New cards get an #id; overwriting needs expected_id. Does not push.")]
-    async fn marki_write_card(&self, Parameters(a): Parameters<WriteCardArgs>) -> Result<CallToolResult, McpError> {
-        self.tool(move |h| h.write_card(&a.path, &a.source, a.expected_id.as_deref())).await
-    }
-
-    #[tool(description = "Write many cards at once (e.g. a whole deck from one model): every card is formatted and checked like marki_write_card, then all are written, or none if any fails (the error lists each failing card). Does not push.")]
+    #[tool(description = "Format, validate and save one or more card files (up to 500). Every card is formatted and checked (renders, makes at least one card, no duplicate #id) first; then all are written, or none if any fails (the error lists each failing card). New cards get an #id; overwriting a card needs its current #id as expected_id. Does not push.")]
     async fn marki_write_cards(&self, Parameters(a): Parameters<WriteCardsArgs>) -> Result<CallToolResult, McpError> {
         let cards: Vec<_> = a.cards.into_iter().map(|c| (c.path, c.source, c.expected_id)).collect();
         self.tool(move |h| h.write_cards(&cards)).await
     }
 
-    #[tool(description = "Save a media file (from a URL or base64) under .marki/media/<dir>/. Returns the `src` line for a ```media block.")]
+    #[tool(description = "Save a media file under .marki/media/<dir>/: SVG you write as `text`, a URL to download, or base64. Returns the `src` line for a ```media block and a thumbnail of the image. Unused media files are cleaned up by marki_push with delete_orphans=true (git history keeps them).")]
     async fn marki_add_media(&self, Parameters(a): Parameters<MediaArgs>) -> Result<CallToolResult, McpError> {
-        self.tool(move |h| {
-            let bytes = match (a.url, a.base64) {
-                (Some(url), None) => {
-                    anyhow::ensure!(url.starts_with("https://") || url.starts_with("http://"), "url must be http(s)");
-                    let resp = reqwest::blocking::Client::builder()
-                        .timeout(std::time::Duration::from_secs(30))
-                        .build()?
-                        .get(&url)
-                        .send()?
-                        .error_for_status()?;
-                    resp.bytes()?.to_vec()
+        let r = self
+            .run(move |h| {
+                let bytes = match (a.text, a.url, a.base64) {
+                    (Some(t), None, None) => t.into_bytes(),
+                    (None, Some(url), None) => {
+                        anyhow::ensure!(url.starts_with("https://") || url.starts_with("http://"), "url must be http(s)");
+                        let resp = reqwest::blocking::Client::builder()
+                            .timeout(std::time::Duration::from_secs(30))
+                            .build()?
+                            .get(&url)
+                            .send()?
+                            .error_for_status()?;
+                        resp.bytes()?.to_vec()
+                    }
+                    (None, None, Some(b)) => base64::engine::general_purpose::STANDARD.decode(b.trim())?,
+                    _ => anyhow::bail!("pass exactly one of text, url or base64"),
+                };
+                h.add_media(&a.dir, &a.name, &bytes)
+            })
+            .await;
+        Ok(match r {
+            Ok((json, thumb)) => {
+                let mut out = vec![ContentBlock::text(serde_json::to_string_pretty(&json).unwrap_or_default())];
+                if let Some((bytes, mime)) = thumb {
+                    out.push(ContentBlock::image(base64::engine::general_purpose::STANDARD.encode(bytes), mime));
                 }
-                (None, Some(b)) => base64::engine::general_purpose::STANDARD.decode(b.trim())?,
-                _ => anyhow::bail!("pass exactly one of url or base64"),
-            };
-            h.add_media(&a.dir, &a.name, &bytes)
+                CallToolResult::success(out)
+            }
+            Err(e) => CallToolResult::error(vec![ContentBlock::text(e)]),
         })
-        .await
     }
 
     #[tool(description = "Read a custom model's Lua and CSS, with per-card-type card and review counts from the collection.")]
@@ -461,6 +533,34 @@ impl Marki {
     async fn marki_query(&self, Parameters(a): Parameters<QueryArgs>) -> Result<CallToolResult, McpError> {
         self.tool(move |h| h.query(&a.sql)).await
     }
+
+    #[tool(description = "Cards flagged in Anki (the user's 'look at this' marks; red usually means 'fix this card'), with card file path, card type, deck and colour. Reads marki's copy as last synced. Editing the card and pushing clears its flags.")]
+    async fn marki_flagged(&self, Parameters(a): Parameters<FlaggedArgs>) -> Result<CallToolResult, McpError> {
+        self.tool(move |h| h.flagged(a.color.as_deref())).await
+    }
+
+    #[tool(description = "Set (or clear, color=\"none\") the Anki flag on a card file's cards, or one card type of it, and sync it right away: pull, write, sync up. Changes nothing in the card files; needs no marki_push.")]
+    async fn marki_set_flag(&self, Parameters(a): Parameters<SetFlagArgs>) -> Result<CallToolResult, McpError> {
+        self.tool(move |h| h.set_flag(&a.path, a.card.as_deref(), &a.color)).await
+    }
+
+    #[tool(description = "Anki deck options: every preset with its settings (daily limits, learning steps, intervals, desired retention, orders, burying, leeches) and the decks using it, plus whether FSRS is on. With deck: also that deck's preset and own limits. Reads marki's copy as last synced.")]
+    async fn marki_deck_options(&self, Parameters(a): Parameters<DeckOptionsArgs>) -> Result<CallToolResult, McpError> {
+        self.tool(move |h| h.deck_options(a.deck.as_deref())).await
+    }
+
+    #[tool(description = "Change a deck's options the way Anki's Deck Options screen does, and sync right away: pull, apply, sync up. Give the deck a preset (existing, or new from clone_from or defaults), change that preset's settings, optionally for subdecks too, and/or set the deck's own daily limits. Editing a preset changes it for every deck using it: check marki_deck_options first and ask the user when other decks share it. Never deletes presets, toggles FSRS or reschedules cards. Needs no marki_push.")]
+    async fn marki_set_deck_options(&self, Parameters(a): Parameters<SetDeckOptionsArgs>) -> Result<CallToolResult, McpError> {
+        let req = serde_json::json!({
+            "deck": a.deck,
+            "preset": a.preset,
+            "clone_from": a.clone_from,
+            "settings": a.settings,
+            "subdecks": a.subdecks,
+            "limits": a.limits,
+        });
+        self.tool(move |h| h.set_deck_options(req)).await
+    }
 }
 
 #[prompt_router]
@@ -476,7 +576,7 @@ impl Marki {
                  2. Propose a short list of cards (one fact each, deck = directory) and wait for my OK. \
                  If a card would benefit from a map, image, audio or diagram, read that block's \
                  marki_docs topic and use the block.\n\
-                 3. For each: marki_preview with the draft source, fix any errors, then marki_write_card.\n\
+                 3. For each: marki_preview with the draft source, look at the screenshots, fix any errors, then save them with marki_write_cards.\n\
                  4. marki_push (simulate), show me the plan, and push with confirm only after I agree.",
                 a.topic
             ),
@@ -504,7 +604,7 @@ impl ServerHandler for Marki {
     ) -> Result<ListResourcesResult, McpError> {
         let listed = self
             .run(|h| {
-                let cards = h.search_cards("", usize::MAX)?;
+                let cards = h.search_cards("", &Default::default(), usize::MAX)?;
                 let ctx = h.context()?;
                 Ok((cards, ctx, crate::docs::topics(&h.project.registry)))
             })

@@ -50,6 +50,10 @@ struct Cli {
     #[arg(long, env = "MARKI_TYPST", global = true)]
     typst_binary: Option<PathBuf>,
 
+    /// Headless Chromium for whole-card PNG previews (`marki_preview`).
+    #[arg(long, env = "MARKI_BROWSER", global = true)]
+    browser_binary: Option<PathBuf>,
+
     /// Increase log verbosity. Repeat for more detail: `-v` enables
     /// `debug`, `-vv` enables `trace`. Overridden by an explicit
     /// `RUST_LOG`/env filter when one is set.
@@ -246,6 +250,9 @@ fn apply_cli_overrides(cfg: &mut Config, cli: &Cli) -> Result<()> {
     }
     if let Some(p) = &cli.typst_binary {
         cfg.typst_binary = Some(p.clone());
+    }
+    if let Some(p) = &cli.browser_binary {
+        cfg.browser_binary = Some(p.clone());
     }
     Ok(())
 }

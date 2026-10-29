@@ -78,6 +78,11 @@ pub struct Config {
     #[serde(default)]
     pub typst_binary: Option<PathBuf>,
 
+    /// Chromium (or Chrome) used headless to screenshot whole cards for
+    /// `marki_preview`. When `None`, previews only rasterize SVG figures.
+    #[serde(default)]
+    pub browser_binary: Option<PathBuf>,
+
     /// Project-level defaults and path rules for `map` blocks. Merged
     /// underneath each card's own block (the author always wins). See
     /// [`marki_map::MapDefaults`].
@@ -174,6 +179,7 @@ impl Default for Config {
             debounce_ms: 250,
             media_sources: Default::default(),
             typst_binary: None,
+            browser_binary: None,
             map: Default::default(),
             sync: None,
             server: None,
@@ -291,6 +297,9 @@ impl Config {
         }
         if let Some(p) = self.typst_binary.as_mut() {
             expand_path(p, "typst_binary")?;
+        }
+        if let Some(p) = self.browser_binary.as_mut() {
+            expand_path(p, "browser_binary")?;
         }
         if let Some(p) = self.collection.as_mut() {
             expand_path(p, "collection")?;
@@ -515,6 +524,10 @@ const STARTER_CONFIG: &str = r#"# marki project config — lives in `.marki/`, c
 # Path to the `typst` CLI for ```typst``` blocks. Pair with `nix shell`
 # and env interpolation so the volatile /nix/store path isn't committed:
 # typst_binary = "${TYPST_BIN:-typst}"
+
+# Headless Chromium for whole-card PNG previews over MCP (marki_preview).
+# Also settable with $MARKI_BROWSER:
+# browser_binary = "${CHROMIUM:-chromium}"
 
 # Named media sources for ```media``` blocks. The built-in
 # `.marki/media/` directory is always searched FIRST; these add more.

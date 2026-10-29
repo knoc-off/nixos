@@ -291,21 +291,135 @@ export function wrapForWorld(body, world, timeoutMs, tab) {
   return body;
 }
 
-export default async (_ctx) => {
+// ---- reuse check ----
+//
+// Agents kept rewriting `document.body.innerText.slice(...)` and one-off URL
+// builders instead of re-running or extending a saved snippet, despite the
+// "list first" instruction. So each unsaved script (and each new name) gets
+// one Jev request against the library before it runs: an exact match blocks,
+// a near match or a repeat of a recent throwaway gets a one-line nudge.
+const JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
+const JEV_TIMEOUT_MS = 3000;
+const BLOCK_MIN_P = 0.8;
+const NOTE_MIN_P = 0.6;
+const RECENT_INTENTS = 20;
+// Bridge helpers are not snippets, but "read the page text" should land on
+// readable() rather than a fourth innerText one-liner.
+const BUILTINS = {
+  "readable()": "built-in helper: readable(target?) returns the page's main text content",
+  "openTab()": "built-in helper: openTab(url, {selector?}) opens a tab and waits for it to load",
+  "jev.observe()": "built-in helper: jev.observe() returns a page snapshot {url, title, text, actions}",
+};
+const VERDICTS = {
+  reuse: "an existing snippet or helper in `library` already does what `intent` describes",
+  extend: "an existing snippet does nearly this; it should gain a parameter or helper instead of a new script",
+  save: "not in the library, but likely to be needed again (e.g. `recent_intents` already did the same thing)",
+  throwaway: "a one-off probe specific to this moment, not worth saving",
+};
+
+export function buildClassifyRequest({ intent, script, url, snippets, recent }) {
+  const library = Object.fromEntries(snippets.map((s) => [s.name, s.description || "(no description)"]));
+  const candidates = { ...library, ...BUILTINS, none: "nothing in the library does this" };
+  return {
+    state: {
+      intent,
+      script: script.length > 2000 ? script.slice(0, 2000) + "\n…" : script,
+      ...(url ? { tab: url } : {}),
+      library: { ...library, ...BUILTINS },
+      recent_intents: recent,
+    },
+    questions: {
+      match: {
+        type: "choice",
+        instructions: "Which `library` entry is closest to doing what `intent` (implemented by `script`) describes?",
+        criteria: candidates,
+      },
+      verdict: { type: "choice", instructions: "How should this script be handled?", criteria: VERDICTS },
+    },
+  };
+}
+
+// Jev answers -> {block?: string, note?: string} or null (nothing to say).
+// `saving`: the call saves a new name, so never block, only flag a duplicate.
+export function readVerdict(answers, { force = false, saving = false } = {}) {
+  const verdict = answers?.verdict?.choice;
+  const p = answers?.verdict?.probabilities?.[verdict] ?? 0;
+  const match = answers?.match?.choice;
+  const hit = match && match !== "none" ? match : null;
+  if (!verdict || p < NOTE_MIN_P) return null;
+  const isBuiltin = hit && hit in BUILTINS;
+  const how = isBuiltin ? `call ${hit} inside a script` : `run name:${JSON.stringify(hit)}`;
+  if (verdict === "reuse" && hit) {
+    if (saving) return { note: `[browser-exec] looks like a duplicate of ${hit}; consider extending that instead` };
+    if (!force && p >= BLOCK_MIN_P)
+      return { block: `[browser-exec] not run: ${hit} already does this -- ${how}, or pass force:true if it really doesn't` };
+    return { note: `[browser-exec] ${hit} may already do this -- ${how}` };
+  }
+  if (verdict === "extend" && hit && !isBuiltin)
+    return { note: `[browser-exec] close to ${hit}: extend that snippet and save it under its name rather than a new one` };
+  if (verdict === "save" && !saving)
+    return { note: "[browser-exec] looks repeatable: save it with name+description so the next session can re-run it" };
+  return null;
+}
+
+async function jevKey() {
+  return process.env.TYPESAFE_API_KEY?.trim() || (await readFile("/run/secrets/jev/api-key", "utf8")).trim();
+}
+
+async function recentIntents() {
+  const files = await readdir(TEMP_DIR).catch(() => []);
+  const rows = await Promise.all(
+    files.map(async (f) => {
+      const p = join(TEMP_DIR, f);
+      const [s, src] = await Promise.all([stat(p).catch(() => null), readFile(p, "utf8").catch(() => "")]);
+      return { mtime: s?.mtimeMs ?? 0, intent: parseHeader(src).description };
+    })
+  );
+  return rows
+    .filter((r) => r.intent)
+    .sort((a, b) => b.mtime - a.mtime)
+    .slice(0, RECENT_INTENTS)
+    .map((r) => r.intent);
+}
+
+// Any failure (no key, offline, slow) -> null: the call runs as if unchecked.
+async function classify(input, opts) {
+  try {
+    const { state, questions } = buildClassifyRequest({
+      ...input,
+      snippets: await listSaved(null),
+      recent: await recentIntents(),
+    });
+    const res = await fetch(JEV_ENDPOINT, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${await jevKey()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "jev-latest", state, questions }),
+      signal: AbortSignal.timeout(JEV_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    return readVerdict((await res.json()).answers, opts);
+  } catch {
+    return null;
+  }
+}
+
+// V1 plugin shape (`export default { id, server }`): with a bare-function
+// default, opencode's legacy loader calls every named export as a plugin,
+// and one throwing helper (buildClassifyRequest on opencode's ctx) aborted
+// the whole file. See axiom-ledger's plugin for the same fix.
+async function server(_ctx) {
   const z = loadZod();
   return {
   tool: {
     browser_exec: {
       description:
-        "ALWAYS START WITH `list`. Call with `list: true` (or " +
-        "`list: \"substring\"`) before writing any new `script`. It does not " +
-        "evaluate anything, it is one cheap read of the snippet library, and " +
-        "it is the only way to find out that the thing you are about to " +
-        "write already exists. Re-running a saved snippet by `name` is " +
-        "cheaper and more reliable than rewriting it from memory, and an " +
-        "existing snippet has already had its bugs found. Skip the list step " +
-        "only when re-running a `name` you have already seen in this " +
-        "session. " +
+        "Check the snippet library (`list: true`) before writing a new " +
+        "`script`: re-running a saved snippet by `name` beats rewriting it. " +
+        "An unsaved `script` needs a one-line `intent`; it is checked " +
+        "against the library first, and is NOT run when a saved snippet " +
+        "already does it (the result names it; `force: true` overrides). " +
+        "Near matches and repeatable scripts get a one-line hint to extend " +
+        "or save instead. " +
         "What: evaluate JavaScript against a running Firefox (firefox-neo), " +
         "either chrome-privileged (`world: 'chrome'`, default -- full browser " +
         "UI/XPCOM access) or in a tab's page (`world: 'page'` -- the page's " +
@@ -388,6 +502,17 @@ export default async (_ctx) => {
           .optional()
           .describe("One-line summary. Required the first time a `name` is saved."),
         message: z.string().optional().describe("Git commit message for this save."),
+        intent: z
+          .string()
+          .optional()
+          .describe(
+            "Required with an unsaved `script`: one line on what it is for (e.g. " +
+              "'read visible log rows on Datadog'). Checked against saved snippets."
+          ),
+        force: z
+          .boolean()
+          .optional()
+          .describe("Run an unsaved `script` even though a saved snippet was judged to do the same."),
         timeout: z
           .number()
           .optional()
@@ -437,6 +562,12 @@ export default async (_ctx) => {
           let body;
           let label;
           let savedMsg = "";
+          const intent = String(args.intent || "").trim();
+          if (script && !name && !intent) {
+            return "Error: `intent` is required for an unsaved script (one line: what it is for)";
+          }
+          const force = args.force === true || args.force === "true";
+          const tabUrl = typeof args.tab === "string" ? args.tab : undefined;
 
           if (script) {
             if (name) {
@@ -456,17 +587,23 @@ export default async (_ctx) => {
               if (!description) {
                 return "Error: `description` is required the first time a snippet is saved";
               }
+              const check = isUpdate
+                ? null
+                : await classify({ intent: intent || description, script, url: tabUrl }, { saving: true });
               await writeFile(snippetPath, withHeader(script, description, world));
               const commitMsg = args.message || (isUpdate ? `update ${name}` : `add ${name}`);
               await commit(commitMsg);
               label = `${name}.js`;
-              savedMsg = `saved to ${snippetPath} (${commitMsg}); re-run with name only\n`;
+              savedMsg = `${check?.note ? check.note + "\n" : ""}saved to ${snippetPath} (${commitMsg}); re-run with name only\n`;
             } else {
+              const check = await classify({ intent, script, url: tabUrl }, { force });
+              if (check?.block) return check.block;
+              if (check?.note) savedMsg = check.note + "\n";
               await mkdir(TEMP_DIR, { recursive: true });
               const tempName = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
               await writeFile(
                 join(TEMP_DIR, `${tempName}.js`),
-                withHeader(script, args.description || "", world)
+                withHeader(script, intent, world)
               );
               await pruneTemp();
               label = `${tempName}.js`;
@@ -497,4 +634,6 @@ export default async (_ctx) => {
       },
     },
   };
-};
+}
+
+export default { id: "browser-exec", server };

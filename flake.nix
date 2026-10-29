@@ -340,7 +340,7 @@
     # claude-code, and both break on upstream bumps. To bump, push there and
     # update the rev here. Local iteration:
     #   --override-input private path:/home/knoff/workspaces/private
-    private.url = "git+ssh://git@github.com/knoc-off/private-inputs?rev=ca3234eba9158e0bc3204d79e74071c0d9c2dd7b";
+    private.url = "git+ssh://git@github.com/knoc-off/private-inputs";
   };
 
   nixConfig = {

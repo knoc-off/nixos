@@ -36,6 +36,20 @@ pub struct CardSummary {
     pub deck: String,
     /// First line of the note, for orientation.
     pub title: String,
+    /// With the `flagged` filter: the flag colours on the note's cards.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub flags: Option<Vec<&'static str>>,
+}
+
+/// Narrowing for [`Handler::search_cards`].
+#[derive(Default)]
+pub struct SearchFilter {
+    /// Deck or any of its subdecks, `a::b`.
+    pub deck: Option<String>,
+    /// File tag (or a child of it, `geo` matches `geo::europe`).
+    pub tag: Option<String>,
+    /// Only notes with a flagged card: a colour, or `any`.
+    pub flagged: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -193,8 +207,52 @@ impl Handler {
 
     /// Run a block module's lookup tool (`marki_<lang>_<name>`).
     pub fn block_tool(&self, lang: &str, name: &str, args: serde_json::Value) -> Result<serde_json::Value> {
+        let flag = |k: &str| args.get(k).and_then(|v| v.as_bool()).unwrap_or(false);
+        if (lang, name) == ("media", "list") && (flag("used_by") || flag("unused")) {
+            return self.media_usage(&args, flag("unused"));
+        }
         let cache = crate::project::render_cache_dir();
         Ok(self.project.registry.call_tool(lang, name, args, self.root(), &cache)?)
+    }
+
+    /// `marki_media_list` with the cards using each file: renders every
+    /// card and matches its assets against each file's asset name.
+    fn media_usage(&self, args: &serde_json::Value, only_unused: bool) -> Result<serde_json::Value> {
+        let arg = |k: &str| args.get(k).and_then(|v| v.as_str()).map(str::to_lowercase);
+        let (filter, only) = (arg("filter").unwrap_or_default(), arg("source"));
+        let notes = scan_dir_v2(self.root())?;
+        let mut users: HashMap<String, Vec<String>> = HashMap::new();
+        let mut errors = Vec::new();
+        for (sn, r) in notes.iter().zip(self.project.render_notes(&notes, |_| true, None)) {
+            match r {
+                Some(Ok(r)) => {
+                    for a in r.assets {
+                        users.entry(a.filename).or_default().push(self.rel(&sn.path));
+                    }
+                }
+                Some(Err(e)) => errors.push(format!("{}: {e:#}", self.rel(&sn.path))),
+                None => {}
+            }
+        }
+        let mut sources = vec![(marki_media::BUILTIN_SOURCE.to_string(), self.project.cfg.builtin_media_dir())];
+        sources.extend(self.project.cfg.media_sources.iter().map(|(n, d)| (n.clone(), d.clone())));
+        let mut files = Vec::new();
+        for (src, path) in marki_media::media_files(&sources, &filter, only.as_deref()) {
+            let used_by = marki_media::asset_name(&path).ok().and_then(|n| users.get(&n).cloned()).unwrap_or_default();
+            if only_unused && !used_by.is_empty() {
+                continue;
+            }
+            files.push(serde_json::json!({"src": src, "used_by": used_by}));
+            if files.len() == 200 {
+                break;
+            }
+        }
+        let mut out = serde_json::json!({"files": files, "truncated": files.len() == 200});
+        if !errors.is_empty() {
+            // A card that doesn't render may use files listed as unused.
+            out["render_errors"] = errors.into();
+        }
+        Ok(out)
     }
 
     /// Render one ```map block (its TOML, no card needed) to a PNG of the
@@ -235,27 +293,63 @@ impl Handler {
         Ok(out)
     }
 
-    /// Case-insensitive substring search over path and source. Empty query
-    /// lists everything (capped).
-    pub fn search_cards(&self, query: &str, limit: usize) -> Result<Vec<CardSummary>> {
+    /// Case-insensitive substring search over path and source, narrowed by
+    /// deck (itself or a subdeck), tag and flag. Empty query lists
+    /// everything (capped).
+    pub fn search_cards(&self, query: &str, f: &SearchFilter, limit: usize) -> Result<Vec<CardSummary>> {
         let q = query.to_lowercase();
+        // guid -> flag colours, from the local copy as last synced.
+        let flags: Option<HashMap<String, Vec<&'static str>>> = match &f.flagged {
+            None => None,
+            Some(color) => {
+                let want = (color != "any").then(|| flag_number(color)).transpose()?;
+                let mut m: HashMap<String, Vec<&'static str>> = HashMap::new();
+                for c in self.project.read_view()?.col.card_infos(None)? {
+                    if c.flag != 0 && want.is_none_or(|w| w == c.flag) {
+                        m.entry(c.guid).or_default().push(FLAGS[c.flag as usize]);
+                    }
+                }
+                Some(m)
+            }
+        };
         let mut out = Vec::new();
         let mut notes = scan_dir_v2(self.root())?;
         notes.sort_by(|a, b| a.path.cmp(&b.path));
         for sn in notes {
             let rel = self.rel(&sn.path);
+            let deck = deck_for_note(self.root(), &sn.note);
             if !q.is_empty()
                 && !rel.to_lowercase().contains(&q)
                 && !sn.source.to_lowercase().contains(&q)
             {
                 continue;
             }
+            if let Some(d) = &f.deck {
+                if !(deck.eq_ignore_ascii_case(d) || deck.to_lowercase().starts_with(&format!("{}::", d.to_lowercase()))) {
+                    continue;
+                }
+            }
+            if let Some(t) = &f.tag {
+                let t = t.trim_start_matches('#').to_lowercase();
+                let hit = |a: &String| a.to_lowercase() == t || a.to_lowercase().starts_with(&format!("{t}::"));
+                if !sn.note.anki_tags.iter().chain(sn.note.tags.keys()).any(hit) {
+                    continue;
+                }
+            }
+            let flag = match &flags {
+                None => None,
+                Some(m) => match sn.note.id.as_ref().and_then(|id| m.get(id)) {
+                    Some(v) => Some(v.clone()),
+                    None => continue,
+                },
+            };
             out.push(CardSummary {
-                deck: deck_for_note(self.root(), &sn.note),
+                deck,
                 id: sn.note.id.clone(),
                 model: sn.note.model.clone(),
                 title: sn.source.lines().find(|l| !l.trim().is_empty()).unwrap_or("").chars().take(80).collect(),
                 path: rel,
+                flags: flag,
             });
             if out.len() >= limit {
                 break;
@@ -270,15 +364,18 @@ impl Handler {
     }
 
     /// Render a card (saved file or draft `source`) with an optional draft
-    /// model. Returns the HTML page plus per-card JSON.
+    /// model. Returns per-card JSON (plain text sides, or HTML with `html`)
+    /// plus labelled PNGs: one per card side with `browser_binary`,
+    /// otherwise one per SVG figure.
     pub fn preview(
         &mut self,
         rel: &str,
         source: Option<&str>,
-        model_lua: Option<&str>,
-        model_css: Option<&str>,
+        model: (Option<&str>, Option<&str>),
         images: bool,
+        html: bool,
     ) -> Result<(serde_json::Value, Vec<(String, Vec<u8>)>)> {
+        let (model_lua, model_css) = model;
         let path = self.card_path(rel)?;
         let source = match source {
             Some(s) => s.to_string(),
@@ -297,7 +394,23 @@ impl Handler {
         // One PNG per figure per card side; failures are reported, not fatal.
         let mut pngs = Vec::new();
         let mut image_errors = Vec::new();
-        if images {
+        let browser = self.project.cfg.browser_binary.clone();
+        if images && let Some(bin) = &browser {
+            // One screenshot per card side, as Anki draws it.
+            let sides: Vec<(String, String)> = p
+                .cards
+                .iter()
+                .flat_map(|c| [(format!("{} front", c.name), c.front.clone()), (format!("{} back", c.name), c.back.clone())])
+                .collect();
+            let shots = crate::browser::screenshots(bin, &p.note.spec.css, &sides, &p.note.assets)?;
+            for ((label, _), shot) in sides.into_iter().zip(shots) {
+                match shot {
+                    Ok(png) => pngs.push((label, png)),
+                    Err(e) => image_errors.push(format!("{label}: {e}")),
+                }
+            }
+        } else if images {
+            // No browser: one PNG per SVG figure per card side.
             for c in &p.cards {
                 for (side, html, back) in [("front", &c.front, false), ("back", &c.back, true)] {
                     for (i, fig) in crate::raster::figures(html, &p.note.assets, back, 512).into_iter().enumerate() {
@@ -310,35 +423,51 @@ impl Handler {
                 }
             }
         }
-        let json = serde_json::json!({
+        let text = |h: &str| {
+            static BREAK: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+                regex::Regex::new(r"(?i)<br\s*/?>|</(p|div|li|tr|h[1-6]|pre|blockquote)>").unwrap()
+            });
+            marki_anki::notes::strip_html_preserving_media_filenames(&BREAK.replace_all(h, "$0\n"))
+                .lines()
+                .map(str::trim)
+                .filter(|l| !l.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        let cards: Vec<_> = p
+            .cards
+            .iter()
+            .map(|c| {
+                if html {
+                    serde_json::json!({"name": c.name, "ord": c.ord, "front": c.front, "back": c.back})
+                } else {
+                    serde_json::json!({"name": c.name, "ord": c.ord, "front": text(&c.front), "back": text(&c.back)})
+                }
+            })
+            .collect();
+        let mut json = serde_json::json!({
             "model": model,
             "deck": deck_for_note(self.root(), &parse_note(&source, path.clone())),
-            "cards": p.cards,
+            "cards": cards,
             "errors": p.note.errors,
             "assets": p.note.assets.iter().map(|a| &a.filename).collect::<Vec<_>>(),
-            "css": p.note.spec.css,
             "docs": block_docs(&self.project.registry, &source),
             "images": pngs.iter().map(|(l, _)| l).collect::<Vec<_>>(),
             "image_errors": image_errors,
         });
+        if html {
+            json["css"] = p.note.spec.css.clone().into();
+        }
+        if images && browser.is_none() {
+            json["images_note"] = "only map/typst figures are drawn; set browser_binary for whole-card screenshots".into();
+        }
         Ok((json, pngs))
     }
 
-    /// Format, validate and write a card. A new file gets a fresh id; an
-    /// existing file may only be replaced when `expected_id` matches its
-    /// current `#id` (so an agent can't clobber a card it didn't read).
-    /// Returns the written source.
-    pub fn write_card(&mut self, rel: &str, source: &str, expected_id: Option<&str>) -> Result<String> {
-        let (path, formatted) = self.check_card(rel, source, expected_id, &self.ids_on_disk()?, &HashSet::new())?;
-        if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir)?;
-        }
-        std::fs::write(&path, &formatted).with_context(|| format!("write {rel}"))?;
-        Ok(formatted)
-    }
-
-    /// Write many cards: all are checked first, then all are written, or
-    /// none if any fails.
+    /// Format, check and write cards: all are checked first, then all are
+    /// written, or none if any fails. A new file gets a fresh id; an existing
+    /// file may only be replaced when `expected_id` matches its current `#id`
+    /// (so an agent can't clobber a card it didn't read).
     pub fn write_cards(&mut self, cards: &[(String, String, Option<String>)]) -> Result<serde_json::Value> {
         ensure!(!cards.is_empty(), "no cards");
         ensure!(cards.len() <= 500, "at most 500 cards per call (got {})", cards.len());
@@ -479,8 +608,10 @@ impl Handler {
     }
 
     /// Save a media file into `.marki/media/<dir>/<name>`. Referenced from
-    /// cards as ```media src = "<dir>/<stem>"```.
-    pub fn add_media(&self, dir: &str, name: &str, bytes: &[u8]) -> Result<String> {
+    /// cards as ```media src = "<dir>/<stem>"```. Returns the `src` line and
+    /// a thumbnail `(bytes, mime)` of an image, so the agent sees what it
+    /// saved. An SVG that doesn't parse is refused.
+    pub fn add_media(&self, dir: &str, name: &str, bytes: &[u8]) -> Result<(serde_json::Value, Option<(Vec<u8>, &'static str)>)> {
         let rel = safe_rel(&format!("{dir}/{name}"))?;
         ensure!(rel.components().count() >= 2, "media needs a directory: dir/name.ext");
         let ext = rel.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
@@ -489,13 +620,27 @@ impl Handler {
             "unsupported media extension .{ext}"
         );
         ensure!(bytes.len() <= 20 << 20, "media file over 20 MiB");
+        let thumb = match ext.as_str() {
+            "svg" => Some((crate::raster::stack_png(&[bytes], 256).map_err(|e| anyhow::anyhow!("not a valid SVG: {e}"))?, "image/png")),
+            // MCP clients show these as they are; skip ones too big to send.
+            "png" | "jpg" | "jpeg" | "webp" | "gif" if bytes.len() <= 1 << 20 => {
+                let mime = match ext.as_str() {
+                    "png" => "image/png",
+                    "webp" => "image/webp",
+                    "gif" => "image/gif",
+                    _ => "image/jpeg",
+                };
+                Some((bytes.to_vec(), mime))
+            }
+            _ => None,
+        };
         let dest = self.project.cfg.builtin_media_dir().join(&rel);
         if let Some(d) = dest.parent() {
             std::fs::create_dir_all(d)?;
         }
         std::fs::write(&dest, bytes)?;
         let stem = rel.with_extension("");
-        Ok(format!("src = \"{}\"", stem.display()))
+        Ok((serde_json::json!({"src": format!("src = \"{}\"", stem.display()), "bytes": bytes.len()}), thumb))
     }
 
     pub fn read_model(&mut self, name: &str) -> Result<serde_json::Value> {
@@ -679,6 +824,85 @@ impl PushReport {
 
 impl Handler {
 
+    /// Flagged cards (optionally one colour) from the local copy as last
+    /// synced, with the card file each belongs to.
+    pub fn flagged(&self, color: Option<&str>) -> Result<serde_json::Value> {
+        let want = color.map(flag_number).transpose()?;
+        let paths = self.paths_by_id()?;
+        let view = self.project.read_view()?;
+        let cards: Vec<_> = view
+            .col
+            .card_infos(None)?
+            .into_iter()
+            .filter(|c| c.flag != 0 && want.is_none_or(|w| w == c.flag))
+            .map(|c| {
+                serde_json::json!({
+                    "path": paths.get(&c.guid),
+                    "id": c.guid,
+                    "card": c.card,
+                    "deck": c.deck,
+                    "flag": FLAGS[c.flag as usize],
+                })
+            })
+            .collect();
+        Ok(serde_json::json!({ "cards": cards }))
+    }
+
+    /// Set (or with `none`, clear) the flag on one card type of a note, or
+    /// all its cards: pull, write, sync up. Flags aren't in the card files,
+    /// so this skips the push plan.
+    pub fn set_flag(&mut self, rel: &str, card: Option<&str>, color: &str) -> Result<serde_json::Value> {
+        let flag = flag_number(color)?;
+        let path = self.card_path(rel)?;
+        let guid = parse_note(&std::fs::read_to_string(&path).with_context(|| format!("read {rel}"))?, path)
+            .id
+            .with_context(|| format!("{rel} has no #id yet"))?;
+        let pulled = self.project.pull().context("pull")?;
+        let mut col = self.project.open_collection()?;
+        let cards = col.card_infos(Some(&guid))?;
+        ensure!(!cards.is_empty(), "{rel} is not in Anki yet; push it first");
+        let ids: Vec<i64> = match card {
+            None => cards.iter().map(|c| c.card_id).collect(),
+            Some(name) => {
+                let ids: Vec<i64> = cards.iter().filter(|c| c.card == name).map(|c| c.card_id).collect();
+                ensure!(
+                    !ids.is_empty(),
+                    "{rel} has no card {name:?}; its cards are {}",
+                    cards.iter().map(|c| c.card.as_str()).collect::<Vec<_>>().join(", ")
+                );
+                ids
+            }
+        };
+        let changed = col.transact(|w| w.set_card_flags(&ids, flag))?;
+        drop(col);
+        let sync = if changed > 0 { self.project.sync_up(false).context("sync")? } else { None };
+        Ok(serde_json::json!({
+            "path": rel,
+            "flag": FLAGS[flag as usize],
+            "cards_changed": changed,
+            "pull": pulled,
+            "sync": sync.unwrap_or_else(|| if changed > 0 { "no [sync] configured".into() } else { "nothing to sync".into() }),
+        }))
+    }
+
+    /// Deck option presets (and one deck's preset and limits) from the
+    /// local copy as last synced.
+    pub fn deck_options(&self, deck: Option<&str>) -> Result<serde_json::Value> {
+        self.project.deck_options(serde_json::json!({ "action": "get", "deck": deck }))
+    }
+
+    /// Change a deck's options: pull, apply through Anki's Deck Options
+    /// call, sync up. Settings aren't in the card files, so no push plan.
+    pub fn set_deck_options(&mut self, mut req: serde_json::Value) -> Result<serde_json::Value> {
+        let pulled = self.project.pull().context("pull")?;
+        req["action"] = "set".into();
+        let mut out = self.project.deck_options(req)?;
+        let sync = self.project.sync_up(false).context("sync")?;
+        out["pull"] = serde_json::json!(pulled);
+        out["sync"] = serde_json::json!(sync.unwrap_or_else(|| "no [sync] configured".into()));
+        Ok(out)
+    }
+
     fn paths_by_id(&self) -> Result<std::collections::HashMap<String, String>> {
         Ok(scan_dir_v2(self.root())?
             .into_iter()
@@ -735,6 +959,18 @@ impl Handler {
             Ok(serde_json::json!({"rows": out, "truncated": truncated}))
         }
     }
+}
+
+/// Anki's flag colours by number (`cards.flags & 7`).
+const FLAGS: [&str; 8] = ["none", "red", "orange", "green", "blue", "pink", "turquoise", "purple"];
+
+fn flag_number(color: &str) -> Result<u8> {
+    let c = color.trim().to_lowercase();
+    FLAGS
+        .iter()
+        .position(|f| *f == c)
+        .map(|i| i as u8)
+        .with_context(|| format!("unknown flag {color:?}; one of {}", FLAGS.join(", ")))
 }
 
 /// Lua equivalents of the built-in models, as examples for authors.

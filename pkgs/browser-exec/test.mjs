@@ -5,8 +5,62 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { parseUserscript, globToRegExp, matchesAny } from "./match.mjs";
-import { makeHeader, parseHeader, stripHeader, withHeader, wrapForWorld, renderReply } from "./opencode-plugin.js";
+import { makeHeader, parseHeader, stripHeader, withHeader, wrapForWorld, renderReply, buildClassifyRequest, readVerdict } from "./opencode-plugin.js";
 import { validateChoice, actionSpace, decisionRequest, readDecision, rateWindow, toCriteria, actJs } from "./jevkit.mjs";
+
+test("default export is the V1 {id, server} shape (legacy shape calls every named export)", async () => {
+  const mod = await import("./opencode-plugin.js");
+  assert.equal(typeof mod.default.id, "string");
+  assert.equal(typeof mod.default.server, "function");
+});
+
+const ans = (verdict, p, match) => ({
+  verdict: { choice: verdict, probabilities: { [verdict]: p } },
+  match: { choice: match },
+});
+
+test("buildClassifyRequest offers snippets, builtins and none as match candidates", () => {
+  const { state, questions } = buildClassifyRequest({
+    intent: "read page text",
+    script: "x".repeat(3000),
+    url: "https://a/",
+    snippets: [{ name: "notion-read", description: "read a notion page" }],
+    recent: ["probe logs"],
+  });
+  assert.equal(state.library["notion-read"], "read a notion page");
+  assert.ok("readable()" in state.library);
+  assert.ok(state.script.length < 2100);
+  assert.equal(state.tab, "https://a/");
+  assert.deepEqual(state.recent_intents, ["probe logs"]);
+  assert.ok("none" in questions.match.criteria && "notion-read" in questions.match.criteria);
+  assert.deepEqual(Object.keys(questions.verdict.criteria), ["reuse", "extend", "save", "throwaway"]);
+});
+
+test("readVerdict blocks a confident reuse unless forced", () => {
+  assert.match(readVerdict(ans("reuse", 0.9, "notion-read")).block, /name:"notion-read".*force:true/);
+  assert.match(readVerdict(ans("reuse", 0.9, "readable()")).block, /call readable\(\) inside a script/);
+  const forced = readVerdict(ans("reuse", 0.9, "notion-read"), { force: true });
+  assert.ok(!forced.block && /may already do this/.test(forced.note));
+  const unsure = readVerdict(ans("reuse", 0.7, "notion-read"));
+  assert.ok(!unsure.block && unsure.note);
+});
+
+test("readVerdict notes extend/save, stays silent otherwise", () => {
+  assert.match(readVerdict(ans("extend", 0.8, "page-blocks")).note, /extend that snippet/);
+  assert.equal(readVerdict(ans("extend", 0.8, "readable()")), null);
+  assert.match(readVerdict(ans("save", 0.8, "none")).note, /save it/);
+  assert.equal(readVerdict(ans("throwaway", 0.95, "none")), null);
+  assert.equal(readVerdict(ans("reuse", 0.5, "notion-read")), null);
+  assert.equal(readVerdict(ans("reuse", 0.9, "none")), null);
+  assert.equal(readVerdict(null), null);
+  assert.equal(readVerdict({}), null);
+});
+
+test("readVerdict never blocks a save, only flags the duplicate", () => {
+  const r = readVerdict(ans("reuse", 0.95, "notion-read"), { saving: true });
+  assert.ok(!r.block && /duplicate of notion-read/.test(r.note));
+  assert.equal(readVerdict(ans("save", 0.9, "none"), { saving: true }), null);
+});
 
 test("parseUserscript collects @grant, dropping none", () => {
   const src = ["// ==UserScript==", "// @match https://a/*", "// @grant none", "// @grant jev", "// ==/UserScript=="].join("\n");

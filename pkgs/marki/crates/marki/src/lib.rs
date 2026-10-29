@@ -1,6 +1,7 @@
 //! marki internals shared between the `main` binary and integration tests.
 
 pub mod anki;
+pub mod browser;
 pub mod config;
 pub mod docs;
 pub mod fmt;

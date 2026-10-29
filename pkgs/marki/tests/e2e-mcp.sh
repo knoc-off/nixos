@@ -4,6 +4,8 @@
 # then has Anki's own library confirm the pushed result.
 #
 # Usage: tests/e2e-mcp.sh [path/to/marki]   (defaults to target/debug/marki)
+# Set MARKI_E2E_BROWSER=/path/to/chromium (with fonts via FONTCONFIG_FILE)
+# to also check whole-card screenshots.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -39,7 +41,7 @@ for _ in $(seq 50); do curl -s "127.0.0.1:$port/mcp" >/dev/null && break; sleep 
 
 # The client half lives in python (json handling); it asserts as it goes.
 py "$port" "$w" "$here" <<'EOF'
-import sys, json, urllib.request, sqlite3, base64
+import sys, json, urllib.request, sqlite3, base64, os, subprocess
 port, w, here = sys.argv[1], sys.argv[2], sys.argv[3]
 url = f"http://127.0.0.1:{port}/mcp"
 sid = None
@@ -72,19 +74,24 @@ def tool(name, args=None, ok=True):
     assert bool(r.get("isError")) != ok, f"{name}: {text}"
     return json.loads(text) if ok and name != "marki_docs" else text
 
+def write_card(card, ok=True):
+    """One card through marki_write_cards; returns its #id (or the error)."""
+    r = tool("marki_write_cards", {"cards": [card]}, ok=ok)
+    return r["written"][0]["id"] if ok else r
+
 init = rpc("initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
                           "clientInfo": {"name": "e2e", "version": "0"}})
 assert "marki_context" in init["instructions"]
 rpc("notifications/initialized", notify=True)
 names = {t["name"] for t in rpc("tools/list")["tools"]}
 want = {"marki_context", "marki_search_cards", "marki_read_card", "marki_preview",
-        "marki_write_card", "marki_add_media", "marki_read_model",
+        "marki_add_media", "marki_read_model",
         "marki_write_model", "marki_status", "marki_push", "marki_query",
         "marki_delete_card", "marki_move_card", "marki_docs", "marki_write_cards",
         "marki_map_units", "marki_map_find", "marki_map_define", "marki_map_list", "marki_media_list",
-        "marki_map_render", "marki_map_get"}
+        "marki_map_render", "marki_map_get", "marki_flagged", "marki_set_flag"}
 assert want <= names, want - names
-assert not names & {"marki_find", "marki_flagged"}, names
+assert not names & {"marki_find", "marki_write_card"}, names
 assert "marki_docs" in init["instructions"]
 assert "layers" in tool("marki_docs", {"topic": "map"}) and "### Cloze" in tool("marki_docs", {"topic": "cards"})
 assert "topics: cards" in tool("marki_docs", {"topic": "nope"}, ok=False)
@@ -98,7 +105,7 @@ assert tool("marki_media_list")["src"] == []
 
 # A wrong region name lists the valid ones, and the error points at the docs and tools.
 bad_map = "Which state?\n\n```map\n[layers.base]\nfeatures = [\"country/DEU\"]\n[layers.answer]\nhighlights = [\"adm1/DEU/Bavaria\"]\n```\n\n---\n\nBavaria"
-err = tool("marki_write_card", {"path": "geo/by.md", "source": bad_map}, ok=False)
+err = write_card({"path": "geo/by.md", "source": bad_map}, ok=False)
 assert "bayern" in err and 'marki_docs("map")' in err and "marki_map_units" in err, err
 assert "marki_map_find" in tool("marki_preview", {"path": "geo/by.md", "source": bad_map})["docs"]
 assert any(p["name"] == "make-cards" for p in rpc("prompts/list")["prompts"])
@@ -110,35 +117,43 @@ assert mapb and mapb[0]["tools"] == ["marki_map_units", "marki_map_find", "marki
 assert {d["topic"] for d in ctx["docs"]} == {"cards", "map", "media", "models"}, ctx["docs"]
 
 # Path confinement.
-assert "relative" in tool("marki_write_card", {"path": "../evil.md", "source": "x"}, ok=False)
+assert "relative" in write_card({"path": "../evil.md", "source": "x"}, ok=False)
 
 # Preview a draft cloze without saving.
 pv = tool("marki_preview", {"path": "geo/caps.md",
           "source": "Capital of France: **Paris**, of Italy: **Rome**.\n\n#cloze"})
 assert len(pv["cards"]) == 2 and "[...]" in pv["cards"][0]["front"], pv
+assert "<span" not in pv["cards"][0]["front"] and "css" not in pv, "plain text by default"
+assert "<span class=\"cloze\">" in tool("marki_preview", {"path": "geo/caps.md", "html": True,
+          "source": "Capital of France: **Paris**.\n\n#cloze"})["cards"][0]["front"]
 
-written = tool("marki_write_card", {"path": "geo/caps.md",
+cid = write_card({"path": "geo/caps.md",
           "source": "Capital of France: **Paris**, of Italy: **Rome**.\n\n#cloze"})
-cid = written.split("#id(")[1].split(")")[0]
-tool("marki_write_card", {"path": "geo/q.md", "source": "Largest ocean?\n\n---\n\nPacific"})
+write_card({"path": "geo/q.md", "source": "Largest ocean?\n\n---\n\nPacific"})
 
 # Overwrite needs the right expected_id.
-assert "expected_id" in tool("marki_write_card", {"path": "geo/caps.md", "source": "x"}, ok=False)
-tool("marki_write_card", {"path": "geo/caps.md", "expected_id": cid,
+assert "expected_id" in write_card({"path": "geo/caps.md", "source": "x"}, ok=False)
+write_card({"path": "geo/caps.md", "expected_id": cid,
      "source": f"Capital of France: **Paris**, of Spain: **Madrid**.\n\n#id({cid}) #cloze"})
 
 # A card that doesn't render is refused and not written.
-assert "load model" in tool("marki_write_card", {"path": "bad.md", "source": "x\n\n#model(nope)"}, ok=False)
+assert "load model" in write_card({"path": "bad.md", "source": "x\n\n#model(nope)"}, ok=False)
 
 assert [c["path"] for c in tool("marki_search_cards", {"query": "madrid"})] == ["geo/caps.md"]
 assert [c["path"] for c in tool("marki_search_cards", {"query": cid})] == ["geo/caps.md"]
 assert "Madrid" in tool("marki_read_card", {"path": "geo/caps.md"})
 
-# Media.
-media = tool("marki_add_media", {"dir": "icons", "name": "dot.svg",
-        "base64": "PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnLz4="})
-assert media == 'src = "icons/dot"', media
-assert tool("marki_media_list", {"filter": "dot"})["src"] == ["icons/dot"]
+# Media: SVG as text comes back with a thumbnail; a broken SVG is refused.
+r = rpc("tools/call", {"name": "marki_add_media", "arguments": {"dir": "icons", "name": "dot.svg",
+        "text": "<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'><circle r='5' cx='5' cy='5'/></svg>"}})
+assert json.loads(r["content"][0]["text"])["src"] == 'src = "icons/dot"', r
+assert [c["mimeType"] for c in r["content"] if c["type"] == "image"] == ["image/png"], r
+assert "not a valid SVG" in tool("marki_add_media", {"dir": "icons", "name": "bad.svg", "text": "nope"}, ok=False)
+assert "exactly one" in tool("marki_add_media", {"dir": "icons", "name": "x.svg", "text": "a", "base64": "YQ=="}, ok=False)
+media = tool("marki_add_media", {"dir": "icons", "name": "sq.svg",
+        "base64": "PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxJyBoZWlnaHQ9JzEnLz4="})
+assert media["src"] == 'src = "icons/sq"', media
+assert tool("marki_media_list", {"filter": "icons/"})["src"] == ["icons/dot", "icons/sq"]
 
 # Models: describe() is mandatory; a valid model renders.
 lua = '''local M = {}
@@ -154,10 +169,10 @@ assert tool("marki_read_model", {"name": "qa"})["lua"].startswith("local M")
 assert tool("marki_read_model", {"name": "basic"})["builtin"]
 assert "models are basic, cloze, qa" in tool("marki_read_model", {"name": "nope"}, ok=False)
 # A card that makes no cards is refused.
-assert "no cards" in tool("marki_write_card", {"path": "empty.md", "source": "\n---\n\nonly a back"}, ok=False)
+assert "no cards" in write_card({"path": "empty.md", "source": "\n---\n\nonly a back"}, ok=False)
 doc = rpc("resources/read", {"uri": "marki://docs/models"})["contents"][0]["text"]
 assert "section_html" in doc and "<Card>Front" in doc
-tool("marki_write_card", {"path": "geo/m.md", "source": "Tallest mountain?\n\n---\n\nEverest\n\n#model(qa)"})
+write_card({"path": "geo/m.md", "source": "Tallest mountain?\n\n---\n\nEverest\n\n#model(qa)"})
 # Wrong generate keys: named error, not a silently missing card.
 bad = lua.replace("AskFront", "Ask").replace("AskBack", "Back") % 'function M.describe() return "x" end'
 err = tool("marki_write_model", {"name": "qa", "lua": bad}, ok=False)
@@ -188,6 +203,10 @@ assert {s["name"]: s["status"] for s in done["steps"]} == \
 st = tool("marki_status")
 assert st["ok"] and not st["changes"] and "uncommitted" not in st, st
 assert col.execute("select count() from notes").fetchone()[0] == 3
+# The two icons are committed now and no card uses them.
+assert st["media_orphans"] == 2, st
+u = tool("marki_media_list", {"unused": True})
+assert [f["src"] for f in u["files"]] == ["icons/dot", "icons/sq"] and u["files"][0]["used_by"] == [], u
 
 # A tag-only edit is a change (the content hash covers fields only).
 caps = open(f"{w}/p/geo/caps.md").read()
@@ -208,11 +227,16 @@ soft = tool("marki_push")
 assert [c["detail"].split()[0] for c in soft["changes"] if c["kind"] == "orphan"] == ["suspend"], soft
 hard = tool("marki_push", {"delete_orphans": True})
 assert [c["detail"].split()[0] for c in hard["changes"] if c["kind"] == "orphan"] == ["delete"], hard
+assert sorted(c["path"] for c in hard["changes"] if c["kind"] == "media_source_delete") == \
+    [".marki/media/icons/dot.svg", ".marki/media/icons/sq.svg"], hard["changes"]
 assert soft["plan_hash"] != hard["plan_hash"]
 assert "plan changed" in tool("marki_push", {"confirm": True, "plan_hash": soft["plan_hash"], "delete_orphans": True}, ok=False)
 done = tool("marki_push", {"confirm": True, "plan_hash": hard["plan_hash"], "delete_orphans": True})
 assert done["ok"], done
 assert col.execute("select count() from notes where guid=?", (qid,)).fetchone()[0] == 0
+assert not os.path.exists(f"{w}/p/.marki/media/icons"), "unused sources deleted"
+assert "dot.svg" in subprocess.run(["git", "-C", f"{w}/p", "log", "--stat", "-1"], capture_output=True, text=True).stdout
+assert "media_orphans" not in tool("marki_status")
 
 # Config edits apply without a restart; a broken one fails tools loudly.
 cfg = open(f"{w}/p/.marki/config.toml").read()
@@ -237,11 +261,28 @@ assert [(c["kind"], c["detail"]) for c in sim["changes"]] == [("move", "deck geo
 assert tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"]})["ok"]
 assert col.execute("select id from notes where guid=?", (mid,)).fetchone()[0] == nid
 
+
 # A flag set in Anki is cleared by the push that changes the note.
 col.execute("update cards set flags=1 where nid=(select id from notes where guid=?)", (cid,))
 col.commit()
-fl = tool("marki_query", {"sql": "select distinct n.guid from cards c join notes n on n.id=c.nid where c.flags & 7 = 1"})
-assert [r["path"] for r in fl["rows"]] == ["geo/caps.md"], fl
+fl = tool("marki_flagged")
+assert [(c["path"], c["flag"]) for c in fl["cards"]] == [("geo/caps.md", "red")] * 2, fl
+assert fl["cards"][0]["card"] == "Cloze 1" and fl["cards"][0]["deck"] == "geo", fl
+assert tool("marki_flagged", {"color": "blue"})["cards"] == []
+assert "unknown flag" in tool("marki_flagged", {"color": "mauve"}, ok=False)
+s = tool("marki_search_cards", {"flagged": "any"})
+assert [(c["path"], c["flags"]) for c in s] == [("geo/caps.md", ["red", "red"])], s
+assert [c["path"] for c in tool("marki_search_cards", {"deck": "nature"})] == ["nature/peaks/m.md"]
+assert [c["path"] for c in tool("marki_search_cards", {"tag": "retag"})] == ["geo/caps.md"]
+# marki_set_flag writes straight to the collection (no [sync] here).
+r = tool("marki_set_flag", {"path": "nature/peaks/m.md", "color": "green"})
+assert r["cards_changed"] == 1, r
+assert "no card" in tool("marki_set_flag", {"path": "geo/caps.md", "card": "Card", "color": "blue"}, ok=False)
+tool("marki_set_flag", {"path": "geo/caps.md", "card": "Cloze 2", "color": "none"})
+got = col.execute("select n.guid, c.ord, c.flags, c.usn from cards c join notes n on n.id=c.nid order by n.guid, c.ord").fetchall()
+assert (mid, 0, 3, -1) in got and (cid, 0, 1, -1) in got and (cid, 1, 0, -1) in got, got
+tool("marki_set_flag", {"path": "nature/peaks/m.md", "color": "none"})
+assert not tool("marki_status")["changes"], "flags are not a card change"
 caps = open(f"{w}/p/geo/caps.md").read()
 open(f"{w}/p/geo/caps.md", "w").write(caps.replace("Madrid", "Madrid (Spain)"))
 sim = tool("marki_push")
@@ -260,12 +301,12 @@ function M.generate(note, ctx)
 end
 return M'''
 tool("marki_write_model", {"name": "timeline", "lua": tl})
-tool("marki_write_card", {"path": "tl/fire.md", "source": "# Fire\n\n#model(timeline) #event"})
-tool("marki_write_card", {"path": "tl/plague.md", "source": "# Plague\n\n#model(timeline) #event"})
+write_card({"path": "tl/fire.md", "source": "# Fire\n\n#model(timeline) #event"})
+write_card({"path": "tl/plague.md", "source": "# Plague\n\n#model(timeline) #event"})
 assert tool("marki_preview", {"path": "tl/fire.md"})["cards"][0]["back"].endswith("Plague"), "preview sees others"
 sim = tool("marki_push")
 assert tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"]})["ok"]
-tool("marki_write_card", {"path": "tl/war.md", "source": "# War\n\n#model(timeline) #event"})
+write_card({"path": "tl/war.md", "source": "# War\n\n#model(timeline) #event"})
 sim = tool("marki_push", {"detail": True})
 got = sorted((c["path"], c["kind"], c["detail"]) for c in sim["changes"] if c["kind"] != "model")
 assert got == [("tl/fire.md", "update", "dependency"), ("tl/plague.md", "update", "dependency"),
@@ -338,8 +379,17 @@ assert pv["images"] == ["Card front #1"] and len(imgs) == 1, (pv["images"], pv["
 assert base64.b64decode(imgs[0]["data"]).startswith(b"\x89PNG")
 r = rpc("tools/call", {"name": "marki_preview", "arguments": {"path": "wall.md", "source": wall_card, "images": False}})
 assert not [c for c in r["content"] if c["type"] == "image"]
+# With a browser: one screenshot per card side instead of per figure.
+if os.environ.get("MARKI_E2E_BROWSER"):
+    cfg0 = open(f"{w}/p/.marki/config.toml").read()
+    open(f"{w}/p/.marki/config.toml", "w").write(f'browser_binary = "{os.environ["MARKI_E2E_BROWSER"]}"\n' + cfg0)
+    r = rpc("tools/call", {"name": "marki_preview", "arguments": {"path": "wall.md", "source": wall_card}})
+    pv = json.loads(r["content"][0]["text"])
+    assert pv["images"] == ["Card front", "Card back"] and not pv["image_errors"], pv
+    assert all(base64.b64decode(c["data"]).startswith(b"\x89PNG") for c in r["content"] if c["type"] == "image")
+    open(f"{w}/p/.marki/config.toml", "w").write(cfg0)
 # Media changes are counted, not listed, unless detail=true.
-tool("marki_write_card", {"path": "wall.md", "source": wall_card})
+write_card({"path": "wall.md", "source": wall_card})
 sim = tool("marki_push")
 full = tool("marki_push", {"detail": True})
 media = [c for c in full["changes"] if c["kind"] == "media"]
@@ -352,7 +402,7 @@ assert tool("marki_push", {"confirm": True, "plan_hash": sim["plan_hash"]})["ok"
 before = {c["path"] for c in media}
 cur = open(f"{w}/p/wall.md").read()
 wid = cur.split("#id(")[1].split(")")[0]
-tool("marki_write_card", {"path": "wall.md", "expected_id": wid,
+write_card({"path": "wall.md", "expected_id": wid,
                           "source": cur.replace("```\n\n---", "[layers.answer.style]\nstroke = \"#f0f\"\n```\n\n---")})
 full = tool("marki_push", {"detail": True})
 new = {c["path"] for c in full["changes"] if c["kind"] == "media"}

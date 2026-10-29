@@ -80,12 +80,14 @@ impl Renderer for MediaRenderer {
     fn tools(&self) -> Vec<Tool> {
         vec![Tool {
             name: "list",
-            description: "List media files usable in ```media blocks, as ready-to-use `src` values, from .marki/media and the configured media sources. Filter by substring (e.g. a country code for flags) instead of guessing paths.",
+            description: "List media files usable in ```media blocks, as ready-to-use `src` values, from .marki/media and the configured media sources. Filter by substring (e.g. a country code for flags) instead of guessing paths. used_by=true adds the cards using each file; unused=true lists only files no card uses.",
             schema: serde_json::json!({
                 "type": "object",
                 "properties": {
                     "filter": {"type": "string", "description": "Case-insensitive substring of the src, e.g. \"fr\" or \"flags/\"."},
-                    "source": {"type": "string", "description": "Only this source (e.g. \"flags\")."}
+                    "source": {"type": "string", "description": "Only this source (e.g. \"flags\")."},
+                    "used_by": {"type": "boolean", "description": "Also list the card files using each file (renders every card; slower)."},
+                    "unused": {"type": "boolean", "description": "Only files no card uses (implies used_by)."}
                 }
             }),
         }]
@@ -103,12 +105,21 @@ impl Renderer for MediaRenderer {
 
 /// Built-in `.marki/media/` source, whose files are referenced without a
 /// source prefix (see `marki::project::build_registry`).
-const BUILTIN_SOURCE: &str = "media";
+pub const BUILTIN_SOURCE: &str = "media";
 
 /// `src` values of every media file, filtered; `truncated` when capped.
 fn list_media(sources: &[(String, PathBuf)], filter: &str, only: Option<&str>, cap: usize) -> serde_json::Value {
+    let all = media_files(sources, filter, only);
+    let total = all.len();
+    let out: Vec<String> = all.into_iter().take(cap).map(|(src, _)| src).collect();
+    serde_json::json!({ "src": out, "total": total, "truncated": total > out.len() })
+}
+
+/// Every media file in `sources` as `(src, path)`, sorted by src: `src` is
+/// what a ```media block names it by. `filter` is a lowercase substring of
+/// the src, `only` a lowercase source name.
+pub fn media_files(sources: &[(String, PathBuf)], filter: &str, only: Option<&str>) -> Vec<(String, PathBuf)> {
     let mut out = Vec::new();
-    let mut total = 0usize;
     for (name, dir) in sources {
         if only.is_some_and(|o| o != name.to_lowercase()) {
             continue;
@@ -129,18 +140,23 @@ fn list_media(sources: &[(String, PathBuf)], filter: &str, only: Option<&str>, c
                 let rel = p.strip_prefix(dir).unwrap_or(&p).with_extension("");
                 let rel = rel.to_string_lossy().replace('\\', "/");
                 let src = if name == BUILTIN_SOURCE { rel } else { format!("{name}/{rel}") };
-                if !src.to_lowercase().contains(filter) {
-                    continue;
-                }
-                total += 1;
-                if out.len() < cap {
-                    out.push(src);
+                if src.to_lowercase().contains(filter) {
+                    out.push((src, p));
                 }
             }
         }
     }
     out.sort();
-    serde_json::json!({ "src": out, "total": total, "truncated": total > out.len() })
+    out
+}
+
+/// The media-folder filename a ```media block gives the file at `path`
+/// (content-addressed, see [`content_addressed_filename`]): a card uses
+/// the file exactly when its rendered assets contain this name.
+pub fn asset_name(path: &Path) -> std::io::Result<String> {
+    let bytes = std::fs::read(path)?;
+    let base = path.file_name().and_then(|n| n.to_str()).unwrap_or("media");
+    Ok(content_addressed_filename(&bytes, base))
 }
 
 fn render_media(
