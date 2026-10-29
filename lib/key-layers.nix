@@ -513,7 +513,9 @@ let
             map (
               n:
               "(deflayermap (${n})\n      caps @cap-${n}"
-              + "\n      spc (fork spc @panic (lctl lalt))"
+              # `fork` is any-of: a bare (lctl lalt) list would hijack ctrl+space
+              # and alt+space. `switch` with `and` is the only all-of form.
+              + "\n      spc (switch ((and lctl lalt)) @panic break () spc break)"
               + lib.optionalString (hasBinds n) "\n      ${bindEntries n}"
               + "\n    )"
             ) layerNames
