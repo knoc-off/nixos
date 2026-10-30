@@ -19,20 +19,110 @@
 
       # Input presets
 
+      rnnoise = {
+        bypass = false;
+        "enable-vad" = true;
+        "input-gain" = 0.0;
+        "model-path" = "";
+        "output-gain" = 0.0;
+        release = 20.0;
+        "vad-thres" = 50.0;
+        wet = 0.0;
+      };
+
       inputPresets = {
         mic-denoise = {
           input = {
             blocklist = [ ];
             plugins_order = [ "rnnoise#0" ];
-            "rnnoise#0" = {
+            "rnnoise#0" = rnnoise;
+          };
+        };
+
+        # For open headphones near the mic: WebRTC AEC taps the current output
+        # device as its far-end reference (easyeffects links the probe itself).
+        # Keys match src/echo_canceller_preset.cpp in easyeffects 8.2.
+        mic-denoise-aec = {
+          input = {
+            blocklist = [ ];
+            plugins_order = [
+              "echo_canceller#0"
+              "rnnoise#0"
+            ];
+            "echo_canceller#0" = {
               bypass = false;
-              "enable-vad" = true;
               "input-gain" = 0.0;
-              "model-path" = "";
               "output-gain" = 0.0;
+              "echo-canceller" = {
+                enable = true;
+                "mobile-mode" = false;
+                "enforce-high-pass" = true;
+                # AGC pumps on headphone bleed; leave levels alone.
+                "automatic-gain-control" = false;
+              };
+              # rnnoise downstream does a better job than webrtc's suppressor.
+              "noise-suppression" = {
+                enable = false;
+                level = "Moderate";
+              };
+              "high-pass" = {
+                enable = true;
+                "full-band" = true;
+              };
+            };
+            "rnnoise#0" = rnnoise;
+          };
+        };
+
+        # Broadcast-style voice chain on top of mic-denoise-aec. Keys omitted
+        # from a plugin block fall back to easyeffects' kcfg defaults
+        # (presets_macros.hpp UPDATE_PROPERTY), so only deviations are listed.
+        # Tuned on desktop's ALC892 front mic at Front Mic Boost=10dB:
+        # speech RMS -28 dBFS, peaks -3 dBFS, sibilance band ~9 dB under full.
+        mic-voice = {
+          input = {
+            blocklist = [ ];
+            plugins_order = [
+              "echo_canceller#0"
+              "rnnoise#0"
+              "deesser#0"
+              "compressor#0"
+              "limiter#0"
+            ];
+            "echo_canceller#0" = inputPresets.mic-denoise-aec.input."echo_canceller#0";
+            "rnnoise#0" = rnnoise;
+            "deesser#0" = {
+              bypass = false;
+              detection = "RMS";
+              mode = "Wide";
+              threshold = -30.0;
+              ratio = 4.0;
+              laxity = 15;
+              "f1-freq" = 6000.0;
+              "f2-freq" = 5000.0;
+              "f2-level" = 12.0;
+              "f2-q" = 1.0;
+            };
+            # Gentle leveling: ~4 dB on a normal phrase, more on shouts.
+            "compressor#0" = {
+              bypass = false;
+              mode = "Downward";
+              attack = 10.0;
+              release = 120.0;
+              threshold = -30.0;
+              ratio = 3.0;
+              knee = -6.0;
+              makeup = 8.0;
+              "hpf-mode" = "12 dB/oct";
+              "hpf-frequency" = 80.0;
+            };
+            "limiter#0" = {
+              bypass = false;
+              mode = "Herm Wide";
+              threshold = -3.0;
+              lookahead = 5.0;
+              attack = 5.0;
               release = 20.0;
-              "vad-thres" = 50.0;
-              wet = 0.0;
             };
           };
         };
@@ -233,7 +323,7 @@
             default = { };
             description = ''
               Map PipeWire input devices to presets. Keys are "node.name:route_description".
-              Available presets: mic-denoise, passthrough.
+              Available presets: mic-denoise, mic-denoise-aec, mic-voice, passthrough.
             '';
           };
         };

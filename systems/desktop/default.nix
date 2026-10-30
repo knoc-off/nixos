@@ -2,6 +2,7 @@
   lib,
   inputs,
   pkgs,
+  upkgs,
   self,
   config,
   ...
@@ -103,6 +104,37 @@ in
       };
       hardware.steam-hardware.enable = true;
       services.pipewire.alsa.support32Bit = true;
+    }
+
+    {
+      home-manager.users.${user} = {
+        # Unstable: Discord refuses to launch on versions it considers stale.
+        home.packages = [ upkgs.discord ];
+        # knoff.nix's autoload entries are keyed to Framework 13 device names;
+        # these are the desktop's onboard codec (front-panel mic + headphones).
+        services.easyeffects.autoload = {
+          input."alsa_input.pci-0000_2a_00.4.analog-stereo:Front Microphone" = {
+            preset = "mic-voice";
+            description = "Starship/Matisse HD Audio Controller Analog Stereo";
+          };
+          output."alsa_output.pci-0000_2a_00.4.analog-stereo:Headphones" = {
+            preset = "passthrough";
+            description = "Starship/Matisse HD Audio Controller Analog Stereo";
+          };
+        };
+      };
+
+      # The ALC892 defaults Front Mic Boost to +20 dB, which clips speech at
+      # 0 dBFS. WirePlumber only manages the Capture mixer, not the boost
+      # switch, so set it once per boot; mic-voice is tuned for +10 dB.
+      systemd.services.mic-boost = {
+        wantedBy = [ "sound.target" ];
+        after = [ "sound.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = "${pkgs.alsa-utils}/bin/amixer -c Generic sset 'Front Mic Boost' 1";
+        };
+      };
     }
 
     self.nixosModules.sops
