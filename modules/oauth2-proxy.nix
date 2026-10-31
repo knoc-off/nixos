@@ -9,6 +9,8 @@
       enable = true;
       provider = "github";
       reverseProxy = true;
+      # Only Caddy on the same host talks to us (httpAddress defaults to 127.0.0.1).
+      trustedProxyIP = [ "127.0.0.1" "::1" ];
       setXauthrequest = true;
 
       keyFile = config.sops.secrets."services/oauth2-proxy/env".path;
