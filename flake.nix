@@ -157,8 +157,9 @@
         thinkpad-work = "x86_64-linux";
         optiplex = "x86_64-linux";
         desktop = "x86_64-linux";
-        hetzner = "x86_64-linux";
+        oink = "x86_64-linux";
         rpi-4b-plus = "aarch64-linux";
+        wsl = "x86_64-linux";
       };
 
       nixosConfigurations = lib.mapAttrs (hostname: system: mkConfig { inherit hostname system; }) hosts;
@@ -256,6 +257,11 @@
     nixneovimplugins.url = "github:NixNeovim/NixNeovimPlugins";
 
     hardware.url = "github:nixos/nixos-hardware";
+
+    nixos-wsl = {
+      url = "github:nix-community/NixOS-WSL";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
 
     disko = {
       url = "github:nix-community/disko";

@@ -23,7 +23,7 @@
 # minecraft-modpack input. Deploying only this host publishes mods the server
 # does not have, and NeoForge disconnects clients whose mod set does not match
 # during the CONFIG-phase registry sync. After `nix flake update
-# minecraft-modpack`, rebuild optiplex and hetzner from the same lock.
+# minecraft-modpack`, rebuild optiplex and oink from the same lock.
 {
   inputs,
   pkgs,

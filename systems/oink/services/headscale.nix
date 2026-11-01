@@ -69,12 +69,12 @@ in
           {
             name = "kitchenowl.niko.ink";
             type = "A";
-            value = tailnet.hetzner;
+            value = tailnet.oink;
           }
           {
             name = "notes.niko.ink";
             type = "A";
-            value = tailnet.hetzner;
+            value = tailnet.oink;
           }
           # anki-sync-server on optiplex. MagicDNS only auto-names a node's
           # own hostname (optiplex.tail.niko.ink); a subdomain of that still

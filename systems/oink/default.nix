@@ -102,7 +102,6 @@ in
 
   time.timeZone = "Europe/Berlin";
 
-  networking.hostName = "oink";
   networking.firewall = {
     enable = true;
     # 25565: Gate, the public Minecraft entrypoint (see services/minecraft-gate.nix).

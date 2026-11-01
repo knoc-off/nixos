@@ -1,4 +1,5 @@
 pkgs/marki/docs/
+private-inputs
 minecraft
 photos
 .minecraft-flake-modpack

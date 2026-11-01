@@ -9,7 +9,8 @@ let
 in
 {
   services.trilium-server = {
-    enable = true;
+    # Flaky. waiting for upstream fix
+    enable = false;
     package = upkgs.trilium-server;
   };
 

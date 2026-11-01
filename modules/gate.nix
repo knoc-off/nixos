@@ -1,6 +1,6 @@
 # Gate -- Minecraft reverse proxy (services.gate).
 #
-# Standalone and generic. Intended to run on a public host (hetzner) as the
+# Standalone and generic. Intended to run on a public host (oink) as the
 # Internet-facing entrypoint, routing per-hostname to Minecraft backends reached
 # over Headscale. Exposed as self.nixosModules.gate.
 #

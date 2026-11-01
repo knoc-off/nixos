@@ -13,7 +13,7 @@
 # Collect with: ssh-keyscan -t ed25519 <host-or-tailnet-ip>
 {
   user = {
-    # hetzner =
+    # oink =
     # rpi-4b-plus =
     framework13 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJojYXf9Koo8FT/vWB+skUbrgWCkng158wJvHX0zJBXb selby@niko.ink";
     thinkpad-work = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAoc9pt7DrD5G0RYHRcyZv7QCBocoy1O0lKUtsikF5NH nicholas.selby@nelly-solutions.com";
@@ -27,7 +27,7 @@
     optiplex = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHOSVw65Xl7eind7bUuDmyVcHb4dpvlbsnzUoVdnGR/j";
     framework13 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIME1gAzCfuoDLdBwe6ptHES9MRYYqporJB/NeoSU4e+A";
     thinkpad-work = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICimRMpaSmOKhgaRz03Mdk6YzPZLX0bLUEUAdsrZdPvx";
-    hetzner = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM7F9mU/XlIYzq82SBUyxaGLq+ROFllnO1ysuljdI0Ib";
+    oink = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIM7F9mU/XlIYzq82SBUyxaGLq+ROFllnO1ysuljdI0Ib";
     rpi-4b-plus = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGOaX5OwjZz3gZIF4Hb7YW51M1uUY9yE2/WMzrwYVAYR";
     desktop = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJEtxk8gHFx1UDeJZ2wve7R9tLmX4RorsCMCsWx343p2";
   };

@@ -303,7 +303,7 @@
 
         services.caddy.virtualHosts = mkIf (cfg.domain != null) {
           ${cfg.domain} = {
-            # The hetzner wildcard cert covers any *.niko.ink name, so a new
+            # The oink wildcard cert covers any *.niko.ink name, so a new
             # domain here needs no cert change. Set this to a matching
             # security.acme.certs name if the module is ever used off niko.ink.
             useACMEHost = "niko.ink";

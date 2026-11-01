@@ -65,7 +65,7 @@ in
       # Subscriptions live in StateDirectory, not here: publish "+spiderman
       # imax ov" to the ovwatch topic to watch a film, "?" to list, "-" to
       # drop. Notifications and commands share that one topic, so the token
-      # needs rw on it (see hetzner's services/ntfy.nix).
+      # needs rw on it (see oink's services/ntfy.nix).
       services.ovwatch = {
         enable = true;
         ntfy.tokenFile = config.sops.secrets."services/ntfy/publish-token".path;

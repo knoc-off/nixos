@@ -18,7 +18,7 @@
 # toplevel miss the cache unless the client sat on the builder's exact commit.)
 #
 # Servers don't need this at all: they can rebuild straight off the branch,
-# e.g. `nixos-rebuild switch --flake github:knoc-off/nixos/built#hetzner`.
+# e.g. `nixos-rebuild switch --flake github:knoc-off/nixos/built#oink`.
 #
 # Usage:
 #   ./scripts/nix-bump.sh

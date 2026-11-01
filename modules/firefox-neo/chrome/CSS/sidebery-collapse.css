@@ -16,7 +16,7 @@
 
 :root {
   --neo-sidebar-rail-width: 60px;
-  --neo-sidebar-hover-width: 300px;
+  --neo-sidebar-hover-width: 360px;
   --neo-sidebar-delay: 100ms;
   --neo-sidebar-duration: 200ms;
   /* Radius of the inverted corner; also how far the cover overhangs the rail. */
@@ -212,7 +212,7 @@
   transition-delay: 0ms;
 }
 
-/* Non-static layout: the frame itself resizes, 60px <-> 300px.
+/* Non-static layout: the frame itself resizes, rail <-> hover width.
  *
  * The alternative (userchrome.autohide-sidebar.static-layout.enabled) pins the
  * frame at 300px and animates a clipping container over it. Smoother, but

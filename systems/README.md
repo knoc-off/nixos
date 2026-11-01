@@ -32,7 +32,7 @@ holds identity: this machine's role, domains, IPs, and cross-host references.
 Good hosts to copy from:
 
 - `optiplex/` -- encrypted btrfs, lanzaboote, measured boot, TPM2 unlock.
-- `hetzner/` -- older hand-written `disk.nix` (LVM/ext4). Use `btrfs-luks` for new hosts.
+- `oink/` -- older hand-written `disk.nix` (LVM/ext4). Use `btrfs-luks` for new hosts.
 
 ### Disk layout
 

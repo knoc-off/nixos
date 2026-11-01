@@ -9,7 +9,7 @@ My personal NixOS flake for my laptops, a home server, a VPS, and a Raspberry Pi
 | `framework13`   | Framework 13 (AMD) | Main laptop                                 |
 | `thinkpad-work` | Lenovo ThinkPad    | Work laptop                                 |
 | `optiplex`      | Dell OptiPlex 7080 | Home server: Minecraft, nix cache, services |
-| `hetzner`       | Hetzner VPS        | Public web services, Gate ingress           |
+| `oink`          | Hetzner VPS        | Public web services, Gate ingress           |
 | `rpi-4b-plus`   | Raspberry Pi 4     | Home Assistant, MQTT                        |
 
 ## Highlights
@@ -20,7 +20,7 @@ My personal NixOS flake for my laptops, a home server, a VPS, and a Raspberry Pi
 - Secrets with sops-nix
 - home-manager for user config
 - Neovim built with nixvim
-- Minecraft via nix-minecraft on `optiplex`, exposed through Gate on `hetzner` over the tailnet
+- Minecraft via nix-minecraft on `optiplex`, exposed through Gate on `oink` over the tailnet
 - A theme generator built on a pure-Nix OkLab/OkHSL implementation, for perceptually uniform colors
 
 ## Layout

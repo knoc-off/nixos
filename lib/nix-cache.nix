@@ -23,7 +23,7 @@
   clients = [
     "framework13"
     "thinkpad-work"
-    "hetzner"
+    "oink"
     "rpi-4b-plus"
     "desktop"
   ];

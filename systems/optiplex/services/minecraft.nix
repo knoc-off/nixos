@@ -8,10 +8,10 @@
 #
 # Exposure model -- Gate is the ONLY way in:
 #
-#   player -> mc.niko.ink:25565 (A -> hetzner) -> Gate (Lite) -> here
+#   player -> mc.niko.ink:25565 (A -> oink) -> Gate (Lite) -> here
 #
 # The tailnet is the transport between Gate and this host, not a second player
-# entrypoint. The firewall rule below is scoped to hetzner's tailnet address
+# entrypoint. The firewall rule below is scoped to oink's tailnet address
 # rather than to the tailscale0 interface, so no other tailnet peer -- and
 # nothing on the LAN or WAN -- can open a session. There is deliberately no
 # MagicDNS record pointing at this host either.
@@ -36,10 +36,10 @@ let
   gamePort = 25565;
   rconPort = 25575;
 
-  # Gate runs on hetzner. Literal tailnet IP rather than MagicDNS: iptables
+  # Gate runs on oink. Literal tailnet IP rather than MagicDNS: iptables
   # resolves names once at rule-insertion time, during early boot before
   # tailscale is up. See lib/tailnet.nix.
-  gateHost = self.lib.tailnet.hetzner;
+  gateHost = self.lib.tailnet.oink;
 
   ph = name: config.sops.placeholder.${name};
   envFile = config.sops.templates."minecraft.env".path;

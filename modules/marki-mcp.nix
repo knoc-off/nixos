@@ -8,7 +8,7 @@
 # The server authenticates nobody and only ever listens on loopback. `proxy`
 # puts mcp-auth-proxy in front of it -- the OAuth 2.1 gateway MCP clients
 # expect -- and is the only way in. The proxy listens on all interfaces
-# because the public vhost lives on another host (hetzner) and reaches it over
+# because the public vhost lives on another host (oink) and reaches it over
 # the tailnet; the host's firewall is what limits who can connect (see
 # systems/optiplex/services/anki.nix).
 { self, ... }:

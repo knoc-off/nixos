@@ -1,6 +1,6 @@
 # Headscale-assigned tailnet addresses, by host.
 #
-# Single source of truth. hetzner's Gate backend, optiplex's firewall rule and
+# Single source of truth. oink's Gate backend, optiplex's firewall rule and
 # headscale's MagicDNS extra_records must all agree; a mismatch there is a
 # silent outage rather than an eval error, so they all read from here.
 #
@@ -18,8 +18,7 @@
 # Verified 2026-08-08. Only the NixOS hosts in this flake are listed; phones and
 # other clients are addressed by MagicDNS from the client side.
 {
-  # "oink" in headscale, `hetzner` in this flake.
-  hetzner = "100.64.0.1";
+  oink = "100.64.0.1";
   rpi-4b-plus = "100.64.0.2";
   framework13 = "100.64.0.3";
   optiplex = "100.64.0.7";

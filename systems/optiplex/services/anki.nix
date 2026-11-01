@@ -16,14 +16,14 @@
 let
   # Literal tailnet IP: iptables resolves names at rule-insertion time,
   # before tailscale is up (see lib/tailnet.nix).
-  inherit (self.lib.tailnet) hetzner;
+  inherit (self.lib.tailnet) oink;
 in
 {
   imports = [
     self.nixosModules.marki-mcp
     {
       # Card authoring for LLM agents (see modules/marki-mcp.nix). Public at
-      # https://marki-mcp.niko.ink: hetzner's Caddy proxies over the tailnet
+      # https://marki-mcp.niko.ink: oink's Caddy proxies over the tailnet
       # to the OAuth proxy here, which is the only way to the server.
       services.marki-mcp = {
         enable = true;
@@ -38,17 +38,17 @@ in
         proxy = {
           enable = true;
           externalUrl = "https://marki-mcp.niko.ink";
-          trustedProxy = hetzner;
+          trustedProxy = oink;
           passwordHashFile = config.sops.secrets."services/marki-mcp/password-hash".path;
         };
       };
       sops.secrets."services/marki-mcp/password-hash" = { };
 
-      # Only hetzner's Caddy may reach the proxy. Scoped to its source address
+      # Only oink's Caddy may reach the proxy. Scoped to its source address
       # rather than tailscale0, which would admit every tailnet peer (same
       # pattern as the Minecraft game port in minecraft.nix).
       networking.firewall.extraCommands = ''
-        iptables -A nixos-fw -p tcp -s ${hetzner} --dport ${toString config.services.marki-mcp.proxy.port} -j nixos-fw-accept
+        iptables -A nixos-fw -p tcp -s ${oink} --dport ${toString config.services.marki-mcp.proxy.port} -j nixos-fw-accept
       '';
     }
   ];

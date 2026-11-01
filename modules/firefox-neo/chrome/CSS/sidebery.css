@@ -64,24 +64,9 @@
   transition: background-color 120ms ease;
 }
 
-/* Hold the tabs off the right edge. Has to be padding on the list, not margin
- * on .Tab: Sidebery sets an explicit width on .Tab, so a margin there does not
- * narrow it (measured: right edge unmoved at 61px).
- *
- * .bottom-space and .new-tab-btns are inside this list and must still paint
- * full width, so the padding is cancelled on them. */
-.AnimatedTabList {
-  padding-right: 6px;
-}
-
-/* Cancel the padding on the two full-width rows. .new-tab-btns also carries an
- * explicit width from Sidebery, so the negative margin alone would move it
- * right without widening it -- width:auto lets it span the row. */
-.AnimatedTabList .bottom-space,
-.AnimatedTabList .new-tab-btns {
-  margin-right: -6px;
-}
-
+/* Sidebery gives .new-tab-btns an explicit width that overshoots the panel's
+ * padding (measured right edge 241 in a 237px content box); width:auto keeps
+ * it inside the row. */
 .AnimatedTabList .new-tab-btns {
   width: auto !important;
 }
@@ -180,6 +165,9 @@
 .bookmarks-tree {
   padding-left: 5px;
   padding-right: 4px;
+  /* Sidebery sizes .TabsPanel at width:100%, content-box, so this padding
+     pushed it 9px past the frame's right edge. */
+  box-sizing: border-box;
 }
 
 /* The NavigationBar is deliberately excluded from ALL transitions.
@@ -236,7 +224,15 @@
    * 32px instead of the original 30px. Pin it back to the literal so the
    * visible tab size is unchanged -- only the JS's internal pitch math sees
    * the bigger number. */
-  height: 30px !important;
+  /* border-box: Sidebery indents nested tabs with padding-left on a
+   * content-box .Tab whose width is already calc(100% - margins), so every
+   * nesting level pushed the tab another --tabs-indent past the right edge
+   * (measured rights 238/248/258/268 in a 241px frame). border-box keeps
+   * every level inside the frame. Height is therefore 32px, not 30px: it now
+   * includes Sidebery's 2px padding-bottom, so the content is still 30px and
+   * the 32px row pitch the drag math relies on is unchanged (verified). */
+  box-sizing: border-box !important;
+  height: 32px !important;
 }
 
 .ctx {
@@ -258,6 +254,13 @@
   transition: all var(--transition-duration) var(--transition-ease);
 }
 
+/* Sidebery leaves cursor:auto, which turns into the text I-beam over titles. */
+.Tab,
+.BookmarkNode,
+.NavigationBar {
+  cursor: default !important;
+}
+
 .nav-item:hover {
   background-color: rgba(255, 255, 255, 0.1);
 }
@@ -271,7 +274,7 @@
 }
 
 /* Breakpoints sized to the 60px collapsed rail (sidebery-collapse.css
-   --sidebery-collapsed-width) and the 300px hover-expanded width, with
+   --neo-sidebar-rail-width) and the hover-expanded width, with
    headroom on both sides so drift in padding/scrollbar width can't push
    the frame's real size to the wrong side of the line. */
 @media screen and (max-width: 90px) {
