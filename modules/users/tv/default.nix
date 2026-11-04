@@ -351,6 +351,8 @@
               # The UHD 630 render engine sat at 87-100% (intel_gpu_top) with
               # the default lanczos 1080p->2160p upscale and per-frame HDR peak
               # detection. "fast" drops to bilinear and hdr-compute-peak=no.
+              # TODO: re-measure on the Arc A310; it likely has the headroom to
+              # drop this (and the matching other_conf above).
               defaultProfiles = [ "fast" ];
 
               bindings = {

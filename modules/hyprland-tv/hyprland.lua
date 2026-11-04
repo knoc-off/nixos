@@ -8,8 +8,10 @@ local mainMod = "SUPER"
 -- navigation surface). Generated from the Nix plugin modules.
 require("plugins")
 
--- Single HDMI output, no fractional scaling.
-hl.monitor({ output = "", mode = "preferred", position = "auto", scale = env.display_scale })
+-- Single HDMI output, no fractional scaling. Explicit mode: the Hisense EDID
+-- marks 4K30 as preferred, and highrr would take 800x600@60.32 over 4K@60.00.
+-- refresh-rate.lua drops to the video's rate during playback.
+hl.monitor({ output = "", mode = "3840x2160@60", position = "auto", scale = env.display_scale })
 
 hl.config({
 	ecosystem = {

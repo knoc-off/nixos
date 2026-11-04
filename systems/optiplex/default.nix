@@ -304,40 +304,42 @@ in
     {
       # Inlined from nixos-hardware common/cpu/intel/comet-lake: that path has
       # no flake attr, and common-gpu-intel-comet-lake is deprecated
-      # (nixos-hardware#992). The i5-10500 is Comet Lake, UHD 630 is Gen9.5.
+      # (nixos-hardware#992). The i5-10500 is Comet Lake.
       #
-      # enable_guc=2 loads GuC + HuC. HuC is what gives Jellyfin low-power
-      # fixed-function encode.
-      boot.kernelParams = [ "i915.enable_guc=2" ];
-
+      # Display, decode and encode all run on the Arc A310 (DG2, 0000:04:00.0)
+      # now; the UHD 630 is unused and meant to be disabled in the BIOS. No
+      # i915.enable_guc: the old =2 (HuC only) was for Gen9.5 and applies to
+      # every i915 device, so it also turned off GuC submission on DG2, whose
+      # default already loads GuC + HuC.
       hardware.intelgpu = {
-        # Gen8-11. The default (intel-compute-runtime) targets Gen12+ and does
-        # not support Gen9.5, so OpenCL was silently broken.
-        computeRuntime = "legacy";
+        # computeRuntime stays at the default (intel-compute-runtime, Gen12+),
+        # which covers the Arc; OpenCL is what Jellyfin's tone mapping uses.
         # iHD only. The null default installs i965 alongside it, leaving VA-API
         # driver selection ambiguous.
         vaapiDriver = "intel-media-driver";
-        # mediaRuntime stays at the vpl-gpu-rt default. It is Gen12+ only and so
-        # unused here, but the Gen9.5-correct alternative (intel-media-sdk) is
-        # EOL with local privesc CVEs and would need permittedInsecurePackages.
-        # Jellyfin uses the VA-API path via intel-media-driver regardless.
+        # mediaRuntime stays at the vpl-gpu-rt default, which is the Arc's
+        # oneVPL/QSV runtime.
       };
     }
 
     self.nixosModules.pipewire
     {
-      # ACP ranks the analog jack above HDMI (prio 6500+ vs 5900), so
-      # find-best-profile picks the headphone jack by default even though the
-      # TV is the only speaker. Pinning the name here makes selection
-      # deterministic across the TV being off/on-another-input at boot, since
-      # find-preferred-profile matches on name only and ignores availability.
+      # The TV is the only speaker and hangs off the Arc, whose HDMI audio is
+      # its own card (DG2 Audio Controller, 0000:05:00.0; HDMI-A-4 is its
+      # "HDMI 0" PCM). The onboard codec keeps only its mic input: ACP ranks
+      # the analog jack above HDMI (prio 6500+ vs 5900), so leaving its output
+      # up would make the headphone jack the default sink. Pinning names makes
+      # selection deterministic across the TV being off/on-another-input at
+      # boot, since find-preferred-profile matches on name only and ignores
+      # availability.
       services.pipewire.wireplumber.extraConfig."99-tv-hdmi"."device.profile.priority.rules" = [
         {
+          matches = [ { "device.name" = "alsa_card.pci-0000_05_00.0"; } ];
+          actions.update-props.priorities = [ "output:hdmi-stereo" ];
+        }
+        {
           matches = [ { "device.name" = "alsa_card.pci-0000_00_1f.3"; } ];
-          actions.update-props.priorities = [
-            "output:hdmi-stereo+input:analog-stereo"
-            "output:hdmi-stereo"
-          ];
+          actions.update-props.priorities = [ "input:analog-stereo" ];
         }
       ];
 
@@ -575,8 +577,8 @@ in
   };
 
   # No i915 kernelParams/kernelModules needed here: hardware.intelgpu puts i915
-  # in the initrd (loadInInitrd defaults true) and sets enable_guc above.
-  # HDMI-CEC is not achievable on this box -- the Intel iGPU exposes no CEC
+  # in the initrd (loadInInitrd defaults true).
+  # HDMI-CEC is not achievable on this box -- neither Intel GPU exposes a CEC
   # adapter, so libcec needs a USB-CEC dongle (e.g. Pulse-Eight).
 
   services.openssh.enable = true;

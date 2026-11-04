@@ -174,22 +174,26 @@ in
         password = secret "services/jellyfin/password";
         policy.isAdministrator = true;
       };
-      # UHD 630 (Gen9.5): QSV would need the EOL intel-media-sdk, so VA-API
-      # via intel-media-driver (see hardware.intelgpu in default.nix). Only
-      # matters for remote clients; the local app direct-plays.
+      # VA-API on the Arc A310 via intel-media-driver (see hardware.intelgpu in
+      # default.nix). Only matters for remote clients; the local app
+      # direct-plays.
       encoding = {
         hardwareAccelerationType = "vaapi";
+        # By PCI path: while the iGPU is still enabled in the BIOS it takes
+        # renderD128, the default here.
+        vaapiDevice = "/dev/dri/by-path/pci-0000:04:00.0-render";
         hardwareDecodingCodecs = [
           "h264"
           "hevc"
           "mpeg2video"
           "vc1"
           "vp9"
+          "av1"
         ];
         # Without this, an HDR10 source transcoded for an SDR client (most
         # phones on mobile data, browsers) is only relabelled bt709 and looks
-        # washed out. OpenCL tone mapping runs on the iGPU via the legacy
-        # compute runtime set in default.nix (clinfo lists UHD 630).
+        # washed out. OpenCL tone mapping runs on the Arc via the default
+        # compute runtime set in default.nix.
         enableTonemapping = true;
       };
     };
