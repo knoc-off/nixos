@@ -1199,11 +1199,11 @@
         "ponytail": "ponytail"
       },
       "locked": {
-        "lastModified": 1793430798,
-        "narHash": "sha256-HrFdUJatHxRxkS8NR3VhMo3ZatgF7uhMnzBZz9/q+Ps=",
+        "lastModified": 1793567718,
+        "narHash": "sha256-r6qpRGkN0KS/4bmbwmc3EYezlfiGS/A79WCWUJaLEC4=",
         "ref": "refs/heads/main",
-        "rev": "ab6dffb85f69f1276b9ef3de2b9367fe812f903a",
-        "revCount": 44,
+        "rev": "597f471c5c886a9ee9badb9eaa820b772b2269e6",
+        "revCount": 46,
         "type": "git",
         "url": "ssh://git@github.com/knoc-off/private-inputs"
       },
