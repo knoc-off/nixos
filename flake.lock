@@ -561,11 +561,11 @@
         "nixpkgs-tools": "nixpkgs-tools"
       },
       "locked": {
-        "lastModified": 1793469975,
-        "narHash": "sha256-7YNoqnLl9OZsmKlAcSIFCuqQDZ/mcDE3qkU4Vsks7JU=",
+        "lastModified": 1793821931,
+        "narHash": "sha256-Q7hvK0cbHh9S8eifUbGVcj2JQbw08aCxd5OjKLrzOtQ=",
         "owner": "knoc-off",
         "repo": "minecraft-modpack",
-        "rev": "e1c0616088265c4343c8dda6158c395ba538fa60",
+        "rev": "4d8c4cca234a19df9b3868acbe4f325dfe9f9afa",
         "type": "github"
       },
       "original": {
@@ -1020,11 +1020,11 @@
     },
     "nixpkgs_9": {
       "locked": {
-        "lastModified": 1789921291,
-        "narHash": "sha256-Ft/BRnIqw1MywFoXydKobjjWmDFgDdYtSpJliE8+yUw=",
+        "lastModified": 1793540411,
+        "narHash": "sha256-fiPJ88izTVucjeo2EQ3jk4aWmLg03I1D4vxnX2QjEgE=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "44a91898084f46797b5fac650c7e8c9ac38c43d4",
+        "rev": "0bb2eedc20e4739f29e8045034f2828ad7054f8f",
         "type": "github"
       },
       "original": {
@@ -1154,11 +1154,11 @@
     "ponytail": {
       "flake": false,
       "locked": {
-        "lastModified": 1789396482,
-        "narHash": "sha256-PES5XrSYx0VBXWVHEDRykGy0SAmJfV/luzy8Gfg0aAQ=",
+        "lastModified": 1793275171,
+        "narHash": "sha256-PhPtZbeX2wBp19GtWRy+fV93+fFYZe5S487eXPDl/us=",
         "owner": "DietrichGebert",
         "repo": "ponytail",
-        "rev": "e3ba2aa6f1e6f0bc4d69eb09c9f0d0a93af56156",
+        "rev": "96608e078b2d5ea607c5c3b8b5a54d1c1fba6846",
         "type": "github"
       },
       "original": {
@@ -1199,11 +1199,11 @@
         "ponytail": "ponytail"
       },
       "locked": {
-        "lastModified": 1793567718,
-        "narHash": "sha256-r6qpRGkN0KS/4bmbwmc3EYezlfiGS/A79WCWUJaLEC4=",
+        "lastModified": 1793825970,
+        "narHash": "sha256-decjft16aymHxZKhsbgywSaYGjXxM5cNWRvkFVrHSwk=",
         "ref": "refs/heads/main",
-        "rev": "597f471c5c886a9ee9badb9eaa820b772b2269e6",
-        "revCount": 46,
+        "rev": "7d0e5f8b42f1717c6a399bf4bf663a6012af315d",
+        "revCount": 59,
         "type": "git",
         "url": "ssh://git@github.com/knoc-off/private-inputs"
       },
