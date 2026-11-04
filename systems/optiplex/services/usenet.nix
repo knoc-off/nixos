@@ -3,8 +3,11 @@
 # (indexer sync, download client, categories, root folders), so nothing has
 # to be clicked through in the UIs. Recyclarr keeps the TRaSH profiles synced.
 #
-# Downloads and library share the /srv/media subvolume so imports are
-# hardlinks/atomic renames instead of copies.
+# Completed downloads and the library share the /srv/media filesystem (the
+# HDD, see default.nix) so imports are hardlinks/atomic renames instead of
+# copies. SABnzbd's incomplete dir is on the NVMe (/srv/cache): download,
+# par2 and unpack churn stays on flash and the HDD sees one sequential write
+# per release.
 #
 # Secrets are { _secret = path; } refs: nixflix reads them as root
 # (LoadCredential / ExecStartPre=+), so plain root-owned sops secrets work
@@ -100,6 +103,7 @@ in
           nzb_key = secret "services/sabnzbd/nzb-key";
           username = "tv";
           password = secret "services/sabnzbd/password";
+          download_dir = "/srv/cache/sabnzbd-incomplete";
         };
         # Both use the same Frugal account. The bonus server sits on a
         # different backbone (UsenetFarm), so it fills articles missing from
@@ -199,12 +203,23 @@ in
     };
   };
 
-  # Keep downloads/unpacking from competing with mpv and Jellyfin on the
-  # shared NVMe. ponytail: the idle IO class only takes effect under bfq;
-  # nvme0n1 runs scheduler "none", so switch it via udev if stutters persist.
-  systemd.services.sabnzbd.serviceConfig = {
-    IOSchedulingClass = "idle";
-    Nice = 10;
+  # Keep downloads/unpacking from competing with mpv and Jellyfin.
+  # shortcut: the idle IO class only takes effect under bfq; nvme0n1 runs
+  # "none" and the HDD mq-deadline, so switch sda to bfq via udev if playback
+  # stutters while a release unpacks onto it.
+  #
+  # /srv/media is a nofail mount (default.nix): without the HDD the rest would
+  # otherwise start on the empty mountpoint and write into the NVMe.
+  systemd.services = {
+    sabnzbd.serviceConfig = {
+      IOSchedulingClass = "idle";
+      Nice = 10;
+    };
+    sabnzbd.unitConfig.RequiresMountsFor = [ "/srv/media" ];
+    sonarr.unitConfig.RequiresMountsFor = [ "/srv/media" ];
+    radarr.unitConfig.RequiresMountsFor = [ "/srv/media" ];
+    jellyfin.unitConfig.RequiresMountsFor = [ "/srv/media" ];
+    nixflix-setup-dirs.unitConfig.RequiresMountsFor = [ "/srv/media" ];
   };
 
   services.caddy.virtualHosts = lib.genAttrs (map (s: "${s}.${domain}") [

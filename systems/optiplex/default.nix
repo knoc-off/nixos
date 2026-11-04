@@ -228,10 +228,13 @@ in
         # Enrolled against the pcrlock policy with systemd-cryptenroll; slots 0
         # and 1 remain as passphrase recovery.
         tpm2Unlock = true;
-        # Jellyfin library and the Minecraft world get their own subvolumes so
-        # they snapshot independently of the rootfs and survive root rollbacks.
+        # The Minecraft world gets its own subvolume so it snapshots
+        # independently of the rootfs and survives root rollbacks. "/media"
+        # held the Jellyfin library until it moved to the HDD below; it is
+        # now the NVMe scratch space (SABnzbd incomplete, later the transcode
+        # cache), keeping its name so the existing subvolume is reused.
         extraSubvolumes = {
-          "/media".mountpoint = "/srv/media";
+          "/media".mountpoint = "/srv/cache";
           "/minecraft".mountpoint = "/srv/minecraft";
         };
       };
@@ -372,9 +375,26 @@ in
       # TPM-unlocked root fs; a passphrase slot is the off-host recovery path.
       # nofail everywhere: a dead or unplugged drive must never block boot,
       # it only fails btrbk-minecraft-usb, which alerts via ntfy.
+      #
+      # The internal 4TB HDD is the media library (/srv/media), LUKS with the
+      # same keyfile-on-root arrangement but no passphrase slot: everything on
+      # it can be downloaded again. nofail so a dead disk does not block boot;
+      # the media services carry RequiresMountsFor=/srv/media (usenet.nix) so
+      # they stay down instead of filling the empty mountpoint on the NVMe.
       environment.etc.crypttab.text = ''
         backup /dev/disk/by-id/usb-Kingston_XS2000_50026B7283103E35-0:0 /root/backup-usb.key nofail,x-systemd.device-timeout=10s
+        media /dev/disk/by-id/ata-Hitachi_HUS724040ALE641_PAH6593S-part1 /root/media-hdd.key nofail,x-systemd.device-timeout=30s
       '';
+      fileSystems."/srv/media" = {
+        device = "/dev/mapper/media";
+        fsType = "btrfs";
+        # No compress: video does not shrink, it would only burn CPU.
+        options = [
+          "nofail"
+          "noatime"
+          "x-systemd.device-timeout=30s"
+        ];
+      };
       fileSystems."/mnt/backup" = {
         device = "/dev/mapper/backup";
         fsType = "btrfs";
@@ -390,6 +410,7 @@ in
       services.udev.extraRules = ''
         ENV{ID_SERIAL_SHORT}=="50026B7283103E35", ENV{UDISKS_IGNORE}="1"
         ENV{DM_NAME}=="backup", ENV{UDISKS_IGNORE}="1"
+        ENV{DM_NAME}=="media", ENV{UDISKS_IGNORE}="1"
       '';
     }
 
