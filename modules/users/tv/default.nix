@@ -68,17 +68,9 @@
         path.startupurl_desktop = "http://localhost:8096/web/";
         # vaapi zero-copy instead of the default auto-copy readback.
         video.hardwareDecoding = "enabled";
-        # Same cheap-render settings as standalone mpv's "fast" profile: the
-        # UHD 630 render engine otherwise sits at 100% upscaling to 2160p.
+        # mpv's default scalers. The bilinear overrides that used to live here
+        # were for the UHD 630; the Arc A310 has the headroom.
         other.other_conf = lib.concatStringsSep "\n" [
-          "scale=bilinear"
-          "cscale=bilinear"
-          "dscale=bilinear"
-          "dither-depth=no"
-          "correct-downscaling=no"
-          "linear-downscaling=no"
-          "sigmoid-upscaling=no"
-          "hdr-compute-peak=no"
           "load-script=${mpvRefreshRate}/share/mpv/scripts/refresh-rate.lua"
         ];
       };
@@ -348,12 +340,10 @@
                 };
               };
 
-              # The UHD 630 render engine sat at 87-100% (intel_gpu_top) with
-              # the default lanczos 1080p->2160p upscale and per-frame HDR peak
-              # detection. "fast" drops to bilinear and hdr-compute-peak=no.
-              # TODO: re-measure on the Arc A310; it likely has the headroom to
-              # drop this (and the matching other_conf above).
-              defaultProfiles = [ "fast" ];
+              # This was "fast" on the UHD 630, whose render engine sat at
+              # 87-100% at max clock upscaling 1080p->2160p. The Arc A310
+              # composites a 4K60 desktop at ~22% busy at 300-400 MHz.
+              defaultProfiles = [ "high-quality" ];
 
               bindings = {
                 "WHEEL_UP" = "seek 5";
