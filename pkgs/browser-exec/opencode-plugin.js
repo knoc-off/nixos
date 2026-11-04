@@ -433,246 +433,256 @@ async function classify(input, opts) {
   }
 }
 
-// V1 plugin shape (`export default { id, server }`): with a bare-function
-// default, opencode's legacy loader calls every named export as a plugin,
-// and one throwing helper (buildClassifyRequest on opencode's ctx) aborted
-// the whole file. See axiom-ledger's plugin for the same fix.
-async function server(_ctx) {
-  const z = loadZod();
-  return {
-    tool: {
-      browser_exec: {
-        description:
-          "Check the snippet library (`list: true`) before writing a new " +
-          "`script`: re-running a saved snippet by `name` beats rewriting it. " +
-          "An unsaved `script` needs a one-line `intent`; it is checked " +
-          "against the library first, and is NOT run when a saved snippet " +
-          "already does it (the result names it; `force: true` overrides). " +
-          "Near matches and repeatable scripts get a one-line hint to extend " +
-          "or save instead. " +
-          "What: evaluate JavaScript against a running Firefox (firefox-neo), " +
-          "either chrome-privileged (`world: 'chrome'`, default -- full browser " +
-          "UI/XPCOM access) or in a tab's page (`world: 'page'` -- the page's " +
-          "own JS environment, no Xrays: spreading NodeLists, page globals and " +
-          "frameworks all work like the devtools console). Pin the tab with " +
-          "`tab` (URL prefix or tab id); without it, page code runs in whatever " +
-          "tab the user has focused. " +
-          "Chrome-world helpers: `tabs()` -> [{tab, window, url, title, " +
-          "selected, ...}] (each row is a valid target); `await openTab(url, " +
-          "{selector?, select?, wait?})` opens a tab, waits for load (or the " +
-          "selector), returns its target; `selectTab(target)`, " +
-          "`closeTab(target)`; `await waitFor(target, {selector?, timeout?})`; " +
-          "`await pageEval(code, target?, timeoutMs?)` runs page-world code in " +
-          "that tab (code is a string; `return` optional); `readable(target?)`; " +
-          "`sidebarEval(code)` targets the Sidebery sidebar, NOT a page; " +
-          "`sleep(ms)`; $/$$/cs()/R() on chrome DOM; reloadUserscripts(); jev; " +
-          "snippet(name). A target is a tab id ({tab: n}), a URL prefix string " +
-          "or RegExp, or a window id. " +
-          "When: extracting structure/text from a page, filling forms, driving " +
-          "the browser UI, or iterating on a userscript before saving it. " +
-          "Requires firefox-neo running with browser-exec's bridge.sys.mjs " +
-          "loaded (unix socket, no auth beyond filesystem permissions -- see " +
-          "pkgs/browser-exec). " +
-          "Shapes: `list` (true, or a substring) returns saved snippets without " +
-          "evaluating anything -- do this first; `script` alone evals once, " +
-          "nothing saved; `script`+`name`(+`description`) saves to the snippet " +
-          "library and evals it, git-committed; `name` alone re-evals a saved " +
-          "snippet; `reload: true` asks the bridge to re-scan the userscript " +
-          "library (~/.local/share/browser-exec/userscripts/*.user.js) after " +
-          "you've written or edited one with the normal file tools. " +
-          "JEV (chrome world): `jev` is TypeSafe's Jev, a fast decision model " +
-          "that answers typed questions about a JSON state -- it never writes " +
-          "text or code, so you write the script and it makes the calls inside " +
-          "it. `await jev.noul(state, 'Is there a captcha?')` -> 0..1; " +
-          "`jev.choose(state, instr, ['a','b'] | {a:'desc'})` -> {choice, " +
-          "probabilities, confidence}; `jev.score(state, instr, [levels])` -> " +
-          "{score, confidence}; `jev.ask(state, {id: {type, instructions, " +
-          "criteria}})` batches many questions in one ~fast call (prefer this). " +
-          "`jev.observe()` -> page snapshot {url,title,text,actions}; " +
-          "`jev.run({goal, values:[strings it may type], ops:{NAME:{description, " +
-          "run: page => ...}}, maxSteps, minConfidence})` is a browser agent loop " +
-          "(CLICK/TYPE_TEXT/SELECT/SCROLL/WAIT/DONE/BLOCKED + your ops) on the " +
-          "active tab, returning {status, history}. `snippet(name)` runs a saved " +
-          "snippet, e.g. as an op's run. Userscripts get jev.ask/noul/choose/" +
-          "score with `// @grant jev` in their header.",
-        args: {
-          script: z
-            .string()
-            .optional()
-            .describe(
-              "JS body. `return` is optional: a lone expression (e.g. " +
-                "`document.title`) returns its value; a multi-statement body " +
-                "needs `return`. Bare `await` works. In `world: 'page'` the " +
-                "body runs in the page's own window (document, location, " +
-                "fetch, page globals). Omit to re-run a saved snippet by name, " +
-                "reload, or list.",
-            ),
-          world: z
-            .enum(["chrome", "page"])
-            .optional()
-            .describe("'chrome' (default) or 'page' (a tab's content window; see `tab`)."),
-          tab: z
-            .union([z.string(), z.number()])
-            .optional()
-            .describe(
-              "world 'page' only: which tab -- a URL prefix (e.g. " +
-                "'https://www.kingston.com/en/support/rma') or a tab id from " +
-                "tabs(). Default: the focused tab, which the user may change " +
-                "under you.",
-            ),
-          name: z
-            .string()
-            .optional()
-            .describe(
-              "Snippet name ([A-Za-z0-9_-]). With `script`: save (or update, " +
-                "git-committed) then eval. Alone: re-eval the saved snippet.",
-            ),
-          description: z
-            .string()
-            .optional()
-            .describe("One-line summary. Required the first time a `name` is saved."),
-          message: z.string().optional().describe("Git commit message for this save."),
-          intent: z
-            .string()
-            .optional()
-            .describe(
-              "Required with an unsaved `script`: one line on what it is for (e.g. " +
-                "'read visible log rows on Datadog'). Checked against saved snippets.",
-            ),
-          force: z
-            .boolean()
-            .optional()
-            .describe(
-              "Run an unsaved `script` even though a saved snippet was judged to do the same.",
-            ),
-          timeout: z
-            .number()
-            .optional()
-            .describe(
-              "Eval timeout in seconds (default 15). For `world: 'page'` the " +
-                "bridge's content probe is budgeted just under this, so a " +
-                "slow page-world snippet gets the time you asked for.",
-            ),
-          list: z
-            .union([z.boolean(), z.string()])
-            .optional()
-            .describe(
-              "List saved snippets instead of evaluating anything. `true` " +
-                "lists all; a string filters by substring.",
-            ),
-          reload: z
-            .boolean()
-            .optional()
-            .describe("Ask the bridge to re-scan the userscript library."),
-        },
-        async execute(args) {
-          if (args.reload) {
-            try {
-              const out = await evalOverBridge("return await reloadUserscripts();", 15000);
-              return `reload: ${renderReply(out)}`;
-            } catch (e) {
-              return `Error: ${e.message}`;
-            }
-          }
+const DESCRIPTION =
+  "Check the snippet library (`list: true`) before writing a new " +
+  "`script`: re-running a saved snippet by `name` beats rewriting it. " +
+  "An unsaved `script` needs a one-line `intent`; it is checked " +
+  "against the library first, and is NOT run when a saved snippet " +
+  "already does it (the result names it; `force: true` overrides). " +
+  "Near matches and repeatable scripts get a one-line hint to extend " +
+  "or save instead. " +
+  "What: evaluate JavaScript against a running Firefox (firefox-neo), " +
+  "either chrome-privileged (`world: 'chrome'`, default -- full browser " +
+  "UI/XPCOM access) or in a tab's page (`world: 'page'` -- the page's " +
+  "own JS environment, no Xrays: spreading NodeLists, page globals and " +
+  "frameworks all work like the devtools console). Pin the tab with " +
+  "`tab` (URL prefix or tab id); without it, page code runs in whatever " +
+  "tab the user has focused. " +
+  "Chrome-world helpers: `tabs()` -> [{tab, window, url, title, " +
+  "selected, ...}] (each row is a valid target); `await openTab(url, " +
+  "{selector?, select?, wait?})` opens a tab, waits for load (or the " +
+  "selector), returns its target; `selectTab(target)`, " +
+  "`closeTab(target)`; `await waitFor(target, {selector?, timeout?})`; " +
+  "`await pageEval(code, target?, timeoutMs?)` runs page-world code in " +
+  "that tab (code is a string; `return` optional); `readable(target?)`; " +
+  "`sidebarEval(code)` targets the Sidebery sidebar, NOT a page; " +
+  "`sleep(ms)`; $/$$/cs()/R() on chrome DOM; reloadUserscripts(); jev; " +
+  "snippet(name). A target is a tab id ({tab: n}), a URL prefix string " +
+  "or RegExp, or a window id. " +
+  "When: extracting structure/text from a page, filling forms, driving " +
+  "the browser UI, or iterating on a userscript before saving it. " +
+  "Requires firefox-neo running with browser-exec's bridge.sys.mjs " +
+  "loaded (unix socket, no auth beyond filesystem permissions -- see " +
+  "pkgs/browser-exec). " +
+  "Shapes: `list` (true, or a substring) returns saved snippets without " +
+  "evaluating anything -- do this first; `script` alone evals once, " +
+  "nothing saved; `script`+`name`(+`description`) saves to the snippet " +
+  "library and evals it, git-committed; `name` alone re-evals a saved " +
+  "snippet; `reload: true` asks the bridge to re-scan the userscript " +
+  "library (~/.local/share/browser-exec/userscripts/*.user.js) after " +
+  "you've written or edited one with the normal file tools. " +
+  "JEV (chrome world): `jev` is TypeSafe's Jev, a fast decision model " +
+  "that answers typed questions about a JSON state -- it never writes " +
+  "text or code, so you write the script and it makes the calls inside " +
+  "it. `await jev.noul(state, 'Is there a captcha?')` -> 0..1; " +
+  "`jev.choose(state, instr, ['a','b'] | {a:'desc'})` -> {choice, " +
+  "probabilities, confidence}; `jev.score(state, instr, [levels])` -> " +
+  "{score, confidence}; `jev.ask(state, {id: {type, instructions, " +
+  "criteria}})` batches many questions in one ~fast call (prefer this). " +
+  "`jev.observe()` -> page snapshot {url,title,text,actions}; " +
+  "`jev.run({goal, values:[strings it may type], ops:{NAME:{description, " +
+  "run: page => ...}}, maxSteps, minConfidence})` is a browser agent loop " +
+  "(CLICK/TYPE_TEXT/SELECT/SCROLL/WAIT/DONE/BLOCKED + your ops) on the " +
+  "active tab, returning {status, history}. `snippet(name)` runs a saved " +
+  "snippet, e.g. as an op's run. Userscripts get jev.ask/noul/choose/" +
+  "score with `// @grant jev` in their header.";
 
-          // Tool-call args can arrive with the boolean stringified ("true").
-          if (args.list && args.list !== "false") {
-            const entries = await listSaved(
-              typeof args.list === "string" && args.list !== "true" ? args.list : null,
-            );
-            return formatList(entries);
-          }
-
-          const script = args.script;
-          let name = String(args.name || "")
-            .trim()
-            .replace(/\.js$/, "");
-          if (name && !NAME_RE.test(name)) {
-            return `Error: invalid name ${JSON.stringify(name)} (allowed: [A-Za-z0-9_-])`;
-          }
-          if (!script && !name) {
-            return "Error: provide `script` (eval), `name` (re-eval saved), `list`, or `reload`";
-          }
-
-          let world = args.world === "page" ? "page" : "chrome";
-          let body;
-          let label;
-          let savedMsg = "";
-          const intent = String(args.intent || "").trim();
-          if (script && !name && !intent) {
-            return "Error: `intent` is required for an unsaved script (one line: what it is for)";
-          }
-          const force = args.force === true || args.force === "true";
-          const tabUrl = typeof args.tab === "string" ? args.tab : undefined;
-
-          if (script) {
-            if (name) {
-              await ensureRepo();
-              const snippetPath = join(SNIPPETS_DIR, `${name}.js`);
-              let existingDescription = "";
-              let isUpdate = false;
-              try {
-                ({ description: existingDescription } = parseHeader(
-                  await readFile(snippetPath, "utf8"),
-                ));
-                isUpdate = true;
-              } catch {
-                // new snippet
-              }
-              const description = args.description || existingDescription;
-              if (!description) {
-                return "Error: `description` is required the first time a snippet is saved";
-              }
-              const check = isUpdate
-                ? null
-                : await classify(
-                    { intent: intent || description, script, url: tabUrl },
-                    { saving: true },
-                  );
-              await writeFile(snippetPath, withHeader(script, description, world));
-              const commitMsg = args.message || (isUpdate ? `update ${name}` : `add ${name}`);
-              await commit(commitMsg);
-              label = `${name}.js`;
-              savedMsg = `${check?.note ? check.note + "\n" : ""}saved to ${snippetPath} (${commitMsg}); re-run with name only\n`;
-            } else {
-              const check = await classify({ intent, script, url: tabUrl }, { force });
-              if (check?.block) return check.block;
-              if (check?.note) savedMsg = check.note + "\n";
-              await mkdir(TEMP_DIR, { recursive: true });
-              const tempName = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-              await writeFile(join(TEMP_DIR, `${tempName}.js`), withHeader(script, intent, world));
-              await pruneTemp();
-              label = `${tempName}.js`;
-            }
-            body = script;
-          } else {
-            const snippetPath = join(SNIPPETS_DIR, `${name}.js`);
-            let source;
-            try {
-              source = await readFile(snippetPath, "utf8");
-            } catch {
-              const entries = await listSaved(null);
-              return `Error: no saved snippet ${name}.js in ${SNIPPETS_DIR}\nSaved snippets:\n${formatList(entries)}`;
-            }
-            ({ world } = parseHeader(source));
-            body = stripHeader(source);
-            label = `${name}.js`;
-          }
-
-          const timeoutMs = Math.min(Number(args.timeout) || 15, 120) * 1000;
-          try {
-            const out = await evalOverBridge(
-              wrapForWorld(body, world, timeoutMs, args.tab),
-              timeoutMs,
-            );
-            return `${savedMsg}$ browser_exec [${world}] ${label}\n${clip(renderReply(out))}`;
-          } catch (e) {
-            return `${savedMsg}$ browser_exec [${world}] ${label}\nError: ${e.message}`;
-          }
-        },
-      },
+const str = (description) => ({ type: "string", description });
+const bool = (description) => ({ type: "boolean", description });
+const INPUT = {
+  type: "object",
+  properties: {
+    script: str(
+      "JS body. `return` is optional: a lone expression (e.g. " +
+        "`document.title`) returns its value; a multi-statement body " +
+        "needs `return`. Bare `await` works. In `world: 'page'` the " +
+        "body runs in the page's own window (document, location, " +
+        "fetch, page globals). Omit to re-run a saved snippet by name, " +
+        "reload, or list.",
+    ),
+    world: {
+      type: "string",
+      enum: ["chrome", "page"],
+      description: "'chrome' (default) or 'page' (a tab's content window; see `tab`).",
     },
-  };
+    tab: {
+      anyOf: [{ type: "string" }, { type: "number" }],
+      description:
+        "world 'page' only: which tab -- a URL prefix (e.g. " +
+        "'https://www.kingston.com/en/support/rma') or a tab id from " +
+        "tabs(). Default: the focused tab, which the user may change " +
+        "under you.",
+    },
+    name: str(
+      "Snippet name ([A-Za-z0-9_-]). With `script`: save (or update, " +
+        "git-committed) then eval. Alone: re-eval the saved snippet.",
+    ),
+    description: str("One-line summary. Required the first time a `name` is saved."),
+    message: str("Git commit message for this save."),
+    intent: str(
+      "Required with an unsaved `script`: one line on what it is for (e.g. " +
+        "'read visible log rows on Datadog'). Checked against saved snippets.",
+    ),
+    force: bool("Run an unsaved `script` even though a saved snippet was judged to do the same."),
+    timeout: {
+      type: "number",
+      description:
+        "Eval timeout in seconds (default 15). For `world: 'page'` the " +
+        "bridge's content probe is budgeted just under this, so a " +
+        "slow page-world snippet gets the time you asked for.",
+    },
+    list: {
+      anyOf: [{ type: "boolean" }, { type: "string" }],
+      description:
+        "List saved snippets instead of evaluating anything. `true` lists all; a string filters by substring.",
+    },
+    reload: bool("Ask the bridge to re-scan the userscript library."),
+  },
+};
+
+async function execute(args) {
+  if (args.reload) {
+    try {
+      const out = await evalOverBridge("return await reloadUserscripts();", 15000);
+      return `reload: ${renderReply(out)}`;
+    } catch (e) {
+      return `Error: ${e.message}`;
+    }
+  }
+
+  // Tool-call args can arrive with the boolean stringified ("true").
+  if (args.list && args.list !== "false") {
+    const entries = await listSaved(
+      typeof args.list === "string" && args.list !== "true" ? args.list : null,
+    );
+    return formatList(entries);
+  }
+
+  const script = args.script;
+  let name = String(args.name || "")
+    .trim()
+    .replace(/\.js$/, "");
+  if (name && !NAME_RE.test(name)) {
+    return `Error: invalid name ${JSON.stringify(name)} (allowed: [A-Za-z0-9_-])`;
+  }
+  if (!script && !name) {
+    return "Error: provide `script` (eval), `name` (re-eval saved), `list`, or `reload`";
+  }
+
+  let world = args.world === "page" ? "page" : "chrome";
+  let body;
+  let label;
+  let savedMsg = "";
+  const intent = String(args.intent || "").trim();
+  if (script && !name && !intent) {
+    return "Error: `intent` is required for an unsaved script (one line: what it is for)";
+  }
+  const force = args.force === true || args.force === "true";
+  const tabUrl = typeof args.tab === "string" ? args.tab : undefined;
+
+  if (script) {
+    if (name) {
+      await ensureRepo();
+      const snippetPath = join(SNIPPETS_DIR, `${name}.js`);
+      let existingDescription = "";
+      let isUpdate = false;
+      try {
+        ({ description: existingDescription } = parseHeader(await readFile(snippetPath, "utf8")));
+        isUpdate = true;
+      } catch {
+        // new snippet
+      }
+      const description = args.description || existingDescription;
+      if (!description) {
+        return "Error: `description` is required the first time a snippet is saved";
+      }
+      const check = isUpdate
+        ? null
+        : await classify({ intent: intent || description, script, url: tabUrl }, { saving: true });
+      await writeFile(snippetPath, withHeader(script, description, world));
+      const commitMsg = args.message || (isUpdate ? `update ${name}` : `add ${name}`);
+      await commit(commitMsg);
+      label = `${name}.js`;
+      savedMsg = `${check?.note ? check.note + "\n" : ""}saved to ${snippetPath} (${commitMsg}); re-run with name only\n`;
+    } else {
+      const check = await classify({ intent, script, url: tabUrl }, { force });
+      if (check?.block) return check.block;
+      if (check?.note) savedMsg = check.note + "\n";
+      await mkdir(TEMP_DIR, { recursive: true });
+      const tempName = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      await writeFile(join(TEMP_DIR, `${tempName}.js`), withHeader(script, intent, world));
+      await pruneTemp();
+      label = `${tempName}.js`;
+    }
+    body = script;
+  } else {
+    const snippetPath = join(SNIPPETS_DIR, `${name}.js`);
+    let source;
+    try {
+      source = await readFile(snippetPath, "utf8");
+    } catch {
+      const entries = await listSaved(null);
+      return `Error: no saved snippet ${name}.js in ${SNIPPETS_DIR}\nSaved snippets:\n${formatList(entries)}`;
+    }
+    ({ world } = parseHeader(source));
+    body = stripHeader(source);
+    label = `${name}.js`;
+  }
+
+  const timeoutMs = Math.min(Number(args.timeout) || 15, 120) * 1000;
+  try {
+    const out = await evalOverBridge(wrapForWorld(body, world, timeoutMs, args.tab), timeoutMs);
+    return `${savedMsg}$ browser_exec [${world}] ${label}\n${clip(renderReply(out))}`;
+  } catch (e) {
+    return `${savedMsg}$ browser_exec [${world}] ${label}\nError: ${e.message}`;
+  }
 }
 
-export default { id: "browser-exec", server };
+// Dual entrypoint: opencode v2 calls setup(), v1 (>= 1.18.29) calls
+// server(). An object default also keeps v1's legacy loader from calling
+// every named export as a plugin (one throwing helper aborted the whole
+// file; see axiom-ledger's plugin for the same fix).
+// TODO: drop server() and loadZod once v1 is gone.
+export default {
+  id: "browser-exec",
+
+  async setup(ctx) {
+    await ctx.tool.transform((editor) =>
+      editor.add({
+        name: "browser_exec",
+        description: DESCRIPTION,
+        input: INPUT,
+        options: { codemode: false },
+        execute: async (args) => ({ content: await execute(args) }),
+      }),
+    );
+  },
+
+  async server() {
+    const z = loadZod();
+    const p = INPUT.properties;
+    const s = (k) => z.string().optional().describe(p[k].description);
+    const b = (k) => z.boolean().optional().describe(p[k].description);
+    return {
+      tool: {
+        browser_exec: {
+          description: DESCRIPTION,
+          args: {
+            script: s("script"),
+            world: z.enum(["chrome", "page"]).optional().describe(p.world.description),
+            tab: z.union([z.string(), z.number()]).optional().describe(p.tab.description),
+            name: s("name"),
+            description: s("description"),
+            message: s("message"),
+            intent: s("intent"),
+            force: b("force"),
+            timeout: z.number().optional().describe(p.timeout.description),
+            list: z.union([z.boolean(), z.string()]).optional().describe(p.list.description),
+            reload: b("reload"),
+          },
+          execute,
+        },
+      },
+    };
+  },
+};
