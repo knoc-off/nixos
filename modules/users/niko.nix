@@ -203,7 +203,7 @@
               upkgs.foliate
               upkgs.readest
 
-              (self.packages.${pkgs.stdenv.hostPlatform.system}.opencode-bubblewrap.override {
+              (self.packages.${pkgs.stdenv.hostPlatform.system}.cj.override {
                 datadog = true;
               })
               self.packages.${pkgs.stdenv.hostPlatform.system}.neovim

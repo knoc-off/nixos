@@ -47,10 +47,10 @@
         # `!!` abbr below: expands in place to the previous command.
         last_history_item = "echo $history[1]";
 
-        # Throwaway jailed-opencode session in a fresh temp dir; argv tags the dir name.
-        # Only defined for users who actually install jailed-opencode.
-        joc = lib.mkIf (lib.any (p: lib.getName p == "jailed-opencode") config.home.packages) ''
-          jailed-opencode (mktemp -d --suffix "-$argv")
+        # Throwaway cj session in a fresh temp dir; argv tags the dir name.
+        # Only defined for users who actually install cj.
+        joc = lib.mkIf (lib.any (p: lib.getName p == "cj") config.home.packages) ''
+          cj (mktemp -d --suffix "-$argv")
         '';
 
         backg = ''

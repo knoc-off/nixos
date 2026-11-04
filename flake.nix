@@ -130,7 +130,7 @@
         // {
           # Lives in the private input; the packages and settings it shares
           # with the rest of this config are handed in from here.
-          opencode-bubblewrap = inputs.private.lib.mkOpencodeBubblewrap pkgs {
+          cj = inputs.private.lib.mkCj pkgs {
             inherit (self.packages.${system})
               neovim
               lspmux
@@ -341,10 +341,10 @@
 
     jail-nix.url = "sourcehut:~alexdavid/jail.nix";
 
-    # Private repo: compat-proxy, the patched opencode and its bubblewrap jail.
+    # Private repo: the sandboxed coding agent (`cj`) and its proxy.
     # Pinned by rev (not just locked) so nix-autobuild's `nix flake update`
-    # can't move it -- it carries its own nixpkgs pin for opencode and
-    # claude-code, and both break on upstream bumps. To bump, push there and
+    # can't move it -- it carries its own nixpkgs pin, and the agent breaks
+    # on upstream bumps. To bump, push there and
     # update the rev here. Local iteration:
     #   --override-input private path:/home/knoff/workspaces/private
     private.url = "git+ssh://git@github.com/knoc-off/private-inputs";

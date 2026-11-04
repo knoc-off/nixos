@@ -209,7 +209,7 @@
                 upkgs.notion-app-enhanced
 
                 self.packages.${pkgs.stdenv.hostPlatform.system}.neovim
-                self.packages.${pkgs.stdenv.hostPlatform.system}.opencode-bubblewrap
+                self.packages.${pkgs.stdenv.hostPlatform.system}.cj
 
                 spotify
 
