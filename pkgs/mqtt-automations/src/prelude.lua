@@ -110,21 +110,24 @@ for name, l in pairs(lights) do
 end
 local follow_ct = setting("mqtt-auto/color-temp-cycle/enabled", true)
 
--- A look following the sun: brightness on each light's min/max/curve knobs,
--- colour temperature through the day (HA "Lights follow hue").
--- `floor` (percent, or a function(c) returning it) raises the minimum;
--- any look field given replaces the sun's.
+-- A look following the sun: brightness from 0 up to each light's HA max,
+-- along its curve knob, never below its brightness floor (the old
+-- min-brightness topic) -- so the floor is what evenings and nights get,
+-- and the day isn't squeezed above it. Colour temperature follows the day
+-- (HA "Lights follow hue"). `floor` (percent, or a function(c) returning
+-- it) raises the floor further; any look field given replaces the sun's.
 function sunlight(o)
   o = o or {}
   local look = {
     brightness = function(c)
       local k = knobs[c.light]
       if not k.min then return 254 end
-      local min, max = clamp(k.min(), 0, 100), clamp(k.max(), 0, 100)
+      local max = clamp(k.max(), 0, 100)
       local floor = o.floor
       if type(floor) == "function" then floor = floor(c) end
-      if floor then min = math.max(min, math.min(floor, max)) end
-      return sun.level{ min = min, max = max, gamma = clamp(k.gamma(), 0.1, 10) }
+      floor = math.min(math.max(clamp(k.min(), 0, 100), floor or 0), max)
+      local curve = sun.level{ min = 0, max = max, gamma = clamp(k.gamma(), 0.1, 10) }
+      return math.max(curve, math.max(1, math.floor(floor / 100 * 254 + 0.5)))
     end,
     color_temp = function()
       return follow_ct() and sun.ct() or nil

@@ -66,7 +66,9 @@ let
   # of "unknown" (see `seed` below).
   lightKnobs = d: [
     {
-      entity = number d "min-brightness" "min brightness" "mdi:brightness-4" {
+      # The old topic and id on purpose (values and history carry over); it is
+      # now the floor under the sun curve, not the curve's bottom end.
+      entity = number d "min-brightness" "brightness floor" "mdi:brightness-4" {
         min = 0;
         max = 100;
         step = 5;

@@ -957,6 +957,44 @@ mod tests {
     }
 
     #[test]
+    fn sunlight_runs_from_zero_to_max_above_the_floor() {
+        let (script, spec) = load(
+            r#"room{ default = "on", states = {
+                on = { look = sunlight() },
+                cosy = { look = sunlight{ floor = 30 } },
+            } }"#,
+        )
+        .unwrap();
+        let state = |n: &str| spec.states.iter().find(|s| s.name == n).unwrap();
+        let bri = |n: &str| {
+            script
+                .look(state(n), "a", &ctx("a", n))
+                .unwrap()
+                .unwrap()
+                .target
+                .brightness
+        };
+        let base = "mqtt-auto/sun-follow/dev_a/";
+        script.setting(&format!("{base}min-brightness"), &serde_json::json!(10));
+        script.setting(&format!("{base}max-brightness"), &serde_json::json!(80));
+
+        // Midday: the curve's top, the floor doesn't matter.
+        assert_eq!(bri("on"), 203);
+        // Night: the floor (10% of 254), or the state's higher one.
+        script.set_clock(DateTime::parse_from_rfc3339("2026-06-21T23:30:00+02:00").unwrap());
+        assert_eq!((bri("on"), bri("cosy")), (25, 76));
+        // Dusk: the curve from 0, not squeezed between floor and max.
+        script.set_clock(DateTime::parse_from_rfc3339("2026-06-21T20:45:00+02:00").unwrap());
+        let frac = sun::daylight_fraction(
+            52.52,
+            13.405,
+            DateTime::parse_from_rfc3339("2026-06-21T20:45:00+02:00").unwrap(),
+        );
+        assert!(frac > 0.05 && frac < 0.5, "{frac}");
+        assert_eq!(bri("on"), curves::brightness_254(0, 80, frac).max(25));
+    }
+
+    #[test]
     fn a_runaway_function_is_stopped() {
         let err = load(
             r#"room{ default = "on", states = { on = { look = {
