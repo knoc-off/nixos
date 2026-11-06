@@ -1,11 +1,11 @@
 # Every light in the house from one process: the `lights` binary from
-# pkgs/mqtt-automations. Each room is a Lua script (API: src/script.rs,
-# helpers: src/prelude.lua) deciding what the room wants; a per-bulb arbiter
-# in Rust decides whether the bulb listens or a person is in charge.
+# pkgs/mqtt-automations. Each room is a state machine declared in Lua (the
+# format is at the top of src/prelude.lua) and run by src/room.rs; a
+# per-bulb arbiter decides whether the bulb listens or a person is in charge.
 #
 # The generated config is loaded with `lights --check` at build time, so a
-# script that fails to load (syntax error, unknown bulb, bad option) fails
-# the rebuild instead of the service.
+# room file that fails to load (syntax error, unknown state, light or key, a
+# look function that errors) fails the rebuild instead of the service.
 { self, ... }:
 {
   nixos =
@@ -16,13 +16,18 @@
       ...
     }:
     let
-      inherit (lib) mkEnableOption mkOption mkIf types;
+      inherit (lib)
+        mkEnableOption
+        mkOption
+        mkIf
+        types
+        ;
       cfg = config.services.lighting;
 
       configJson = (pkgs.formats.json { }).generate "lights.json" {
         inherit (cfg) latitude longitude;
         rooms = lib.mapAttrs (_: room: {
-          inherit (room) group lua;
+          inherit (room) label group lua;
           bulbs = lib.mapAttrs (_: b: { inherit (b) device dimmable; }) room.bulbs;
         }) cfg.rooms;
       };
@@ -54,43 +59,51 @@
 
         rooms = mkOption {
           default = { };
-          description = "Rooms, each with its bulbs and the script that drives them.";
+          description = "Rooms, each with its bulbs and the state machine that drives them.";
           type = types.attrsOf (
-            types.submodule {
-              options = {
-                bulbs = mkOption {
-                  description = "Bulbs and plugs this room owns, by the name the script uses.";
-                  type = types.attrsOf (
-                    types.submodule {
-                      options = {
-                        device = mkOption {
-                          type = types.str;
-                          description = "zigbee2mqtt friendly name.";
+            types.submodule (
+              { name, ... }:
+              {
+                options = {
+                  label = mkOption {
+                    type = types.str;
+                    default = name;
+                    description = "Name shown in Home Assistant (the room's mode select).";
+                  };
+                  bulbs = mkOption {
+                    description = "Bulbs and plugs this room owns, by the name the script uses.";
+                    type = types.attrsOf (
+                      types.submodule {
+                        options = {
+                          device = mkOption {
+                            type = types.str;
+                            description = "zigbee2mqtt friendly name.";
+                          };
+                          dimmable = mkOption {
+                            type = types.bool;
+                            default = true;
+                            description = "False for plugs: on/off only.";
+                          };
                         };
-                        dimmable = mkOption {
-                          type = types.bool;
-                          default = true;
-                          description = "False for plugs: on/off only.";
-                        };
-                      };
-                    }
-                  );
+                      }
+                    );
+                  };
+                  group = mkOption {
+                    type = types.nullOr types.str;
+                    default = null;
+                    description = ''
+                      zigbee2mqtt group containing exactly this room's bulbs. A
+                      change that is the same for every bulb then goes out as
+                      one group command, so the bulbs switch together.
+                    '';
+                  };
+                  lua = mkOption {
+                    type = types.lines;
+                    description = "The room's Lua file: one room{} call.";
+                  };
                 };
-                group = mkOption {
-                  type = types.nullOr types.str;
-                  default = null;
-                  description = ''
-                    zigbee2mqtt group containing exactly this room's bulbs. A
-                    change that is the same for every bulb then goes out as
-                    one group command, so the bulbs switch together.
-                  '';
-                };
-                lua = mkOption {
-                  type = types.lines;
-                  description = "The room's script.";
-                };
-              };
-            }
+              }
+            )
           );
         };
       };

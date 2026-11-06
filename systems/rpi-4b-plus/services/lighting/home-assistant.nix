@@ -1,6 +1,9 @@
 # Home Assistant side of the lighting service: per-bulb tuning knobs, a
-# "release" button and a mode sensor, plus the house-wide colour and wake
-# settings the room scripts read (see pkgs/mqtt-automations/src/prelude.lua).
+# "release" button and a mode sensor, per-room reset, state and occupancy,
+# plus the house-wide colour and wake settings the room files read (see
+# pkgs/mqtt-automations/src/prelude.lua). Each room's mode select is not
+# here: `lights` announces it by MQTT discovery, with the room file's states
+# as options, so the list lives in one place.
 #
 # Identity is inherited from the old per-device sun-follow daemons on
 # purpose: unique_ids stay `sun_follow_<ieee>_<suffix>` and the HA device
@@ -145,41 +148,15 @@ let
   sunrise = suffix: "mqtt-auto/sunrise-lights/${suffix}";
   colorTempTopic = "mqtt-auto/color-temp-cycle/enabled";
 
-  # Room controls (see `lights/<room>/...` in the prelude). Entity ids come
-  # from the names (`select.bedroom_scene`), which the Rooms dashboard view
-  # relies on. `lights` publishes JSON, so strings arrive quoted.
+  # Room entities (see the MQTT surface in pkgs/mqtt-automations/src/bin/lights.rs).
+  # Entity ids come from the names (`sensor.bedroom_state`), which the Rooms
+  # dashboard view relies on. `lights` publishes JSON, so strings arrive
+  # quoted.
   roomTopic = roomKey: suffix: "lights/${roomKey}/${suffix}";
   roomKeys = builtins.filter (r: lit.${r} != { }) (builtins.attrNames lit);
   roomLabel = roomKey: (import ../../devices.nix).rooms.${roomKey}.label;
-  jsonValue = "{{ value | from_json }}";
 
-  roomScenes = map (r: {
-    unique_id = "lights_${r}_scene";
-    name = "${roomLabel r} scene";
-    icon = "mdi:palette-swatch";
-    command_topic = roomTopic r "scene";
-    command_template = "{{ value | to_json }}";
-    state_topic = roomTopic r "scene";
-    value_template = jsonValue;
-    options = [
-      "auto"
-      "bright"
-      "dim"
-      "night"
-    ];
-  }) roomKeys;
-
-  roomAutomatic = map (r: {
-    unique_id = "lights_${r}_automatic";
-    name = "${roomLabel r} automatic";
-    icon = "mdi:motion-sensor";
-    command_topic = roomTopic r "automatic";
-    state_topic = roomTopic r "automatic";
-    retain = true;
-    payload_on = "true";
-    payload_off = "false";
-  }) roomKeys;
-
+  # Back to the room's default state, holds and memory dropped.
   roomRelease = map (r: {
     unique_id = "lights_${r}_release";
     name = "${roomLabel r} release";
@@ -188,15 +165,16 @@ let
     payload_press = "release";
   }) roomKeys;
 
-  roomMode = map (r: {
-    unique_id = "lights_${r}_mode";
-    name = "${roomLabel r} mode";
-    icon = "mdi:account-hard-hat";
-    state_topic = roomTopic r "mode";
-    value_template = jsonValue;
+  # The state the room is in, hidden phases (off, closing, ...) included.
+  roomState = map (r: {
+    unique_id = "lights_${r}_state";
+    name = "${roomLabel r} state";
+    icon = "mdi:state-machine";
+    state_topic = roomTopic r "state";
+    value_template = "{{ value | from_json }}";
   }) roomKeys;
 
-  # Only rooms whose script runs occupancy() publish this.
+  # Only rooms with presence sensors publish this.
   roomOccupied = map (r: {
     unique_id = "lights_${r}_occupied";
     name = "${roomLabel r} occupied";
@@ -206,18 +184,6 @@ let
     payload_off = "false";
   }) roomKeys;
 
-  # A room runs only while both its own switch and this one are on.
-  houseAutomatic = {
-    unique_id = "lights_house_automatic";
-    name = "House automatic";
-    icon = "mdi:home-automation";
-    command_topic = "lights/automatic";
-    state_topic = "lights/automatic";
-    retain = true;
-    payload_on = "true";
-    payload_off = "false";
-  };
-
   seeds =
     map (k: {
       topic = k.entity.command_topic;
@@ -226,11 +192,7 @@ let
     ++ map (s: {
       topic = s.command_topic;
       value = "false";
-    }) plugSwitches
-    ++ map (s: {
-      topic = s.command_topic;
-      value = "true";
-    }) (roomAutomatic ++ [ houseAutomatic ]);
+    }) plugSwitches;
 
   seed = pkgs.writeShellApplication {
     name = "lighting-seed";
@@ -314,8 +276,7 @@ in
       }
     ];
 
-    mqtt.switch = plugSwitches ++ roomAutomatic ++ [
-      houseAutomatic
+    mqtt.switch = plugSwitches ++ [
       {
         unique_id = "lights_follow_hue";
         name = "Lights follow hue";
@@ -329,8 +290,7 @@ in
     ];
 
     mqtt.button = releaseButtons ++ roomRelease;
-    mqtt.sensor = modeSensors ++ roomMode;
-    mqtt.select = roomScenes;
+    mqtt.sensor = modeSensors ++ roomState;
     mqtt.binary_sensor = roomOccupied;
   };
 }

@@ -1,43 +1,39 @@
-//! Every light in the house, in one process: each room's Lua script decides
-//! what the room wants (`mqtt_automations::script`), and the arbiter
-//! decides, per bulb, whether the bulb listens (`mqtt_automations::arbiter`)
-//! -- the automation, or a person who changed it by button, HA or app.
+//! Every light in the house, in one process. Each room is a state machine
+//! declared in Lua and run by `mqtt_automations::room`; this file only
+//! routes MQTT to rooms and turns their commands into z2m messages.
 //!
 //! This is the only writer to z2m light and plug `/set` topics. A room-wide
 //! identical change goes out as one group command, so bulbs don't pop on
 //! one after another.
 //!
 //! MQTT surface, besides z2m:
+//!   - `lights/<room>/state` (retained, from here): the current state.
+//!   - `lights/<room>/mode` (retained, from here): the current mode -- the
+//!     state, or while in a hidden one, the mode the room will resume.
+//!   - `lights/<room>/mode/set` (to here): pick a mode. The HA select for it
+//!     is published here by discovery, with the room's modes as options.
+//!   - `lights/<room>/occupied` (retained, from here), for rooms with
+//!     presence sensors.
+//!   - `lights/<room>/release` (to here): reset the room: holds and memory
+//!     dropped, default state. `lights/release`: every room.
 //!   - `lights/<room>/<bulb>/state` (retained, from here):
 //!     `{ "mode": "auto"|"held"|"unknown", "on", "brightness", "color_temp" }`.
-//!   - `lights/<room>/<bulb>/release` (to here): hand one bulb back to the
-//!     automation (the HA "release hold" button).
-//!   - `lights/release` (to here): the same for every bulb in the house.
-//!   - `lights/<room>/mode` (retained, from here): "held" if any of the
-//!     room's bulbs is, else "auto".
-//!   - `lights/<room>/<name>` (retained, from here): whatever the room's
-//!     script `publish()`es -- the prelude's `occupied` and `scene`.
-//!   - Room controls the prelude reads (`release`, `scene`, `automatic`
-//!     under `lights/<room>/`) arrive as script topics.
+//!   - `lights/<room>/<bulb>/release` (to here): hand one bulb back.
+//!   - Whatever settings topics the room files read.
 //!
 //! Config: a JSON file, see [`Config`]. `lights --check <file>` loads it and
-//! every script without connecting, for build-time validation.
+//! every room without connecting, for build-time validation.
 
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap};
 use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context, Result};
 use chrono::{DateTime, FixedOffset, Local};
-use mqtt_automations::arbiter::{self, Bulb, Command, Input, Mode, Target};
-use mqtt_automations::script::Script;
+use mqtt_automations::arbiter::{Command, Mode, Target};
+use mqtt_automations::room::{Event, Room};
 use mqtt_automations::{Message, Runtime};
 use serde::Deserialize;
 use serde_json::{json, Value};
-
-/// Room -> arbiter -> room rounds per event. Scripts only react to what
-/// changed, so this settles in one or two; the cap is a backstop against a
-/// script bug turning into a hot loop.
-const MAX_ROUNDS: usize = 8;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -50,11 +46,14 @@ struct Config {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RoomConfig {
+    /// Shown in HA ("<label> mode"); defaults to the room's name.
+    #[serde(default)]
+    label: Option<String>,
     /// z2m group containing exactly this room's bulbs, if there is one.
     #[serde(default)]
     group: Option<String>,
     bulbs: BTreeMap<String, BulbConfig>,
-    /// The room's script; see `mqtt_automations::script` for the API.
+    /// The room's Lua file; see `prelude.lua` for the format.
     lua: String,
 }
 
@@ -79,93 +78,98 @@ struct Out {
     retain: bool,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 enum Route {
     Report(usize, usize),
-    BulbRelease(usize, usize),
-    Script(usize),
+    Presence(usize),
+    Door(usize, String),
+    Button(usize, String),
+    Setting(usize),
+    Select(usize),
+    Release(usize, usize),
+    Reset(usize),
+    ResetAll,
 }
 
-struct BulbSlot {
-    name: String,
-    device: String,
-    dimmable: bool,
-    bulb: Bulb,
-    published: Option<Value>,
-}
-
-struct Room {
-    name: String,
+struct Slot {
+    room: Room,
+    label: String,
     group: Option<String>,
-    bulbs: Vec<BulbSlot>,
-    script: Script,
-    /// Last `lights/<room>/mode` sent.
-    mode: Option<&'static str>,
+    /// Last `lights/<room>/<bulb>/state` sent, per bulb.
+    shown: Vec<Option<Value>>,
 }
 
 /// All routing and z2m formatting, without MQTT -- so it can be tested.
 struct House {
-    rooms: Vec<Room>,
-    /// One topic can feed several rooms (a sensor on a shared doorway).
+    rooms: Vec<Slot>,
+    /// One topic can feed several rooms (a shared setting or sensor).
     routes: HashMap<String, Vec<Route>>,
 }
 
 impl House {
     fn new(cfg: Config, now: Instant, wall: DateTime<FixedOffset>) -> Result<Self> {
         let mut routes: HashMap<String, Vec<Route>> = HashMap::new();
+        let mut route = |topic: String, to: Route| routes.entry(topic).or_default().push(to);
+        route("lights/release".into(), Route::ResetAll);
         let mut rooms = Vec::new();
-        for (r, (name, room)) in cfg.rooms.into_iter().enumerate() {
-            let mut route = |topic: String, to: Route| routes.entry(topic).or_default().push(to);
-            let lights = room
+        for (r, (name, rc)) in cfg.rooms.into_iter().enumerate() {
+            let bulbs = rc
                 .bulbs
-                .iter()
-                .map(|(n, b)| (n.clone(), b.device.clone()));
-            let script = Script::new(
+                .into_iter()
+                .map(|(n, b)| (n, b.device, b.dimmable))
+                .collect();
+            let room = Room::new(
                 &name,
-                &room.lua,
-                lights,
+                &rc.lua,
+                bulbs,
                 (cfg.latitude, cfg.longitude),
                 now,
                 wall,
             )?;
-            for topic in script.topics() {
-                route(topic, Route::Script(r));
+            for (b, l) in room.bulbs.iter().enumerate() {
+                route(format!("zigbee2mqtt/{}", l.device), Route::Report(r, b));
+                route(
+                    format!("lights/{name}/{}/release", l.name),
+                    Route::Release(r, b),
+                );
             }
-            let bulbs = room
-                .bulbs
-                .into_iter()
-                .enumerate()
-                .map(|(b, (bulb_name, bulb))| {
-                    route(
-                        format!("lights/{name}/{bulb_name}/release"),
-                        Route::BulbRelease(r, b),
-                    );
-                    route(format!("zigbee2mqtt/{}", bulb.device), Route::Report(r, b));
-                    BulbSlot {
-                        name: bulb_name,
-                        device: bulb.device,
-                        dimmable: bulb.dimmable,
-                        bulb: Bulb::new(arbiter::Config {
-                            dimmable: bulb.dimmable,
-                            ..arbiter::Config::default()
-                        }),
-                        published: None,
-                    }
-                })
-                .collect();
-            rooms.push(Room {
-                name,
-                group: room.group,
-                bulbs,
-                script,
-                mode: None,
+            let spec = room.spec();
+            for device in &spec.presence {
+                route(format!("zigbee2mqtt/{device}"), Route::Presence(r));
+            }
+            for (door, device) in &spec.doors {
+                route(
+                    format!("zigbee2mqtt/{device}"),
+                    Route::Door(r, door.clone()),
+                );
+            }
+            for (button, device) in &spec.buttons {
+                route(
+                    format!("zigbee2mqtt/{device}/action"),
+                    Route::Button(r, button.clone()),
+                );
+            }
+            for topic in room.setting_topics() {
+                route(topic, Route::Setting(r));
+            }
+            route(format!("lights/{name}/mode/set"), Route::Select(r));
+            route(format!("lights/{name}/release"), Route::Reset(r));
+            rooms.push(Slot {
+                shown: vec![None; room.bulbs.len()],
+                label: rc.label.unwrap_or_else(|| name.clone()),
+                group: rc.group,
+                room,
             });
         }
         let mut seen = HashMap::new();
-        for room in &rooms {
-            for slot in &room.bulbs {
-                if let Some(other) = seen.insert(&slot.device, &room.name) {
-                    bail!("bulb {} is in both {other} and {}", slot.device, room.name);
+        for slot in &rooms {
+            for l in &slot.room.bulbs {
+                if let Some(other) = seen.insert(&l.device, &slot.room.name) {
+                    bail!(
+                        "bulb {} is in both {other} and {}",
+                        l.device,
+                        slot.room.name
+                    );
                 }
             }
         }
@@ -176,202 +180,178 @@ impl House {
         self.routes.keys().cloned().collect()
     }
 
-    /// Ask every bulb for its current state, so startup can adopt it.
+    /// Ask every bulb for its state, so startup can adopt it, and announce
+    /// each room's mode select to HA.
     fn startup(&self) -> Vec<Out> {
-        self.rooms
-            .iter()
-            .flat_map(|room| &room.bulbs)
-            .map(|slot| Out {
-                topic: format!("zigbee2mqtt/{}/get", slot.device),
-                payload: json!({ "state": "" }),
-                retain: false,
-            })
-            .collect()
+        let gets = self.rooms.iter().flat_map(|s| &s.room.bulbs).map(|l| Out {
+            topic: format!("zigbee2mqtt/{}/get", l.device),
+            payload: json!({ "state": "" }),
+            retain: false,
+        });
+        let selects = self.rooms.iter().map(|s| {
+            let name = &s.room.name;
+            Out {
+                topic: format!("homeassistant/select/lights_{name}_mode/config"),
+                payload: json!({
+                    "unique_id": format!("lights_{name}_mode_select"),
+                    "name": format!("{} mode", s.label),
+                    "icon": "mdi:home-lightbulb-outline",
+                    "command_topic": format!("lights/{name}/mode/set"),
+                    "state_topic": format!("lights/{name}/mode"),
+                    "value_template": "{{ value_json }}",
+                    "options": s.room.modes(),
+                }),
+                retain: true,
+            }
+        });
+        gets.chain(selects).collect()
     }
 
     /// The next moment anything changes by itself.
     fn deadline(&self) -> Option<Instant> {
-        self.rooms
-            .iter()
-            .flat_map(|room| {
-                let bulbs = room.bulbs.iter().filter_map(|s| s.bulb.deadline());
-                bulbs.chain(room.script.deadline())
-            })
-            .min()
+        self.rooms.iter().map(|s| s.room.deadline()).min()
     }
 
     fn handle(&mut self, msg: &Message, now: Instant, wall: DateTime<FixedOffset>) -> Vec<Out> {
         let Some(routes) = self.routes.get(&msg.topic).cloned() else {
             return Vec::new();
         };
+        let p = &msg.payload;
         let mut out = Vec::new();
         for route in routes {
-            out.extend(match route {
-                Route::Report(r, b) => match parse_report(&msg.payload) {
-                    Some(report) => self.step_bulbs(r, vec![(b, Input::Report(report))], now),
-                    None => Vec::new(),
+            let (r, event) = match &route {
+                Route::Report(r, b) => match parse_report(p) {
+                    Some(target) => (*r, Event::Report { bulb: *b, target }),
+                    None => continue,
                 },
-                Route::BulbRelease(r, b) => {
-                    let release = Input::Release {
-                        transition: Duration::ZERO,
+                Route::Presence(r) => {
+                    let v = p.get("occupancy").or_else(|| p.get("presence"));
+                    let Some(present) = v.and_then(Value::as_bool) else {
+                        continue;
                     };
-                    self.step_bulbs(r, vec![(b, release)], now)
+                    let device = msg.topic.trim_start_matches("zigbee2mqtt/");
+                    (*r, Event::Presence { device, present })
                 }
-                Route::Script(r) => {
-                    let reqs = self.rooms[r]
-                        .script
-                        .message(&msg.topic, &msg.payload, now, wall);
-                    let inputs = self.named(r, reqs);
-                    self.step_bulbs(r, inputs, now)
+                // z2m: `contact = true` is closed.
+                Route::Door(r, name) => match p.get("contact").and_then(Value::as_bool) {
+                    Some(closed) => (
+                        *r,
+                        Event::Door {
+                            name,
+                            open: !closed,
+                        },
+                    ),
+                    None => continue,
+                },
+                Route::Button(r, name) => {
+                    match p
+                        .get("action")
+                        .unwrap_or(p)
+                        .as_str()
+                        .filter(|a| !a.is_empty())
+                    {
+                        Some(action) => (*r, Event::Button { name, action }),
+                        None => continue,
+                    }
                 }
-            });
+                Route::Setting(r) => (
+                    *r,
+                    Event::Setting {
+                        topic: &msg.topic,
+                        payload: p,
+                    },
+                ),
+                Route::Select(r) => match p.as_str() {
+                    Some(mode) => (*r, Event::Select(mode)),
+                    None => continue,
+                },
+                Route::Release(r, b) => (*r, Event::Release(*b)),
+                Route::Reset(r) => (*r, Event::Reset),
+                Route::ResetAll => {
+                    for r in 0..self.rooms.len() {
+                        out.extend(self.step(r, Event::Reset, now, wall));
+                    }
+                    continue;
+                }
+            };
+            out.extend(self.step(r, event, now, wall));
         }
         out
     }
 
-    /// Timers: every room's script and every due bulb.
+    /// Every room that is due.
     fn tick(&mut self, now: Instant, wall: DateTime<FixedOffset>) -> Vec<Out> {
         let mut out = Vec::new();
         for r in 0..self.rooms.len() {
-            let due = self.rooms[r]
-                .bulbs
-                .iter()
-                .enumerate()
-                .filter(|(_, s)| s.bulb.deadline().is_some_and(|at| at <= now))
-                .map(|(b, _)| (b, Input::Tick))
-                .collect();
-            out.extend(self.step_bulbs(r, due, now));
-            let reqs = self.rooms[r].script.tick(now, wall);
-            let inputs = self.named(r, reqs);
-            out.extend(self.step_bulbs(r, inputs, now));
-        }
-        out
-    }
-
-    /// Feed inputs to the bulbs as one batch, so a room-wide change can go
-    /// out as a single group command. Bulb changes flow back to the room's
-    /// script, whose answers are fed in the same way until it is quiet.
-    fn step_bulbs(&mut self, r: usize, inputs: Vec<(usize, Input)>, now: Instant) -> Vec<Out> {
-        let mut out = self.step_rounds(r, inputs, now);
-        let room = &mut self.rooms[r];
-        out.extend(
-            room.script
-                .take_published()
-                .into_iter()
-                .map(|(topic, value)| Out {
-                    topic,
-                    payload: value,
-                    retain: true,
-                }),
-        );
-        let mode = if room
-            .bulbs
-            .iter()
-            .any(|s| matches!(s.bulb.mode, Mode::Held(_)))
-        {
-            "held"
-        } else {
-            "auto"
-        };
-        if room.mode != Some(mode) {
-            room.mode = Some(mode);
-            out.push(Out {
-                topic: format!("lights/{}/mode", room.name),
-                payload: json!(mode),
-                retain: true,
-            });
-        }
-        out
-    }
-
-    fn step_rounds(&mut self, r: usize, inputs: Vec<(usize, Input)>, now: Instant) -> Vec<Out> {
-        let mut out = Vec::new();
-        let mut queue = VecDeque::from([inputs]);
-        for _ in 0..MAX_ROUNDS {
-            let Some(inputs) = queue.pop_front() else {
-                return out;
-            };
-            let changed = self.apply(r, inputs, now, &mut out);
-            let room = &mut self.rooms[r];
-            let mut answers = Vec::new();
-            for b in changed {
-                let slot = &room.bulbs[b];
-                let Some(state) = slot.bulb.showing() else {
-                    continue;
-                };
-                let held = matches!(slot.bulb.mode, Mode::Held(_));
-                answers.extend(room.script.bulb(&slot.name, held, state));
-            }
-            let next = self.named(r, answers);
-            if !next.is_empty() {
-                queue.push_back(next);
+            if self.rooms[r].room.deadline() <= now {
+                out.extend(self.step(r, Event::Tick, now, wall));
             }
         }
-        eprintln!("{}: script and arbiter did not settle", self.rooms[r].name);
         out
     }
 
-    /// Step the bulbs, collect z2m commands into `out`, and return which
-    /// bulbs' published state changed.
-    fn apply(
+    fn step(
         &mut self,
         r: usize,
-        inputs: Vec<(usize, Input)>,
+        event: Event,
         now: Instant,
-        out: &mut Vec<Out>,
-    ) -> Vec<usize> {
-        let room = &mut self.rooms[r];
-        // Only each bulb's last command goes out: a handler that releases
-        // and then sets a new target must not flash the bulb in between.
-        let mut commands: BTreeMap<usize, Command> = BTreeMap::new();
-        for (b, input) in inputs {
-            let slot = &mut room.bulbs[b];
-            let before = slot.bulb.mode;
-            if let Some(cmd) = slot.bulb.step(input, now) {
-                commands.insert(b, cmd);
-            }
-            if slot.bulb.mode != before {
-                eprintln!(
-                    "{}/{}: {before:?} -> {:?}",
-                    room.name, slot.name, slot.bulb.mode
-                );
-            }
-        }
-
-        let first = commands.values().next().copied();
-        let all_same =
-            commands.len() == room.bulbs.len() && commands.values().all(|c| Some(*c) == first);
-        // One payload must suit every member: a group mixing bulbs and plugs
-        // would get a plug's state-only payload and leave the bulbs at
-        // whatever brightness they had, so those rooms address each device.
-        let dimmable = room.bulbs.iter().all(|s| s.dimmable);
-        let uniform = dimmable || room.bulbs.iter().all(|s| !s.dimmable);
-        match (&room.group, first) {
-            (Some(group), Some(cmd)) if all_same && uniform && room.bulbs.len() > 1 => {
-                out.push(set(group, cmd, dimmable));
-            }
-            _ => out.extend(commands.iter().map(|(&b, &cmd)| {
-                let slot = &room.bulbs[b];
-                set(&slot.device, cmd, slot.dimmable)
-            })),
-        }
-
-        let mut changed = Vec::new();
-        for (b, slot) in room.bulbs.iter_mut().enumerate() {
-            if let Some(state) = publish_state(&room.name, slot) {
-                out.push(state);
-                changed.push(b);
+        wall: DateTime<FixedOffset>,
+    ) -> Vec<Out> {
+        let slot = &mut self.rooms[r];
+        let outcome = slot.room.step(event, now, wall);
+        let mut out = commands(slot, &outcome.commands);
+        for (b, l) in slot.room.bulbs.iter().enumerate() {
+            let Some(t) = l.bulb.showing() else {
+                continue;
+            };
+            let mode = match l.bulb.mode {
+                Mode::Unknown => "unknown",
+                Mode::Auto => "auto",
+                Mode::Held(_) => "held",
+            };
+            let payload = json!({
+                "mode": mode,
+                "on": t.on,
+                "brightness": t.brightness,
+                "color_temp": t.color_temp,
+            });
+            if slot.shown[b].as_ref() != Some(&payload) {
+                slot.shown[b] = Some(payload.clone());
+                out.push(Out {
+                    topic: format!("lights/{}/{}/state", slot.room.name, l.name),
+                    payload,
+                    retain: true,
+                });
             }
         }
-        changed
+        out.extend(outcome.publish.into_iter().map(|(topic, payload)| Out {
+            topic,
+            payload,
+            retain: true,
+        }));
+        out
     }
+}
 
-    /// Resolve bulb names to indices. Scripts can only name their own bulbs.
-    fn named(&self, r: usize, reqs: Vec<(String, Input)>) -> Vec<(usize, Input)> {
-        let bulbs = &self.rooms[r].bulbs;
-        reqs.into_iter()
-            .filter_map(|(name, input)| Some((bulbs.iter().position(|s| s.name == name)?, input)))
-            .collect()
+/// z2m messages for a step's commands: one group command if every bulb
+/// got the same one, else one per device.
+fn commands(slot: &Slot, cmds: &BTreeMap<usize, Command>) -> Vec<Out> {
+    let bulbs = &slot.room.bulbs;
+    let first = cmds.values().next().copied();
+    let all_same = cmds.len() == bulbs.len() && cmds.values().all(|c| Some(*c) == first);
+    // One payload must suit every member: a group mixing bulbs and plugs
+    // would get a plug's state-only payload and leave the bulbs at
+    // whatever brightness they had, so those rooms address each device.
+    let dimmable = bulbs.iter().all(|l| l.dimmable);
+    let uniform = dimmable || bulbs.iter().all(|l| !l.dimmable);
+    match (&slot.group, first) {
+        (Some(group), Some(cmd)) if all_same && uniform && bulbs.len() > 1 => {
+            vec![set(group, cmd, dimmable)]
+        }
+        _ => cmds
+            .iter()
+            .map(|(&b, &cmd)| set(&bulbs[b].device, cmd, bulbs[b].dimmable))
+            .collect(),
     }
 }
 
@@ -412,30 +392,6 @@ fn set(device: &str, cmd: Command, dimmable: bool) -> Out {
     }
 }
 
-fn publish_state(room: &str, slot: &mut BulbSlot) -> Option<Out> {
-    let t = slot.bulb.showing()?;
-    let mode = match slot.bulb.mode {
-        Mode::Unknown => "unknown",
-        Mode::Auto => "auto",
-        Mode::Held(_) => "held",
-    };
-    let payload = json!({
-        "mode": mode,
-        "on": t.on,
-        "brightness": t.brightness,
-        "color_temp": t.color_temp,
-    });
-    if slot.published.as_ref() == Some(&payload) {
-        return None;
-    }
-    slot.published = Some(payload.clone());
-    Some(Out {
-        topic: format!("lights/{room}/{}/state", slot.name),
-        payload,
-        retain: true,
-    })
-}
-
 fn wall_now() -> DateTime<FixedOffset> {
     Local::now().fixed_offset()
 }
@@ -444,6 +400,8 @@ fn load(path: &str) -> Result<Config> {
     let text = std::fs::read_to_string(path).with_context(|| format!("reading {path:?}"))?;
     serde_json::from_str(&text).with_context(|| format!("parsing {path:?}"))
 }
+
+const IDLE_TICK: Duration = Duration::from_secs(60);
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> Result<()> {
@@ -467,7 +425,7 @@ async fn main() -> Result<()> {
     }
     eprintln!("lights started: {} rooms", house.rooms.len());
 
-    // Ticks once straight away, so scripts' top-level requests go out.
+    // Rooms start due, so their looks go out straight away.
     let mut wake_at = Instant::now();
     loop {
         let outs = tokio::select! {
@@ -478,8 +436,6 @@ async fn main() -> Result<()> {
         for out in outs {
             send(&rt, out).await;
         }
-        // Scripts keep their own `every()` timers, so a deadline always
-        // exists in practice; the fallback only bounds a script without one.
         let now = Instant::now();
         wake_at = house
             .deadline()
@@ -488,8 +444,6 @@ async fn main() -> Result<()> {
     }
     Ok(())
 }
-
-const IDLE_TICK: Duration = Duration::from_secs(60);
 
 /// A failed publish is logged, not fatal: the next event republishes.
 async fn send(rt: &Runtime, out: Out) {
@@ -507,6 +461,7 @@ async fn send(rt: &Runtime, out: Out) {
 mod tests {
     use super::*;
 
+    /// A Sunday, 13:10 local.
     const NOON: &str = "2026-06-21T13:10:00+02:00";
 
     struct Rig {
@@ -517,17 +472,20 @@ mod tests {
 
     impl Rig {
         fn new(rooms: Value) -> Self {
-            Self::try_new(rooms).unwrap()
+            Self::at(rooms, NOON)
         }
 
-        fn try_new(rooms: Value) -> Result<Self> {
+        fn at(rooms: Value, wall: &str) -> Self {
+            let cfg = json!({ "latitude": 52.52, "longitude": 13.405, "rooms": rooms });
             let now = Instant::now();
-            let wall = DateTime::parse_from_rfc3339(NOON).unwrap();
-            Ok(Self {
-                house: House::new(config(rooms)?, now, wall)?,
+            let wall = DateTime::parse_from_rfc3339(wall).unwrap();
+            let mut rig = Self {
+                house: House::new(serde_json::from_value(cfg).unwrap(), now, wall).unwrap(),
                 now,
                 wall,
-            })
+            };
+            rig.wait(Duration::ZERO);
+            rig
         }
 
         fn send(&mut self, topic: &str, payload: Value) -> Vec<Out> {
@@ -538,17 +496,43 @@ mod tests {
             self.house.handle(&msg, self.now, self.wall)
         }
 
+        /// Advance the clock, ticking at every deadline on the way.
         fn wait(&mut self, d: Duration) -> Vec<Out> {
-            self.now += d;
-            self.wall += chrono::TimeDelta::from_std(d).unwrap();
-            self.house.tick(self.now, self.wall)
+            let end = self.now + d;
+            let mut out = Vec::new();
+            loop {
+                let next = self.house.deadline().unwrap_or(end).max(self.now).min(end);
+                let step = next - self.now;
+                self.now = next;
+                self.wall += chrono::TimeDelta::from_std(step).unwrap();
+                out.extend(self.house.tick(self.now, self.wall));
+                if self.now >= end {
+                    return out;
+                }
+            }
         }
 
-        /// Every bulb reports on at `brightness`.
+        fn mins(&mut self, m: u64) -> Vec<Out> {
+            self.wait(Duration::from_secs(m * 60))
+        }
+
+        /// Every bulb reports `payload`, then settles.
         fn report_all(&mut self, devices: &[&str], payload: Value) {
             for d in devices {
                 self.send(&format!("zigbee2mqtt/{d}"), payload.clone());
             }
+            self.wait(Duration::from_secs(5));
+        }
+
+        fn presence(&mut self, sensor: &str, present: bool) -> Vec<Out> {
+            self.send(
+                &format!("zigbee2mqtt/{sensor}"),
+                json!({ "occupancy": present }),
+            )
+        }
+
+        fn state(&self, room: usize) -> &str {
+            self.house.rooms[room].room.state_name()
         }
     }
 
@@ -559,355 +543,499 @@ mod tests {
             .collect()
     }
 
-    fn state<'a>(outs: &'a [Out], topic: &str) -> Option<&'a Value> {
+    fn last<'a>(outs: &'a [Out], topic: &str) -> Option<&'a Value> {
         outs.iter()
             .rev()
             .find(|o| o.topic == topic)
             .map(|o| &o.payload)
     }
 
-    fn hallway() -> Value {
-        json!({ "hallway": {
+    const HALLWAY: &str = r#"
+        room{
+          presence = { "motion" },
+          buttons = { button = "button" },
+          default = "auto",
+          start = "off",
+          states = scenes("auto", {
+            off = { hidden = true, look = { on = false, transition = 30 }, on = { present = "resume" } },
+            auto = {
+              look = { brightness = 200 },
+              on = { ["button.single"] = { toggle = { "a" } } },
+              when = { { to = "off", absent_for = 60 } },
+            },
+          }),
+        }"#;
+
+    fn hallway() -> Rig {
+        let mut rig = Rig::new(json!({ "hallway": {
+            "label": "Hallway",
             "group": "hallway",
             "bulbs": { "a": { "device": "hallway_a" }, "b": { "device": "hallway_b" } },
-            "lua": r#"follow{ when = occupancy{ sensors = { "hallway_motion" }, hold = 90 }, fade = 180 }"#,
-        } })
-    }
-
-    /// Hallway with both bulbs off and adopted.
-    fn quiet_hallway() -> Rig {
-        let mut rig = Rig::new(hallway());
+            "lua": HALLWAY,
+        } }));
         rig.report_all(&["hallway_a", "hallway_b"], json!({ "state": "OFF" }));
-        rig.wait(Duration::ZERO);
         rig
     }
 
     #[test]
-    fn global_release_hands_every_bulb_back() {
-        let mut rig = quiet_hallway();
-        rig.send(
-            "zigbee2mqtt/hallway_a",
-            json!({ "state": "ON", "brightness": 200 }),
-        );
-        rig.send(
-            "zigbee2mqtt/hallway_b",
-            json!({ "state": "ON", "brightness": 200 }),
-        );
-        assert_eq!(rig.house.rooms[0].mode, Some("held"));
-        let outs = rig.send("lights/release", json!("release"));
-        for b in ["a", "b"] {
-            assert_eq!(
-                state(&outs, &format!("lights/hallway/{b}/state")).unwrap()["mode"],
-                "auto"
-            );
-        }
-        assert_eq!(state(&outs, "lights/hallway/mode"), Some(&json!("auto")));
-    }
-
-    #[test]
-    fn script_publishes_are_retained_under_the_room() {
-        let mut rig = Rig::new(hallway());
-        rig.wait(Duration::ZERO);
-        let outs = rig.send("zigbee2mqtt/hallway_motion", json!({ "occupancy": true }));
-        let out = outs
-            .iter()
-            .find(|o| o.topic == "lights/hallway/occupied")
-            .unwrap();
-        assert_eq!((&out.payload, out.retain), (&json!(true), true));
-    }
-
-    #[test]
-    fn startup_adopts_bulbs_from_their_reports() {
-        let mut rig = Rig::new(hallway());
-        // The main loop ticks once at startup, so rooms state their targets
-        // before the first reports come back. The hallway starts vacant.
-        rig.wait(Duration::ZERO);
-        let outs = rig.send("zigbee2mqtt/hallway_a", json!({ "state": "OFF" }));
+    fn startup_adopts_and_announces_the_mode_select() {
+        let rig = hallway();
+        let outs = rig.house.startup();
+        let select = last(&outs, "homeassistant/select/lights_hallway_mode/config").unwrap();
+        assert_eq!(select["name"], "Hallway mode");
         assert_eq!(
-            state(&outs, "lights/hallway/a/state").unwrap()["mode"],
-            "auto"
+            select["options"],
+            json!(["auto", "bright", "dim", "night", "manual"])
         );
-        // A light someone left on is not yanked off by a restart.
+        assert_eq!(rig.state(0), "off");
+        for l in &rig.house.rooms[0].room.bulbs {
+            assert_eq!(l.bulb.mode, Mode::Auto);
+        }
+    }
+
+    #[test]
+    fn a_light_left_on_is_not_yanked_at_startup() {
+        let mut rig = Rig::new(json!({ "hallway": {
+            "bulbs": { "a": { "device": "hallway_a" } },
+            "lua": HALLWAY,
+        } }));
         let outs = rig.send(
-            "zigbee2mqtt/hallway_b",
+            "zigbee2mqtt/hallway_a",
             json!({ "state": "ON", "brightness": 250 }),
         );
         assert!(sets(&outs).is_empty());
         assert_eq!(
-            state(&outs, "lights/hallway/b/state").unwrap()["mode"],
+            last(&outs, "lights/hallway/a/state").unwrap()["mode"],
             "held"
         );
+        // Someone arriving hands it back to the room.
+        let outs = rig.presence("motion", true);
+        assert_eq!(sets(&outs)[0].1["brightness"], 200);
     }
 
     #[test]
-    fn motion_turns_the_whole_room_on_as_one_group_command() {
-        let mut rig = quiet_hallway();
-        let outs = rig.send("zigbee2mqtt/hallway_motion", json!({ "occupancy": true }));
-        let sets = sets(&outs);
-        assert_eq!(sets.len(), 1, "{sets:?}");
-        assert_eq!(sets[0].0, "zigbee2mqtt/hallway/set");
-        assert_eq!(sets[0].1["state"], "ON");
-        assert_eq!(sets[0].1["transition"], 0.4);
-    }
-
-    #[test]
-    fn app_override_holds_until_the_room_empties() {
-        let mut rig = quiet_hallway();
-        rig.send("zigbee2mqtt/hallway_motion", json!({ "occupancy": true }));
-        rig.wait(Duration::from_secs(5));
-        let outs = rig.send("zigbee2mqtt/hallway_a", json!({ "state": "OFF" }));
+    fn arrival_turns_the_room_on_as_one_group_command_and_leaving_fades_it() {
+        let mut rig = hallway();
+        let outs = rig.presence("motion", true);
         assert_eq!(
-            state(&outs, "lights/hallway/a/state").unwrap()["mode"],
-            "held"
+            sets(&outs),
+            [(
+                "zigbee2mqtt/hallway/set",
+                &json!({ "state": "ON", "brightness": 200, "transition": 0.4 })
+            )]
         );
+        assert_eq!(last(&outs, "lights/hallway/state"), Some(&json!("auto")));
+        assert_eq!(last(&outs, "lights/hallway/occupied"), Some(&json!(true)));
 
-        // More motion: only the bulb that isn't held follows the room.
-        rig.wait(Duration::from_secs(60));
-        rig.send("zigbee2mqtt/hallway_motion", json!({ "occupancy": true }));
-        assert_eq!(
-            rig.house.rooms[0].bulbs[0].bulb.held().map(|t| t.on),
-            Some(false)
-        );
-
-        // Leaving: hold, then vacant -- released, fading off.
-        rig.send("zigbee2mqtt/hallway_motion", json!({ "occupancy": false }));
-        assert!(sets(&rig.wait(Duration::from_secs(89))).is_empty());
+        rig.presence("motion", false);
+        assert!(sets(&rig.wait(Duration::from_secs(59))).is_empty());
         let outs = rig.wait(Duration::from_secs(1));
         assert_eq!(
-            state(&outs, "lights/hallway/a/state").unwrap()["mode"],
-            "auto"
+            sets(&outs),
+            [(
+                "zigbee2mqtt/hallway/set",
+                &json!({ "state": "OFF", "transition": 30.0 })
+            )]
         );
-        rig.report_all(&["hallway_a", "hallway_b"], json!({ "state": "OFF" }));
-        rig.wait(Duration::from_secs(181));
+        assert_eq!(last(&outs, "lights/hallway/state"), Some(&json!("off")));
+        // Hidden state: HA keeps showing the mode it will come back to.
+        assert_eq!(last(&outs, "lights/hallway/mode"), None);
+    }
 
-        // Back within the hour: the manual off is remembered.
-        let outs = rig.send("zigbee2mqtt/hallway_motion", json!({ "occupancy": true }));
+    #[test]
+    fn a_manual_change_holds_for_the_state_and_comes_back_with_resume() {
+        let mut rig = hallway();
+        rig.presence("motion", true);
+        rig.wait(Duration::from_secs(5));
+        rig.send(
+            "zigbee2mqtt/hallway_a",
+            json!({ "state": "ON", "brightness": 40 }),
+        );
         assert_eq!(
-            sets(&outs).iter().map(|s| s.0).collect::<Vec<_>>(),
-            ["zigbee2mqtt/hallway_b/set"]
+            rig.house.rooms[0].room.bulbs[0]
+                .bulb
+                .held()
+                .map(|t| t.brightness),
+            Some(40)
         );
 
-        // Empty for over an hour: forgotten, the next walk-through works
-        // normally again, as one group command.
-        rig.send("zigbee2mqtt/hallway_motion", json!({ "occupancy": false }));
-        rig.wait(Duration::from_secs(90));
+        // Leave: the hold ends with the state, everything fades.
+        rig.presence("motion", false);
+        let outs = rig.mins(1);
+        assert_eq!(sets(&outs)[0].0, "zigbee2mqtt/hallway/set");
         rig.report_all(&["hallway_a", "hallway_b"], json!({ "state": "OFF" }));
-        rig.wait(Duration::from_secs(3600));
-        let outs = rig.send("zigbee2mqtt/hallway_motion", json!({ "occupancy": true }));
+
+        // Back within the hour: the 40 is remembered for bulb a.
+        let outs = rig.presence("motion", true);
+        let s = sets(&outs);
+        assert_eq!(s.len(), 2, "{s:?}");
+        assert!(s.contains(&(
+            "zigbee2mqtt/hallway_a/set",
+            &json!({ "state": "ON", "brightness": 40, "transition": 0.4 })
+        )));
+
+        // Empty for over an hour: forgotten.
+        rig.presence("motion", false);
+        rig.mins(2);
+        rig.report_all(&["hallway_a", "hallway_b"], json!({ "state": "OFF" }));
+        rig.mins(61);
+        let outs = rig.presence("motion", true);
         assert_eq!(sets(&outs)[0].0, "zigbee2mqtt/hallway/set");
     }
 
     #[test]
-    fn button_press_goes_through_script_and_arbiter() {
-        let mut rig = Rig::new(json!({ "bedroom": {
-            "bulbs": { "light": { "device": "bedroom_light" } },
-            "lua": r#"
-                follow{}
-                button("bedroom_button", { single = toggle() })
-            "#,
-        } }));
-        rig.send("zigbee2mqtt/bedroom_light", json!({ "state": "OFF" }));
-        rig.wait(Duration::from_secs(5));
+    fn a_scene_picked_in_ha_is_resumed_then_forgotten() {
+        let mut rig = hallway();
+        rig.presence("motion", true);
+        let outs = rig.send("lights/hallway/mode/set", json!("night"));
+        assert_eq!(sets(&outs)[0].1["brightness"], 8);
+        assert_eq!(last(&outs, "lights/hallway/mode"), Some(&json!("night")));
 
-        let outs = rig.send(
-            "zigbee2mqtt/bedroom_button/action",
-            json!({ "action": "single" }),
-        );
-        let sets = sets(&outs);
-        assert_eq!(sets[0].0, "zigbee2mqtt/bedroom_light/set");
-        assert_eq!(sets[0].1["state"], "ON");
-        // A follow room without occupancy keeps a light on once it is on.
-        let later = rig.wait(Duration::from_secs(60));
-        assert!(later.iter().all(|o| o.payload["state"] != "OFF"));
+        rig.presence("motion", false);
+        rig.mins(2);
+        let outs = rig.presence("motion", true);
+        assert_eq!(rig.state(0), "night");
+        assert_eq!(sets(&outs)[0].1["brightness"], 8);
 
-        // The script saw the new state through the arbiter: next press is off.
-        let outs = rig.send("zigbee2mqtt/bedroom_button/action", json!("single"));
-        assert_eq!(sets_of(&outs)["state"], "OFF");
-    }
-
-    fn sets_of(outs: &[Out]) -> &Value {
-        sets(outs)[0].1
+        rig.presence("motion", false);
+        rig.mins(62);
+        rig.presence("motion", true);
+        assert_eq!(rig.state(0), "auto");
+        // Unknown and hidden modes are ignored.
+        rig.send("lights/hallway/mode/set", json!("off"));
+        rig.send("lights/hallway/mode/set", json!("disco"));
+        assert_eq!(rig.state(0), "auto");
     }
 
     #[test]
-    fn ha_release_button_hands_one_bulb_back() {
-        let mut rig = quiet_hallway();
-        rig.send("zigbee2mqtt/hallway_motion", json!({ "occupancy": true }));
+    fn manual_sends_nothing_until_another_mode() {
+        let mut rig = hallway();
+        rig.presence("motion", true);
+        rig.send("lights/hallway/mode/set", json!("manual"));
+        rig.presence("motion", false);
+        assert!(sets(&rig.mins(10)).is_empty());
+        assert_eq!(rig.state(0), "manual");
+        // Reset: back to auto, which with nobody there goes straight off,
+        // without flashing on first.
+        let outs = rig.send("lights/hallway/release", json!("release"));
+        assert_eq!(rig.state(0), "off");
+        assert_eq!(sets(&outs)[0].1["state"], "OFF");
+    }
+
+    #[test]
+    fn toggle_holds_the_bulb_and_flips_it_back() {
+        let mut rig = hallway();
+        rig.presence("motion", true);
+        rig.report_all(
+            &["hallway_a", "hallway_b"],
+            json!({ "state": "ON", "brightness": 200 }),
+        );
+        let outs = rig.send("zigbee2mqtt/button/action", json!("single"));
+        assert_eq!(
+            sets(&outs),
+            [(
+                "zigbee2mqtt/hallway_a/set",
+                &json!({ "state": "OFF", "transition": 0.4 })
+            )]
+        );
+        let outs = rig.send("zigbee2mqtt/button/action", json!({ "action": "single" }));
+        assert_eq!(sets(&outs)[0].1["state"], "ON");
+        // Actions the state doesn't handle are ignored.
+        assert!(sets(&rig.send("zigbee2mqtt/button/action", json!("double"))).is_empty());
+    }
+
+    #[test]
+    fn release_hands_one_bulb_back() {
+        let mut rig = hallway();
+        rig.presence("motion", true);
         rig.wait(Duration::from_secs(5));
         rig.send("zigbee2mqtt/hallway_a", json!({ "state": "OFF" }));
         let outs = rig.send("lights/hallway/a/release", json!(""));
         assert_eq!(
-            state(&outs, "lights/hallway/a/state").unwrap()["mode"],
-            "auto"
+            sets(&outs),
+            [(
+                "zigbee2mqtt/hallway_a/set",
+                &json!({ "state": "ON", "brightness": 200, "transition": 0.4 })
+            )]
         );
+    }
+
+    #[test]
+    fn doors_triggers_and_when_rows_drive_a_room() {
+        // A cupboard-like room with a time-based trigger.
+        let lua = r#"
+            local late = function() return clock() >= 14 end
+            room{
+              doors = { door = "door" },
+              triggers = { late = late },
+              default = "open", start = "shut", forget_after = 0,
+              states = {
+                shut = { hidden = true, look = { on = false }, on = { ["door.open"] = "resume", late = "late" } },
+                open = { look = { brightness = 100 }, on = { ["door.closed"] = "shut" } },
+                late = { look = { brightness = 3 }, when = { { to = "shut", time_in_state = 600 } } },
+              },
+            }"#;
+        let mut rig =
+            Rig::new(json!({ "cupboard": { "bulbs": { "bulb": { "device": "c" } }, "lua": lua } }));
+        rig.report_all(&["c"], json!({ "state": "OFF" }));
+        let outs = rig.send("zigbee2mqtt/door", json!({ "contact": false }));
+        assert_eq!(sets(&outs)[0].1["brightness"], 100);
+        rig.send("zigbee2mqtt/door", json!({ "contact": true }));
+        assert_eq!(rig.state(0), "shut");
+
+        // 14:00 comes round: the trigger fires once, the row ends it.
+        rig.mins(50);
+        assert_eq!(rig.state(0), "late");
+        rig.mins(10);
+        assert_eq!(rig.state(0), "shut");
+        rig.mins(10);
+        assert_eq!(rig.state(0), "shut");
+    }
+
+    #[test]
+    fn plugs_fade_out_as_a_delayed_off() {
+        let lua = r#"room{ presence = { "m" }, default = "on", states = {
+            on = { look = {}, when = { { to = "off", absent_for = 1 } } },
+            off = { hidden = true, look = { on = false, transition = 60 }, on = { present = "on" } },
+        } }"#;
+        let mut rig = Rig::new(
+            json!({ "r": { "bulbs": { "p": { "device": "p", "dimmable": false } }, "lua": lua } }),
+        );
+        rig.report_all(&["p"], json!({ "state": "ON" }));
+        rig.presence("m", true);
+        rig.presence("m", false);
+        assert!(sets(&rig.wait(Duration::from_secs(59))).is_empty());
+        let outs = rig.wait(Duration::from_secs(2));
         assert_eq!(
             sets(&outs),
-            vec![("zigbee2mqtt/hallway_a/set", &sets_of(&outs).clone())]
+            [("zigbee2mqtt/p/set", &json!({ "state": "OFF" }))]
         );
     }
 
-    #[test]
-    fn mixed_bulb_and_plug_rooms_never_use_the_group() {
-        let mut rig = Rig::new(json!({ "lounge": {
-            "group": "lounge",
-            "bulbs": {
-                "lamp": { "device": "lamp" },
-                "plug": { "device": "plug", "dimmable": false },
-            },
-            "lua": r#"button("btn", { single = toggle() })"#,
-        } }));
-        rig.report_all(
-            &["lamp", "plug"],
-            json!({ "state": "ON", "brightness": 254 }),
+    /// The real room files, when the repo is around (not in the Nix build).
+    fn real(room: &str) -> Option<String> {
+        let dir = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../systems/rpi-4b-plus/services/lighting"
         );
-        let outs = rig.send("zigbee2mqtt/btn/action", json!("single"));
-        let topics: Vec<_> = sets(&outs).into_iter().map(|(t, _)| t).collect();
-        assert_eq!(topics, ["zigbee2mqtt/lamp/set", "zigbee2mqtt/plug/set"]);
+        std::fs::read_to_string(format!("{dir}/{room}.lua")).ok()
+    }
+
+    fn bedroom_at(wall: &str) -> Option<Rig> {
+        let lua = real("bedroom")?;
+        let mut rig = Rig::at(
+            json!({ "bedroom": {
+                "group": "bedroom",
+                "bulbs": { "bulb_1": { "device": "b1" }, "bulb_2": { "device": "b2" } },
+                "lua": lua,
+            } }),
+            wall,
+        );
+        rig.report_all(&["b1", "b2"], json!({ "state": "OFF" }));
+        Some(rig)
     }
 
     #[test]
-    fn plug_commands_carry_only_state() {
-        let cmd = Command {
-            target: Target {
-                on: true,
-                brightness: 254,
-                color_temp: Some(300),
-            },
-            transition: Duration::from_millis(400),
+    fn bedroom_day_floor_rises_while_there_and_resets_after_leaving() {
+        // After sunset, so the sun alone would keep it at the minimum.
+        let Some(mut rig) = bedroom_at("2026-01-10T17:00:00+01:00") else {
+            return;
         };
-        assert_eq!(
-            set("plug", cmd, false).payload,
-            json!({ "state": "ON", "transition": 0.4 })
-        );
+        let bri = |outs: &[Out]| {
+            sets(outs)
+                .last()
+                .map(|s| s.1["brightness"].as_u64().unwrap())
+        };
+        let first = bri(&rig.presence("bedroom_presence", true)).unwrap();
+        rig.mins(120);
+        let later = rig.house.rooms[0].room.bulbs[0]
+            .bulb
+            .showing()
+            .unwrap()
+            .brightness;
+        assert!(u64::from(later) > first + 30, "{first} -> {later}");
+
+        rig.presence("bedroom_presence", false);
+        rig.mins(31);
+        assert_eq!(rig.state(0), "off");
+        let back = bri(&rig.presence("bedroom_presence", true)).unwrap();
+        assert!(back < first + 10, "{first} vs {back}");
     }
 
     #[test]
-    fn garbage_is_ignored_not_fatal() {
-        let mut rig = quiet_hallway();
-        for (topic, payload) in [
-            ("zigbee2mqtt/hallway_a", json!({ "linkquality": 80 })),
-            (
-                "zigbee2mqtt/hallway_motion",
-                json!({ "occupancy": "maybe" }),
-            ),
-            ("zigbee2mqtt/hallway_motion", json!(42)),
-            ("lights/hallway/nope/release", json!("")),
-            ("other/topic", json!({})),
-        ] {
-            assert!(sets(&rig.send(topic, payload)).is_empty());
-        }
+    fn bedroom_button_walks_through_bedtime() {
+        let Some(mut rig) = bedroom_at("2026-01-10T21:30:00+01:00") else {
+            return;
+        };
+        rig.presence("bedroom_presence", true);
+        let press = |rig: &mut Rig, a: &str| {
+            let outs = rig.send("zigbee2mqtt/bedroom_button/action", json!(a));
+            sets(&outs).last().map(|s| s.1.clone())
+        };
+        assert_eq!(press(&mut rig, "single").unwrap()["brightness"], 25);
+        assert_eq!(rig.state(0), "bedtime");
+        assert_eq!(press(&mut rig, "single").unwrap()["state"], "OFF");
+        assert_eq!(press(&mut rig, "single").unwrap()["brightness"], 25);
+
+        // Hold: dim now, off after five minutes.
+        press(&mut rig, "hold");
+        assert_eq!(rig.state(0), "winddown");
+        rig.mins(5);
+        assert_eq!(rig.state(0), "bedtime_off");
+
+        // A trip out at night and back: still dark, still bedtime.
+        rig.presence("bedroom_presence", false);
+        rig.mins(10);
+        let outs = rig.presence("bedroom_presence", true);
+        assert!(sets(&outs).is_empty());
     }
 
     #[test]
-    fn config_errors_are_caught_at_startup() {
-        let mut ghost = hallway();
-        ghost["hallway"]["lua"] = json!("light('ghost')");
-        assert!(Rig::try_new(ghost).is_err(), "unknown bulb");
-
-        let mut twice = hallway();
-        twice["attic"] = twice["hallway"].clone();
-        assert!(Rig::try_new(twice).is_err(), "bulb in two rooms");
-
-        let mut extra = hallway();
-        extra["hallway"]["logic"] = json!({});
-        assert!(Rig::try_new(extra).is_err(), "unknown field");
-    }
-
-    fn config(rooms: Value) -> Result<Config> {
-        let cfg = json!({ "latitude": 52.52, "longitude": 13.405, "rooms": rooms });
-        Ok(serde_json::from_value(cfg)?)
-    }
-
-    /// The cupboard as it will actually be configured: on while the door is
-    /// open, off when it closes, at the sun's level.
-    fn cupboard() -> Value {
-        json!({ "cupboard": {
-            "bulbs": { "bulb": { "device": "cupboard_bulb" } },
-            "lua": r#"
-                local bulb = light("bulb")
-                local open = false
-                local function update()
-                  bulb:auto{
-                    on = open,
-                    brightness = sun.level{ min = 30 },
-                    color_temp = sun.ct{},
-                    transition = open and 0.4 or 1,
-                  }
-                end
-                on("cupboard_door", function(p)
-                  if p.contact == nil then return end
-                  open = not p.contact
-                  -- Shut means done: forget any manual change.
-                  if not open then bulb:release{ transition = 1 } end
-                  update()
-                end)
-                every(30, update)
-                update()
-            "#,
-        } })
-    }
-
-    #[test]
-    fn cupboard_is_on_while_the_door_is_open() {
-        let mut rig = Rig::new(cupboard());
-        rig.send("zigbee2mqtt/cupboard_bulb", json!({ "state": "OFF" }));
-        rig.wait(Duration::ZERO);
-
-        let outs = rig.send("zigbee2mqtt/cupboard_door", json!({ "contact": false }));
-        let on = sets_of(&outs);
-        assert_eq!(
-            (&on["state"], &on["transition"]),
-            (&json!("ON"), &json!(0.4))
-        );
-        assert!(on["color_temp"].is_number());
-
-        // Left open for an hour: still on, following the sun.
-        let outs = rig.wait(Duration::from_secs(3600));
-        assert!(sets(&outs).iter().all(|(_, p)| p["state"] == "ON"));
-
-        let outs = rig.send("zigbee2mqtt/cupboard_door", json!({ "contact": true }));
-        assert_eq!(sets_of(&outs)["state"], "OFF");
-
-        // Battery reports carry no `contact`: ignored.
-        assert!(sets(&rig.send("zigbee2mqtt/cupboard_door", json!({ "battery": 80 }))).is_empty());
-    }
-
-    #[test]
-    fn cupboard_manual_change_lasts_until_the_door_shuts() {
-        let mut rig = Rig::new(cupboard());
-        rig.send("zigbee2mqtt/cupboard_bulb", json!({ "state": "OFF" }));
-        rig.wait(Duration::ZERO);
-        rig.send("zigbee2mqtt/cupboard_door", json!({ "contact": false }));
-        rig.wait(Duration::from_secs(5));
-
-        let outs = rig.send(
-            "zigbee2mqtt/cupboard_bulb",
-            json!({ "state": "ON", "brightness": 20 }),
-        );
-        assert_eq!(
-            state(&outs, "lights/cupboard/bulb/state").unwrap()["mode"],
-            "held"
-        );
+    fn bedroom_quiet_hours_and_wake_ramp() {
+        let Some(mut rig) = bedroom_at("2026-01-10T23:00:00+01:00") else {
+            return;
+        };
+        // Arriving at night switches nothing on.
+        assert!(sets(&rig.presence("bedroom_presence", true)).is_empty());
+        rig.presence("bedroom_presence", false);
+        // 06:30: the ramp starts, from any state, even with nobody seen.
+        rig.mins(7 * 60 + 29);
+        assert_eq!(rig.state(0), "off");
+        rig.mins(2);
+        assert_eq!(rig.state(0), "wake");
+        let early = rig.house.rooms[0].room.bulbs[0].bulb.showing().unwrap();
+        rig.mins(40);
+        let late = rig.house.rooms[0].room.bulbs[0].bulb.showing().unwrap();
         assert!(
-            sets(&rig.wait(Duration::from_secs(60))).is_empty(),
-            "held at 20"
+            early.on && late.brightness > early.brightness,
+            "{early:?} {late:?}"
         );
-
-        let outs = rig.send("zigbee2mqtt/cupboard_door", json!({ "contact": true }));
-        assert_eq!(sets_of(&outs)["state"], "OFF");
-        assert_eq!(
-            state(&outs, "lights/cupboard/bulb/state").unwrap()["mode"],
-            "auto"
-        );
+        assert_eq!(rig.state(0), "wake");
+        // Over, and nobody seen for hours: off.
+        rig.mins(10);
+        assert_eq!(rig.state(0), "off");
     }
 
     #[test]
-    fn startup_asks_every_bulb_for_its_state() {
-        let rig = Rig::new(hallway());
-        let topics: Vec<_> = rig.house.startup().into_iter().map(|o| o.topic).collect();
-        assert_eq!(
-            topics,
-            ["zigbee2mqtt/hallway_a/get", "zigbee2mqtt/hallway_b/get"]
+    fn bathroom_door_and_sensor() {
+        let Some(lua) = real("bathroom") else {
+            return;
+        };
+        let mut rig = Rig::new(json!({ "bathroom": {
+            "bulbs": { "light": { "device": "l" } },
+            "lua": lua,
+        } }));
+        rig.report_all(&["l"], json!({ "state": "OFF" }));
+        let door = |rig: &mut Rig, open: bool| rig.send("zigbee2mqtt/bathroom_door", json!({ "contact": !open }));
+
+        // Door opened, nobody ever seen: on, then off after a minute.
+        assert_eq!(sets(&door(&mut rig, true))[0].1["state"], "ON");
+        rig.wait(Duration::from_secs(59));
+        assert_eq!(rig.state(0), "auto");
+        rig.wait(Duration::from_secs(1));
+        assert_eq!(rig.state(0), "off");
+
+        // In with the door shut behind them: stays on while seen, off 30s
+        // after.
+        door(&mut rig, true);
+        rig.presence("bathroom_presence", true);
+        door(&mut rig, false);
+        rig.mins(10);
+        assert_eq!(rig.state(0), "auto");
+        rig.presence("bathroom_presence", false);
+        rig.wait(Duration::from_secs(30));
+        assert_eq!(rig.state(0), "off");
+
+        // Out, door shut, nobody seen: off 3s later.
+        rig.presence("bathroom_presence", true);
+        rig.mins(2);
+        rig.presence("bathroom_presence", false);
+        door(&mut rig, true);
+        door(&mut rig, false);
+        assert_eq!(rig.state(0), "closing");
+        rig.wait(Duration::from_secs(3));
+        assert_eq!(rig.state(0), "off");
+
+        // Shut in, seen within the grace: stays on.
+        door(&mut rig, true);
+        door(&mut rig, false);
+        rig.wait(Duration::from_secs(1));
+        rig.presence("bathroom_presence", true);
+        assert_eq!(rig.state(0), "auto");
+    }
+
+    #[test]
+    fn living_room_plugs_follow_daylight_and_buttons_toggle() {
+        let Some(lua) = real("living-room") else {
+            return;
+        };
+        let mut rig = Rig::at(
+            json!({ "living-room": {
+                "group": "living_room",
+                "bulbs": {
+                    "light": { "device": "ceiling" }, "bulb_1": { "device": "b1" }, "bulb_2": { "device": "b2" },
+                    "carla_desk_lamp": { "device": "lamp1", "dimmable": false },
+                    "standing_lamp": { "device": "lamp2", "dimmable": false },
+                },
+                "lua": lua,
+            } }),
+            "2026-01-10T12:00:00+01:00",
         );
+        // The knobs as HA has them: lamps on in the dark.
+        for d in ["lamp1", "lamp2"] {
+            rig.send(&format!("mqtt-auto/sun-follow/{d}/invert"), json!(true));
+        }
+        rig.report_all(&["ceiling", "b1", "b2", "lamp1", "lamp2"], json!({ "state": "OFF" }));
+        let on = |rig: &Rig, name: &str| {
+            let l = rig.house.rooms[0].room.bulbs.iter().find(|l| l.name == name).unwrap();
+            l.bulb.showing().unwrap().on
+        };
+
+        // Midday, nobody here: everything off. Evening: the lamps come on
+        // by themselves.
+        assert!(!on(&rig, "carla_desk_lamp") && !on(&rig, "standing_lamp"));
+        rig.mins(6 * 60);
+        assert_eq!(rig.state(0), "off");
+        assert!(on(&rig, "carla_desk_lamp") && on(&rig, "standing_lamp"));
+        assert!(!on(&rig, "light"));
+
+        // Someone in: the room lights up. Single toggles the ceiling only.
+        rig.presence("livingroom_presence", true);
+        assert!(on(&rig, "light") && on(&rig, "bulb_1"));
+        rig.send("zigbee2mqtt/livingroom_button/action", json!("single"));
+        assert!(!on(&rig, "light") && on(&rig, "bulb_1"));
+        // Double: something is on, so everything goes off, lamps too.
+        rig.send("zigbee2mqtt/livingroom_button/action", json!("double"));
+        let all = ["light", "bulb_1", "bulb_2", "carla_desk_lamp", "standing_lamp"];
+        assert!(all.iter().all(|b| !on(&rig, b)));
+    }
+
+    #[test]
+    fn every_real_room_loads() {
+        for room in [
+            "bathroom",
+            "bedroom",
+            "cupboard",
+            "hallway",
+            "kitchen",
+            "living-room",
+        ] {
+            let Some(lua) = real(room) else {
+                return;
+            };
+            let cfg = json!({ "latitude": 52.52, "longitude": 13.405, "rooms": { room: {
+                "bulbs": {
+                    "light": { "device": "x1" }, "bulb_1": { "device": "x2" }, "bulb_2": { "device": "x3" },
+                    "bulb": { "device": "x4" }, "a": { "device": "x5" },
+                    "carla_desk_lamp": { "device": "x6", "dimmable": false },
+                    "standing_lamp": { "device": "x7", "dimmable": false },
+                },
+                "lua": lua,
+            } } });
+            let wall = DateTime::parse_from_rfc3339(NOON).unwrap();
+            if let Err(e) = House::new(serde_json::from_value(cfg).unwrap(), Instant::now(), wall) {
+                panic!("{room}: {e:#}");
+            }
+        }
     }
 }

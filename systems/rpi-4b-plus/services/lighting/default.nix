@@ -1,13 +1,14 @@
 # Rooms for services.lighting (modules/lighting.nix): each room's bulbs come
-# from the device registry, and its behaviour from `<room>.lua` next to this
-# file. Helpers available to every script: pkgs/mqtt-automations/src/prelude.lua.
+# from the device registry, and its behaviour -- a state machine -- from
+# `<room>.lua` next to this file. The format and helpers:
+# pkgs/mqtt-automations/src/prelude.lua.
 {
   lib,
   self,
   ...
 }:
 let
-  inherit (import ../../devices.nix) lit kinds zigbeeGroups;
+  inherit (import ../../devices.nix) lit kinds zigbeeGroups rooms;
 
   groupOf =
     roomKey: lib.findFirst (g: zigbeeGroups.${g}.room == roomKey) null (builtins.attrNames zigbeeGroups);
@@ -18,6 +19,7 @@ let
       dimmable = d.kind == kinds.light;
     }) lit.${roomKey};
     group = groupOf roomKey;
+    inherit (rooms.${roomKey}) label;
     lua = builtins.readFile ./${roomKey}.lua;
   };
 in

@@ -1,139 +1,191 @@
-//! Room logic written in Lua: one sandboxed Lua state per room, driven by
-//! the same events as the built-in logic and answering with the same
-//! per-bulb arbiter inputs, so ownership, fades and group commands stay in
-//! Rust and a script can't fight the user or flicker a bulb.
+//! A room's Lua file, evaluated once into a [`Spec`]: its states, how each
+//! light looks in them, and what moves the room between them. Lua keeps
+//! only the small functions a spec may contain (look values, `test`
+//! conditions, triggers), which [`crate::room`] calls with a read-only
+//! context. The file format is documented at the top of `prelude.lua`.
 //!
-//! API (all durations in seconds, brightness 1-254, colour temperature in
-//! mireds):
-//!   - `on(device, fn(payload))`: z2m messages from `zigbee2mqtt/<device>`.
-//!     `on_topic(topic, fn(payload))` for any other topic. Top level only:
-//!     subscriptions are fixed once the script has loaded.
-//!   - `after(s, fn)` / `every(s, fn)` -> id, `cancel(id)`.
-//!   - `light(name)`: one of the room's bulbs, with
-//!     `:auto{ on, brightness, color_temp, scale, transition }` (what the
-//!     automation wants; the bulb follows unless a person took over),
-//!     `:user{ ... }` (a person's choice: applied and held),
-//!     `:release{ transition }` (hand back to the automation) and
-//!     `:state()` -> `{ mode = "auto"|"held"|"unknown", on, brightness,
-//!     color_temp }` or nil before the bulb has reported.
-//!     `lights` lists the room's bulb names.
+//! Globals besides the prelude's (durations in seconds, brightness 1-254,
+//! colour temperature in mireds):
+//!   - `lights`: `{ <name> = { device, dimmable } }`, the room's bulbs.
+//!   - `setting(topic, default)` -> a getter for a retained value HA sets,
+//!     parsed as the default's type. Top level only.
 //!   - `sun.level{ min, max, gamma, invert }` -> brightness for now,
 //!     `sun.ct{ warm, cool }` -> mireds, `sun.daylight()` -> 0..1.
 //!   - `clock()` -> local time of day in hours (13.5 = 13:30).
-//!   - `room`: this room's name. `publish(name, value)`: retain `value`
-//!     (string, number or boolean, sent bare) on `lights/<room>/<name>`,
-//!     for HA to show; `name` is lowercase letters, digits, `_` and `-`.
-//!     `publish_house(name, value)`: the same on `lights/<name>`.
 //!   - `log(...)`.
 //!
-//! A runtime error in a handler is logged and that handler's requests are
-//! dropped; the room keeps running. Errors while loading fail startup.
+//! Errors while loading (including any spec function failing on a first
+//! dry run) fail startup and `lights --check`; at runtime they are logged
+//! and that light or condition is skipped.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Context as _, Result};
 use chrono::{DateTime, FixedOffset, Timelike};
-use mlua::serde::SerializeOptions;
 use mlua::{
-    Function, HookTriggers, Lua, LuaOptions, LuaSerdeExt, StdLib, Table, UserData, UserDataMethods,
-    Value, Variadic, VmState,
+    Function, HookTriggers, Lua, LuaOptions, LuaSerdeExt, RegistryKey, StdLib, Table, Value,
+    Variadic, VmState,
 };
+use serde::Serialize;
 
-use crate::arbiter::{Input, Target};
+use crate::arbiter::Target;
 use crate::{curves, sun};
 
-/// One handler or timer may run this long before it is stopped.
+/// One spec function may run this long before it is stopped.
 const CALL_BUDGET: Duration = Duration::from_millis(200);
 const MEMORY_LIMIT: usize = 32 << 20;
-/// Timers firing timers (`after(0, ...)` chains) per tick.
-const MAX_TIMER_ROUNDS: usize = 100;
-const MIN_EVERY: Duration = Duration::from_secs(1);
 
-const HANDLERS: &str = "handlers";
-const TIMERS: &str = "timers";
+const SETTINGS: &str = "settings";
+const ROOM: &str = "room";
 
-/// The arbiter's view of a bulb.
-#[derive(Clone, Copy, Debug)]
-struct Shown {
-    held: bool,
-    state: Target,
+/// Helpers loaded ahead of every room file (`room`, `sunlight`, ...).
+const PRELUDE: &str = include_str!("prelude.lua");
+
+const LOOK_KEYS: [&str; 4] = ["on", "brightness", "color_temp", "transition"];
+const ROW_KEYS: [&str; 7] = [
+    "to",
+    "toggle",
+    "present",
+    "absent_for",
+    "time_in_state",
+    "between",
+    "outside",
+];
+/// Rows may also carry `test`; listed apart so ROW_KEYS stays the data part.
+const ROW_TEST: &str = "test";
+const ROOM_KEYS: [&str; 8] = [
+    "presence",
+    "doors",
+    "buttons",
+    "triggers",
+    "default",
+    "start",
+    "forget_after",
+    "states",
+];
+
+/// A Lua function or table kept alive in the registry.
+pub struct Func(RegistryKey);
+
+/// A room, as its file declares it.
+pub struct Spec {
+    /// z2m devices reporting `occupancy` or `presence`.
+    pub presence: Vec<String>,
+    /// (name, z2m contact device): events `<name>.open` / `<name>.closed`.
+    pub doors: Vec<(String, String)>,
+    /// (name, z2m device): events `<name>.<action>`.
+    pub buttons: Vec<(String, String)>,
+    /// (name, predicate): event `<name>` when the predicate turns true.
+    pub triggers: Vec<(String, Func)>,
+    pub default: usize,
+    pub start: usize,
+    pub forget_after: Duration,
+    /// Sorted by name; indices are state ids.
+    pub states: Vec<State>,
 }
 
-struct Bulb {
-    device: String,
-    shown: Option<Shown>,
+pub struct State {
+    pub name: String,
+    /// A phase, not a mode: not offered in HA, never remembered.
+    pub hidden: bool,
+    look: Option<Func>,
+    per_light: Option<Func>,
+    /// Event -> rows; the first whose condition holds is taken.
+    pub on: BTreeMap<String, Vec<Row>>,
+    /// Checked after every event and tick; the first that holds is taken.
+    pub when: Vec<Row>,
 }
 
-struct Timer {
-    at: Instant,
-    every: Option<Duration>,
+pub struct Row {
+    pub go: Go,
+    pub cond: Cond,
 }
 
-/// Everything the API functions share, kept as Lua app data.
-struct State {
-    room: String,
+pub enum Go {
+    State(usize),
+    /// The mode the room left last, within `forget_after`; else `default`.
+    Resume,
+    /// A person's toggle of these bulbs (indices): any on -> all off, else
+    /// all on as the state looks.
+    Toggle(Vec<usize>),
+}
+
+/// All set fields must hold.
+#[derive(Default)]
+pub struct Cond {
+    pub present: Option<bool>,
+    pub absent_for: Option<Duration>,
+    pub time_in_state: Option<Duration>,
+    /// Hours `[from, to)`, wrapping past midnight.
+    pub between: Option<(f64, f64)>,
+    pub outside: Option<(f64, f64)>,
+    pub test: Option<Func>,
+}
+
+/// One light's look in a state. `transition` applies on entering it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Look {
+    pub target: Target,
+    pub transition: Option<Duration>,
+}
+
+/// What spec functions see, as their one argument `c`.
+#[derive(Serialize)]
+pub struct Ctx<'a> {
+    pub light: Option<&'a str>,
+    pub state: &'a str,
+    pub present: bool,
+    pub present_for: f64,
+    pub absent_for: f64,
+    pub time_in_state: f64,
+    pub clock: f64,
+}
+
+#[derive(Clone, Copy)]
+enum Kind {
+    Number,
+    Bool,
+    Text,
+}
+
+struct Env {
     latitude: f64,
     longitude: f64,
-    now: Instant,
     wall: DateTime<FixedOffset>,
-    lights: BTreeMap<String, Bulb>,
-    requests: Vec<(String, Input)>,
-    /// `publish()` calls not yet collected: (full topic, value).
-    published: Vec<(String, serde_json::Value)>,
-    timers: BTreeMap<u64, Timer>,
-    next_timer: u64,
-    topics: BTreeSet<String>,
+    settings: BTreeMap<String, Kind>,
     loaded: bool,
 }
 
 /// Real-time cutoff for the running call, checked by the instruction hook.
 struct CallDeadline(std::time::Instant);
 
-/// Helpers loaded ahead of every room script (`follow`, `occupancy`, ...).
-const PRELUDE: &str = include_str!("prelude.lua");
-
 pub struct Script {
     lua: Lua,
+    room: String,
 }
 
 impl Script {
-    /// `lights`: the room's bulbs as (name, z2m device).
-    pub fn new(
+    /// `lights`: the room's bulbs as (name, z2m device, dimmable), in the
+    /// order the room indexes them.
+    pub fn load(
         room: &str,
         source: &str,
-        lights: impl IntoIterator<Item = (String, String)>,
+        lights: &[(String, String, bool)],
         (latitude, longitude): (f64, f64),
-        now: Instant,
         wall: DateTime<FixedOffset>,
-    ) -> Result<Self> {
+    ) -> Result<(Self, Spec)> {
         let lua = Lua::new_with(
             StdLib::STRING | StdLib::TABLE | StdLib::MATH | StdLib::UTF8,
             LuaOptions::default(),
         )
         .map_err(lua_err)?;
         lua.set_memory_limit(MEMORY_LIMIT).map_err(lua_err)?;
-        lua.set_app_data(State {
-            room: room.to_owned(),
+        lua.set_app_data(Env {
             latitude,
             longitude,
-            now,
             wall,
-            lights: lights
-                .into_iter()
-                .map(|(name, device)| {
-                    let bulb = Bulb {
-                        device,
-                        shown: None,
-                    };
-                    (name, bulb)
-                })
-                .collect(),
-            requests: Vec::new(),
-            published: Vec::new(),
-            timers: BTreeMap::new(),
-            next_timer: 1,
-            topics: BTreeSet::new(),
+            settings: BTreeMap::new(),
             loaded: false,
         });
         let triggers = HookTriggers::new().every_nth_instruction(10_000);
@@ -146,9 +198,12 @@ impl Script {
             }
         })
         .map_err(lua_err)?;
-        install(&lua).map_err(lua_err)?;
+        install(&lua, lights).map_err(lua_err)?;
 
-        let script = Self { lua };
+        let script = Self {
+            lua,
+            room: room.to_owned(),
+        };
         script.budget();
         script
             .lua
@@ -163,116 +218,397 @@ impl Script {
             .set_name(format!("@{room}.lua"))
             .exec()
             .map_err(|e| anyhow!("room {room}: {e}"))?;
-        script.state().loaded = true;
-        Ok(script)
+        script.env().loaded = true;
+
+        let names: Vec<&str> = lights.iter().map(|(n, _, _)| n.as_str()).collect();
+        let spec = script
+            .parse(&names)
+            .with_context(|| format!("room {room}"))?;
+        script
+            .dry_run(&spec, &names)
+            .with_context(|| format!("room {room}"))?;
+        Ok((script, spec))
     }
 
-    /// Topics the script listens to.
+    /// Topics of the settings the file reads.
     pub fn topics(&self) -> Vec<String> {
-        self.state().topics.iter().cloned().collect()
+        self.env().settings.keys().cloned().collect()
     }
 
-    pub fn deadline(&self) -> Option<Instant> {
-        self.state().timers.values().map(|t| t.at).min()
-    }
-
-    pub fn message(
-        &mut self,
-        topic: &str,
-        payload: &serde_json::Value,
-        now: Instant,
-        wall: DateTime<FixedOffset>,
-    ) -> Vec<(String, Input)> {
-        self.set_clock(now, wall);
-        let handlers = self
-            .lua
-            .named_registry_value::<Table>(HANDLERS)
-            .and_then(|h| h.get::<Option<Table>>(topic));
-        if let Ok(Some(list)) = handlers {
-            let payload = self.lua.to_value_with(payload, serialize_options());
-            match payload {
-                Ok(payload) => {
-                    for f in list.sequence_values::<Function>().flatten() {
-                        self.call(&f, payload.clone());
-                    }
-                }
-                Err(e) => self.log(&format!("{topic}: {e}")),
-            }
-        }
-        self.take()
-    }
-
-    pub fn bulb(&mut self, light: &str, held: bool, state: Target) -> Vec<(String, Input)> {
-        if let Some(slot) = self.state().lights.get_mut(light) {
-            slot.shown = Some(Shown { held, state });
-        }
-        self.take()
-    }
-
-    /// Run due timers, plus anything the script did while loading.
-    pub fn tick(&mut self, now: Instant, wall: DateTime<FixedOffset>) -> Vec<(String, Input)> {
-        self.set_clock(now, wall);
-        for _ in 0..MAX_TIMER_ROUNDS {
-            let due = {
-                let state = self.state();
-                let mut due: Vec<_> = state.timers.iter().filter(|(_, t)| t.at <= now).collect();
-                due.sort_by_key(|(id, t)| (t.at, **id));
-                due.into_iter().map(|(id, _)| *id).collect::<Vec<_>>()
-            };
-            if due.is_empty() {
-                return self.take();
-            }
-            for id in due {
-                let Ok(Some(f)) = self
-                    .lua
-                    .named_registry_value::<Table>(TIMERS)
-                    .and_then(|t| t.get::<Option<Function>>(id))
-                else {
-                    continue;
-                };
-                {
-                    let mut state = self.state();
-                    match state.timers.get_mut(&id) {
-                        Some(Timer { at, every: Some(d) }) => *at = now + *d,
-                        Some(_) => {
-                            state.timers.remove(&id);
-                        }
-                        // Cancelled by an earlier timer this round.
-                        None => continue,
-                    }
-                }
-                if !self.state().timers.contains_key(&id) {
-                    let _ = self
-                        .lua
-                        .named_registry_value::<Table>(TIMERS)
-                        .and_then(|t| t.set(id, Value::Nil));
-                }
-                self.call(&f, Value::Nil);
-            }
-        }
-        self.log("timers keep firing immediately, deferring the rest");
-        self.take()
-    }
-
-    fn call(&self, f: &Function, arg: Value) {
-        let marks = {
-            let s = self.state();
-            (s.requests.len(), s.published.len())
+    /// A message on a setting's topic. Payloads that don't parse as the
+    /// setting's type are ignored.
+    pub fn setting(&self, topic: &str, payload: &serde_json::Value) {
+        let Some(kind) = self.env().settings.get(topic).copied() else {
+            return;
         };
-        self.budget();
-        if let Err(e) = f.call::<()>(arg) {
-            // A half-run handler would leave the room half-applied.
-            let mut s = self.state();
-            s.requests.truncate(marks.0);
-            s.published.truncate(marks.1);
-            drop(s);
-            self.log(&e.to_string());
+        let text = payload.as_str();
+        let value = match kind {
+            Kind::Number => payload
+                .as_f64()
+                .or_else(|| text.and_then(|s| s.trim().parse().ok()))
+                .map(Value::Number),
+            Kind::Bool => match (payload.as_bool(), text) {
+                (Some(b), _) => Some(b),
+                (_, Some("true" | "on" | "ON")) => Some(true),
+                (_, Some("false" | "off" | "OFF")) => Some(false),
+                _ => None,
+            }
+            .map(Value::Boolean),
+            Kind::Text => text.and_then(|s| self.lua.create_string(s).ok().map(Value::String)),
+        };
+        let Some(value) = value else {
+            self.log(&format!("{topic}: ignoring {payload}"));
+            return;
+        };
+        if let Err(e) = self
+            .lua
+            .named_registry_value::<Table>(SETTINGS)
+            .and_then(|t| t.set(topic, value))
+        {
+            self.log(&format!("{topic}: {e}"));
         }
     }
 
-    /// Values the script published since the last call, as (topic, value).
-    pub fn take_published(&mut self) -> Vec<(String, serde_json::Value)> {
-        std::mem::take(&mut self.state().published)
+    pub fn set_clock(&self, wall: DateTime<FixedOffset>) {
+        self.env().wall = wall;
+    }
+
+    /// `light`'s look in `state`, or `None` if the state leaves it alone.
+    pub fn look(&self, state: &State, light: &str, ctx: &Ctx) -> Result<Option<Look>> {
+        let look: Option<Table> = state.look.as_ref().map(|f| self.get(f)).transpose()?;
+        let own: Option<Table> = match &state.per_light {
+            Some(f) => self.get::<Table>(f)?.get(light).map_err(lua_err)?,
+            None => None,
+        };
+        if look.is_none() && own.is_none() {
+            return Ok(None);
+        }
+        let ctx = self.ctx(ctx)?;
+        let field = |key: &str| -> Result<Value> {
+            for t in [&own, &look].into_iter().flatten() {
+                let v: Value = t.get(key).map_err(lua_err)?;
+                if !v.is_nil() {
+                    return self.value(v, &ctx).with_context(|| format!("look.{key}"));
+                }
+            }
+            Ok(Value::Nil)
+        };
+        let number = |key: &str, lo: f64, hi: f64| -> Result<Option<f64>> {
+            match field(key)? {
+                Value::Nil => Ok(None),
+                Value::Integer(i) => Ok(Some((i as f64).clamp(lo, hi))),
+                Value::Number(n) if n.is_finite() => Ok(Some(n.clamp(lo, hi))),
+                v => bail!("{key} must be a number, got {}", v.type_name()),
+            }
+        };
+        let on = match field("on")? {
+            Value::Nil => true,
+            Value::Boolean(b) => b,
+            v => bail!("on must be a boolean, got {}", v.type_name()),
+        };
+        let brightness =
+            number("brightness", 1.0, 254.0)?.map_or(Target::FULL, |b| b.round() as u8);
+        let color_temp = number("color_temp", 100.0, 1000.0)?.map(|c| c.round() as u16);
+        let transition = number("transition", 0.0, 3600.0)?.map(Duration::from_secs_f64);
+        Ok(Some(Look {
+            target: Target {
+                on,
+                brightness,
+                color_temp,
+            },
+            transition,
+        }))
+    }
+
+    /// Run a `test` or trigger predicate.
+    pub fn test(&self, f: &Func, ctx: &Ctx) -> Result<bool> {
+        let f: Function = self.get(f)?;
+        let ctx = self.ctx(ctx)?;
+        self.budget();
+        let v: Value = f.call(ctx).map_err(lua_err)?;
+        Ok(!matches!(v, Value::Nil | Value::Boolean(false)))
+    }
+
+    fn value(&self, v: Value, ctx: &Table) -> Result<Value> {
+        match v {
+            Value::Function(f) => {
+                self.budget();
+                f.call(ctx.clone()).map_err(lua_err)
+            }
+            v => Ok(v),
+        }
+    }
+
+    fn ctx(&self, ctx: &Ctx) -> Result<Table> {
+        match self.lua.to_value(ctx).map_err(lua_err)? {
+            Value::Table(t) => Ok(t),
+            _ => bail!("context is not a table"),
+        }
+    }
+
+    fn get<T: mlua::FromLua>(&self, f: &Func) -> Result<T> {
+        self.lua.registry_value(&f.0).map_err(lua_err)
+    }
+
+    fn keep(&self, v: impl mlua::IntoLua) -> Result<Func> {
+        Ok(Func(self.lua.create_registry_value(v).map_err(lua_err)?))
+    }
+
+    fn parse(&self, lights: &[&str]) -> Result<Spec> {
+        let t: Table = self
+            .lua
+            .named_registry_value(ROOM)
+            .map_err(|_| anyhow!("the file never calls room{{}}"))?;
+        check_keys(&t, &ROOM_KEYS, "room{}")?;
+
+        let presence: Vec<String> = list(&t, "presence")?;
+        let doors = named(&t, "doors")?;
+        let buttons = named(&t, "buttons")?;
+        let mut triggers = Vec::new();
+        if let Some(tt) = t.get::<Option<Table>>("triggers").map_err(lua_err)? {
+            for pair in tt.pairs::<String, Function>() {
+                let (name, f) = pair.map_err(|e| anyhow!("triggers: {e}"))?;
+                triggers.push((name, self.keep(f)?));
+            }
+        }
+        triggers.sort_by(|a, b| a.0.cmp(&b.0));
+
+        let states_t: Table = t
+            .get::<Option<Table>>("states")
+            .map_err(lua_err)?
+            .ok_or_else(|| anyhow!("room{{}} has no states"))?;
+        let mut names: Vec<String> = states_t
+            .pairs::<String, Value>()
+            .map(|p| p.map(|(k, _)| k).map_err(lua_err))
+            .collect::<Result<_>>()?;
+        names.sort();
+        let index = |name: &str| -> Result<usize> {
+            names
+                .iter()
+                .position(|n| n == name)
+                .ok_or_else(|| anyhow!("no state {name:?}"))
+        };
+
+        let mut events: BTreeSet<String> = BTreeSet::new();
+        if !presence.is_empty() {
+            events.extend(["present".into(), "absent".into()]);
+        }
+        for (d, _) in &doors {
+            events.extend([format!("{d}.open"), format!("{d}.closed")]);
+        }
+        events.extend(triggers.iter().map(|(n, _)| n.clone()));
+        let known_event = |e: &str| {
+            events.contains(e)
+                || buttons.iter().any(|(b, _)| {
+                    e.strip_prefix(b.as_str())
+                        .is_some_and(|a| a.len() > 1 && a.starts_with('.'))
+                })
+        };
+
+        let mut states = Vec::new();
+        for name in &names {
+            let s: Table = states_t.get(name.as_str()).map_err(lua_err)?;
+            let state = self
+                .state(name, &s, &index, lights, &known_event)
+                .with_context(|| format!("state {name}"))?;
+            states.push(state);
+        }
+
+        let default_name: String = t
+            .get::<Option<String>>("default")
+            .map_err(lua_err)?
+            .ok_or_else(|| anyhow!("room{{}} needs a default state"))?;
+        let default = index(&default_name)?;
+        let start = match t.get::<Option<String>>("start").map_err(lua_err)? {
+            Some(s) => index(&s)?,
+            None => default,
+        };
+        if states[default].hidden {
+            bail!("the default state {default_name:?} is hidden");
+        }
+        let forget_after = secs(t.get("forget_after").map_err(lua_err)?, "forget_after")?
+            .unwrap_or(Duration::from_secs(3600));
+        Ok(Spec {
+            presence,
+            doors,
+            buttons,
+            triggers,
+            default,
+            start,
+            forget_after,
+            states,
+        })
+    }
+
+    fn state(
+        &self,
+        name: &str,
+        s: &Table,
+        index: &dyn Fn(&str) -> Result<usize>,
+        lights: &[&str],
+        known_event: &dyn Fn(&str) -> bool,
+    ) -> Result<State> {
+        let look: Option<Table> = s.get("look").map_err(lua_err)?;
+        if let Some(l) = &look {
+            check_keys(l, &LOOK_KEYS, "look")?;
+        }
+        let per_light: Option<Table> = s.get("per_light").map_err(lua_err)?;
+        if let Some(p) = &per_light {
+            for pair in p.pairs::<String, Table>() {
+                let (light, l) = pair.map_err(|e| anyhow!("per_light: {e}"))?;
+                if !lights.contains(&light.as_str()) {
+                    bail!("per_light: no light {light:?} in this room");
+                }
+                check_keys(&l, &LOOK_KEYS, &format!("per_light.{light}"))?;
+            }
+        }
+        let mut on = BTreeMap::new();
+        if let Some(t) = s.get::<Option<Table>>("on").map_err(lua_err)? {
+            for pair in t.pairs::<String, Value>() {
+                let (event, v) = pair.map_err(|e| anyhow!("on: {e}"))?;
+                if !known_event(&event) {
+                    bail!("on: no event {event:?} (declare its sensor, door, button or trigger)");
+                }
+                let rows = self
+                    .rows(v, index, lights)
+                    .with_context(|| format!("on[{event:?}]"))?;
+                on.insert(event, rows);
+            }
+        }
+        let when = match s.get::<Value>("when").map_err(lua_err)? {
+            Value::Nil => Vec::new(),
+            v => self.rows(v, index, lights).context("when")?,
+        };
+        Ok(State {
+            name: name.to_owned(),
+            hidden: s
+                .get::<Option<bool>>("hidden")
+                .map_err(lua_err)?
+                .unwrap_or(false),
+            look: look.map(|t| self.keep(t)).transpose()?,
+            per_light: per_light.map(|t| self.keep(t)).transpose()?,
+            on,
+            when,
+        })
+    }
+
+    /// A state name, one row table, or a list of rows.
+    fn rows(
+        &self,
+        v: Value,
+        index: &dyn Fn(&str) -> Result<usize>,
+        lights: &[&str],
+    ) -> Result<Vec<Row>> {
+        match v {
+            Value::String(s) => Ok(vec![Row {
+                go: go(&s.to_str().map_err(lua_err)?, index)?,
+                cond: Cond::default(),
+            }]),
+            Value::Table(t)
+                if t.contains_key("to").map_err(lua_err)?
+                    || t.contains_key("toggle").map_err(lua_err)? =>
+            {
+                Ok(vec![self.row(&t, index, lights)?])
+            }
+            Value::Table(t) => t
+                .sequence_values::<Table>()
+                .enumerate()
+                .map(|(i, r)| {
+                    self.row(&r.map_err(lua_err)?, index, lights)
+                        .with_context(|| format!("row {}", i + 1))
+                })
+                .collect(),
+            v => bail!("expected a state name or rows, got {}", v.type_name()),
+        }
+    }
+
+    fn row(
+        &self,
+        t: &Table,
+        index: &dyn Fn(&str) -> Result<usize>,
+        lights: &[&str],
+    ) -> Result<Row> {
+        let mut allowed = ROW_KEYS.to_vec();
+        allowed.push(ROW_TEST);
+        check_keys(t, &allowed, "row")?;
+        let to: Option<String> = t.get("to").map_err(lua_err)?;
+        let toggle: Option<Vec<String>> = t.get("toggle").map_err(lua_err)?;
+        let go = match (to, toggle) {
+            (Some(to), None) => go(&to, index)?,
+            (None, Some(names)) => Go::Toggle(
+                names
+                    .iter()
+                    .map(|n| {
+                        lights
+                            .iter()
+                            .position(|l| l == n)
+                            .ok_or_else(|| anyhow!("toggle: no light {n:?} in this room"))
+                    })
+                    .collect::<Result<_>>()?,
+            ),
+            _ => bail!("a row needs exactly one of `to` and `toggle`"),
+        };
+        let hours = |key: &str| -> Result<Option<(f64, f64)>> {
+            let v: Option<Vec<f64>> = t.get(key).map_err(lua_err)?;
+            match v.as_deref() {
+                None => Ok(None),
+                Some(&[from, to]) if (0.0..=24.0).contains(&from) && (0.0..=24.0).contains(&to) => {
+                    Ok(Some((from, to)))
+                }
+                Some(_) => bail!("{key} must be {{ from_hour, to_hour }}"),
+            }
+        };
+        let test: Option<Function> = t.get(ROW_TEST).map_err(lua_err)?;
+        Ok(Row {
+            go,
+            cond: Cond {
+                present: t.get("present").map_err(lua_err)?,
+                absent_for: secs(t.get("absent_for").map_err(lua_err)?, "absent_for")?,
+                time_in_state: secs(t.get("time_in_state").map_err(lua_err)?, "time_in_state")?,
+                between: hours("between")?,
+                outside: hours("outside")?,
+                test: test.map(|f| self.keep(f)).transpose()?,
+            },
+        })
+    }
+
+    /// Call every spec function once, so a typo fails the build, not the
+    /// first evening.
+    fn dry_run(&self, spec: &Spec, lights: &[&str]) -> Result<()> {
+        for state in &spec.states {
+            let ctx = |light| Ctx {
+                light,
+                state: &state.name,
+                present: false,
+                present_for: 0.0,
+                absent_for: 0.0,
+                time_in_state: 0.0,
+                clock: 12.0,
+            };
+            for light in lights {
+                self.look(state, light, &ctx(Some(light)))
+                    .with_context(|| format!("state {}, light {light}", state.name))?;
+            }
+            let rows = state.on.values().flatten().chain(&state.when);
+            for f in rows.filter_map(|r| r.cond.test.as_ref()) {
+                self.test(f, &ctx(None))
+                    .with_context(|| format!("state {}: test", state.name))?;
+            }
+        }
+        for (name, f) in &spec.triggers {
+            let ctx = Ctx {
+                light: None,
+                state: &spec.states[spec.start].name,
+                present: false,
+                present_for: 0.0,
+                absent_for: 0.0,
+                time_in_state: 0.0,
+                clock: 12.0,
+            };
+            self.test(f, &ctx)
+                .with_context(|| format!("trigger {name}"))?;
+        }
+        Ok(())
     }
 
     fn budget(&self) {
@@ -280,32 +616,53 @@ impl Script {
             .set_app_data(CallDeadline(std::time::Instant::now() + CALL_BUDGET));
     }
 
-    fn set_clock(&self, now: Instant, wall: DateTime<FixedOffset>) {
-        let mut state = self.state();
-        state.now = now;
-        state.wall = wall;
+    pub fn log(&self, msg: &str) {
+        eprintln!("{}: {msg}", self.room);
     }
 
-    fn take(&self) -> Vec<(String, Input)> {
-        std::mem::take(&mut self.state().requests)
-    }
-
-    fn log(&self, msg: &str) {
-        eprintln!("{}: {msg}", self.state().room);
-    }
-
-    fn state(&self) -> mlua::AppDataRefMut<'_, State> {
+    fn env(&self) -> mlua::AppDataRefMut<'_, Env> {
         self.lua
-            .app_data_mut::<State>()
-            .expect("state is installed in new")
+            .app_data_mut::<Env>()
+            .expect("env is installed in load")
     }
 }
 
-fn serialize_options() -> SerializeOptions {
-    // Absent JSON fields and `null` should both read as nil in Lua.
-    SerializeOptions::new()
-        .serialize_none_to_null(false)
-        .serialize_unit_to_null(false)
+fn go(name: &str, index: &dyn Fn(&str) -> Result<usize>) -> Result<Go> {
+    if name == "resume" {
+        Ok(Go::Resume)
+    } else {
+        Ok(Go::State(index(name)?))
+    }
+}
+
+fn check_keys(t: &Table, allowed: &[&str], what: &str) -> Result<()> {
+    for pair in t.pairs::<Value, Value>() {
+        let (key, _) = pair.map_err(lua_err)?;
+        let key = key.to_string().map_err(lua_err)?;
+        if !allowed.contains(&key.as_str()) {
+            bail!(
+                "{what}: unknown key {key:?} (expected one of {})",
+                allowed.join(", ")
+            );
+        }
+    }
+    Ok(())
+}
+
+fn list(t: &Table, key: &str) -> Result<Vec<String>> {
+    Ok(t.get::<Option<Vec<String>>>(key)
+        .map_err(|e| anyhow!("{key}: {e}"))?
+        .unwrap_or_default())
+}
+
+fn named(t: &Table, key: &str) -> Result<Vec<(String, String)>> {
+    let m: Option<BTreeMap<String, String>> = t.get(key).map_err(|e| anyhow!("{key}: {e}"))?;
+    Ok(m.unwrap_or_default().into_iter().collect())
+}
+
+fn secs(v: Option<f64>, what: &str) -> Result<Option<Duration>> {
+    v.map(|s| Duration::try_from_secs_f64(s).map_err(|_| anyhow!("{what}: bad duration {s}")))
+        .transpose()
 }
 
 /// mlua errors aren't `Send`; keep the message.
@@ -313,68 +670,64 @@ fn lua_err(e: mlua::Error) -> anyhow::Error {
     anyhow!("{e}")
 }
 
-fn state(lua: &Lua) -> mlua::Result<mlua::AppDataRefMut<'_, State>> {
-    lua.app_data_mut::<State>()
-        .ok_or_else(|| mlua::Error::runtime("room state missing"))
+fn env(lua: &Lua) -> mlua::Result<mlua::AppDataRefMut<'_, Env>> {
+    lua.app_data_mut::<Env>()
+        .ok_or_else(|| mlua::Error::runtime("room env missing"))
 }
 
-fn install(lua: &Lua) -> mlua::Result<()> {
-    lua.set_named_registry_value(HANDLERS, lua.create_table()?)?;
-    lua.set_named_registry_value(TIMERS, lua.create_table()?)?;
+fn install(lua: &Lua, lights: &[(String, String, bool)]) -> mlua::Result<()> {
+    lua.set_named_registry_value(SETTINGS, lua.create_table()?)?;
     let g = lua.globals();
 
     g.set(
-        "on",
-        lua.create_function(|lua, (device, f): (String, Function)| {
-            subscribe(lua, format!("zigbee2mqtt/{device}"), f)
-        })?,
-    )?;
-    g.set(
-        "on_topic",
-        lua.create_function(|lua, (topic, f): (String, Function)| subscribe(lua, topic, f))?,
-    )?;
-    g.set(
-        "after",
-        lua.create_function(|lua, (s, f): (f64, Function)| schedule(lua, s, f, false))?,
-    )?;
-    g.set(
-        "every",
-        lua.create_function(|lua, (s, f): (f64, Function)| schedule(lua, s, f, true))?,
-    )?;
-    g.set(
-        "cancel",
-        lua.create_function(|lua, id: u64| {
-            state(lua)?.timers.remove(&id);
-            lua.named_registry_value::<Table>(TIMERS)?
-                .set(id, Value::Nil)
-        })?,
-    )?;
-    g.set(
-        "light",
-        lua.create_function(|lua, name: String| {
-            if !state(lua)?.lights.contains_key(&name) {
-                return Err(mlua::Error::runtime(format!(
-                    "no bulb {name:?} in this room"
-                )));
+        "__room",
+        lua.create_function(|lua, t: Table| {
+            if lua.named_registry_value::<Option<Table>>(ROOM)?.is_some() {
+                return Err(mlua::Error::runtime("room{} is called more than once"));
             }
-            Ok(Light(name))
+            lua.set_named_registry_value(ROOM, t)
         })?,
     )?;
-    let names: Vec<String> = state(lua)?.lights.keys().cloned().collect();
-    g.set("lights", names)?;
-    let room = state(lua)?.room.clone();
-    g.set("room", room)?;
+
+    let ls = lua.create_table()?;
+    for (name, device, dimmable) in lights {
+        let l = lua.create_table()?;
+        l.set("device", device.as_str())?;
+        l.set("dimmable", *dimmable)?;
+        ls.set(name.as_str(), l)?;
+    }
+    g.set("lights", ls)?;
+
     g.set(
-        "publish",
-        lua.create_function(|lua, (name, value): (String, Value)| {
-            let room = state(lua)?.room.clone();
-            publish(lua, format!("lights/{room}"), name, value)
-        })?,
-    )?;
-    g.set(
-        "publish_house",
-        lua.create_function(|lua, (name, value): (String, Value)| {
-            publish(lua, "lights".into(), name, value)
+        "setting",
+        lua.create_function(|lua, (topic, default): (String, Value)| {
+            let kind = match default {
+                Value::Integer(_) | Value::Number(_) => Kind::Number,
+                Value::Boolean(_) => Kind::Bool,
+                Value::String(_) => Kind::Text,
+                _ => {
+                    return Err(mlua::Error::runtime(
+                        "setting() default must be a number, boolean or string",
+                    ))
+                }
+            };
+            {
+                let mut e = env(lua)?;
+                if e.loaded {
+                    return Err(mlua::Error::runtime(
+                        "setting() only works at the top level",
+                    ));
+                }
+                e.settings.insert(topic.clone(), kind);
+            }
+            let values: Table = lua.named_registry_value(SETTINGS)?;
+            if values.get::<Value>(topic.as_str())?.is_nil() {
+                values.set(topic.as_str(), default)?;
+            }
+            lua.create_function(move |lua, ()| {
+                lua.named_registry_value::<Table>(SETTINGS)?
+                    .get::<Value>(topic.as_str())
+            })
         })?,
     )?;
 
@@ -382,10 +735,28 @@ fn install(lua: &Lua) -> mlua::Result<()> {
     sun_table.set(
         "level",
         lua.create_function(|lua, opts: Option<Table>| {
-            let opts = Opts::new(opts, &["min", "max", "gamma", "invert"])?;
-            let (min, max) = (opts.pct("min", 1)?, opts.pct("max", 100)?);
-            let gamma = opts.number("gamma", 1.0, 0.1, 10.0)?;
-            let invert = opts.flag("invert", false)?;
+            let get = |k: &str| -> mlua::Result<Option<f64>> {
+                opts.as_ref().map_or(Ok(None), |t| t.get(k))
+            };
+            if let Some(t) = &opts {
+                for pair in t.pairs::<String, Value>() {
+                    let (k, _) = pair?;
+                    if !["min", "max", "gamma", "invert"].contains(&k.as_str()) {
+                        return Err(mlua::Error::runtime(format!(
+                            "sun.level: unknown option {k:?}"
+                        )));
+                    }
+                }
+            }
+            let pct = |k| -> mlua::Result<Option<u8>> {
+                Ok(get(k)?.map(|v| v.clamp(0.0, 100.0).round() as u8))
+            };
+            let (min, max) = (pct("min")?.unwrap_or(1), pct("max")?.unwrap_or(100));
+            let gamma = get("gamma")?.unwrap_or(1.0).clamp(0.1, 10.0);
+            let invert: bool = opts
+                .as_ref()
+                .map_or(Ok(None), |t| t.get("invert"))?
+                .unwrap_or(false);
             let raw = daylight(lua)?;
             let frac = if invert { 1.0 - raw } else { raw };
             Ok(curves::brightness_254(
@@ -398,11 +769,13 @@ fn install(lua: &Lua) -> mlua::Result<()> {
     sun_table.set(
         "ct",
         lua.create_function(|lua, opts: Option<Table>| {
-            let opts = Opts::new(opts, &["warm", "cool"])?;
-            let warm = opts.number("warm", 454.0, 100.0, 1000.0)? as u16;
-            let cool = opts.number("cool", 250.0, 100.0, 1000.0)? as u16;
-            let s = state(lua)?;
-            let progress = sun::day_progress(s.latitude, s.longitude, s.wall);
+            let get = |k: &str, d: f64| -> mlua::Result<u16> {
+                let v: Option<f64> = opts.as_ref().map_or(Ok(None), |t| t.get(k))?;
+                Ok(v.unwrap_or(d).clamp(100.0, 1000.0) as u16)
+            };
+            let (warm, cool) = (get("warm", 454.0)?, get("cool", 250.0)?);
+            let e = env(lua)?;
+            let progress = sun::day_progress(e.latitude, e.longitude, e.wall);
             Ok(curves::color_temp(progress, warm, cool))
         })?,
     )?;
@@ -412,1123 +785,185 @@ fn install(lua: &Lua) -> mlua::Result<()> {
     g.set(
         "clock",
         lua.create_function(|lua, ()| {
-            let t = state(lua)?.wall.time();
+            let t = env(lua)?.wall.time();
             Ok(f64::from(t.num_seconds_from_midnight()) / 3600.0)
         })?,
     )?;
     g.set(
         "log",
-        lua.create_function(|lua, args: Variadic<Value>| {
+        lua.create_function(|_, args: Variadic<Value>| {
             let parts: Vec<String> = args
                 .iter()
                 .map(|v| v.to_string().unwrap_or_else(|_| format!("{v:?}")))
                 .collect();
-            eprintln!("{}: {}", state(lua)?.room, parts.join(" "));
+            eprintln!("{}", parts.join(" "));
             Ok(())
         })?,
     )?;
     Ok(())
 }
 
-fn publish(lua: &Lua, prefix: String, name: String, value: Value) -> mlua::Result<()> {
-    let ok = !name.is_empty()
-        && name
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-');
-    if !ok {
-        return Err(mlua::Error::runtime(format!("bad publish name {name:?}")));
-    }
-    if !matches!(
-        value,
-        Value::String(_) | Value::Boolean(_) | Value::Integer(_) | Value::Number(_)
-    ) {
-        return Err(mlua::Error::runtime(
-            "publish() takes a string, number or boolean",
-        ));
-    }
-    let value: serde_json::Value = lua.from_value(value)?;
-    state(lua)?.published.push((format!("{prefix}/{name}"), value));
-    Ok(())
-}
-
-fn subscribe(lua: &Lua, topic: String, f: Function) -> mlua::Result<()> {
-    if state(lua)?.loaded {
-        return Err(mlua::Error::runtime(
-            "on() only works at the top level of the script",
-        ));
-    }
-    let handlers = lua.named_registry_value::<Table>(HANDLERS)?;
-    let list = match handlers.get::<Option<Table>>(topic.as_str())? {
-        Some(list) => list,
-        None => {
-            let list = lua.create_table()?;
-            handlers.set(topic.as_str(), &list)?;
-            list
-        }
-    };
-    list.push(f)?;
-    state(lua)?.topics.insert(topic);
-    Ok(())
-}
-
-fn schedule(lua: &Lua, secs: f64, f: Function, every: bool) -> mlua::Result<u64> {
-    let d = Duration::try_from_secs_f64(secs)
-        .map_err(|_| mlua::Error::runtime(format!("bad duration {secs}")))?;
-    if every && d < MIN_EVERY {
-        return Err(mlua::Error::runtime("every() needs at least 1 second"));
-    }
-    let id = {
-        let mut s = state(lua)?;
-        let id = s.next_timer;
-        s.next_timer += 1;
-        let at = s.now + d;
-        s.timers.insert(
-            id,
-            Timer {
-                at,
-                every: every.then_some(d),
-            },
-        );
-        id
-    };
-    lua.named_registry_value::<Table>(TIMERS)?.set(id, f)?;
-    Ok(id)
-}
-
 fn daylight(lua: &Lua) -> mlua::Result<f64> {
-    let s = state(lua)?;
-    Ok(sun::daylight_fraction(s.latitude, s.longitude, s.wall))
-}
-
-/// A table of named options; unknown keys are errors, so typos surface.
-struct Opts(Option<Table>);
-
-impl Opts {
-    fn new(t: Option<Table>, allowed: &[&str]) -> mlua::Result<Self> {
-        if let Some(t) = &t {
-            for pair in t.pairs::<Value, Value>() {
-                let (key, _) = pair?;
-                let key = key.to_string()?;
-                if !allowed.contains(&key.as_str()) {
-                    return Err(mlua::Error::runtime(format!(
-                        "unknown option {key:?} (expected one of {})",
-                        allowed.join(", ")
-                    )));
-                }
-            }
-        }
-        Ok(Self(t))
-    }
-
-    fn get<T: mlua::FromLua>(&self, key: &str) -> mlua::Result<Option<T>> {
-        match &self.0 {
-            Some(t) => t.get(key),
-            None => Ok(None),
-        }
-    }
-
-    fn number(&self, key: &str, default: f64, lo: f64, hi: f64) -> mlua::Result<f64> {
-        let Some(v) = self.get::<f64>(key)? else {
-            return Ok(default);
-        };
-        if !(lo..=hi).contains(&v) {
-            return Err(mlua::Error::runtime(format!(
-                "{key} = {v} is outside {lo}..{hi}"
-            )));
-        }
-        Ok(v)
-    }
-
-    fn pct(&self, key: &str, default: u8) -> mlua::Result<u8> {
-        Ok(self.number(key, default.into(), 0.0, 100.0)?.round() as u8)
-    }
-
-    fn flag(&self, key: &str, default: bool) -> mlua::Result<bool> {
-        Ok(self.get(key)?.unwrap_or(default))
-    }
-
-    fn transition(&self) -> mlua::Result<Duration> {
-        Ok(Duration::from_secs_f64(self.number(
-            "transition",
-            0.0,
-            0.0,
-            3600.0,
-        )?))
-    }
-
-    fn target(&self) -> mlua::Result<Target> {
-        Ok(Target {
-            on: self.flag("on", true)?,
-            brightness: self
-                .number("brightness", Target::FULL.into(), 1.0, 254.0)?
-                .round() as u8,
-            color_temp: match self.get::<f64>("color_temp")? {
-                Some(_) => Some(self.number("color_temp", 0.0, 100.0, 1000.0)?.round() as u16),
-                None => None,
-            },
-        })
-    }
-}
-
-const TARGET_KEYS: [&str; 5] = ["on", "brightness", "color_temp", "scale", "transition"];
-
-/// A bulb handle from `light(name)`.
-struct Light(String);
-
-impl Light {
-    fn request(&self, lua: &Lua, input: Input) -> mlua::Result<()> {
-        state(lua)?.requests.push((self.0.clone(), input));
-        Ok(())
-    }
-}
-
-impl UserData for Light {
-    fn add_methods<M: UserDataMethods<Self>>(methods: &mut M) {
-        methods.add_method("auto", |lua, this, t: Option<Table>| {
-            let opts = Opts::new(t, &TARGET_KEYS)?;
-            let input = Input::Auto {
-                target: opts.target()?,
-                scale: opts.number("scale", 1.0, 0.0, 1.0)? as f32,
-                transition: opts.transition()?,
-            };
-            this.request(lua, input)
-        });
-        methods.add_method("user", |lua, this, t: Option<Table>| {
-            let opts = Opts::new(t, &["on", "brightness", "color_temp", "transition"])?;
-            let input = Input::User {
-                target: opts.target()?,
-                transition: opts.transition()?,
-            };
-            this.request(lua, input)
-        });
-        methods.add_method("release", |lua, this, t: Option<Table>| {
-            let opts = Opts::new(t, &["transition"])?;
-            let input = Input::Release {
-                transition: opts.transition()?,
-            };
-            this.request(lua, input)
-        });
-        methods.add_method("device", |lua, this, ()| {
-            Ok(state(lua)?.lights.get(&this.0).map(|b| b.device.clone()))
-        });
-        methods.add_method("state", |lua, this, ()| {
-            let Some(shown) = state(lua)?.lights.get(&this.0).and_then(|b| b.shown) else {
-                return Ok(None);
-            };
-            let t = lua.create_table()?;
-            t.set("mode", if shown.held { "held" } else { "auto" })?;
-            t.set("on", shown.state.on)?;
-            t.set("brightness", shown.state.brightness)?;
-            t.set("color_temp", shown.state.color_temp)?;
-            Ok(Some(t))
-        });
-    }
+    let e = env(lua)?;
+    Ok(sun::daylight_fraction(e.latitude, e.longitude, e.wall))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
 
     const NOON: &str = "2026-06-21T13:10:00+02:00";
 
-    struct Rig {
-        script: Script,
-        now: Instant,
-        wall: DateTime<FixedOffset>,
+    fn load(src: &str) -> Result<(Script, Spec)> {
+        let lights = [
+            ("a".to_owned(), "dev_a".to_owned(), true),
+            ("plug".to_owned(), "dev_plug".to_owned(), false),
+        ];
+        Script::load(
+            "test",
+            src,
+            &lights,
+            (52.52, 13.405),
+            DateTime::parse_from_rfc3339(NOON).unwrap(),
+        )
     }
 
-    impl Rig {
-        fn new(source: &str) -> Self {
-            Self::try_new(source).unwrap()
-        }
-
-        fn try_new(source: &str) -> Result<Self> {
-            let now = Instant::now();
-            let wall = DateTime::parse_from_rfc3339(NOON).unwrap();
-            let lights = ["a", "b"].map(|n| (n.to_owned(), format!("dev_{n}")));
-            Ok(Self {
-                script: Script::new("test", source, lights, (52.52, 13.405), now, wall)?,
-                now,
-                wall,
-            })
-        }
-
-        fn send(&mut self, device: &str, payload: serde_json::Value) -> Vec<(String, Input)> {
-            let topic = format!("zigbee2mqtt/{device}");
-            self.script.message(&topic, &payload, self.now, self.wall)
-        }
-
-        fn wait(&mut self, secs: u64) -> Vec<(String, Input)> {
-            self.now += Duration::from_secs(secs);
-            self.wall += chrono::TimeDelta::seconds(secs as i64);
-            self.script.tick(self.now, self.wall)
-        }
-
-        fn topic(&mut self, topic: &str, payload: serde_json::Value) -> Vec<(String, Input)> {
-            self.script.message(topic, &payload, self.now, self.wall)
-        }
-    }
-
-    fn last_auto(reqs: &[(String, Input)], bulb: &str) -> Option<Target> {
-        reqs.iter().rev().find_map(|(n, i)| match i {
-            Input::Auto { target, .. } if n == bulb => Some(*target),
-            _ => None,
-        })
-    }
-
-    fn published(rig: &mut Rig) -> Vec<(String, serde_json::Value)> {
-        rig.script.take_published()
-    }
-
-    fn has(published: &[(String, serde_json::Value)], topic: &str, v: serde_json::Value) -> bool {
-        published.contains(&(topic.into(), v))
-    }
-
-    fn users(reqs: &[(String, Input)], bulb: &str) -> Vec<Target> {
-        reqs.iter()
-            .filter_map(|(n, i)| match i {
-                Input::User { target, .. } if n == bulb => Some(*target),
-                _ => None,
-            })
-            .collect()
-    }
-
-    const DIM_80: Target = Target {
-        on: true,
-        brightness: 80,
-        color_temp: Some(400),
-    };
-
-    #[test]
-    fn scene_sets_brightness_without_holding_and_outlasts_a_short_absence() {
-        let mut rig = Rig::new(MOTION_ROOM);
-        rig.wait(0);
-        rig.send("motion", json!({ "occupancy": true }));
-        let reqs = rig.topic("lights/test/scene", json!("dim"));
-        let t = last_auto(&reqs, "a").expect("applied at once");
-        assert_eq!((t.on, t.brightness), (true, 76));
-        assert!(
-            reqs.iter().all(|(_, i)| matches!(i, Input::Auto { .. })),
-            "a scene is automation, not a hold"
-        );
-
-        rig.send("motion", json!({ "occupancy": false }));
-        let reqs = rig.wait(60);
-        assert_eq!(last_auto(&reqs, "a").map(|t| t.on), Some(false));
-        assert!(!has(&published(&mut rig), "lights/test/scene", json!("auto")));
-        rig.wait(30 * 60);
-        let reqs = rig.send("motion", json!({ "occupancy": true }));
-        assert_eq!(last_auto(&reqs, "a").unwrap().brightness, 76, "still dim");
-
-        // Gone for longer than reset_after: back to the curve.
-        rig.send("motion", json!({ "occupancy": false }));
-        rig.wait(60);
-        rig.wait(3600);
-        assert!(has(&published(&mut rig), "lights/test/scene", json!("auto")));
-        let reqs = rig.send("motion", json!({ "occupancy": true }));
-        assert_ne!(last_auto(&reqs, "a").unwrap().brightness, 76);
-    }
-
-    #[test]
-    fn manual_settings_come_back_after_a_short_absence_and_go_after_a_long_one() {
-        let mut rig = Rig::new(MOTION_ROOM);
-        rig.wait(0);
-        rig.send("motion", json!({ "occupancy": true }));
-        rig.script.bulb("a", true, DIM_80);
-        rig.script.bulb("b", true, HELD_OFF);
-        rig.send("motion", json!({ "occupancy": false }));
-        let reqs = rig.wait(60);
-        assert_eq!(releases(&reqs), 2, "the room still fades out");
-        // The fade released them; the arbiter now shows them as automatic.
-        rig.script.bulb("a", false, HELD_OFF);
-        rig.script.bulb("b", false, HELD_OFF);
-
-        rig.wait(59 * 60 - 60);
-        let reqs = rig.send("motion", json!({ "occupancy": true }));
-        assert_eq!(users(&reqs, "a"), [DIM_80], "brightness and colour back");
-        assert_eq!(users(&reqs, "b").iter().map(|t| t.on).collect::<Vec<_>>(), [false], "a manual off stays off");
-
-        // Restored, so held again, and gone longer than the hour this time.
-        rig.script.bulb("a", true, DIM_80);
-        rig.script.bulb("b", true, HELD_OFF);
-        rig.send("motion", json!({ "occupancy": false }));
-        rig.wait(60);
-        rig.script.bulb("a", false, HELD_OFF);
-        rig.script.bulb("b", false, HELD_OFF);
-        rig.wait(3600);
-        let reqs = rig.send("motion", json!({ "occupancy": true }));
-        assert!(users(&reqs, "a").is_empty() && users(&reqs, "b").is_empty());
-        assert_eq!(last_auto_on(&reqs, "b"), Some(true), "forgotten: on at the curve");
-    }
-
-    #[test]
-    fn a_hold_made_while_empty_is_not_remembered() {
-        let mut rig = Rig::new(MOTION_ROOM);
-        rig.wait(0);
-        rig.send("motion", json!({ "occupancy": true }));
-        rig.send("motion", json!({ "occupancy": false }));
-        rig.wait(60);
-        // A late report during the fade-out, misread as a manual off.
-        rig.script.bulb("a", true, HELD_OFF);
-        let reqs = rig.send("motion", json!({ "occupancy": true }));
-        assert!(users(&reqs, "a").is_empty());
-        assert_eq!(last_auto_on(&reqs, "a"), Some(true));
-    }
-
-    #[test]
-    fn night_scene_is_warm_and_unknown_scenes_are_ignored() {
-        let mut rig = Rig::new(
-            "sun_curve(); on_topic('x', function() light('a'):auto(curve_target('a')) end)",
-        );
-        rig.topic("lights/test/scene", json!("night"));
-        let t = last_auto(&rig.topic("x", json!({})), "a").unwrap();
-        assert_eq!((t.brightness, t.color_temp), (8, Some(454)));
-        rig.topic("lights/test/scene", json!("disco"));
-        let t = last_auto(&rig.topic("x", json!({})), "a").unwrap();
-        assert_eq!(t.brightness, 8);
-    }
-
-    #[test]
-    fn automatic_off_leaves_the_bulbs_alone_room_or_house() {
-        for topic in ["lights/test/automatic", "lights/automatic"] {
-            let mut rig = Rig::new(MOTION_ROOM);
-            rig.wait(0);
-            rig.topic(topic, json!(false));
-            let mut reqs = rig.send("motion", json!({ "occupancy": true }));
-            reqs.extend(rig.wait(600));
-            rig.send("motion", json!({ "occupancy": false }));
-            reqs.extend(rig.wait(600));
-            assert!(reqs.is_empty(), "{topic}: {reqs:?}");
-
-            rig.send("motion", json!({ "occupancy": true }));
-            let reqs = rig.topic(topic, json!(true));
-            assert_eq!(last_auto_on(&reqs, "a"), Some(true), "{topic}: catches up");
+    fn ctx<'a>(light: &'a str, state: &'a str) -> Ctx<'a> {
+        Ctx {
+            light: Some(light),
+            state,
+            present: true,
+            present_for: 0.0,
+            absent_for: 0.0,
+            time_in_state: 0.0,
+            clock: 13.0,
         }
     }
 
     #[test]
-    fn room_and_house_reset_free_everything_and_switch_automatic_back_on() {
-        for (topic, house) in [("lights/test/release", false), ("lights/release", true)] {
-            let mut rig = Rig::new(MOTION_ROOM);
-            rig.wait(0);
-            rig.send("motion", json!({ "occupancy": true }));
-            rig.script.bulb("a", true, DIM_80);
-            rig.send("motion", json!({ "occupancy": false }));
-            rig.wait(60);
-            rig.topic("lights/test/scene", json!("bright"));
-            rig.topic("lights/test/automatic", json!(false));
-            rig.topic("lights/automatic", json!(false));
-            published(&mut rig);
-
-            let reqs = rig.topic(topic, json!("release"));
-            assert_eq!(releases(&reqs), 2, "{topic}");
-            let p = published(&mut rig);
-            assert!(has(&p, "lights/test/scene", json!("auto")), "{topic}");
-            assert!(has(&p, "lights/test/automatic", json!(true)), "{topic}");
-            assert_eq!(has(&p, "lights/automatic", json!(true)), house, "{topic}");
-            if !house {
-                rig.topic("lights/automatic", json!(true));
-            }
-            let reqs = rig.send("motion", json!({ "occupancy": true }));
-            assert!(users(&reqs, "a").is_empty(), "{topic}: memory forgotten");
-            assert_eq!(last_auto_on(&reqs, "a"), Some(true), "{topic}");
-        }
-    }
-
-    #[test]
-    fn publish_reports_occupancy_and_rejects_bad_input() {
-        let mut rig = Rig::new(MOTION_ROOM);
-        assert!(has(&published(&mut rig), "lights/test/occupied", json!(false)));
-        rig.send("motion", json!({ "occupancy": true }));
-        assert_eq!(
-            rig.script.take_published(),
-            [("lights/test/occupied".into(), json!(true))]
-        );
-
-        let mut rig = Rig::new(
-            r#"
-            on_topic("x", function(p) publish(p, 1) end)
-            on_topic("y", function() publish("ok", {}) end)
-            "#,
-        );
-        rig.topic("x", json!("a/b"));
-        rig.topic("y", json!({}));
-        assert!(rig.script.take_published().is_empty());
-    }
-
-    fn auto_on(reqs: &[(String, Input)]) -> Vec<(&str, bool)> {
-        reqs.iter()
-            .filter_map(|(name, i)| match i {
-                Input::Auto { target, .. } => Some((name.as_str(), target.on)),
-                _ => None,
-            })
-            .collect()
-    }
-
-    #[test]
-    fn handlers_get_the_z2m_payload_and_request_targets() {
-        let mut rig = Rig::new(
-            r#"
-            on("door", function(p)
-              light("a"):auto{ on = not p.contact, brightness = 120, transition = 0.4 }
-            end)
-            "#,
-        );
-        assert!(rig.script.topics().contains(&"zigbee2mqtt/door".to_owned()));
-        let reqs = rig.send("door", json!({ "contact": false, "battery": 90 }));
-        match &reqs[..] {
-            [(
-                name,
-                Input::Auto {
-                    target,
-                    scale,
-                    transition,
-                },
-            )] => {
-                assert_eq!(name, "a");
-                assert_eq!(
-                    *target,
-                    Target {
-                        on: true,
-                        brightness: 120,
-                        color_temp: None
-                    }
-                );
-                assert_eq!((*scale, *transition), (1.0, Duration::from_millis(400)));
-            }
-            other => panic!("{other:?}"),
-        }
-    }
-
-    #[test]
-    fn json_null_and_missing_fields_are_nil() {
-        let mut rig = Rig::new(
-            r#"
-            on("door", function(p)
-              assert(p.contact == nil and p.missing == nil)
-              light("a"):auto{ on = false }
-            end)
-            "#,
-        );
-        assert_eq!(
-            auto_on(&rig.send("door", json!({ "contact": null }))),
-            [("a", false)]
-        );
-    }
-
-    #[test]
-    fn timers_fire_on_the_fake_clock_and_can_be_cancelled() {
-        let mut rig = Rig::new(
-            r#"
-            local t
-            on("button", function(p)
-              if p.action == "single" then
-                light("a"):user{ brightness = 25 }
-                if t then cancel(t) end
-                t = after(300, function() light("a"):user{ on = false } end)
-              elseif p.action == "double" and t then
-                cancel(t); t = nil
-              end
-            end)
-            "#,
-        );
-        rig.send("button", json!({ "action": "single" }));
-        assert_eq!(
-            rig.script.deadline(),
-            Some(rig.now + Duration::from_secs(300))
-        );
-        assert!(rig.wait(299).is_empty());
-        let reqs = rig.wait(1);
-        assert!(matches!(&reqs[..], [(_, Input::User { target, .. })] if !target.on));
-        assert_eq!(rig.script.deadline(), None);
-
-        rig.send("button", json!({ "action": "single" }));
-        rig.send("button", json!({ "action": "double" }));
-        assert!(rig.wait(600).is_empty());
-    }
-
-    #[test]
-    fn every_repeats_and_top_level_requests_go_out_on_the_first_tick() {
-        let mut rig = Rig::new(
-            r#"
-            local function update() light("a"):auto{ brightness = sun.level{ min = 5 } } end
-            update()
-            every(30, update)
-            "#,
-        );
-        assert_eq!(auto_on(&rig.wait(0)), [("a", true)]);
-        assert!(rig.wait(29).is_empty());
-        assert_eq!(rig.wait(1).len(), 1);
-        assert_eq!(rig.wait(30).len(), 1);
-    }
-
-    #[test]
-    fn a_failing_handler_drops_its_half_made_requests_and_keeps_running() {
-        let mut rig = Rig::new(
-            r#"
-            on("door", function(p)
-              light("a"):auto{ on = true }
-              if p.contact then error("boom") end
-              light("b"):auto{ on = true }
-            end)
-            "#,
-        );
-        assert!(rig.send("door", json!({ "contact": true })).is_empty());
-        assert_eq!(rig.send("door", json!({ "contact": false })).len(), 2);
-    }
-
-    #[test]
-    fn runaway_handlers_are_stopped() {
-        let mut rig = Rig::new(r#"on("x", function() while true do end end)"#);
-        assert!(rig.send("x", json!({})).is_empty());
-    }
-
-    #[test]
-    fn sandbox_has_no_os_or_io() {
-        let mut rig = Rig::new(
-            r#"on("x", function() assert(os == nil and io == nil and require == nil and load); light("a"):auto{} end)"#,
-        );
-        assert_eq!(rig.send("x", json!({})).len(), 1);
-    }
-
-    #[test]
-    fn mistakes_fail_at_load_time() {
-        for source in [
-            r#"light("nope")"#,
-            r#"light("a"):auto{ brigthness = 3 }"#,
-            r#"light("a"):auto{ brightness = 300 }"#,
-            r#"every(0.1, function() end)"#,
-            r#"this is not lua"#,
-        ] {
-            assert!(Rig::try_new(source).is_err(), "{source}");
-        }
-    }
-
-    #[test]
-    fn subscribing_after_load_is_an_error() {
-        let mut rig =
-            Rig::new(r#"on("x", function() on("y", function() end); light("a"):auto{} end)"#);
-        assert!(rig.send("x", json!({})).is_empty());
-        assert!(!rig.script.topics().contains(&"zigbee2mqtt/y".to_owned()));
-    }
-
-    #[test]
-    fn state_reflects_the_arbiter() {
-        let mut rig = Rig::new(
-            r#"
-            on("x", function()
-              local s = light("a"):state()
-              if s and s.mode == "held" and s.on then light("b"):user{ brightness = s.brightness } end
-            end)
-            "#,
-        );
-        assert!(rig.send("x", json!({})).is_empty());
-        rig.script.bulb(
-            "a",
-            true,
-            Target {
-                on: true,
-                brightness: 80,
-                color_temp: None,
-            },
-        );
-        let reqs = rig.send("x", json!({}));
-        assert!(
-            matches!(&reqs[..], [(b, Input::User { target, .. })] if b == "b" && target.brightness == 80)
-        );
-    }
-
-    #[test]
-    fn sun_and_clock() {
-        let mut rig = Rig::new(
-            r#"
-            on("x", function()
-              assert(math.abs(clock() - 13.1667) < 0.01, clock())
-              assert(sun.daylight() > 0.95)
-              assert(sun.level{ min = 5, max = 50 } > 120)
-              assert(sun.ct{} < 260)
-              light("a"):auto{}
-            end)
-            "#,
-        );
-        assert_eq!(rig.send("x", json!({})).len(), 1);
-    }
-
-    fn targets(reqs: &[(String, Input)]) -> Vec<(&str, &'static str, Target)> {
-        reqs.iter()
-            .filter_map(|(n, i)| match i {
-                Input::Auto { target, .. } => Some((n.as_str(), "auto", *target)),
-                Input::User { target, .. } => Some((n.as_str(), "user", *target)),
-                _ => None,
-            })
-            .collect()
-    }
-
-    fn releases(reqs: &[(String, Input)]) -> usize {
-        reqs.iter()
-            .filter(|(_, i)| matches!(i, Input::Release { .. }))
-            .count()
-    }
-
-    fn last_auto_on(reqs: &[(String, Input)], bulb: &str) -> Option<bool> {
-        targets(reqs)
-            .into_iter()
-            .rev()
-            .find(|(n, k, _)| *n == bulb && *k == "auto")
-            .map(|(_, _, t)| t.on)
-    }
-
-    const MOTION_ROOM: &str = r#"
-        follow{ when = occupancy{ sensors = { "motion" }, doors = { "door" }, hold = 60, door_hold = 30 }, fade = 20 }
-    "#;
-
-    #[test]
-    fn occupancy_turns_on_with_motion_and_off_after_hold_and_fade() {
-        let mut rig = Rig::new(MOTION_ROOM);
-        assert_eq!(
-            last_auto_on(&rig.wait(0), "a"),
-            Some(false),
-            "starts vacant"
-        );
-
-        let reqs = rig.send("motion", json!({ "occupancy": true }));
-        assert_eq!(last_auto_on(&reqs, "a"), Some(true));
-        assert_eq!(last_auto_on(&reqs, "b"), Some(true));
-        assert!(
-            matches!(reqs[0].1, Input::Auto { transition, .. } if transition == Duration::from_millis(400))
-        );
-
-        // Still there as long as the sensor says so, whatever the hold.
-        assert_ne!(last_auto_on(&rig.wait(600), "a"), Some(false));
-
-        rig.send("motion", json!({ "occupancy": false }));
-        assert_ne!(last_auto_on(&rig.wait(59), "a"), Some(false));
-        let reqs = rig.wait(1);
-        assert_eq!(last_auto_on(&reqs, "a"), Some(false));
-        assert_eq!(
-            releases(&reqs),
-            2,
-            "a manual change lasts as long as the visit"
-        );
-        assert!(matches!(
-            reqs.iter().find(|(_, i)| matches!(i, Input::Auto { .. })).unwrap().1,
-            Input::Auto { transition, .. } if transition == Duration::from_secs(20)
-        ));
-    }
-
-    #[test]
-    fn presence_field_counts_like_occupancy_and_noise_is_ignored() {
-        let mut rig = Rig::new(MOTION_ROOM);
-        rig.wait(0);
-        for p in [
-            json!({ "battery": 90 }),
-            json!("x"),
-            json!({ "occupancy": "yes" }),
-        ] {
-            assert_eq!(last_auto_on(&rig.send("motion", p), "a"), None);
-        }
-        assert_eq!(
-            last_auto_on(&rig.send("motion", json!({ "presence": true })), "a"),
-            Some(true)
-        );
-    }
-
-    #[test]
-    fn door_opening_lights_the_room_until_a_sensor_takes_over() {
-        let mut rig = Rig::new(MOTION_ROOM);
-        rig.wait(0);
-        assert_eq!(
-            last_auto_on(&rig.send("door", json!({ "contact": true })), "a"),
-            None,
-            "closing says nothing"
-        );
-        assert_eq!(
-            last_auto_on(&rig.send("door", json!({ "contact": false })), "a"),
-            Some(true)
-        );
-        rig.wait(10);
-        rig.send("motion", json!({ "occupancy": true }));
-        // The door's window ends, but the sensor still sees someone.
-        assert_ne!(last_auto_on(&rig.wait(60), "a"), Some(false));
-        rig.send("motion", json!({ "occupancy": false }));
-        assert_eq!(last_auto_on(&rig.wait(60), "a"), Some(false));
-    }
-
-    #[test]
-    fn door_alone_times_out() {
-        let mut rig = Rig::new(MOTION_ROOM);
-        rig.wait(0);
-        rig.send("door", json!({ "contact": false }));
-        assert_eq!(last_auto_on(&rig.wait(30), "a"), Some(false));
-    }
-
-    const BATHROOM: &str = r#"
-        follow{ when = occupancy{ sensors = { "p1", "p2" }, doors = { "door" }, hold = 30, door_hold = 60, close_grace = 3 }, fade = 20 }
-    "#;
-
-    const BEDROOM: &str = r#"
-        follow{ wake = wake_ramp(), when = occupancy{ sensors = { "p" }, hold = 120 }, fade = 30, quiet = { 22, 8 } }
-    "#;
-
-    fn at(rig: &mut Rig, time: &str) {
-        rig.wall = DateTime::parse_from_rfc3339(&format!("2026-06-21T{time}+02:00")).unwrap();
-    }
-
-    #[test]
-    fn quiet_hours_block_arrival_but_not_lights_already_on() {
-        let mut rig = Rig::new(BEDROOM);
-        at(&mut rig, "23:00:00");
-        rig.wait(0);
-        assert_eq!(
-            last_auto_on(&rig.send("p", json!({ "occupancy": true })), "a"),
-            Some(false),
-            "arriving at night"
-        );
-        assert_ne!(last_auto_on(&rig.wait(600), "a"), Some(true));
-
-        rig.send("p", json!({ "occupancy": false }));
-        rig.wait(121);
-        at(&mut rig, "21:50:00");
-        assert_eq!(
-            last_auto_on(&rig.send("p", json!({ "occupancy": true })), "a"),
-            Some(true),
-            "arriving by day"
-        );
-        assert_eq!(
-            last_auto_on(&rig.wait(20 * 60), "a"),
-            Some(true),
-            "stays on past 22:00"
-        );
-
-        rig.send("p", json!({ "occupancy": false }));
-        assert_eq!(last_auto_on(&rig.wait(120), "a"), Some(false), "empty: off");
-    }
-
-    #[test]
-    fn hold_can_depend_on_the_time_of_day() {
-        let room = r#"
-            follow{ when = occupancy{ sensors = { "p" }, hold = function() return between(22, 8) and 120 or 1800 end }, fade = 10 }
-        "#;
-        for (time, hold) in [("13:00:00", 1800), ("23:30:00", 120), ("07:00:00", 120)] {
-            let mut rig = Rig::new(room);
-            at(&mut rig, time);
-            rig.wait(0);
-            rig.send("p", json!({ "occupancy": true }));
-            rig.send("p", json!({ "occupancy": false }));
-            assert_ne!(last_auto_on(&rig.wait(hold - 1), "a"), Some(false), "{time}");
-            assert_eq!(last_auto_on(&rig.wait(1), "a"), Some(false), "{time}");
-        }
-    }
-
-    #[test]
-    fn quiet_hours_ending_switch_nothing_on() {
-        let mut rig = Rig::new(BEDROOM);
-        at(&mut rig, "07:55:00");
-        rig.wait(0);
-        rig.send("p", json!({ "occupancy": true }));
-        assert_ne!(last_auto_on(&rig.wait(600), "a"), Some(true));
-    }
-
-    #[test]
-    fn wake_ramp_runs_inside_quiet_hours() {
-        let mut rig = Rig::new(BEDROOM);
-        at(&mut rig, "06:29:00");
-        rig.wait(0);
-        rig.send("p", json!({ "occupancy": true }));
-        assert_eq!(last_auto_on(&rig.wait(5 * 60), "a"), Some(true));
-    }
-
-    #[test]
-    fn door_shut_with_nobody_detected_empties_after_the_grace() {
-        let mut rig = Rig::new(BATHROOM);
-        rig.wait(0);
-        rig.send("door", json!({ "contact": false }));
-        rig.wait(5);
-        rig.send("door", json!({ "contact": true }));
-        assert_ne!(last_auto_on(&rig.wait(2), "a"), Some(false));
-        assert_eq!(last_auto_on(&rig.wait(1), "a"), Some(false));
-    }
-
-    #[test]
-    fn door_shut_on_someone_inside_keeps_the_light_until_both_sensors_clear() {
-        let mut rig = Rig::new(BATHROOM);
-        rig.wait(0);
-        rig.send("door", json!({ "contact": false }));
-        rig.send("p1", json!({ "occupancy": true }));
-        rig.send("door", json!({ "contact": true }));
-        rig.send("p2", json!({ "occupancy": true }));
-        assert_ne!(last_auto_on(&rig.wait(600), "a"), Some(false));
-
-        // One sensor losing you is not enough.
-        rig.send("p1", json!({ "occupancy": false }));
-        assert_ne!(last_auto_on(&rig.wait(600), "a"), Some(false));
-
-        rig.send("p2", json!({ "occupancy": false }));
-        assert_ne!(last_auto_on(&rig.wait(29), "a"), Some(false));
-        assert_eq!(last_auto_on(&rig.wait(1), "a"), Some(false));
-    }
-
-    #[test]
-    fn leaving_and_shutting_the_door_cuts_the_sensor_hold_short() {
-        let mut rig = Rig::new(BATHROOM);
-        rig.wait(0);
-        rig.send("p1", json!({ "occupancy": true }));
-        rig.send("p1", json!({ "occupancy": false }));
-        rig.wait(1);
-        rig.send("door", json!({ "contact": false }));
-        rig.send("door", json!({ "contact": true }));
-        assert_eq!(last_auto_on(&rig.wait(3), "a"), Some(false));
-    }
-
-    #[test]
-    fn follow_without_occupancy_keeps_bulbs_as_they_are() {
-        let mut rig = Rig::new("follow{}");
-        let reqs = rig.wait(0);
-        assert_eq!(
-            last_auto_on(&reqs, "a"),
-            Some(false),
-            "unknown bulbs: off is the safe guess"
-        );
-        let on = Target {
-            on: true,
-            brightness: 200,
-            color_temp: Some(300),
-        };
-        rig.script.bulb("a", false, on);
-        let reqs = rig.wait(30);
-        assert_eq!(
-            last_auto_on(&reqs, "a"),
-            Some(true),
-            "on stays on, at the curve"
-        );
-        let (_, _, t) = targets(&reqs)
-            .into_iter()
-            .find(|(n, _, _)| *n == "a")
-            .unwrap();
-        assert!(t.color_temp.is_some() && t.brightness > 100, "{t:?}");
-    }
-
-    #[test]
-    fn manual_off_in_a_follow_room_is_not_shown_as_held() {
-        let mut rig = Rig::new("follow{}");
-        rig.wait(0);
-        let off = Target {
-            on: false,
-            brightness: 1,
-            color_temp: None,
-        };
-        rig.script.bulb("a", true, off);
-        assert_eq!(releases(&rig.wait(30)), 1);
-    }
-
-    #[test]
-    fn ha_sliders_shape_the_curve() {
-        let mut rig = Rig::new("follow{}");
-        rig.wait(0);
-        rig.script.bulb(
-            "a",
-            false,
-            Target {
-                on: true,
-                brightness: 200,
-                color_temp: None,
-            },
-        );
-        let bri = |reqs: &[(String, Input)]| {
-            targets(reqs)
-                .into_iter()
-                .find(|(n, _, _)| *n == "a")
-                .unwrap()
-                .2
-                .brightness
-        };
-        let full = bri(&rig.wait(30));
-        let topic = "mqtt-auto/sun-follow/dev_a/max-brightness";
-        rig.script.message(topic, &json!(50), rig.now, rig.wall);
-        assert!(bri(&rig.wait(30)) < full / 2 + 5);
-        // HA sends numbers as strings too; garbage keeps the last value.
-        rig.script.message(topic, &json!("20"), rig.now, rig.wall);
-        let low = bri(&rig.wait(30));
-        rig.script.message(topic, &json!("lots"), rig.now, rig.wall);
-        assert_eq!(bri(&rig.wait(30)), low);
-        assert!(low <= 51);
-
-        rig.script.message(
-            "mqtt-auto/color-temp-cycle/enabled",
-            &json!("false"),
-            rig.now,
-            rig.wall,
-        );
-        let reqs = rig.wait(30);
-        assert_eq!(targets(&reqs)[0].2.color_temp, None);
-    }
-
-    const HELD_OFF: Target = Target {
-        on: false,
-        brightness: 1,
-        color_temp: None,
-    };
-    const HELD_ON: Target = Target {
-        on: true,
-        brightness: 254,
-        color_temp: None,
-    };
-
-    #[test]
-    fn arrival_releases_a_bulb_held_off_but_keeps_one_held_on() {
-        let mut rig = Rig::new(MOTION_ROOM);
-        rig.wait(0);
-        // Held while the room was empty: off on the way out, and on at
-        // the wall switch.
-        rig.script.bulb("a", true, HELD_OFF);
-        rig.script.bulb("b", true, HELD_ON);
-        let reqs = rig.send("motion", json!({ "occupancy": true }));
-        let released: Vec<_> = reqs
-            .iter()
-            .filter(|(_, i)| matches!(i, Input::Release { .. }))
-            .map(|(n, _)| n.as_str())
-            .collect();
-        assert_eq!(released, ["a"]);
-        assert_eq!(last_auto_on(&reqs, "a"), Some(true));
-    }
-
-    #[test]
-    fn a_manual_off_during_the_wake_ramp_survives_the_room_emptying() {
-        let mut rig = Rig::new(BEDROOM);
-        at(&mut rig, "06:40:00");
-        rig.wait(0);
-        rig.send("p", json!({ "occupancy": true }));
-        rig.script.bulb("a", true, HELD_OFF);
-        rig.send("p", json!({ "occupancy": false }));
-        let reqs = rig.wait(121);
-        assert_eq!(releases(&reqs), 0, "vacancy during the ramp");
-        let reqs = rig.send("p", json!({ "occupancy": true }));
-        assert_eq!(releases(&reqs), 0, "arrival during the ramp");
-    }
-
-    #[test]
-    fn wake_ramp_switches_on_dim_and_releases_a_night_off() {
-        let mut rig = Rig::new("follow{ wake = wake_ramp() }");
-        rig.wall = DateTime::parse_from_rfc3339("2026-06-21T06:29:00+02:00").unwrap();
-        assert_eq!(last_auto_on(&rig.wait(0), "a"), Some(false));
-        rig.script.bulb(
-            "a",
-            true,
-            Target {
-                on: false,
-                brightness: 1,
-                color_temp: None,
-            },
-        );
-        let reqs = rig.wait(30);
-        assert_eq!(
-            releases(&reqs),
-            1,
-            "follow without occupancy releases an off hold"
-        );
-
-        rig.script.bulb(
-            "a",
-            true,
-            Target {
-                on: false,
-                brightness: 1,
-                color_temp: None,
-            },
-        );
-        let reqs = rig.wait(30 + 10 * 60);
-        assert_eq!(last_auto_on(&reqs, "a"), Some(true));
-        assert!(releases(&reqs) >= 2, "ramp start releases every bulb");
-        let early = targets(&reqs)[0].2.brightness;
-        let later = targets(&rig.wait(20 * 60))
-            .into_iter()
-            .find(|(n, _, _)| *n == "a")
+    fn per_light_overrides_look_and_functions_get_the_light() {
+        let (script, spec) = load(
+            r#"room{ default = "on", states = { on = {
+                look = { brightness = function(c) return c.light == "a" and 100 or 1 end, transition = 2 },
+                per_light = { plug = { on = false } },
+            } } }"#,
+        )
+        .unwrap();
+        let on = &spec.states[spec.default];
+        let a = script.look(on, "a", &ctx("a", "on")).unwrap().unwrap();
+        assert_eq!(a.target.brightness, 100);
+        assert_eq!(a.transition, Some(Duration::from_secs(2)));
+        let plug = script
+            .look(on, "plug", &ctx("plug", "on"))
             .unwrap()
-            .2
-            .brightness;
-        assert!(
-            early < later && later <= 77,
-            "{early} -> {later}, capped at 30%"
-        );
+            .unwrap();
+        assert!(!plug.target.on);
+    }
 
-        // Ramp over: held where it ended, not jumped to the curve.
-        let end = Target {
-            on: true,
-            brightness: 77,
-            color_temp: Some(400),
+    #[test]
+    fn a_state_without_look_is_hands_off_and_manual_always_exists() {
+        let (script, spec) =
+            load(r#"room{ default = "on", states = { on = { look = {} } } }"#).unwrap();
+        let manual = spec.states.iter().find(|s| s.name == "manual").unwrap();
+        assert_eq!(script.look(manual, "a", &ctx("a", "manual")).unwrap(), None);
+    }
+
+    #[test]
+    fn extends_merges_look_fields_and_prepends_when_rows() {
+        let (script, spec) = load(
+            r#"room{ presence = { "s" }, default = "on", states = {
+                on = { look = { brightness = 50, color_temp = 300 }, when = { { to = "on", absent_for = 9 } } },
+                dim = { extends = "on", look = { brightness = 5 }, when = { { to = "on", time_in_state = 1 } } },
+            } }"#,
+        )
+        .unwrap();
+        let dim = spec.states.iter().find(|s| s.name == "dim").unwrap();
+        let l = script.look(dim, "a", &ctx("a", "dim")).unwrap().unwrap();
+        assert_eq!((l.target.brightness, l.target.color_temp), (5, Some(300)));
+        assert_eq!(dim.when.len(), 2);
+        assert!(dim.when[0].cond.time_in_state.is_some());
+    }
+
+    #[test]
+    fn mistakes_fail_loading() {
+        for (src, want) in [
+            (
+                r#"room{ default = "on", states = { on = { look = { brightnes = 5 } } } }"#,
+                "unknown key",
+            ),
+            (
+                r#"room{ default = "on", states = { on = { on = { present = "on" } } } }"#,
+                "no event",
+            ),
+            (
+                r#"room{ default = "on", states = { on = { when = { { to = "of" } } } } }"#,
+                "no state",
+            ),
+            (
+                r#"room{ default = "on", states = { on = { look = { brightness = function() return nil + 1 end } } } }"#,
+                "arithmetic",
+            ),
+            (
+                r#"room{ default = "on", states = { on = { when = { { to = "on", toggle = { "a" } } } } } }"#,
+                "exactly one",
+            ),
+            (
+                r#"room{ default = "on", states = { on = { extends = "on" } } }"#,
+                "loop",
+            ),
+            (r#"local x = 1"#, "never calls room"),
+        ] {
+            let err = format!(
+                "{:#}",
+                load(src).err().unwrap_or_else(|| panic!("{src} loaded"))
+            );
+            assert!(err.contains(want), "{src}: {err}");
+        }
+    }
+
+    #[test]
+    fn settings_parse_as_their_default_type() {
+        let (script, spec) = load(
+            r#"local n = setting("t/n", 5); local b = setting("t/b", false)
+               room{ default = "on", states = { on = { look = {
+                 brightness = function() return n() end,
+                 on = function() return b() end,
+               } } } }"#,
+        )
+        .unwrap();
+        let on = &spec.states[spec.default];
+        let get = || {
+            script
+                .look(on, "a", &ctx("a", "on"))
+                .unwrap()
+                .unwrap()
+                .target
         };
-        rig.script.bulb("a", false, end);
-        let reqs = rig.wait(20 * 60);
-        assert!(
-            targets(&reqs)
-                .iter()
-                .any(|(n, k, t)| *n == "a" && *k == "user" && t.brightness == 77),
-            "{reqs:?}"
-        );
+        assert_eq!((get().brightness, get().on), (5, false));
+        script.setting("t/n", &serde_json::json!("40"));
+        script.setting("t/b", &serde_json::json!(true));
+        script.setting("t/n", &serde_json::json!("junk"));
+        assert_eq!((get().brightness, get().on), (40, true));
+        // Besides the prelude's knobs for every light.
+        let ours: Vec<_> = script
+            .topics()
+            .into_iter()
+            .filter(|t| t.starts_with("t/"))
+            .collect();
+        assert_eq!(ours, ["t/b", "t/n"]);
+        assert!(script
+            .topics()
+            .contains(&"mqtt-auto/sun-follow/dev_a/min-brightness".to_owned()));
     }
 
     #[test]
-    fn sun_switch_flips_once_per_crossing_and_releases() {
-        let mut rig = Rig::new(r#"sun_switch{ lights = { "a" } }"#);
-        assert_eq!(last_auto_on(&rig.wait(0), "a"), Some(true), "noon: bright");
-        rig.script.message(
-            "mqtt-auto/sun-follow/dev_a/invert",
-            &json!("true"),
-            rig.now,
-            rig.wall,
-        );
-        let reqs = rig.wait(30);
-        assert_eq!(last_auto_on(&reqs, "a"), Some(false));
-        assert_eq!(releases(&reqs), 1);
-        assert_eq!(releases(&rig.wait(30)), 0);
-    }
-
-    #[test]
-    fn buttons_toggle_at_the_curve() {
-        let mut rig = Rig::new(
-            r#"
-            follow{}
-            button("btn", { single = toggle(), double = toggle{ "b" } })
-            "#,
-        );
-        rig.wait(0);
-        let reqs = rig.script.message(
-            "zigbee2mqtt/btn/action",
-            &json!("single"),
-            rig.now,
-            rig.wall,
-        );
-        let t = targets(&reqs);
-        assert_eq!(t.len(), 2);
-        assert!(t
-            .iter()
-            .all(|(_, k, t)| *k == "user" && t.on && t.color_temp.is_some()));
-
-        rig.script.bulb(
-            "b",
-            false,
-            Target {
-                on: true,
-                brightness: 200,
-                color_temp: None,
-            },
-        );
-        let reqs = rig.script.message(
-            "zigbee2mqtt/btn/action",
-            &json!({ "action": "double" }),
-            rig.now,
-            rig.wall,
-        );
-        assert!(matches!(&targets(&reqs)[..], [("b", "user", t)] if !t.on));
-        assert!(rig
-            .script
-            .message(
-                "zigbee2mqtt/btn/action",
-                &json!({ "action": "triple" }),
-                rig.now,
-                rig.wall
-            )
-            .is_empty());
+    fn a_runaway_function_is_stopped() {
+        let err = load(
+            r#"room{ default = "on", states = { on = { look = {
+                 brightness = function() while true do end end } } } }"#,
+        )
+        .err()
+        .unwrap();
+        assert!(format!("{err:#}").contains("too long"), "{err:#}");
     }
 }

@@ -287,9 +287,10 @@ let
       }
       ++ [
         {
+          # Announced by `lights` itself (MQTT discovery), named "<label> mode".
           type = "tile";
-          entity = ctl "select" "scene";
-          name = "Scene";
+          entity = ctl "select" "mode";
+          name = "Mode";
           grid_options.columns = "full";
           features = [
             {
@@ -306,15 +307,10 @@ let
       ++ [
         {
           type = "tile";
-          entity = ctl "sensor" "mode";
-          name = "Mode";
+          entity = ctl "sensor" "state";
+          name = "State";
         }
       ]
-      ++ lib.optional hasOccupancy {
-        type = "tile";
-        entity = ctl "switch" "automatic";
-        name = "Automatic";
-      }
       ++ [
         {
           type = "tile";
@@ -331,8 +327,8 @@ let
       }) (if main != null && group == null then [ ] else ds);
     };
 
-  # Rooms whose script uses occupancy(): only those publish `occupied` and
-  # have anything for the automatic switch to turn off.
+  # Rooms whose file declares presence sensors: only those publish
+  # `occupied`.
   occupancyRooms = [
     "living-room"
     "kitchen"
@@ -355,11 +351,6 @@ let
             type = "heading";
             heading = "House";
             heading_style = "title";
-          }
-          {
-            type = "tile";
-            entity = "switch.house_automatic";
-            name = "Automatic";
           }
           {
             type = "tile";

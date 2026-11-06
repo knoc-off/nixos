@@ -3,18 +3,13 @@
 //! publish. Pure -- no MQTT, no wall clock; the caller passes `now` and
 //! calls back with `Input::Tick` at [`Bulb::deadline`].
 //!
-//! Generalises sun_follow.rs's ownership machine. Rooms only *ask* for a
-//! target; this is the one place that decides whether the bulb listens:
+//! Rooms only *ask* for a target; this is the one place that decides whether
+//! the bulb listens:
 //!   - `Auto`: the bulb follows the automation target.
 //!   - `Held`: the user set a value -- via a button (`Input::User`), or in
 //!     HA/the app, seen as a z2m report we didn't cause. The automation's
-//!     target is ignored until a `Release`; when a hold ends is the room
-//!     script's policy, not the arbiter's.
-//!
-//! On top of either, the room's `scale` (0..1) dims the output: that is how
-//! a leaving room fades out. It applies to held bulbs too, so the warning
-//! dim covers user settings, but the held value itself is stored unscaled,
-//! so coming back restores it exactly.
+//!     target is ignored until a `Release`; when a hold ends is the room's
+//!     state machine's business (`crate::room`), not the arbiter's.
 //!
 //! Because the arbiter is the only writer, override detection reduces to
 //! "the bulb reports something other than what we commanded" -- compared
@@ -84,38 +79,28 @@ pub struct Command {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub struct Hold {
-    pub value: Target,
-    /// Set when the user acted while the room was already fading: they
-    /// chose that exact output, so the fade stops applying to this bulb
-    /// for the rest of the hold instead of fighting them.
-    pub ignores_fade: bool,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Mode {
     /// Waiting for both a z2m report and an automation target, so startup
     /// can adopt the bulb where it is instead of jumping.
     Unknown,
     Auto,
-    Held(Hold),
+    Held(Target),
 }
 
 #[derive(Clone, Copy, Debug)]
 pub enum Input {
-    /// What the room's automation wants for this bulb, and how far the
-    /// room is faded (1 = full, 0 = off).
+    /// What the room's automation wants for this bulb.
     Auto {
         target: Target,
-        scale: f32,
         transition: Duration,
     },
-    /// A button gesture the room interpreted: apply it and hold.
+    /// A person's choice the room passes on (a button, a restored
+    /// setting): apply it and hold.
     User {
         target: Target,
         transition: Duration,
     },
-    /// The room hit a reset point (vacancy, wake ramp): back to `Auto`.
+    /// Back to `Auto`.
     Release { transition: Duration },
     /// A z2m state message for this bulb.
     Report(Target),
@@ -265,7 +250,6 @@ pub struct Bulb {
     cfg: Config,
     auto: Option<Target>,
     auto_transition: Duration,
-    scale: f32,
     reported: Option<Target>,
     /// What the bulb should be showing: our last command, or a report we
     /// accepted as the new truth (adoption, user override).
@@ -282,7 +266,6 @@ impl Bulb {
             cfg,
             auto: None,
             auto_transition: Duration::ZERO,
-            scale: 1.0,
             reported: None,
             expected: None,
             settle_until: None,
@@ -293,7 +276,7 @@ impl Bulb {
     /// The held value, if the user is in charge.
     pub fn held(&self) -> Option<Target> {
         match self.mode {
-            Mode::Held(h) => Some(h.value),
+            Mode::Held(t) => Some(t),
             _ => None,
         }
     }
@@ -312,14 +295,9 @@ impl Bulb {
     /// Feed one input; returns the command to publish, if any.
     pub fn step(&mut self, input: Input, now: Instant) -> Option<Command> {
         match input {
-            Input::Auto {
-                target,
-                scale,
-                transition,
-            } => {
+            Input::Auto { target, transition } => {
                 self.auto = Some(self.normalize(target));
                 self.auto_transition = transition;
-                self.scale = scale.clamp(0.0, 1.0);
                 if self.mode == Mode::Unknown {
                     return self.try_adopt(now);
                 }
@@ -331,7 +309,11 @@ impl Bulb {
                 self.apply(transition, now)
             }
             Input::Release { transition } => {
-                self.mode = Mode::Auto;
+                // Not adopted yet: there is nothing to hand back, and
+                // skipping adoption could wake or yank the bulb.
+                if self.mode != Mode::Unknown {
+                    self.mode = Mode::Auto;
+                }
                 self.apply(transition, now)
             }
             Input::Report(r) => {
@@ -374,7 +356,7 @@ impl Bulb {
             return None;
         };
         self.accept(r, now);
-        if r.differs(self.shape(t, self.scale), self.cfg.adopt) {
+        if r.differs(t, self.cfg.adopt) {
             // Covers an off bulb the automation wants on (never wake it on a
             // restart) and an on bulb it wants off (never yank it).
             self.hold(r);
@@ -386,10 +368,7 @@ impl Bulb {
     }
 
     fn hold(&mut self, value: Target) {
-        self.mode = Mode::Held(Hold {
-            value,
-            ignores_fade: self.scale < 1.0,
-        });
+        self.mode = Mode::Held(value);
     }
 
     /// Take `r` as what the bulb is now showing, cancelling any transition.
@@ -412,38 +391,22 @@ impl Bulb {
         }
     }
 
-    /// `t` dimmed by the room's fade. A plug stays on until the fade is
-    /// complete.
-    fn shape(&self, t: Target, scale: f32) -> Target {
-        let on = t.on && scale > 0.0;
-        if !self.cfg.dimmable {
-            return Target { on, ..t };
-        }
-        let brightness = (f32::from(t.brightness) * scale).round().max(1.0) as u8;
-        Target {
-            on,
-            brightness,
-            ..t
-        }
-    }
-
-    /// Publish whatever the current mode and fade call for.
+    /// Publish whatever the current mode calls for.
     fn apply(&mut self, transition: Duration, now: Instant) -> Option<Command> {
-        let (value, scale) = match self.mode {
+        let t = match self.mode {
             Mode::Unknown => return None,
-            Mode::Auto => (self.auto?, self.scale),
-            Mode::Held(h) if h.ignores_fade => (h.value, 1.0),
-            Mode::Held(h) => (h.value, self.scale),
+            Mode::Auto => self.auto?,
+            Mode::Held(t) => t,
         };
-        let t = self.shape(value, scale);
         if self.cfg.dimmable {
             return self.send(t, transition, now);
         }
-        // A plug can't dim, so a room fading out is a delayed off: the plug
+        // A plug can't dim, so fading it out is a delayed off: the plug
         // stays on for the length of the fade, then switches (see
         // `Input::Tick`). Rooms resend their target on every tick, which
-        // must not postpone the deadline.
-        let fading_out = value.on && !t.on && !transition.is_zero();
+        // must not postpone the deadline. Quick transitions (a toggle) just
+        // switch, like `Motion::explains` tells fades from them.
+        let fading_out = !t.on && (transition > self.cfg.settle || self.switch_off_at.is_some());
         if fading_out && self.expected.is_some_and(|m| m.to.on) {
             self.switch_off_at.get_or_insert(now + transition);
             return None;
@@ -510,15 +473,13 @@ mod tests {
     fn auto(target: Target) -> Input {
         Input::Auto {
             target,
-            scale: 1.0,
             transition: FAST,
         }
     }
 
-    fn fade(target: Target, scale: f32) -> Input {
+    fn fade(target: Target) -> Input {
         Input::Auto {
             target,
-            scale,
             transition: FADE,
         }
     }
@@ -700,40 +661,11 @@ mod tests {
     }
 
     #[test]
-    fn fade_dims_auto_output_over_the_fade_and_restores_on_return() {
-        let mut rig = Rig::light(on(200));
-        let cmd = rig.bulb.step(fade(on(200), 0.5), rig.now);
-        assert_eq!(
-            cmd,
-            Some(Command {
-                target: on(100),
-                transition: FADE
-            })
-        );
-        assert_eq!(rig.send(auto(on(200))), Some(on(200)));
-    }
-
-    #[test]
-    fn fade_to_zero_turns_a_light_off() {
-        let mut rig = Rig::light(on(200));
-        assert_eq!(rig.send(fade(on(200), 0.0)).map(|t| t.on), Some(false));
-    }
-
-    #[test]
-    fn fade_dims_held_bulbs_but_keeps_the_held_value() {
-        let mut rig = Rig::light(on(200));
-        rig.send(user(on(80)));
-        assert_eq!(rig.send(fade(on(200), 0.5)), Some(on(40)));
-        assert_eq!(rig.bulb.held(), Some(on(80)));
-        assert_eq!(rig.send(auto(on(200))), Some(on(80)));
-    }
-
-    #[test]
     fn reports_tracking_a_long_fade_are_not_overrides() {
         // Halfway through a 180s fade from 200 to off, reported a few
         // seconds behind the curve.
         let mut rig = Rig::light(on(200));
-        rig.send(fade(OFF, 1.0));
+        rig.send(fade(OFF));
         rig.wait(secs(90));
         rig.send(Input::Report(on(104)));
         assert_eq!(rig.bulb.mode, Mode::Auto);
@@ -745,8 +677,7 @@ mod tests {
         // bulb still reported its start level 13s in, then off.
         let mut rig = Rig::light(on(247));
         rig.send(Input::Auto {
-            target: on(247),
-            scale: 0.0,
+            target: OFF,
             transition: secs(30),
         });
         rig.wait(secs(13));
@@ -758,7 +689,7 @@ mod tests {
     #[test]
     fn optimistic_end_state_report_during_a_fade_is_not_an_override() {
         let mut rig = Rig::light(on(200));
-        rig.send(fade(OFF, 1.0));
+        rig.send(fade(OFF));
         rig.wait(secs(10));
         rig.send(Input::Report(OFF));
         assert_eq!(rig.bulb.mode, Mode::Auto);
@@ -768,14 +699,14 @@ mod tests {
     fn plug_already_off_schedules_nothing() {
         let mut rig = Rig::plug(on(254));
         rig.send(user(OFF));
-        rig.send(fade(on(254), 0.0));
+        rig.send(fade(OFF));
         assert_eq!(rig.bulb.deadline(), None);
     }
 
     #[test]
     fn app_change_during_a_long_fade_is_an_override() {
         let mut rig = Rig::light(on(200));
-        rig.send(fade(OFF, 1.0));
+        rig.send(fade(OFF));
         rig.wait(secs(90));
         rig.send(Input::Report(on(220)));
         assert_eq!(rig.bulb.held(), Some(on(220)));
@@ -795,13 +726,11 @@ mod tests {
     #[test]
     fn override_during_a_fade_stops_the_fade_for_that_bulb() {
         let mut rig = Rig::light(on(200));
-        rig.send(fade(on(200), 0.5));
+        rig.send(fade(OFF));
         rig.wait(secs(90));
         rig.send(Input::Report(on(220)));
-        // The room keeps fading; the bulb stays where the user put it.
-        assert_eq!(rig.send(fade(on(200), 0.2)), None);
-        assert_eq!(rig.send(fade(on(200), 0.0)), None);
-        // Release (vacancy) ends the hold and the exemption with it.
+        // The room keeps asking for off; the bulb stays where the user put it.
+        assert_eq!(rig.send(fade(OFF)), None);
         assert_eq!(
             rig.send(Input::Release { transition: FADE }).map(|t| t.on),
             Some(false)
@@ -819,8 +748,7 @@ mod tests {
     #[test]
     fn plug_stays_on_through_a_fade_and_switches_off_at_the_end() {
         let mut rig = Rig::plug(on(254));
-        assert_eq!(rig.send(fade(on(254), 0.3)), None);
-        assert_eq!(rig.send(fade(on(254), 0.0)), None);
+        assert_eq!(rig.send(fade(OFF)), None);
         let at = rig.bulb.deadline().expect("off scheduled");
         assert_eq!(at, rig.now + FADE);
         rig.wait(secs(90));
@@ -837,17 +765,17 @@ mod tests {
     #[test]
     fn plug_fade_off_deadline_is_not_postponed_by_resends() {
         let mut rig = Rig::plug(on(254));
-        rig.send(fade(on(254), 0.0));
+        rig.send(fade(OFF));
         let at = rig.bulb.deadline();
         rig.wait(secs(60));
-        rig.send(fade(on(254), 0.0));
+        rig.send(fade(OFF));
         assert_eq!(rig.bulb.deadline(), at);
     }
 
     #[test]
     fn plug_fade_off_is_cancelled_by_coming_back() {
         let mut rig = Rig::plug(on(254));
-        rig.send(fade(on(254), 0.0));
+        rig.send(fade(OFF));
         rig.wait(secs(60));
         // Still on, so nothing to publish -- just the off is called off.
         assert_eq!(rig.send(auto(on(254))), None);
@@ -857,7 +785,7 @@ mod tests {
     #[test]
     fn plug_turned_off_in_app_during_fade_is_held_off() {
         let mut rig = Rig::plug(on(254));
-        rig.send(fade(on(254), 0.0));
+        rig.send(fade(OFF));
         rig.wait(secs(60));
         rig.send(Input::Report(OFF));
         assert_eq!(rig.bulb.held().map(|t| t.on), Some(false));
