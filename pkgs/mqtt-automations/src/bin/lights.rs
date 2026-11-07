@@ -970,18 +970,24 @@ mod tests {
     }
 
     #[test]
-    fn bedroom_quiet_hours_and_wake_ramp() {
+    fn bedroom_sleeps_until_the_wake_ramp() {
         let Some(mut rig) = bedroom_at("2026-01-10T23:00:00+01:00") else {
             return;
         };
-        // Arriving at night switches nothing on.
+        rig.send("mqtt-auto/sunrise-lights/start-time", json!("07:30:00"));
+        rig.send("zigbee2mqtt/bedroom_button/action", json!("single"));
+        rig.mins(31);
+        assert_eq!(rig.state(0), "off");
+        // 07:00, moving in bed: the house sleeps, so nothing comes on.
+        rig.mins(7 * 60 + 29);
         assert!(sets(&rig.presence("bedroom_presence", true)).is_empty());
         rig.presence("bedroom_presence", false);
-        // 06:30: the ramp starts, from any state, even with nobody seen.
-        rig.mins(7 * 60 + 29);
+        // 07:30: the ramp starts, from any state, even with nobody seen.
+        rig.mins(29);
         assert_eq!(rig.state(0), "off");
         rig.mins(2);
         assert_eq!(rig.state(0), "wake");
+        assert_eq!(rig.house.house.as_deref(), Some("day"));
         let early = rig.house.rooms[0].room.bulbs[0].bulb.showing().unwrap();
         rig.mins(40);
         let late = rig.house.rooms[0].room.bulbs[0].bulb.showing().unwrap();
@@ -993,6 +999,31 @@ mod tests {
         // Over, and nobody seen for hours: off.
         rig.mins(10);
         assert_eq!(rig.state(0), "off");
+    }
+
+    #[test]
+    fn bedroom_without_a_ramp_wakes_at_nine() {
+        let Some(mut rig) = bedroom_at("2026-01-10T23:00:00+01:00") else {
+            return;
+        };
+        rig.send("mqtt-auto/sunrise-lights/duration", json!(0));
+        // Before bed, the house still awake: arriving lights the room.
+        assert!(!sets(&rig.presence("bedroom_presence", true)).is_empty());
+        rig.presence("bedroom_presence", false);
+        rig.mins(31);
+        assert_eq!(rig.state(0), "off");
+        // Nobody pressed the button: 02:00 puts the house to sleep anyway.
+        rig.mins(3 * 60);
+        assert_eq!(rig.house.house.as_deref(), Some("night"));
+        // 08:31: still night, nothing comes on.
+        rig.mins(6 * 60);
+        assert!(sets(&rig.presence("bedroom_presence", true)).is_empty());
+        rig.presence("bedroom_presence", false);
+        // 09:01: day, so the next movement lights the room.
+        rig.mins(30);
+        assert_eq!(rig.house.house.as_deref(), Some("day"));
+        assert!(!sets(&rig.presence("bedroom_presence", true)).is_empty());
+        assert_eq!(rig.state(0), "day");
     }
 
     #[test]

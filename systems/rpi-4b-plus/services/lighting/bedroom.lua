@@ -1,8 +1,8 @@
 -- Day: on at the sun's level while someone is here, with a floor that rises
 -- the longer they stay (up to 40% after two hours, 08:00-20:00) and starts
 -- low again after they leave. Off 30 minutes after the sensor last saw
--- anyone (sitting still at the desk). Arriving 22:00-08:00 switches nothing
--- on.
+-- anyone (sitting still at the desk). While the house sleeps, arriving
+-- switches nothing on, so moving in bed never lights the room.
 --
 -- Button: single -> bedtime, a dim warm light; in bedtime, single switches
 -- it off and on again. Hold: wind down -- dim now, off after five minutes.
@@ -10,8 +10,8 @@
 -- from all of them.
 --
 -- This room puts the house to sleep: bedtime and wind down announce night
--- (so does 02:00, if nobody did), and the wake ramp or a double press
--- announce day. It doesn't follow the house itself.
+-- (so does 02:00, if nobody did). The wake ramp, a double press, or 09:00
+-- at the latest announce day. It doesn't follow the house itself.
 local LOW = 25 -- of 254
 local ramp = wake_ramp()
 
@@ -26,6 +26,7 @@ local buttons = {
   ["button.double"] = { to = "day", announce = "day" },
   wake = { to = "wake", announce = "day" },
   late = { announce = "night" },
+  morning = { announce = "day" },
 }
 local function with(on)
   local t = {}
@@ -40,6 +41,7 @@ room{
   triggers = {
     wake = ramp.active,
     late = function() return clock() >= 2 and clock() < 3 end,
+    morning = function() return clock() >= 9 and clock() < 10 end,
   },
   default = "day",
   start = "off",
@@ -47,7 +49,7 @@ room{
     off = {
       hidden = true,
       look = { on = false, transition = 30 },
-      on = with{ present = { to = "resume", outside = { 22, 8 } } },
+      on = with{ present = { to = "resume", test = function(c) return c.house ~= "night" end } },
     },
     day = {
       look = sunlight{ floor = floor },
