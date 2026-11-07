@@ -353,6 +353,15 @@ let
             heading_style = "title";
           }
           {
+            # Announced by `lights` (MQTT discovery): day / night, which
+            # the bedroom button and the wake ramp also set.
+            type = "tile";
+            entity = "select.house_mode";
+            name = "House";
+            grid_options.columns = "full";
+            features = [ { type = "select-options"; } ];
+          }
+          {
             type = "tile";
             entity = "button.release_all_lights";
             name = "Reset all";

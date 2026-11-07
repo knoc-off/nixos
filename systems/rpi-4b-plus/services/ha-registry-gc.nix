@@ -53,7 +53,8 @@ let
     entities =
       map (e: e.unique_id) ownedEntities
       # Announced by `lights` itself (startup() in pkgs/mqtt-automations/src/bin/lights.rs).
-      ++ map (r: "lights_${r}_mode_select") (builtins.attrNames config.services.lighting.rooms);
+      ++ map (r: "lights_${r}_mode_select") (builtins.attrNames config.services.lighting.rooms)
+      ++ [ "lights_house_mode_select" ];
     devices = lib.unique (builtins.concatMap (e: e.device.identifiers or [ ]) ownedEntities);
   };
 

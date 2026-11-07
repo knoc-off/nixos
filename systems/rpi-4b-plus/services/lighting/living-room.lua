@@ -1,11 +1,15 @@
 -- Ceiling light and bulbs follow presence and the sun; the two lamp plugs
 -- switch with daylight whether anyone is here or not. Off 30 minutes after
--- the sensor last saw anyone by day (people sit still here, and mmWave
--- loses someone on the sofa), 2 minutes at night.
+-- the sensor last saw anyone (people sit still here, and mmWave loses
+-- someone on the sofa). While the house sleeps: dim and warm, lamps off, off
+-- two minutes after.
 --
 -- Button: single toggles the ceiling light, double or hold the whole room.
-local lamps = { carla_desk_lamp = sun_switch(), standing_lamp = sun_switch() }
+local lamp = sun_switch().on
+local function lamp_on(c) return c.house ~= "night" and lamp(c) end
+local lamps = { carla_desk_lamp = { on = lamp_on }, standing_lamp = { on = lamp_on } }
 local everything = { "light", "bulb_1", "bulb_2", "carla_desk_lamp", "standing_lamp" }
+local back = { { to = "night", house = "night" }, { to = "resume" } }
 
 local function with_buttons(on)
   on["button.single"] = { toggle = { "light" } }
@@ -24,16 +28,20 @@ room{
       hidden = true,
       look = { on = false, transition = 60 },
       per_light = lamps,
-      on = with_buttons{ present = "resume" },
+      on = with_buttons{ present = back },
     },
     auto = {
       look = sunlight(),
       per_light = lamps,
-      on = with_buttons{},
-      when = {
-        { to = "off", absent_for = 1800 },
-        { to = "off", absent_for = 120, between = { 22, 8 } },
-      },
+      on = with_buttons{ ["house.night"] = "night" },
+      when = { { to = "off", absent_for = 1800 } },
+    },
+    night = {
+      hidden = true,
+      look = { brightness = 25, color_temp = 454, transition = 1 },
+      per_light = { carla_desk_lamp = { on = false }, standing_lamp = { on = false } },
+      on = with_buttons{ ["house.day"] = "resume" },
+      when = { { to = "off", absent_for = 120 } },
     },
   }),
 }

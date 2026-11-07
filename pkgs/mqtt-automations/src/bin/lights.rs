@@ -19,12 +19,16 @@
 //!   - `lights/<room>/<bulb>/state` (retained, from here):
 //!     `{ "mode": "auto"|"held"|"unknown", "on", "brightness", "color_temp" }`.
 //!   - `lights/<room>/<bulb>/release` (to here): hand one bulb back.
+//!   - `lights/house` (retained, from here): the house mode some room last
+//!     announced (`announce` rows); read back once at startup to restore
+//!     it. `lights/house/set` (to here): set it from HA, whose select is
+//!     announced by discovery like the rooms'.
 //!   - Whatever settings topics the room files read.
 //!
 //! Config: a JSON file, see [`Config`]. `lights --check <file>` loads it and
 //! every room without connecting, for build-time validation.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context, Result};
@@ -89,6 +93,10 @@ enum Route {
     Release(usize, usize),
     Reset(usize),
     ResetAll,
+    /// HA picked a house mode.
+    HouseSet,
+    /// Our own retained `lights/house`, read back once to restore it.
+    HouseRestore,
 }
 
 struct Slot {
@@ -104,6 +112,10 @@ struct House {
     rooms: Vec<Slot>,
     /// One topic can feed several rooms (a shared setting or sensor).
     routes: HashMap<String, Vec<Route>>,
+    /// The house mode, once announced or restored.
+    house: Option<String>,
+    /// Every house mode some room announces or reacts to.
+    house_modes: Vec<String>,
 }
 
 impl House {
@@ -111,6 +123,8 @@ impl House {
         let mut routes: HashMap<String, Vec<Route>> = HashMap::new();
         let mut route = |topic: String, to: Route| routes.entry(topic).or_default().push(to);
         route("lights/release".into(), Route::ResetAll);
+        route("lights/house/set".into(), Route::HouseSet);
+        route("lights/house".into(), Route::HouseRestore);
         let mut rooms = Vec::new();
         for (r, (name, rc)) in cfg.rooms.into_iter().enumerate() {
             let bulbs = rc
@@ -173,7 +187,14 @@ impl House {
                 }
             }
         }
-        Ok(Self { rooms, routes })
+        let modes: BTreeSet<&str> = rooms.iter().flat_map(|s| s.room.house_modes()).collect();
+        let house_modes = modes.into_iter().map(str::to_owned).collect();
+        Ok(Self {
+            rooms,
+            routes,
+            house: None,
+            house_modes,
+        })
     }
 
     fn topics(&self) -> Vec<String> {
@@ -204,7 +225,20 @@ impl House {
                 retain: true,
             }
         });
-        gets.chain(selects).collect()
+        let house = (!self.house_modes.is_empty()).then(|| Out {
+            topic: "homeassistant/select/lights_house_mode/config".into(),
+            payload: json!({
+                "unique_id": "lights_house_mode_select",
+                "name": "House mode",
+                "icon": "mdi:home-clock-outline",
+                "command_topic": "lights/house/set",
+                "state_topic": "lights/house",
+                "value_template": "{{ value_json }}",
+                "options": self.house_modes,
+            }),
+            retain: true,
+        });
+        gets.chain(selects).chain(house).collect()
     }
 
     /// The next moment anything changes by itself.
@@ -273,6 +307,21 @@ impl House {
                     }
                     continue;
                 }
+                Route::HouseSet | Route::HouseRestore => {
+                    let restore = matches!(route, Route::HouseRestore);
+                    // After the first, `lights/house` is only our own echo.
+                    if restore && self.house.is_some() {
+                        continue;
+                    }
+                    match p
+                        .as_str()
+                        .filter(|m| self.house_modes.iter().any(|h| h == m))
+                    {
+                        Some(mode) => out.extend(self.broadcast(mode.to_owned(), now, wall)),
+                        None => eprintln!("house: no mode {p}"),
+                    }
+                    continue;
+                }
             };
             out.extend(self.step(r, event, now, wall));
         }
@@ -329,6 +378,36 @@ impl House {
             payload,
             retain: true,
         }));
+        for mode in outcome.announce {
+            if matches!(event, Event::House(_)) {
+                // One level only: a room answering a house mode with another
+                // could ping-pong the house forever.
+                eprintln!(
+                    "{}: ignoring announce {mode:?} made in reply to the house",
+                    self.rooms[r].room.name
+                );
+                continue;
+            }
+            out.extend(self.broadcast(mode, now, wall));
+        }
+        out
+    }
+
+    /// Set the house mode and tell every room, the announcing one included.
+    fn broadcast(&mut self, mode: String, now: Instant, wall: DateTime<FixedOffset>) -> Vec<Out> {
+        eprintln!("house: {mode}");
+        let mut out = Vec::new();
+        if self.house.as_ref() != Some(&mode) {
+            out.push(Out {
+                topic: "lights/house".into(),
+                payload: json!(mode),
+                retain: true,
+            });
+        }
+        self.house = Some(mode.clone());
+        for r in 0..self.rooms.len() {
+            out.extend(self.step(r, Event::House(&mode), now, wall));
+        }
         out
     }
 }
@@ -585,7 +664,7 @@ mod tests {
         assert_eq!(select["name"], "Hallway mode");
         assert_eq!(
             select["options"],
-            json!(["auto", "bright", "dim", "night", "manual"])
+            json!(["auto", "bright", "dim", "manual"])
         );
         assert_eq!(rig.state(0), "off");
         for l in &rig.house.rooms[0].room.bulbs {
@@ -687,15 +766,15 @@ mod tests {
     fn a_scene_picked_in_ha_is_resumed_then_forgotten() {
         let mut rig = hallway();
         rig.presence("motion", true);
-        let outs = rig.send("lights/hallway/mode/set", json!("night"));
-        assert_eq!(sets(&outs)[0].1["brightness"], 8);
-        assert_eq!(last(&outs, "lights/hallway/mode"), Some(&json!("night")));
+        let outs = rig.send("lights/hallway/mode/set", json!("dim"));
+        assert_eq!(sets(&outs)[0].1["brightness"], 76);
+        assert_eq!(last(&outs, "lights/hallway/mode"), Some(&json!("dim")));
 
         rig.presence("motion", false);
         rig.mins(2);
         let outs = rig.presence("motion", true);
-        assert_eq!(rig.state(0), "night");
-        assert_eq!(sets(&outs)[0].1["brightness"], 8);
+        assert_eq!(rig.state(0), "dim");
+        assert_eq!(sets(&outs)[0].1["brightness"], 76);
 
         rig.presence("motion", false);
         rig.mins(62);
@@ -926,7 +1005,9 @@ mod tests {
             "lua": lua,
         } }));
         rig.report_all(&["l"], json!({ "state": "OFF" }));
-        let door = |rig: &mut Rig, open: bool| rig.send("zigbee2mqtt/bathroom_door", json!({ "contact": !open }));
+        let door = |rig: &mut Rig, open: bool| {
+            rig.send("zigbee2mqtt/bathroom_door", json!({ "contact": !open }))
+        };
 
         // Door opened, nobody ever seen: on, then off after a minute.
         assert_eq!(sets(&door(&mut rig, true))[0].1["state"], "ON");
@@ -985,9 +1066,17 @@ mod tests {
         for d in ["lamp1", "lamp2"] {
             rig.send(&format!("mqtt-auto/sun-follow/{d}/invert"), json!(true));
         }
-        rig.report_all(&["ceiling", "b1", "b2", "lamp1", "lamp2"], json!({ "state": "OFF" }));
+        rig.report_all(
+            &["ceiling", "b1", "b2", "lamp1", "lamp2"],
+            json!({ "state": "OFF" }),
+        );
         let on = |rig: &Rig, name: &str| {
-            let l = rig.house.rooms[0].room.bulbs.iter().find(|l| l.name == name).unwrap();
+            let l = rig.house.rooms[0]
+                .room
+                .bulbs
+                .iter()
+                .find(|l| l.name == name)
+                .unwrap();
             l.bulb.showing().unwrap().on
         };
 
@@ -1006,8 +1095,128 @@ mod tests {
         assert!(!on(&rig, "light") && on(&rig, "bulb_1"));
         // Double: something is on, so everything goes off, lamps too.
         rig.send("zigbee2mqtt/livingroom_button/action", json!("double"));
-        let all = ["light", "bulb_1", "bulb_2", "carla_desk_lamp", "standing_lamp"];
+        let all = [
+            "light",
+            "bulb_1",
+            "bulb_2",
+            "carla_desk_lamp",
+            "standing_lamp",
+        ];
         assert!(all.iter().all(|b| !on(&rig, b)));
+    }
+
+    /// Bedroom, hallway and living room from the real files.
+    fn house_at(wall: &str) -> Option<Rig> {
+        let rooms = json!({
+            "bedroom": {
+                "bulbs": { "bulb_1": { "device": "b1" }, "bulb_2": { "device": "b2" } },
+                "lua": real("bedroom")?,
+            },
+            "hallway": {
+                "bulbs": { "bulb_1": { "device": "h1" } },
+                "lua": real("hallway")?,
+            },
+            "living-room": {
+                "bulbs": {
+                    "light": { "device": "ceiling" }, "bulb_1": { "device": "l1" }, "bulb_2": { "device": "l2" },
+                    "carla_desk_lamp": { "device": "lamp1", "dimmable": false },
+                    "standing_lamp": { "device": "lamp", "dimmable": false },
+                },
+                "lua": real("living-room")?,
+            },
+        });
+        let mut rig = Rig::at(rooms, wall);
+        rig.send("mqtt-auto/sun-follow/lamp/invert", json!(true));
+        let all = ["b1", "b2", "h1", "ceiling", "l1", "l2", "lamp1", "lamp"];
+        rig.report_all(&all, json!({ "state": "OFF" }));
+        Some(rig)
+    }
+
+    fn showing(rig: &Rig, room: usize, bulb: &str) -> Target {
+        let l = rig.house.rooms[room]
+            .room
+            .bulbs
+            .iter()
+            .find(|l| l.name == bulb)
+            .unwrap();
+        l.bulb.showing().unwrap()
+    }
+
+    #[test]
+    fn bedtime_puts_the_house_to_sleep_and_the_wake_ramp_wakes_it() {
+        let Some(mut rig) = house_at("2026-01-10T23:00:00+01:00") else {
+            return;
+        };
+        let (bedroom, hallway, living) = (0, 1, 2);
+        rig.presence("livingroom_presence", true);
+        assert_eq!(rig.state(living), "auto");
+        assert!(
+            showing(&rig, living, "standing_lamp").on,
+            "the lamp is on in the dark"
+        );
+
+        // Bedtime: the house goes to sleep, the living room dims at once and
+        // its lamp goes off.
+        let outs = rig.send("zigbee2mqtt/bedroom_button/action", json!("single"));
+        assert_eq!(last(&outs, "lights/house"), Some(&json!("night")));
+        assert_eq!(rig.state(bedroom), "bedtime");
+        assert_eq!(rig.state(living), "night");
+        assert_eq!(showing(&rig, living, "light").brightness, 25);
+        assert!(!showing(&rig, living, "standing_lamp").on);
+        // Two minutes after leaving, not thirty.
+        rig.presence("livingroom_presence", false);
+        rig.wait(Duration::from_secs(120));
+        assert_eq!(rig.state(living), "off");
+
+        // A walk down the hallway: faint, and off 30 seconds after.
+        let outs = rig.presence("hallway_motion", true);
+        assert_eq!(sets(&outs)[0].1["brightness"], 8);
+        rig.presence("hallway_motion", false);
+        rig.wait(Duration::from_secs(30));
+        assert_eq!(rig.state(hallway), "off");
+
+        // 06:30, the ramp: day again. The hallway is back to normal.
+        rig.mins(7 * 60 + 31);
+        assert_eq!(rig.state(bedroom), "wake");
+        assert_eq!(rig.house.house.as_deref(), Some("day"));
+        rig.presence("hallway_motion", true);
+        assert_eq!(rig.state(hallway), "auto");
+        rig.presence("hallway_motion", false);
+        rig.mins(1);
+        assert_eq!(rig.state(hallway), "off");
+    }
+
+    #[test]
+    fn the_house_falls_asleep_at_two_and_ha_can_set_it() {
+        let Some(mut rig) = house_at("2026-01-10T01:50:00+01:00") else {
+            return;
+        };
+        rig.presence("hallway_motion", true);
+        assert_eq!(rig.state(1), "auto");
+        rig.mins(11);
+        assert_eq!(rig.house.house.as_deref(), Some("night"));
+        assert_eq!(rig.state(1), "night");
+
+        let startup = rig.house.startup();
+        let select = last(&startup, "homeassistant/select/lights_house_mode/config").unwrap();
+        assert_eq!(select["options"], json!(["day", "night"]));
+        rig.send("lights/house/set", json!("day"));
+        assert_eq!(rig.state(1), "auto");
+        rig.send("lights/house/set", json!("disco"));
+        assert_eq!(rig.house.house.as_deref(), Some("day"));
+    }
+
+    #[test]
+    fn a_restart_restores_the_house_mode_once() {
+        let Some(mut rig) = house_at("2026-01-10T23:00:00+01:00") else {
+            return;
+        };
+        rig.send("lights/house", json!("night"));
+        let outs = rig.presence("hallway_motion", true);
+        assert_eq!(sets(&outs)[0].1["brightness"], 8);
+        // Later copies are our own echo, never an instruction.
+        rig.send("lights/house", json!("day"));
+        assert_eq!(rig.house.house.as_deref(), Some("night"));
     }
 
     #[test]

@@ -43,9 +43,11 @@ const ROOM: &str = "room";
 const PRELUDE: &str = include_str!("prelude.lua");
 
 const LOOK_KEYS: [&str; 4] = ["on", "brightness", "color_temp", "transition"];
-const ROW_KEYS: [&str; 7] = [
+const ROW_KEYS: [&str; 9] = [
     "to",
     "toggle",
+    "announce",
+    "house",
     "present",
     "absent_for",
     "time_in_state",
@@ -97,8 +99,11 @@ pub struct State {
     pub when: Vec<Row>,
 }
 
+/// At least one of `go` and `announce`.
 pub struct Row {
-    pub go: Go,
+    pub go: Option<Go>,
+    /// A house mode to tell every room about (event `house.<name>`).
+    pub announce: Option<String>,
     pub cond: Cond,
 }
 
@@ -114,6 +119,8 @@ pub enum Go {
 /// All set fields must hold.
 #[derive(Default)]
 pub struct Cond {
+    /// The house mode last announced.
+    pub house: Option<String>,
     pub present: Option<bool>,
     pub absent_for: Option<Duration>,
     pub time_in_state: Option<Duration>,
@@ -135,6 +142,7 @@ pub struct Look {
 pub struct Ctx<'a> {
     pub light: Option<&'a str>,
     pub state: &'a str,
+    pub house: Option<&'a str>,
     pub present: bool,
     pub present_for: f64,
     pub absent_for: f64,
@@ -399,6 +407,7 @@ impl Script {
         events.extend(triggers.iter().map(|(n, _)| n.clone()));
         let known_event = |e: &str| {
             events.contains(e)
+                || e.strip_prefix("house.").is_some_and(|n| !n.is_empty())
                 || buttons.iter().any(|(b, _)| {
                     e.strip_prefix(b.as_str())
                         .is_some_and(|a| a.len() > 1 && a.starts_with('.'))
@@ -479,6 +488,13 @@ impl Script {
             Value::Nil => Vec::new(),
             v => self.rows(v, index, lights).context("when")?,
         };
+        // Checked all the time, so anything but a move would repeat forever.
+        if when
+            .iter()
+            .any(|r| r.announce.is_some() || !matches!(r.go, Some(Go::State(_) | Go::Resume)))
+        {
+            bail!("when: rows can only `to` a state (toggles and announces belong in `on`)");
+        }
         Ok(State {
             name: name.to_owned(),
             hidden: s
@@ -501,12 +517,14 @@ impl Script {
     ) -> Result<Vec<Row>> {
         match v {
             Value::String(s) => Ok(vec![Row {
-                go: go(&s.to_str().map_err(lua_err)?, index)?,
+                go: Some(go(&s.to_str().map_err(lua_err)?, index)?),
+                announce: None,
                 cond: Cond::default(),
             }]),
             Value::Table(t)
-                if t.contains_key("to").map_err(lua_err)?
-                    || t.contains_key("toggle").map_err(lua_err)? =>
+                if ["to", "toggle", "announce"]
+                    .iter()
+                    .any(|k| t.contains_key(*k).unwrap_or(false)) =>
             {
                 Ok(vec![self.row(&t, index, lights)?])
             }
@@ -533,9 +551,10 @@ impl Script {
         check_keys(t, &allowed, "row")?;
         let to: Option<String> = t.get("to").map_err(lua_err)?;
         let toggle: Option<Vec<String>> = t.get("toggle").map_err(lua_err)?;
+        let announce: Option<String> = t.get("announce").map_err(lua_err)?;
         let go = match (to, toggle) {
-            (Some(to), None) => go(&to, index)?,
-            (None, Some(names)) => Go::Toggle(
+            (Some(to), None) => Some(go(&to, index)?),
+            (None, Some(names)) => Some(Go::Toggle(
                 names
                     .iter()
                     .map(|n| {
@@ -545,9 +564,13 @@ impl Script {
                             .ok_or_else(|| anyhow!("toggle: no light {n:?} in this room"))
                     })
                     .collect::<Result<_>>()?,
-            ),
-            _ => bail!("a row needs exactly one of `to` and `toggle`"),
+            )),
+            (None, None) if announce.is_some() => None,
+            _ => bail!("a row needs one of `to` and `toggle`, or an `announce`"),
         };
+        if announce.as_deref() == Some("") {
+            bail!("announce needs a name");
+        }
         let hours = |key: &str| -> Result<Option<(f64, f64)>> {
             let v: Option<Vec<f64>> = t.get(key).map_err(lua_err)?;
             match v.as_deref() {
@@ -561,7 +584,9 @@ impl Script {
         let test: Option<Function> = t.get(ROW_TEST).map_err(lua_err)?;
         Ok(Row {
             go,
+            announce,
             cond: Cond {
+                house: t.get("house").map_err(lua_err)?,
                 present: t.get("present").map_err(lua_err)?,
                 absent_for: secs(t.get("absent_for").map_err(lua_err)?, "absent_for")?,
                 time_in_state: secs(t.get("time_in_state").map_err(lua_err)?, "time_in_state")?,
@@ -579,6 +604,7 @@ impl Script {
             let ctx = |light| Ctx {
                 light,
                 state: &state.name,
+                house: None,
                 present: false,
                 present_for: 0.0,
                 absent_for: 0.0,
@@ -599,6 +625,7 @@ impl Script {
             let ctx = Ctx {
                 light: None,
                 state: &spec.states[spec.start].name,
+                house: None,
                 present: false,
                 present_for: 0.0,
                 absent_for: 0.0,
@@ -832,6 +859,7 @@ mod tests {
         Ctx {
             light: Some(light),
             state,
+            house: None,
             present: true,
             present_for: 0.0,
             absent_for: 0.0,
@@ -905,7 +933,11 @@ mod tests {
             ),
             (
                 r#"room{ default = "on", states = { on = { when = { { to = "on", toggle = { "a" } } } } } }"#,
-                "exactly one",
+                "needs one of",
+            ),
+            (
+                r#"room{ default = "on", states = { on = { when = { { present = true } } } } }"#,
+                "needs one of",
             ),
             (
                 r#"room{ default = "on", states = { on = { extends = "on" } } }"#,

@@ -25,16 +25,22 @@
 --   }
 --
 -- Rows: { to = "<state>" | "resume", <conditions> } or
--- { toggle = { <light>, ... }, <conditions> }. The first row whose
--- conditions all hold is taken. Conditions: present = bool;
+-- { toggle = { <light>, ... }, <conditions> }, either optionally with
+-- announce = "<house mode>" (an `on` row may also only announce). The first
+-- row whose conditions all hold is taken. Conditions: present = bool;
 -- absent_for, time_in_state = secs (at least); between, outside =
--- { from_hour, to_hour }; test = function(c) -> bool.
+-- { from_hour, to_hour }; house = "<mode>"; test = function(c) -> bool.
+-- `when` rows can only move the room.
+--
+-- The house mode: any room can announce one; every room then gets the
+-- event house.<mode> and sees it as c.house / the `house` condition. HA
+-- shows and sets it ("House mode"), and it survives restarts.
 --
 -- Look: brightness 1-254, color_temp in mireds, transition in seconds (used
 -- when the state is entered; while it lasts, changes glide over 2s). Any
--- value may be a function(c). c = { light, state, present, present_for,
--- absent_for, time_in_state, clock }. A state without a look leaves the
--- lights alone; `manual` is such a state and always exists.
+-- value may be a function(c). c = { light, state, house, present,
+-- present_for, absent_for, time_in_state, clock }. A state without a look
+-- leaves the lights alone; `manual` is such a state and always exists.
 --
 -- Manual changes (HA, the app, a wall switch, a toggle row) hold until the
 -- room changes state. Leaving a mode (a state that isn't hidden) remembers
@@ -182,11 +188,10 @@ function wake_ramp()
   }
 end
 
--- HA's bright / dim / night modes: `base` at a fixed brightness (and warm,
--- for night), otherwise behaving like it.
+-- HA's bright / dim modes: `base` at a fixed brightness, otherwise behaving
+-- like it. (Night is the house's: rooms declare their own.)
 function scenes(base, states)
   states.bright = { extends = base, look = { brightness = 254 } }
   states.dim = { extends = base, look = { brightness = 76 } }
-  states.night = { extends = base, look = { brightness = 8, color_temp = 454 } }
   return states
 end

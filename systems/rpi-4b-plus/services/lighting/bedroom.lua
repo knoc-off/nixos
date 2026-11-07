@@ -1,13 +1,17 @@
 -- Day: on at the sun's level while someone is here, with a floor that rises
 -- the longer they stay (up to 40% after two hours, 08:00-20:00) and starts
 -- low again after they leave. Off 30 minutes after the sensor last saw
--- anyone (sitting still at the desk), 2 minutes at night. Arriving
--- 22:00-08:00 switches nothing on.
+-- anyone (sitting still at the desk). Arriving 22:00-08:00 switches nothing
+-- on.
 --
 -- Button: single -> bedtime, a dim warm light; in bedtime, single switches
 -- it off and on again. Hold: wind down -- dim now, off after five minutes.
 -- Double: back to day. The wake ramp (HA "Sunrise ..." settings) takes over
 -- from all of them.
+--
+-- This room puts the house to sleep: bedtime and wind down announce night
+-- (so does 02:00, if nobody did), and the wake ramp or a double press
+-- announce day. It doesn't follow the house itself.
 local LOW = 25 -- of 254
 local ramp = wake_ramp()
 
@@ -17,10 +21,11 @@ local function floor(c)
 end
 
 local buttons = {
-  ["button.single"] = "bedtime",
-  ["button.hold"] = "winddown",
-  ["button.double"] = "day",
-  wake = "wake",
+  ["button.single"] = { to = "bedtime", announce = "night" },
+  ["button.hold"] = { to = "winddown", announce = "night" },
+  ["button.double"] = { to = "day", announce = "day" },
+  wake = { to = "wake", announce = "day" },
+  late = { announce = "night" },
 }
 local function with(on)
   local t = {}
@@ -32,7 +37,10 @@ end
 room{
   presence = { "bedroom_presence" },
   buttons = { button = "bedroom_button" },
-  triggers = { wake = ramp.active },
+  triggers = {
+    wake = ramp.active,
+    late = function() return clock() >= 2 and clock() < 3 end,
+  },
   default = "day",
   start = "off",
   states = scenes("day", {
@@ -44,10 +52,7 @@ room{
     day = {
       look = sunlight{ floor = floor },
       on = with{},
-      when = {
-        { to = "off", absent_for = 1800 },
-        { to = "off", absent_for = 120, between = { 22, 8 } },
-      },
+      when = { { to = "off", absent_for = 1800 } },
     },
     -- Ramps up, then stays at its peak until the room empties. Whoever
     -- sleeps through it may be invisible to the sensor, so absence only

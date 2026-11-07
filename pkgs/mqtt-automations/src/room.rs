@@ -67,6 +67,8 @@ pub enum Event<'a> {
         topic: &'a str,
         payload: &'a Value,
     },
+    /// The house mode changed (some room announced it, or HA set it).
+    House(&'a str),
 }
 
 #[derive(Default, Debug)]
@@ -75,6 +77,8 @@ pub struct Outcome {
     pub commands: BTreeMap<usize, Command>,
     /// Retained (topic, value) pairs that changed.
     pub publish: Vec<(String, Value)>,
+    /// House modes this room announced, for the caller to tell every room.
+    pub announce: Vec<String>,
 }
 
 struct Memory {
@@ -96,6 +100,8 @@ pub struct Room {
     /// When `present` last changed (startup counts as a change).
     present_changed: Instant,
     memory: Option<Memory>,
+    /// The house mode last announced, if any yet.
+    house: Option<String>,
     /// Each trigger's last value, to fire on the rising edge only.
     triggered: Vec<bool>,
     last_eval: Instant,
@@ -137,6 +143,7 @@ impl Room {
             present: false,
             present_changed: now,
             memory: None,
+            house: None,
             // Due straight away, so the looks go out at startup.
             last_eval: now.checked_sub(EVAL_EVERY).unwrap_or(now),
             published: BTreeMap::new(),
@@ -164,6 +171,18 @@ impl Room {
         let default = self.spec.states[self.spec.default].name.as_str();
         modes.sort_by_key(|&m| (m != default, m == "manual", m));
         modes
+    }
+
+    /// House modes this room announces or reacts to.
+    pub fn house_modes(&self) -> BTreeSet<&str> {
+        let states = self.spec.states.iter();
+        let handled = states
+            .clone()
+            .flat_map(|s| s.on.keys())
+            .filter_map(|e| e.strip_prefix("house."));
+        let rows = states.flat_map(|s| s.on.values().flatten().chain(&s.when));
+        let announced = rows.filter_map(|r| r.announce.as_deref());
+        handled.chain(announced).collect()
     }
 
     pub fn state_name(&self) -> &str {
@@ -235,6 +254,10 @@ impl Room {
                 }
             }
             Event::Setting { topic, payload } => self.script.setting(topic, payload),
+            Event::House(name) => {
+                self.house = Some(name.to_owned());
+                events.push(format!("house.{name}"));
+            }
         }
 
         for i in 0..self.spec.triggers.len() {
@@ -276,13 +299,19 @@ impl Room {
     }
 
     fn take(&mut self, event: &str, i: usize, now: Instant, clock: f64, step: &mut Step) {
-        let go = &self.spec.states[self.state].on[event][i].go;
-        self.go(go_of(go), now, clock, step, event);
+        let row = &self.spec.states[self.state].on[event][i];
+        let (go, announce) = (row.go.as_ref().map(go_of), row.announce.clone());
+        step.announce.extend(announce);
+        if let Some(go) = go {
+            self.go(go, now, clock, step, event);
+        }
     }
 
     fn take_when(&mut self, i: usize, now: Instant, clock: f64, step: &mut Step) {
-        let go = &self.spec.states[self.state].when[i].go;
-        self.go(go_of(go), now, clock, step, "when");
+        // The loader only lets `when` rows move the room (see script.rs).
+        if let Some(go) = self.spec.states[self.state].when[i].go.as_ref().map(go_of) {
+            self.go(go, now, clock, step, "when");
+        }
     }
 
     fn go(&mut self, go: GoOwned, now: Instant, clock: f64, step: &mut Step, why: &str) {
@@ -389,7 +418,10 @@ impl Room {
         }
         inputs.extend(step.after);
 
-        let mut out = Outcome::default();
+        let mut out = Outcome {
+            announce: step.announce,
+            ..Outcome::default()
+        };
         for (b, input) in inputs {
             let l = &mut self.bulbs[b];
             let before = l.bulb.mode;
@@ -453,6 +485,7 @@ impl Room {
         Ctx {
             light,
             state: self.state_name(),
+            house: self.house.as_deref(),
             present: self.present,
             present_for: if self.present { since_change } else { 0.0 },
             absent_for: if self.present { 0.0 } else { since_change },
@@ -463,7 +496,10 @@ impl Room {
 
     fn holds(&self, c: &Cond, now: Instant, clock: f64) -> bool {
         let absent = now - self.present_changed;
-        c.present.is_none_or(|p| p == self.present)
+        c.house
+            .as_deref()
+            .is_none_or(|h| self.house.as_deref() == Some(h))
+            && c.present.is_none_or(|p| p == self.present)
             && c.absent_for.is_none_or(|d| !self.present && absent >= d)
             && c.time_in_state.is_none_or(|d| now - self.since >= d)
             && c.between.is_none_or(|(a, b)| in_hours(clock, a, b))
@@ -505,6 +541,7 @@ struct Step {
     entered: bool,
     /// Applied last: restored holds and toggles.
     after: Vec<(usize, Input)>,
+    announce: Vec<String>,
 }
 
 /// [`Go`] without the borrow on the spec.
