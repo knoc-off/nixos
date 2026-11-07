@@ -1,6 +1,6 @@
-# Entity registry GC for the lighting MQTT entities (unique_ids
-# `sun_follow_*`, a name kept from the sun-follow daemons they replaced;
-# see services/lighting/home-assistant.nix).
+# Entity registry GC for the lighting MQTT entities: unique_ids `sun_follow_*`
+# (per bulb, a name kept from the sun-follow daemons they replaced) and
+# `lights_*` (per room and house; see services/lighting/home-assistant.nix).
 #
 # Home Assistant never removes YAML-configured MQTT entities from its entity
 # registry. When one disappears from the config, `__async_remove_impl`
@@ -19,10 +19,11 @@
 # stopped -- HA loads the registry at startup and rewrites it from memory, so
 # editing underneath a running instance would simply be overwritten.
 #
-# Scope is deliberately narrow: only entities whose unique_id starts with
-# `sun_follow_` and devices identified as `sun-follow-*`. Everything else
-# (zigbee2mqtt discovery, mobile_app, ...) is owned by something else and is
-# never touched.
+# Scope is deliberately narrow: only MQTT entities whose unique_id starts with
+# `sun_follow_` or `lights_`, and devices identified as `sun-follow-*`.
+# Everything else (zigbee2mqtt discovery, mobile_app, automations that happen
+# to be called lights_..., ...) is owned by something else and is never
+# touched.
 {
   config,
   lib,
@@ -32,22 +33,28 @@
 let
   haConfig = config.services.home-assistant.config;
 
-  mqttEntities =
-    (haConfig.mqtt.switch or [ ])
-    ++ (haConfig.mqtt.number or [ ])
-    ++ (haConfig.mqtt.button or [ ])
-    ++ (haConfig.mqtt.sensor or [ ]);
+  mqttEntities = builtins.concatMap (domain: haConfig.mqtt.${domain} or [ ]) [
+    "switch"
+    "number"
+    "button"
+    "sensor"
+    "binary_sensor"
+    "select"
+    "time"
+  ];
 
-  sunFollowEntities = builtins.filter (e: lib.hasPrefix "sun_follow_" e.unique_id) mqttEntities;
+  owned = e: lib.hasPrefix "sun_follow_" e.unique_id || lib.hasPrefix "lights_" e.unique_id;
+  ownedEntities = builtins.filter owned mqttEntities;
 
   # Both halves of the desired state are emitted explicitly rather than having
   # the script recover device ids by string-splitting unique_ids -- that
   # coupling would break silently the first time either naming scheme changed.
-  desiredFile = (pkgs.formats.json { }).generate "ha-sun-follow-desired.json" {
-    entities = map (e: e.unique_id) sunFollowEntities;
-    devices = lib.unique (
-      builtins.concatMap (e: e.device.identifiers or [ ]) sunFollowEntities
-    );
+  desiredFile = (pkgs.formats.json { }).generate "ha-lighting-desired.json" {
+    entities =
+      map (e: e.unique_id) ownedEntities
+      # Announced by `lights` itself (startup() in pkgs/mqtt-automations/src/bin/lights.rs).
+      ++ map (r: "lights_${r}_mode_select") (builtins.attrNames config.services.lighting.rooms);
+    devices = lib.unique (builtins.concatMap (e: e.device.identifiers or [ ]) ownedEntities);
   };
 
   gc = pkgs.writeShellApplication {
@@ -88,26 +95,22 @@ let
         mv "$tmp" "$target"
       }
 
+      owned='def owned: .platform == "mqtt" and (.unique_id | type) == "string"
+        and (.unique_id | startswith("sun_follow_") or startswith("lights_"));'
+
       # Report what goes before it goes, so the journal says which entities
       # were dropped rather than just a count.
-      jq -r --slurpfile d "$desired" '
+      jq -r --slurpfile d "$desired" "$owned"'
         ($d[0].entities | map({(.): true}) | add // {}) as $want
         | .data.entities[]
-        | select((.unique_id | type) == "string")
-        | select(.unique_id | startswith("sun_follow_"))
+        | select(owned)
         | select($want[.unique_id] // false | not)
         | "  stale entity: \(.entity_id)  <=  \(.unique_id)"
       ' "$entities"
 
-      rewrite "$entities" '
+      rewrite "$entities" "$owned"'
         ($d[0].entities | map({(.): true}) | add // {}) as $want
-        | .data.entities |= map(
-            select(
-              ((.unique_id | type) != "string")
-              or (.unique_id | startswith("sun_follow_") | not)
-              or ($want[.unique_id] // false)
-            )
-          )
+        | .data.entities |= map(select((owned | not) or ($want[.unique_id] // false)))
       ' '.data.entities' "entity"
 
       [ -f "$devices" ] || exit 0
@@ -126,7 +129,7 @@ let
 in
 {
   systemd.services.ha-registry-gc = {
-    description = "Remove orphaned sun-follow entities from the Home Assistant registry";
+    description = "Remove orphaned lighting entities from the Home Assistant registry";
     # Before, not after: HA reads the registry at startup and rewrites it from
     # memory, so anything changed under a running instance is discarded.
     before = [ "home-assistant.service" ];
