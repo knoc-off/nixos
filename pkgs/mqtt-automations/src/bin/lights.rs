@@ -14,21 +14,23 @@
 //!     is published here by discovery, with the room's modes as options.
 //!   - `lights/<room>/occupied` (retained, from here), for rooms with
 //!     presence sensors.
-//!   - `lights/<room>/release` (to here): reset the room: holds and memory
-//!     dropped, default state. `lights/release`: every room.
+//!   - `lights/<room>/release` (to here): reset the room as if just started:
+//!     holds and memory dropped, start state, sensors replayed.
+//!     `lights/release`: every room, and the house back to its first mode.
 //!   - `lights/<room>/<bulb>/state` (retained, from here):
 //!     `{ "mode": "auto"|"held"|"unknown", "on", "brightness", "color_temp" }`.
 //!   - `lights/<room>/<bulb>/release` (to here): hand one bulb back.
-//!   - `lights/house` (retained, from here): the house mode some room last
-//!     announced (`announce` rows); read back once at startup to restore
-//!     it. `lights/house/set` (to here): set it from HA, whose select is
-//!     announced by discovery like the rooms'.
+//!   - `lights/house` (retained, from here): the house mode (one of the
+//!     config's `house_modes`) some room last announced (`announce` rows);
+//!     read back once at startup to restore it. `lights/house/set` (to
+//!     here): set it from HA, whose select is announced by discovery like
+//!     the rooms'.
 //!   - Whatever settings topics the room files read.
 //!
 //! Config: a JSON file, see [`Config`]. `lights --check <file>` loads it and
 //! every room without connecting, for build-time validation.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, HashMap};
 use std::time::{Duration, Instant};
 
 use anyhow::{bail, Context, Result};
@@ -44,6 +46,10 @@ use serde_json::{json, Value};
 struct Config {
     latitude: f64,
     longitude: f64,
+    /// The house modes rooms may announce and react to; the first is what
+    /// resetting every room returns the house to.
+    #[serde(default)]
+    house_modes: Vec<String>,
     rooms: BTreeMap<String, RoomConfig>,
 }
 
@@ -114,7 +120,7 @@ struct House {
     routes: HashMap<String, Vec<Route>>,
     /// The house mode, once announced or restored.
     house: Option<String>,
-    /// Every house mode some room announces or reacts to.
+    /// From the config; every one a room uses is among them.
     house_modes: Vec<String>,
 }
 
@@ -187,13 +193,21 @@ impl House {
                 }
             }
         }
-        let modes: BTreeSet<&str> = rooms.iter().flat_map(|s| s.room.house_modes()).collect();
-        let house_modes = modes.into_iter().map(str::to_owned).collect();
+        for slot in &rooms {
+            if let Some(m) = slot
+                .room
+                .house_modes()
+                .into_iter()
+                .find(|m| !cfg.house_modes.iter().any(|h| h == m))
+            {
+                bail!("room {}: no house mode {m:?} (houseModes)", slot.room.name);
+            }
+        }
         Ok(Self {
             rooms,
             routes,
             house: None,
-            house_modes,
+            house_modes: cfg.house_modes,
         })
     }
 
@@ -302,6 +316,10 @@ impl House {
                 Route::Release(r, b) => (*r, Event::Release(*b)),
                 Route::Reset(r) => (*r, Event::Reset),
                 Route::ResetAll => {
+                    // The house first, so rooms reset straight into it.
+                    if let Some(mode) = self.house_modes.first().cloned() {
+                        out.extend(self.broadcast(mode, now, wall));
+                    }
                     for r in 0..self.rooms.len() {
                         out.extend(self.step(r, Event::Reset, now, wall));
                     }
@@ -549,13 +567,19 @@ mod tests {
         wall: DateTime<FixedOffset>,
     }
 
+    /// As in systems/rpi-4b-plus/services/lighting/default.nix.
+    const HOUSE_MODES: [&str; 3] = ["day", "bright", "night"];
+
     impl Rig {
         fn new(rooms: Value) -> Self {
             Self::at(rooms, NOON)
         }
 
         fn at(rooms: Value, wall: &str) -> Self {
-            let cfg = json!({ "latitude": 52.52, "longitude": 13.405, "rooms": rooms });
+            let cfg = json!({
+                "latitude": 52.52, "longitude": 13.405,
+                "house_modes": HOUSE_MODES, "rooms": rooms,
+            });
             let now = Instant::now();
             let wall = DateTime::parse_from_rfc3339(wall).unwrap();
             let mut rig = Self {
@@ -1072,6 +1096,32 @@ mod tests {
         rig.wait(Duration::from_secs(1));
         rig.presence("bathroom_presence", true);
         assert_eq!(rig.state(0), "auto");
+
+        // Reset, nobody there: dark, not a minute of light.
+        rig.presence("bathroom_presence", false);
+        rig.mins(1);
+        assert_eq!(rig.state(0), "off");
+        let outs = rig.send("lights/bathroom/release", json!("release"));
+        assert!(
+            !sets(&outs).iter().any(|s| s.1["state"] == "ON"),
+            "{outs:?}"
+        );
+        assert_eq!(rig.state(0), "off");
+        // Reset with the door open: lit, as at startup.
+        door(&mut rig, true);
+        rig.send("lights/bathroom/release", json!("release"));
+        assert_eq!(rig.state(0), "auto");
+
+        // While the house sleeps: dim, warm, the same rules.
+        rig.mins(2);
+        door(&mut rig, false);
+        rig.wait(Duration::from_secs(3));
+        rig.send("lights/house/set", json!("night"));
+        let outs = door(&mut rig, true);
+        assert_eq!(rig.state(0), "night");
+        assert_eq!(sets(&outs)[0].1["brightness"], 20);
+        rig.wait(Duration::from_secs(60));
+        assert_eq!(rig.state(0), "off");
     }
 
     #[test]
@@ -1228,7 +1278,7 @@ mod tests {
 
         let startup = rig.house.startup();
         let select = last(&startup, "homeassistant/select/lights_house_mode/config").unwrap();
-        assert_eq!(select["options"], json!(["bright", "day", "night"]));
+        assert_eq!(select["options"], json!(HOUSE_MODES));
         rig.send("lights/house/set", json!("day"));
         assert_eq!(rig.state(1), "auto");
         rig.send("lights/house/set", json!("disco"));
@@ -1266,6 +1316,45 @@ mod tests {
     }
 
     #[test]
+    fn a_reset_never_contradicts_the_house_or_lights_an_empty_room() {
+        let Some(mut rig) = house_at("2026-01-10T23:00:00+01:00") else {
+            return;
+        };
+        let (hallway, living) = (1, 2);
+        rig.presence("livingroom_presence", true);
+        rig.send("lights/house/set", json!("night"));
+        assert_eq!(rig.state(living), "night");
+
+        // One room reset while the house sleeps: still night.
+        rig.send("lights/living-room/release", json!("release"));
+        assert_eq!(rig.state(living), "night");
+        // Someone picking auto in HA: straight back to night too.
+        rig.send("lights/living-room/mode/set", json!("auto"));
+        assert_eq!(rig.state(living), "night");
+
+        // Reset everything: the house wakes with it, the empty hallway stays
+        // dark.
+        let outs = rig.send("lights/release", json!("release"));
+        assert_eq!(last(&outs, "lights/house"), Some(&json!("day")));
+        assert_eq!(rig.state(living), "auto");
+        assert_eq!(rig.state(hallway), "off");
+        assert!(!outs
+            .iter()
+            .any(|o| o.topic.starts_with("zigbee2mqtt/h1") && o.payload["state"] == "ON"));
+    }
+
+    #[test]
+    fn a_house_mode_not_in_the_config_fails_loading() {
+        let cfg = json!({ "latitude": 0.0, "longitude": 0.0, "house_modes": ["day"], "rooms": { "r": {
+            "bulbs": { "a": { "device": "a" } },
+            "lua": r#"room{ default = "on", states = { on = { look = {}, when = { { to = "on", house = "nite" } } } } }"#,
+        } } });
+        let wall = DateTime::parse_from_rfc3339(NOON).unwrap();
+        let err = House::new(serde_json::from_value(cfg).unwrap(), Instant::now(), wall).err();
+        assert!(format!("{err:?}").contains("nite"), "{err:?}");
+    }
+
+    #[test]
     fn a_restart_restores_the_house_mode_once() {
         let Some(mut rig) = house_at("2026-01-10T23:00:00+01:00") else {
             return;
@@ -1291,7 +1380,7 @@ mod tests {
             let Some(lua) = real(room) else {
                 return;
             };
-            let cfg = json!({ "latitude": 52.52, "longitude": 13.405, "rooms": { room: {
+            let cfg = json!({ "latitude": 52.52, "longitude": 13.405, "house_modes": HOUSE_MODES, "rooms": { room: {
                 "bulbs": {
                     "light": { "device": "x1" }, "bulb_1": { "device": "x2" }, "bulb_2": { "device": "x3" },
                     "bulb": { "device": "x4" }, "a": { "device": "x5" },

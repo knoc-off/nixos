@@ -5,11 +5,11 @@
 -- two minutes after.
 --
 -- Button: single toggles the ceiling light, double or hold the whole room.
+local function awake(c) return c.house ~= "night" end
 local lamp = sun_switch().on
-local function lamp_on(c) return c.house ~= "night" and lamp(c) end
+local function lamp_on(c) return awake(c) and lamp(c) end
 local lamps = { carla_desk_lamp = { on = lamp_on }, standing_lamp = { on = lamp_on } }
 local everything = { "light", "bulb_1", "bulb_2", "carla_desk_lamp", "standing_lamp" }
-local back = { { to = "night", house = "night" }, { to = "resume" } }
 
 local function with_buttons(on)
   on["button.single"] = { toggle = { "light" } }
@@ -28,20 +28,20 @@ room{
       hidden = true,
       look = { on = false, transition = 60 },
       per_light = lamps,
-      on = with_buttons{ present = back },
+      on = with_buttons{ present = "resume" },
     },
     auto = {
       look = sunlight(),
       per_light = lamps,
-      on = with_buttons{ ["house.night"] = "night" },
-      when = { { to = "off", absent_for = 1800 } },
+      on = with_buttons{},
+      when = { { to = "off", absent_for = 1800 }, { to = "night", house = "night" } },
     },
     night = {
       hidden = true,
       look = { brightness = 25, color_temp = 454, transition = 1 },
       per_light = { carla_desk_lamp = { on = false }, standing_lamp = { on = false } },
-      on = with_buttons{ ["house.day"] = "resume", ["house.bright"] = "resume" },
-      when = { { to = "off", absent_for = 120 } },
+      on = with_buttons{},
+      when = { { to = "resume", test = awake }, { to = "off", absent_for = 120 } },
     },
   },
 }

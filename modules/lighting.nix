@@ -26,6 +26,7 @@
 
       configJson = (pkgs.formats.json { }).generate "lights.json" {
         inherit (cfg) latitude longitude;
+        house_modes = cfg.houseModes;
         rooms = lib.mapAttrs (_: room: {
           inherit (room) label group lua;
           bulbs = lib.mapAttrs (_: b: { inherit (b) device dimmable; }) room.bulbs;
@@ -55,6 +56,19 @@
         longitude = mkOption {
           type = types.float;
           description = "Location for the sun curves.";
+        };
+
+        houseModes = mkOption {
+          type = types.listOf types.str;
+          default = [ ];
+          example = [
+            "day"
+            "night"
+          ];
+          description = ''
+            House-wide modes (HA "House mode"), which rooms announce and react
+            to. The first is where resetting every room puts the house.
+          '';
         };
 
         rooms = mkOption {

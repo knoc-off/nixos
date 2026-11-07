@@ -96,6 +96,8 @@ pub struct Room {
     since: Instant,
     /// Presence sensors currently reporting someone.
     sensing: BTreeSet<String>,
+    /// Doors last reported open, replayed on a reset.
+    open_doors: BTreeSet<String>,
     present: bool,
     /// When `present` last changed (startup counts as a change).
     present_changed: Instant,
@@ -140,6 +142,7 @@ impl Room {
             spec,
             since: now,
             sensing: BTreeSet::new(),
+            open_doors: BTreeSet::new(),
             present: false,
             present_changed: now,
             memory: None,
@@ -173,7 +176,7 @@ impl Room {
         modes
     }
 
-    /// House modes this room announces or reacts to.
+    /// House modes this room announces, reacts to or tests for.
     pub fn house_modes(&self) -> BTreeSet<&str> {
         let states = self.spec.states.iter();
         let handled = states
@@ -181,8 +184,8 @@ impl Room {
             .flat_map(|s| s.on.keys())
             .filter_map(|e| e.strip_prefix("house."));
         let rows = states.flat_map(|s| s.on.values().flatten().chain(&s.when));
-        let announced = rows.filter_map(|r| r.announce.as_deref());
-        handled.chain(announced).collect()
+        let named = rows.flat_map(|r| [r.announce.as_deref(), r.cond.house.as_deref()]);
+        handled.chain(named.flatten()).collect()
     }
 
     pub fn state_name(&self) -> &str {
@@ -230,6 +233,11 @@ impl Room {
                 }
             }
             Event::Door { name, open } => {
+                if open {
+                    self.open_doors.insert(name.to_owned());
+                } else {
+                    self.open_doors.remove(name);
+                }
                 events.push(format!("{name}.{}", if open { "open" } else { "closed" }));
             }
             Event::Button { name, action } => events.push(format!("{name}.{action}")),
@@ -240,7 +248,13 @@ impl Room {
                 for b in 0..self.bulbs.len() {
                     step.before.push((b, Input::Release { transition: ENTER }));
                 }
-                self.enter(self.spec.default, true, now, &mut step, "reset");
+                // As if just started: the start state, then what the sensors
+                // already know (an empty room stays dark).
+                self.enter(self.spec.start, true, now, &mut step, "reset");
+                if self.present {
+                    events.push("present".to_owned());
+                }
+                events.extend(self.open_doors.iter().map(|d| format!("{d}.open")));
             }
             Event::Select(name) => {
                 match self
@@ -274,7 +288,13 @@ impl Room {
             }
         }
         for hop in 0.. {
-            let Some(i) = self.first(&self.spec.states[self.state].when, now, clock) else {
+            // A row back to this very state (inherited through `extends`)
+            // would shadow the rows after it.
+            let here = self.state;
+            let when = &self.spec.states[here].when;
+            let Some(i) = when.iter().position(|r| {
+                !matches!(r.go, Some(Go::State(s)) if s == here) && self.holds(&r.cond, now, clock)
+            }) else {
                 break;
             };
             if hop == MAX_HOPS {

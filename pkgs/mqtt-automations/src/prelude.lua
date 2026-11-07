@@ -7,8 +7,9 @@
 --     doors    = { <name> = "<z2m device>" }, -- events <name>.open / .closed
 --     buttons  = { <name> = "<z2m device>" }, -- events <name>.<action>
 --     triggers = { <name> = function(c) end },-- event <name> when it turns true
---     default  = "<state>",  -- after a reset; where `resume` goes by default
---     start    = "<state>",  -- at startup (default: default)
+--     default  = "<state>",  -- where `resume` goes when it remembers nothing
+--     start    = "<state>",  -- at startup and on a reset, which then
+--                            -- replays present / <door>.open (default: default)
 --     forget_after = secs,   -- how long `resume` remembers (default 3600)
 --     states = {
 --       <name> = {
@@ -30,11 +31,15 @@
 -- row whose conditions all hold is taken. Conditions: present = bool;
 -- absent_for, time_in_state = secs (at least); between, outside =
 -- { from_hour, to_hour }; house = "<mode>"; test = function(c) -> bool.
--- `when` rows can only move the room.
+-- `when` rows can only move the room; one to the state the room is already
+-- in (say, inherited through extends) is skipped.
 --
--- The house mode: any room can announce one; every room then gets the
--- event house.<mode> and sees it as c.house / the `house` condition. HA
--- shows and sets it ("House mode"), and it survives restarts.
+-- The house mode, one of services.lighting.houseModes: any room can
+-- announce one; every room then gets the event house.<mode> and sees it as
+-- c.house / the `house` condition. HA shows and sets it ("House mode"), it
+-- survives restarts, and resetting every room sets the first mode. To
+-- follow it whatever the room was doing, prefer a `when` row (house =
+-- "night") over an `on` row: it also holds after a reset or an HA pick.
 --
 -- Look: brightness 1-254, color_temp in mireds, transition in seconds (used
 -- when the state is entered; while it lasts, changes glide over 2s). Any

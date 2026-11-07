@@ -2,7 +2,7 @@
 -- sensor last saw anyone, fading over a minute. While the house sleeps: dim
 -- and warm, off two minutes after. The plug is not a light: it is left to
 -- whoever switches it (devices.nix keeps it out of the room).
-local back = { { to = "night", house = "night" }, { to = "resume" } }
+local function awake(c) return c.house ~= "night" end
 
 room{
   presence = { "kitchen_motion" },
@@ -12,18 +12,16 @@ room{
     off = {
       hidden = true,
       look = { on = false, transition = 60 },
-      on = { present = back },
+      on = { present = "resume" },
     },
     auto = {
       look = sunlight(),
-      on = { ["house.night"] = "night" },
-      when = { { to = "off", absent_for = 300 } },
+      when = { { to = "off", absent_for = 300 }, { to = "night", house = "night" } },
     },
     night = {
       hidden = true,
       look = { brightness = 25, color_temp = 454, transition = 1 },
-      on = { ["house.day"] = "resume", ["house.bright"] = "resume" },
-      when = { { to = "off", absent_for = 120 } },
+      when = { { to = "resume", test = awake }, { to = "off", absent_for = 120 } },
     },
   },
 }

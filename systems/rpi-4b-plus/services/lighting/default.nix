@@ -33,6 +33,12 @@ in
     enable = true;
     latitude = 52.52;
     longitude = 13.405;
+    # The bedroom sets day and night (lighting/bedroom.lua); bright is HA's.
+    houseModes = [
+      "day"
+      "bright"
+      "night"
+    ];
     rooms = lib.genAttrs [
       "living-room"
       "kitchen"
