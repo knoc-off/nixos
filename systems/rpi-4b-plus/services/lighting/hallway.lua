@@ -7,7 +7,7 @@ room{
   presence = { "hallway_motion" },
   default = "auto",
   start = "off",
-  states = scenes("auto", {
+  states = {
     off = {
       hidden = true,
       look = { on = false, transition = 30 },
@@ -21,8 +21,8 @@ room{
     night = {
       hidden = true,
       look = { brightness = 8, color_temp = 454, transition = 1 },
-      on = { ["house.day"] = "resume" },
+      on = { ["house.day"] = "resume", ["house.bright"] = "resume" },
       when = { { to = "off", absent_for = 30 } },
     },
-  }),
+  },
 }

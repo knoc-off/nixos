@@ -10,7 +10,7 @@ room{
   doors = { door = "bathroom_door" },
   default = "auto",
   start = "off",
-  states = scenes("auto", {
+  states = {
     off = {
       hidden = true,
       look = { on = false, transition = 20 },
@@ -28,7 +28,7 @@ room{
       hidden = true,
       extends = "auto",
       look = { brightness = 20, color_temp = 454, transition = 1 },
-      on = { ["house.day"] = "resume" },
+      on = { ["house.day"] = "resume", ["house.bright"] = "resume" },
     },
     -- No look: the lights stay as they are while the sensor gets a chance
     -- to spot someone who just shut themselves in.
@@ -41,5 +41,5 @@ room{
         { to = "off", time_in_state = 3 },
       },
     },
-  }),
+  },
 }

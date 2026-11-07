@@ -8,7 +8,7 @@ room{
   presence = { "kitchen_motion" },
   default = "auto",
   start = "off",
-  states = scenes("auto", {
+  states = {
     off = {
       hidden = true,
       look = { on = false, transition = 60 },
@@ -22,8 +22,8 @@ room{
     night = {
       hidden = true,
       look = { brightness = 25, color_temp = 454, transition = 1 },
-      on = { ["house.day"] = "resume" },
+      on = { ["house.day"] = "resume", ["house.bright"] = "resume" },
       when = { { to = "off", absent_for = 120 } },
     },
-  }),
+  },
 }

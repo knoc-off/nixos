@@ -5,7 +5,7 @@ room{
   default = "auto",
   start = "shut",
   forget_after = 0,
-  states = scenes("auto", {
+  states = {
     shut = {
       hidden = true,
       look = { on = false, transition = 1 },
@@ -15,5 +15,5 @@ room{
       look = sunlight(),
       on = { ["door.closed"] = "shut" },
     },
-  }),
+  },
 }

@@ -45,7 +45,7 @@ room{
   },
   default = "day",
   start = "off",
-  states = scenes("day", {
+  states = {
     off = {
       hidden = true,
       look = { on = false, transition = 30 },
@@ -79,5 +79,5 @@ room{
       extends = "bedtime",
       when = { { to = "bedtime_off", time_in_state = 300 } },
     },
-  }),
+  },
 }

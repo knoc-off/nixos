@@ -23,7 +23,7 @@ room{
   buttons = { button = "livingroom_button" },
   default = "auto",
   start = "off",
-  states = scenes("auto", {
+  states = {
     off = {
       hidden = true,
       look = { on = false, transition = 60 },
@@ -40,8 +40,8 @@ room{
       hidden = true,
       look = { brightness = 25, color_temp = 454, transition = 1 },
       per_light = { carla_desk_lamp = { on = false }, standing_lamp = { on = false } },
-      on = with_buttons{ ["house.day"] = "resume" },
+      on = with_buttons{ ["house.day"] = "resume", ["house.bright"] = "resume" },
       when = { { to = "off", absent_for = 120 } },
     },
-  }),
+  },
 }

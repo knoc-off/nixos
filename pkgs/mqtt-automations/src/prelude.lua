@@ -122,6 +122,9 @@ local follow_ct = setting("mqtt-auto/color-temp-cycle/enabled", true)
 -- and the day isn't squeezed above it. Colour temperature follows the day
 -- (HA "Lights follow hue"). `floor` (percent, or a function(c) returning
 -- it) raises the floor further; any look field given replaces the sun's.
+-- While the house is "bright" (HA only, e.g. guests over): at least
+-- BRIGHT percent, above the max knob too, at the midday colour.
+local BRIGHT, BRIGHT_CT = 75, 250
 function sunlight(o)
   o = o or {}
   local look = {
@@ -132,10 +135,12 @@ function sunlight(o)
       local floor = o.floor
       if type(floor) == "function" then floor = floor(c) end
       floor = math.min(math.max(clamp(k.min(), 0, 100), floor or 0), max)
+      if c.house == "bright" then floor = math.max(floor, BRIGHT) end
       local curve = sun.level{ min = 0, max = max, gamma = clamp(k.gamma(), 0.1, 10) }
       return math.max(curve, math.max(1, math.floor(floor / 100 * 254 + 0.5)))
     end,
-    color_temp = function()
+    color_temp = function(c)
+      if c.house == "bright" then return BRIGHT_CT end
       return follow_ct() and sun.ct() or nil
     end,
   }
@@ -188,10 +193,3 @@ function wake_ramp()
   }
 end
 
--- HA's bright / dim modes: `base` at a fixed brightness, otherwise behaving
--- like it. (Night is the house's: rooms declare their own.)
-function scenes(base, states)
-  states.bright = { extends = base, look = { brightness = 254 } }
-  states.dim = { extends = base, look = { brightness = 76 } }
-  return states
-end

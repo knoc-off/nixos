@@ -635,14 +635,15 @@ mod tests {
           buttons = { button = "button" },
           default = "auto",
           start = "off",
-          states = scenes("auto", {
+          states = {
             off = { hidden = true, look = { on = false, transition = 30 }, on = { present = "resume" } },
             auto = {
               look = { brightness = 200 },
               on = { ["button.single"] = { toggle = { "a" } } },
               when = { { to = "off", absent_for = 60 } },
             },
-          }),
+            dim = { extends = "auto", look = { brightness = 76 } },
+          },
         }"#;
 
     fn hallway() -> Rig {
@@ -662,10 +663,7 @@ mod tests {
         let outs = rig.house.startup();
         let select = last(&outs, "homeassistant/select/lights_hallway_mode/config").unwrap();
         assert_eq!(select["name"], "Hallway mode");
-        assert_eq!(
-            select["options"],
-            json!(["auto", "bright", "dim", "manual"])
-        );
+        assert_eq!(select["options"], json!(["auto", "dim", "manual"]));
         assert_eq!(rig.state(0), "off");
         for l in &rig.house.rooms[0].room.bulbs {
             assert_eq!(l.bulb.mode, Mode::Auto);
@@ -1230,11 +1228,41 @@ mod tests {
 
         let startup = rig.house.startup();
         let select = last(&startup, "homeassistant/select/lights_house_mode/config").unwrap();
-        assert_eq!(select["options"], json!(["day", "night"]));
+        assert_eq!(select["options"], json!(["bright", "day", "night"]));
         rig.send("lights/house/set", json!("day"));
         assert_eq!(rig.state(1), "auto");
         rig.send("lights/house/set", json!("disco"));
         assert_eq!(rig.house.house.as_deref(), Some("day"));
+    }
+
+    #[test]
+    fn bright_lifts_every_room_until_bedtime() {
+        let Some(mut rig) = house_at("2026-01-10T21:00:00+01:00") else {
+            return;
+        };
+        let (bedroom, living) = (0, 2);
+        rig.presence("livingroom_presence", true);
+        rig.presence("bedroom_presence", true);
+        let evening = showing(&rig, living, "light");
+        assert!(evening.brightness < 100, "{evening:?}");
+
+        // Already on: it glides up and cools, no state change.
+        rig.send("lights/house/set", json!("bright"));
+        for (r, bulb) in [(living, "light"), (bedroom, "bulb_1")] {
+            let t = showing(&rig, r, bulb);
+            assert!(t.brightness >= 190, "{t:?}");
+            assert_eq!(t.color_temp, Some(250));
+        }
+        assert_eq!(rig.state(living), "auto");
+
+        // Bedtime ends it.
+        rig.send("zigbee2mqtt/bedroom_button/action", json!("single"));
+        assert_eq!(rig.state(living), "night");
+        assert_eq!(showing(&rig, living, "light").brightness, 25);
+        // Bright from HA wakes a sleeping room too.
+        rig.send("lights/house/set", json!("bright"));
+        assert_eq!(rig.state(living), "auto");
+        assert!(showing(&rig, living, "light").brightness >= 190);
     }
 
     #[test]
