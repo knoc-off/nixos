@@ -140,6 +140,8 @@
               ;
             inherit (libExtra) theme color-lib rustAnalyzerSettings;
           };
+          # Unjailed opencode for the wsl host, with cj's config.
+          opencode-remote = inputs.private.lib.mkOpencodeRemote pkgs self.packages.${system}.cj;
         };
 
       # just iterate over toplevels, build all things that i would need to build

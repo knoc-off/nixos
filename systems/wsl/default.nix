@@ -29,6 +29,11 @@ in
     # in lib/ssh.nix, which a WSL install doesn't have up front.
     self.nixosModules.nix-cache
     { services.nixCache.client.enable = true; }
+
+    # Jev key (/run/secrets/jev/api-key) for opencode-remote's jev-review and
+    # search tools, plus the `jegrep` CLI they run.
+    self.nixosModules.sops
+    self.nixosModules.jegrep
   ];
 
   # Joins the tailnet by hand rather than through services.tailnet, which
@@ -37,8 +42,23 @@ in
   # then approve the node in headscale. optiplex's /ai-raw is tailnet-only.
   services.tailscale.enable = true;
 
+  # Deployed from framework13 over the tailnet, so the private git+ssh input
+  # is evaluated and built there, never here:
+  #   nixos-rebuild switch --flake .#wsl --target-host root@wsl
+  services.openssh = {
+    enable = true;
+    openFirewall = false;
+    settings = {
+      PermitRootLogin = "prohibit-password";
+      PasswordAuthentication = false;
+      KbdInteractiveAuthentication = false;
+    };
+  };
+  networking.firewall.interfaces.tailscale0.allowedTCPPorts = [ 22 ];
+  users.users.root.openssh.authorizedKeys.keys = [ self.lib.ssh.user.framework13 ];
+
   environment.systemPackages = [
-    inputs.private.packages.${system}.opencode-remote
+    self.packages.${system}.opencode-remote
     pkgs.git
     pkgs.ripgrep
   ];

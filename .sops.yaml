@@ -7,6 +7,7 @@ keys:
   - &work age14tstqskklfdq4uclxvxeygh6xj40f6axfm82r8umzvvs0de2f5zqen9vrd
   - &optiplex age13yardd2dl3ex60phynx4t9sgxm3wy07jxhee6yu2dxzs99ld34ns9zpve7
   - &desktop age1e2rm0yky629qvg944ktyg0dtqxqauhgq0pawhccywfgatmml739qc72uek
+  - &wsl age18nhfuu63fquqtpnud3pq8f9tupfmec74ueud64krevfvjgj3y3mqc2926j
 
 creation_rules:
   - path_regex: systems/oink/secrets\.yaml$
@@ -51,3 +52,4 @@ creation_rules:
           - *work
           - *optiplex
           - *desktop
+          - *wsl

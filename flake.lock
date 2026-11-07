@@ -561,11 +561,11 @@
         "nixpkgs-tools": "nixpkgs-tools"
       },
       "locked": {
-        "lastModified": 1793821931,
-        "narHash": "sha256-Q7hvK0cbHh9S8eifUbGVcj2JQbw08aCxd5OjKLrzOtQ=",
+        "lastModified": 1794042136,
+        "narHash": "sha256-mf6okjo8Bdb7jnakdn7OzMBQT4mM88K9FESmilz/IMs=",
         "owner": "knoc-off",
         "repo": "minecraft-modpack",
-        "rev": "4d8c4cca234a19df9b3868acbe4f325dfe9f9afa",
+        "rev": "04825af274b07f40bfcf4297a72152d1c04f0f57",
         "type": "github"
       },
       "original": {
@@ -1199,11 +1199,11 @@
         "ponytail": "ponytail"
       },
       "locked": {
-        "lastModified": 1793904157,
-        "narHash": "sha256-mFq8NK0Wd/NMCECHrzKLtCppcS+A8gOf5nucRMJdgMI=",
+        "lastModified": 1793909686,
+        "narHash": "sha256-yoyqLdMWaba6erF0bRuizojELcQ+dO98VYawla1ubPc=",
         "ref": "refs/heads/main",
-        "rev": "c02fc14fddcad8d5be24a4eff62d1b47950fb1b9",
-        "revCount": 61,
+        "rev": "7c3275ba890bb1405b1f5f6854df1dce60515881",
+        "revCount": 64,
         "type": "git",
         "url": "ssh://git@github.com/knoc-off/private-inputs"
       },
