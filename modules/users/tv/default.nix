@@ -286,6 +286,11 @@
                 # fix for that is matching the refresh rate, not blending.
                 vo = "gpu-next";
                 hwdec = "auto-safe";
+                # gpu-next built-in: ewa_lanczossharp, deband, sigmoid upscaling.
+                # The Arc A310 has the headroom the UHD 630 did not.
+                profile = "high-quality";
+                # Only engages on content flagged interlaced (1080i TV rips).
+                deinterlace = "auto";
                 "video-sync" = "display-resample";
                 # Pass HDR through instead of tone-mapping: mpv tags its surface
                 # with the source colorspace, and refresh-rate.lua switches the
