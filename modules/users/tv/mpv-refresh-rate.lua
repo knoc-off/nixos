@@ -11,6 +11,7 @@
 -- merges with the existing rule (omitted bitdepth/cm keep their old values),
 -- so every call passes all three.
 local utils = require("mp.utils")
+local msg = require("mp.msg")
 local hyprctl = "@hyprctl@"
 local orig -- output state to restore, set on first switch
 
@@ -19,15 +20,22 @@ local function run(args)
 		name = "subprocess",
 		args = args,
 		capture_stdout = true,
+		capture_stderr = true,
 		playback_only = false,
 	})
-	return r.status == 0 and r.stdout or nil
+	if r.status ~= 0 then
+		-- Typical cause: no HYPRLAND_INSTANCE_SIGNATURE in the environment.
+		msg.warn(string.format("%s failed (%s): %s", table.concat(args, " "), tostring(r.status), r.stderr or r.error_string or ""))
+		return nil
+	end
+	return r.stdout
 end
 
 local function monitor()
 	local out = run({ hyprctl, "-j", "monitors" })
 	local list = out and utils.parse_json(out)
 	if not list then
+		msg.warn("no monitor list from hyprctl")
 		return nil
 	end
 	for _, m in ipairs(list) do
@@ -54,6 +62,7 @@ local function same(a, b)
 end
 
 local function apply(m, s)
+	msg.info(string.format("%s -> %dx%d@%.2f %d-bit %s", m.name, m.width, m.height, s.rate, s.bitdepth, s.cm))
 	run({
 		hyprctl,
 		"eval",
@@ -126,8 +135,12 @@ mp.observe_property("video-params", "native", function(_, p)
 	-- The embedded libmpv (jellyfin-desktop) renders into a Qt sRGB surface
 	-- and tone-maps itself, so HDR output would only wash it out.
 	local hdr = (p.gamma == "pq" or p.gamma == "hlg") and not (mp.get_property("vo") or ""):find("libmpv")
+	local rate = fps and pick(fps, m, hdr)
+	if fps and not rate then
+		msg.warn(string.format("no %dx%d mode for %.3f fps, keeping %.2f Hz", m.width, m.height, fps, base.rate))
+	end
 	local want = {
-		rate = fps and pick(fps, m, hdr) or base.rate,
+		rate = rate or base.rate,
 		bitdepth = hdr and 10 or base.bitdepth,
 		cm = hdr and "hdr" or base.cm,
 	}
@@ -137,6 +150,18 @@ mp.observe_property("video-params", "native", function(_, p)
 	orig = base
 	apply(m, want)
 	mp.osd_message(string.format("%.2f fps -> %.2f Hz%s", fps or 0, want.rate, hdr and " HDR" or ""), 2)
+end)
+
+-- Answers "did mpv drop frames or is it the display" after the fact.
+mp.register_event("end-file", function()
+	msg.info(string.format(
+		"%s: dropped=%d delayed=%d mistimed=%d vf-fps=%.3f",
+		mp.get_property("filename") or "?",
+		mp.get_property_number("frame-drop-count") or 0,
+		mp.get_property_number("vo-delayed-frame-count") or 0,
+		mp.get_property_number("mistimed-frame-count") or 0,
+		mp.get_property_number("estimated-vf-fps") or 0
+	))
 end)
 
 mp.register_event("shutdown", restore)
