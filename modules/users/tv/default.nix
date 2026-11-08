@@ -319,13 +319,13 @@
               in {
                 # Neural 2x upscalers for 1080p -> 4K, off by default; see the
                 # ALT+<n> bindings. Each sets the whole list, so they are exclusive.
-                artcnn = {
-                  "profile-desc" = "ArtCNN C4F16: live action, cleanest";
-                  "glsl-shaders" = [ "${shaders}/ArtCNN_C4F16.glsl" ];
-                };
                 fsrcnnx = {
-                  "profile-desc" = "FSRCNNX 16-0-4-1: live action, sharper, some ringing";
+                  "profile-desc" = "FSRCNNX 16-0-4-1: live action default, sharp, some ringing";
                   "glsl-shaders" = [ "${shaders}/FSRCNNX_x2_16-0-4-1.glsl" ];
+                };
+                artcnn = {
+                  "profile-desc" = "ArtCNN C4F32: anime-trained luma doubler, less ringing than FSRCNNX";
+                  "glsl-shaders" = [ "${shaders}/ArtCNN_C4F32.glsl" ];
                 };
                 anime4k = {
                   "profile-desc" = "Anime4K mode A (HQ): line art only";
@@ -385,8 +385,8 @@
                 "s" = "screenshot video";
                 "S" = "screenshot window";
                 "ctrl+l" = ''apply-profile "low-latency-stream"; show-text "Low Latency Stream Profile Applied"'';
-                "ALT+1" = ''apply-profile artcnn; show-text "ArtCNN"'';
-                "ALT+2" = ''apply-profile fsrcnnx; show-text "FSRCNNX"'';
+                "ALT+1" = ''apply-profile fsrcnnx; show-text "FSRCNNX"'';
+                "ALT+2" = ''apply-profile artcnn; show-text "ArtCNN"'';
                 "ALT+3" = ''apply-profile anime4k; show-text "Anime4K"'';
                 "ALT+0" = ''change-list glsl-shaders clr all; show-text "Shaders off"'';
               };
