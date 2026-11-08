@@ -286,9 +286,6 @@
                 # fix for that is matching the refresh rate, not blending.
                 vo = "gpu-next";
                 hwdec = "auto-safe";
-                # gpu-next built-in: ewa_lanczossharp, deband, sigmoid upscaling.
-                # The Arc A310 has the headroom the UHD 630 did not.
-                profile = "high-quality";
                 # Only engages on content flagged interlaced (1080i TV rips).
                 deinterlace = "auto";
                 "video-sync" = "display-resample";
@@ -317,7 +314,32 @@
                 "screenshot-directory" = "~/Pictures/mpv_screenshots";
               };
 
-              profiles = {
+              profiles = let
+                shaders = "${upkgs.mpv-shim-default-shaders}/share/mpv-shim-default-shaders/shaders";
+              in {
+                # Neural 2x upscalers for 1080p -> 4K, off by default; see the
+                # ALT+<n> bindings. Each sets the whole list, so they are exclusive.
+                artcnn = {
+                  "profile-desc" = "ArtCNN C4F16: live action, cleanest";
+                  "glsl-shaders" = [ "${shaders}/ArtCNN_C4F16.glsl" ];
+                };
+                fsrcnnx = {
+                  "profile-desc" = "FSRCNNX 16-0-4-1: live action, sharper, some ringing";
+                  "glsl-shaders" = [ "${shaders}/FSRCNNX_x2_16-0-4-1.glsl" ];
+                };
+                anime4k = {
+                  "profile-desc" = "Anime4K mode A (HQ): line art only";
+                  # One ':'-joined value: home-manager writes a list as repeated
+                  # glsl-shaders= lines, and in mpv each of those replaces the last.
+                  "glsl-shaders" = lib.concatStringsSep ":" (map (s: "${shaders}/${s}") [
+                    "Anime4K_Clamp_Highlights.glsl"
+                    "Anime4K_Restore_CNN_VL.glsl"
+                    "Anime4K_Upscale_CNN_x2_VL.glsl"
+                    "Anime4K_AutoDownscalePre_x2.glsl"
+                    "Anime4K_AutoDownscalePre_x4.glsl"
+                    "Anime4K_Upscale_CNN_x2_M.glsl"
+                  ]);
+                };
                 hdr = {
                   "profile-desc" = "HDR passthrough: tag the surface so Hyprland gets PQ/HLG";
                   "profile-cond" = ''get("video-params/gamma") == "pq" or get("video-params/gamma") == "hlg"'';
@@ -363,6 +385,10 @@
                 "s" = "screenshot video";
                 "S" = "screenshot window";
                 "ctrl+l" = ''apply-profile "low-latency-stream"; show-text "Low Latency Stream Profile Applied"'';
+                "ALT+1" = ''apply-profile artcnn; show-text "ArtCNN"'';
+                "ALT+2" = ''apply-profile fsrcnnx; show-text "FSRCNNX"'';
+                "ALT+3" = ''apply-profile anime4k; show-text "Anime4K"'';
+                "ALT+0" = ''change-list glsl-shaders clr all; show-text "Shaders off"'';
               };
             };
 
