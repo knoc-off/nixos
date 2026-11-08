@@ -13,16 +13,15 @@ index e3e8e95..d1aaf2b 100644
              this.loading = loading;
              this.appRouter = appRouter;
              this.globalize = globalize;
-@@ -338,6 +339,16 @@
+@@ -338,6 +339,15 @@
  
                  console.log('[MPV] Mapped audio index:', this._audioTrackIndexToSetOnPlaying, '->', audioRelIndex);
  
-+                // HDR needs a surface the compositor can switch to HDR10,
-+                // which the embedded libmpv (Qt sRGB surface) cannot give,
-+                // so hand direct-play HDR items to a separate system mpv.
-+                const video = streams.find((s) => s.Type === 'Video');
-+                const hdr = /^(HDR|HLG|DOVI)/.test(video?.VideoRangeType || '') || video?.VideoRange === 'HDR';
-+                if (hdr && options.playMethod === 'DirectPlay') {
++                // Direct play goes to the system mpv: it gets mpv.conf (shaders,
++                // refresh-rate switch) and can pass HDR10 through, which the
++                // embedded libmpv's Qt sRGB surface cannot. Transcodes have no
++                // self-authenticating stream URL and stay embedded.
++                if (options.playMethod === 'DirectPlay') {
 +                    this.playExternal(val, ms, audioRelIndex, subtitleParam, resolve);
 +                    return;
 +                }
@@ -39,7 +38,7 @@ index e3e8e95..d1aaf2b 100644
 +         */
 +        playExternal(url, startMs, audioRelIndex, subtitleParam, resolve) {
 +            const player = window.api.player;
-+            console.log('[MPV] HDR item, playing in external mpv:', url);
++            console.log('[MPV] direct play, playing in external mpv:', url);
 +            this._external = true;
 +            const done = (positionMs, eof) => {
 +                player.externalFinished.disconnect(done);
