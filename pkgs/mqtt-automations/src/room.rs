@@ -403,6 +403,9 @@ impl Room {
                 at: now,
             });
         }
+        if self.spec.states[i].forget {
+            self.memory = None;
+        }
         eprintln!(
             "{}: {} -> {} ({why})",
             self.name, self.spec.states[from].name, self.spec.states[i].name

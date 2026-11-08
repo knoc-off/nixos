@@ -15,6 +15,8 @@
 --       <name> = {
 --         hidden = true,        -- a phase, not a mode: not in HA's dropdown
 --                               -- and never what `resume` returns to
+--         forget = true,        -- entering it drops what `resume` remembers
+--                               -- (it then goes to the default)
 --         extends = "<state>",  -- start from another state: look fields
 --                               -- and `on` merge, its `when` rows go last
 --         look = { on, brightness, color_temp, transition },
@@ -64,7 +66,7 @@ local function copy(a, b)
   return out
 end
 
-local STATE_KEYS = { hidden = true, extends = true, look = true, per_light = true, on = true, when = true }
+local STATE_KEYS = { hidden = true, forget = true, extends = true, look = true, per_light = true, on = true, when = true }
 
 function room(spec)
   local states = spec.states or {}
@@ -79,7 +81,7 @@ function room(spec)
       if not STATE_KEYS[k] then error("state " .. name .. ": unknown key " .. tostring(k), 0) end
     end
     busy[name] = true
-    local out = { hidden = s.hidden, look = s.look, per_light = s.per_light, on = s.on, when = s.when }
+    local out = { hidden = s.hidden, forget = s.forget, look = s.look, per_light = s.per_light, on = s.on, when = s.when }
     if s.extends then
       local p = resolve(s.extends)
       out.look = copy(p.look, s.look)

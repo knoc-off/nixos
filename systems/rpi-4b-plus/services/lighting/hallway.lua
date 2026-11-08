@@ -19,6 +19,7 @@ room{
     },
     night = {
       hidden = true,
+      forget = true, -- the morning starts afresh, not with last evening's changes
       look = { brightness = 8, color_temp = 454, transition = 1 },
       when = { { to = "resume", test = awake }, { to = "off", absent_for = 30 } },
     },

@@ -38,6 +38,7 @@ room{
     },
     night = {
       hidden = true,
+      forget = true, -- the morning starts afresh, not with last evening's changes
       look = { brightness = 25, color_temp = 454, transition = 1 },
       per_light = { carla_desk_lamp = { on = false }, standing_lamp = { on = false } },
       on = with_buttons{},

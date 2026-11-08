@@ -91,6 +91,8 @@ pub struct State {
     pub name: String,
     /// A phase, not a mode: not offered in HA, never remembered.
     pub hidden: bool,
+    /// Entering it drops what `resume` remembers.
+    pub forget: bool,
     look: Option<Func>,
     per_light: Option<Func>,
     /// Event -> rows; the first whose condition holds is taken.
@@ -499,6 +501,10 @@ impl Script {
             name: name.to_owned(),
             hidden: s
                 .get::<Option<bool>>("hidden")
+                .map_err(lua_err)?
+                .unwrap_or(false),
+            forget: s
+                .get::<Option<bool>>("forget")
                 .map_err(lua_err)?
                 .unwrap_or(false),
             look: look.map(|t| self.keep(t)).transpose()?,

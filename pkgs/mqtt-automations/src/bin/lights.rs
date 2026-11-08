@@ -1359,6 +1359,49 @@ mod tests {
     }
 
     #[test]
+    fn day_after_night_forgets_the_evenings_manual_changes() {
+        let Some(mut rig) = house_at("2026-01-10T21:00:00+01:00") else {
+            return;
+        };
+        let living = 2;
+        let held = |rig: &Rig| {
+            let l = rig.house.rooms[living]
+                .room
+                .bulbs
+                .iter()
+                .find(|l| l.name == "light");
+            l.unwrap().bulb.held()
+        };
+        let dim = |rig: &mut Rig| {
+            rig.wait(Duration::from_secs(5));
+            rig.send(
+                "zigbee2mqtt/ceiling",
+                json!({ "state": "ON", "brightness": 60 }),
+            );
+            assert!(held(rig).is_some());
+        };
+
+        // Night, then day while still there.
+        rig.presence("livingroom_presence", true);
+        dim(&mut rig);
+        rig.send("lights/house/set", json!("night"));
+        rig.send("lights/house/set", json!("day"));
+        assert_eq!(rig.state(living), "auto");
+        assert_eq!(held(&rig), None);
+
+        // Night, the room empties, day, back in.
+        dim(&mut rig);
+        rig.send("lights/house/set", json!("night"));
+        rig.presence("livingroom_presence", false);
+        rig.mins(3);
+        assert_eq!(rig.state(living), "off");
+        rig.send("lights/house/set", json!("day"));
+        rig.presence("livingroom_presence", true);
+        assert_eq!(rig.state(living), "auto");
+        assert_eq!(held(&rig), None);
+    }
+
+    #[test]
     fn a_house_mode_not_in_the_config_fails_loading() {
         let cfg = json!({ "latitude": 0.0, "longitude": 0.0, "house_modes": ["day"], "rooms": { "r": {
             "bulbs": { "a": { "device": "a" } },
