@@ -137,6 +137,85 @@ in
       };
     }
 
+    # Push-to-talk dictation. Pinned HM 26.05 has no services.voxtype module,
+    # so the daemon unit is hand-rolled. Parakeet runs on CPU via ONNX: the
+    # RX 6600 XT (RDNA2) is too old for voxtype's MIGraphX path.
+    (
+      let
+        # wtype 0.4 (nixpkgs) types literal text on keycode 1 (Esc) and the
+        # number row, so keycode-driven apps (Minecraft chat, games) get Esc +
+        # digits. v0.5 uses printable keycodes only (upstream commit 82bca82b).
+        # TODO: drop once nixpkgs ships wtype >= 0.5.
+        wtype = upkgs.wtype.overrideAttrs {
+          version = "0.5";
+          src = pkgs.fetchFromGitHub {
+            owner = "atx";
+            repo = "wtype";
+            rev = "v0.5";
+            hash = "sha256-1Qf35RPfaMusP1WeLcwmvfmnCmaG/WZBoIlOewZakc4=";
+          };
+        };
+        voxtypePkg = upkgs.voxtype-onnx.override {
+          waylandRuntimePackages = [
+            upkgs.dotool
+            upkgs.wl-clipboard
+            wtype
+          ];
+        };
+        voxtype = lib.getExe voxtypePkg;
+        model = "parakeet-tdt-0.6b-v3";
+        configFile = (pkgs.formats.toml { }).generate "config.toml" {
+          engine = "parakeet";
+          parakeet.model = model;
+          # Hyprland's press/release binds drive recording instead of evdev.
+          hotkey.enabled = false;
+          # nixpkgs builds no OSD frontend; without this the daemon crash-loops
+          # spawning one on every start.
+          osd.enabled = false;
+          output = {
+            mode = "type";
+            fallback_to_clipboard = true;
+            # Transcription lands in ~0.2s; if caps (= Super_R) is still held
+            # then, typed letters become Hyprland shortcuts.
+            pre_type_delay_ms = 300;
+          };
+        };
+      in
+      {
+        home-manager.users.${user} = {
+          home.packages = [ voxtypePkg ];
+          xdg.configFile."voxtype/config.toml".source = configFile;
+          # caps+e holds F19 (the only F13-F24 key xkb leaves as a plain
+          # keysym). kanata keeps it down until e itself is released, whatever
+          # order caps comes up in, and suppresses Super meanwhile -- so the
+          # release bind always fires. Base layer only: per-app layers (ghostty)
+          # keep their own caps+e.
+          keyLayers.layers.base.capsbinds.keys.e.key = "f19";
+          xdg.configFile."hypr/voxtype.lua".text = ''
+            hl.bind("F19", hl.dsp.exec_cmd("${voxtype} record start"))
+            hl.bind("F19", hl.dsp.exec_cmd("${voxtype} record stop"), { release = true })
+          '';
+          systemd.user.services.voxtype = {
+            Unit = {
+              Description = "Voxtype push-to-talk dictation";
+              After = [ "graphical-session.target" ];
+              PartOf = [ "graphical-session.target" ];
+              # The daemon reads config.toml only at start, so restart it on change.
+              X-Restart-Triggers = [ "${configFile}" ];
+            };
+            Service = {
+              # Downloads the model on first start; a no-op once it is present.
+              ExecStartPre = "${voxtype} setup --download --model ${model} --no-post-install";
+              ExecStart = "${voxtype} daemon";
+              Restart = "on-failure";
+              RestartSec = 5;
+            };
+            Install.WantedBy = [ "graphical-session.target" ];
+          };
+        };
+      }
+    )
+
     self.nixosModules.sops
     {
       sops = {

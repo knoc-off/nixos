@@ -561,11 +561,11 @@
         "nixpkgs-tools": "nixpkgs-tools"
       },
       "locked": {
-        "lastModified": 1794042136,
-        "narHash": "sha256-mf6okjo8Bdb7jnakdn7OzMBQT4mM88K9FESmilz/IMs=",
+        "lastModified": 1794054557,
+        "narHash": "sha256-dt0bhds+eDPlHIyzaC3/oB8NVpkT594oxgBMT8VWBhw=",
         "owner": "knoc-off",
         "repo": "minecraft-modpack",
-        "rev": "04825af274b07f40bfcf4297a72152d1c04f0f57",
+        "rev": "b542adf65f33988be393b2eab1f53822b8a3e922",
         "type": "github"
       },
       "original": {
