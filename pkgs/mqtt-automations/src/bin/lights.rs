@@ -809,6 +809,21 @@ mod tests {
     }
 
     #[test]
+    fn a_reset_with_someone_there_drops_the_manual_change() {
+        let mut rig = hallway();
+        rig.presence("motion", true);
+        rig.wait(Duration::from_secs(5));
+        rig.send(
+            "zigbee2mqtt/hallway_a",
+            json!({ "state": "ON", "brightness": 20 }),
+        );
+        let outs = rig.send("lights/hallway/release", json!("release"));
+        assert_eq!(rig.state(0), "auto");
+        assert_eq!(rig.house.rooms[0].room.bulbs[0].bulb.mode, Mode::Auto);
+        assert_eq!(sets(&outs)[0].1["brightness"], 200, "{outs:?}");
+    }
+
+    #[test]
     fn manual_sends_nothing_until_another_mode() {
         let mut rig = hallway();
         rig.presence("motion", true);

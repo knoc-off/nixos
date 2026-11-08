@@ -244,13 +244,15 @@ impl Room {
             Event::Report { bulb, target } => step.before.push((bulb, Input::Report(target))),
             Event::Release(b) => step.before.push((b, Input::Release { transition: ENTER })),
             Event::Reset => {
-                self.memory = None;
                 for b in 0..self.bulbs.len() {
                     step.before.push((b, Input::Release { transition: ENTER }));
                 }
                 // As if just started: the start state, then what the sensors
                 // already know (an empty room stays dark).
                 self.enter(self.spec.start, true, now, &mut step, "reset");
+                // After entering, which remembered the mode left with its
+                // holds: the replayed `present` would resume them.
+                self.memory = None;
                 if self.present {
                     events.push("present".to_owned());
                 }
