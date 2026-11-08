@@ -286,6 +286,10 @@
                 # fix for that is matching the refresh rate, not blending.
                 vo = "gpu-next";
                 hwdec = "auto-safe";
+                # The iGPU is still enabled, so vaapi "auto" picks it (renderD128)
+                # and every decoded frame crosses PCIe into the Arc's Vulkan,
+                # which cost 1 in 5 frames at 4K. Pin decode to the Arc by PCI path.
+                "vaapi-device" = "/dev/dri/by-path/pci-0000:04:00.0-render";
                 # Only engages on content flagged interlaced (1080i TV rips).
                 deinterlace = "auto";
                 "video-sync" = "display-resample";
